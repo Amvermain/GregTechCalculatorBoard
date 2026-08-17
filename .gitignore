@@ -1,0 +1,33 @@
+# Gradle build artifacts and cache
+.gradle/
+build/
+bin/
+out/
+
+# IDE Configuration
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# Minecraft Runtime & Local Test Instance
+run/
+instance/
+crash-reports/
+logs/
+saves/
+screenshots/
+replay_recordings/
+usernamecache.json
+usercache.json
+*.log
+hs_err_pid*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
