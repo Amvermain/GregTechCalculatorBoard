@@ -31,6 +31,7 @@ public class BoardScreen extends Screen {
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private RecipeSearchDialog searchDialog;
+    private TurbineRotorDialog rotorDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -56,7 +57,14 @@ public class BoardScreen extends Screen {
     protected void init() {
         super.init();
         this.searchDialog = new RecipeSearchDialog(this);
+        this.rotorDialog = new TurbineRotorDialog(this);
         rebuildWidgets();
+    }
+
+    public void openTurbineRotorDialog(RecipeNode node) {
+        if (rotorDialog != null) {
+            rotorDialog.open(node);
+        }
     }
 
     public void rebuildWidgets() {
@@ -127,9 +135,16 @@ public class BoardScreen extends Screen {
         // 4. Render Active Wire Dragging
         NodeWidget wireStart = canvasHandler.getWireStartNode();
         if (wireStart != null) {
-            float x1 = wireStart.getOutputPortX(canvasHandler.getWireStartOutputIdx());
-            float y1 = wireStart.getOutputPortY(canvasHandler.getWireStartOutputIdx());
-            ConnectionRenderer.renderBezier(graphics, x1, y1, (float) canvasMouseX, (float) canvasMouseY, 0xFF00E676, 3.0f);
+            float x1, y1;
+            if (canvasHandler.isWireStartInput()) {
+                x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
+                y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
+                ConnectionRenderer.renderBezier(graphics, (float) canvasMouseX, (float) canvasMouseY, x1, y1, 0xFF00E676, 3.0f);
+            } else {
+                x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
+                y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
+                ConnectionRenderer.renderBezier(graphics, x1, y1, (float) canvasMouseX, (float) canvasMouseY, 0xFF00E676, 3.0f);
+            }
         }
 
         // 5. Render Node Widgets with Viewport Culling
@@ -160,14 +175,19 @@ public class BoardScreen extends Screen {
         }
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
 
-        // 7. Render Search Dialog or Tooltips
-        if (searchDialog != null && searchDialog.isVisible()) {
-            searchDialog.render(graphics, width, height, mouseX, mouseY);
-        } else {
+        // 7. Render Tooltips only if no modal dialog is open
+        if ((searchDialog == null || !searchDialog.isVisible()) && (rotorDialog == null || !rotorDialog.isVisible())) {
             renderTooltips(graphics, canvasMouseX, canvasMouseY, mouseX, mouseY);
         }
 
         super.render(graphics, mouseX, mouseY, partialTicks);
+
+        // 8. Top-level Modal Dialogs (Highest Layer)
+        if (searchDialog != null && searchDialog.isVisible()) {
+            searchDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (rotorDialog != null && rotorDialog.isVisible()) {
+            rotorDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
+        }
     }
 
     private void renderTooltips(GuiGraphics graphics, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
@@ -236,6 +256,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (rotorDialog != null && rotorDialog.isVisible()) {
+            return rotorDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
@@ -275,6 +298,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (rotorDialog != null && rotorDialog.isVisible()) {
+            return rotorDialog.mouseScrolled(mouseX, mouseY, delta, width, height);
+        }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -284,6 +310,15 @@ public class BoardScreen extends Screen {
         if (toolbarWidget.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
         }
+
+        double canvasMouseX = toCanvasX(mouseX);
+        double canvasMouseY = toCanvasY(mouseY);
+        for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
+            if (nodeWidgets.get(i).mouseScrolled(canvasMouseX, canvasMouseY, delta)) {
+                return true;
+            }
+        }
+
         if (canvasHandler.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
         }
@@ -291,7 +326,27 @@ public class BoardScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (rotorDialog != null && rotorDialog.isVisible()) {
+            return rotorDialog.charTyped(codePoint, modifiers);
+        }
+        if (searchDialog != null && searchDialog.isVisible()) {
+            return searchDialog.charTyped(codePoint, modifiers);
+        }
+
+        for (NodeWidget w : nodeWidgets) {
+            if (w.charTyped(codePoint, modifiers)) {
+                return true;
+            }
+        }
+        return super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (rotorDialog != null && rotorDialog.isVisible()) {
+            return rotorDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (searchDialog != null && searchDialog.isVisible()) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 searchDialog.setVisible(false);
@@ -343,19 +398,6 @@ public class BoardScreen extends Screen {
         }
 
         return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    @Override
-    public boolean charTyped(char codePoint, int modifiers) {
-        if (searchDialog != null && searchDialog.isVisible()) {
-            return searchDialog.charTyped(codePoint, modifiers);
-        }
-        for (NodeWidget w : nodeWidgets) {
-            if (w.charTyped(codePoint, modifiers)) {
-                return true;
-            }
-        }
-        return super.charTyped(codePoint, modifiers);
     }
 
     public double toCanvasX(double screenX) {

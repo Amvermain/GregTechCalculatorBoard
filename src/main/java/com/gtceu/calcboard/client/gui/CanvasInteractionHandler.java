@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Handles canvas panning, zooming, node dragging, wire connections, and line cut interactions.
+ * Handles canvas panning, zooming, node dragging, bidirectional wire connections, and line cut interactions.
  */
 public class CanvasInteractionHandler {
     private final BoardScreen screen;
@@ -24,9 +24,10 @@ public class CanvasInteractionHandler {
     private NodeWidget draggingNode = null;
     private double dragOffsetNodeX, dragOffsetNodeY;
 
-    // Interactive Wire Dragging State
+    // Wire Connection Dragging State
     private NodeWidget wireStartNode = null;
-    private int wireStartOutputIdx = -1;
+    private int wireStartPortIdx = -1;
+    private boolean wireStartIsInput = false;
 
     public CanvasInteractionHandler(BoardScreen screen) {
         this.screen = screen;
@@ -36,8 +37,12 @@ public class CanvasInteractionHandler {
         return wireStartNode;
     }
 
-    public int getWireStartOutputIdx() {
-        return wireStartOutputIdx;
+    public int getWireStartPortIdx() {
+        return wireStartPortIdx;
+    }
+
+    public boolean isWireStartInput() {
+        return wireStartIsInput;
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -51,12 +56,13 @@ public class CanvasInteractionHandler {
             NodeWidget widget = nodeWidgets.get(i);
             if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
 
-                // Output Port: Left click to start wire, Right click to disconnect
+                // Output Port: Left click to start forward wire, Right click to disconnect
                 int outPortIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
                 if (outPortIdx >= 0) {
                     if (button == 0) {
                         wireStartNode = widget;
-                        wireStartOutputIdx = outPortIdx;
+                        wireStartPortIdx = outPortIdx;
+                        wireStartIsInput = false;
                         return true;
                     } else if (button == 1) {
                         boolean removed = graph.getConnections().removeIf(e -> e.fromNodeId().equals(widget.getNode().getId()) && e.outputIndex() == outPortIdx);
@@ -67,14 +73,21 @@ public class CanvasInteractionHandler {
                     }
                 }
 
-                // Input Port: Right click to disconnect
+                // Input Port: Left click to start reverse wire, Right click to disconnect
                 int inPortIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
-                if (inPortIdx >= 0 && button == 1) {
-                    boolean removed = graph.getConnections().removeIf(e -> e.toNodeId().equals(widget.getNode().getId()) && e.inputIndex() == inPortIdx);
-                    if (removed) {
-                        notifyDisconnect("message.gtcalcboard.disconnect_in");
+                if (inPortIdx >= 0) {
+                    if (button == 0) {
+                        wireStartNode = widget;
+                        wireStartPortIdx = inPortIdx;
+                        wireStartIsInput = true;
+                        return true;
+                    } else if (button == 1) {
+                        boolean removed = graph.getConnections().removeIf(e -> e.toNodeId().equals(widget.getNode().getId()) && e.inputIndex() == inPortIdx);
+                        if (removed) {
+                            notifyDisconnect("message.gtcalcboard.disconnect_in");
+                        }
+                        return true;
                     }
-                    return true;
                 }
 
                 // Widget internal controls (Count, Tier, Base button, Close button)
@@ -143,52 +156,102 @@ public class CanvasInteractionHandler {
 
                 for (NodeWidget targetWidget : nodeWidgets) {
                     if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
-                        int inPortIdx = targetWidget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
-                        if (inPortIdx >= 0) {
-                            RecipeNode fromNode = wireStartNode.getNode();
-                            RecipeNode toNode = targetWidget.getNode();
-                            graph.addConnection(fromNode.getId(), wireStartOutputIdx, toNode.getId(), inPortIdx);
+                        
+                        // Case A: Forward drag (Output -> Input)
+                        if (!wireStartIsInput) {
+                            int inPortIdx = targetWidget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
+                            if (inPortIdx >= 0) {
+                                RecipeNode fromNode = wireStartNode.getNode();
+                                RecipeNode toNode = targetWidget.getNode();
+                                graph.addConnection(fromNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx);
 
-                            boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
-                            if (shiftDown && wireStartOutputIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
-                                IngredientStack outStack = fromNode.getOutputs().get(wireStartOutputIdx);
-                                double producedRate = fromNode.getCyclesPerSecond() * outStack.getExpectedAmount();
+                                boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                                if (shiftDown && wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
+                                    IngredientStack outStack = fromNode.getOutputs().get(wireStartPortIdx);
+                                    double producedRate = fromNode.getCyclesPerSecond() * outStack.getExpectedAmount();
 
-                                IngredientStack inStack = toNode.getInputs().get(inPortIdx);
-                                double singleInRate = toNode.getOverclockResult().getCyclesPerSecond() * toNode.getParallel() * inStack.getAmount();
+                                    IngredientStack inStack = toNode.getInputs().get(inPortIdx);
+                                    double singleInRate = toNode.getOverclockResult().getCyclesPerSecond() * toNode.getParallel() * inStack.getAmount();
 
-                                if (singleInRate > 0.0001) {
-                                    double matchedCount = Math.max(0.01, Math.round((producedRate / singleInRate) * 100.0) / 100.0);
-                                    toNode.setMachineCount(matchedCount);
-                                    targetWidget.updateCountBuffer();
-                                    targetWidget.invalidateCache();
+                                    if (singleInRate > 0.0001) {
+                                        double matchedCount = Math.max(1.0, Math.ceil((producedRate / singleInRate) - 0.00001));
+                                        toNode.setMachineCount(matchedCount);
+                                        targetWidget.updateCountBuffer();
+                                        targetWidget.invalidateCache();
 
-                                    Minecraft mc = Minecraft.getInstance();
-                                    if (mc.player != null) {
-                                        mc.player.displayClientMessage(Component.literal("§a✔ ").append(
-                                            Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.2f", matchedCount))
-                                        ), true);
+                                        Minecraft mc = Minecraft.getInstance();
+                                        if (mc.player != null) {
+                                            mc.player.displayClientMessage(Component.literal("§a✔ ").append(
+                                                Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.0f", matchedCount))
+                                            ), true);
+                                        }
+                                        mc.getSoundManager().play(
+                                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                                SoundEvents.PLAYER_LEVELUP, 1.2F
+                                            )
+                                        );
                                     }
-                                    mc.getSoundManager().play(
+                                } else {
+                                    Minecraft.getInstance().getSoundManager().play(
                                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                            SoundEvents.PLAYER_LEVELUP, 1.2F
+                                            SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
                                         )
                                     );
                                 }
-                            } else {
-                                Minecraft.getInstance().getSoundManager().play(
-                                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                        SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
-                                    )
-                                );
+                                screen.markSummaryDirty();
+                                break;
                             }
-                            screen.markSummaryDirty();
-                            break;
+                        } 
+                        // Case B: Reverse drag (Input -> Output) - match upstream producer count to downstream consumer requirement
+                        else {
+                            int outPortIdx = targetWidget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
+                            if (outPortIdx >= 0) {
+                                RecipeNode fromNode = targetWidget.getNode();   // Producer
+                                RecipeNode toNode = wireStartNode.getNode();    // Consumer
+                                graph.addConnection(fromNode.getId(), outPortIdx, toNode.getId(), wireStartPortIdx);
+
+                                boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                                if (shiftDown && outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx < toNode.getInputs().size()) {
+                                    IngredientStack inStack = toNode.getInputs().get(wireStartPortIdx);
+                                    double neededRate = toNode.getCyclesPerSecond() * inStack.getAmount();
+
+                                    IngredientStack outStack = fromNode.getOutputs().get(outPortIdx);
+                                    double singleOutRate = fromNode.getOverclockResult().getCyclesPerSecond() * fromNode.getParallel() * outStack.getExpectedAmount();
+
+                                    if (singleOutRate > 0.0001) {
+                                        double matchedCount = Math.max(1.0, Math.ceil((neededRate / singleOutRate) - 0.00001));
+                                        fromNode.setMachineCount(matchedCount);
+                                        targetWidget.updateCountBuffer();
+                                        targetWidget.invalidateCache();
+
+                                        Minecraft mc = Minecraft.getInstance();
+                                        if (mc.player != null) {
+                                            mc.player.displayClientMessage(Component.literal("§a✔ ").append(
+                                                Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), String.format("%.0f", matchedCount))
+                                            ), true);
+                                        }
+                                        mc.getSoundManager().play(
+                                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                                SoundEvents.PLAYER_LEVELUP, 1.2F
+                                            )
+                                        );
+                                    }
+                                } else {
+                                    Minecraft.getInstance().getSoundManager().play(
+                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                            SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
+                                        )
+                                    );
+                                }
+                                screen.markSummaryDirty();
+                                break;
+                            }
                         }
                     }
                 }
                 wireStartNode = null;
-                wireStartOutputIdx = -1;
+                wireStartPortIdx = -1;
+                wireStartIsInput = false;
                 return true;
             }
 
@@ -215,11 +278,9 @@ public class CanvasInteractionHandler {
             return true;
         }
 
-        if (isPanning) {
-            screen.setPanX(mouseX - panStartX);
-            screen.setPanY(mouseY - panStartY);
-            BoardScreen.lastPanX = screen.getPanX();
-            BoardScreen.lastPanY = screen.getPanY();
+        if (isPanning && (button == 1 || button == 2)) {
+            screen.setPanX(screen.getPanX() + dragX);
+            screen.setPanY(screen.getPanY() + dragY);
             return true;
         }
 
@@ -227,44 +288,29 @@ public class CanvasInteractionHandler {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        double canvasMouseX = screen.toCanvasX(mouseX);
-        double canvasMouseY = screen.toCanvasY(mouseY);
-
-        // Check if any NodeWidget handles the scroll event (e.g. tier selector button)
-        List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
-        for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
-            NodeWidget widget = nodeWidgets.get(i);
-            if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
-                if (widget.mouseScrolled(canvasMouseX, canvasMouseY, delta)) {
-                    return true;
-                }
-            }
-        }
-
+        double zoomFactor = delta > 0 ? 1.15 : 0.87;
         double oldZoom = screen.getZoom();
-        double newZoom = oldZoom;
-        if (delta > 0) {
-            newZoom = Math.min(2.0, oldZoom * 1.15);
-        } else if (delta < 0) {
-            newZoom = Math.max(0.4, oldZoom / 1.15);
+        double newZoom = Math.max(0.2, Math.min(3.0, oldZoom * zoomFactor));
+
+        if (newZoom != oldZoom) {
+            double canvasX = (mouseX - screen.getPanX()) / oldZoom;
+            double canvasY = (mouseY - screen.getPanY()) / oldZoom;
+
+            screen.setZoom(newZoom);
+            screen.setPanX(mouseX - canvasX * newZoom);
+            screen.setPanY(mouseY - canvasY * newZoom);
+            return true;
         }
 
-        // Zoom toward mouse pointer
-        screen.setPanX(mouseX - (mouseX - screen.getPanX()) * (newZoom / oldZoom));
-        screen.setPanY(mouseY - (mouseY - screen.getPanY()) * (newZoom / oldZoom));
-        screen.setZoom(newZoom);
-        BoardScreen.lastPanX = screen.getPanX();
-        BoardScreen.lastPanY = screen.getPanY();
-        BoardScreen.lastZoom = screen.getZoom();
-        return true;
+        return false;
     }
 
-    private void notifyDisconnect(String translationKey) {
+    private void notifyDisconnect(String translatableKey) {
         screen.markSummaryDirty();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§e✂ ").append(Component.translatable(translationKey)), true);
+            mc.player.displayClientMessage(Component.literal("§c✕ ").append(Component.translatable(translatableKey)), true);
         }
-        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.LEASH_KNOT_BREAK, 1.2F));
+        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
     }
 }

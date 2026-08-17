@@ -29,6 +29,17 @@
   "gui.gtcalcboard.oc_std": "일반 OC",
   "gui.gtcalcboard.oc_perf": "퍼펙트 OC",
   "gui.gtcalcboard.parallel": "병렬: %sx",
+  "gui.gtcalcboard.gen_badge": "발전기",
+
+  "gui.gtcalcboard.rotor.title": "⚡ 터빈 로터 선택",
+  "gui.gtcalcboard.rotor.count": "✔ %s개 GT 로터",
+  "gui.gtcalcboard.rotor.eff": "효율%:",
+  "gui.gtcalcboard.rotor.power": "출력%:",
+  "gui.gtcalcboard.rotor.apply": "적용",
+  "gui.gtcalcboard.rotor.search_hint": "로터 / 재질 검색...",
+  "gui.gtcalcboard.rotor.tooltip_eff": "터빈 효율: %s%%",
+  "gui.gtcalcboard.rotor.tooltip_power": "터빈 출력: %s%%",
+  "gui.gtcalcboard.rotor.tooltip_equip": "클릭하여 터빈에 장착",
 
   "gui.gtcalcboard.tooltip.base_active": "기준 마스터 레시피 (활성)",
   "gui.gtcalcboard.tooltip.base_active_desc": "클릭하여 기준 마스터 해제",

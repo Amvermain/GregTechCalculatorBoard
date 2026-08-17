@@ -28,6 +28,10 @@ public class RecipeNode {
 
     // Master base node for Auto Ratio
     private boolean isBaseNode = false;
+    private boolean isGenerator = false;
+    private int rotorEfficiency = 100; // Default 100%
+    private int rotorPower = 100;      // Default 100%
+    private String rotorName = "Standard (100%)";
 
     // Canvas position
     private double posX;
@@ -43,6 +47,10 @@ public class RecipeNode {
         this.machineCount = 1.0;
         this.parallel = 1;
         this.overclockMode = OverclockMode.STANDARD;
+        this.isGenerator = false;
+        this.rotorEfficiency = 100;
+        this.rotorPower = 100;
+        this.rotorName = "Standard (100%)";
     }
 
     public static RecipeNode create(String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
@@ -103,6 +111,9 @@ public class RecipeNode {
         } else {
             this.targetTier = recipeTier;
         }
+        if (isGenerator) {
+            autoCalculateTurbineParallel();
+        }
     }
 
     public double getMachineCount() {
@@ -161,12 +172,60 @@ public class RecipeNode {
         this.posY = posY;
     }
 
+    public void setPos(double posX, double posY) {
+        this.posX = posX;
+        this.posY = posY;
+    }
+
+    public int getRotorEfficiency() {
+        return rotorEfficiency;
+    }
+
+    public void setRotorEfficiency(int rotorEfficiency) {
+        this.rotorEfficiency = Math.max(10, Math.min(1000, rotorEfficiency));
+    }
+
+    public int getRotorPower() {
+        return rotorPower;
+    }
+
+    public void setRotorPower(int rotorPower) {
+        this.rotorPower = Math.max(10, Math.min(5000, rotorPower));
+    }
+
+    /**
+     * Automatically calculates and applies optimal turbine parallel count 
+     * based on target voltage tier limit, rotor power multiplier, and base recipe EU/t.
+     * Turbine Max EU/t = targetTier.getVoltage() * (rotorPower / 100.0)
+     * Parallel = floor(Turbine Max EU/t / baseEUt)
+     */
+    public void autoCalculateTurbineParallel() {
+        if (!isGenerator) return;
+        if (baseEUt <= 0) return;
+        double maxTurbineVoltage = targetTier.getVoltage() * (rotorPower / 100.0);
+        int maxPar = (int) Math.max(1, Math.floor(maxTurbineVoltage / baseEUt));
+        this.parallel = maxPar;
+    }
+
+    public String getRotorName() {
+        return rotorName;
+    }
+
+    public void setRotorName(String rotorName) {
+        this.rotorName = rotorName;
+    }
+
     // Calculation logic
     public int getTierDelta() {
         return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
+        if (isGenerator) {
+            // Turbine duration expands with rotor efficiency percentage (e.g. 220% -> 2.2x duration)
+            double effectiveDurationTicks = baseDurationTicks * (rotorEfficiency / 100.0);
+            return new OverclockMode.OverclockResult(effectiveDurationTicks, baseEUt, 1.0, 0);
+        }
         return overclockMode.calculate(baseDurationTicks, baseEUt, getTierDelta());
     }
 
@@ -239,6 +298,14 @@ public class RecipeNode {
         this.isBaseNode = baseNode;
     }
 
+    public boolean isGenerator() {
+        return isGenerator;
+    }
+
+    public void setGenerator(boolean generator) {
+        this.isGenerator = generator;
+    }
+
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("id", id);
@@ -254,6 +321,10 @@ public class RecipeNode {
         tag.putInt("parallel", parallel);
         tag.putString("overclockMode", overclockMode.name());
         tag.putBoolean("isBaseNode", isBaseNode);
+        tag.putBoolean("isGenerator", isGenerator);
+        tag.putInt("rotorEfficiency", rotorEfficiency);
+        tag.putInt("rotorPower", rotorPower);
+        tag.putString("rotorName", rotorName);
         tag.putDouble("posX", posX);
         tag.putDouble("posY", posY);
 
@@ -297,6 +368,18 @@ public class RecipeNode {
         }
         if (tag.contains("isBaseNode")) {
             node.isBaseNode = tag.getBoolean("isBaseNode");
+        }
+        if (tag.contains("isGenerator")) {
+            node.isGenerator = tag.getBoolean("isGenerator");
+        }
+        if (tag.contains("rotorEfficiency")) {
+            node.rotorEfficiency = tag.getInt("rotorEfficiency");
+        }
+        if (tag.contains("rotorPower")) {
+            node.rotorPower = tag.getInt("rotorPower");
+        }
+        if (tag.contains("rotorName")) {
+            node.rotorName = tag.getString("rotorName");
         }
         node.posX = tag.getDouble("posX");
         node.posY = tag.getDouble("posY");

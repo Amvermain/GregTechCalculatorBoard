@@ -66,11 +66,19 @@ public class FlowGraph {
     }
 
     public void autoRatioFromAnchor(RecipeNode anchor) {
+        autoRatioFromAnchor(anchor, true);
+    }
+
+    public void autoRatioFromAnchor(RecipeNode anchor, boolean integerCounts) {
         if (anchor == null || nodes.isEmpty()) return;
 
         double targetAnchorCount = anchor.getMachineCount();
+        if (integerCounts) {
+            targetAnchorCount = Math.max(1.0, Math.ceil(targetAnchorCount - 0.00001));
+            anchor.setMachineCount(targetAnchorCount);
+        }
 
-        // 1. Upstream Wavefront Propagation (Supply Anchor's Inputs)
+        // 1. Upstream Wavefront Propagation (Supply Anchor's Inputs with Supply >= Demand)
         Map<String, Double> upstreamCounts = new HashMap<>();
         upstreamCounts.put(anchor.getId(), targetAnchorCount);
 
@@ -109,8 +117,11 @@ public class FlowGraph {
 
                         if (singleRate > 0.0001) {
                             double neededCount = sharePerProducer / singleRate;
+                            if (integerCounts) {
+                                // Always round UP (Ceil) so producer supply >= consumer demand
+                                neededCount = Math.max(1.0, Math.ceil(neededCount - 0.00001));
+                            }
                             double currentMax = upstreamCounts.getOrDefault(producer.getId(), 0.0);
-                            // Take max demand across multiple outputs
                             upstreamCounts.put(producer.getId(), Math.max(currentMax, neededCount));
 
                             if (!upstreamVisited.contains(producer.getId())) {
@@ -170,6 +181,10 @@ public class FlowGraph {
 
                         if (singleInRate > 0.0001) {
                             double neededCount = sharePerConsumer / singleInRate;
+                            if (integerCounts) {
+                                // Round up to ensure adequate consumption capacity
+                                neededCount = Math.max(1.0, Math.ceil(neededCount - 0.00001));
+                            }
                             double currentMax = downstreamCounts.getOrDefault(consumer.getId(), 0.0);
                             downstreamCounts.put(consumer.getId(), Math.max(currentMax, neededCount));
 
@@ -194,9 +209,13 @@ public class FlowGraph {
         // Always enforce anchor machine count
         anchor.setMachineCount(targetAnchorCount);
 
-        // Round counts to 2 decimal places
+        // Enforce integer or 2 decimal places
         for (RecipeNode n : nodes) {
-            n.setMachineCount(Math.round(n.getMachineCount() * 100.0) / 100.0);
+            if (integerCounts) {
+                n.setMachineCount(Math.max(1.0, Math.ceil(n.getMachineCount() - 0.00001)));
+            } else {
+                n.setMachineCount(Math.round(n.getMachineCount() * 100.0) / 100.0);
+            }
         }
     }
 
@@ -231,14 +250,19 @@ public class FlowGraph {
      * Solves the overall graph and computes total EU/t, raw ingredients, net outputs, and byproducts.
      */
     public BalanceSummary computeSummary() {
-        double totalEUt = 0.0;
+        double totalConsumedEUt = 0.0;
+        double totalGeneratedEUt = 0.0;
         GTVoltageTier highestTier = GTVoltageTier.ULV;
 
         Map<IngredientStack, Double> totalProduction = new HashMap<>();
         Map<IngredientStack, Double> totalConsumption = new HashMap<>();
 
         for (RecipeNode node : nodes) {
-            totalEUt += node.getTotalEUt();
+            if (node.isGenerator()) {
+                totalGeneratedEUt += node.getTotalEUt();
+            } else {
+                totalConsumedEUt += node.getTotalEUt();
+            }
             if (node.getTargetTier().ordinal() > highestTier.ordinal()) {
                 highestTier = node.getTargetTier();
             }
@@ -279,7 +303,8 @@ public class FlowGraph {
             }
         }
 
-        return new BalanceSummary(totalEUt, highestTier, rawInputs, netOutputs, balanced, totalProduction, totalConsumption);
+        double netEUt = totalConsumedEUt - totalGeneratedEUt;
+        return new BalanceSummary(netEUt, highestTier, rawInputs, netOutputs, balanced, totalProduction, totalConsumption);
     }
 
     private void mergeRate(Map<IngredientStack, Double> map, IngredientStack stack, double rate) {

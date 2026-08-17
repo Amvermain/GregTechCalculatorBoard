@@ -1,18 +1,18 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
+import dev.emi.emi.api.stack.EmiIngredient;
+import dev.emi.emi.api.stack.EmiStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +20,12 @@ import java.util.List;
 public class RecipeSearchDialog {
     private final BoardScreen parent;
     private final EditBox searchBox;
-    private final List<EmiRecipe> filteredRecipes = new ArrayList<>();
+
+    public record SearchableRecipe(EmiRecipe recipe, String displayName, String searchIndex) {}
+
+    private final List<SearchableRecipe> cachedAllRecipes = new ArrayList<>();
+    private final List<SearchableRecipe> filteredRecipes = new ArrayList<>();
+    private boolean recipesCached = false;
     private int scrollOffset = 0;
     private boolean visible = false;
 
@@ -45,8 +50,65 @@ public class RecipeSearchDialog {
         if (visible) {
             searchBox.setValue("");
             searchBox.setFocused(true);
+            ensureRecipesCached();
             updateSearchResults("");
         }
+    }
+
+    private void ensureRecipesCached() {
+        if (recipesCached && !cachedAllRecipes.isEmpty()) return;
+        cachedAllRecipes.clear();
+        try {
+            var recipeManager = EmiApi.getRecipeManager();
+            if (recipeManager != null) {
+                for (EmiRecipeCategory cat : recipeManager.getCategories()) {
+                    for (EmiRecipe recipe : recipeManager.getRecipes(cat)) {
+                        String displayName = extractDisplayName(recipe);
+                        String searchIndex = buildSearchIndex(recipe, displayName);
+                        cachedAllRecipes.add(new SearchableRecipe(recipe, displayName, searchIndex));
+                    }
+                }
+                recipesCached = true;
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private String extractDisplayName(EmiRecipe recipe) {
+        if (!recipe.getOutputs().isEmpty()) {
+            var firstOut = recipe.getOutputs().get(0);
+            if (!firstOut.getEmiStacks().isEmpty()) {
+                return firstOut.getEmiStacks().get(0).getName().getString();
+            }
+        }
+        if (recipe.getId() != null) {
+            String path = recipe.getId().getPath();
+            if (path.contains("/")) path = path.substring(path.lastIndexOf('/') + 1);
+            return EmiRecipeConverter.formatName(path);
+        }
+        return "Unknown Recipe";
+    }
+
+    private String buildSearchIndex(EmiRecipe recipe, String displayName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(displayName.toLowerCase()).append(" ");
+
+        if (recipe.getId() != null) {
+            sb.append(recipe.getId().toString().toLowerCase()).append(" ");
+        }
+        if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
+            sb.append(recipe.getCategory().getId().toString().toLowerCase()).append(" ");
+        }
+        for (var out : recipe.getOutputs()) {
+            for (var stack : out.getEmiStacks()) {
+                sb.append(stack.getName().getString().toLowerCase()).append(" ");
+            }
+        }
+        for (var in : recipe.getInputs()) {
+            for (var stack : in.getEmiStacks()) {
+                sb.append(stack.getName().getString().toLowerCase()).append(" ");
+            }
+        }
+        return sb.toString();
     }
 
     private void onSearchQueryChanged(String query) {
@@ -58,57 +120,36 @@ public class RecipeSearchDialog {
         filteredRecipes.clear();
         String lower = query.toLowerCase().trim();
 
-        try {
-            var recipeManager = EmiApi.getRecipeManager();
-            if (recipeManager != null) {
-                for (EmiRecipeCategory cat : recipeManager.getCategories()) {
-                    for (EmiRecipe recipe : recipeManager.getRecipes(cat)) {
-                        if (filteredRecipes.size() >= 100) break; // Limit search results for fast UI
-                        if (matchesQuery(recipe, lower)) {
-                            filteredRecipes.add(recipe);
-                        }
-                    }
-                }
+        if (lower.isEmpty()) {
+            int limit = Math.min(80, cachedAllRecipes.size());
+            for (int i = 0; i < limit; i++) {
+                filteredRecipes.add(cachedAllRecipes.get(i));
             }
-        } catch (Throwable ignored) {}
-    }
+            return;
+        }
 
-    private boolean matchesQuery(EmiRecipe recipe, String query) {
-        if (query.isEmpty()) return true;
-
-        if (recipe.getId() != null && recipe.getId().toString().toLowerCase().contains(query)) {
-            return true;
-        }
-        if (recipe.getCategory() != null && recipe.getCategory().getId().toString().toLowerCase().contains(query)) {
-            return true;
-        }
-        // Match outputs
-        for (var out : recipe.getOutputs()) {
-            if (out.getName().getString().toLowerCase().contains(query)) {
-                return true;
+        // Extremely fast String.contains lookup without dynamic Component extraction
+        for (SearchableRecipe sr : cachedAllRecipes) {
+            if (filteredRecipes.size() >= 80) break;
+            if (sr.searchIndex.contains(lower)) {
+                filteredRecipes.add(sr);
             }
         }
-        // Match inputs
-        for (var in : recipe.getInputs()) {
-            for (var stack : in.getEmiStacks()) {
-                if (stack.getName().getString().toLowerCase().contains(query)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         if (!visible) return;
 
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 600);
+
         Font font = Minecraft.getInstance().font;
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
 
-        // Dark Modal Background & Dimmer
-        graphics.fill(0, 0, screenWidth, screenHeight, 0x99000000);
-        graphics.fill(x, y, x + DIALOG_WIDTH, y + DIALOG_HEIGHT, 0xFA1E222B);
+        // Solid Dark Backdrop
+        graphics.fill(0, 0, screenWidth, screenHeight, 0xCC000000);
+        graphics.fill(x, y, x + DIALOG_WIDTH, y + DIALOG_HEIGHT, 0xFF1E222B);
         graphics.renderOutline(x, y, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF4A90E2);
 
         // Header
@@ -142,6 +183,7 @@ public class RecipeSearchDialog {
 
         if (filteredRecipes.isEmpty()) {
             graphics.drawCenteredString(font, "§7No recipes found. Type to search...", x + DIALOG_WIDTH / 2, listY + listHeight / 2 - 4, 0xFF888888);
+            graphics.pose().popPose();
             return;
         }
 
@@ -150,27 +192,39 @@ public class RecipeSearchDialog {
             int recipeIdx = scrollOffset + i;
             if (recipeIdx >= filteredRecipes.size()) break;
 
-            EmiRecipe recipe = filteredRecipes.get(recipeIdx);
+            SearchableRecipe sr = filteredRecipes.get(recipeIdx);
+            EmiRecipe recipe = sr.recipe;
             int rowY = listY + i * ROW_HEIGHT;
 
-            boolean rowHover = mouseX >= x + 14 && mouseX <= x + DIALOG_WIDTH - 14 && mouseY >= rowY + 2 && mouseY <= rowY + ROW_HEIGHT - 2;
-            graphics.fill(x + 14, rowY + 2, x + DIALOG_WIDTH - 14, rowY + ROW_HEIGHT - 2, rowHover ? 0xFF283446 : 0xFF1C222D);
+            boolean rowHover = mouseX >= x + 12 && mouseX <= x + DIALOG_WIDTH - 12 && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT;
+            if (rowHover) {
+                graphics.fill(x + 13, rowY + 1, x + DIALOG_WIDTH - 13, rowY + ROW_HEIGHT - 1, 0xFF283244);
+            }
 
-            // Recipe Name / ID
-            String rName = recipe.getId() != null ? recipe.getId().getPath() : "Recipe";
-            if (rName.contains("/")) rName = rName.substring(rName.lastIndexOf('/') + 1);
-            graphics.drawString(font, "§f" + rName, x + 20, rowY + 5, 0xFFFFFFFF, false);
+            // Recipe Name
+            graphics.drawString(font, font.plainSubstrByWidth(sr.displayName, 170), x + 16, rowY + 4, 0xFFFFFFFF, false);
 
-            // Input / Output summary text
-            String cat = recipe.getCategory() != null ? recipe.getCategory().getId().getPath() : "Recipe";
-            graphics.drawString(font, "§7[" + cat + "] §e" + recipe.getInputs().size() + " in §7-> §a" + recipe.getOutputs().size() + " out", x + 20, rowY + 17, 0xFFAAAAAA, false);
+            // Inputs & Outputs Mini preview
+            int slotX = x + 190;
+            renderMiniStackList(graphics, recipe.getInputs(), slotX, rowY + 8);
+            graphics.drawString(font, "➔", slotX + 46, rowY + 12, 0xFF888888, false);
+            renderMiniStackList(graphics, recipe.getOutputs(), slotX + 62, rowY + 8);
 
-            // Add button
-            int addBtnX = x + DIALOG_WIDTH - 50;
-            int addBtnY = rowY + 8;
-            boolean btnHover = mouseX >= addBtnX && mouseX <= addBtnX + 32 && mouseY >= addBtnY && mouseY <= addBtnY + 14;
-            graphics.fill(addBtnX, addBtnY, addBtnX + 32, addBtnY + 14, btnHover ? 0xFF55AA55 : 0xFF336633);
-            graphics.drawCenteredString(font, "Add", addBtnX + 16, addBtnY + 3, 0xFFFFFFFF);
+            // Bottom line separator
+            graphics.fill(x + 16, rowY + ROW_HEIGHT - 1, x + DIALOG_WIDTH - 16, rowY + ROW_HEIGHT, 0xFF2D3546);
+        }
+
+        graphics.pose().popPose();
+    }
+
+    private void renderMiniStackList(GuiGraphics graphics, List<? extends EmiIngredient> list, int x, int y) {
+        int max = Math.min(2, list.size());
+        for (int i = 0; i < max; i++) {
+            var ing = list.get(i);
+            if (!ing.getEmiStacks().isEmpty()) {
+                var emiStack = ing.getEmiStacks().get(0);
+                emiStack.render(graphics, x + i * 18, y, 0);
+            }
         }
     }
 
@@ -180,6 +234,11 @@ public class RecipeSearchDialog {
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
 
+        if (mouseX < x || mouseX > x + DIALOG_WIDTH || mouseY < y || mouseY > y + DIALOG_HEIGHT) {
+            setVisible(false);
+            return true;
+        }
+
         // Close [X]
         int closeX = x + DIALOG_WIDTH - 18;
         int closeY = y + 6;
@@ -188,43 +247,42 @@ public class RecipeSearchDialog {
             return true;
         }
 
-        // Custom Blank Node Button
-        int blankBtnY = y + 50;
-        if (mouseX >= x + 12 && mouseX <= x + DIALOG_WIDTH - 12 && mouseY >= blankBtnY && mouseY <= blankBtnY + 16) {
-            RecipeNode customNode = RecipeNode.create("Custom Machine", 100.0, 32.0, GTVoltageTier.LV);
-            customNode.addInput(IngredientStack.item(new ResourceLocation("minecraft", "iron_ingot"), "Iron Ingot", 1, 1.0));
-            customNode.addOutput(IngredientStack.item(new ResourceLocation("minecraft", "iron_nugget"), "Iron Nugget", 9, 1.0));
-            parent.addNode(customNode);
-            setVisible(false);
-            return true;
-        }
-
-        // Search Box click
         if (searchBox.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
 
-        // Recipe Row Click
+        // Blank Recipe Button
+        int blankBtnY = y + 50;
+        if (mouseX >= x + 12 && mouseX <= x + DIALOG_WIDTH - 12 && mouseY >= blankBtnY && mouseY <= blankBtnY + 16) {
+            RecipeNode blankNode = RecipeNode.create("Custom Recipe", 100.0, 30.0, GTVoltageTier.LV);
+            blankNode.setPos(-parent.getPanX() + (parent.width / 2.0) - 70, -parent.getPanY() + (parent.height / 2.0) - 50);
+            parent.getGraph().addNode(blankNode);
+            parent.markSummaryDirty();
+            parent.rebuildWidgets();
+            setVisible(false);
+            return true;
+        }
+
+        // Click recipe row
         int listY = blankBtnY + 22;
         int listHeight = DIALOG_HEIGHT - (listY - y) - 10;
         int maxVisibleRows = listHeight / ROW_HEIGHT;
 
-        if (mouseX >= x + 14 && mouseX <= x + DIALOG_WIDTH - 14 && mouseY >= listY && mouseY <= listY + listHeight) {
-            int clickedRow = (int) (mouseY - listY) / ROW_HEIGHT;
-            int recipeIdx = scrollOffset + clickedRow;
-            if (recipeIdx >= 0 && recipeIdx < filteredRecipes.size()) {
-                EmiRecipe recipe = filteredRecipes.get(recipeIdx);
-                RecipeNode node = EmiRecipeConverter.convert(recipe);
-                parent.addNode(node);
+        for (int i = 0; i < maxVisibleRows; i++) {
+            int recipeIdx = scrollOffset + i;
+            if (recipeIdx >= filteredRecipes.size()) break;
+
+            int rowY = listY + i * ROW_HEIGHT;
+            if (mouseX >= x + 12 && mouseX <= x + DIALOG_WIDTH - 12 && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT) {
+                SearchableRecipe sr = filteredRecipes.get(recipeIdx);
+                RecipeNode newNode = EmiRecipeConverter.convert(sr.recipe);
+                newNode.setPos(-parent.getPanX() + (parent.width / 2.0) - 70, -parent.getPanY() + (parent.height / 2.0) - 50);
+                parent.getGraph().addNode(newNode);
+                parent.markSummaryDirty();
+                parent.rebuildWidgets();
                 setVisible(false);
                 return true;
             }
-        }
-
-        // Outside modal click -> close
-        if (mouseX < x || mouseX > x + DIALOG_WIDTH || mouseY < y || mouseY > y + DIALOG_HEIGHT) {
-            setVisible(false);
-            return true;
         }
 
         return true;
@@ -232,21 +290,15 @@ public class RecipeSearchDialog {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!visible) return false;
-        if (delta > 0) {
-            scrollOffset = Math.max(0, scrollOffset - 1);
-        } else if (delta < 0) {
-            scrollOffset = Math.min(Math.max(0, filteredRecipes.size() - 5), scrollOffset + 1);
-        }
+        int maxScroll = Math.max(0, filteredRecipes.size() - (DIALOG_HEIGHT - 100) / ROW_HEIGHT);
+        scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.signum(delta)));
         return true;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!visible) return false;
-        if (keyCode == 256) { // ESC
-            setVisible(false);
-            return true;
-        }
-        return searchBox.keyPressed(keyCode, scanCode, modifiers);
+        if (searchBox.keyPressed(keyCode, scanCode, modifiers)) return true;
+        return false;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {

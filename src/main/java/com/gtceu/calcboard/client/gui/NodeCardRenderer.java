@@ -24,20 +24,26 @@ public class NodeCardRenderer {
         int height = widget.getHeight();
 
         // 1. Card Background & Golden/Metallic Outlines
-        graphics.fill(x, y, x + NodeWidget.WIDTH, y + height, 0xF01E222B);
-        int headerColor = widget.isHeaderHovered(mouseX, mouseY) ? 0xFF353C4D : 0xFF2A2E39;
+        int cardBg = node.isGenerator() ? 0xF0122218 : 0xF01E222B;
+        graphics.fill(x, y, x + NodeWidget.WIDTH, y + height, cardBg);
+
+        int headerColor = node.isGenerator()
+                ? (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF1E482E : 0xFF163824)
+                : (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF353C4D : 0xFF2A2E39);
         graphics.fill(x, y, x + NodeWidget.WIDTH, y + NodeWidget.HEADER_HEIGHT, headerColor);
 
-        int outlineColor = node.isBaseNode() ? 0xFFFFD700 : 0xFF3D4455;
+        int outlineColor = node.isBaseNode() ? 0xFFFFD700 : (node.isGenerator() ? 0xFF33AA66 : 0xFF3D4455);
         graphics.renderOutline(x, y, NodeWidget.WIDTH, height, outlineColor);
         if (node.isBaseNode()) {
             graphics.renderOutline(x + 1, y + 1, NodeWidget.WIDTH - 2, height - 2, 0x88FFD700);
+        } else if (node.isGenerator()) {
+            graphics.renderOutline(x + 1, y + 1, NodeWidget.WIDTH - 2, height - 2, 0x4433AA66);
         }
 
         // 2. Header Title
-        String title = (node.isBaseNode() ? "§6★ " : "") + node.getName();
+        String title = (node.isBaseNode() ? "§6★ " : (node.isGenerator() ? "§a⚡ " : "")) + node.getName();
         if (title.length() > 22) title = title.substring(0, 20) + "...";
-        graphics.drawString(font, title, x + 6, y + 6, node.isBaseNode() ? 0xFFFFE066 : 0xFFE0E0E0, false);
+        graphics.drawString(font, title, x + 6, y + 6, node.isBaseNode() ? 0xFFFFE066 : (node.isGenerator() ? 0xFF77FFAA : 0xFFE0E0E0), false);
 
         // 3. Target Base Node Toggle Button [🎯]
         int targetX = x + NodeWidget.WIDTH - 36;
@@ -63,38 +69,65 @@ public class NodeCardRenderer {
         drawBtn(graphics, font, "-", x + 44, ctrlY, 14, 14, mouseX, mouseY);
 
         // Interactive Numeric Count Box
+        NodeCountEditor countEditor = widget.getCountEditor();
+        String countText = countEditor.getDisplayText();
+        int countBoxW = Math.max(32, font.width(countText) + 8);
         int countBoxX = x + 60;
-        int countBoxW = 36;
         boolean countHover = mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14;
-        boolean isEditing = widget.getCountEditor().isEditing();
-        int boxBg = isEditing ? 0xFF0D1B2A : (countHover ? 0xFF252A36 : 0xFF14171E);
-        int boxBorder = isEditing ? 0xFF55FFFF : (countHover ? 0xFF5577AA : 0xFF3D4455);
-        graphics.fill(countBoxX, ctrlY, countBoxX + countBoxW, ctrlY + 14, boxBg);
-        graphics.renderOutline(countBoxX, ctrlY, countBoxW, 14, boxBorder);
+        boolean isEditing = countEditor.isEditing();
+        int countBg = isEditing ? 0xFF0D1B2A : (countHover ? 0xFF252A36 : 0xFF14171E);
+        int countBorder = isEditing ? 0xFF55FFFF : (countHover ? 0xFF5577AA : 0xFF3D4455);
+        graphics.fill(countBoxX, ctrlY, countBoxX + countBoxW, ctrlY + 14, countBg);
+        graphics.renderOutline(countBoxX, ctrlY, countBoxW, 14, countBorder);
+        graphics.drawCenteredString(font, countText, countBoxX + countBoxW / 2, ctrlY + 3, isEditing ? 0xFF55FFFF : 0xFFFFFFAA);
 
-        String displayText = widget.getCountEditor().getDisplayText();
-        graphics.drawCenteredString(font, displayText, countBoxX + countBoxW / 2, ctrlY + 3, isEditing ? 0xFF55FFFF : 0xFFFFFF55);
-
-        drawBtn(graphics, font, "+", x + 98, ctrlY, 14, 14, mouseX, mouseY);
-        drawBtn(graphics, font, "/2", x + 115, ctrlY, 16, 14, mouseX, mouseY);
-        drawBtn(graphics, font, "x2", x + 133, ctrlY, 16, 14, mouseX, mouseY);
+        int afterCountX = countBoxX + countBoxW + 2;
+        drawBtn(graphics, font, "+", afterCountX, ctrlY, 14, 14, mouseX, mouseY);
+        drawBtn(graphics, font, "/2", afterCountX + 16, ctrlY, 16, 14, mouseX, mouseY);
+        drawBtn(graphics, font, "x2", afterCountX + 34, ctrlY, 16, 14, mouseX, mouseY);
 
         // 6. Voltage Tier Selector: [Tier] button
         int tierBtnX = x + 154;
         GTVoltageTier tier = node.getTargetTier();
         drawBtn(graphics, font, tier.getName(), tierBtnX, ctrlY, 34, 14, mouseX, mouseY, tier.getColor());
 
-        // 7. Second Row Controls: Overclock Mode & Parallel
+        // 7. Second Row Controls: Overclock Mode / Rotor Setting & Parallel
         int row2Y = ctrlY + 18;
-        String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
-        String ocText = Component.translatable(ocKey).getString();
-        int ocColor = node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA;
-        int ocW = Math.max(54, font.width(ocText) + 8);
-        drawBtn(graphics, font, ocText, x + 6, row2Y, ocW, 14, mouseX, mouseY, ocColor);
+        int nextCtrlX = x + 6;
 
-        String parText = Component.translatable("gui.gtcalcboard.parallel", String.valueOf(node.getParallel())).getString();
-        int parW = Math.max(48, font.width(parText) + 8);
-        drawBtn(graphics, font, parText, x + 8 + ocW, row2Y, parW, 14, mouseX, mouseY);
+        if (node.isGenerator()) {
+            // [GEN] / [발전기] badge
+            String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
+            int genW = Math.max(30, font.width(genBadge) + 6);
+            drawBtn(graphics, font, genBadge, nextCtrlX, row2Y, genW, 14, mouseX, mouseY, 0xFF55FF88);
+            nextCtrlX += genW + 4;
+
+            // [⚙ 220%] rotor button
+            String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
+            int rotorW = Math.max(48, font.width(rotorText) + 8);
+            drawBtn(graphics, font, rotorText, nextCtrlX, row2Y, rotorW, 14, mouseX, mouseY, 0xFFFFAA00);
+            nextCtrlX += rotorW + 4;
+        } else {
+            String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
+            String ocText = Component.translatable(ocKey).getString();
+            int ocColor = node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA;
+            int ocW = Math.max(54, font.width(ocText) + 8);
+            drawBtn(graphics, font, ocText, nextCtrlX, row2Y, ocW, 14, mouseX, mouseY, ocColor);
+            nextCtrlX += ocW + 4;
+        }
+
+        // Interactive Numeric Parallel Box
+        NodeParallelEditor parEditor = widget.getParallelEditor();
+        String parText = parEditor.getDisplayText();
+        int parW = Math.max(44, font.width(parText) + 8);
+        int parX = nextCtrlX;
+        boolean parHover = mouseX >= parX && mouseX <= parX + parW && mouseY >= row2Y && mouseY <= row2Y + 14;
+        boolean isParEditing = parEditor.isEditing();
+        int parBg = isParEditing ? 0xFF0D1B2A : (parHover ? 0xFF252A36 : 0xFF14171E);
+        int parBorder = isParEditing ? 0xFF55FFFF : (parHover ? 0xFF5577AA : 0xFF3D4455);
+        graphics.fill(parX, row2Y, parX + parW, row2Y + 14, parBg);
+        graphics.renderOutline(parX, row2Y, parW, 14, parBorder);
+        graphics.drawCenteredString(font, parText, parX + parW / 2, row2Y + 3, isParEditing ? 0xFF55FFFF : 0xFFFFFFFF);
 
         // 8. Recipe Energy & Duration Info
         int infoY = row2Y + 18;
@@ -102,7 +135,9 @@ public class NodeCardRenderer {
         double durationSec = node.getEffectiveDurationSeconds();
         double cyclesPerSec = node.getCyclesPerSecond();
 
-        String eutStr = String.format("§e%.1f EU/t §7(%s)", totalEUt, tier.getName());
+        String eutStr = node.isGenerator() 
+            ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, tier.getName()) 
+            : String.format("§e%.1f EU/t §7(%s)", totalEUt, tier.getName());
         graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
 
         String cycleStr = String.format("§b%.2fs §7(§f%.2f/s§7)", durationSec, cyclesPerSec);

@@ -36,6 +36,87 @@ public class CalculationTest {
     }
 
     @Test
+    public void testGeneratorPowerSubtraction() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Consumer machine: 120 EU/t (MV)
+        RecipeNode machine = RecipeNode.create("Electric Furnace", 100.0, 120.0, GTVoltageTier.MV);
+        machine.setMachineCount(2.0); // Total consumption: 240 EU/t
+        graph.addNode(machine);
+
+        // 2. Generator: produces 512 EU/t (HV)
+        RecipeNode generator = RecipeNode.create("Gas Turbine", 100.0, 512.0, GTVoltageTier.HV);
+        generator.setGenerator(true);
+        generator.setMachineCount(1.0); // Total generation: 512 EU/t
+        graph.addNode(generator);
+
+        BalanceSummary summary = graph.computeSummary();
+
+        // Net EU/t should be 240 - 512 = -272 EU/t (Net Generation)
+        Assertions.assertEquals(-272.0, summary.totalEUt(), 0.001);
+        Assertions.assertEquals(GTVoltageTier.HV, summary.highestVoltageTier());
+
+        // Generator duration must remain constant (no exponential OC) even if tier is raised to ZPM
+        generator.setTargetTier(GTVoltageTier.ZPM);
+        Assertions.assertEquals(100.0 / 20.0, generator.getEffectiveDurationSeconds(), 0.001); // 5.0s constant
+
+        // Linear scaling with parallel factor
+        generator.setParallel(1152);
+        Assertions.assertEquals(512.0 * 1152, generator.getTotalEUt(), 0.001);
+    }
+
+    @Test
+    public void testTurbineRotorEfficiencyScaling() {
+        // Base: 40 ticks (2.0s), 32 EU/t (LV)
+        RecipeNode turbine = RecipeNode.create("Large Gas Turbine", 40.0, 32.0, GTVoltageTier.LV);
+        turbine.setGenerator(true);
+        turbine.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "nitrobenzene"), "Nitrobenzene", 1, 1.0));
+
+        // 1. Standard Rotor (100%): 2.0s, 32 EU/t
+        Assertions.assertEquals(2.0, turbine.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(32.0, turbine.getTotalEUt(), 0.001);
+
+        // 2. Rhodium-Plated Palladium Rotor (220%): 4.40s duration!
+        turbine.setRotorEfficiency(220);
+        Assertions.assertEquals(4.40, turbine.getEffectiveDurationSeconds(), 0.001);
+
+        // 3. 1,152 Parallels: +36,864 EU/t, 261.82 mB/s consumption
+        turbine.setParallel(1152);
+        Assertions.assertEquals(36864.0, turbine.getTotalEUt(), 0.001);
+        
+        var inputRates = turbine.calculateInputRates();
+        IngredientStack nitrobenzene = turbine.getInputs().get(0);
+        Assertions.assertEquals(1152.0 / 4.40, inputRates.get(nitrobenzene), 0.01);
+
+        // 4. Enderium Rotor (Efficiency 180%): 3.60s duration, 36,864 EU/t, 320.0 mB/s
+        turbine.setRotorEfficiency(180);
+        Assertions.assertEquals(3.60, turbine.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(32.0 * 1152, turbine.getTotalEUt(), 0.001);
+        
+        var enderiumRates = turbine.calculateInputRates();
+        Assertions.assertEquals(1152.0 / 3.60, enderiumRates.get(nitrobenzene), 0.01);
+
+        // 5. Auto Parallel Derivation by Rotor Power & Voltage Tier Limit
+        // Base 32 EU/t, Scheelite Rotor (200% Efficiency, 450% Power)
+        turbine.setRotorEfficiency(200);
+        turbine.setRotorPower(450);
+        
+        // IV Rotor Holder (8,192 EU/t * 4.5 = 36,864 EU/t -> 1,152 parallels!)
+        turbine.setTargetTier(GTVoltageTier.IV);
+        Assertions.assertEquals(1152, turbine.getParallel());
+        Assertions.assertEquals(36864.0, turbine.getTotalEUt(), 0.001);
+        Assertions.assertEquals(4.00, turbine.getEffectiveDurationSeconds(), 0.001);
+
+        var scheeliteRates = turbine.calculateInputRates();
+        Assertions.assertEquals(1152.0 / 4.00, scheeliteRates.get(nitrobenzene), 0.01); // 288.0 mB/s
+
+        // EV Rotor Holder (2,048 EU/t * 4.5 = 9,216 EU/t -> 288 parallels)
+        turbine.setTargetTier(GTVoltageTier.EV);
+        Assertions.assertEquals(288, turbine.getParallel());
+        Assertions.assertEquals(32.0 * 288, turbine.getTotalEUt(), 0.001);
+    }
+
+    @Test
     public void testPyrolyseAndDistillationTowerFlowBalance() {
         // Scenario: 1 Pyrolyse Oven produces Charcoal + Wood Tar
         // 3 Distillation Towers consume Wood Tar to produce Creosote, Phenol, Benzene, Toluene etc.
@@ -180,19 +261,18 @@ public class CalculationTest {
 
         graph.addConnection(pyrolyse.getId(), 0, distTower.getId(), 0);
 
-        // Run Anchor Auto-Ratio
+        // Run Anchor Auto-Ratio (Integer Ceiling)
         graph.autoRatioFromAnchor(distTower);
 
-        // Check Pyrolyse Oven count: should be 400 / 62.5 = 6.4
-        Assertions.assertEquals(6.4, pyrolyse.getMachineCount(), 0.001);
+        // Check Pyrolyse Oven count: 400 / 62.5 = 6.4 -> Ceil to 7.0 machines (Supply >= Demand)
+        Assertions.assertEquals(7.0, pyrolyse.getMachineCount(), 0.001);
         Assertions.assertEquals(2.0, distTower.getMachineCount(), 0.001); // Anchor remains unchanged!
 
-        // Summary balance: Wood Tar should be completely balanced (delta = 0)
+        // Summary balance: Wood Tar produced (437.5) >= consumed (400.0) -> surplus in netOutputs, zero deficit
         BalanceSummary summary = graph.computeSummary();
         IngredientStack woodTar = IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0);
-        Double balancedRate = summary.fullyBalanced().get(woodTar);
-        Assertions.assertNotNull(balancedRate);
-        Assertions.assertEquals(400.0, balancedRate, 0.001);
+        Assertions.assertFalse(summary.rawInputs().containsKey(woodTar));
+        Assertions.assertTrue(summary.netOutputs().containsKey(woodTar) || summary.fullyBalanced().containsKey(woodTar));
     }
 
     @Test
@@ -296,9 +376,10 @@ public class CalculationTest {
                     n.getOverclockResult().getCyclesPerSecond(), n.getCyclesPerSecond());
         }
 
-        // Assert that upstream oil / cracking nodes do NOT explode into hundreds
+        // Assert that upstream oil / cracking nodes do NOT explode and are all integer counts
         for (RecipeNode n : graph.getNodes()) {
             Assertions.assertTrue(n.getMachineCount() < 50.0, "Node " + n.getName() + " exploded to " + n.getMachineCount());
+            Assertions.assertEquals(Math.floor(n.getMachineCount()), n.getMachineCount(), 0.001, "Node " + n.getName() + " is not integer: " + n.getMachineCount());
         }
     }
 }

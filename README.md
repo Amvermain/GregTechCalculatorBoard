@@ -1,7 +1,7 @@
 # GregTech Calculator Board (GTCalcBoard)
 
 <p align="center">
-  <b>English</b> | <a href="README_KR.md">한국어</a>
+  <b>English</b> | <a href="README_KR.md">한국어</a> | <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
@@ -28,21 +28,27 @@ An in-game node graph calculator for GregTech CEu Modern. Instead of juggling ex
 - Hit **Auto Connect** to automatically link up all matching item and fluid ports across your board in one go.
 - Right-click any wire or port socket to cut the connection.
 
-### 3. Master Anchor & Auto Ratio
-- Mark any bottleneck or target product recipe as the **Base Anchor** (`[Base]`).
-- Hit **Auto Ratio** to instantly rebalance and scale machine counts across the entire upstream and downstream chain to match your anchor's exact throughput.
+### 3. Master Anchor & Bottleneck-Free Auto Ratio (Integer Ceiling)
+- Mark any target product or bottleneck machine as the **Base Anchor** (`🎯`).
+- Hit **Auto Ratio** to instantly rebalance and scale machine counts across the entire upstream and downstream chain with **Integer Ceiling** ($1, 2, 3...$).
+- Enforces $\text{Supply} \ge \text{Demand}$ across all nodes to guarantee that no upstream starvation occurs in real gameplay.
 
-### 4. Max Flow & Tier Capping
-- Set a global voltage cap (`Cap: LV ~ MAX`) so machines won't overclock past what you can actually build in your current stage of the game.
-- Use **Max Flow** to automatically push all machines to the highest allowed tier and group them into multi-block parallel batches (`4x, 8x, 16x...`).
+### 4. Large Turbine / Generator Simulation & 48+ Rotor Scanner
+- **Dedicated Emerald Theme**: Generator nodes feature a distinctive deep emerald dark theme (`#122218`) and energy green borders (`+EU/t`).
+- **3D Visual Rotor Dialog (`[⚙ 220%]` click)**: Scans 48+ native and modpack-added GT rotors in real-time, rendering distinct item icons, efficiency badges, and localized tooltips.
+- **Rotor Power & Tier Auto Parallel Derivation**: Selecting a rotor or changing voltage tier automatically calculates the turbine's maximum voltage ($V_{\text{max}} = V_{\text{holder}} \times \frac{P_{\text{rotor}}}{100}$) and sets optimal rated parallels (Par) in 1 second.
 
-### 5. Blueprint Sharing
+### 5. Interactive Numeric Parallel Input & Wheel Control
+- **Direct Number Input**: Click `Par` button to type any parallel number directly (e.g. `1152`).
+- **Mouse Wheel Control**: Scroll on the `Par` button to quickly scale by 2x (or `Shift + Wheel` for +/- 1 fine stepping).
+
+### 6. Blueprint Sharing
 - **Share (`Ctrl + C`)**: Copies your entire setup (nodes, tiers, counts, wires, and layout) as a compact string (`GTBOARD:...`).
 - **Import (`Ctrl + V`)**: Paste a shared string to load someone else's line layout in a second.
 - Easy to share on Discord, forums, or notes.
 
-### 6. Live Process Summary
-- Live overlay tracking total power draw (EU/t) and highest tier required.
+### 7. Live Process Summary
+- Live overlay tracking total power draw (EU/t) and highest tier required (with generator output subtracted).
 - Real-time breakdown of raw external inputs needed vs. net output products and byproducts.
 
 ---
@@ -54,15 +60,17 @@ An in-game node graph calculator for GregTech CEu Modern. Instead of juggling ex
 | Open Calculator Board | Configurable in Options -> Controls |
 | Pan Canvas | Right Click + Drag or Middle Click + Drag |
 | Zoom Canvas | Mouse Wheel (Zooms to cursor) |
-| Connect Wire | Left Click & Drag from output port to input port |
-| **Smart Match Connect** | **Shift + Drag from output port to input port** (Auto-matches consumer machine count to producer output) |
+| Connect Wire | Left Click & Drag between ports (Output -> Input or Input -> Output) |
+| **Smart Match Connect (Bidirectional)** | **Shift + Drag between ports**<br>• Output -> Input: Scales consumer machine count to producer supply (Integer Ceiling)<br>• Input -> Output: Scales producer machine count to consumer demand (Integer Ceiling) |
 | Disconnect Wire / Port | Right Click on wire or port socket |
-| Set Master Anchor | Click `[Base]` icon on recipe card header |
-| Edit Machine Count | Click count box -> type number -> `Enter` or `Esc` |
-| Quick Scale Count | `[-]` -1, `[+]` +1, `[/2]` Half, `[x2]` Double |
+| Set Master Anchor | Click `🎯` icon on recipe card header |
+| Edit Machine Count | Click count box -> type number -> `Enter` or `Esc`, or use `[-]`/`[+]`/`[/2]`/`[x2]` |
+| **Adjust Parallel (Par)** | **Click `[Par: 1x]` to type number**, Mouse Wheel to double/halve, Right Click for 1/2 |
+| **Equip Turbine Rotor** | Click **`[⚙ 220%]` rotor button** -> Choose from 3D visual rotor dialog |
 | Change Voltage Tier | Click or Mouse Wheel over Tier button (`LV`, `MV`, `HV`...) |
 | Toggle Overclock Mode | Click `[STD OC]` / `[PERF OC]` button |
-| Cycle Parallel | Click `[Par: 1x]` button |
+| Blueprint Copy / Paste | `Ctrl + C` (Copy) / `Ctrl + V` (Import) in calculator board |
+| Parallel Factor (Par) | • **Click**: Type custom integer directly (e.g. 1152)<br>• **Right Click**: Halve parallel<br>• **Mouse Wheel**: Multiply/Divide (Shift+Wheel: +1 / -1) |
 | Copy Blueprint | `[Share]` button or `Ctrl + C` |
 | Paste Blueprint | `[Import]` button or `Ctrl + V` |
 | Recipe / Uses Lookup | Hover over port and press `R` (Recipes) or `U` (Uses) |
@@ -90,7 +98,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.1.jar`.
+The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.2.jar`.
 
 ---
 

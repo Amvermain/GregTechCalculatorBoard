@@ -25,6 +25,7 @@ public class EmiRecipeConverter {
         double baseDurationTicks = 100.0; // Default 5s
         double baseEUt = 30.0;           // Default LV
         GTVoltageTier tier = GTVoltageTier.LV;
+        boolean isGenerator = false;
 
         // Try extracting real GTRecipe details
         try {
@@ -36,16 +37,39 @@ public class EmiRecipeConverter {
                     var durationField = backing.getClass().getField("duration");
                     baseDurationTicks = durationField.getInt(backing);
 
-                    // Extract input EU/t
-                    var getInputEUtMethod = backing.getClass().getMethod("getInputEUt");
-                    Object energyStack = getInputEUtMethod.invoke(backing);
-                    if (energyStack != null) {
-                        var voltageMethod = energyStack.getClass().getMethod("voltage");
-                        var amperageMethod = energyStack.getClass().getMethod("amperage");
-                        long voltage = (long) voltageMethod.invoke(energyStack);
-                        long amperage = (long) amperageMethod.invoke(energyStack);
-                        baseEUt = Math.max(1.0, voltage * Math.max(1L, amperage));
-                        tier = GTVoltageTier.getTierForVoltage(voltage);
+                    // Check getOutputEUt (Generator recipes)
+                    try {
+                        var getOutputEUtMethod = backing.getClass().getMethod("getOutputEUt");
+                        Object outEnergy = getOutputEUtMethod.invoke(backing);
+                        if (outEnergy != null) {
+                            var voltageMethod = outEnergy.getClass().getMethod("voltage");
+                            var amperageMethod = outEnergy.getClass().getMethod("amperage");
+                            long voltage = (long) voltageMethod.invoke(outEnergy);
+                            long amperage = (long) amperageMethod.invoke(outEnergy);
+                            if (voltage > 0) {
+                                baseEUt = Math.max(1.0, voltage * Math.max(1L, amperage));
+                                tier = GTVoltageTier.getTierForVoltage(voltage);
+                                isGenerator = true;
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+
+                    // If not generator, extract input EU/t
+                    if (!isGenerator) {
+                        try {
+                            var getInputEUtMethod = backing.getClass().getMethod("getInputEUt");
+                            Object energyStack = getInputEUtMethod.invoke(backing);
+                            if (energyStack != null) {
+                                var voltageMethod = energyStack.getClass().getMethod("voltage");
+                                var amperageMethod = energyStack.getClass().getMethod("amperage");
+                                long voltage = (long) voltageMethod.invoke(energyStack);
+                                long amperage = (long) amperageMethod.invoke(energyStack);
+                                if (voltage > 0) {
+                                    baseEUt = Math.max(1.0, voltage * Math.max(1L, amperage));
+                                    tier = GTVoltageTier.getTierForVoltage(voltage);
+                                }
+                            }
+                        } catch (Throwable ignored) {}
                     }
                 }
             }
@@ -53,7 +77,16 @@ public class EmiRecipeConverter {
             // Fallback
         }
 
+        // Secondary check: recipe ID or category keywords
+        if (!isGenerator && recipe.getId() != null) {
+            String path = recipe.getId().getPath().toLowerCase();
+            if (path.contains("generator") || path.contains("turbine") || path.contains("diesel") || path.contains("combustion") || path.contains("plasma_generator")) {
+                isGenerator = true;
+            }
+        }
+
         RecipeNode node = RecipeNode.create(name, baseDurationTicks, baseEUt, tier);
+        node.setGenerator(isGenerator);
 
         // Convert Inputs
         for (EmiIngredient input : recipe.getInputs()) {
@@ -92,7 +125,7 @@ public class EmiRecipeConverter {
         }
     }
 
-    private static String formatName(String raw) {
+    public static String formatName(String raw) {
         if (raw == null || raw.isEmpty()) return "Unknown Machine";
         String[] parts = raw.split("[_\\-.]");
         StringBuilder sb = new StringBuilder();

@@ -67,8 +67,12 @@ public class SummaryOverlay {
         // 2. Fixed Total Power Section
         int powerY = y + 26;
         String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
-        graphics.drawString(font, pLabel, x + 8, powerY, 0xFFFFFFFF, false);
-        String eutStr = String.format("§a%,.1f EU/t §7(%s)", summary.totalEUt(), summary.highestVoltageTier().getName());
+        String eutStr;
+        if (summary.totalEUt() < -0.001) {
+            eutStr = String.format("§a+%,.1f EU/t §7(%s) §2(Gen)", -summary.totalEUt(), summary.highestVoltageTier().getName());
+        } else {
+            eutStr = String.format("§e%,.1f EU/t §7(%s)", summary.totalEUt(), summary.highestVoltageTier().getName());
+        }
         int pLabelW = font.width(pLabel) + 6;
         graphics.drawString(font, eutStr, x + 8 + pLabelW, powerY, 0xFFFFFFFF, false);
 

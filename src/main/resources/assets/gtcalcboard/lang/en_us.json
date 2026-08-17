@@ -29,6 +29,17 @@
   "gui.gtcalcboard.oc_std": "STD OC",
   "gui.gtcalcboard.oc_perf": "PERF OC",
   "gui.gtcalcboard.parallel": "Par: %sx",
+  "gui.gtcalcboard.gen_badge": "GEN",
+
+  "gui.gtcalcboard.rotor.title": "⚡ Select Turbine Rotor",
+  "gui.gtcalcboard.rotor.count": "✔ %s GT Rotors",
+  "gui.gtcalcboard.rotor.eff": "Eff%:",
+  "gui.gtcalcboard.rotor.power": "Pwr%:",
+  "gui.gtcalcboard.rotor.apply": "Apply",
+  "gui.gtcalcboard.rotor.search_hint": "Search rotor / material...",
+  "gui.gtcalcboard.rotor.tooltip_eff": "Turbine Efficiency: %s%%",
+  "gui.gtcalcboard.rotor.tooltip_power": "Turbine Power: %s%%",
+  "gui.gtcalcboard.rotor.tooltip_equip": "Click to equip to turbine",
 
   "gui.gtcalcboard.tooltip.base_active": "Base Master Recipe (Active)",
   "gui.gtcalcboard.tooltip.base_active_desc": "Click to unset as Auto-Ratio base master",
