@@ -223,6 +223,14 @@ public class RecipeNode {
         return rates;
     }
 
+    /**
+     * Calculates single machine production rate for a specific output ingredient.
+     */
+    public double calculateSingleMachineOutputRate(IngredientStack out) {
+        double singleCps = getOverclockResult().getCyclesPerSecond() * parallel;
+        return out.getExpectedAmount() * singleCps;
+    }
+
     public boolean isBaseNode() {
         return isBaseNode;
     }

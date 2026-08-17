@@ -55,6 +55,7 @@
 | 화면 이동 (Pan) | 우클릭 드래그 또는 휠 클릭 드래그 |
 | 화면 줌 (Zoom) | 마우스 휠 |
 | 파이프라인 연결 | 출력 포트 클릭 드래그 -> 입력 포트에 드롭 |
+| **비율 자동 맞춤 연결** | **Shift + 출력 포트 드래그 -> 입력 포트에 드롭** (앞 기계 생산량에 맞춰 뒤 기계 대수 자동 계산) |
 | 연결 끊기 | 전선이나 포트 소켓 우클릭 |
 | 기준 기계 지정 | 노드 상단 `[Base]` 아이콘 클릭 |
 | 기계 대수 직접 입력 | 숫자 박스 클릭 -> 숫자 타이핑 -> `Enter` 또는 `Esc` |
@@ -89,7 +90,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-빌드된 파일은 `build/libs/gtcalcboard-1.20.1-1.0.0.jar`에 생성됩니다.
+빌드된 파일은 `build/libs/gtcalcboard-1.20.1-1.0.1.jar`에 생성됩니다.
 
 ---
 

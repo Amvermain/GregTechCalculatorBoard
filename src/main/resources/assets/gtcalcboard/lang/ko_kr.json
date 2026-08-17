@@ -26,6 +26,9 @@
   "gui.gtcalcboard.load": "불러오기",
   "gui.gtcalcboard.clear": "초기화",
   "gui.gtcalcboard.center": "중앙정렬",
+  "gui.gtcalcboard.oc_std": "일반 OC",
+  "gui.gtcalcboard.oc_perf": "퍼펙트 OC",
+  "gui.gtcalcboard.parallel": "병렬: %sx",
 
   "gui.gtcalcboard.tooltip.base_active": "기준 마스터 레시피 (활성)",
   "gui.gtcalcboard.tooltip.base_active_desc": "클릭하여 기준 마스터 해제",
@@ -45,6 +48,7 @@
   "message.gtcalcboard.tier_cap_set": "전체 최대 전압 티어 상한선 설정: %s",
   "message.gtcalcboard.max_flow_optimized": "전체 공정이 최대 처리량으로 최적화되었습니다 (상한선: %s)!",
   "message.gtcalcboard.auto_ratio_matched": "[%s] 기준으로 자동 비율이 정렬되었습니다!",
+  "message.gtcalcboard.shift_connect_matched": "연결 완료: [%s] 대수를 %s대로 자동 맞춤했습니다!",
   "message.gtcalcboard.base_set": "[%s] 레시피를 기준 마스터로 설정했습니다!",
   "message.gtcalcboard.base_cleared": "기준 마스터 설정을 해제했습니다.",
   "message.gtcalcboard.disconnect_out": "출력 포트 연결을 해제했습니다!",

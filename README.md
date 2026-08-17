@@ -55,6 +55,7 @@ An in-game node graph calculator for GregTech CEu Modern. Instead of juggling ex
 | Pan Canvas | Right Click + Drag or Middle Click + Drag |
 | Zoom Canvas | Mouse Wheel (Zooms to cursor) |
 | Connect Wire | Left Click & Drag from output port to input port |
+| **Smart Match Connect** | **Shift + Drag from output port to input port** (Auto-matches consumer machine count to producer output) |
 | Disconnect Wire / Port | Right Click on wire or port socket |
 | Set Master Anchor | Click `[Base]` icon on recipe card header |
 | Edit Machine Count | Click count box -> type number -> `Enter` or `Esc` |
@@ -89,7 +90,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.0.jar`.
+The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.1.jar`.
 
 ---
 

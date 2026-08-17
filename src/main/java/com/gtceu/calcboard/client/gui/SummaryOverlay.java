@@ -7,11 +7,17 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class SummaryOverlay {
     public static final int WIDTH = 220;
     private boolean collapsed = false;
+    private double scrollY = 0;
+    private double maxScrollY = 0;
+
+    private IngredientStack hoveredStack = null;
 
     public boolean isCollapsed() {
         return collapsed;
@@ -23,6 +29,9 @@ public class SummaryOverlay {
 
     public void toggle() {
         this.collapsed = !this.collapsed;
+        if (collapsed) {
+            scrollY = 0;
+        }
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {
@@ -30,6 +39,7 @@ public class SummaryOverlay {
         int x = screenWidth - WIDTH - 10;
         int y = 36;
         int height = screenHeight - 46;
+        hoveredStack = null;
 
         if (collapsed) {
             // Mini collapsed tab
@@ -47,63 +57,96 @@ public class SummaryOverlay {
         graphics.fill(x, y, x + WIDTH, y + height, 0xEE1A1E26);
         graphics.renderOutline(x, y, WIDTH, height, 0xFF3D4455);
 
-        // Header Title
+        // 1. Fixed Header Title
         graphics.fill(x, y, x + WIDTH, y + 22, 0xFF242934);
         graphics.drawString(font, "§6⚡ " + Component.translatable("gui.gtcalcboard.summary").getString(), x + 8, y + 7, 0xFFFFFFFF, false);
 
         // Collapse button [>>]
         graphics.drawString(font, "»", x + WIDTH - 16, y + 7, 0xFFAAAAAA, false);
 
-        int curY = y + 28;
-
-        // 1. Total Power Section
+        // 2. Fixed Total Power Section
+        int powerY = y + 26;
         String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
-        graphics.drawString(font, pLabel, x + 8, curY, 0xFFFFFFFF, false);
+        graphics.drawString(font, pLabel, x + 8, powerY, 0xFFFFFFFF, false);
         String eutStr = String.format("§a%,.1f EU/t §7(%s)", summary.totalEUt(), summary.highestVoltageTier().getName());
         int pLabelW = font.width(pLabel) + 6;
-        graphics.drawString(font, eutStr, x + 8 + pLabelW, curY, 0xFFFFFFFF, false);
-        curY += 16;
+        graphics.drawString(font, eutStr, x + 8 + pLabelW, powerY, 0xFFFFFFFF, false);
 
-        // Separator
-        graphics.fill(x + 8, curY, x + WIDTH - 8, curY + 1, 0xFF353C4D);
-        curY += 6;
+        // Top separator below power
+        int headerBottom = powerY + 14;
+        graphics.fill(x + 8, headerBottom, x + WIDTH - 8, headerBottom + 1, 0xFF353C4D);
 
-        // 2. Raw Inputs (Deficits/External supplies needed)
+        // 3. Scrollable Content Area (Raw Inputs + Net Outputs)
+        int contentY = headerBottom + 4;
+        int contentH = (y + height) - contentY - 4;
+
+        // Calculate total content height
+        int rawCount = summary.rawInputs().isEmpty() ? 1 : summary.rawInputs().size();
+        int netCount = summary.netOutputs().isEmpty() ? 1 : summary.netOutputs().size();
+        int totalContentH = 16 + (rawCount * 16) + 12 + 16 + (netCount * 16) + 8;
+
+        maxScrollY = Math.max(0, totalContentH - contentH);
+        scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
+
+        graphics.enableScissor(x + 1, contentY, x + WIDTH - 1, contentY + contentH);
+
+        int curY = contentY - (int) scrollY;
+
+        // Section A: Raw Inputs
         graphics.drawString(font, "§c📥 " + Component.translatable("gui.gtcalcboard.raw_inputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
         if (summary.rawInputs().isEmpty()) {
             graphics.drawString(font, "  §7" + Component.translatable("gui.gtcalcboard.none").getString(), x + 8, curY, 0xFF888888, false);
-            curY += 14;
+            curY += 16;
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
-                if (curY > y + height - 20) break;
-                renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555);
+                if (curY >= contentY - 16 && curY <= contentY + contentH) {
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH);
+                }
                 curY += 16;
             }
         }
 
-        // Separator
-        graphics.fill(x + 8, curY, x + WIDTH - 8, curY + 1, 0xFF353C4D);
-        curY += 6;
+        // Section Separator
+        curY += 2;
+        if (curY >= contentY - 4 && curY <= contentY + contentH) {
+            graphics.fill(x + 8, curY, x + WIDTH - 8, curY + 1, 0xFF353C4D);
+        }
+        curY += 8;
 
-        // 3. Net Outputs (Surplus)
+        // Section B: Net Outputs
         graphics.drawString(font, "§a📤 " + Component.translatable("gui.gtcalcboard.net_outputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
         if (summary.netOutputs().isEmpty()) {
             graphics.drawString(font, "  §7" + Component.translatable("gui.gtcalcboard.none").getString(), x + 8, curY, 0xFF888888, false);
-            curY += 14;
+            curY += 16;
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
-                if (curY > y + height - 20) break;
-                renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55);
+                if (curY >= contentY - 16 && curY <= contentY + contentH) {
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH);
+                }
                 curY += 16;
             }
         }
+
+        graphics.disableScissor();
+
+        // 4. Render Scrollbar if needed
+        if (maxScrollY > 0) {
+            int sbX = x + WIDTH - 5;
+            int sbTrackY = contentY;
+            int sbTrackH = contentH;
+            graphics.fill(sbX, sbTrackY, sbX + 3, sbTrackY + sbTrackH, 0x55000000);
+
+            int thumbH = Math.max(16, (int) ((double) contentH / totalContentH * sbTrackH));
+            int thumbY = sbTrackY + (int) ((scrollY / maxScrollY) * (sbTrackH - thumbH));
+            graphics.fill(sbX, thumbY, sbX + 3, thumbY + thumbH, 0xFFAAAAAA);
+        }
     }
 
-    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor) {
+    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH) {
         stack.render(graphics, x + 8, y - 2);
 
         String name = stack.getDisplayName();
@@ -115,7 +158,21 @@ public class SummaryOverlay {
         String ratePrefix = rate > 0 ? "+" : "";
         String rateStr = ratePrefix + formatRate(rate, stack.isFluid());
         int rateW = font.width(rateStr);
-        graphics.drawString(font, rateStr, x + WIDTH - 8 - rateW, y + 2, rateColor, false);
+        graphics.drawString(font, rateStr, x + WIDTH - 10 - rateW, y + 2, rateColor, false);
+
+        // Check if hovered
+        if (mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
+            hoveredStack = stack;
+        }
+    }
+
+    public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (hoveredStack != null) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal(hoveredStack.getDisplayName()));
+            tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
+            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+        }
     }
 
     private String formatRate(double rate, boolean isFluid) {
@@ -128,6 +185,22 @@ public class SummaryOverlay {
         } else {
             return String.format("%.2f/s", rate).replaceAll("\\.?0+$", "/s");
         }
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
+        if (collapsed) return false;
+
+        int x = screenWidth - WIDTH - 10;
+        int y = 36;
+        int height = screenHeight - 46;
+
+        if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + height) {
+            if (maxScrollY > 0) {
+                scrollY = Math.max(0, Math.min(maxScrollY, scrollY - (delta * 18.0)));
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {

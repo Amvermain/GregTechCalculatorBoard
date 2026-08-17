@@ -26,6 +26,9 @@
   "gui.gtcalcboard.load": "Load",
   "gui.gtcalcboard.clear": "Clear",
   "gui.gtcalcboard.center": "Center",
+  "gui.gtcalcboard.oc_std": "STD OC",
+  "gui.gtcalcboard.oc_perf": "PERF OC",
+  "gui.gtcalcboard.parallel": "Par: %sx",
 
   "gui.gtcalcboard.tooltip.base_active": "Base Master Recipe (Active)",
   "gui.gtcalcboard.tooltip.base_active_desc": "Click to unset as Auto-Ratio base master",
@@ -45,6 +48,7 @@
   "message.gtcalcboard.tier_cap_set": "Global Max Tier Cap set to: %s",
   "message.gtcalcboard.max_flow_optimized": "Optimized entire flowsheet for Maximum Throughput (Cap: %s)!",
   "message.gtcalcboard.auto_ratio_matched": "Auto Ratio matched based on [%s]!",
+  "message.gtcalcboard.shift_connect_matched": "Connected & matched [%s] to %s machines!",
   "message.gtcalcboard.base_set": "Set [%s] as Auto-Ratio Base Master!",
   "message.gtcalcboard.base_cleared": "Cleared Base Master Recipe.",
   "message.gtcalcboard.disconnect_out": "Disconnected output port!",

@@ -86,12 +86,15 @@ public class NodeCardRenderer {
 
         // 7. Second Row Controls: Overclock Mode & Parallel
         int row2Y = ctrlY + 18;
-        String ocText = node.getOverclockMode() == OverclockMode.PERFECT ? "PERF OC" : "STD OC";
+        String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
+        String ocText = Component.translatable(ocKey).getString();
         int ocColor = node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA;
-        drawBtn(graphics, font, ocText, x + 6, row2Y, 54, 14, mouseX, mouseY, ocColor);
+        int ocW = Math.max(54, font.width(ocText) + 8);
+        drawBtn(graphics, font, ocText, x + 6, row2Y, ocW, 14, mouseX, mouseY, ocColor);
 
-        String parText = "Par: " + node.getParallel() + "x";
-        drawBtn(graphics, font, parText, x + 64, row2Y, 48, 14, mouseX, mouseY);
+        String parText = Component.translatable("gui.gtcalcboard.parallel", String.valueOf(node.getParallel())).getString();
+        int parW = Math.max(48, font.width(parText) + 8);
+        drawBtn(graphics, font, parText, x + 8 + ocW, row2Y, parW, 14, mouseX, mouseY);
 
         // 8. Recipe Energy & Duration Info
         int infoY = row2Y + 18;

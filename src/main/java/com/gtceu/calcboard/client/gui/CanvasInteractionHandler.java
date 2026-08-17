@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -144,12 +145,43 @@ public class CanvasInteractionHandler {
                     if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
                         int inPortIdx = targetWidget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
                         if (inPortIdx >= 0) {
-                            graph.addConnection(wireStartNode.getNode().getId(), wireStartOutputIdx, targetWidget.getNode().getId(), inPortIdx);
-                            Minecraft.getInstance().getSoundManager().play(
-                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                    SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
-                                )
-                            );
+                            RecipeNode fromNode = wireStartNode.getNode();
+                            RecipeNode toNode = targetWidget.getNode();
+                            graph.addConnection(fromNode.getId(), wireStartOutputIdx, toNode.getId(), inPortIdx);
+
+                            boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                            if (shiftDown && wireStartOutputIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
+                                IngredientStack outStack = fromNode.getOutputs().get(wireStartOutputIdx);
+                                double producedRate = fromNode.getCyclesPerSecond() * outStack.getExpectedAmount();
+
+                                IngredientStack inStack = toNode.getInputs().get(inPortIdx);
+                                double singleInRate = toNode.getOverclockResult().getCyclesPerSecond() * toNode.getParallel() * inStack.getAmount();
+
+                                if (singleInRate > 0.0001) {
+                                    double matchedCount = Math.max(0.01, Math.round((producedRate / singleInRate) * 100.0) / 100.0);
+                                    toNode.setMachineCount(matchedCount);
+                                    targetWidget.updateCountBuffer();
+                                    targetWidget.invalidateCache();
+
+                                    Minecraft mc = Minecraft.getInstance();
+                                    if (mc.player != null) {
+                                        mc.player.displayClientMessage(Component.literal("§a✔ ").append(
+                                            Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.2f", matchedCount))
+                                        ), true);
+                                    }
+                                    mc.getSoundManager().play(
+                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                            SoundEvents.PLAYER_LEVELUP, 1.2F
+                                        )
+                                    );
+                                }
+                            } else {
+                                Minecraft.getInstance().getSoundManager().play(
+                                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                        SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
+                                    )
+                                );
+                            }
                             screen.markSummaryDirty();
                             break;
                         }

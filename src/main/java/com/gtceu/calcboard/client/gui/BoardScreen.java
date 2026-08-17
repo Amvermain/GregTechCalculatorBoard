@@ -209,6 +209,8 @@ public class BoardScreen extends Screen {
                 }
             }
         }
+
+        summaryOverlay.renderTooltips(graphics, font, mouseX, mouseY);
     }
 
     private void renderGridBackground(GuiGraphics graphics) {
@@ -275,6 +277,9 @@ public class BoardScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (summaryOverlay.mouseScrolled(mouseX, mouseY, delta, width, height)) {
+            return true;
         }
         if (toolbarWidget.mouseScrolled(mouseX, mouseY, delta)) {
             return true;

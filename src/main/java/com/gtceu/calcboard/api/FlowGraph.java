@@ -68,66 +68,54 @@ public class FlowGraph {
     public void autoRatioFromAnchor(RecipeNode anchor) {
         if (anchor == null || nodes.isEmpty()) return;
 
-        Map<String, Double> targetCounts = new HashMap<>();
-        targetCounts.put(anchor.getId(), anchor.getMachineCount());
+        double targetAnchorCount = anchor.getMachineCount();
 
-        Set<String> visited = new HashSet<>();
-        Queue<RecipeNode> queue = new ArrayDeque<>();
+        // 1. Upstream Wavefront Propagation (Supply Anchor's Inputs)
+        Map<String, Double> upstreamCounts = new HashMap<>();
+        upstreamCounts.put(anchor.getId(), targetAnchorCount);
 
-        visited.add(anchor.getId());
-        queue.add(anchor);
+        Queue<RecipeNode> upstreamQueue = new ArrayDeque<>();
+        upstreamQueue.add(anchor);
 
-        while (!queue.isEmpty()) {
-            RecipeNode curr = queue.poll();
-            double currCount = targetCounts.getOrDefault(curr.getId(), curr.getMachineCount());
-            double currSingleCps = curr.getOverclockResult().getCyclesPerSecond() * curr.getParallel();
+        Set<String> upstreamVisited = new HashSet<>();
+        upstreamVisited.add(anchor.getId());
 
-            // 1. Upstream Propagation: Match producer counts to supply curr node's inputs
-            for (int inIdx = 0; inIdx < curr.getInputs().size(); inIdx++) {
-                IngredientStack inStack = curr.getInputs().get(inIdx);
-                double neededRate = inStack.getAmount() * (currSingleCps * currCount);
+        while (!upstreamQueue.isEmpty()) {
+            RecipeNode consumer = upstreamQueue.poll();
+            double consumerCount = upstreamCounts.getOrDefault(consumer.getId(), consumer.getMachineCount());
+            double consumerCps = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * consumerCount;
 
+            for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
+                IngredientStack inStack = consumer.getInputs().get(inIdx);
+                double neededRate = inStack.getAmount() * consumerCps;
+
+                List<ConnectionEdge> inEdges = new ArrayList<>();
                 for (ConnectionEdge edge : connections) {
-                    if (edge.toNodeId().equals(curr.getId()) && edge.inputIndex() == inIdx) {
-                        RecipeNode fromNode = findNodeById(edge.fromNodeId());
-                        if (fromNode != null && !visited.contains(fromNode.getId())) {
-                            if (edge.outputIndex() < fromNode.getOutputs().size()) {
-                                IngredientStack outStack = fromNode.getOutputs().get(edge.outputIndex());
-                                double fromSingleCps = fromNode.getOverclockResult().getCyclesPerSecond() * fromNode.getParallel();
-                                double fromSingleRate = outStack.getExpectedAmount() * fromSingleCps;
-
-                                if (fromSingleRate > 0) {
-                                    double count = Math.max(0.01, neededRate / fromSingleRate);
-                                    targetCounts.put(fromNode.getId(), count);
-                                    visited.add(fromNode.getId());
-                                    queue.add(fromNode);
-                                }
-                            }
-                        }
+                    if (edge.toNodeId().equals(consumer.getId()) && edge.inputIndex() == inIdx) {
+                        inEdges.add(edge);
                     }
                 }
-            }
 
-            // 2. Downstream Propagation: Match consumer counts to consume curr node's outputs
-            for (int outIdx = 0; outIdx < curr.getOutputs().size(); outIdx++) {
-                IngredientStack outStack = curr.getOutputs().get(outIdx);
-                double producedRate = outStack.getExpectedAmount() * (currSingleCps * currCount);
+                if (inEdges.isEmpty()) continue;
+                double sharePerProducer = neededRate / inEdges.size();
 
-                for (ConnectionEdge edge : connections) {
-                    if (edge.fromNodeId().equals(curr.getId()) && edge.outputIndex() == outIdx) {
-                        RecipeNode toNode = findNodeById(edge.toNodeId());
-                        if (toNode != null && !visited.contains(toNode.getId())) {
-                            if (edge.inputIndex() < toNode.getInputs().size()) {
-                                IngredientStack inStack = toNode.getInputs().get(edge.inputIndex());
-                                double toSingleCps = toNode.getOverclockResult().getCyclesPerSecond() * toNode.getParallel();
-                                double toSingleRate = inStack.getAmount() * toSingleCps;
+                for (ConnectionEdge edge : inEdges) {
+                    RecipeNode producer = findNodeById(edge.fromNodeId());
+                    if (producer == null || producer == anchor) continue;
 
-                                if (toSingleRate > 0) {
-                                    double count = Math.max(0.01, producedRate / toSingleRate);
-                                    targetCounts.put(toNode.getId(), count);
-                                    visited.add(toNode.getId());
-                                    queue.add(toNode);
-                                }
+                    if (edge.outputIndex() < producer.getOutputs().size()) {
+                        IngredientStack outStack = producer.getOutputs().get(edge.outputIndex());
+                        double singleRate = producer.calculateSingleMachineOutputRate(outStack);
+
+                        if (singleRate > 0.0001) {
+                            double neededCount = sharePerProducer / singleRate;
+                            double currentMax = upstreamCounts.getOrDefault(producer.getId(), 0.0);
+                            // Take max demand across multiple outputs
+                            upstreamCounts.put(producer.getId(), Math.max(currentMax, neededCount));
+
+                            if (!upstreamVisited.contains(producer.getId())) {
+                                upstreamVisited.add(producer.getId());
+                                upstreamQueue.add(producer);
                             }
                         }
                     }
@@ -135,12 +123,80 @@ public class FlowGraph {
             }
         }
 
-        // Apply all calculated counts
-        for (Map.Entry<String, Double> entry : targetCounts.entrySet()) {
+        // Apply upstream calculated counts
+        for (Map.Entry<String, Double> entry : upstreamCounts.entrySet()) {
             RecipeNode n = findNodeById(entry.getKey());
             if (n != null) {
-                n.setMachineCount(Math.round(entry.getValue() * 100.0) / 100.0);
+                n.setMachineCount(entry.getValue());
             }
+        }
+
+        // 2. Downstream Wavefront Propagation (Consume Anchor's Outputs)
+        Map<String, Double> downstreamCounts = new HashMap<>();
+        downstreamCounts.put(anchor.getId(), targetAnchorCount);
+
+        Queue<RecipeNode> downstreamQueue = new ArrayDeque<>();
+        downstreamQueue.add(anchor);
+
+        Set<String> downstreamVisited = new HashSet<>();
+        downstreamVisited.add(anchor.getId());
+
+        while (!downstreamQueue.isEmpty()) {
+            RecipeNode producer = downstreamQueue.poll();
+            double prodCount = downstreamCounts.getOrDefault(producer.getId(), producer.getMachineCount());
+            double prodCps = producer.getOverclockResult().getCyclesPerSecond() * producer.getParallel() * prodCount;
+
+            for (int outIdx = 0; outIdx < producer.getOutputs().size(); outIdx++) {
+                IngredientStack outStack = producer.getOutputs().get(outIdx);
+                double producedRate = outStack.getExpectedAmount() * prodCps;
+
+                List<ConnectionEdge> outEdges = new ArrayList<>();
+                for (ConnectionEdge edge : connections) {
+                    if (edge.fromNodeId().equals(producer.getId()) && edge.outputIndex() == outIdx) {
+                        outEdges.add(edge);
+                    }
+                }
+
+                if (outEdges.isEmpty()) continue;
+                double sharePerConsumer = producedRate / outEdges.size();
+
+                for (ConnectionEdge edge : outEdges) {
+                    RecipeNode consumer = findNodeById(edge.toNodeId());
+                    if (consumer == null || consumer == anchor || upstreamVisited.contains(consumer.getId())) continue;
+
+                    if (edge.inputIndex() < consumer.getInputs().size()) {
+                        IngredientStack inStack = consumer.getInputs().get(edge.inputIndex());
+                        double singleInRate = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * inStack.getAmount();
+
+                        if (singleInRate > 0.0001) {
+                            double neededCount = sharePerConsumer / singleInRate;
+                            double currentMax = downstreamCounts.getOrDefault(consumer.getId(), 0.0);
+                            downstreamCounts.put(consumer.getId(), Math.max(currentMax, neededCount));
+
+                            if (!downstreamVisited.contains(consumer.getId())) {
+                                downstreamVisited.add(consumer.getId());
+                                downstreamQueue.add(consumer);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply downstream calculated counts
+        for (Map.Entry<String, Double> entry : downstreamCounts.entrySet()) {
+            RecipeNode n = findNodeById(entry.getKey());
+            if (n != null) {
+                n.setMachineCount(entry.getValue());
+            }
+        }
+
+        // Always enforce anchor machine count
+        anchor.setMachineCount(targetAnchorCount);
+
+        // Round counts to 2 decimal places
+        for (RecipeNode n : nodes) {
+            n.setMachineCount(Math.round(n.getMachineCount() * 100.0) / 100.0);
         }
     }
 
