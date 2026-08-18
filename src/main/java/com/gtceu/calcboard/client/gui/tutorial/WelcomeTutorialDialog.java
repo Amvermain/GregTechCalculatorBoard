@@ -29,12 +29,15 @@ public class WelcomeTutorialDialog {
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {
         if (!visible) return;
 
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 700.0f);
+
         // Semi-transparent backdrop
-        graphics.fill(0, 0, screenW, screenH, 0x99000000);
+        graphics.fill(0, 0, screenW, screenH, 0xAA000000);
 
         Font font = Minecraft.getInstance().font;
-        int modalW = 320;
-        int modalH = 160;
+        int modalW = Math.min(380, screenW - 24);
+        int modalH = Math.min(180, screenH - 24);
         int modalX = (screenW - modalW) / 2;
         int modalY = (screenH - modalH) / 2;
 
@@ -44,40 +47,49 @@ public class WelcomeTutorialDialog {
         graphics.renderOutline(modalX + 1, modalY + 1, modalW - 2, modalH - 2, 0x8800E676);
 
         // Title
-        graphics.drawString(font, "§a🎓 " + Component.translatable("gui.gtcalcboard.welcome.title").getString(), modalX + 12, modalY + 12, 0xFFFFFFFF, false);
+        String title = "§a🎓 " + Component.translatable("gui.gtcalcboard.welcome.title").getString();
+        var titleLines = font.split(Component.literal(title), modalW - 24);
+        int curY = modalY + 12;
+        for (var tl : titleLines) {
+            graphics.drawString(font, tl, modalX + 12, curY, 0xFFFFFFFF, false);
+            curY += 11;
+        }
+        curY += 2;
 
         // Body Text
         String desc = Component.translatable("gui.gtcalcboard.welcome.desc").getString();
         List<net.minecraft.util.FormattedCharSequence> lines = font.split(Component.literal("§7" + desc), modalW - 24);
-        for (int i = 0; i < lines.size(); i++) {
-            graphics.drawString(font, lines.get(i), modalX + 12, modalY + 34 + i * 12, 0xFFDDDDDD, false);
+        for (int i = 0; i < Math.min(5, lines.size()); i++) {
+            graphics.drawString(font, lines.get(i), modalX + 12, curY + i * 11, 0xFFDDDDDD, false);
         }
 
         // Action Buttons: [🎓 튜토리얼 시작] vs [직접 둘러보기]
-        int btnW = 135;
+        int btnW = (modalW - 32) / 2;
         int btnH = 22;
         int startBtnX = modalX + modalW - btnW - 12;
-        int startBtnY = modalY + modalH - btnH - 12;
+        int startBtnY = modalY + modalH - btnH - 10;
 
         int closeBtnX = modalX + 12;
         int closeBtnY = startBtnY;
 
         drawBtn(graphics, font, Component.translatable("gui.gtcalcboard.welcome.skip").getString(), closeBtnX, closeBtnY, btnW, btnH, mouseX, mouseY, 0xFF888888, 0xFF3E475A);
         drawBtn(graphics, font, Component.translatable("gui.gtcalcboard.welcome.start").getString(), startBtnX, startBtnY, btnW, btnH, mouseX, mouseY, 0xFF00FF88, 0xFF1D5A3A);
+
+        graphics.pose().popPose();
     }
 
     public boolean mouseClicked(BoardScreen screen, int screenW, int screenH, double mouseX, double mouseY, int button) {
         if (!visible || button != 0) return false;
 
-        int modalW = 320;
-        int modalH = 160;
+        int modalW = Math.min(380, screenW - 24);
+        int modalH = Math.min(180, screenH - 24);
         int modalX = (screenW - modalW) / 2;
         int modalY = (screenH - modalH) / 2;
 
-        int btnW = 135;
+        int btnW = (modalW - 32) / 2;
         int btnH = 22;
         int startBtnX = modalX + modalW - btnW - 12;
-        int startBtnY = modalY + modalH - btnH - 12;
+        int startBtnY = modalY + modalH - btnH - 10;
 
         int closeBtnX = modalX + 12;
         int closeBtnY = startBtnY;

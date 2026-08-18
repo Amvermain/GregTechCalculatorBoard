@@ -24,6 +24,13 @@ minecraft {
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
             property 'forge.logging.console.level', 'debug'
 
+            // Mixin refmap remapping in dev environment
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+
+            // Dev memory allocation
+            jvmArgs '-Xmx4G', '-Xms2G'
+
             mods {
                 "${mod_id}" {
                     source sourceSets.main
@@ -35,6 +42,8 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
             property 'forge.logging.console.level', 'debug'
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
             args 'nogui'
 
             mods {
@@ -51,21 +60,30 @@ repositories {
     maven { url = "https://maven.terraformersmc.com/" }
     maven { url = "https://maven.blamejared.com" }
     maven { url = "https://www.cursemaven.com" }
+    maven { url = "https://api.modrinth.com/maven" }
     flatDir {
-        dirs 'instance/mods'
+        dirs 'libs', 'C:/Users/JongUk/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods'
     }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // EMI API
-    compileOnly fg.deobf("dev.emi:emi-forge:${emi_version}:api")
-    runtimeOnly fg.deobf("dev.emi:emi-forge:${emi_version}")
+    // EMI API & Runtime (Deobfuscated automatically by ForgeGradle)
+    compileOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
+    runtimeOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
 
     // JEI API (Optional / Fallback)
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+
+    // GregTech Modern (StarT Fork) & LowDragLib (Prism Launcher mods)
+    compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
+    runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
+    runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
+
+    // Create (필요 시 주석 해제)
+    // runtimeOnly fg.deobf(name: "create-${minecraft_version}-${create_version}")
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'

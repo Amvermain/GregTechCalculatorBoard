@@ -85,22 +85,21 @@ public class GuideDialog {
 
         Font font = Minecraft.getInstance().font;
 
-        // Semi-transparent backdrop overlay (covers entire screen behind dialog)
-        graphics.fill(0, 0, screenWidth, screenHeight, 0xCC000000);
-
-        int dialogX = (screenWidth - DIALOG_WIDTH) / 2;
-        int dialogY = (screenHeight - DIALOG_HEIGHT) / 2;
+        int dialogW = Math.min(480, screenWidth - 24);
+        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogX = (screenWidth - dialogW) / 2;
+        int dialogY = (screenHeight - dialogH) / 2;
 
         // 1. Dialog Main Container Background & Outline
-        graphics.fill(dialogX, dialogY, dialogX + DIALOG_WIDTH, dialogY + DIALOG_HEIGHT, 0xF0121722);
-        graphics.renderOutline(dialogX, dialogY, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF3D4B66);
+        graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xF0121722);
+        graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4B66);
 
         // 2. Header Bar
-        graphics.fill(dialogX, dialogY, dialogX + DIALOG_WIDTH, dialogY + 24, 0xFF1C2433);
+        graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
         graphics.drawString(font, "§e📖 " + Component.translatable("gui.gtcalcboard.guide.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
-        int closeX = dialogX + DIALOG_WIDTH - 20;
+        int closeX = dialogX + dialogW - 20;
         int closeY = dialogY + 4;
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 16 && mouseY >= closeY && mouseY <= closeY + 16;
         graphics.fill(closeX, closeY, closeX + 16, closeY + 16, closeHover ? 0xFF992222 : 0xFF2A3345);
@@ -141,13 +140,13 @@ public class GuideDialog {
         }
 
         // Sidebar Separator Line
-        graphics.fill(dialogX + SIDEBAR_WIDTH + 10, dialogY + 28, dialogX + SIDEBAR_WIDTH + 11, dialogY + DIALOG_HEIGHT - 6, 0xFF283448);
+        graphics.fill(dialogX + SIDEBAR_WIDTH + 10, dialogY + 28, dialogX + SIDEBAR_WIDTH + 11, dialogY + dialogH - 6, 0xFF283448);
 
         // 4. Right Content Area (Scrollable text & highlights)
         int contentX = dialogX + SIDEBAR_WIDTH + 18;
         int contentY = dialogY + 32;
-        int contentW = DIALOG_WIDTH - SIDEBAR_WIDTH - 28;
-        int contentH = DIALOG_HEIGHT - 40;
+        int contentW = dialogW - SIDEBAR_WIDTH - 28;
+        int contentH = dialogH - 40;
 
         // Content Area Background
         graphics.fill(contentX - 4, contentY - 4, contentX + contentW + 4, contentY + contentH + 4, 0xFF0D121B);
@@ -217,17 +216,19 @@ public class GuideDialog {
 
         int screenWidth = parent.width;
         int screenHeight = parent.height;
-        int dialogX = (screenWidth - DIALOG_WIDTH) / 2;
-        int dialogY = (screenHeight - DIALOG_HEIGHT) / 2;
+        int dialogW = Math.min(480, screenWidth - 24);
+        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogX = (screenWidth - dialogW) / 2;
+        int dialogY = (screenHeight - dialogH) / 2;
 
         // Check if inside dialog
-        if (mouseX < dialogX || mouseX > dialogX + DIALOG_WIDTH || mouseY < dialogY || mouseY > dialogY + DIALOG_HEIGHT) {
+        if (mouseX < dialogX || mouseX > dialogX + dialogW || mouseY < dialogY || mouseY > dialogY + dialogH) {
             close();
             return true;
         }
 
         // Close button click
-        int closeX = dialogX + DIALOG_WIDTH - 20;
+        int closeX = dialogX + dialogW - 20;
         int closeY = dialogY + 4;
         if (mouseX >= closeX && mouseX <= closeX + 16 && mouseY >= closeY && mouseY <= closeY + 16) {
             close();

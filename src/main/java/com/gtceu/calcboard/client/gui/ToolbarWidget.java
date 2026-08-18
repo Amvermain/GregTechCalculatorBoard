@@ -18,7 +18,11 @@ public class ToolbarWidget {
     private double scrollX = 0;
     private double maxScrollX = 0;
     private boolean isDraggingToolbar = false;
-    private double lastMouseX = 0;
+    private double dragStartX = 0;
+    private double dragStartY = 0;
+    private double initialScrollX = 0;
+    private boolean hasDragged = false;
+    private int pressedButton = -1;
 
     public ToolbarWidget(BoardScreen screen) {
         this.screen = screen;
@@ -257,46 +261,53 @@ public class ToolbarWidget {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (mouseY < 26 || mouseY > 44) return false;
-
-        Font font = Minecraft.getInstance().font;
-        String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
-        int titleRight = 14 + font.width(titleStr) + 8;
-        int curX = titleRight - (int) scrollX;
-
-        List<ToolbarButtonDef> buttons = buildButtons(font);
-        for (ToolbarButtonDef btn : buttons) {
-            if (mouseX >= curX && mouseX <= curX + btn.width) {
-                btn.onClick.accept(button);
-                return true;
-            }
-            curX += btn.width + 3;
+        if (mouseY < 24 || mouseY > 46 || mouseX < 8 || mouseX > screen.width - 8) {
+            return false;
         }
 
-        // Click on empty space inside toolbar starts horizontal drag
-        if (mouseX >= titleRight && mouseX <= screen.width - 8) {
-            isDraggingToolbar = true;
-            lastMouseX = mouseX;
-            return true;
-        }
-
-        return false;
+        isDraggingToolbar = true;
+        dragStartX = mouseX;
+        dragStartY = mouseY;
+        initialScrollX = scrollX;
+        hasDragged = false;
+        pressedButton = button;
+        return true;
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (isDraggingToolbar) {
-            isDraggingToolbar = false;
-            return true;
+        if (!isDraggingToolbar) {
+            return false;
         }
-        return false;
+
+        isDraggingToolbar = false;
+
+        // If not dragged (simple click), trigger button click at dragStartX / dragStartY
+        if (!hasDragged && button == pressedButton) {
+            Font font = Minecraft.getInstance().font;
+            String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
+            int titleRight = 14 + font.width(titleStr) + 8;
+            int curX = titleRight - (int) scrollX;
+
+            List<ToolbarButtonDef> buttons = buildButtons(font);
+            for (ToolbarButtonDef btn : buttons) {
+                if (dragStartX >= curX && dragStartX <= curX + btn.width && dragStartY >= 26 && dragStartY <= 44) {
+                    btn.onClick.accept(button);
+                    return true;
+                }
+                curX += btn.width + 3;
+            }
+        }
+
+        return true;
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (isDraggingToolbar && button == 0) {
-            double deltaX = mouseX - lastMouseX;
-            lastMouseX = mouseX;
+            if (Math.abs(mouseX - dragStartX) > 2.0) {
+                hasDragged = true;
+            }
             if (maxScrollX > 0) {
-                scrollX = Math.max(0, Math.min(maxScrollX, scrollX - deltaX));
+                scrollX = Math.max(0, Math.min(maxScrollX, initialScrollX - (mouseX - dragStartX)));
                 return true;
             }
         }
@@ -304,7 +315,7 @@ public class ToolbarWidget {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseY >= 8 && mouseY <= 26) {
+        if (mouseY >= 24 && mouseY <= 46 && mouseX >= 8 && mouseX <= screen.width - 8) {
             if (maxScrollX > 0) {
                 scrollX = Math.max(0, Math.min(maxScrollX, scrollX - (delta * 24.0)));
                 return true;

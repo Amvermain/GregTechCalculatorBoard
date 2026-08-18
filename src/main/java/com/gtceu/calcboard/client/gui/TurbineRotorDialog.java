@@ -203,22 +203,24 @@ public class TurbineRotorDialog {
         // Modal backdrop overlay
         graphics.fill(0, 0, screenWidth, screenHeight, 0xCC000000);
 
-        int dialogX = (screenWidth - DIALOG_WIDTH) / 2;
-        int dialogY = (screenHeight - DIALOG_HEIGHT) / 2;
+        int dialogW = Math.min(340, screenWidth - 24);
+        int dialogH = Math.min(270, screenHeight - 24);
+        int dialogX = (screenWidth - dialogW) / 2;
+        int dialogY = (screenHeight - dialogH) / 2;
 
         // Modal Box (Fully Opaque)
-        graphics.fill(dialogX, dialogY, dialogX + DIALOG_WIDTH, dialogY + DIALOG_HEIGHT, 0xFF14171E);
-        graphics.renderOutline(dialogX, dialogY, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF3D4455);
+        graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xFF14171E);
+        graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4455);
 
         // Header
-        graphics.fill(dialogX + 1, dialogY + 1, dialogX + DIALOG_WIDTH - 1, dialogY + 22, 0xFF1B202A);
+        graphics.fill(dialogX + 1, dialogY + 1, dialogX + dialogW - 1, dialogY + 22, 0xFF1B202A);
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.rotor.title"), dialogX + 8, dialogY + 7, 0xFF55FFFF, false);
 
         String countBadge = "§a" + Component.translatable("gui.gtcalcboard.rotor.count", filteredRotors.size()).getString();
         graphics.drawString(font, countBadge, dialogX + 155, dialogY + 7, 0xFF55FF55, false);
 
         // Close button [X]
-        int closeX = dialogX + DIALOG_WIDTH - 18;
+        int closeX = dialogX + dialogW - 18;
         int closeY = dialogY + 4;
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= closeY && mouseY <= closeY + 14;
         graphics.fill(closeX, closeY, closeX + 14, closeY + 14, closeHover ? 0xFFAA2222 : 0xFF2B3242);
@@ -249,13 +251,14 @@ public class TurbineRotorDialog {
         int searchY = dialogY + 48;
         searchBox.setX(dialogX + 8);
         searchBox.setY(searchY);
+        searchBox.setWidth(dialogW - 16);
         searchBox.render(graphics, mouseX, mouseY, partialTicks);
 
         // Grid of Rotor Items
         int gridX = dialogX + 10;
         int gridY = searchY + 22;
-        int gridW = DIALOG_WIDTH - 20;
-        int gridH = DIALOG_HEIGHT - (gridY - dialogY) - 10;
+        int gridW = dialogW - 20;
+        int gridH = dialogH - (gridY - dialogY) - 10;
 
         int totalRows = (int) Math.ceil((double) filteredRotors.size() / COLS);
         int maxScroll = Math.max(0, totalRows * SLOT_SIZE - gridH);
@@ -315,16 +318,18 @@ public class TurbineRotorDialog {
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible || targetNode == null) return false;
 
-        int dialogX = (screenWidth - DIALOG_WIDTH) / 2;
-        int dialogY = (screenHeight - DIALOG_HEIGHT) / 2;
+        int dialogW = Math.min(340, screenWidth - 24);
+        int dialogH = Math.min(270, screenHeight - 24);
+        int dialogX = (screenWidth - dialogW) / 2;
+        int dialogY = (screenHeight - dialogH) / 2;
 
-        if (mouseX < dialogX || mouseX > dialogX + DIALOG_WIDTH || mouseY < dialogY || mouseY > dialogY + DIALOG_HEIGHT) {
+        if (mouseX < dialogX || mouseX > dialogX + dialogW || mouseY < dialogY || mouseY > dialogY + dialogH) {
             close();
             return true;
         }
 
         // Close button
-        int closeX = dialogX + DIALOG_WIDTH - 18;
+        int closeX = dialogX + dialogW - 18;
         int closeY = dialogY + 4;
         if (mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= closeY && mouseY <= closeY + 14) {
             close();

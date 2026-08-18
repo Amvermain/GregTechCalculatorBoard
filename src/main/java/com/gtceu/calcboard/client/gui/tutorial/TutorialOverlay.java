@@ -58,34 +58,6 @@ public class TutorialOverlay {
         } else {
             drawTutorialBtn(graphics, font, Component.translatable("gui.gtcalcboard.tutorial.finish").getString(), nextBtnX, nextBtnY, btnW, btnH, mouseX, mouseY, 0xFF55FFFF);
         }
-
-        // 2. Render Animated Pulse Wire Guides for Interactive Targets
-        renderTargetHighlights(graphics, screen, step);
-    }
-
-    private static void renderTargetHighlights(GuiGraphics graphics, BoardScreen screen, TutorialStep step) {
-        if (step == TutorialStep.STEP_4_NORMAL_WIRING || step == TutorialStep.STEP_5_SHIFT_WIRING) {
-            // Render hint dynamic bezier line between Boiler Output port and Turbine Input port
-            NodeWidget boilerW = findWidget(screen, TutorialManager.getInstance().getBoilerNodeId());
-            NodeWidget turbineW = findWidget(screen, TutorialManager.getInstance().getTurbineNodeId());
-
-            if (boilerW != null && turbineW != null) {
-                double zoom = screen.getZoom();
-                double panX = screen.getPanX();
-                double panY = screen.getPanY();
-
-                float x1 = (float) ((boilerW.getOutputPortX(0) * zoom) + panX);
-                float y1 = (float) ((boilerW.getOutputPortY(0) * zoom) + panY);
-                float x2 = (float) ((turbineW.getInputPortX(0) * zoom) + panX);
-                float y2 = (float) ((turbineW.getInputPortY(0) * zoom) + panY);
-
-                float time = (System.currentTimeMillis() % 1000) / 1000.0f;
-                int alpha = (int) (150 + 105 * Math.sin(time * Math.PI));
-                int wireGuideColor = (alpha << 24) | 0x00FF88;
-
-                com.gtceu.calcboard.client.gui.ConnectionRenderer.renderBezier(graphics, x1, y1, x2, y2, wireGuideColor, 2.5f);
-            }
-        }
     }
 
     public static boolean mouseClicked(BoardScreen screen, int screenW, int screenH, double mouseX, double mouseY, int button) {

@@ -45,15 +45,15 @@ public class SummaryOverlay {
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         int x = screenWidth - WIDTH - 10;
-        int y = 36;
-        int height = screenHeight - 46;
+        int y = 48;
+        int height = screenHeight - 56;
         hoveredStack = null;
         hoveredMachines = false;
 
         if (collapsed) {
             // Mini collapsed tab
             int tabW = 24;
-            int tabH = 60;
+            int tabH = 50;
             int tabX = screenWidth - tabW - 4;
             graphics.fill(tabX, y, tabX + tabW, y + tabH, 0xEE1E2430);
             graphics.renderOutline(tabX, y, tabW, tabH, 0xFF3D4B66);
@@ -162,6 +162,8 @@ public class SummaryOverlay {
             int thumbY = sbTrackY + (int) ((scrollY / maxScrollY) * (sbTrackH - thumbH));
             graphics.fill(sbX, thumbY, sbX + 3, thumbY + thumbH, 0xFFAAAAAA);
         }
+
+        graphics.pose().popPose();
     }
 
     private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH) {
@@ -192,7 +194,6 @@ public class SummaryOverlay {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
-            graphics.pose().popPose();
             return;
         }
 
@@ -202,8 +203,6 @@ public class SummaryOverlay {
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         }
-
-        graphics.pose().popPose();
     }
 
     private String formatRate(double rate, boolean isFluid) {
@@ -222,8 +221,8 @@ public class SummaryOverlay {
         if (collapsed) return false;
 
         int x = screenWidth - WIDTH - 10;
-        int y = 36;
-        int height = screenHeight - 46;
+        int y = 48;
+        int height = screenHeight - 56;
 
         if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + height) {
             if (maxScrollY > 0) {
@@ -237,9 +236,9 @@ public class SummaryOverlay {
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (collapsed) {
             int tabW = 24;
-            int tabH = 60;
+            int tabH = 50;
             int tabX = screenWidth - tabW - 4;
-            int y = 36;
+            int y = 48;
             if (mouseX >= tabX && mouseX <= tabX + tabW && mouseY >= y && mouseY <= y + tabH) {
                 toggle();
                 return true;
@@ -248,7 +247,7 @@ public class SummaryOverlay {
         }
 
         int x = screenWidth - WIDTH - 10;
-        int y = 36;
+        int y = 48;
         if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + 22) {
             toggle();
             return true;

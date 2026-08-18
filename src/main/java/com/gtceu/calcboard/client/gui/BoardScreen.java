@@ -267,8 +267,13 @@ public class BoardScreen extends Screen {
         this.guideDialog = new GuideDialog(this);
         rebuildWidgets();
 
+        if (this.width < 640) {
+            summaryOverlay.setCollapsed(true);
+        }
+
         if (!BoardManager.getInstance().hasSeenWelcomePrompt() && getGraph().getNodes().isEmpty()) {
             welcomeDialog.show();
+            summaryOverlay.setCollapsed(true);
             BoardManager.getInstance().setHasSeenWelcomePrompt(true);
             BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile());
         }
@@ -803,6 +808,7 @@ public class BoardScreen extends Screen {
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }
+    public SummaryOverlay getSummaryOverlay() { return summaryOverlay; }
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
 
     public double getPanX() { return panX; }

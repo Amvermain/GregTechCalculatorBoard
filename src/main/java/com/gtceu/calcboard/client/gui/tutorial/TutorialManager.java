@@ -45,6 +45,7 @@ public class TutorialManager {
 
         // Reset canvas to a clean slate
         if (screen != null) {
+            screen.getSummaryOverlay().setCollapsed(true);
             screen.getGraph().getNodes().clear();
             screen.getGraph().getConnections().clear();
             screen.setPanX(screen.width / 2.0);
