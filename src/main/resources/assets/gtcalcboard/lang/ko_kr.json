@@ -18,6 +18,14 @@
   "gui.gtcalcboard.amount": "수량:",
   "gui.gtcalcboard.chance": "확률: %s%%",
   "gui.gtcalcboard.search": "레시피 검색...",
+  "gui.gtcalcboard.add_btn": "추가",
+  "gui.gtcalcboard.gen_tag": "발전",
+  "gui.gtcalcboard.drain_tag": "소비",
+  "gui.gtcalcboard.loading_recipes": "레시피 인덱스 로딩 중...",
+  "gui.gtcalcboard.no_matching_recipes": "일치하는 레시피가 없습니다.",
+  "gui.gtcalcboard.page_name_hint": "페이지 이름",
+  "gui.gtcalcboard.default_recipe_name": "레시피",
+  "gui.gtcalcboard.default_compound_name": "복합 공정 모듈",
 
   "gui.gtcalcboard.undo": "실행취소",
   "gui.gtcalcboard.redo": "다시실행",
@@ -85,6 +93,12 @@
   "message.gtcalcboard.base_set": "[%s] 레시피를 기준 마스터로 설정했습니다!",
   "message.gtcalcboard.base_cleared": "기준 마스터 지정을 해제했습니다.",
   "message.gtcalcboard.recipe_added": "[%s] 레시피를 계산기 보드에 추가했습니다!",
+  "message.gtcalcboard.undo": "실행 취소: %s",
+  "message.gtcalcboard.redo": "다시 실행: %s",
+  "message.gtcalcboard.deleted_components": "%s개 컴포넌트를 삭제했습니다",
+  "message.gtcalcboard.copied_components": "%s개 컴포넌트를 클립보드에 복사했습니다",
+  "message.gtcalcboard.pasted_components": "%s개 컴포넌트를 붙여넣었습니다",
+  "message.gtcalcboard.cut_components": "%s개 컴포넌트를 잘라내기했습니다",
 
   "gui.gtcalcboard.emi.btn_title": "계산기 보드에 레시피 추가",
   "gui.gtcalcboard.emi.btn_desc": "클릭하여 이 레시피를 계산기 보드에 추가합니다.",
@@ -152,5 +166,6 @@
   "gui.gtcalcboard.tutorial.step8_desc": "우측 요약창에서 총 발전량을 확인하고, 상단 [📦 모듈화] 버튼을 눌러 복잡한 공정을 하나의 카드로 압축해 보세요!",
 
   "gui.gtcalcboard.tutorial.completed_title": "튜토리얼 완료!",
-  "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 거대한 석유화학 및 핵융합 공정을 자유롭게 설계해 보세요! 언제든 상단 [📖 도움말]이나 [🎓 튜토리얼]을 다시 볼 수 있습니다."
+  "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 거대한 석유화학 및 핵융합 공정을 자유롭게 설계해 보세요! 언제든 상단 [📖 도움말]이나 [🎓 튜토리얼]을 다시 볼 수 있습니다.",
+  "gui.gtcalcboard.tutorial.completed_tag": "[완료]"
 }

@@ -32,7 +32,9 @@ public class TutorialOverlay {
         graphics.renderOutline(bannerX + 1, bannerY + 1, bannerW - 2, bannerH - 2, 0x8800E676);
 
         // Header Title
-        String stepTag = step != TutorialStep.COMPLETED ? String.format("§a🎓 [Step %d/8] ", step.getStepNumber()) : "§a🎉 [완료] ";
+        String stepTag = step != TutorialStep.COMPLETED 
+            ? String.format("§a🎓 [Step %d/8] ", step.getStepNumber()) 
+            : "§a🎉 " + Component.translatable("gui.gtcalcboard.tutorial.completed_tag").getString() + " ";
         String titleStr = stepTag + Component.translatable(step.getTitleKey()).getString();
         graphics.drawString(font, titleStr, bannerX + 10, bannerY + 8, 0xFFFFFFFF, false);
 

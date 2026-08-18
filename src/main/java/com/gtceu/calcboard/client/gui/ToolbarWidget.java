@@ -468,9 +468,10 @@ public class ToolbarWidget {
         List<RecipeNode> origNodes = new ArrayList<>(graph.getNodes());
         List<FlowGraph.ConnectionEdge> origEdges = new ArrayList<>(graph.getConnections());
 
+        String defaultModuleName = Component.translatable("gui.gtcalcboard.default_compound_name").getString();
         RecipeNode moduleNode = hasSpecificSelection 
-            ? graph.groupIntoModule(selectedIds, "Compound Process")
-            : graph.groupIntoModule("Compound Process");
+            ? graph.groupIntoModule(selectedIds, defaultModuleName)
+            : graph.groupIntoModule(defaultModuleName);
 
         if (moduleNode != null) {
             List<RecipeNode> groupedNodes = new ArrayList<>();

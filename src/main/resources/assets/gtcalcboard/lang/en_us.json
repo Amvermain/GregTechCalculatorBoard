@@ -18,6 +18,14 @@
   "gui.gtcalcboard.amount": "Amount:",
   "gui.gtcalcboard.chance": "Chance: %s%%",
   "gui.gtcalcboard.search": "Search Recipes...",
+  "gui.gtcalcboard.add_btn": "Add",
+  "gui.gtcalcboard.gen_tag": "Gen",
+  "gui.gtcalcboard.drain_tag": "Drain",
+  "gui.gtcalcboard.loading_recipes": "Loading recipe index...",
+  "gui.gtcalcboard.no_matching_recipes": "No matching recipes found.",
+  "gui.gtcalcboard.page_name_hint": "Page Name",
+  "gui.gtcalcboard.default_recipe_name": "Recipe",
+  "gui.gtcalcboard.default_compound_name": "Compound Process",
 
   "gui.gtcalcboard.undo": "Undo",
   "gui.gtcalcboard.redo": "Redo",
@@ -85,6 +93,12 @@
   "message.gtcalcboard.base_set": "Set [%s] as Auto-Ratio Base Master!",
   "message.gtcalcboard.base_cleared": "Cleared Base Master Recipe.",
   "message.gtcalcboard.recipe_added": "Added [%s] to Calculator Board!",
+  "message.gtcalcboard.undo": "Undo: %s",
+  "message.gtcalcboard.redo": "Redo: %s",
+  "message.gtcalcboard.deleted_components": "Deleted %s components",
+  "message.gtcalcboard.copied_components": "Copied %s components to clipboard",
+  "message.gtcalcboard.pasted_components": "Pasted %s components",
+  "message.gtcalcboard.cut_components": "Cut %s components to clipboard",
 
   "gui.gtcalcboard.emi.btn_title": "Add to Calculator Board",
   "gui.gtcalcboard.emi.btn_desc": "Click to add this recipe to flowsheet",
@@ -152,5 +166,6 @@
   "gui.gtcalcboard.tutorial.step8_desc": "Check total power output in the summary overlay, and click [📦 Group Module] to collapse into a single card!",
 
   "gui.gtcalcboard.tutorial.completed_title": "Tutorial Complete!",
-  "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [📖 Help] or [🎓 Tutorial] anytime."
+  "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [📖 Help] or [🎓 Tutorial] anytime.",
+  "gui.gtcalcboard.tutorial.completed_tag": "[Complete]"
 }

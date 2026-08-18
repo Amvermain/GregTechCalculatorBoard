@@ -45,7 +45,7 @@ public class TurbineRotorDialog {
         this.parent = parent;
         Font font = Minecraft.getInstance().font;
 
-        this.searchBox = new EditBox(font, 0, 0, DIALOG_WIDTH - 24, 16, Component.literal("Search rotor..."));
+        this.searchBox = new EditBox(font, 0, 0, DIALOG_WIDTH - 24, 16, Component.translatable("gui.gtcalcboard.rotor.search_hint"));
         this.searchBox.setResponder(this::onSearchChanged);
         this.searchBox.setHint(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.rotor.search_hint")));
 

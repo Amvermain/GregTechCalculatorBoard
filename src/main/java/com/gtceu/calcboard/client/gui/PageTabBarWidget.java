@@ -150,7 +150,7 @@ public class PageTabBarWidget {
     private void startRename(int index, String currentName, int x, int y, int width) {
         this.editingPageIndex = index;
         Font font = Minecraft.getInstance().font;
-        this.renameBox = new EditBox(font, x, y, Math.max(60, width), 16, Component.literal("Page Name"));
+        this.renameBox = new EditBox(font, x, y, Math.max(60, width), 16, Component.translatable("gui.gtcalcboard.page_name_hint"));
         this.renameBox.setValue(currentName);
         this.renameBox.setFocused(true);
     }

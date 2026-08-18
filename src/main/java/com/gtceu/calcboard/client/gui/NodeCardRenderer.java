@@ -204,8 +204,8 @@ public class NodeCardRenderer {
 
         if (node.isModule()) {
             String eutStr = totalEUt > 0.0001
-                ? String.format("§a+%.1f EU/t §7(발전)", totalEUt)
-                : String.format("§e%.1f EU/t §7(소비)", totalEUt);
+                ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, Component.translatable("gui.gtcalcboard.gen_tag").getString())
+                : String.format("§e%.1f EU/t §7(%s)", totalEUt, Component.translatable("gui.gtcalcboard.drain_tag").getString());
             graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
 
             String modTag = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";

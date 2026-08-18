@@ -79,7 +79,7 @@ public class SummaryOverlay {
         String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
         String eutStr;
         if (summary.totalEUt() < -0.001) {
-            eutStr = String.format("§a+%,.1f EU/t §7(%s) §2(Gen)", -summary.totalEUt(), summary.highestVoltageTier().getName());
+            eutStr = String.format("§a+%,.1f EU/t §7(%s) §2(%s)", -summary.totalEUt(), summary.highestVoltageTier().getName(), Component.translatable("gui.gtcalcboard.gen_tag").getString());
         } else {
             eutStr = String.format("§e%,.1f EU/t §7(%s)", summary.totalEUt(), summary.highestVoltageTier().getName());
         }

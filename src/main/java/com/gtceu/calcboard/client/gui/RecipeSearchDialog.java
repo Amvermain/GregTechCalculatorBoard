@@ -194,7 +194,7 @@ public class RecipeSearchDialog {
             if (path.contains("/")) path = path.substring(path.lastIndexOf('/') + 1);
             return EmiRecipeConverter.formatName(path);
         }
-        return "Recipe";
+        return Component.translatable("gui.gtcalcboard.default_recipe_name").getString();
     }
 
     private void onSearchQueryChanged(String query) {
@@ -298,7 +298,9 @@ public class RecipeSearchDialog {
         scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
 
         if (filteredRecipes.isEmpty()) {
-            String emptyMsg = !GLOBAL_CACHED ? "§eLoading recipe index..." : "§7No matching recipes found.";
+            String emptyMsg = !GLOBAL_CACHED 
+                ? "§e" + Component.translatable("gui.gtcalcboard.loading_recipes").getString() 
+                : "§7" + Component.translatable("gui.gtcalcboard.no_matching_recipes").getString();
             graphics.drawCenteredString(font, emptyMsg, listX + listW / 2, listY + listH / 2 - 4, 0xFF888888);
         } else {
             for (int i = 0; i < visibleRows; i++) {
@@ -342,7 +344,7 @@ public class RecipeSearchDialog {
 
                 graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, btnHover ? 0xFF3A824A : 0xFF245030);
                 graphics.renderOutline(btnX, btnY, btnW, btnH, btnHover ? 0xFF55FF88 : 0xFF357045);
-                graphics.drawCenteredString(font, "§a+ Add", btnX + btnW / 2, btnY + 5, 0xFFFFFFFF);
+                graphics.drawCenteredString(font, "§a+ " + Component.translatable("gui.gtcalcboard.add_btn").getString(), btnX + btnW / 2, btnY + 5, 0xFFFFFFFF);
             }
 
             // Scrollbar indicator

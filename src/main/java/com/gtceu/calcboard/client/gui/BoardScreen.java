@@ -56,7 +56,7 @@ public class BoardScreen extends Screen {
     private double lastMouseX, lastMouseY;
 
     public BoardScreen() {
-        super(Component.literal("GregTech Calculator Board"));
+        super(Component.translatable("gui.gtcalcboard.title"));
         var activePage = BoardManager.getInstance().getActivePage();
         this.panX = activePage.getPanX();
         this.panY = activePage.getPanY();
@@ -115,7 +115,7 @@ public class BoardScreen extends Screen {
                 markSummaryDirty();
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§e↶ Undo: " + cmd.getDescription()), true);
+                    mc.player.displayClientMessage(Component.literal("§e↶ ").append(Component.translatable("message.gtcalcboard.undo", cmd.getDescription())), true);
                 }
             }
         }
@@ -130,7 +130,7 @@ public class BoardScreen extends Screen {
                 markSummaryDirty();
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§a↷ Redo: " + cmd.getDescription()), true);
+                    mc.player.displayClientMessage(Component.literal("§a↷ ").append(Component.translatable("message.gtcalcboard.redo", cmd.getDescription())), true);
                 }
             }
         }
@@ -163,7 +163,7 @@ public class BoardScreen extends Screen {
         }
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§c🗑 Deleted " + count + " components"), true);
+            mc.player.displayClientMessage(Component.literal("§c🗑 ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))), true);
         }
     }
 
@@ -175,7 +175,7 @@ public class BoardScreen extends Screen {
         NodeClipboard.getInstance().copy(getGraph(), selectedNodeIds);
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§a✔ Copied " + selectedNodeIds.size() + " components to clipboard"), true);
+            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copied_components", String.valueOf(selectedNodeIds.size()))), true);
         }
     }
 
@@ -204,7 +204,7 @@ public class BoardScreen extends Screen {
         markSummaryDirty();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§a✔ Pasted " + newNodes.size() + " components"), true);
+            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.pasted_components", String.valueOf(newNodes.size()))), true);
         }
     }
 
@@ -232,7 +232,7 @@ public class BoardScreen extends Screen {
         markSummaryDirty();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§6✂ Cut " + count + " components to clipboard"), true);
+            mc.player.displayClientMessage(Component.literal("§6✂ ").append(Component.translatable("message.gtcalcboard.cut_components", String.valueOf(count))), true);
         }
     }
 
