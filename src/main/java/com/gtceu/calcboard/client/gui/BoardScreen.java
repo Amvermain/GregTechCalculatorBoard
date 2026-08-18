@@ -34,11 +34,13 @@ public class BoardScreen extends Screen {
     private final PageTabBarWidget pageTabBar = new PageTabBarWidget(this);
     private final SummaryOverlay summaryOverlay = new SummaryOverlay();
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
+    private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private final com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog welcomeDialog = new com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
     private TurbineRotorDialog rotorDialog;
     private GuideDialog guideDialog;
+    private DeletePageConfirmDialog deletePageDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -97,6 +99,7 @@ public class BoardScreen extends Screen {
         for (RecipeNode n : getGraph().getNodes()) {
             selectedNodeIds.add(n.getId());
         }
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onSelectAll();
     }
 
     public void recordCommand(com.gtceu.calcboard.api.history.BoardCommand cmd) {
@@ -113,6 +116,7 @@ public class BoardScreen extends Screen {
             if (cmd != null) {
                 rebuildWidgets();
                 markSummaryDirty();
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onUndo();
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
                     mc.player.displayClientMessage(Component.literal("§e↶ ").append(Component.translatable("message.gtcalcboard.undo", cmd.getDescription())), true);
@@ -128,6 +132,7 @@ public class BoardScreen extends Screen {
             if (cmd != null) {
                 rebuildWidgets();
                 markSummaryDirty();
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onRedo();
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.player != null) {
                     mc.player.displayClientMessage(Component.literal("§a↷ ").append(Component.translatable("message.gtcalcboard.redo", cmd.getDescription())), true);
@@ -202,6 +207,7 @@ public class BoardScreen extends Screen {
         }
         rebuildWidgets();
         markSummaryDirty();
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onPasted();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.pasted_components", String.valueOf(newNodes.size()))), true);
@@ -230,6 +236,7 @@ public class BoardScreen extends Screen {
         selectedNodeIds.clear();
         rebuildWidgets();
         markSummaryDirty();
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onCut();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.displayClientMessage(Component.literal("§6✂ ").append(Component.translatable("message.gtcalcboard.cut_components", String.valueOf(count))), true);
@@ -265,6 +272,7 @@ public class BoardScreen extends Screen {
         this.searchDialog = new RecipeSearchDialog(this);
         this.rotorDialog = new TurbineRotorDialog(this);
         this.guideDialog = new GuideDialog(this);
+        this.deletePageDialog = new DeletePageConfirmDialog(this);
         rebuildWidgets();
 
         if (this.width < 640) {
@@ -276,6 +284,12 @@ public class BoardScreen extends Screen {
             summaryOverlay.setCollapsed(true);
             BoardManager.getInstance().setHasSeenWelcomePrompt(true);
             BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile());
+        }
+    }
+
+    public void openDeletePageDialog(int pageIndex, String pageName) {
+        if (deletePageDialog != null) {
+            deletePageDialog.open(pageIndex, pageName);
         }
     }
 
@@ -342,8 +356,20 @@ public class BoardScreen extends Screen {
     }
 
     public void removeNode(NodeWidget widget) {
-        getGraph().removeNode(widget.getNode());
+        if (widget == null || widget.getNode() == null) return;
+        RecipeNode n = widget.getNode();
+        List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
+        for (FlowGraph.ConnectionEdge e : getGraph().getConnections()) {
+            if (e.fromNodeId().equals(n.getId()) || e.toNodeId().equals(n.getId())) {
+                removedEdges.add(e);
+            }
+        }
+        getGraph().removeNode(n);
+        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.RemoveNodesCommand(List.of(n), removedEdges, "Delete " + n.getName()));
+        selectedNodeIds.remove(n.getId());
         rebuildWidgets();
+        markSummaryDirty();
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onNodeRemoved(n);
     }
 
     public void markSummaryDirty() {
@@ -391,14 +417,15 @@ public class BoardScreen extends Screen {
         NodeWidget wireStart = canvasHandler.getWireStartNode();
         if (wireStart != null) {
             float x1, y1;
+            int dragWireColor = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0xFFFFD700 : 0xFF00E676;
             if (canvasHandler.isWireStartInput()) {
                 x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-                ConnectionRenderer.renderBezier(graphics, (float) canvasMouseX, (float) canvasMouseY, x1, y1, 0xFF00E676, 3.0f);
+                ConnectionRenderer.renderBezier(graphics, (float) canvasMouseX, (float) canvasMouseY, x1, y1, dragWireColor, 3.0f);
             } else {
                 x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-                ConnectionRenderer.renderBezier(graphics, x1, y1, (float) canvasMouseX, (float) canvasMouseY, 0xFF00E676, 3.0f);
+                ConnectionRenderer.renderBezier(graphics, x1, y1, (float) canvasMouseX, (float) canvasMouseY, dragWireColor, 3.0f);
             }
         }
 
@@ -428,6 +455,23 @@ public class BoardScreen extends Screen {
             }
         }
 
+        // 4.5 Render Quick Add Marker if active
+        if (canvasHandler.hasQuickAddMarker()) {
+            double qx = canvasHandler.getQuickAddMarkerCanvasX();
+            double qy = canvasHandler.getQuickAddMarkerCanvasY();
+            boolean isMarkerHovered = Math.hypot(canvasMouseX - qx, canvasMouseY - qy) <= 14.0;
+
+            int markerBg = isMarkerHovered ? 0xEE10B981 : 0x99059669;
+            int markerBorder = isMarkerHovered ? 0xFF6EE7B7 : 0xCC10B981;
+
+            graphics.fill((int)(qx - 10), (int)(qy - 10), (int)(qx + 10), (int)(qy + 10), markerBg);
+            graphics.renderOutline((int)(qx - 10), (int)(qy - 10), 20, 20, markerBorder);
+
+            String plus = "+";
+            int pw = font.width(plus);
+            graphics.drawString(font, plus, (int)(qx - pw / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+        }
+
         // Render Active Marquee Box Selection
         canvasHandler.renderMarquee(graphics);
 
@@ -437,9 +481,10 @@ public class BoardScreen extends Screen {
         com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, net.minecraft.client.Minecraft.ON_OSX);
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        // 6. Render Page Tab Bar, Top Toolbar and Summary Overlay
+        // 6. Render Page Tab Bar, Top Toolbar, Hotkey HUD and Summary Overlay
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
+        hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
 
         if (summaryDirty || cachedSummary == null) {
             cachedSummary = getGraph().computeSummary();
@@ -455,7 +500,9 @@ public class BoardScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTicks);
 
         // 8. Top-level Modal Dialogs (Highest Layer)
-        if (guideDialog != null && guideDialog.isVisible()) {
+        if (deletePageDialog != null && deletePageDialog.isVisible()) {
+            deletePageDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (guideDialog != null && guideDialog.isVisible()) {
             guideDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (searchDialog != null && searchDialog.isVisible()) {
             searchDialog.render(graphics, width, height, mouseX, mouseY);
@@ -524,6 +571,11 @@ public class BoardScreen extends Screen {
                     if (in.getChance() < 1.0) {
                         tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", in.getChance() * 100.0))));
                     }
+                    tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
+                    tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
+                    if (stats.isConnected()) {
+                        tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_sever").getString()));
+                    }
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;
@@ -557,10 +609,33 @@ public class BoardScreen extends Screen {
                     if (out.getChance() < 1.0) {
                         tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", out.getChance() * 100.0))));
                     }
+                    tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
+                    tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
+                    if (stats.isConnected()) {
+                        tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_sever").getString()));
+                    }
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;
                 }
+            }
+        }
+
+        // Floating hint while dragging wire
+        NodeWidget wireStart = canvasHandler.getWireStartNode();
+        if (wireStart != null) {
+            boolean shift = Screen.hasShiftDown();
+            String hintKey = shift ? "gui.gtcalcboard.tooltip.wire_mode_shift" : "gui.gtcalcboard.tooltip.wire_mode_normal";
+            graphics.renderTooltip(font, Component.translatable(hintKey), mouseX, mouseY);
+            return;
+        }
+
+        if (canvasHandler.hasQuickAddMarker()) {
+            double qx = canvasHandler.getQuickAddMarkerCanvasX();
+            double qy = canvasHandler.getQuickAddMarkerCanvasY();
+            if (Math.hypot(canvasMouseX - qx, canvasMouseY - qy) <= 14.0) {
+                graphics.renderTooltip(font, Component.literal("§a➕ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_add")), mouseX, mouseY);
+                return;
             }
         }
 
@@ -596,6 +671,9 @@ public class BoardScreen extends Screen {
         if (com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay.mouseClicked(this, width, height, mouseX, mouseY, button)) {
             return true;
         }
+        if (deletePageDialog != null && deletePageDialog.isVisible()) {
+            return deletePageDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseClicked(mouseX, mouseY, button);
         }
@@ -606,6 +684,9 @@ public class BoardScreen extends Screen {
             return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
         if (pageTabBar.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (hotkeyHudWidget.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
         if (summaryOverlay.mouseClicked(mouseX, mouseY, button, width, height)) {
@@ -715,6 +796,13 @@ public class BoardScreen extends Screen {
                 return true;
             }
         }
+        if (deletePageDialog != null && deletePageDialog.isVisible()) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                deletePageDialog.close();
+                return true;
+            }
+            return deletePageDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (guideDialog != null && guideDialog.isVisible()) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 guideDialog.close();
@@ -775,6 +863,9 @@ public class BoardScreen extends Screen {
             } else if (keyCode == GLFW.GLFW_KEY_A) {
                 selectAll();
                 return true;
+            } else if (keyCode == GLFW.GLFW_KEY_G) {
+                performGroupIntoModule();
+                return true;
             }
         }
 
@@ -803,11 +894,26 @@ public class BoardScreen extends Screen {
                             } else {
                                 EmiApi.displayUses(emiStack);
                             }
+                            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onRecipeLookup();
                             return true;
                         }
                     }
                 }
             }
+        }
+
+        // Quick Recipe Search at Cursor: Space
+        if (keyCode == GLFW.GLFW_KEY_SPACE && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+            if (searchDialog != null && !searchDialog.isVisible()) {
+                searchDialog.openAt(toCanvasX(lastMouseX), toCanvasY(lastMouseY));
+                return true;
+            }
+        }
+
+        // Toggle Hotkey HUD: H
+        if (keyCode == GLFW.GLFW_KEY_H && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+            hotkeyHudWidget.toggle();
+            return true;
         }
 
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -826,6 +932,7 @@ public class BoardScreen extends Screen {
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }
     public SummaryOverlay getSummaryOverlay() { return summaryOverlay; }
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
+    public void performGroupIntoModule() { toolbarWidget.performGroupIntoModule(); }
 
     public double getPanX() { return panX; }
     public void setPanX(double panX) {
@@ -860,6 +967,7 @@ public class BoardScreen extends Screen {
             active.setPanY(this.panY);
             active.setZoom(this.zoom);
         }
+        BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), this.panX, this.panY, this.zoom);
         super.onClose();
     }
 

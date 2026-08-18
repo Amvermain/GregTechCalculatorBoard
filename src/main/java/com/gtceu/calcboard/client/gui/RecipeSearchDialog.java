@@ -31,6 +31,9 @@ public class RecipeSearchDialog {
     private final List<SearchableRecipe> filteredRecipes = new ArrayList<>();
     private int scrollOffset = 0;
     private boolean visible = false;
+    private boolean hasTargetSpawnPos = false;
+    private double targetSpawnCanvasX = 0;
+    private double targetSpawnCanvasY = 0;
 
     private static final int DIALOG_WIDTH = 360;
     private static final int DIALOG_HEIGHT = 280;
@@ -45,6 +48,18 @@ public class RecipeSearchDialog {
 
         // Trigger background pre-caching immediately
         ensureGlobalRecipesCachedAsync(null);
+    }
+
+    public void openAt(double canvasX, double canvasY) {
+        this.hasTargetSpawnPos = true;
+        this.targetSpawnCanvasX = canvasX;
+        this.targetSpawnCanvasY = canvasY;
+        setVisible(true);
+    }
+
+    public void open() {
+        this.hasTargetSpawnPos = false;
+        setVisible(true);
     }
 
     public static void cacheFromRecipes(Collection<EmiRecipe> recipes) {
@@ -405,9 +420,14 @@ public class RecipeSearchDialog {
                 SearchableRecipe sr = filteredRecipes.get(index);
                 RecipeNode node = EmiRecipeConverter.convert(sr.recipe);
                 if (node != null) {
-                    double[] center = BoardScreen.getNextNodeCenterPosition(screenWidth, screenHeight);
-                    node.setPosX(center[0]);
-                    node.setPosY(center[1]);
+                    if (hasTargetSpawnPos) {
+                        node.setPosX(targetSpawnCanvasX - 80);
+                        node.setPosY(targetSpawnCanvasY - 30);
+                    } else {
+                        double[] center = BoardScreen.getNextNodeCenterPosition(screenWidth, screenHeight);
+                        node.setPosX(center[0]);
+                        node.setPosY(center[1]);
+                    }
                     parent.addNode(node);
                     setVisible(false);
                 }

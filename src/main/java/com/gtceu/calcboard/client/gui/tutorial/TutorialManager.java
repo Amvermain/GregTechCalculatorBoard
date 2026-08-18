@@ -10,13 +10,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
 /**
- * Manages the state machine and progression of the 7-step interactive onboarding tutorial.
+ * Manages the state machine and progression of the 12-step interactive onboarding tutorial.
  */
 public class TutorialManager {
     private static final TutorialManager INSTANCE = new TutorialManager();
 
     private boolean active = false;
-    private TutorialStep currentStep = TutorialStep.STEP_1_PAN_ZOOM;
+    private TutorialStep currentStep = TutorialStep.STEP_1_ADD_RECIPE;
     private BoardScreen currentScreen = null;
 
     // Track user actions for step transitions
@@ -40,7 +40,7 @@ public class TutorialManager {
     public void startTutorial(BoardScreen screen) {
         this.currentScreen = screen;
         this.active = true;
-        this.currentStep = TutorialStep.STEP_1_PAN_ZOOM;
+        this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
         this.pannedOrZoomed = false;
 
         // Reset canvas to a clean slate
@@ -59,7 +59,7 @@ public class TutorialManager {
 
     public void stopTutorial() {
         this.active = false;
-        this.currentStep = TutorialStep.STEP_1_PAN_ZOOM;
+        this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
         this.practiceNodeId = null;
         this.boilerNodeId = null;
         this.turbineNodeId = null;
@@ -84,15 +84,17 @@ public class TutorialManager {
     private void onStepEnter(TutorialStep step) {
         if (currentScreen == null) return;
 
-        if (step == TutorialStep.STEP_4_NORMAL_WIRING) {
+        if (step == TutorialStep.STEP_2_NORMAL_WIRING) {
             setupWiringExercise();
-        } else if (step == TutorialStep.STEP_6_SHIFT_WIRING) {
+        } else if (step == TutorialStep.STEP_4_SHIFT_WIRING) {
             // Reset turbine count to 1.0 so user can experience Shift auto-calculation to 5.0
             RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
             if (turbine != null) {
                 turbine.setMachineCount(1.0);
                 currentScreen.rebuildWidgets();
             }
+        } else if (step == TutorialStep.STEP_5_SUMMARY_MODULE) {
+            currentScreen.getSummaryOverlay().setCollapsed(false);
         }
     }
 
@@ -127,56 +129,64 @@ public class TutorialManager {
     // --- Action Event Triggers ---
 
     public void onPanOrZoom() {
-        if (!active) return;
-        if (currentStep == TutorialStep.STEP_1_PAN_ZOOM && !pannedOrZoomed) {
-            pannedOrZoomed = true;
-            nextStep();
-        }
     }
 
     public void onNodeAdded(RecipeNode node) {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_2_ADD_RECIPE) {
+        if (currentStep == TutorialStep.STEP_1_ADD_RECIPE) {
             this.practiceNodeId = node != null ? node.getId() : null;
             nextStep();
         }
     }
 
+    public void onRecipeLookup() {
+    }
+
+    public void onNodeRenamed() {
+    }
+
     public void onNodeRemoved(RecipeNode node) {
-        if (!active) return;
-        if (currentStep == TutorialStep.STEP_3_REMOVE_RECIPE) {
-            nextStep();
-        }
     }
 
     public void onWireConnected(boolean shiftDown) {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_4_NORMAL_WIRING) {
-            // Advance to Step 5 (Delete Wiring)
+        if (currentStep == TutorialStep.STEP_2_NORMAL_WIRING) {
+            // Advance to Step 3 (Delete Wiring)
             nextStep();
-        } else if (currentStep == TutorialStep.STEP_6_SHIFT_WIRING) {
-            // Advance to Step 7 (Auto Ratio)
+        } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
+            // Advance to Step 5 (Summary & Module)
             nextStep();
         }
     }
 
     public void onWireDisconnected() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_5_DELETE_WIRING) {
-            nextStep(); // Advance to Step 6 (Shift Wiring)
+        if (currentStep == TutorialStep.STEP_3_DELETE_WIRING) {
+            nextStep(); // Advance to Step 4 (Shift Wiring)
         }
     }
 
     public void onAutoRatioTriggered() {
-        if (!active) return;
-        if (currentStep == TutorialStep.STEP_7_AUTO_RATIO) {
-            nextStep();
-        }
+    }
+
+    public void onSelectAll() {
+    }
+
+    public void onPasted() {
+    }
+
+    public void onCut() {
+    }
+
+    public void onUndo() {
+    }
+
+    public void onRedo() {
     }
 
     public void onModuleGrouped() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_8_SUMMARY_MODULE) {
+        if (currentStep == TutorialStep.STEP_5_SUMMARY_MODULE) {
             completeTutorial();
         }
     }
@@ -196,31 +206,20 @@ public class TutorialManager {
     // --- Dynamic Widget Glowing Helpers ---
 
     public boolean isToolbarButtonGlowing(String buttonKey) {
-        if (!active) return false;
-        return switch (currentStep) {
-            case STEP_2_ADD_RECIPE -> "add_recipe".equals(buttonKey);
-            case STEP_7_AUTO_RATIO -> "auto_ratio".equals(buttonKey);
-            case STEP_8_SUMMARY_MODULE -> "group_module".equals(buttonKey);
-            default -> false;
-        };
+        return false;
     }
 
     public boolean isNodeCloseButtonGlowing(String nodeId) {
-        if (!active) return false;
-        return currentStep == TutorialStep.STEP_3_REMOVE_RECIPE;
+        return false;
     }
 
     public boolean isNodeBaseTargetButtonGlowing(String nodeId) {
-        if (!active) return false;
-        if (currentStep == TutorialStep.STEP_7_AUTO_RATIO) {
-            return turbineNodeId != null && turbineNodeId.equals(nodeId);
-        }
         return false;
     }
 
     public boolean isPortGlowing(String nodeId, boolean isInput, int portIdx) {
         if (!active) return false;
-        if (currentStep == TutorialStep.STEP_4_NORMAL_WIRING || currentStep == TutorialStep.STEP_6_SHIFT_WIRING) {
+        if (currentStep == TutorialStep.STEP_2_NORMAL_WIRING || currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
             if (!isInput && portIdx == 0 && boilerNodeId != null && boilerNodeId.equals(nodeId)) {
                 return true;
             }

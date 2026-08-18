@@ -722,15 +722,12 @@ public class CalculationTest {
 
     @Test
     public void testTutorialStepEnumProperties() {
-        Assertions.assertEquals(1, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_1_PAN_ZOOM.getStepNumber());
-        Assertions.assertEquals(2, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_2_ADD_RECIPE.getStepNumber());
-        Assertions.assertEquals(3, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_3_REMOVE_RECIPE.getStepNumber());
-        Assertions.assertEquals(4, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_4_NORMAL_WIRING.getStepNumber());
-        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_DELETE_WIRING.getStepNumber());
-        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_SHIFT_WIRING.getStepNumber());
-        Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_AUTO_RATIO.getStepNumber());
-        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_SUMMARY_MODULE.getStepNumber());
-        Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
+        Assertions.assertEquals(1, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_1_ADD_RECIPE.getStepNumber());
+        Assertions.assertEquals(2, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_2_NORMAL_WIRING.getStepNumber());
+        Assertions.assertEquals(3, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_3_DELETE_WIRING.getStepNumber());
+        Assertions.assertEquals(4, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_4_SHIFT_WIRING.getStepNumber());
+        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_SUMMARY_MODULE.getStepNumber());
+        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
     }
 
     @Test
@@ -741,5 +738,46 @@ public class CalculationTest {
 
         mgr.setHasSeenWelcomePrompt(false);
         Assertions.assertFalse(mgr.hasSeenWelcomePrompt());
+    }
+
+    @Test
+    public void testPowerDisplayModeConversions() {
+        // LV (32V)
+        Assertions.assertEquals("2A LV", PowerDisplayMode.formatAmps(2.0, GTVoltageTier.LV));
+        Assertions.assertEquals("0.5A LV", PowerDisplayMode.formatAmps(0.5, GTVoltageTier.LV));
+        Assertions.assertEquals("1.25A LV", PowerDisplayMode.formatAmps(1.25, GTVoltageTier.LV));
+
+        // HV (512V)
+        Assertions.assertEquals("1A HV", PowerDisplayMode.formatAmps(1.0, GTVoltageTier.HV));
+        Assertions.assertEquals("5A HV", PowerDisplayMode.formatAmps(5.0, GTVoltageTier.HV));
+
+        // Node card formatting in different modes
+        RecipeNode turbine = RecipeNode.create("Gas Turbine", 100.0, 512.0, GTVoltageTier.HV);
+        turbine.setGenerator(true);
+
+        String eutStr = PowerDisplayMode.EUT.formatNodePower(turbine);
+        Assertions.assertTrue(eutStr.contains("512.0 EU/t"));
+
+        String ampsStr = PowerDisplayMode.AMPS.formatNodePower(turbine);
+        Assertions.assertTrue(ampsStr.contains("1.0A HV"));
+
+        String bothStr = PowerDisplayMode.BOTH.formatNodePower(turbine);
+        Assertions.assertTrue(bothStr.contains("512.0 EU/t") && bothStr.contains("1A HV"));
+    }
+
+    @Test
+    public void testBoardManagerPowerDisplayModeCycling() {
+        BoardManager mgr = BoardManager.getInstance();
+        mgr.setPowerDisplayMode(PowerDisplayMode.EUT);
+        Assertions.assertEquals(PowerDisplayMode.EUT, mgr.getPowerDisplayMode());
+
+        PowerDisplayMode m1 = mgr.cyclePowerDisplayMode();
+        Assertions.assertEquals(PowerDisplayMode.AMPS, m1);
+
+        PowerDisplayMode m2 = mgr.cyclePowerDisplayMode();
+        Assertions.assertEquals(PowerDisplayMode.BOTH, m2);
+
+        PowerDisplayMode m3 = mgr.cyclePowerDisplayMode();
+        Assertions.assertEquals(PowerDisplayMode.EUT, m3);
     }
 }

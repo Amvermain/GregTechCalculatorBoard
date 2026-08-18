@@ -42,8 +42,33 @@ public class CanvasInteractionHandler {
     private double boxSelectCurX, boxSelectCurY;
     private final Map<String, double[]> dragStartPositions = new HashMap<>();
 
+    // Quick Add Marker State
+    private boolean hasQuickAddMarker = false;
+    private double quickAddMarkerCanvasX = 0;
+    private double quickAddMarkerCanvasY = 0;
+    private long quickAddMarkerTime = 0;
+    private long lastEmptyClickTime = 0;
+    private double lastEmptyClickCanvasX = 0;
+    private double lastEmptyClickCanvasY = 0;
+
     public CanvasInteractionHandler(BoardScreen screen) {
         this.screen = screen;
+    }
+
+    public boolean hasQuickAddMarker() {
+        return hasQuickAddMarker && (System.currentTimeMillis() - quickAddMarkerTime < 15000);
+    }
+
+    public double getQuickAddMarkerCanvasX() {
+        return quickAddMarkerCanvasX;
+    }
+
+    public double getQuickAddMarkerCanvasY() {
+        return quickAddMarkerCanvasY;
+    }
+
+    public void clearQuickAddMarker() {
+        this.hasQuickAddMarker = false;
     }
 
     public NodeWidget getWireStartNode() {
@@ -208,8 +233,32 @@ public class CanvasInteractionHandler {
             w.commitCountEdit();
         }
 
-        // 4. Empty Space Left Click -> Start Marquee Box Selection
+        // Check clicking on existing Quick Add Marker
+        if (button == 0 && hasQuickAddMarker()) {
+            double dist = Math.hypot(canvasMouseX - quickAddMarkerCanvasX, canvasMouseY - quickAddMarkerCanvasY);
+            if (dist <= 16.0) {
+                screen.getSearchDialog().openAt(quickAddMarkerCanvasX, quickAddMarkerCanvasY);
+                hasQuickAddMarker = false;
+                return true;
+            }
+        }
+
+        // 4. Empty Space Left Click -> Check Double Click or Start Box Select / Click
         if (button == 0) {
+            long now = System.currentTimeMillis();
+            if (now - lastEmptyClickTime < 350 && Math.hypot(canvasMouseX - lastEmptyClickCanvasX, canvasMouseY - lastEmptyClickCanvasY) < 25) {
+                screen.getSearchDialog().openAt(canvasMouseX, canvasMouseY);
+                hasQuickAddMarker = false;
+                isBoxSelecting = false;
+                lastEmptyClickTime = 0;
+                return true;
+            }
+            lastEmptyClickTime = now;
+            lastEmptyClickCanvasX = canvasMouseX;
+            lastEmptyClickCanvasY = canvasMouseY;
+
+            hasQuickAddMarker = false;
+
             isBoxSelecting = true;
             boxSelectStartX = canvasMouseX;
             boxSelectStartY = canvasMouseY;
@@ -411,7 +460,8 @@ public class CanvasInteractionHandler {
                 double minY = Math.min(boxSelectStartY, boxSelectCurY);
                 double maxY = Math.max(boxSelectStartY, boxSelectCurY);
 
-                if (Math.abs(maxX - minX) > 4 || Math.abs(maxY - minY) > 4) {
+                if (Math.abs(maxX - minX) > 6 || Math.abs(maxY - minY) > 6) {
+                    hasQuickAddMarker = false; // User dragged a selection box, don't leave marker
                     for (NodeWidget w : screen.getNodeWidgets()) {
                         double nx = w.getNode().getPosX();
                         double ny = w.getNode().getPosY();
@@ -422,6 +472,12 @@ public class CanvasInteractionHandler {
                             screen.getSelectedNodeIds().add(w.getNode().getId());
                         }
                     }
+                } else {
+                    // Stationary click release -> spawn [+] Quick-Add marker!
+                    quickAddMarkerCanvasX = boxSelectStartX;
+                    quickAddMarkerCanvasY = boxSelectStartY;
+                    quickAddMarkerTime = System.currentTimeMillis();
+                    hasQuickAddMarker = true;
                 }
                 return true;
             }

@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Top bar widget for managing and switching between multiple board preset pages / tabs.
- * Supports double-click inline renaming and horizontal drag/wheel scrolling.
+ * Supports double-click inline renaming, horizontal drag/wheel scrolling, and confirmation modal on tab deletion.
  */
 public class PageTabBarWidget {
     public static final int TAB_HEIGHT = 18;
@@ -160,9 +160,17 @@ public class PageTabBarWidget {
                 // 1. Delete [x] button clicked
                 if (pages.size() > 1 && virtualMouseX >= curX + tabW - 14 && virtualMouseX <= curX + tabW - 2 && button == 0) {
                     commitRename();
-                    bm.removePage(i);
-                    screen.rebuildWidgets();
-                    playClickSound();
+                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                        // Shift + Click -> Fast Delete without confirmation modal!
+                        bm.removePage(i);
+                        screen.rebuildWidgets();
+                        Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
+                        );
+                    } else {
+                        // Regular Click -> Open confirmation modal
+                        screen.openDeletePageDialog(i, page.getName());
+                    }
                     return true;
                 }
 
@@ -265,6 +273,7 @@ public class PageTabBarWidget {
             String val = renameBox.getValue().trim();
             if (!val.isEmpty()) {
                 BoardManager.getInstance().renamePage(editingPageIndex, val);
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onNodeRenamed();
             }
             editingPageIndex = -1;
             renameBox = null;

@@ -68,120 +68,25 @@ public class ToolbarWidget {
             com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
         }));
 
-        // 0.1 Undo
-        boolean canUndo = BoardManager.getInstance().getActivePage() != null && BoardManager.getInstance().getActivePage().getHistoryManager().canUndo();
-        String undoTxt = "↶ " + Component.translatable("gui.gtcalcboard.undo").getString();
-        int undoCol = canUndo ? 0xFFEEEEEE : 0xFF777777;
-        int undoBg = canUndo ? 0xFF282E3B : 0xFF1C2028;
-        int undoHov = canUndo ? 0xFF3E475A : 0xFF1C2028;
-        int undoBorder = canUndo ? 0xFF3D4455 : 0xFF282E3B;
-        list.add(new ToolbarButtonDef("undo", undoTxt, undoCol, undoBg, undoHov, undoBorder, font.width(undoTxt) + 10, btn -> {
-            if (canUndo) screen.undo();
-        }));
-
-        // 0.2 Redo
-        boolean canRedo = BoardManager.getInstance().getActivePage() != null && BoardManager.getInstance().getActivePage().getHistoryManager().canRedo();
-        String redoTxt = "↷ " + Component.translatable("gui.gtcalcboard.redo").getString();
-        int redoCol = canRedo ? 0xFFEEEEEE : 0xFF777777;
-        int redoBg = canRedo ? 0xFF282E3B : 0xFF1C2028;
-        int redoHov = canRedo ? 0xFF3E475A : 0xFF1C2028;
-        int redoBorder = canRedo ? 0xFF3D4455 : 0xFF282E3B;
-        list.add(new ToolbarButtonDef("redo", redoTxt, redoCol, redoBg, redoHov, redoBorder, font.width(redoTxt) + 10, btn -> {
-            if (canRedo) screen.redo();
-        }));
-
-        // 1. Add
-        String addTxt = "§a➕ " + Component.translatable("gui.gtcalcboard.add_recipe").getString();
-        list.add(new ToolbarButtonDef("add_recipe", addTxt, 0xFF55FF55, 0xFF2A623A, 0xFF3A824A, 0xFF44AA55, font.width(addTxt) + 12, btn -> {
-            if (screen.getSearchDialog() != null) {
-                screen.getSearchDialog().setVisible(true);
-            }
-        }));
-
-        // 2. Connect
+        // 1. Connect
         String connTxt = "⚡ " + Component.translatable("gui.gtcalcboard.auto_connect").getString();
         list.add(new ToolbarButtonDef("auto_connect", connTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(connTxt) + 12, btn -> performAutoConnect()));
 
-        // 3. Ratio
+        // 2. Ratio
         String ratioTxt = "⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString();
         list.add(new ToolbarButtonDef("auto_ratio", ratioTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(ratioTxt) + 12, btn -> performAutoRatio()));
 
-        // 4. Flow
+        // 3. Flow
         String flowTxt = "🚀 " + Component.translatable("gui.gtcalcboard.max_flow").getString();
         list.add(new ToolbarButtonDef("max_flow", flowTxt, 0xFFFFAA00, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(flowTxt) + 12, btn -> performMaxThroughputOptimization()));
 
-        // 5. Group into Module
-        String groupTxt = "📦 " + Component.translatable("gui.gtcalcboard.group_module").getString();
-        list.add(new ToolbarButtonDef("group_module", groupTxt, 0xFFCC88FF, 0xFF352055, 0xFF5A3A8A, 0xFF7744AA, font.width(groupTxt) + 12, btn -> performGroupIntoModule()));
-
-        // 6. Share
+        // 4. Share
         String shareTxt = "📋 " + Component.translatable("gui.gtcalcboard.export").getString();
         list.add(new ToolbarButtonDef("export", shareTxt, 0xFF66DDFF, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(shareTxt) + 12, btn -> copyBlueprintToClipboard()));
 
-        // 8. Import
+        // 5. Import
         String importTxt = "📥 " + Component.translatable("gui.gtcalcboard.import").getString();
         list.add(new ToolbarButtonDef("import", importTxt, 0xFF66FF88, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(importTxt) + 12, btn -> importBlueprintFromClipboard()));
-
-        // 9. Save
-        String saveTxt = "💾 " + Component.translatable("gui.gtcalcboard.save").getString();
-        list.add(new ToolbarButtonDef("save", saveTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(saveTxt) + 12, btn -> {
-            boolean saved = BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), screen.getPanX(), screen.getPanY(), screen.getZoom());
-            Minecraft mc = Minecraft.getInstance();
-            if (saved) {
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.save_success", String.valueOf(graph.getNodes().size()))), true);
-                }
-                mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-            } else {
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.save_fail")), true);
-                }
-            }
-        }));
-
-        // 10. Load
-        String loadTxt = "📂 " + Component.translatable("gui.gtcalcboard.load").getString();
-        list.add(new ToolbarButtonDef("load", loadTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(loadTxt) + 12, btn -> {
-            boolean loaded = BoardManager.getInstance().loadFromFile(BoardManager.getInstance().getDefaultSaveFile());
-            Minecraft mc = Minecraft.getInstance();
-            if (loaded) {
-                screen.setPanX(BoardScreen.lastPanX);
-                screen.setPanY(BoardScreen.lastPanY);
-                screen.setZoom(BoardScreen.lastZoom);
-                screen.rebuildWidgets();
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.load_success", String.valueOf(graph.getNodes().size()))), true);
-                }
-                mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.0F));
-            } else {
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.load_fail")), true);
-                }
-            }
-        }));
-
-        // 11. Clear
-        String clearTxt = "🗑 " + Component.translatable("gui.gtcalcboard.clear").getString();
-        list.add(new ToolbarButtonDef("clear", clearTxt, 0xFFFF6666, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(clearTxt) + 12, btn -> {
-            if (graph.getNodes().isEmpty()) return;
-            List<RecipeNode> removedNodes = new ArrayList<>(graph.getNodes());
-            List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>(graph.getConnections());
-            graph.clear();
-            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Clear board"));
-            screen.rebuildWidgets();
-            screen.markSummaryDirty();
-        }));
-
-        // 12. Center
-        String centerTxt = "⊕ " + Component.translatable("gui.gtcalcboard.center").getString();
-        list.add(new ToolbarButtonDef("center", centerTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(centerTxt) + 12, btn -> {
-            screen.setPanX(screen.width / 2.0 - 100);
-            screen.setPanY(screen.height / 2.0 - 50);
-            screen.setZoom(1.0);
-            BoardScreen.lastPanX = screen.getPanX();
-            BoardScreen.lastPanY = screen.getPanY();
-            BoardScreen.lastZoom = screen.getZoom();
-        }));
 
         return list;
     }
@@ -222,10 +127,16 @@ public class ToolbarWidget {
 
         graphics.enableScissor(scrollAreaX, tbY + 1, tbX + tbW - 2, tbY + tbH - 1);
 
+        ToolbarButtonDef hoveredBtn = null;
         int curX = scrollAreaX - (int) scrollX;
         for (ToolbarButtonDef btn : buttons) {
             boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isToolbarButtonGlowing(btn.id);
             drawBtn(graphics, font, btn.text, curX, tbY + 1, btn.width, 16, mouseX, mouseY, btn.color, btn.bg, btn.hoverBg, btn.border, isGlowing);
+            if (mouseX >= curX && mouseX <= curX + btn.width && mouseY >= tbY + 1 && mouseY <= tbY + 17) {
+                if (mouseX >= scrollAreaX && mouseX <= tbX + tbW - 2) {
+                    hoveredBtn = btn;
+                }
+            }
             curX += btn.width + 3;
         }
 
@@ -242,6 +153,11 @@ public class ToolbarWidget {
         }
 
         graphics.pose().popPose();
+
+        if (hoveredBtn != null) {
+            String tooltipKey = "gui.gtcalcboard.tooltip.btn_" + hoveredBtn.id;
+            graphics.renderTooltip(font, Component.translatable(tooltipKey), mouseX, mouseY);
+        }
     }
 
     private void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int defaultTextColor, int bg, int hoverBg, int border, boolean isGlowing) {
@@ -452,7 +368,7 @@ public class ToolbarWidget {
         mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
     }
 
-    private void performGroupIntoModule() {
+    public void performGroupIntoModule() {
         FlowGraph graph = screen.getGraph();
         var selectedIds = screen.getSelectedNodeIds();
         boolean hasSpecificSelection = selectedIds != null && selectedIds.size() >= 2;

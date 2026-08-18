@@ -1,11 +1,13 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.BalanceSummary;
+import com.gtceu.calcboard.api.BoardManager;
 import com.gtceu.calcboard.api.IngredientStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,12 +79,7 @@ public class SummaryOverlay {
         // 2. Fixed Total Power & Machines Section
         int powerY = y + 26;
         String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
-        String eutStr;
-        if (summary.totalEUt() < -0.001) {
-            eutStr = String.format("§a+%,.1f EU/t §7(%s) §2(%s)", -summary.totalEUt(), summary.highestVoltageTier().getName(), Component.translatable("gui.gtcalcboard.gen_tag").getString());
-        } else {
-            eutStr = String.format("§e%,.1f EU/t §7(%s)", summary.totalEUt(), summary.highestVoltageTier().getName());
-        }
+        String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
         int pLabelW = font.width(pLabel) + 6;
         graphics.drawString(font, pLabel, x + 8, powerY, 0xFFFFFFFF, false);
         graphics.drawString(font, eutStr, x + 8 + pLabelW, powerY, 0xFFFFFFFF, false);
@@ -248,8 +245,22 @@ public class SummaryOverlay {
 
         int x = screenWidth - WIDTH - 10;
         int y = 48;
+
+        // Header click -> collapse/expand
         if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + 22) {
             toggle();
+            return true;
+        }
+
+        // Total Power line click -> cycle power display mode (EU/t <-> Amps <-> Both)
+        int powerY = y + 26;
+        if (mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12 && button == 0) {
+            var newMode = BoardManager.getInstance().cyclePowerDisplayMode();
+            Minecraft mc = Minecraft.getInstance();
+            mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            if (mc.player != null) {
+                mc.player.displayClientMessage(Component.literal("§e⚡ ").append(Component.translatable("message.gtcalcboard.power_mode_changed", newMode.getDisplayName())), true);
+            }
             return true;
         }
         return false;

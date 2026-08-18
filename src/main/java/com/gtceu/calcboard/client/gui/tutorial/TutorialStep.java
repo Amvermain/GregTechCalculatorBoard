@@ -1,15 +1,12 @@
 package com.gtceu.calcboard.client.gui.tutorial;
 
 public enum TutorialStep {
-    STEP_1_PAN_ZOOM(1, "gui.gtcalcboard.tutorial.step1_title", "gui.gtcalcboard.tutorial.step1_desc"),
-    STEP_2_ADD_RECIPE(2, "gui.gtcalcboard.tutorial.step2_title", "gui.gtcalcboard.tutorial.step2_desc"),
-    STEP_3_REMOVE_RECIPE(3, "gui.gtcalcboard.tutorial.step3_title", "gui.gtcalcboard.tutorial.step3_desc"),
-    STEP_4_NORMAL_WIRING(4, "gui.gtcalcboard.tutorial.step4_title", "gui.gtcalcboard.tutorial.step4_desc"),
-    STEP_5_DELETE_WIRING(5, "gui.gtcalcboard.tutorial.step5_title", "gui.gtcalcboard.tutorial.step5_desc"),
-    STEP_6_SHIFT_WIRING(6, "gui.gtcalcboard.tutorial.step6_title", "gui.gtcalcboard.tutorial.step6_desc"),
-    STEP_7_AUTO_RATIO(7, "gui.gtcalcboard.tutorial.step7_title", "gui.gtcalcboard.tutorial.step7_desc"),
-    STEP_8_SUMMARY_MODULE(8, "gui.gtcalcboard.tutorial.step8_title", "gui.gtcalcboard.tutorial.step8_desc"),
-    COMPLETED(9, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
+    STEP_1_ADD_RECIPE(1, "gui.gtcalcboard.tutorial.step1_title", "gui.gtcalcboard.tutorial.step1_desc"),
+    STEP_2_NORMAL_WIRING(2, "gui.gtcalcboard.tutorial.step2_title", "gui.gtcalcboard.tutorial.step2_desc"),
+    STEP_3_DELETE_WIRING(3, "gui.gtcalcboard.tutorial.step3_title", "gui.gtcalcboard.tutorial.step3_desc"),
+    STEP_4_SHIFT_WIRING(4, "gui.gtcalcboard.tutorial.step4_title", "gui.gtcalcboard.tutorial.step4_desc"),
+    STEP_5_SUMMARY_MODULE(5, "gui.gtcalcboard.tutorial.step5_title", "gui.gtcalcboard.tutorial.step5_desc"),
+    COMPLETED(6, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
 
     private final int stepNumber;
     private final String titleKey;

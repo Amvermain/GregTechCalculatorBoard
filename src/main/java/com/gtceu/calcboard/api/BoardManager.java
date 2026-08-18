@@ -17,9 +17,38 @@ public class BoardManager {
     private final List<BoardPage> pages = new ArrayList<>();
     private int activePageIndex = 0;
     private boolean hasSeenWelcomePrompt = false;
+    private PowerDisplayMode powerDisplayMode = PowerDisplayMode.EUT;
+    private boolean autoLoaded = false;
 
     private BoardManager() {
         pages.add(BoardPage.createDefault("Page 1"));
+    }
+
+    public void ensureLoaded() {
+        if (!autoLoaded) {
+            autoLoaded = true;
+            try {
+                File defaultFile = getDefaultSaveFile();
+                if (defaultFile != null && defaultFile.exists()) {
+                    loadFromFile(defaultFile);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public PowerDisplayMode getPowerDisplayMode() {
+        return powerDisplayMode != null ? powerDisplayMode : PowerDisplayMode.EUT;
+    }
+
+    public void setPowerDisplayMode(PowerDisplayMode powerDisplayMode) {
+        this.powerDisplayMode = powerDisplayMode != null ? powerDisplayMode : PowerDisplayMode.EUT;
+    }
+
+    public PowerDisplayMode cyclePowerDisplayMode() {
+        this.powerDisplayMode = getPowerDisplayMode().next();
+        return this.powerDisplayMode;
     }
 
     public boolean hasSeenWelcomePrompt() {
@@ -31,6 +60,7 @@ public class BoardManager {
     }
 
     public static BoardManager getInstance() {
+        INSTANCE.ensureLoaded();
         return INSTANCE;
     }
 
@@ -122,6 +152,7 @@ public class BoardManager {
             CompoundTag rootTag = new CompoundTag();
             rootTag.putInt("activePageIndex", activePageIndex);
             rootTag.putBoolean("hasSeenWelcomePrompt", hasSeenWelcomePrompt);
+            rootTag.putString("powerDisplayMode", getPowerDisplayMode().name());
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
@@ -143,6 +174,11 @@ public class BoardManager {
                 CompoundTag rootTag = NbtIo.readCompressed(file);
                 if (rootTag.contains("hasSeenWelcomePrompt")) {
                     this.hasSeenWelcomePrompt = rootTag.getBoolean("hasSeenWelcomePrompt");
+                }
+                if (rootTag.contains("powerDisplayMode")) {
+                    try {
+                        this.powerDisplayMode = PowerDisplayMode.valueOf(rootTag.getString("powerDisplayMode"));
+                    } catch (Exception ignored) {}
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);

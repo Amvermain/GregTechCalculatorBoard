@@ -56,6 +56,15 @@
   "gui.gtcalcboard.rotor.tooltip_power": "터빈 출력: %s%%",
   "gui.gtcalcboard.rotor.tooltip_equip": "클릭하여 터빈에 장착",
 
+  "gui.gtcalcboard.page_delete.title": "페이지 삭제 확인",
+  "gui.gtcalcboard.page_delete.desc": "'%s' 페이지와 내부의 모든 공정/연결선이 삭제됩니다.\\n이 작업은 실행 취소(Undo)할 수 없습니다. 계속하시겠습니까?",
+  "gui.gtcalcboard.page_delete.confirm": "삭제",
+  "gui.gtcalcboard.page_delete.cancel": "취소",
+
+  "gui.gtcalcboard.power_mode.eut": "EU/t",
+  "gui.gtcalcboard.power_mode.amps": "암페어 (A)",
+  "gui.gtcalcboard.power_mode.both": "EU/t + 암페어 (A)",
+
   "gui.gtcalcboard.input": "입력",
   "gui.gtcalcboard.output": "출력",
   "gui.gtcalcboard.tooltip.demand": "요구량 (Demand)",
@@ -99,6 +108,7 @@
   "message.gtcalcboard.copied_components": "%s개 컴포넌트를 클립보드에 복사했습니다",
   "message.gtcalcboard.pasted_components": "%s개 컴포넌트를 붙여넣었습니다",
   "message.gtcalcboard.cut_components": "%s개 컴포넌트를 잘라내기했습니다",
+  "message.gtcalcboard.power_mode_changed": "전력 표시 단위: %s",
 
   "gui.gtcalcboard.emi.btn_title": "계산기 보드에 레시피 추가",
   "gui.gtcalcboard.emi.btn_desc": "클릭하여 이 레시피를 계산기 보드에 추가합니다.",
@@ -137,35 +147,49 @@
   "gui.gtcalcboard.welcome.start": "🎓 1분 튜토리얼 시작",
   "gui.gtcalcboard.welcome.skip": "직접 둘러보기",
 
+  "gui.gtcalcboard.tooltip.quick_add": "클릭하여 여기에 레시피 추가 (Space / 더블클릭)",
+  "gui.gtcalcboard.tooltip.drag_connect": "와이어 연결 (단순 연결)",
+  "gui.gtcalcboard.tooltip.shift_auto_ratio": "1:1 대수 자동 맞춤 연결",
+  "gui.gtcalcboard.tooltip.right_click_sever": "와이어 끊기",
+  "gui.gtcalcboard.tooltip.wire_mode_shift": "⚡ 1:1 대수 자동 맞춤 모드",
+  "gui.gtcalcboard.tooltip.wire_mode_normal": "일반 연결 (Shift 유지: 1:1 대수 자동 맞춤)",
+  "gui.gtcalcboard.tooltip.btn_guide": "종합 가이드 및 매뉴얼 열기 (기초, 와이어링, 모듈화, 단축키)",
+  "gui.gtcalcboard.tooltip.btn_tutorial": "15초 핵심 와이어링 & 비율 맞춤 튜토리얼 시작",
+  "gui.gtcalcboard.tooltip.btn_auto_connect": "자동 연결 (Auto Connect)\n캔버스 내 모든 일치하는 아이템 및 유체 포트를 1초 만에 자동 연결합니다.",
+  "gui.gtcalcboard.tooltip.btn_auto_ratio": "비율 맞춤 (Auto Ratio)\n기준 마스터(🎯) 노드에 맞춰 상위 모든 공정 기계의 대수와 비율을 1:1로 자동 맞춤 조절합니다.",
+  "gui.gtcalcboard.tooltip.btn_max_flow": "최대 생산량 최적화 (Max Flow)\n모든 기계를 MAX 티어로 오버클럭하고 병렬 해치를 극대화하여 초대용량 공정으로 최적화합니다.",
+  "gui.gtcalcboard.tooltip.btn_export": "블루프린트 공유 (Export)\n현재 페이지의 전체 공정 플로우차트를 압축 코드로 클립보드에 복사합니다.",
+  "gui.gtcalcboard.tooltip.btn_import": "블루프린트 가져오기 (Import)\n클립보드에 복사된 블루프린트 코드를 읽어와 보드에 즉시 배치합니다.",
+  "gui.gtcalcboard.hotkey_hud.title": "단축키",
+  "gui.gtcalcboard.hotkey_hud.expand": "단축키 가이드 펼치기 (H)",
+  "gui.gtcalcboard.hotkey_hud.add": "레시피 추가",
+  "gui.gtcalcboard.hotkey_hud.shift_wire": "비율 자동맞춤",
+  "gui.gtcalcboard.hotkey_hud.group": "모듈 묶기",
+  "gui.gtcalcboard.hotkey_hud.undo_redo": "되돌리기/다시실행",
+  "gui.gtcalcboard.hotkey_hud.clipboard": "클립보드",
+  "gui.gtcalcboard.hotkey_hud.sever": "와이어 끊기",
+  "gui.gtcalcboard.hotkey_hud.delete": "선택 삭제",
+
   "gui.gtcalcboard.tutorial.skip": "건너뛰기",
   "gui.gtcalcboard.tutorial.next": "다음 ➔",
   "gui.gtcalcboard.tutorial.finish": "완료하고 시작하기",
 
-  "gui.gtcalcboard.tutorial.step1_title": "캔버스 이동 & 확대/축소",
-  "gui.gtcalcboard.tutorial.step1_desc": "마우스 우클릭 드래그로 캔버스를 자유롭게 이동하고, 마우스 휠을 굴려 확대/축소(Zoom)해 보세요.",
+  "gui.gtcalcboard.tutorial.step1_title": "레시피 노드 추가하기",
+  "gui.gtcalcboard.tutorial.step1_desc": "캔버스 빈 곳을 클릭해 [+] 버튼을 누르거나 상단 [+ 추가] 버튼으로 원하는 레시피를 배치해 보세요. (EMI 창에서 'A' 키로도 즉시 추가됩니다)",
 
-  "gui.gtcalcboard.tutorial.step2_title": "레시피 노드 추가하기",
-  "gui.gtcalcboard.tutorial.step2_desc": "상단 툴바의 [+ 추가] 버튼을 눌러 원하는 레시피를 캔버스에 추가해 보세요. (EMI 레시피 창에서 'A' 키를 눌러도 즉시 추가됩니다)",
+  "gui.gtcalcboard.tutorial.step2_title": "일반 와이어 연결 (수치 불일치 확인)",
+  "gui.gtcalcboard.tutorial.step2_desc": "보일러의 [Steam] 출력 포트(초록)에서 터빈의 [Steam] 입력 포트(파랑)로 마우스 드래그하여 연결해 보세요.",
 
-  "gui.gtcalcboard.tutorial.step3_title": "레시피 노드 삭제하기",
-  "gui.gtcalcboard.tutorial.step3_desc": "불필요한 기계는 카드의 [✕] 버튼을 누르거나, 노드를 클릭하고 Delete 키를 눌러 삭제할 수 있습니다.",
+  "gui.gtcalcboard.tutorial.step3_title": "와이어 링크 끊기",
+  "gui.gtcalcboard.tutorial.step3_desc": "연결된 와이어 선 위에 마우스 커서를 올리고 [마우스 우클릭]하여 연결을 끊어보세요.",
 
-  "gui.gtcalcboard.tutorial.step4_title": "일반 와이어 연결 (수치 불일치 확인)",
-  "gui.gtcalcboard.tutorial.step4_desc": "보일러의 [Steam] 출력 포트(초록)에서 터빈의 [Steam] 입력 포트(파랑)로 마우스 드래그하여 연결해 보세요. (보일러 생산 500mB/s에 비해 터빈 소비가 100mB/s에 불과해 증기가 낭비됩니다)",
+  "gui.gtcalcboard.tutorial.step4_title": "Shift + 와이어 연결 (100% 자동 비율 일치)",
+  "gui.gtcalcboard.tutorial.step4_desc": "✨ 이번에는 [Shift 키]를 누른 채 보일러 출력에서 터빈 입력으로 다시 드래그해 보세요! (터빈 대수가 5.0대로 즉각 자동 계산되며 생산과 소비가 100% 완벽히 일치합니다)",
 
-  "gui.gtcalcboard.tutorial.step5_title": "와이어 링크 삭제하기",
-  "gui.gtcalcboard.tutorial.step5_desc": "연결된 와이어 링크 선 위에 마우스 커서를 올리고 [마우스 우클릭]하여 와이어 연결을 끊어보세요.",
-
-  "gui.gtcalcboard.tutorial.step6_title": "Shift + 와이어 연결 (100% 자동 비율 일치)",
-  "gui.gtcalcboard.tutorial.step6_desc": "✨ 이번에는 [Shift 키]를 누른 채 보일러 출력에서 터빈 입력으로 다시 드래그해 보세요! (터빈 대수가 5.0대로 즉각 자동 계산되며 생산과 소비가 100% 완벽히 일치합니다)",
-
-  "gui.gtcalcboard.tutorial.step7_title": "기준 마스터 지정 & 자동 비율 (Auto-Ratio)",
-  "gui.gtcalcboard.tutorial.step7_desc": "터빈 카드의 [🎯] 버튼을 눌러 기준 마스터로 지정한 뒤, 상단 [⚖ 비율맞춤] 버튼을 클릭해 보세요!",
-
-  "gui.gtcalcboard.tutorial.step8_title": "공정 요약 & 복합 모듈 압축",
-  "gui.gtcalcboard.tutorial.step8_desc": "우측 요약창에서 총 발전량을 확인하고, 상단 [📦 모듈화] 버튼을 눌러 복잡한 공정을 하나의 카드로 압축해 보세요!",
+  "gui.gtcalcboard.tutorial.step5_title": "공정 요약 & 복합 모듈 압축 (Ctrl + G)",
+  "gui.gtcalcboard.tutorial.step5_desc": "우측 요약창에서 총 발전량을 확인하고, 상단 [📦 모듈화] 버튼(또는 Ctrl + G)을 눌러 복잡한 공정을 하나의 카드로 압축해 보세요!",
 
   "gui.gtcalcboard.tutorial.completed_title": "튜토리얼 완료!",
-  "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 거대한 석유화학 및 핵융합 공정을 자유롭게 설계해 보세요! 언제든 상단 [📖 도움말]이나 [🎓 튜토리얼]을 다시 볼 수 있습니다.",
+  "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 거대한 석유화학 및 핵융합 공정을 자유롭게 설계해 보세요! 언제든 상단 [가이드(Guide)]나 [튜토리얼(Tutorial)]을 다시 열어볼 수 있습니다.",
   "gui.gtcalcboard.tutorial.completed_tag": "[완료]"
 }

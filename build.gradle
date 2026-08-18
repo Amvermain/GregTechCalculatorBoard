@@ -29,6 +29,7 @@ minecraft {
             property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
 
             // Dev memory allocation
+            jvmArgs '-XX:+AllowEnhancedClassRedefinition'
             jvmArgs '-Xmx4G', '-Xms2G'
 
             mods {

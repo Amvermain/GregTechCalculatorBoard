@@ -39,6 +39,7 @@ public class NodeNameEditor {
                     text
                 ));
             }
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onNodeRenamed();
         }
     }
 

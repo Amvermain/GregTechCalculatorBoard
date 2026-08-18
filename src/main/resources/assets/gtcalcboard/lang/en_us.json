@@ -56,6 +56,15 @@
   "gui.gtcalcboard.rotor.tooltip_power": "Turbine Power: %s%%",
   "gui.gtcalcboard.rotor.tooltip_equip": "Click to equip to turbine",
 
+  "gui.gtcalcboard.page_delete.title": "Confirm Delete Page",
+  "gui.gtcalcboard.page_delete.desc": "Page '%s' and all contents inside will be deleted.\\nThis action cannot be undone. Are you sure?",
+  "gui.gtcalcboard.page_delete.confirm": "Delete",
+  "gui.gtcalcboard.page_delete.cancel": "Cancel",
+
+  "gui.gtcalcboard.power_mode.eut": "EU/t",
+  "gui.gtcalcboard.power_mode.amps": "Amperes (A)",
+  "gui.gtcalcboard.power_mode.both": "Both (EU/t + A)",
+
   "gui.gtcalcboard.input": "Input",
   "gui.gtcalcboard.output": "Output",
   "gui.gtcalcboard.tooltip.demand": "Demand (Required)",
@@ -99,6 +108,7 @@
   "message.gtcalcboard.copied_components": "Copied %s components to clipboard",
   "message.gtcalcboard.pasted_components": "Pasted %s components",
   "message.gtcalcboard.cut_components": "Cut %s components to clipboard",
+  "message.gtcalcboard.power_mode_changed": "Power Display Unit: %s",
 
   "gui.gtcalcboard.emi.btn_title": "Add to Calculator Board",
   "gui.gtcalcboard.emi.btn_desc": "Click to add this recipe to flowsheet",
@@ -137,35 +147,49 @@
   "gui.gtcalcboard.welcome.start": "🎓 Start 1-Min Tutorial",
   "gui.gtcalcboard.welcome.skip": "Explore on My Own",
 
+  "gui.gtcalcboard.tooltip.quick_add": "Click to Add Recipe Here (Space / Double-Click)",
+  "gui.gtcalcboard.tooltip.drag_connect": "Connect Wire",
+  "gui.gtcalcboard.tooltip.shift_auto_ratio": "1:1 Auto-Ratio Matching",
+  "gui.gtcalcboard.tooltip.right_click_sever": "Sever Wire",
+  "gui.gtcalcboard.tooltip.wire_mode_shift": "⚡ 1:1 Auto-Ratio Matching Mode",
+  "gui.gtcalcboard.tooltip.wire_mode_normal": "Normal Connection (Hold Shift: 1:1 Auto-Ratio)",
+  "gui.gtcalcboard.tooltip.btn_guide": "Open User Guide & Manual Book",
+  "gui.gtcalcboard.tooltip.btn_tutorial": "Start 15-Second Core Tutorial",
+  "gui.gtcalcboard.tooltip.btn_auto_connect": "Auto Connect\nScans the board and automatically connects all matching item & fluid ports in 1 second.",
+  "gui.gtcalcboard.tooltip.btn_auto_ratio": "Auto Ratio (Balance)\nScales and balances all upstream machines backwards to match the Base Master Anchor (🎯).",
+  "gui.gtcalcboard.tooltip.btn_max_flow": "Max Flow Throughput\nOverclocks all nodes to MAX tier and maximizes parallel hatches for highest throughput.",
+  "gui.gtcalcboard.tooltip.btn_export": "Export Blueprint\nCompresses and copies the entire board flowchart code to clipboard.",
+  "gui.gtcalcboard.tooltip.btn_import": "Import Blueprint\nLoads and reconstructs a flowchart blueprint code from clipboard.",
+  "gui.gtcalcboard.hotkey_hud.title": "Hotkeys",
+  "gui.gtcalcboard.hotkey_hud.expand": "Expand Hotkey Guide (H)",
+  "gui.gtcalcboard.hotkey_hud.add": "Add Recipe",
+  "gui.gtcalcboard.hotkey_hud.shift_wire": "Auto Ratio",
+  "gui.gtcalcboard.hotkey_hud.group": "Group Module",
+  "gui.gtcalcboard.hotkey_hud.undo_redo": "Undo / Redo",
+  "gui.gtcalcboard.hotkey_hud.clipboard": "Clipboard",
+  "gui.gtcalcboard.hotkey_hud.sever": "Sever Wire",
+  "gui.gtcalcboard.hotkey_hud.delete": "Delete Selected",
+
   "gui.gtcalcboard.tutorial.skip": "Skip",
   "gui.gtcalcboard.tutorial.next": "Next ➔",
   "gui.gtcalcboard.tutorial.finish": "Finish & Start",
 
-  "gui.gtcalcboard.tutorial.step1_title": "Canvas Navigation & Zoom",
-  "gui.gtcalcboard.tutorial.step1_desc": "Right-click drag to pan the canvas freely, and roll your mouse wheel to zoom in and out.",
+  "gui.gtcalcboard.tutorial.step1_title": "Adding Recipe Nodes",
+  "gui.gtcalcboard.tutorial.step1_desc": "Click anywhere on empty canvas to spawn [+] button or click [+ Add] on toolbar! (Or press 'A' on EMI recipes)",
 
-  "gui.gtcalcboard.tutorial.step2_title": "Adding Recipe Nodes",
-  "gui.gtcalcboard.tutorial.step2_desc": "Click [+ Add] on the top toolbar to search and add a recipe node. (You can also hover any EMI recipe and press 'A')",
+  "gui.gtcalcboard.tutorial.step2_title": "Normal Wiring (Inspect Imbalance)",
+  "gui.gtcalcboard.tutorial.step2_desc": "Drag from Boiler's [Steam] output port (green) to Turbine's [Steam] input port (blue) normally.",
 
-  "gui.gtcalcboard.tutorial.step3_title": "Removing Recipe Nodes",
-  "gui.gtcalcboard.tutorial.step3_desc": "Remove unwanted machines by clicking the [✕] button on the card, or by selecting it and pressing Delete.",
+  "gui.gtcalcboard.tutorial.step3_title": "Disconnecting Wire Links",
+  "gui.gtcalcboard.tutorial.step3_desc": "Hover your mouse cursor over the connected wire curve and [Right-Click] to sever the connection.",
 
-  "gui.gtcalcboard.tutorial.step4_title": "Normal Wiring (Inspect Imbalance)",
-  "gui.gtcalcboard.tutorial.step4_desc": "Drag from Boiler's [Steam] output port (green) to Turbine's [Steam] input port (blue) normally. (Notice that 500 mB/s produced is wasted on 1 turbine consuming only 100 mB/s)",
+  "gui.gtcalcboard.tutorial.step4_title": "Shift + Wiring (100% Auto-Ratio Matching)",
+  "gui.gtcalcboard.tutorial.step4_desc": "✨ Now hold SHIFT while dragging from Boiler output to Turbine input! (Turbine count is instantly calculated to 5.0, achieving 100% perfect balance)",
 
-  "gui.gtcalcboard.tutorial.step5_title": "Disconnecting Wire Links",
-  "gui.gtcalcboard.tutorial.step5_desc": "Hover your mouse cursor over the connected wire curve and [Right-Click] to sever the connection.",
-
-  "gui.gtcalcboard.tutorial.step6_title": "Shift + Wiring (100% Auto-Ratio Matching)",
-  "gui.gtcalcboard.tutorial.step6_desc": "✨ Now hold SHIFT while dragging from Boiler output to Turbine input! (Turbine count is instantly calculated to 5.0, achieving 100% perfect balance)",
-
-  "gui.gtcalcboard.tutorial.step7_title": "Set Master Anchor & Auto-Ratio",
-  "gui.gtcalcboard.tutorial.step7_desc": "Click [🎯] on Turbine card to set as Master Anchor, then click [⚖ Auto Ratio] on the toolbar!",
-
-  "gui.gtcalcboard.tutorial.step8_title": "Summary & Modular Packaging",
-  "gui.gtcalcboard.tutorial.step8_desc": "Check total power output in the summary overlay, and click [📦 Group Module] to collapse into a single card!",
+  "gui.gtcalcboard.tutorial.step5_title": "Summary & Modular Packaging (Ctrl + G)",
+  "gui.gtcalcboard.tutorial.step5_desc": "Check total power output in the summary overlay, and click [📦 Group Module] (or Ctrl + G) to collapse into a single card!",
 
   "gui.gtcalcboard.tutorial.completed_title": "Tutorial Complete!",
-  "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [📖 Help] or [🎓 Tutorial] anytime.",
+  "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [Guide] or [Tutorial] anytime.",
   "gui.gtcalcboard.tutorial.completed_tag": "[Complete]"
 }

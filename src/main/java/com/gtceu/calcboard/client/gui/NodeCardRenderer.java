@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui;
 
+import com.gtceu.calcboard.api.BoardManager;
 import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
@@ -202,21 +203,14 @@ public class NodeCardRenderer {
         double durationSec = node.getEffectiveDurationSeconds();
         double cyclesPerSec = node.getCyclesPerSecond();
 
-        if (node.isModule()) {
-            String eutStr = totalEUt > 0.0001
-                ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, Component.translatable("gui.gtcalcboard.gen_tag").getString())
-                : String.format("§e%.1f EU/t §7(%s)", totalEUt, Component.translatable("gui.gtcalcboard.drain_tag").getString());
-            graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
+        String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatNodePower(node);
+        graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
 
+        if (node.isModule()) {
             String modTag = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
             int tagW = font.width(modTag);
             graphics.drawString(font, modTag, x + cardW - 6 - tagW, infoY, 0xFFFFFFFF, false);
         } else {
-            GTVoltageTier tier = node.getTargetTier();
-            String eutStr = node.isGenerator() 
-                ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, tier.getName()) 
-                : String.format("§e%.1f EU/t §7(%s)", totalEUt, tier.getName());
-            graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
 
             String cycleStr = String.format("§b%.2fs §7(§f%.2f/s§7)", durationSec, cyclesPerSec);
             int cycleW = font.width(cycleStr);
