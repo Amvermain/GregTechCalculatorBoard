@@ -1,0 +1,212 @@
+package com.gtceu.calcboard;
+
+import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.history.HistoryManager;
+import net.minecraft.resources.ResourceLocation;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class HistoryTest {
+
+    private FlowGraph graph;
+    private HistoryManager historyManager;
+
+    @BeforeEach
+    public void setup() {
+        graph = new FlowGraph();
+        historyManager = new HistoryManager();
+    }
+
+    @Test
+    public void testMoveNodesUndoRedo() {
+        RecipeNode node = RecipeNode.create("Test Node", 100.0, 30.0, GTVoltageTier.LV);
+        node.setPos(50.0, 50.0);
+        graph.addNode(node);
+
+        // Record a move delta of (+20, +30)
+        Map<String, double[]> deltas = Map.of(node.getId(), new double[]{20.0, 30.0});
+        node.setPos(70.0, 80.0);
+        historyManager.record(new BoardCommand.MoveNodesCommand(deltas));
+
+        assertEquals(70.0, node.getPosX(), 0.001);
+        assertEquals(80.0, node.getPosY(), 0.001);
+
+        // Undo
+        historyManager.undo(graph);
+        assertEquals(50.0, node.getPosX(), 0.001);
+        assertEquals(50.0, node.getPosY(), 0.001);
+
+        // Redo
+        historyManager.redo(graph);
+        assertEquals(70.0, node.getPosX(), 0.001);
+        assertEquals(80.0, node.getPosY(), 0.001);
+    }
+
+    @Test
+    public void testAddRemoveNodesUndoRedo() {
+        RecipeNode node1 = RecipeNode.create("Node 1", 100.0, 30.0, GTVoltageTier.LV);
+        RecipeNode node2 = RecipeNode.create("Node 2", 100.0, 30.0, GTVoltageTier.LV);
+        node1.addOutput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 100.0, 1.0));
+        node2.addInput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 100.0, 1.0));
+
+        graph.addNode(node1);
+        graph.addNode(node2);
+        graph.addConnection(node1.getId(), 0, node2.getId(), 0);
+
+        // Remove node2 with its wire
+        FlowGraph.ConnectionEdge edge = graph.getConnections().get(0);
+        graph.removeNode(node2);
+        historyManager.record(new BoardCommand.RemoveNodesCommand(List.of(node2), List.of(edge), "Remove Node 2"));
+
+        assertEquals(1, graph.getNodes().size());
+        assertEquals(0, graph.getConnections().size());
+
+        // Undo -> node2 and edge restored
+        historyManager.undo(graph);
+        assertEquals(2, graph.getNodes().size());
+        assertEquals(1, graph.getConnections().size());
+        assertEquals(node1.getId(), graph.getConnections().get(0).fromNodeId());
+
+        // Redo -> removed again
+        historyManager.redo(graph);
+        assertEquals(1, graph.getNodes().size());
+        assertEquals(0, graph.getConnections().size());
+    }
+
+    @Test
+    public void testWireConnectWithShiftScalingUndoRedo() {
+        RecipeNode producer = RecipeNode.create("Producer", 100.0, 20.0, GTVoltageTier.LV);
+        RecipeNode consumer = RecipeNode.create("Consumer", 100.0, 20.0, GTVoltageTier.LV);
+        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 500.0, 1.0));
+        consumer.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 100.0, 1.0));
+        consumer.setMachineCount(1.0);
+
+        graph.addNode(producer);
+        graph.addNode(consumer);
+
+        // Shift Connect: scale consumer to 5.0
+        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(producer.getId(), 0, consumer.getId(), 0);
+        graph.addConnection(producer.getId(), 0, consumer.getId(), 0);
+        consumer.setMachineCount(5.0);
+        historyManager.record(new BoardCommand.ConnectWireCommand(edge, consumer.getId(), 1.0, 5.0));
+
+        assertEquals(1, graph.getConnections().size());
+        assertEquals(5.0, consumer.getMachineCount(), 0.001);
+
+        // Undo -> wire removed and count restored to 1.0
+        historyManager.undo(graph);
+        assertEquals(0, graph.getConnections().size());
+        assertEquals(1.0, consumer.getMachineCount(), 0.001);
+
+        // Redo -> wire reconnected and count restored to 5.0
+        historyManager.redo(graph);
+        assertEquals(1, graph.getConnections().size());
+        assertEquals(5.0, consumer.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testPropertyModificationUndoRedo() {
+        RecipeNode node = RecipeNode.create("Chemical Reactor", 100.0, 30.0, GTVoltageTier.LV);
+        graph.addNode(node);
+
+        // Modify Machine Count (1.0 -> 8.0)
+        node.setMachineCount(8.0);
+        historyManager.record(new BoardCommand.ModifyPropertyCommand(
+            node.getId(),
+            BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT,
+            1.0,
+            8.0
+        ));
+
+        // Modify Custom Name
+        node.setName("Sulfuric Acid Line 1");
+        historyManager.record(new BoardCommand.ModifyPropertyCommand(
+            node.getId(),
+            BoardCommand.ModifyPropertyCommand.Property.CUSTOM_NAME,
+            "Chemical Reactor",
+            "Sulfuric Acid Line 1"
+        ));
+
+        assertEquals("Sulfuric Acid Line 1", node.getName());
+        assertEquals(8.0, node.getMachineCount(), 0.001);
+
+        // Undo Name
+        historyManager.undo(graph);
+        assertEquals("Chemical Reactor", node.getName());
+        assertEquals(8.0, node.getMachineCount(), 0.001);
+
+        // Undo Count
+        historyManager.undo(graph);
+        assertEquals("Chemical Reactor", node.getName());
+        assertEquals(1.0, node.getMachineCount(), 0.001);
+
+        // Redo Count
+        historyManager.redo(graph);
+        assertEquals(8.0, node.getMachineCount(), 0.001);
+
+        // Redo Name
+        historyManager.redo(graph);
+        assertEquals("Sulfuric Acid Line 1", node.getName());
+    }
+
+    @Test
+    public void testGroupAndExpandModuleUndoRedo() {
+        RecipeNode nodeA = RecipeNode.create("Node A", 100.0, 20.0, GTVoltageTier.LV);
+        RecipeNode nodeB = RecipeNode.create("Node B", 100.0, 20.0, GTVoltageTier.LV);
+        nodeA.addOutput(IngredientStack.item(new ResourceLocation("gtceu", "raw_a"), "Raw A", 10.0, 1.0));
+        nodeB.addInput(IngredientStack.item(new ResourceLocation("gtceu", "raw_a"), "Raw A", 10.0, 1.0));
+        nodeB.addOutput(IngredientStack.item(new ResourceLocation("gtceu", "final_b"), "Final B", 5.0, 1.0));
+
+        graph.addNode(nodeA);
+        graph.addNode(nodeB);
+        graph.addConnection(nodeA.getId(), 0, nodeB.getId(), 0);
+
+        List<RecipeNode> origNodes = new ArrayList<>(graph.getNodes());
+        List<FlowGraph.ConnectionEdge> origEdges = new ArrayList<>(graph.getConnections());
+
+        RecipeNode module = graph.groupIntoModule("Compound Process");
+        assertNotNull(module);
+        assertEquals(1, graph.getNodes().size());
+
+        historyManager.record(new BoardCommand.GroupModuleCommand(origNodes, module, origEdges, List.of()));
+
+        // Undo Module grouping -> restores Node A and Node B
+        historyManager.undo(graph);
+        assertEquals(2, graph.getNodes().size());
+        assertEquals(1, graph.getConnections().size());
+        assertFalse(graph.getNodes().get(0).isModule());
+
+        // Redo Module grouping -> back to single module
+        historyManager.redo(graph);
+        assertEquals(1, graph.getNodes().size());
+        assertTrue(graph.getNodes().get(0).isModule());
+    }
+
+    @Test
+    public void testPerTabHistoryIndependence() {
+        BoardPage page1 = BoardPage.createDefault("Page 1");
+        BoardPage page2 = BoardPage.createDefault("Page 2");
+
+        RecipeNode node1 = RecipeNode.create("Node in P1", 100.0, 30.0, GTVoltageTier.LV);
+        page1.getGraph().addNode(node1);
+        page1.getHistoryManager().record(new BoardCommand.AddNodesCommand(node1, "Add to P1"));
+
+        RecipeNode node2 = RecipeNode.create("Node in P2", 100.0, 30.0, GTVoltageTier.LV);
+        page2.getGraph().addNode(node2);
+        page2.getHistoryManager().record(new BoardCommand.AddNodesCommand(node2, "Add to P2"));
+
+        // Undo in Page 1 -> only affects Page 1
+        page1.getHistoryManager().undo(page1.getGraph());
+        assertEquals(0, page1.getGraph().getNodes().size());
+        assertEquals(1, page2.getGraph().getNodes().size());
+
+        // Page 2 undo -> only affects Page 2
+        page2.getHistoryManager().undo(page2.getGraph());
+        assertEquals(0, page2.getGraph().getNodes().size());
+    }
+}

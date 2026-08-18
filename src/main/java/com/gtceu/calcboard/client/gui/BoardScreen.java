@@ -2,17 +2,22 @@ package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.BalanceSummary;
 import com.gtceu.calcboard.api.BoardManager;
+import com.gtceu.calcboard.api.BoardPage;
 import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.api.NodeClipboard;
 import com.gtceu.calcboard.api.RecipeNode;
 import dev.emi.emi.api.EmiApi;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Main GUI Screen for GregTech Calculator Board.
@@ -23,15 +28,17 @@ public class BoardScreen extends Screen {
     public static double lastPanY = 40.0;
     public static double lastZoom = 1.0;
 
-    private final FlowGraph graph;
     private final List<NodeWidget> nodeWidgets = new ArrayList<>();
 
     // Sub-components
+    private final PageTabBarWidget pageTabBar = new PageTabBarWidget(this);
     private final SummaryOverlay summaryOverlay = new SummaryOverlay();
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
+    private final com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog welcomeDialog = new com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
     private TurbineRotorDialog rotorDialog;
+    private GuideDialog guideDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -42,15 +49,214 @@ public class BoardScreen extends Screen {
     private BalanceSummary cachedSummary = null;
     private boolean summaryDirty = true;
 
+    // Multi-Selection State
+    private final Set<String> selectedNodeIds = new HashSet<>();
+
     // Mouse tracking for hotkeys
     private double lastMouseX, lastMouseY;
 
     public BoardScreen() {
         super(Component.literal("GregTech Calculator Board"));
-        this.graph = BoardManager.getInstance().getActiveGraph();
-        this.panX = lastPanX;
-        this.panY = lastPanY;
-        this.zoom = lastZoom;
+        var activePage = BoardManager.getInstance().getActivePage();
+        this.panX = activePage.getPanX();
+        this.panY = activePage.getPanY();
+        this.zoom = activePage.getZoom();
+        lastPanX = this.panX;
+        lastPanY = this.panY;
+        lastZoom = this.zoom;
+    }
+
+    public FlowGraph getGraph() {
+        return BoardManager.getInstance().getActiveGraph();
+    }
+
+    public Set<String> getSelectedNodeIds() {
+        return selectedNodeIds;
+    }
+
+    public boolean isNodeSelected(String id) {
+        return selectedNodeIds.contains(id);
+    }
+
+    public void selectNode(String id, boolean multi) {
+        if (!multi) selectedNodeIds.clear();
+        if (id != null) selectedNodeIds.add(id);
+    }
+
+    public void toggleSelectNode(String id) {
+        if (selectedNodeIds.contains(id)) selectedNodeIds.remove(id);
+        else selectedNodeIds.add(id);
+    }
+
+    public void clearSelection() {
+        selectedNodeIds.clear();
+    }
+
+    public void selectAll() {
+        selectedNodeIds.clear();
+        for (RecipeNode n : getGraph().getNodes()) {
+            selectedNodeIds.add(n.getId());
+        }
+    }
+
+    public void recordCommand(com.gtceu.calcboard.api.history.BoardCommand cmd) {
+        BoardPage page = BoardManager.getInstance().getActivePage();
+        if (page != null) {
+            page.getHistoryManager().record(cmd);
+        }
+    }
+
+    public void undo() {
+        BoardPage page = BoardManager.getInstance().getActivePage();
+        if (page != null) {
+            com.gtceu.calcboard.api.history.BoardCommand cmd = page.getHistoryManager().undo(getGraph());
+            if (cmd != null) {
+                rebuildWidgets();
+                markSummaryDirty();
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.player != null) {
+                    mc.player.displayClientMessage(Component.literal("§e↶ Undo: " + cmd.getDescription()), true);
+                }
+            }
+        }
+    }
+
+    public void redo() {
+        BoardPage page = BoardManager.getInstance().getActivePage();
+        if (page != null) {
+            com.gtceu.calcboard.api.history.BoardCommand cmd = page.getHistoryManager().redo(getGraph());
+            if (cmd != null) {
+                rebuildWidgets();
+                markSummaryDirty();
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.player != null) {
+                    mc.player.displayClientMessage(Component.literal("§a↷ Redo: " + cmd.getDescription()), true);
+                }
+            }
+        }
+    }
+
+    public void deleteSelection() {
+        if (selectedNodeIds.isEmpty()) return;
+        int count = selectedNodeIds.size();
+        List<RecipeNode> removedNodes = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
+        for (RecipeNode n : getGraph().getNodes()) {
+            if (selectedNodeIds.contains(n.getId())) {
+                removedNodes.add(n);
+            }
+        }
+        for (FlowGraph.ConnectionEdge e : getGraph().getConnections()) {
+            if (selectedNodeIds.contains(e.fromNodeId()) || selectedNodeIds.contains(e.toNodeId())) {
+                removedEdges.add(e);
+            }
+        }
+        getGraph().getNodes().removeAll(removedNodes);
+        getGraph().getConnections().removeAll(removedEdges);
+        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Delete " + count + " components"));
+        selectedNodeIds.clear();
+        rebuildWidgets();
+        markSummaryDirty();
+
+        for (RecipeNode n : removedNodes) {
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onNodeRemoved(n);
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.literal("§c🗑 Deleted " + count + " components"), true);
+        }
+    }
+
+    public void copySelection() {
+        if (selectedNodeIds.isEmpty()) {
+            toolbarWidget.copyBlueprintToClipboard();
+            return;
+        }
+        NodeClipboard.getInstance().copy(getGraph(), selectedNodeIds);
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.literal("§a✔ Copied " + selectedNodeIds.size() + " components to clipboard"), true);
+        }
+    }
+
+    public void pasteSelection(double canvasX, double canvasY) {
+        if (!NodeClipboard.getInstance().hasContent()) {
+            toolbarWidget.importBlueprintFromClipboard();
+            return;
+        }
+        List<RecipeNode> newNodes = NodeClipboard.getInstance().paste(getGraph(), canvasX, canvasY);
+        Set<String> newIds = new HashSet<>();
+        for (RecipeNode n : newNodes) {
+            newIds.add(n.getId());
+        }
+        List<FlowGraph.ConnectionEdge> newEdges = new ArrayList<>();
+        for (FlowGraph.ConnectionEdge e : getGraph().getConnections()) {
+            if (newIds.contains(e.fromNodeId()) && newIds.contains(e.toNodeId())) {
+                newEdges.add(e);
+            }
+        }
+        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(newNodes, newEdges, "Paste " + newNodes.size() + " components"));
+        selectedNodeIds.clear();
+        for (RecipeNode n : newNodes) {
+            selectedNodeIds.add(n.getId());
+        }
+        rebuildWidgets();
+        markSummaryDirty();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.literal("§a✔ Pasted " + newNodes.size() + " components"), true);
+        }
+    }
+
+    public void cutSelection() {
+        if (selectedNodeIds.isEmpty()) return;
+        int count = selectedNodeIds.size();
+        NodeClipboard.getInstance().copy(getGraph(), selectedNodeIds);
+        List<RecipeNode> removedNodes = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
+        for (RecipeNode n : getGraph().getNodes()) {
+            if (selectedNodeIds.contains(n.getId())) {
+                removedNodes.add(n);
+            }
+        }
+        for (FlowGraph.ConnectionEdge e : getGraph().getConnections()) {
+            if (selectedNodeIds.contains(e.fromNodeId()) || selectedNodeIds.contains(e.toNodeId())) {
+                removedEdges.add(e);
+            }
+        }
+        getGraph().getNodes().removeAll(removedNodes);
+        getGraph().getConnections().removeAll(removedEdges);
+        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Cut " + count + " components"));
+        selectedNodeIds.clear();
+        rebuildWidgets();
+        markSummaryDirty();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.literal("§6✂ Cut " + count + " components to clipboard"), true);
+        }
+    }
+
+    public void duplicateSelection() {
+        if (selectedNodeIds.isEmpty()) return;
+        NodeClipboard.getInstance().copy(getGraph(), selectedNodeIds);
+        double canvasX = toCanvasX(lastMouseX) + 30.0;
+        double canvasY = toCanvasY(lastMouseY) + 30.0;
+        pasteSelection(canvasX, canvasY);
+    }
+
+    public void bringNodeToFront(RecipeNode node) {
+        if (node == null) return;
+        List<RecipeNode> nodes = getGraph().getNodes();
+        if (nodes.remove(node)) {
+            nodes.add(node);
+        }
+        for (int i = 0; i < nodeWidgets.size(); i++) {
+            if (nodeWidgets.get(i).getNode() == node) {
+                NodeWidget w = nodeWidgets.remove(i);
+                nodeWidgets.add(w);
+                break;
+            }
+        }
     }
 
     @Override
@@ -58,7 +264,18 @@ public class BoardScreen extends Screen {
         super.init();
         this.searchDialog = new RecipeSearchDialog(this);
         this.rotorDialog = new TurbineRotorDialog(this);
+        this.guideDialog = new GuideDialog(this);
         rebuildWidgets();
+
+        if (!BoardManager.getInstance().hasSeenWelcomePrompt() && getGraph().getNodes().isEmpty()) {
+            welcomeDialog.show();
+            BoardManager.getInstance().setHasSeenWelcomePrompt(true);
+            BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile());
+        }
+    }
+
+    public GuideDialog getGuideDialog() {
+        return guideDialog;
     }
 
     public void openTurbineRotorDialog(RecipeNode node) {
@@ -69,25 +286,58 @@ public class BoardScreen extends Screen {
 
     public void rebuildWidgets() {
         nodeWidgets.clear();
-        for (RecipeNode node : graph.getNodes()) {
+        for (RecipeNode node : getGraph().getNodes()) {
             nodeWidgets.add(new NodeWidget(node, this));
         }
         markSummaryDirty();
     }
 
     public void addNode(RecipeNode node) {
-        graph.addNode(node);
+        getGraph().addNode(node);
         rebuildWidgets();
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onNodeAdded(node);
     }
 
     public static double[] getNextNodeCenterPosition(int screenW, int screenH) {
-        double canvasCenterX = (-lastPanX + screenW / 2.0) / lastZoom;
-        double canvasCenterY = (-lastPanY + screenH / 2.0) / lastZoom;
-        return new double[]{canvasCenterX - NodeWidget.WIDTH / 2.0, canvasCenterY - 40.0};
+        double canvasCenterX = (screenW / 2.0 - lastPanX) / lastZoom - 100.0;
+        double canvasCenterY = (screenH / 2.0 - lastPanY) / lastZoom - 40.0;
+
+        FlowGraph graph = BoardManager.getInstance().getActiveGraph();
+        double candX = canvasCenterX;
+        double candY = canvasCenterY;
+        while (isNodeAt(graph, candX, candY)) {
+            candX += 24.0;
+            candY += 24.0;
+        }
+        return new double[]{candX, candY};
+    }
+
+    public double[] getScreenCenterCanvasPosition() {
+        double canvasCenterX = (this.width / 2.0 - this.panX) / this.zoom - 100.0;
+        double canvasCenterY = (this.height / 2.0 - this.panY) / this.zoom - 40.0;
+
+        FlowGraph graph = getGraph();
+        double candX = canvasCenterX;
+        double candY = canvasCenterY;
+        while (isNodeAt(graph, candX, candY)) {
+            candX += 24.0;
+            candY += 24.0;
+        }
+        return new double[]{candX, candY};
+    }
+
+    private static boolean isNodeAt(FlowGraph graph, double x, double y) {
+        if (graph == null) return false;
+        for (RecipeNode n : graph.getNodes()) {
+            if (Math.abs(n.getPosX() - x) < 20.0 && Math.abs(n.getPosY() - y) < 20.0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void removeNode(NodeWidget widget) {
-        graph.removeNode(widget.getNode());
+        getGraph().removeNode(widget.getNode());
         rebuildWidgets();
     }
 
@@ -113,9 +363,9 @@ public class BoardScreen extends Screen {
         double canvasMouseY = toCanvasY(mouseY);
 
         // 3. Render Static Connection Lines
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
-            RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+        for (FlowGraph.ConnectionEdge edge : getGraph().getConnections()) {
+            RecipeNode fromNode = getGraph().findNodeById(edge.fromNodeId());
+            RecipeNode toNode = getGraph().findNodeById(edge.toNodeId());
             if (fromNode != null && toNode != null) {
                 NodeWidget fromWidget = findWidgetForNode(fromNode);
                 NodeWidget toWidget = findWidgetForNode(toNode);
@@ -153,47 +403,67 @@ public class BoardScreen extends Screen {
         double screenTop = -panY / zoom - 50;
         double screenBottom = (-panY + height) / zoom + 50;
 
-        for (NodeWidget widget : nodeWidgets) {
+        graphics.flush();
+        for (int i = 0; i < nodeWidgets.size(); i++) {
+            NodeWidget widget = nodeWidgets.get(i);
             double nx = widget.getNode().getPosX();
             double ny = widget.getNode().getPosY();
-            int nw = NodeWidget.WIDTH;
+            int nw = widget.getWidth();
             int nh = widget.getHeight();
 
             if (nx + nw >= screenLeft && nx <= screenRight && ny + nh >= screenTop && ny <= screenBottom) {
+                graphics.pose().pushPose();
+                graphics.pose().translate(0, 0, (i + 1) * 10.0f);
                 widget.render(graphics, (int) canvasMouseX, (int) canvasMouseY, partialTicks);
+                graphics.flush();
+                graphics.pose().popPose();
             }
         }
 
+        // Render Active Marquee Box Selection
+        canvasHandler.renderMarquee(graphics);
+
         graphics.pose().popPose();
 
-        // 6. Render Top Toolbar and Summary Overlay
+        // 6. Render Page Tab Bar, Top Toolbar and Summary Overlay
+        pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
 
         if (summaryDirty || cachedSummary == null) {
-            cachedSummary = graph.computeSummary();
+            cachedSummary = getGraph().computeSummary();
             summaryDirty = false;
         }
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
 
         // 7. Render Tooltips only if no modal dialog is open
-        if ((searchDialog == null || !searchDialog.isVisible()) && (rotorDialog == null || !rotorDialog.isVisible())) {
+        if ((guideDialog == null || !guideDialog.isVisible()) && (searchDialog == null || !searchDialog.isVisible()) && (rotorDialog == null || !rotorDialog.isVisible())) {
             renderTooltips(graphics, canvasMouseX, canvasMouseY, mouseX, mouseY);
         }
 
         super.render(graphics, mouseX, mouseY, partialTicks);
 
         // 8. Top-level Modal Dialogs (Highest Layer)
-        if (searchDialog != null && searchDialog.isVisible()) {
+        if (guideDialog != null && guideDialog.isVisible()) {
+            guideDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (searchDialog != null && searchDialog.isVisible()) {
             searchDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (rotorDialog != null && rotorDialog.isVisible()) {
             rotorDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
         }
+
+        // 9. Interactive Tutorial Overlay and Welcome Dialog
+        com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay.render(graphics, font, this, width, height, mouseX, mouseY);
+        welcomeDialog.render(graphics, width, height, mouseX, mouseY);
     }
 
     private void renderTooltips(GuiGraphics graphics, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
             if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
+                if (widget.isExpandButtonHovered(canvasMouseX, canvasMouseY)) {
+                    graphics.renderTooltip(font, Component.literal("§d⤢ ").append(Component.translatable("gui.gtcalcboard.tooltip.expand_module")), mouseX, mouseY);
+                    return;
+                }
                 if (widget.isTargetButtonHovered(canvasMouseX, canvasMouseY)) {
                     List<Component> tooltip = new ArrayList<>();
                     if (widget.getNode().isBaseNode()) {
@@ -211,17 +481,69 @@ public class BoardScreen extends Screen {
                     return;
                 }
 
-                IngredientStack hovered = widget.getHoveredIngredient(canvasMouseX, canvasMouseY);
-                if (hovered != null) {
+                int inIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
+                int outIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
+
+                if (inIdx >= 0 && inIdx < widget.getNode().getInputs().size()) {
+                    IngredientStack in = widget.getNode().getInputs().get(inIdx);
+                    FlowGraph.PortFlowStats stats = getGraph().getInputPortStats(widget.getNode(), inIdx);
+
                     List<Component> tooltipLines = new ArrayList<>();
-                    tooltipLines.add(Component.literal(hovered.getDisplayName()));
-                    if (hovered.isFluid()) {
-                        tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.amount")).append(String.format(" §f%.0f mB", hovered.getAmount())));
+                    tooltipLines.add(Component.literal("§b[📥 " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
+
+                    String reqStr = NodeCardRenderer.formatRate(stats.requiredOrProducedRate(), in.isFluid());
+                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §f" + reqStr));
+
+                    if (stats.isConnected()) {
+                        String supStr = NodeCardRenderer.formatRate(stats.connectedRate(), in.isFluid());
+                        String percentCol = stats.isBalanced() ? "§a" : (stats.isDeficit() ? "§c" : "§b");
+                        String statusStr = stats.isBalanced()
+                            ? "§a✔ 100%"
+                            : (stats.isDeficit()
+                                ? String.format("§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString())
+                                : String.format("§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString()));
+
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supStr + " §7(" + statusStr + "§7)"));
+                        tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.connected_producers", String.valueOf(stats.connectionCount())).getString()));
                     } else {
-                        tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.count")).append(String.format(" §f%.0f", hovered.getAmount())));
+                        tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_raw").getString()));
                     }
-                    if (hovered.getChance() < 1.0) {
-                        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", hovered.getChance() * 100.0))));
+
+                    if (in.getChance() < 1.0) {
+                        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", in.getChance() * 100.0))));
+                    }
+                    tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
+                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    return;
+                }
+
+                if (outIdx >= 0 && outIdx < widget.getNode().getOutputs().size()) {
+                    IngredientStack out = widget.getNode().getOutputs().get(outIdx);
+                    FlowGraph.PortFlowStats stats = getGraph().getOutputPortStats(widget.getNode(), outIdx);
+
+                    List<Component> tooltipLines = new ArrayList<>();
+                    tooltipLines.add(Component.literal("§a[📤 " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
+
+                    String prodStr = NodeCardRenderer.formatRate(stats.requiredOrProducedRate(), out.isFluid());
+                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.production").getString() + ": §f" + prodStr));
+
+                    if (stats.isConnected()) {
+                        String demStr = NodeCardRenderer.formatRate(stats.connectedRate(), out.isFluid());
+                        String percentCol = stats.isBalanced() ? "§a" : (stats.isSurplus() ? "§e" : "§c");
+                        String statusStr = stats.isBalanced()
+                            ? "§a✔ 100%"
+                            : (stats.isSurplus()
+                                ? String.format("§e↓ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString())
+                                : String.format("§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString()));
+
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.consumed").getString() + ": " + percentCol + demStr + " §7(" + statusStr + "§7)"));
+                        tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.connected_consumers", String.valueOf(stats.connectionCount())).getString()));
+                    } else {
+                        tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_final").getString()));
+                    }
+
+                    if (out.getChance() < 1.0) {
+                        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", out.getChance() * 100.0))));
                     }
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
@@ -256,11 +578,23 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (welcomeDialog.mouseClicked(this, width, height, mouseX, mouseY, button)) {
+            return true;
+        }
+        if (com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay.mouseClicked(this, width, height, mouseX, mouseY, button)) {
+            return true;
+        }
+        if (guideDialog != null && guideDialog.isVisible()) {
+            return guideDialog.mouseClicked(mouseX, mouseY, button);
+        }
         if (rotorDialog != null && rotorDialog.isVisible()) {
             return rotorDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (pageTabBar.mouseClicked(mouseX, mouseY, button)) {
+            return true;
         }
         if (summaryOverlay.mouseClicked(mouseX, mouseY, button, width, height)) {
             return true;
@@ -298,6 +632,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (guideDialog != null && guideDialog.isVisible()) {
+            return guideDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         if (rotorDialog != null && rotorDialog.isVisible()) {
             return rotorDialog.mouseScrolled(mouseX, mouseY, delta, width, height);
         }
@@ -327,6 +664,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (pageTabBar.charTyped(codePoint, modifiers)) {
+            return true;
+        }
         if (rotorDialog != null && rotorDialog.isVisible()) {
             return rotorDialog.charTyped(codePoint, modifiers);
         }
@@ -344,7 +684,31 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (welcomeDialog.isVisible()) {
+                welcomeDialog.hide();
+                return true;
+            }
+            if (com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isActive()) {
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().stopTutorial();
+                return true;
+            }
+        }
+        if (guideDialog != null && guideDialog.isVisible()) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                guideDialog.close();
+                return true;
+            }
+            return guideDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (pageTabBar.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         if (rotorDialog != null && rotorDialog.isVisible()) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                rotorDialog.close();
+                return true;
+            }
             return rotorDialog.keyPressed(keyCode, scanCode, modifiers);
         }
         if (searchDialog != null && searchDialog.isVisible()) {
@@ -362,13 +726,41 @@ public class BoardScreen extends Screen {
             }
         }
 
-        // Global Hotkeys: Ctrl+C (Share), Ctrl+V (Import)
+        // Global Hotkeys: Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Ctrl+C (Copy), Ctrl+X (Cut), Ctrl+V (Paste), Ctrl+D (Duplicate), Ctrl+A (Select All)
         if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
-            if (keyCode == GLFW.GLFW_KEY_C) {
-                toolbarWidget.copyBlueprintToClipboard();
+            boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
+            if (keyCode == GLFW.GLFW_KEY_Z) {
+                if (shift) {
+                    redo();
+                } else {
+                    undo();
+                }
+                return true;
+            } else if (keyCode == GLFW.GLFW_KEY_Y) {
+                redo();
+                return true;
+            } else if (keyCode == GLFW.GLFW_KEY_X) {
+                cutSelection();
+                return true;
+            } else if (keyCode == GLFW.GLFW_KEY_C) {
+                copySelection();
                 return true;
             } else if (keyCode == GLFW.GLFW_KEY_V) {
-                toolbarWidget.importBlueprintFromClipboard();
+                pasteSelection(toCanvasX(lastMouseX), toCanvasY(lastMouseY));
+                return true;
+            } else if (keyCode == GLFW.GLFW_KEY_D) {
+                duplicateSelection();
+                return true;
+            } else if (keyCode == GLFW.GLFW_KEY_A) {
+                selectAll();
+                return true;
+            }
+        }
+
+        // Delete / Backspace: Delete selected nodes
+        if (keyCode == GLFW.GLFW_KEY_DELETE || keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+            if (!selectedNodeIds.isEmpty()) {
+                deleteSelection();
                 return true;
             }
         }
@@ -408,18 +800,46 @@ public class BoardScreen extends Screen {
         return (screenY - panY) / zoom;
     }
 
-    public FlowGraph getGraph() { return graph; }
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
 
     public double getPanX() { return panX; }
-    public void setPanX(double panX) { this.panX = panX; }
+    public void setPanX(double panX) {
+        this.panX = panX;
+        lastPanX = panX;
+        var active = BoardManager.getInstance().getActivePage();
+        if (active != null) active.setPanX(panX);
+    }
     public double getPanY() { return panY; }
-    public void setPanY(double panY) { this.panY = panY; }
+    public void setPanY(double panY) {
+        this.panY = panY;
+        lastPanY = panY;
+        var active = BoardManager.getInstance().getActivePage();
+        if (active != null) active.setPanY(panY);
+    }
     public double getZoom() { return zoom; }
-    public void setZoom(double zoom) { this.zoom = zoom; }
+    public void setZoom(double zoom) {
+        this.zoom = zoom;
+        lastZoom = zoom;
+        var active = BoardManager.getInstance().getActivePage();
+        if (active != null) active.setZoom(zoom);
+    }
+
+    @Override
+    public void onClose() {
+        lastPanX = this.panX;
+        lastPanY = this.panY;
+        lastZoom = this.zoom;
+        var active = BoardManager.getInstance().getActivePage();
+        if (active != null) {
+            active.setPanX(this.panX);
+            active.setPanY(this.panY);
+            active.setZoom(this.zoom);
+        }
+        super.onClose();
+    }
 
     @Override
     public boolean isPauseScreen() {

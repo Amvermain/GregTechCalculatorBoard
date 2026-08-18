@@ -97,6 +97,11 @@ public class TurbineRotorDialog {
     }
 
     private void indexAllRotors() {
+        if (!com.gtceu.calcboard.api.ModCompatHelper.isGTLoaded()) {
+            allDiscoveredRotors.clear();
+            return;
+        }
+
         Map<String, RotorItemEntry> collected = new LinkedHashMap<>();
 
         try {
@@ -363,10 +368,21 @@ public class TurbineRotorDialog {
 
                 if (mouseX >= slotX && mouseX <= slotX + SLOT_SIZE && mouseY >= slotY && mouseY <= slotY + SLOT_SIZE) {
                     RotorItemEntry entry = filteredRotors.get(i);
+                    int oldEff = targetNode.getRotorEfficiency();
+                    int oldPwr = targetNode.getRotorPower();
+                    String oldMat = targetNode.getRotorName();
+
                     targetNode.setRotorEfficiency(entry.efficiencyPercent);
                     targetNode.setRotorPower(entry.powerPercent);
                     targetNode.setRotorName(entry.displayName);
                     targetNode.autoCalculateTurbineParallel();
+
+                    List<com.gtceu.calcboard.api.history.BoardCommand> cmds = new ArrayList<>();
+                    cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(targetNode.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.ROTOR_EFFICIENCY, oldEff, entry.efficiencyPercent));
+                    cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(targetNode.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.ROTOR_POWER, oldPwr, entry.powerPercent));
+                    cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(targetNode.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.ROTOR_NAME, oldMat, entry.displayName));
+                    parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(cmds, "Select Turbine Rotor (" + entry.displayName + ")"));
+
                     parent.markSummaryDirty();
                     parent.rebuildWidgets();
                     close();
@@ -418,10 +434,22 @@ public class TurbineRotorDialog {
             int eff = Integer.parseInt(customEffBox.getValue().trim());
             int pwr = Integer.parseInt(customPowerBox.getValue().trim());
             if (eff >= 10 && eff <= 1000 && pwr >= 10 && pwr <= 5000) {
+                int oldEff = targetNode.getRotorEfficiency();
+                int oldPwr = targetNode.getRotorPower();
+                String oldMat = targetNode.getRotorName();
+                String newName = "Custom (" + eff + "% / " + pwr + "%P)";
+
                 targetNode.setRotorEfficiency(eff);
                 targetNode.setRotorPower(pwr);
-                targetNode.setRotorName("Custom (" + eff + "% / " + pwr + "%P)");
+                targetNode.setRotorName(newName);
                 targetNode.autoCalculateTurbineParallel();
+
+                List<com.gtceu.calcboard.api.history.BoardCommand> cmds = new ArrayList<>();
+                cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(targetNode.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.ROTOR_EFFICIENCY, oldEff, eff));
+                cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(targetNode.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.ROTOR_POWER, oldPwr, pwr));
+                cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(targetNode.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.ROTOR_NAME, oldMat, newName));
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(cmds, "Custom Turbine Rotor"));
+
                 parent.markSummaryDirty();
                 parent.rebuildWidgets();
             }

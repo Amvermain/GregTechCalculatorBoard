@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui;
 
+import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.OverclockMode;
@@ -9,19 +10,22 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.util.Map;
+import java.util.*;
 
 /**
  * Interactive card widget representing a single GregTech recipe machine node on the canvas.
  */
 public class NodeWidget {
-    public static final int WIDTH = 230;
+    public static final int WIDTH = 210;
+    public static final int DEFAULT_WIDTH = 210;
     public static final int HEADER_HEIGHT = 20;
 
     private final RecipeNode node;
     private final BoardScreen parent;
     private final NodeCountEditor countEditor;
     private final NodeParallelEditor parallelEditor;
+    private final NodeNameEditor nameEditor;
+    private long lastHeaderClickTime = 0;
 
     // Cached rates for 144+ FPS performance
     private Map<IngredientStack, Double> cachedInputRates = null;
@@ -32,6 +36,7 @@ public class NodeWidget {
         this.parent = parent;
         this.countEditor = new NodeCountEditor(this);
         this.parallelEditor = new NodeParallelEditor(this);
+        this.nameEditor = new NodeNameEditor(this, node);
         invalidateCache();
     }
 
@@ -51,6 +56,7 @@ public class NodeWidget {
     public void commitCountEdit() {
         countEditor.commit();
         parallelEditor.commit();
+        nameEditor.commitEdit();
     }
 
     public RecipeNode getNode() {
@@ -65,17 +71,44 @@ public class NodeWidget {
         return parallelEditor;
     }
 
-    public int getHeight() {
+    public NodeNameEditor getNameEditor() {
+        return nameEditor;
+    }
+
+    public BoardScreen getParent() {
+        return parent;
+    }
+
+    public int getWidth() {
+        return node.getCardWidth();
+    }
+
+    public int getContentStartY() {
+        int y = (int) node.getPosY();
+        int ctrlY = y + HEADER_HEIGHT + 6;
+        int row2H = node.isModule() ? 0 : 18;
+        int infoY = ctrlY + row2H + 18;
+        int sepY = infoY + 14;
+        return sepY + 4;
+    }
+
+    public int calculateAutoHeight() {
         int maxRows = Math.max(node.getInputs().size(), node.getOutputs().size());
-        return HEADER_HEIGHT + 6 + 18 + 18 + 14 + 4 + Math.max(1, maxRows) * 18 + 6;
+        int contentStartY = getContentStartY();
+        int contentEndY = contentStartY + Math.max(1, maxRows) * 18 + 8;
+        return (int) (contentEndY - node.getPosY());
+    }
+
+    public int getHeight() {
+        return Math.max(calculateAutoHeight(), node.getCardHeight());
     }
 
     public float getOutputPortX(int index) {
-        return (float) (node.getPosX() + WIDTH - 6);
+        return (float) (node.getPosX() + getWidth() - 6);
     }
 
     public float getOutputPortY(int index) {
-        int contentY = (int) (node.getPosY() + HEADER_HEIGHT + 6 + 18 + 18 + 14 + 4);
+        int contentY = getContentStartY();
         return contentY + index * 18 + 8;
     }
 
@@ -84,40 +117,53 @@ public class NodeWidget {
     }
 
     public float getInputPortY(int index) {
-        int contentY = (int) (node.getPosY() + HEADER_HEIGHT + 6 + 18 + 18 + 14 + 4);
+        int contentY = getContentStartY();
         return contentY + index * 18 + 8;
     }
 
     public boolean isHeaderHovered(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
-        return canvasMouseX >= x && canvasMouseX <= x + WIDTH - 40 && canvasMouseY >= y && canvasMouseY <= y + HEADER_HEIGHT;
+        return canvasMouseX >= x && canvasMouseX <= x + getWidth() - 40 && canvasMouseY >= y && canvasMouseY <= y + HEADER_HEIGHT;
+    }
+
+    public boolean isExpandButtonHovered(double canvasMouseX, double canvasMouseY) {
+        if (!node.isModule()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int expandX = x + getWidth() - 54;
+        return canvasMouseX >= expandX && canvasMouseX <= expandX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
     }
 
     public boolean isTargetButtonHovered(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
-        int targetX = x + WIDTH - 36;
+        int targetX = x + getWidth() - 36;
         return canvasMouseX >= targetX && canvasMouseX <= targetX + 18 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
     }
 
     public boolean isCloseButtonHovered(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
-        int closeX = x + WIDTH - 18;
+        int closeX = x + getWidth() - 18;
         return canvasMouseX >= closeX && canvasMouseX <= closeX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+    }
+
+    public boolean isResizeHandleHovered(double canvasMouseX, double canvasMouseY) {
+        int right = (int) (node.getPosX() + getWidth());
+        int bottom = (int) (node.getPosY() + getHeight());
+        return canvasMouseX >= right - 12 && canvasMouseX <= right && canvasMouseY >= bottom - 12 && canvasMouseY <= bottom;
     }
 
     public boolean isPointInside(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
-        return canvasMouseX >= x && canvasMouseX <= x + WIDTH && canvasMouseY >= y && canvasMouseY <= y + getHeight();
+        return canvasMouseX >= x && canvasMouseX <= x + getWidth() && canvasMouseY >= y && canvasMouseY <= y + getHeight();
     }
 
     public int getHoveredInputPortIndex(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int contentY = y + HEADER_HEIGHT + 6 + 18 + 18 + 14 + 4;
+        int contentY = getContentStartY();
 
         for (int i = 0; i < node.getInputs().size(); i++) {
             int rowY = contentY + i * 18;
@@ -130,12 +176,12 @@ public class NodeWidget {
 
     public int getHoveredOutputPortIndex(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int contentY = y + HEADER_HEIGHT + 6 + 18 + 18 + 14 + 4;
+        int contentY = getContentStartY();
 
         for (int i = 0; i < node.getOutputs().size(); i++) {
             int rowY = contentY + i * 18;
-            if (canvasMouseX >= x + WIDTH - 40 && canvasMouseX <= x + WIDTH && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
+            int outPortX = x + getWidth() - 36;
+            if (canvasMouseX >= outPortX && canvasMouseX <= x + getWidth() + 4 && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
                 return i;
             }
         }
@@ -173,47 +219,62 @@ public class NodeWidget {
     }
 
     public boolean isTierButtonHovered(double mouseX, double mouseY) {
+        if (node.isModule()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
-        return mouseX >= x + 154 && mouseX <= x + 188 && mouseY >= ctrlY && mouseY <= ctrlY + 14;
+        int row2Y = ctrlY + 18;
+        return mouseX >= x + 6 && mouseX <= x + 38 && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    public boolean isOcButtonHovered(double mouseX, double mouseY) {
+        if (node.isModule() || node.isGenerator()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int ctrlY = y + HEADER_HEIGHT + 6;
+        int row2Y = ctrlY + 18;
+        int ocX = x + 42;
+        String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
+        String ocText = Component.translatable(ocKey).getString();
+        int ocW = Math.max(50, Minecraft.getInstance().font.width(ocText) + 6);
+        return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
     public boolean isRotorButtonHovered(double mouseX, double mouseY) {
-        if (!node.isGenerator()) return false;
+        if (node.isModule() || !node.isGenerator()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
         int row2Y = ctrlY + 18;
         String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
-        int genW = Math.max(30, Minecraft.getInstance().font.width(genBadge) + 6);
-        int rotorX = x + 6 + genW + 4;
+        int genW = Math.max(28, Minecraft.getInstance().font.width(genBadge) + 4);
+        int rotorX = x + 42 + genW + 3;
         String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
-        int rotorW = Math.max(48, Minecraft.getInstance().font.width(rotorText) + 8);
+        int rotorW = Math.max(46, Minecraft.getInstance().font.width(rotorText) + 6);
         return mouseX >= rotorX && mouseX <= rotorX + rotorW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
     public boolean isParallelButtonHovered(double mouseX, double mouseY) {
+        if (node.isModule()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
         int row2Y = ctrlY + 18;
-        int nextCtrlX = x + 6;
+        int parStartX;
         if (node.isGenerator()) {
             String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
-            int genW = Math.max(30, Minecraft.getInstance().font.width(genBadge) + 6);
-            nextCtrlX += genW + 4;
+            int genW = Math.max(28, Minecraft.getInstance().font.width(genBadge) + 4);
             String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
-            int rotorW = Math.max(48, Minecraft.getInstance().font.width(rotorText) + 8);
-            nextCtrlX += rotorW + 4;
+            int rotorW = Math.max(46, Minecraft.getInstance().font.width(rotorText) + 6);
+            parStartX = x + 42 + genW + 3 + rotorW + 3;
         } else {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = Component.translatable(ocKey).getString();
-            int ocW = Math.max(54, Minecraft.getInstance().font.width(ocText) + 8);
-            nextCtrlX += ocW + 4;
+            int ocW = Math.max(50, Minecraft.getInstance().font.width(ocText) + 6);
+            parStartX = x + 42 + ocW + 3;
         }
-        int parW = Math.max(44, Minecraft.getInstance().font.width(parallelEditor.getDisplayText()) + 8);
-        return mouseX >= nextCtrlX && mouseX <= nextCtrlX + parW && mouseY >= row2Y && mouseY <= row2Y + 14;
+        int parW = Math.max(38, (x + getWidth() - 6) - parStartX);
+        return mouseX >= parStartX && mouseX <= parStartX + parW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
     public boolean changeTier(int direction) {
@@ -226,11 +287,14 @@ public class NodeWidget {
             return false;
         }
 
-        double speedRatio = node.getOverclockMode().getSpeedFactor();
-        if (direction > 0) {
-            node.setMachineCount(Math.max(0.01, node.getMachineCount() / speedRatio));
-        } else {
-            node.setMachineCount(node.getMachineCount() * speedRatio);
+        // Only scale down machine count for normal consumer machines. Generators scale up parallels, not reduce count!
+        if (!node.isGenerator()) {
+            double speedRatio = node.getOverclockMode().getSpeedFactor();
+            if (direction > 0) {
+                node.setMachineCount(Math.max(0.01, node.getMachineCount() / speedRatio));
+            } else {
+                node.setMachineCount(node.getMachineCount() * speedRatio);
+            }
         }
 
         node.setTargetTier(GTVoltageTier.getByIndex(newIdx));
@@ -259,6 +323,29 @@ public class NodeWidget {
             return false;
         }
 
+        // Module Expand Button [⤢]
+        if (isExpandButtonHovered(mouseX, mouseY)) {
+            List<FlowGraph.ConnectionEdge> moduleEdges = new ArrayList<>();
+            for (FlowGraph.ConnectionEdge e : parent.getGraph().getConnections()) {
+                if (e.fromNodeId().equals(node.getId()) || e.toNodeId().equals(node.getId())) {
+                    moduleEdges.add(e);
+                }
+            }
+            List<RecipeNode> subNodes = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getNodes()) : Collections.emptyList();
+            List<FlowGraph.ConnectionEdge> subEdges = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getConnections()) : Collections.emptyList();
+
+            boolean expanded = parent.getGraph().expandModule(node);
+            if (expanded) {
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ExpandModuleCommand(node, subNodes, subEdges, moduleEdges));
+                parent.rebuildWidgets();
+                parent.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F)
+                );
+            }
+            return true;
+        }
+
         // Close Button [X]
         if (isCloseButtonHovered(mouseX, mouseY)) {
             parent.removeNode(this);
@@ -268,6 +355,7 @@ public class NodeWidget {
         // Target Base Node Toggle Button [🎯]
         if (isTargetButtonHovered(mouseX, mouseY)) {
             boolean nowBase = !node.isBaseNode();
+            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.BASE_ANCHOR, !nowBase, nowBase));
             parent.getGraph().setBaseNode(nowBase ? node : null);
             parent.rebuildWidgets();
             parent.markSummaryDirty();
@@ -278,7 +366,6 @@ public class NodeWidget {
                     mc.player.displayClientMessage(Component.literal("§6🎯 ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())), true);
                 }
                 mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.2F));
-                parent.performAutoRatio();
             } else {
                 if (mc.player != null) {
                     mc.player.displayClientMessage(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")), true);
@@ -289,102 +376,131 @@ public class NodeWidget {
 
         int ctrlY = y + HEADER_HEIGHT + 6;
 
-        // Numeric Count Box Click
-        int countBoxX = x + 60;
-        int countBoxW = 36;
-        if (mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
-            parallelEditor.commit();
+        // Machine Count Decrement [-]
+        if (mouseX >= x + 44 && mouseX <= x + 58 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+            commitCountEdit();
+            double oldVal = node.getMachineCount();
+            double newVal = Math.max(1.0, oldVal - 1);
+            if (oldVal != newVal) {
+                node.setMachineCount(newVal);
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+            }
+            updateCountBuffer();
+            invalidateCache();
+            return true;
+        }
+
+        // Machine Count Increment [+]
+        int countBoxW = Math.max(32, Minecraft.getInstance().font.width(countEditor.getDisplayText()) + 8);
+        int afterCountX = x + 60 + countBoxW + 2;
+
+        if (mouseX >= afterCountX && mouseX <= afterCountX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+            commitCountEdit();
+            double oldVal = node.getMachineCount();
+            double newVal = oldVal + 1;
+            node.setMachineCount(newVal);
+            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+            updateCountBuffer();
+            invalidateCache();
+            return true;
+        }
+
+        // Machine Count Half [/2]
+        if (mouseX >= afterCountX + 16 && mouseX <= afterCountX + 32 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+            commitCountEdit();
+            double oldVal = node.getMachineCount();
+            double newVal = Math.max(1.0, Math.floor(oldVal / 2.0));
+            if (oldVal != newVal) {
+                node.setMachineCount(newVal);
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+            }
+            updateCountBuffer();
+            invalidateCache();
+            return true;
+        }
+
+        // Machine Count Double [x2]
+        if (mouseX >= afterCountX + 34 && mouseX <= afterCountX + 50 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+            commitCountEdit();
+            double oldVal = node.getMachineCount();
+            double newVal = oldVal * 2.0;
+            node.setMachineCount(newVal);
+            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+            updateCountBuffer();
+            invalidateCache();
+            return true;
+        }
+
+        // Count Input Box Click
+        if (mouseX >= x + 60 && mouseX <= x + 60 + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             countEditor.startEditing();
             return true;
-        } else {
-            countEditor.commit();
         }
 
-        // [-]
-        if (mouseX >= x + 44 && mouseX <= x + 58 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
-            node.setMachineCount(Math.max(0.1, node.getMachineCount() - 1.0));
-            updateCountBuffer();
-            return true;
-        }
-        // [+]
-        if (mouseX >= x + 98 && mouseX <= x + 112 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
-            node.setMachineCount(node.getMachineCount() + 1.0);
-            updateCountBuffer();
-            return true;
-        }
-        // [/2]
-        if (mouseX >= x + 115 && mouseX <= x + 131 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
-            node.setMachineCount(Math.max(0.05, node.getMachineCount() / 2.0));
-            updateCountBuffer();
-            return true;
-        }
-        // [x2]
-        if (mouseX >= x + 133 && mouseX <= x + 149 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
-            node.setMachineCount(node.getMachineCount() * 2.0);
-            updateCountBuffer();
-            return true;
-        }
-
-        // [Tier Button] Left Click: Tier Up / Right Click: Tier Down
+        // Tier Selector Button Click (Row 2, Left: [LV])
         if (isTierButtonHovered(mouseX, mouseY)) {
-            return changeTier(button == 0 ? 1 : -1);
-        }
-
-        // Second Row: [STD OC / PERF OC] toggle & [Par: 1x, 2x, 4x, 8x...]
-        int row2Y = ctrlY + 18;
-        String ocText = node.isGenerator() ? "GEN" : Component.translatable(node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std").getString();
-        int ocW = Math.max(54, Minecraft.getInstance().font.width(ocText) + 8);
-        if (mouseX >= x + 6 && mouseX <= x + 6 + ocW && mouseY >= row2Y && mouseY <= row2Y + 14) {
-            if (!node.isGenerator()) {
-                OverclockMode nextMode = node.getOverclockMode() == OverclockMode.STANDARD ? OverclockMode.PERFECT : OverclockMode.STANDARD;
-                node.setOverclockMode(nextMode);
-                invalidateCache();
+            commitCountEdit();
+            GTVoltageTier oldTier = node.getTargetTier();
+            int direction = (button == 1) ? -1 : 1;
+            changeTier(direction);
+            GTVoltageTier newTier = node.getTargetTier();
+            if (oldTier != newTier) {
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.TARGET_TIER, oldTier, newTier));
             }
+            invalidateCache();
             return true;
         }
 
-        // [Rotor Setting Button] for generators
+        // Overclock Mode Button Click (Row 2: [STD OC] / [PERF OC])
+        if (isOcButtonHovered(mouseX, mouseY)) {
+            commitCountEdit();
+            OverclockMode oldOc = node.getOverclockMode();
+            OverclockMode newOc = (oldOc == OverclockMode.STANDARD) ? OverclockMode.PERFECT : OverclockMode.STANDARD;
+            node.setOverclockMode(newOc);
+            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.OVERCLOCK_MODE, oldOc, newOc));
+            invalidateCache();
+            return true;
+        }
+
+        // Turbine Rotor Dialog Button Click (Row 2: [⚙ 220%])
         if (isRotorButtonHovered(mouseX, mouseY)) {
             parent.openTurbineRotorDialog(node);
             return true;
         }
 
-        // [Parallel Selector] Direct click to type number (like Count box), Right click for /2
+        // Interactive Numeric Parallel Box Click (Row 2: [Par: 1x])
         if (isParallelButtonHovered(mouseX, mouseY)) {
-            countEditor.commit();
-            if (button == 1) {
-                // Right click: halve parallel
-                parallelEditor.commit();
-                parallelEditor.stepParallel(-1, false);
-            } else {
-                // Left click: start inline typing directly
-                parallelEditor.startEditing();
-            }
+            parallelEditor.startEditing();
             return true;
-        } else {
-            parallelEditor.commit();
         }
 
         return false;
     }
 
-    public boolean charTyped(char codePoint, int modifiers) {
-        if (countEditor.isEditing()) {
-            return countEditor.charTyped(codePoint, modifiers);
-        }
-        if (parallelEditor.isEditing()) {
-            return parallelEditor.charTyped(codePoint, modifiers);
+    public boolean checkHeaderDoubleClick(double canvasMouseX, double canvasMouseY) {
+        if (isHeaderHovered(canvasMouseX, canvasMouseY)) {
+            long now = System.currentTimeMillis();
+            if (now - lastHeaderClickTime < 350) {
+                commitCountEdit();
+                nameEditor.startEditing();
+                return true;
+            }
+            lastHeaderClickTime = now;
         }
         return false;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (countEditor.isEditing()) {
-            return countEditor.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (parallelEditor.isEditing()) {
-            return parallelEditor.keyPressed(keyCode, scanCode, modifiers);
-        }
+        if (nameEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
+        if (countEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
+        if (parallelEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
+        return false;
+    }
+
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (nameEditor.charTyped(codePoint, modifiers)) return true;
+        if (countEditor.charTyped(codePoint, modifiers)) return true;
+        if (parallelEditor.charTyped(codePoint, modifiers)) return true;
         return false;
     }
 }

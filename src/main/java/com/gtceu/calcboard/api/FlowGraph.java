@@ -75,21 +75,22 @@ public class FlowGraph {
         double targetAnchorCount = anchor.getMachineCount();
         if (integerCounts) {
             targetAnchorCount = Math.max(1.0, Math.ceil(targetAnchorCount - 0.00001));
-            anchor.setMachineCount(targetAnchorCount);
         }
+        anchor.setMachineCount(targetAnchorCount);
 
-        // 1. Upstream Wavefront Propagation (Supply Anchor's Inputs with Supply >= Demand)
         Map<String, Double> upstreamCounts = new HashMap<>();
         upstreamCounts.put(anchor.getId(), targetAnchorCount);
 
-        Queue<RecipeNode> upstreamQueue = new ArrayDeque<>();
-        upstreamQueue.add(anchor);
+        // ==========================================
+        // 1. UPSTREAM PASS (Supply Anchor & Upstream Inputs with Supply >= Demand)
+        // ==========================================
+        Queue<RecipeNode> upQueue = new ArrayDeque<>();
+        upQueue.add(anchor);
+        Set<String> upVisited = new HashSet<>();
+        upVisited.add(anchor.getId());
 
-        Set<String> upstreamVisited = new HashSet<>();
-        upstreamVisited.add(anchor.getId());
-
-        while (!upstreamQueue.isEmpty()) {
-            RecipeNode consumer = upstreamQueue.poll();
+        while (!upQueue.isEmpty()) {
+            RecipeNode consumer = upQueue.poll();
             double consumerCount = upstreamCounts.getOrDefault(consumer.getId(), consumer.getMachineCount());
             double consumerCps = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * consumerCount;
 
@@ -103,8 +104,8 @@ public class FlowGraph {
                         inEdges.add(edge);
                     }
                 }
-
                 if (inEdges.isEmpty()) continue;
+
                 double sharePerProducer = neededRate / inEdges.size();
 
                 for (ConnectionEdge edge : inEdges) {
@@ -118,15 +119,14 @@ public class FlowGraph {
                         if (singleRate > 0.0001) {
                             double neededCount = sharePerProducer / singleRate;
                             if (integerCounts) {
-                                // Always round UP (Ceil) so producer supply >= consumer demand
                                 neededCount = Math.max(1.0, Math.ceil(neededCount - 0.00001));
                             }
                             double currentMax = upstreamCounts.getOrDefault(producer.getId(), 0.0);
                             upstreamCounts.put(producer.getId(), Math.max(currentMax, neededCount));
 
-                            if (!upstreamVisited.contains(producer.getId())) {
-                                upstreamVisited.add(producer.getId());
-                                upstreamQueue.add(producer);
+                            if (!upVisited.contains(producer.getId())) {
+                                upVisited.add(producer.getId());
+                                upQueue.add(producer);
                             }
                         }
                     }
@@ -134,7 +134,7 @@ public class FlowGraph {
             }
         }
 
-        // Apply upstream calculated counts
+        // Apply upstream calculated counts to graph
         for (Map.Entry<String, Double> entry : upstreamCounts.entrySet()) {
             RecipeNode n = findNodeById(entry.getKey());
             if (n != null) {
@@ -142,57 +142,87 @@ public class FlowGraph {
             }
         }
 
-        // 2. Downstream Wavefront Propagation (Consume Anchor's Outputs)
-        Map<String, Double> downstreamCounts = new HashMap<>();
-        downstreamCounts.put(anchor.getId(), targetAnchorCount);
+        // ==========================================
+        // 2. DOWNSTREAM PASS (Consume Anchor & Upstream Outputs with Supply >= Demand)
+        // ==========================================
+        Map<String, Double> downstreamCounts = new HashMap<>(upstreamCounts);
 
-        Queue<RecipeNode> downstreamQueue = new ArrayDeque<>();
-        downstreamQueue.add(anchor);
+        Queue<RecipeNode> downQueue = new ArrayDeque<>();
+        Set<String> downVisited = new HashSet<>();
 
-        Set<String> downstreamVisited = new HashSet<>();
-        downstreamVisited.add(anchor.getId());
+        // Start downstream propagation from anchor and all upstream producers
+        for (String upId : upstreamCounts.keySet()) {
+            RecipeNode n = findNodeById(upId);
+            if (n != null) {
+                downQueue.add(n);
+                downVisited.add(n.getId());
+            }
+        }
 
-        while (!downstreamQueue.isEmpty()) {
-            RecipeNode producer = downstreamQueue.poll();
-            double prodCount = downstreamCounts.getOrDefault(producer.getId(), producer.getMachineCount());
-            double prodCps = producer.getOverclockResult().getCyclesPerSecond() * producer.getParallel() * prodCount;
+        while (!downQueue.isEmpty()) {
+            RecipeNode producer = downQueue.poll();
+            double pCount = downstreamCounts.getOrDefault(producer.getId(), producer.getMachineCount());
 
-            for (int outIdx = 0; outIdx < producer.getOutputs().size(); outIdx++) {
-                IngredientStack outStack = producer.getOutputs().get(outIdx);
-                double producedRate = outStack.getExpectedAmount() * prodCps;
+            // Find next consumers that are downstream of this producer
+            Set<RecipeNode> nextConsumers = new LinkedHashSet<>();
+            for (ConnectionEdge edge : connections) {
+                if (edge.fromNodeId().equals(producer.getId())) {
+                    RecipeNode consumer = findNodeById(edge.toNodeId());
+                    if (consumer != null && consumer != anchor && !upstreamCounts.containsKey(consumer.getId())) {
+                        nextConsumers.add(consumer);
+                    }
+                }
+            }
 
-                List<ConnectionEdge> outEdges = new ArrayList<>();
-                for (ConnectionEdge edge : connections) {
-                    if (edge.fromNodeId().equals(producer.getId()) && edge.outputIndex() == outIdx) {
-                        outEdges.add(edge);
+            for (RecipeNode consumer : nextConsumers) {
+                double requiredConsumerCount = 0.0;
+
+                for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
+                    IngredientStack inStack = consumer.getInputs().get(inIdx);
+                    double singleInRate = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * inStack.getAmount();
+                    if (singleInRate <= 0.0001) continue;
+
+                    // Sum up all incoming supplies to this input port from all connected producers
+                    double totalIncomingSupply = 0.0;
+                    for (ConnectionEdge edge : connections) {
+                        if (edge.toNodeId().equals(consumer.getId()) && edge.inputIndex() == inIdx) {
+                            RecipeNode p = findNodeById(edge.fromNodeId());
+                            if (p != null && edge.outputIndex() < p.getOutputs().size()) {
+                                double pC = downstreamCounts.getOrDefault(p.getId(), p.getMachineCount());
+                                double pCps = p.getOverclockResult().getCyclesPerSecond() * p.getParallel() * pC;
+                                IngredientStack outStack = p.getOutputs().get(edge.outputIndex());
+                                double pRate = outStack.getExpectedAmount() * pCps;
+
+                                int outDegree = 0;
+                                for (ConnectionEdge outEdge : connections) {
+                                    if (outEdge.fromNodeId().equals(p.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
+                                        outDegree++;
+                                    }
+                                }
+                                totalIncomingSupply += pRate / Math.max(1, outDegree);
+                            }
+                        }
+                    }
+
+                    if (totalIncomingSupply > 0.0001) {
+                        double portConsumerCount = totalIncomingSupply / singleInRate;
+                        requiredConsumerCount = Math.max(requiredConsumerCount, portConsumerCount);
                     }
                 }
 
-                if (outEdges.isEmpty()) continue;
-                double sharePerConsumer = producedRate / outEdges.size();
+                if (requiredConsumerCount > 0.0001) {
+                    double finalConsumerCount = requiredConsumerCount;
+                    if (integerCounts) {
+                        // Floor consumer count so consumer demand never exceeds producer supply (Supply >= Demand)
+                        finalConsumerCount = Math.max(1.0, Math.floor(finalConsumerCount + 0.00001));
+                    } else {
+                        finalConsumerCount = Math.max(0.01, Math.round(finalConsumerCount * 100.0) / 100.0);
+                    }
+                    downstreamCounts.put(consumer.getId(), finalConsumerCount);
 
-                for (ConnectionEdge edge : outEdges) {
-                    RecipeNode consumer = findNodeById(edge.toNodeId());
-                    if (consumer == null || consumer == anchor || upstreamVisited.contains(consumer.getId())) continue;
-
-                    if (edge.inputIndex() < consumer.getInputs().size()) {
-                        IngredientStack inStack = consumer.getInputs().get(edge.inputIndex());
-                        double singleInRate = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * inStack.getAmount();
-
-                        if (singleInRate > 0.0001) {
-                            double neededCount = sharePerConsumer / singleInRate;
-                            if (integerCounts) {
-                                // Round up to ensure adequate consumption capacity
-                                neededCount = Math.max(1.0, Math.ceil(neededCount - 0.00001));
-                            }
-                            double currentMax = downstreamCounts.getOrDefault(consumer.getId(), 0.0);
-                            downstreamCounts.put(consumer.getId(), Math.max(currentMax, neededCount));
-
-                            if (!downstreamVisited.contains(consumer.getId())) {
-                                downstreamVisited.add(consumer.getId());
-                                downstreamQueue.add(consumer);
-                            }
-                        }
+                    if (!downVisited.contains(consumer.getId())) {
+                        downVisited.add(consumer.getId());
+                        downQueue.add(consumer);
                     }
                 }
             }
@@ -209,7 +239,7 @@ public class FlowGraph {
         // Always enforce anchor machine count
         anchor.setMachineCount(targetAnchorCount);
 
-        // Enforce integer or 2 decimal places
+        // Enforce integer or 2 decimal places across the entire graph
         for (RecipeNode n : nodes) {
             if (integerCounts) {
                 n.setMachineCount(Math.max(1.0, Math.ceil(n.getMachineCount() - 0.00001)));
@@ -217,6 +247,97 @@ public class FlowGraph {
                 n.setMachineCount(Math.round(n.getMachineCount() * 100.0) / 100.0);
             }
         }
+
+        // Always enforce anchor machine count
+        anchor.setMachineCount(targetAnchorCount);
+    }
+
+    public record PortFlowStats(
+        double requiredOrProducedRate,
+        double connectedRate,
+        int connectionCount,
+        boolean isConnected
+    ) {
+        public double getRatio() {
+            if (requiredOrProducedRate <= 0.0001) return 1.0;
+            return connectedRate / requiredOrProducedRate;
+        }
+
+        public double getPercent() {
+            return getRatio() * 100.0;
+        }
+
+        public boolean isBalanced() {
+            return isConnected && Math.abs(connectedRate - requiredOrProducedRate) <= 0.001;
+        }
+
+        public boolean isDeficit() {
+            return isConnected && connectedRate < requiredOrProducedRate - 0.001;
+        }
+
+        public boolean isSurplus() {
+            return isConnected && connectedRate > requiredOrProducedRate + 0.001;
+        }
+    }
+
+    public PortFlowStats getInputPortStats(RecipeNode node, int inputIndex) {
+        if (node == null || inputIndex < 0 || inputIndex >= node.getInputs().size()) {
+            return new PortFlowStats(0, 0, 0, false);
+        }
+        IngredientStack in = node.getInputs().get(inputIndex);
+        double req = in.getAmount() * node.getCyclesPerSecond();
+
+        double supplied = 0.0;
+        int count = 0;
+        for (ConnectionEdge edge : connections) {
+            if (edge.toNodeId().equals(node.getId()) && edge.inputIndex() == inputIndex) {
+                RecipeNode p = findNodeById(edge.fromNodeId());
+                if (p != null && edge.outputIndex() < p.getOutputs().size()) {
+                    IngredientStack pOut = p.getOutputs().get(edge.outputIndex());
+                    double pRate = pOut.getExpectedAmount() * p.getCyclesPerSecond();
+
+                    int outDegree = 0;
+                    for (ConnectionEdge outEdge : connections) {
+                        if (outEdge.fromNodeId().equals(p.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
+                            outDegree++;
+                        }
+                    }
+                    supplied += pRate / Math.max(1, outDegree);
+                    count++;
+                }
+            }
+        }
+        return new PortFlowStats(req, supplied, count, count > 0);
+    }
+
+    public PortFlowStats getOutputPortStats(RecipeNode node, int outputIndex) {
+        if (node == null || outputIndex < 0 || outputIndex >= node.getOutputs().size()) {
+            return new PortFlowStats(0, 0, 0, false);
+        }
+        IngredientStack out = node.getOutputs().get(outputIndex);
+        double produced = out.getExpectedAmount() * node.getCyclesPerSecond();
+
+        double demanded = 0.0;
+        int count = 0;
+        for (ConnectionEdge edge : connections) {
+            if (edge.fromNodeId().equals(node.getId()) && edge.outputIndex() == outputIndex) {
+                RecipeNode c = findNodeById(edge.toNodeId());
+                if (c != null && edge.inputIndex() < c.getInputs().size()) {
+                    IngredientStack cIn = c.getInputs().get(edge.inputIndex());
+                    double cRate = cIn.getAmount() * c.getCyclesPerSecond();
+
+                    int inDegree = 0;
+                    for (ConnectionEdge inEdge : connections) {
+                        if (inEdge.toNodeId().equals(c.getId()) && inEdge.inputIndex() == edge.inputIndex()) {
+                            inDegree++;
+                        }
+                    }
+                    demanded += cRate / Math.max(1, inDegree);
+                    count++;
+                }
+            }
+        }
+        return new PortFlowStats(produced, demanded, count, count > 0);
     }
 
     public RecipeNode findNodeById(String id) {
@@ -254,10 +375,34 @@ public class FlowGraph {
         double totalGeneratedEUt = 0.0;
         GTVoltageTier highestTier = GTVoltageTier.ULV;
 
+        int totalMachineCount = 0;
+        Map<String, Integer> machineBreakdown = new LinkedHashMap<>();
+
         Map<IngredientStack, Double> totalProduction = new HashMap<>();
         Map<IngredientStack, Double> totalConsumption = new HashMap<>();
 
         for (RecipeNode node : nodes) {
+            if (node.isModule()) {
+                // Compound Module: aggregate contained machine counts and breakdown recursively
+                int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+                if (node.getSubGraph() != null) {
+                    BalanceSummary subSummary = node.getSubGraph().computeSummary();
+                    int subMachines = subSummary.totalMachineCount() * moduleCount;
+                    totalMachineCount += subMachines;
+                    for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {
+                        machineBreakdown.put(entry.getKey(), machineBreakdown.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
+                    }
+                } else {
+                    int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
+                    totalMachineCount += subMachines;
+                    machineBreakdown.put(node.getName(), machineBreakdown.getOrDefault(node.getName(), 0) + subMachines);
+                }
+            } else {
+                int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+                totalMachineCount += nodeMachines;
+                machineBreakdown.put(node.getName(), machineBreakdown.getOrDefault(node.getName(), 0) + nodeMachines);
+            }
+
             if (node.isGenerator()) {
                 totalGeneratedEUt += node.getTotalEUt();
             } else {
@@ -304,7 +449,7 @@ public class FlowGraph {
         }
 
         double netEUt = totalConsumedEUt - totalGeneratedEUt;
-        return new BalanceSummary(netEUt, highestTier, rawInputs, netOutputs, balanced, totalProduction, totalConsumption);
+        return new BalanceSummary(netEUt, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption);
     }
 
     private void mergeRate(Map<IngredientStack, Double> map, IngredientStack stack, double rate) {
@@ -326,14 +471,169 @@ public class FlowGraph {
         return 0.0;
     }
 
-    private GTVoltageTier maxTierCap = null; // null = ALL / Unlimited
-
-    public GTVoltageTier getMaxTierCap() {
-        return maxTierCap;
+    public RecipeNode groupIntoModule(String moduleName) {
+        return groupIntoModule(null, moduleName);
     }
 
-    public void setMaxTierCap(GTVoltageTier maxTierCap) {
-        this.maxTierCap = maxTierCap;
+    public RecipeNode groupIntoModule(Set<String> targetNodeIds, String moduleName) {
+        List<RecipeNode> selectedNodes = new ArrayList<>();
+        if (targetNodeIds != null && !targetNodeIds.isEmpty()) {
+            for (RecipeNode n : nodes) {
+                if (targetNodeIds.contains(n.getId())) {
+                    selectedNodes.add(n);
+                }
+            }
+        } else {
+            selectedNodes.addAll(nodes);
+        }
+
+        if (selectedNodes.isEmpty()) return null;
+
+        Set<String> selectedIdSet = new HashSet<>();
+        for (RecipeNode n : selectedNodes) selectedIdSet.add(n.getId());
+
+        // 1. Create subGraph with selected nodes and their internal connections
+        FlowGraph subGraph = new FlowGraph();
+        for (RecipeNode n : selectedNodes) {
+            subGraph.nodes.add(n);
+        }
+        for (ConnectionEdge edge : connections) {
+            if (selectedIdSet.contains(edge.fromNodeId()) && selectedIdSet.contains(edge.toNodeId())) {
+                subGraph.connections.add(edge);
+            }
+        }
+
+        // 2. Calculate balance summary for subGraph
+        BalanceSummary summary = subGraph.computeSummary();
+
+        // 3. Compute centroid position
+        double sumX = 0, sumY = 0;
+        for (RecipeNode n : selectedNodes) {
+            sumX += n.getPosX();
+            sumY += n.getPosY();
+        }
+        double centerX = sumX / selectedNodes.size();
+        double centerY = sumY / selectedNodes.size();
+
+        // 4. Create Module RecipeNode
+        String name = (moduleName != null && !moduleName.trim().isEmpty()) ? moduleName.trim() : "Compound Module";
+        double baseEUt = Math.max(1.0, Math.abs(summary.totalEUt()));
+        boolean isGen = summary.totalEUt() < -0.001;
+        GTVoltageTier tier = summary.highestVoltageTier();
+
+        // Standard 1.0 second duration (20 ticks) base for modules
+        RecipeNode moduleNode = RecipeNode.create(name, 20.0, baseEUt, tier);
+        moduleNode.setModule(true);
+        moduleNode.setSubGraph(subGraph);
+        moduleNode.setContainedMachineCount(summary.totalMachineCount());
+        moduleNode.setGenerator(isGen);
+        moduleNode.setPos(centerX, centerY);
+        moduleNode.setCardWidth(230); // Default wider card for compound modules
+
+        // Add net external inputs
+        for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
+            IngredientStack original = entry.getKey();
+            double ratePerSec = entry.getValue();
+            IngredientStack netIn = original.isFluid()
+                ? IngredientStack.fluid(original.getId(), original.getDisplayName(), ratePerSec, 1.0)
+                : IngredientStack.item(original.getId(), original.getDisplayName(), ratePerSec, 1.0);
+            moduleNode.addInput(netIn);
+        }
+
+        // Add net external outputs
+        for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
+            IngredientStack original = entry.getKey();
+            double ratePerSec = entry.getValue();
+            IngredientStack netOut = original.isFluid()
+                ? IngredientStack.fluid(original.getId(), original.getDisplayName(), ratePerSec, 1.0)
+                : IngredientStack.item(original.getId(), original.getDisplayName(), ratePerSec, 1.0);
+            moduleNode.addOutput(netOut);
+        }
+
+        // 5. External connections rewiring
+        List<ConnectionEdge> externalEdges = new ArrayList<>();
+        for (ConnectionEdge edge : connections) {
+            boolean fromSelected = selectedIdSet.contains(edge.fromNodeId());
+            boolean toSelected = selectedIdSet.contains(edge.toNodeId());
+
+            if (fromSelected && !toSelected) {
+                // Outgoing wire from module to outside
+                RecipeNode origFrom = findNodeById(edge.fromNodeId());
+                if (origFrom != null && edge.outputIndex() < origFrom.getOutputs().size()) {
+                    IngredientStack outStack = origFrom.getOutputs().get(edge.outputIndex());
+                    // Find matching output port on moduleNode
+                    for (int mOutIdx = 0; mOutIdx < moduleNode.getOutputs().size(); mOutIdx++) {
+                        if (moduleNode.getOutputs().get(mOutIdx).equals(outStack)) {
+                            externalEdges.add(new ConnectionEdge(moduleNode.getId(), mOutIdx, edge.toNodeId(), edge.inputIndex()));
+                            break;
+                        }
+                    }
+                }
+            } else if (!fromSelected && toSelected) {
+                // Incoming wire from outside into module
+                RecipeNode origTo = findNodeById(edge.toNodeId());
+                if (origTo != null && edge.inputIndex() < origTo.getInputs().size()) {
+                    IngredientStack inStack = origTo.getInputs().get(edge.inputIndex());
+                    // Find matching input port on moduleNode
+                    for (int mInIdx = 0; mInIdx < moduleNode.getInputs().size(); mInIdx++) {
+                        if (moduleNode.getInputs().get(mInIdx).equals(inStack)) {
+                            externalEdges.add(new ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), moduleNode.getId(), mInIdx));
+                            break;
+                        }
+                    }
+                }
+            } else if (!fromSelected && !toSelected) {
+                // Unrelated wire outside
+                externalEdges.add(edge);
+            }
+        }
+
+        // 6. Update this graph
+        this.nodes.removeAll(selectedNodes);
+        this.nodes.add(moduleNode);
+        this.connections.clear();
+        this.connections.addAll(externalEdges);
+
+        return moduleNode;
+    }
+
+    public boolean expandModule(RecipeNode moduleNode) {
+        if (moduleNode == null || !moduleNode.isModule() || moduleNode.getSubGraph() == null) {
+            return false;
+        }
+
+        FlowGraph subGraph = moduleNode.getSubGraph();
+        if (subGraph.getNodes().isEmpty()) return false;
+
+        // Calculate centroid of subGraph to apply relative positioning offset
+        double sumX = 0, sumY = 0;
+        for (RecipeNode n : subGraph.getNodes()) {
+            sumX += n.getPosX();
+            sumY += n.getPosY();
+        }
+        double origCenterX = sumX / subGraph.getNodes().size();
+        double origCenterY = sumY / subGraph.getNodes().size();
+
+        double offsetX = moduleNode.getPosX() - origCenterX;
+        double offsetY = moduleNode.getPosY() - origCenterY;
+        double moduleScale = moduleNode.getMachineCount();
+
+        // Remove moduleNode
+        this.nodes.remove(moduleNode);
+        this.connections.removeIf(e -> e.fromNodeId().equals(moduleNode.getId()) || e.toNodeId().equals(moduleNode.getId()));
+
+        // Restore subGraph nodes
+        for (RecipeNode n : subGraph.getNodes()) {
+            n.setPos(n.getPosX() + offsetX, n.getPosY() + offsetY);
+            if (moduleScale > 1.0) {
+                n.setMachineCount(n.getMachineCount() * moduleScale);
+            }
+            this.nodes.add(n);
+        }
+
+        // Restore subGraph connections
+        this.connections.addAll(subGraph.getConnections());
+        return true;
     }
 
     public void optimizeMaxThroughput(boolean preferParallels, boolean integerCounts) {
@@ -343,10 +643,10 @@ public class FlowGraph {
         }
         if (anchor == null) return;
 
-        // 1. Overclock nodes up to maxTierCap
+        // 1. Overclock nodes up to MAX
         for (RecipeNode n : nodes) {
             GTVoltageTier baseTier = n.getRecipeTier();
-            GTVoltageTier targetTier = (maxTierCap != null) ? maxTierCap : GTVoltageTier.MAX;
+            GTVoltageTier targetTier = GTVoltageTier.MAX;
             if (targetTier.ordinal() < baseTier.ordinal()) {
                 targetTier = baseTier;
             }
@@ -363,8 +663,6 @@ public class FlowGraph {
 
                 double count = n.getMachineCount();
                 if (preferParallels && count > 1.0) {
-                    // Try to consolidate multiple machines into parallel multiplier
-                    // e.g. 4.0 machines -> 1 machine with 4x parallel
                     int[] standardParallels = {1, 2, 4, 8, 16, 64, 128, 256};
                     int bestP = 1;
                     for (int p : standardParallels) {
@@ -392,7 +690,6 @@ public class FlowGraph {
         if (other != null) {
             this.nodes.addAll(other.nodes);
             this.connections.addAll(other.connections);
-            this.maxTierCap = other.maxTierCap;
         }
     }
 
@@ -405,9 +702,6 @@ public class FlowGraph {
         tag.putDouble("panX", panX);
         tag.putDouble("panY", panY);
         tag.putDouble("zoom", zoom);
-        if (maxTierCap != null) {
-            tag.putString("maxTierCap", maxTierCap.name());
-        }
 
         ListTag nodeList = new ListTag();
         for (RecipeNode n : nodes) {
@@ -425,11 +719,6 @@ public class FlowGraph {
 
     public static FlowGraph deserializeNBT(CompoundTag tag) {
         FlowGraph graph = new FlowGraph();
-        if (tag.contains("maxTierCap")) {
-            try {
-                graph.maxTierCap = GTVoltageTier.valueOf(tag.getString("maxTierCap"));
-            } catch (Exception ignored) {}
-        }
         if (tag.contains("nodes", Tag.TAG_LIST)) {
             ListTag nodeList = tag.getList("nodes", Tag.TAG_COMPOUND);
             for (int i = 0; i < nodeList.size(); i++) {

@@ -28,10 +28,17 @@ public class NodeCountEditor {
     public void commit() {
         if (!isEditing) return;
         isEditing = false;
+        double oldVal = widget.getNode().getMachineCount();
         try {
             double parsed = Double.parseDouble(buffer.trim());
-            if (parsed > 0) {
+            if (parsed > 0 && Math.abs(parsed - oldVal) > 0.0001) {
                 widget.getNode().setMachineCount(parsed);
+                widget.getParent().recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(
+                    widget.getNode().getId(),
+                    com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT,
+                    oldVal,
+                    parsed
+                ));
             }
         } catch (NumberFormatException ignored) {
         }

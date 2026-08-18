@@ -99,6 +99,7 @@ public class IngredientStack {
         var emiStack = getEmiStack();
         if (!emiStack.isEmpty()) {
             emiStack.render(graphics, x, y, 0, dev.emi.emi.api.stack.EmiIngredient.RENDER_ICON);
+            com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
         } else {
             graphics.fill(x, y, x + 16, y + 16, isFluid() ? 0xFF3366CC : 0xFF888888);
         }

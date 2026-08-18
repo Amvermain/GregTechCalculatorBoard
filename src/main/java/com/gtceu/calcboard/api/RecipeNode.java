@@ -8,7 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.*;
 
 public class RecipeNode {
-    private final String id;
+    private String id;
     private String name;
     private ResourceLocation machineIcon;
     
@@ -33,9 +33,16 @@ public class RecipeNode {
     private int rotorPower = 100;      // Default 100%
     private String rotorName = "Standard (100%)";
 
-    // Canvas position
+    // Canvas position & Dimensions
     private double posX;
     private double posY;
+    private int cardWidth = 210;  // Default 210, resizable 200-500
+    private int cardHeight = 0;   // 0 = Auto-height, resizable up to 600
+
+    // Module / Subgraph Abstraction
+    private boolean isModule = false;
+    private FlowGraph subGraph = null;
+    private int containedMachineCount = 0;
 
     public RecipeNode(String id, String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -59,6 +66,10 @@ public class RecipeNode {
 
     public String getId() {
         return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -170,6 +181,46 @@ public class RecipeNode {
 
     public void setPosY(double posY) {
         this.posY = posY;
+    }
+
+    public int getCardWidth() {
+        return Math.max(200, Math.min(500, cardWidth));
+    }
+
+    public void setCardWidth(int cardWidth) {
+        this.cardWidth = Math.max(200, Math.min(500, cardWidth));
+    }
+
+    public int getCardHeight() {
+        return Math.max(0, Math.min(600, cardHeight));
+    }
+
+    public void setCardHeight(int cardHeight) {
+        this.cardHeight = Math.max(0, Math.min(600, cardHeight));
+    }
+
+    public boolean isModule() {
+        return isModule;
+    }
+
+    public void setModule(boolean module) {
+        this.isModule = module;
+    }
+
+    public FlowGraph getSubGraph() {
+        return subGraph;
+    }
+
+    public void setSubGraph(FlowGraph subGraph) {
+        this.subGraph = subGraph;
+    }
+
+    public int getContainedMachineCount() {
+        return containedMachineCount;
+    }
+
+    public void setContainedMachineCount(int count) {
+        this.containedMachineCount = count;
     }
 
     public void setPos(double posX, double posY) {
@@ -327,6 +378,13 @@ public class RecipeNode {
         tag.putString("rotorName", rotorName);
         tag.putDouble("posX", posX);
         tag.putDouble("posY", posY);
+        tag.putInt("cardWidth", cardWidth);
+        tag.putInt("cardHeight", cardHeight);
+        tag.putBoolean("isModule", isModule);
+        tag.putInt("containedMachineCount", containedMachineCount);
+        if (subGraph != null) {
+            tag.put("subGraph", subGraph.serializeNBT(0, 0, 1.0));
+        }
 
         ListTag inList = new ListTag();
         for (IngredientStack in : inputs) {
@@ -380,6 +438,21 @@ public class RecipeNode {
         }
         if (tag.contains("rotorName")) {
             node.rotorName = tag.getString("rotorName");
+        }
+        if (tag.contains("cardWidth")) {
+            node.cardWidth = tag.getInt("cardWidth");
+        }
+        if (tag.contains("cardHeight")) {
+            node.cardHeight = tag.getInt("cardHeight");
+        }
+        if (tag.contains("isModule")) {
+            node.isModule = tag.getBoolean("isModule");
+        }
+        if (tag.contains("containedMachineCount")) {
+            node.containedMachineCount = tag.getInt("containedMachineCount");
+        }
+        if (tag.contains("subGraph")) {
+            node.subGraph = FlowGraph.deserializeNBT(tag.getCompound("subGraph"));
         }
         node.posX = tag.getDouble("posX");
         node.posY = tag.getDouble("posY");

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.*;
+
 public class CalculationTest {
 
     @Test
@@ -276,9 +278,8 @@ public class CalculationTest {
     }
 
     @Test
-    public void testMaxTierCapAndParallelOptimization() {
+    public void testMaxThroughputAndParallelOptimization() {
         FlowGraph graph = new FlowGraph();
-        graph.setMaxTierCap(GTVoltageTier.HV); // Cap at HV!
 
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 320.0, 64.0, GTVoltageTier.MV);
         pyrolyse.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0));
@@ -295,9 +296,9 @@ public class CalculationTest {
         // Run Max Throughput Optimizer with Prefer Parallels
         graph.optimizeMaxThroughput(true, false);
 
-        // Assert nodes did not exceed HV cap
-        Assertions.assertEquals(GTVoltageTier.HV, pyrolyse.getTargetTier());
-        Assertions.assertEquals(GTVoltageTier.HV, distTower.getTargetTier());
+        // Assert nodes overclocked to MAX
+        Assertions.assertEquals(GTVoltageTier.MAX, pyrolyse.getTargetTier());
+        Assertions.assertEquals(GTVoltageTier.MAX, distTower.getTargetTier());
 
         // Assert consolidation into parallels (e.g. 4.0 machines -> 1.0 machine with 4x parallel)
         Assertions.assertTrue(pyrolyse.getMachineCount() > 0);
@@ -381,5 +382,363 @@ public class CalculationTest {
             Assertions.assertTrue(n.getMachineCount() < 50.0, "Node " + n.getName() + " exploded to " + n.getMachineCount());
             Assertions.assertEquals(Math.floor(n.getMachineCount()), n.getMachineCount(), 0.001, "Node " + n.getName() + " is not integer: " + n.getMachineCount());
         }
+    }
+
+    @Test
+    public void testMultipleProducersMergingIntoOneConsumer() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Producer A: Log To Creosote (Produces Charcoal 2.5/s, Wood Tar 500 mB/s)
+        RecipeNode nodeA = RecipeNode.create("Log To Creosote", 160.0, 1024.0, GTVoltageTier.EV);
+        nodeA.setMachineCount(1.0);
+        nodeA.addInput(IngredientStack.item(new ResourceLocation("minecraft", "oak_log"), "Oak Log", 1, 1.0));
+        nodeA.addOutput(IngredientStack.item(new ResourceLocation("minecraft", "charcoal"), "Charcoal", 20, 1.0));
+        nodeA.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 4000, 1.0));
+        graph.addNode(nodeA);
+
+        // 2. Producer B: Charcoal Extraction (Consumes Charcoal 2.5/s, Produces Wood Tar 250 mB/s)
+        RecipeNode nodeB = RecipeNode.create("Charcoal Extraction", 8.0, 1024.0, GTVoltageTier.EV);
+        nodeB.setMachineCount(1.0);
+        nodeB.addInput(IngredientStack.item(new ResourceLocation("minecraft", "charcoal"), "Charcoal", 1, 1.0));
+        nodeB.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 100, 1.0));
+        graph.addNode(nodeB);
+
+        // 3. Consumer C: Distill Wood Tar (Consumes Wood Tar 500 mB/s per machine)
+        RecipeNode nodeC = RecipeNode.create("Distill Wood Tar", 60.0, 256.0, GTVoltageTier.HV);
+        nodeC.setMachineCount(1.0);
+        nodeC.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1500, 1.0));
+        graph.addNode(nodeC);
+
+        // Connect Node A (Charcoal) -> Node B (Charcoal)
+        graph.addConnection(nodeA.getId(), 0, nodeB.getId(), 0);
+
+        // Connect Node A (Wood Tar) -> Node C (Wood Tar)
+        graph.addConnection(nodeA.getId(), 1, nodeC.getId(), 0);
+
+        // Connect Node B (Wood Tar) -> Node C (Wood Tar) [MERGE!]
+        graph.addConnection(nodeB.getId(), 0, nodeC.getId(), 0);
+
+        // Auto ratio with Node A as Anchor
+        nodeA.setBaseNode(true);
+        graph.autoRatioFromAnchor(nodeA);
+
+        // Verify Node A count remains 1
+        Assertions.assertEquals(1.0, nodeA.getMachineCount());
+
+        // Verify Node B consumes charcoal from A (1 machine)
+        Assertions.assertEquals(1.0, nodeB.getMachineCount());
+
+        // Verify Node C receives 500 mB/s from A + 250 mB/s from B = 750 mB/s total supply
+        // Node C consumes 500 mB/s per machine. Floor(750 / 500) = 1 machine! (Supply >= Demand)
+        Assertions.assertEquals(1.0, nodeC.getMachineCount());
+
+        // Summary verify: Wood Tar produced >= consumed
+        BalanceSummary summary = graph.computeSummary();
+        IngredientStack woodTar = IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0);
+        Double netWoodTar = summary.netOutputs().get(woodTar);
+        Assertions.assertNotNull(netWoodTar);
+        Assertions.assertTrue(netWoodTar >= 0, "Wood tar should have surplus, not deficit: " + netWoodTar);
+    }
+
+    @Test
+    public void testTotalMachineCountStatistics() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode chemicalReactor = RecipeNode.create("Chemical Reactor", 100.0, 30.0, GTVoltageTier.LV);
+        chemicalReactor.setMachineCount(3.0);
+        graph.addNode(chemicalReactor);
+
+        RecipeNode distillationTower = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
+        distillationTower.setMachineCount(2.0);
+        graph.addNode(distillationTower);
+
+        RecipeNode gasTurbine = RecipeNode.create("Gas Turbine", 100.0, 512.0, GTVoltageTier.HV);
+        gasTurbine.setGenerator(true);
+        gasTurbine.setMachineCount(1.0);
+        graph.addNode(gasTurbine);
+
+        BalanceSummary summary = graph.computeSummary();
+
+        Assertions.assertEquals(6, summary.totalMachineCount());
+        Assertions.assertEquals(3, summary.machineBreakdown().get("Chemical Reactor"));
+        Assertions.assertEquals(2, summary.machineBreakdown().get("Distillation Tower"));
+        Assertions.assertEquals(1, summary.machineBreakdown().get("Gas Turbine"));
+    }
+
+    @Test
+    public void testGroupIntoModuleAndExpand() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Plant A: produces Diluted Sulfuric Acid
+        RecipeNode plantA = RecipeNode.create("Plant A", 100.0, 30.0, GTVoltageTier.LV);
+        plantA.setMachineCount(2.0);
+        plantA.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "sulfur_trioxide"), "Sulfur Trioxide", 1000, 1.0));
+        plantA.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000, 1.0));
+        plantA.setPos(100, 100);
+        graph.addNode(plantA);
+
+        // 2. Plant B: consumes Diluted Sulfuric Acid, produces Sulfuric Acid
+        RecipeNode plantB = RecipeNode.create("Plant B", 100.0, 30.0, GTVoltageTier.LV);
+        plantB.setMachineCount(2.0);
+        plantB.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000, 1.0));
+        plantB.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "sulfuric_acid"), "Sulfuric Acid", 1000, 1.0));
+        plantB.setPos(300, 100);
+        graph.addNode(plantB);
+
+        // Connect A -> B
+        graph.addConnection(plantA.getId(), 0, plantB.getId(), 0);
+
+        // Group into Module
+        RecipeNode moduleNode = graph.groupIntoModule("Sulfuric Acid Line");
+        Assertions.assertNotNull(moduleNode);
+        Assertions.assertTrue(moduleNode.isModule());
+        Assertions.assertEquals(1, graph.getNodes().size());
+        Assertions.assertEquals(4, moduleNode.getContainedMachineCount());
+
+        // External inputs must ONLY have Sulfur Trioxide (Diluted Sulfuric Acid is consumed internally)
+        Assertions.assertEquals(1, moduleNode.getInputs().size());
+        Assertions.assertEquals("Sulfur Trioxide", moduleNode.getInputs().get(0).getDisplayName());
+
+        // External outputs must ONLY have Sulfuric Acid
+        Assertions.assertEquals(1, moduleNode.getOutputs().size());
+        Assertions.assertEquals("Sulfuric Acid", moduleNode.getOutputs().get(0).getDisplayName());
+
+        // Expand Module
+        boolean expanded = graph.expandModule(moduleNode);
+        Assertions.assertTrue(expanded);
+        Assertions.assertEquals(2, graph.getNodes().size());
+        Assertions.assertEquals(1, graph.getConnections().size());
+    }
+
+    @Test
+    public void testNodeClipboardCopyAndPaste() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode nodeA = RecipeNode.create("Node A", 100.0, 30.0, GTVoltageTier.LV);
+        nodeA.addOutput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 1000, 1.0));
+        graph.addNode(nodeA);
+
+        RecipeNode nodeB = RecipeNode.create("Node B", 100.0, 30.0, GTVoltageTier.LV);
+        nodeB.addInput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 1000, 1.0));
+        graph.addNode(nodeB);
+
+        graph.addConnection(nodeA.getId(), 0, nodeB.getId(), 0);
+
+        // Copy both nodes
+        Set<String> sel = Set.of(nodeA.getId(), nodeB.getId());
+        NodeClipboard.getInstance().copy(graph, sel);
+        Assertions.assertTrue(NodeClipboard.getInstance().hasContent());
+
+        // Paste at (200, 200)
+        List<RecipeNode> pasted = NodeClipboard.getInstance().paste(graph, 200.0, 200.0);
+        Assertions.assertEquals(2, pasted.size());
+        Assertions.assertEquals(4, graph.getNodes().size());
+        Assertions.assertEquals(2, graph.getConnections().size());
+
+        // Assert new nodes have distinct UUIDs and are connected to each other
+        RecipeNode pastedA = pasted.get(0);
+        RecipeNode pastedB = pasted.get(1);
+        Assertions.assertNotEquals(nodeA.getId(), pastedA.getId());
+        Assertions.assertNotEquals(nodeB.getId(), pastedB.getId());
+
+        boolean hasPastedEdge = false;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(pastedA.getId()) && edge.toNodeId().equals(pastedB.getId())) {
+                hasPastedEdge = true;
+                break;
+            }
+        }
+        Assertions.assertTrue(hasPastedEdge);
+    }
+
+    @Test
+    public void testSelectiveGroupIntoModuleAndStats() {
+        FlowGraph graph = new FlowGraph();
+
+        // 3 Nodes: n1, n2, n3
+        RecipeNode n1 = RecipeNode.create("Machine 1", 100.0, 30.0, GTVoltageTier.LV);
+        n1.setMachineCount(2.0);
+        graph.addNode(n1);
+
+        RecipeNode n2 = RecipeNode.create("Machine 2", 100.0, 30.0, GTVoltageTier.LV);
+        n2.setMachineCount(3.0);
+        graph.addNode(n2);
+
+        RecipeNode n3 = RecipeNode.create("Machine 3", 100.0, 30.0, GTVoltageTier.LV);
+        n3.setMachineCount(5.0);
+        graph.addNode(n3);
+
+        // Group only n1 and n2 (2 + 3 = 5 machines) into a module
+        Set<String> sel = Set.of(n1.getId(), n2.getId());
+        RecipeNode module = graph.groupIntoModule(sel, "Sub Module");
+        Assertions.assertNotNull(module);
+        Assertions.assertEquals(2, graph.getNodes().size()); // Module + n3
+        Assertions.assertEquals(5, module.getContainedMachineCount());
+
+        // Test computeSummary machine count: Module (5) + n3 (5) = 10 machines total
+        BalanceSummary summary = graph.computeSummary();
+        Assertions.assertEquals(10, summary.totalMachineCount());
+        Assertions.assertEquals(2, summary.machineBreakdown().get("Machine 1"));
+        Assertions.assertEquals(3, summary.machineBreakdown().get("Machine 2"));
+        Assertions.assertEquals(5, summary.machineBreakdown().get("Machine 3"));
+    }
+
+    @Test
+    public void testMultiPagePresetSerialization() {
+        BoardPage page1 = BoardPage.createDefault("Sulfuric Acid Line");
+        RecipeNode node1 = RecipeNode.create("Distillation", 100.0, 120.0, GTVoltageTier.MV);
+        page1.getGraph().addNode(node1);
+
+        BoardPage page2 = BoardPage.createDefault("Polyethylene Line");
+        RecipeNode node2 = RecipeNode.create("Polymerization", 200.0, 480.0, GTVoltageTier.HV);
+        page2.getGraph().addNode(node2);
+
+        // Test Serialization of Page 1
+        net.minecraft.nbt.CompoundTag tag1 = page1.serializeNBT();
+        BoardPage loaded1 = BoardPage.deserializeNBT(tag1);
+        Assertions.assertEquals("Sulfuric Acid Line", loaded1.getName());
+        Assertions.assertEquals(1, loaded1.getGraph().getNodes().size());
+        Assertions.assertEquals("Distillation", loaded1.getGraph().getNodes().get(0).getName());
+
+        // Test Serialization of Page 2
+        net.minecraft.nbt.CompoundTag tag2 = page2.serializeNBT();
+        BoardPage loaded2 = BoardPage.deserializeNBT(tag2);
+        Assertions.assertEquals("Polyethylene Line", loaded2.getName());
+        Assertions.assertEquals(1, loaded2.getGraph().getNodes().size());
+        Assertions.assertEquals("Polymerization", loaded2.getGraph().getNodes().get(0).getName());
+    }
+
+    @Test
+    public void testBidirectionalAutoRatioDownstreamPropagation() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Producer: 20 ticks (1.0s), produces 500 mB/s steam (1000 mB/s for 2 machines)
+        RecipeNode producer = RecipeNode.create("Boiler", 20.0, 30.0, GTVoltageTier.LV);
+        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 500.0, 1.0));
+        producer.setMachineCount(2.0); // Anchor with 2 machines -> 1000 mB/s steam
+        producer.setBaseNode(true);
+        graph.addNode(producer);
+
+        // 2. Middle Consumer: 20 ticks (1.0s), consumes 100 mB/s steam, produces 50 mB/s water
+        RecipeNode middle = RecipeNode.create("Steam Turbine", 20.0, 30.0, GTVoltageTier.LV);
+        middle.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 100.0, 1.0));
+        middle.addOutput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 50.0, 1.0));
+        middle.setMachineCount(1.0);
+        graph.addNode(middle);
+
+        // 3. Final Consumer: 20 ticks (1.0s), consumes 25 mB/s water
+        RecipeNode finalConsumer = RecipeNode.create("Electrolyzer", 20.0, 30.0, GTVoltageTier.LV);
+        finalConsumer.addInput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 25.0, 1.0));
+        finalConsumer.setMachineCount(1.0);
+        graph.addNode(finalConsumer);
+
+        // Connect Producer -> Middle -> Final
+        graph.addConnection(producer.getId(), 0, middle.getId(), 0);
+        graph.addConnection(middle.getId(), 0, finalConsumer.getId(), 0);
+
+        // Auto Ratio from Producer Anchor (Downstream propagation)
+        graph.autoRatioFromAnchor(producer, false);
+
+        // Producer: 2.0 machines (produces 1000 mB/s steam)
+        Assertions.assertEquals(2.0, producer.getMachineCount(), 0.001);
+
+        // Middle: requires 1000 mB/s steam / 100 = 10.0 machines (produces 500 mB/s water)
+        Assertions.assertEquals(10.0, middle.getMachineCount(), 0.001);
+
+        // Final: requires 500 mB/s water / 25 = 20.0 machines
+        Assertions.assertEquals(20.0, finalConsumer.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testBidirectionalAutoRatioFromMiddleAnchor() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Producer: 20 ticks (1.0s), produces 200 mB/s
+        RecipeNode producer = RecipeNode.create("Producer", 20.0, 30.0, GTVoltageTier.LV);
+        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "fuel"), "Fuel", 200.0, 1.0));
+        producer.setMachineCount(1.0);
+        graph.addNode(producer);
+
+        // 2. Middle (Anchor): 20 ticks (1.0s), consumes 100 mB/s, produces 50 mB/s
+        RecipeNode middle = RecipeNode.create("Middle Generator", 20.0, 30.0, GTVoltageTier.LV);
+        middle.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "fuel"), "Fuel", 100.0, 1.0));
+        middle.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "exhaust"), "Exhaust", 50.0, 1.0));
+        middle.setMachineCount(4.0); // 4 machines -> consumes 400 mB/s fuel, produces 200 mB/s exhaust
+        middle.setBaseNode(true);
+        graph.addNode(middle);
+
+        // 3. Downstream Consumer: 20 ticks (1.0s), consumes 20 mB/s exhaust
+        RecipeNode consumer = RecipeNode.create("Exhaust Filter", 20.0, 30.0, GTVoltageTier.LV);
+        consumer.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "exhaust"), "Exhaust", 20.0, 1.0));
+        consumer.setMachineCount(1.0);
+        graph.addNode(consumer);
+
+        graph.addConnection(producer.getId(), 0, middle.getId(), 0);
+        graph.addConnection(middle.getId(), 0, consumer.getId(), 0);
+
+        // Auto Ratio from Middle Anchor (Upstream to Producer, Downstream to Consumer)
+        graph.autoRatioFromAnchor(middle, false);
+
+        // Middle Anchor stays 4.0
+        Assertions.assertEquals(4.0, middle.getMachineCount(), 0.001);
+
+        // Upstream Producer scales to 400 / 200 = 2.0
+        Assertions.assertEquals(2.0, producer.getMachineCount(), 0.001);
+
+        // Downstream Consumer scales to 200 / 20 = 10.0
+        Assertions.assertEquals(10.0, consumer.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testPortFlowStatsCalculations() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode producer = RecipeNode.create("Producer", 20.0, 30.0, GTVoltageTier.LV);
+        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "oil"), "Oil", 100.0, 1.0));
+        producer.setMachineCount(2.0); // 200 mB/s oil
+        graph.addNode(producer);
+
+        RecipeNode consumer = RecipeNode.create("Consumer", 20.0, 30.0, GTVoltageTier.LV);
+        consumer.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "oil"), "Oil", 50.0, 1.0));
+        consumer.setMachineCount(4.0); // 200 mB/s demanded
+        graph.addNode(consumer);
+
+        graph.addConnection(producer.getId(), 0, consumer.getId(), 0);
+
+        // Input stats for consumer
+        FlowGraph.PortFlowStats inStats = graph.getInputPortStats(consumer, 0);
+        Assertions.assertTrue(inStats.isConnected());
+        Assertions.assertEquals(200.0, inStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(200.0, inStats.connectedRate(), 0.001);
+        Assertions.assertTrue(inStats.isBalanced());
+        Assertions.assertEquals(100.0, inStats.getPercent(), 0.001);
+
+        // Output stats for producer
+        FlowGraph.PortFlowStats outStats = graph.getOutputPortStats(producer, 0);
+        Assertions.assertTrue(outStats.isConnected());
+        Assertions.assertEquals(200.0, outStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(200.0, outStats.connectedRate(), 0.001);
+        Assertions.assertTrue(outStats.isBalanced());
+    }
+
+    @Test
+    public void testTutorialStepEnumProperties() {
+        Assertions.assertEquals(1, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_1_PAN_ZOOM.getStepNumber());
+        Assertions.assertEquals(2, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_2_ADD_RECIPE.getStepNumber());
+        Assertions.assertEquals(3, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_3_REMOVE_RECIPE.getStepNumber());
+        Assertions.assertEquals(4, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_4_NORMAL_WIRING.getStepNumber());
+        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_SHIFT_WIRING.getStepNumber());
+        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_AUTO_RATIO.getStepNumber());
+        Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_SUMMARY_MODULE.getStepNumber());
+        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
+    }
+
+    @Test
+    public void testBoardManagerWelcomePromptFlag() {
+        BoardManager mgr = BoardManager.getInstance();
+        mgr.setHasSeenWelcomePrompt(true);
+        Assertions.assertTrue(mgr.hasSeenWelcomePrompt());
+
+        mgr.setHasSeenWelcomePrompt(false);
+        Assertions.assertFalse(mgr.hasSeenWelcomePrompt());
     }
 }

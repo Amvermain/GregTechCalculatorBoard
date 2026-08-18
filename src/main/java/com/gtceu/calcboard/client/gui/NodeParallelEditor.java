@@ -28,10 +28,20 @@ public class NodeParallelEditor {
     public void commit() {
         if (!isEditing) return;
         isEditing = false;
+        int oldVal = widget.getNode().getParallel();
         try {
             int parsed = Integer.parseInt(buffer.trim());
             if (parsed >= 1) {
-                widget.getNode().setParallel(Math.min(65536, parsed));
+                int newVal = Math.min(65536, parsed);
+                if (oldVal != newVal) {
+                    widget.getNode().setParallel(newVal);
+                    widget.getParent().recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(
+                        widget.getNode().getId(),
+                        com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.PARALLEL,
+                        oldVal,
+                        newVal
+                    ));
+                }
             }
         } catch (NumberFormatException ignored) {
         }

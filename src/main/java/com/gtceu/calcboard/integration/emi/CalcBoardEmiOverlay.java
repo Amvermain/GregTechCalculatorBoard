@@ -6,7 +6,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -38,17 +37,58 @@ public class CalcBoardEmiOverlay {
         try {
             Field rF = findField(group.getClass(), "recipe");
             Field grpYF = findField(group.getClass(), "y");
-            if (rF == null || grpYF == null) return null;
+            if (rF == null) return null;
 
             Object recipeObj = rF.get(group);
             if (!(recipeObj instanceof EmiRecipe recipe)) return null;
 
-            int grpY = grpYF.getInt(group);
+            Minecraft mc = Minecraft.getInstance();
+            int screenGuiW = mc.getWindow().getGuiScaledWidth();
 
-            // Align button exactly above the heart/tree button column
-            // In EMI RecipeScreen, button column is located at screenX + bgWidth + 2
-            int btnX = screenX + bgWidth + 2;
-            int btnY = screenY + grpY - 2; // Right above the first button in the column
+            int btnX = screenX + bgWidth + 1;
+            if (btnX + 13 > screenGuiW) {
+                // If hugging screen edge in low resolution, dock inside the right border
+                btnX = screenX + bgWidth - 13;
+            }
+
+            Integer lastButtonBottom = null;
+
+            // Search for EMI's existing side buttons (Favorite, Tree, Fill '+') to dock seamlessly below them
+            for (Field f : group.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object val = f.get(group);
+                if (val != null) {
+                    Field wYF = findField(val.getClass(), "y");
+                    Field wHF = findField(val.getClass(), "height");
+                    Field wXF = findField(val.getClass(), "x");
+                    if (wYF != null && wHF != null) {
+                        try {
+                            int wy = wYF.getInt(val);
+                            int wh = wHF.getInt(val);
+                            int wx = wXF != null ? wXF.getInt(val) : 0;
+
+                            // Check if this widget is located in the right-side button column
+                            if (wXF == null || Math.abs(wx - (screenX + bgWidth)) <= 12 || Math.abs(wx - bgWidth) <= 12 || wx == 0) {
+                                int actualY = wy >= screenY ? wy : (screenY + wy);
+                                if (lastButtonBottom == null || actualY + wh > lastButtonBottom) {
+                                    lastButtonBottom = actualY + wh;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+            }
+
+            int btnY;
+            if (lastButtonBottom != null && lastButtonBottom > screenY) {
+                // Dock directly below the last EMI button ('+' button) with 1px gap
+                btnY = lastButtonBottom + 1;
+            } else if (grpYF != null) {
+                int grpY = grpYF.getInt(group);
+                btnY = (grpY >= screenY ? grpY : screenY + grpY) + 39;
+            } else {
+                btnY = screenY + 41;
+            }
 
             return new RecipeButtonTarget(recipe, btnX, btnY, 12, 12);
         } catch (Throwable t) {
@@ -99,9 +139,9 @@ public class CalcBoardEmiOverlay {
 
                     if (hover) {
                         graphics.renderTooltip(font, List.of(
-                            Component.literal("§6⚡ Add to Calculator Board"),
-                            Component.literal("§7Click to add this recipe to flowsheet"),
-                            Component.literal("§8Shortcut: 'A' key")
+                            Component.literal("§6⚡ ").append(Component.translatable("gui.gtcalcboard.emi.btn_title")),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.emi.btn_desc")),
+                            Component.literal("§8").append(Component.translatable("gui.gtcalcboard.emi.btn_shortcut"))
                         ), java.util.Optional.empty(), mouseX, mouseY);
                     }
                 }

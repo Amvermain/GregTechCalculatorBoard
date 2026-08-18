@@ -18,6 +18,8 @@ public class SummaryOverlay {
     private double maxScrollY = 0;
 
     private IngredientStack hoveredStack = null;
+    private boolean hoveredMachines = false;
+    private BalanceSummary lastSummary = null;
 
     public boolean isCollapsed() {
         return collapsed;
@@ -35,11 +37,18 @@ public class SummaryOverlay {
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {
+        this.lastSummary = summary;
         Font font = Minecraft.getInstance().font;
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 300.0f);
+        com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+
         int x = screenWidth - WIDTH - 10;
         int y = 36;
         int height = screenHeight - 46;
         hoveredStack = null;
+        hoveredMachines = false;
 
         if (collapsed) {
             // Mini collapsed tab
@@ -50,6 +59,7 @@ public class SummaryOverlay {
             graphics.renderOutline(tabX, y, tabW, tabH, 0xFF3D4B66);
             graphics.drawCenteredString(font, "⚡", tabX + tabW / 2, y + 8, 0xFFFFAA00);
             graphics.drawCenteredString(font, "«", tabX + tabW / 2, y + 24, 0xFFAAAAAA);
+            graphics.pose().popPose();
             return;
         }
 
@@ -64,7 +74,7 @@ public class SummaryOverlay {
         // Collapse button [>>]
         graphics.drawString(font, "»", x + WIDTH - 16, y + 7, 0xFFAAAAAA, false);
 
-        // 2. Fixed Total Power Section
+        // 2. Fixed Total Power & Machines Section
         int powerY = y + 26;
         String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
         String eutStr;
@@ -74,10 +84,20 @@ public class SummaryOverlay {
             eutStr = String.format("§e%,.1f EU/t §7(%s)", summary.totalEUt(), summary.highestVoltageTier().getName());
         }
         int pLabelW = font.width(pLabel) + 6;
+        graphics.drawString(font, pLabel, x + 8, powerY, 0xFFFFFFFF, false);
         graphics.drawString(font, eutStr, x + 8 + pLabelW, powerY, 0xFFFFFFFF, false);
 
-        // Top separator below power
-        int headerBottom = powerY + 14;
+        int machinesY = powerY + 13;
+        String mLabel = "§6" + Component.translatable("gui.gtcalcboard.total_machines").getString();
+        String mCountStr = String.format("§f%d%s §7(%s)", summary.totalMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString(), Component.translatable("gui.gtcalcboard.hover_details").getString());
+        int mLabelW = font.width(mLabel) + 6;
+        graphics.drawString(font, mLabel, x + 8, machinesY, 0xFFFFFFFF, false);
+        graphics.drawString(font, mCountStr, x + 8 + mLabelW, machinesY, 0xFFFFFFFF, false);
+
+        hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
+
+        // Top separator below power & machines
+        int headerBottom = machinesY + 14;
         graphics.fill(x + 8, headerBottom, x + WIDTH - 8, headerBottom + 1, 0xFF353C4D);
 
         // 3. Scrollable Content Area (Raw Inputs + Net Outputs)
@@ -112,14 +132,8 @@ public class SummaryOverlay {
             }
         }
 
-        // Section Separator
-        curY += 2;
-        if (curY >= contentY - 4 && curY <= contentY + contentH) {
-            graphics.fill(x + 8, curY, x + WIDTH - 8, curY + 1, 0xFF353C4D);
-        }
-        curY += 8;
-
         // Section B: Net Outputs
+        curY += 8;
         graphics.drawString(font, "§a📤 " + Component.translatable("gui.gtcalcboard.net_outputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
@@ -171,12 +185,25 @@ public class SummaryOverlay {
     }
 
     public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (hoveredMachines && lastSummary != null && !lastSummary.machineBreakdown().isEmpty()) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
+            for (Map.Entry<String, Integer> entry : lastSummary.machineBreakdown().entrySet()) {
+                tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
+            }
+            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            graphics.pose().popPose();
+            return;
+        }
+
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         }
+
+        graphics.pose().popPose();
     }
 
     private String formatRate(double rate, boolean isFluid) {

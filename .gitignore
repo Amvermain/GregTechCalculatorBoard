@@ -1,3 +1,7 @@
+.agents/
+.tools/
+copyparty.conf
+
 # Gradle build artifacts and cache
 .gradle/
 build/

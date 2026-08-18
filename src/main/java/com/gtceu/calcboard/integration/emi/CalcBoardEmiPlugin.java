@@ -40,7 +40,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
         if (mc.player != null) {
             String name = recipe.getId() != null ? recipe.getId().getPath() : "Recipe";
             if (name.contains("/")) name = name.substring(name.lastIndexOf('/') + 1);
-            mc.player.displayClientMessage(Component.literal("§a✔ Added [" + name + "] to Calculator Board!"), true);
+            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name)), true);
         }
 
         mc.getSoundManager().play(
@@ -49,10 +49,10 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
             )
         );
 
-        if (openBoard) {
-            mc.setScreen(new BoardScreen());
-        } else if (mc.screen instanceof BoardScreen boardScreen) {
+        if (mc.screen instanceof BoardScreen boardScreen) {
             boardScreen.rebuildWidgets();
+        } else if (openBoard) {
+            mc.setScreen(new BoardScreen());
         }
     }
 }

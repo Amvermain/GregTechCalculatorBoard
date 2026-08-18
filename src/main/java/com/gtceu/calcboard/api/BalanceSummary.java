@@ -5,6 +5,8 @@ import java.util.Map;
 public record BalanceSummary(
     double totalEUt,
     GTVoltageTier highestVoltageTier,
+    int totalMachineCount,
+    Map<String, Integer> machineBreakdown,
     Map<IngredientStack, Double> rawInputs,
     Map<IngredientStack, Double> netOutputs,
     Map<IngredientStack, Double> fullyBalanced,
