@@ -63,7 +63,7 @@ repositories {
     maven { url = "https://www.cursemaven.com" }
     maven { url = "https://api.modrinth.com/maven" }
     flatDir {
-        dirs 'libs', 'C:/Users/JongUk/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods'
+        dirs 'libs', "${System.getProperty('user.home')}/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods", 'C:/Users/JongUk/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods'
     }
 }
 

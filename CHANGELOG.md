@@ -11,52 +11,77 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ## [1.0.3] - 2026-08-18
 
 ### Added
-- **Interactive In-Game Manual & Guidebook Dialog**:
-  - Added a dedicated **`[📖 Guide]`** button on the top toolbar to open a comprehensive, standalone manual dialog directly over the canvas with zero external mod dependencies.
-  - **6 Core Chapters Included**:
-    1. **Chapter 1. Getting Started & Canvas Navigation**: Panning, zooming, centering, adding recipes via EMI, and resizing cards.
-    2. **Chapter 2. Wiring & Shift-Drag Auto Ratio**: Basic wires, **`Shift + Drag` auto ratio matching between supplier and consumer**, and wire disconnection.
-    3. **Chapter 3. Base Master Anchor & Auto Ratio**: `[🎯]` Master anchor toggle, `[⚖ Auto Ratio]` reverse line synchronization, `[⚡ Auto Connect]`, `[🚀 Max Flow]`.
-    4. **Chapter 4. Compound Modules**: Compressing large lines with `[📦 Group]`, auto byproduct encapsulation, and `[⤢ Expand]` restoration.
-    5. **Chapter 5. Multi-Select & Shortcuts**: Marquee box selection, `Ctrl+C/V/D/A`, `Delete`, and double-click inline title renaming.
-    6. **Chapter 6. Multi-Page Preset Tabs & Blueprints**: Top tab bar, blueprint string export/import, persistent saving.
-  - Features dark slate styling, mouse wheel viewport scrolling, keyboard arrow navigation, and full multilingual localization.
-- **Multi-Selection & Batch Operations (Marquee Box, Multi-Drag, Hotkeys)**:
-  - **Marquee Box Selection**: Click and drag on empty canvas space to create a translucent bounding box and select multiple nodes simultaneously.
-  - **Shift + Click Multi-Select**: Add or toggle individual nodes into selection.
-  - **Batch Dragging**: Dragging any selected node moves all selected nodes together while preserving relative positions and internal wire connections.
-  - **Clipboard Cut / Copy / Paste / Duplicate / Delete**:
-    - `Ctrl + X`: **Cut selected nodes and internal wires (copy to clipboard and remove from canvas)**.
-    - `Ctrl + C`: Copy selected nodes and internal connection wires to clipboard.
+- **Interactive Onboarding Tutorial & Welcome Modal (`TutorialManager`, `TutorialOverlay`)**:
+  - **Welcome Dialog (`WelcomeTutorialDialog`)**: Welcomes first-time players with an option to start a step-by-step interactive flowsheet tutorial.
+  - **5-Step Core Tutorial Guide**:
+    1. **Step 1. Add Recipe Nodes**: Use the canvas quick-add marker `[+]` or the top toolbar `[➕ Add]` button.
+    2. **Step 2. Connect Basic Wires**: Drag from an output port (green) to an input port (blue) to establish resource flow.
+    3. **Step 3. Shift + Drag 1:1 Auto-Ratio**: Hold `Shift` while wiring to automatically calculate and balance machine counts based on production/consumption rates.
+    4. **Step 4. Base Master Anchor & Auto Ratio**: Toggle `[🎯]` on the final product node and click `[⚖ Ratio]` to synchronize the entire upstream production line.
+    5. **Step 5. Disconnecting Wires & Canvas Clear**: Right-click any wire curve or port to disconnect, and use `[🗑 Clear]` to reset.
+  - Features translucent tutorial cards, animated pulsating target highlights, and skip/restart options.
+- **Contextual Quick-Add Canvas Marker (`[+]`)**:
+  - Left-clicking any empty canvas area spawns a subtle, translucent **`[+]` quick-add button** at the clicked coordinates.
+  - Clicking `[+]` opens the recipe search dialog and immediately spawns the selected machine node at the exact clicked canvas location.
+- **Vector / Delta-Based Undo & Redo System (`HistoryManager`, `BoardCommand`)**:
+  - **Ultra-Low Memory Command/Delta Architecture**: Records only relative positional deltas (`dx, dy`), node/wire references, and property old/new values instead of heavy full-graph snapshots.
+  - **Hotkeys**: `Ctrl + Z` (Undo), `Ctrl + Y` or `Ctrl + Shift + Z` (Redo).
+  - **Toolbar Controls**: Added `[↶ Undo]` and `[↷ Redo]` buttons with dynamic enabled/disabled styling.
+  - **Comprehensive Action Coverage**: Supports undoing/redoing node movements (single & multi-drag), adding/deleting nodes, connecting/disconnecting wires (including Shift-scaling counts), inline/button property edits (machine counts, voltage tiers, OC modes, parallels, custom names, master anchors, turbine rotors), module grouping/expanding, auto-connect, auto-ratio, and max-flow optimizations.
+  - **Independent Per-Tab History**: Each page tab maintains its own isolated undo/redo history stacks.
+- **Collapsible Hotkey HUD (`HotkeyHudWidget`)**:
+  - Added a collapsible hotkey guide overlay in the bottom-right corner of the canvas.
+  - Press **`H`** to toggle the HUD open/closed at any time to check keybindings (`Ctrl+Z`, `Ctrl+Y`, `Ctrl+C/V/X/D`, `Shift+Wire`, `H`, `Delete`, `R/U`).
+- **Dynamic Port & Wire Dragging Guidance Tooltips**:
+  - Hovering over ingredient ports displays localized port descriptions and connection tips.
+  - Live wire dragging renders contextual guidance tooltips:
+    - Normal Drag: *"Click target port to connect wire."*
+    - **`Shift + Drag`**: *"✨ Shift Connect: Automatically balances target machine count to 1:1 supply-demand ratio."*
+- **Page Tab Management & Confirmation Dialogs (`PageTabBarWidget`, `DeletePageConfirmDialog`)**:
+  - **Double-Click / Right-Click Tab Renaming**: Double-click or right-click any page tab header to edit its name inline with keyboard typing.
+  - **Horizontal Drag & Wheel Scrolling**: Drag across the tab bar or use the mouse wheel to scroll horizontally when managing many preset tabs.
+  - **Page Deletion Confirmation**: Added `DeletePageConfirmDialog` to prevent accidental deletion of important build flowcharts.
+- **Switchable Power Display Modes (`PowerDisplayMode`)**:
+  - Click the power summary row in the Process Summary panel to cycle through display units:
+    - **`EU/t`** (Default GT tick rate)
+    - **`EU/s`** (Per-second EU)
+    - **`RF/t` / `FE/t`** (FE/RF equivalent for Thermal and cross-mod builds)
+- **Standalone In-Game Manual & Guidebook Dialog (`GuideDialog`)**:
+  - Added `[📖 Guide]` button on the top toolbar to access a built-in, 6-chapter manual modal directly over the canvas with zero external mod dependencies.
+- **Multi-Selection & Batch Operations (Marquee Box, Multi-Drag, Clipboard)**:
+  - **Marquee Box Selection**: Left-click and drag on empty canvas space to draw a cyan selection box and select multiple nodes at once.
+  - **Shift + Click Multi-Select**: Toggle individual nodes into or out of selection.
+  - **Batch Dragging**: Dragging any selected node moves all selected machines together while preserving relative positions and internal wires.
+  - **Clipboard Shortcuts**:
+    - `Ctrl + X`: Cut selected nodes and internal wires.
+    - `Ctrl + C`: Copy selected nodes and internal wires to clipboard.
     - `Ctrl + V`: Paste copied nodes at cursor position with fresh unique IDs (UUIDs).
     - `Ctrl + D`: Duplicate selected nodes immediately.
-    - `Delete` / `Backspace`: Batch delete selected nodes and associated wires.
-    - `Ctrl + A`: Select all nodes.
-  - **Bring-to-Front on Node Click**: Clicking or dragging any node dynamically promotes it to the top rendering layer above overlapping cards.
-  - **Z-Index & Depth Buffer Bleed Fixes**:
-    - Prevented 3D item models and fluid sprites from bleeding through overlapping node cards via explicit depth test disabling and per-node Z-offset tiers.
-    - SummaryOverlay, ToolbarWidget, PageTabBarWidget, and GuideDialog now render on top of all canvas elements with dedicated Z-planes.
-  - **Selective Module Grouping**: Group only the selected subset of nodes into a compound module, automatically rewiring external connections to new module ports.
-- **Inline Custom Title Renaming**:
-  - Double-click any node header title (`Chemical Reactor...`, `Compound Process...`) to enter inline editing mode and rename it with your keyboard.
-- **Module Subgraph Abstraction & Expansion**:
-  - **`[📦 Group]`**: Group multiple interconnected processing facilities on the canvas into a single **Compound Module Card** with a single click.
-  - **Automatic Intermediary Encapsulation**: Internally recycled and consumed intermediate items/fluids are automatically hidden, exposing only **Raw External Inputs**, **Net Final Outputs**, **Total Combined EU/t**, and **Total Contained Machine Count**.
-  - **`[⤢ Expand]` Restoration**: Clicking the expand button on the top-right of a module card instantly restores all original machine nodes and wire connections onto the canvas.
-- **Multi-Page Preset Tabs (Pagination)**:
-  - Added a top **Page Tab Bar (`[1. Acid Line] [2. Petrochem] [3. Power Plant] [+]`)** allowing players to seamlessly switch between independent flowcharts without opening file load dialogs.
-- **Soft Dependency Mod Compatibility Guard**:
-  - Introduced `ModCompatHelper` to ensure GregTech (`gtceu`), Thermal (`thermal`), and EnderIO (`enderio`) specific bytecode and reflection logic only execute when the corresponding mods are loaded.
+    - `Delete` / `Backspace`: Batch delete selected nodes and connections.
+    - `Ctrl + A`: Select all nodes on canvas.
+- **Inline Custom Title Renaming (`NodeNameEditor`)**:
+  - Double-click any node header title to open the inline text editor and rename machines (e.g. `Sulfuric Acid Line 1`, `Turbine Power Plant`) persistently.
+- **Compound Module Subgraph Abstraction & Expansion**:
+  - **`[📦 Group]`**: Condense complex interconnected production facilities into a single **Compound Module Card**.
+  - **Automatic Byproduct Encapsulation**: Hides 100% self-recycled and internally consumed intermediate fluids/items, exposing only raw external inputs, net final outputs, combined EU/t, and total contained machines.
+  - **`[⤢ Expand]` Restoration**: Click the expand button on a module card at any time to restore all individual machines and internal wires onto the canvas.
+  - **Selective Module Grouping**: Group only a selected subset of nodes with automatic external wire rewiring.
+- **Soft Dependency Mod Compatibility Guard (`ModCompatHelper`)**:
+  - Isolates mod-specific bytecode calls for GregTech (`gtceu`), Thermal (`thermal`), and EnderIO (`enderio`).
 
 ### Fixes & Improvements
-- **Fixed Module Machine Count in Balance Summary**:
-  - Compound modules in the Summary Overlay now properly sum up their internal machines (e.g. 58 machines) and display the detailed breakdown in the tooltip.
-- **Fixed Module Card UI Overlap**:
-  - Compacted row 1 machine badge (`📦 58대`) and row 2 module tag (`[📦 Module]`) with increased safety margins to prevent any text collisions.
-- **Minimal Clean UI for Compound Modules**:
+- **Z-Index & Depth Buffer Bleed-Through Fixes**:
+  - Completely eliminated 3D item models and fluid sprites bleeding through overlapping node cards via explicit depth test disabling and per-node Z-offset layers.
+  - SummaryOverlay, ToolbarWidget, PageTabBarWidget, and Dialogs now render reliably on top of all canvas elements.
+- **Fixed Module Machine Count in Process Summary**:
+  - Summary Overlay now accurately aggregates the total count of physical machines contained within compound modules (e.g. 58 machines) and lists detailed breakdown in tooltips.
+- **Fixed Module Card UI Overlap & Clean Minimal Design**:
+  - Compacted module badges (`📦 58 machines`) and tags with safety margins to prevent text clipping.
   - Completely hides irrelevant tier, generator, OC, rotor, and parallel buttons on compound module cards.
-- **Removed Deprecated Tier Cap Option**:
-  - Cleaned up the confusing global tier cap button from the toolbar and code.
+- **Comprehensive I18n Audit & Localization**:
+  - Audited all UI components, dialogs, tutorial hints, and error messages to ensure 100% complete 1:1 translation coverage in English (`en_us.json`) and Korean (`ko_kr.json`).
+- **Streamlined Top Toolbar Layout**:
+  - Reorganized toolbar buttons into a clean, intuitive layout with responsive scrolling and rich tooltips.
 
 ---
 
