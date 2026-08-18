@@ -5,10 +5,11 @@ public enum TutorialStep {
     STEP_2_ADD_RECIPE(2, "gui.gtcalcboard.tutorial.step2_title", "gui.gtcalcboard.tutorial.step2_desc"),
     STEP_3_REMOVE_RECIPE(3, "gui.gtcalcboard.tutorial.step3_title", "gui.gtcalcboard.tutorial.step3_desc"),
     STEP_4_NORMAL_WIRING(4, "gui.gtcalcboard.tutorial.step4_title", "gui.gtcalcboard.tutorial.step4_desc"),
-    STEP_5_SHIFT_WIRING(5, "gui.gtcalcboard.tutorial.step5_title", "gui.gtcalcboard.tutorial.step5_desc"),
-    STEP_6_AUTO_RATIO(6, "gui.gtcalcboard.tutorial.step6_title", "gui.gtcalcboard.tutorial.step6_desc"),
-    STEP_7_SUMMARY_MODULE(7, "gui.gtcalcboard.tutorial.step7_title", "gui.gtcalcboard.tutorial.step7_desc"),
-    COMPLETED(8, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
+    STEP_5_DELETE_WIRING(5, "gui.gtcalcboard.tutorial.step5_title", "gui.gtcalcboard.tutorial.step5_desc"),
+    STEP_6_SHIFT_WIRING(6, "gui.gtcalcboard.tutorial.step6_title", "gui.gtcalcboard.tutorial.step6_desc"),
+    STEP_7_AUTO_RATIO(7, "gui.gtcalcboard.tutorial.step7_title", "gui.gtcalcboard.tutorial.step7_desc"),
+    STEP_8_SUMMARY_MODULE(8, "gui.gtcalcboard.tutorial.step8_title", "gui.gtcalcboard.tutorial.step8_desc"),
+    COMPLETED(9, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
 
     private final int stepNumber;
     private final String titleKey;

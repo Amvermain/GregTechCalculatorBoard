@@ -534,6 +534,7 @@ public class CanvasInteractionHandler {
 
     private void notifyDisconnect(String translatableKey) {
         screen.markSummaryDirty();
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onWireDisconnected();
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             mc.player.displayClientMessage(Component.literal("§c✕ ").append(Component.translatable(translatableKey)), true);

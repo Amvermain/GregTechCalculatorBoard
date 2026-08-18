@@ -86,7 +86,7 @@ public class TutorialManager {
 
         if (step == TutorialStep.STEP_4_NORMAL_WIRING) {
             setupWiringExercise();
-        } else if (step == TutorialStep.STEP_5_SHIFT_WIRING) {
+        } else if (step == TutorialStep.STEP_6_SHIFT_WIRING) {
             // Reset turbine count to 1.0 so user can experience Shift auto-calculation to 5.0
             RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
             if (turbine != null) {
@@ -152,35 +152,31 @@ public class TutorialManager {
     public void onWireConnected(boolean shiftDown) {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_4_NORMAL_WIRING) {
-            if (!shiftDown) {
-                // Advance to Step 5 to guide Shift-connect
-                nextStep();
-            } else {
-                // If user already did shift-connect, advance to Step 6 directly
-                nextStep();
-                nextStep();
-            }
-        } else if (currentStep == TutorialStep.STEP_5_SHIFT_WIRING) {
-            // Check if turbine is now auto-matched to 5.0
-            RecipeNode turbine = currentScreen != null ? currentScreen.getGraph().findNodeById(turbineNodeId) : null;
-            if (turbine != null && Math.abs(turbine.getMachineCount() - 5.0) < 0.1) {
-                nextStep();
-            } else {
-                nextStep();
-            }
+            // Advance to Step 5 (Delete Wiring)
+            nextStep();
+        } else if (currentStep == TutorialStep.STEP_6_SHIFT_WIRING) {
+            // Advance to Step 7 (Auto Ratio)
+            nextStep();
+        }
+    }
+
+    public void onWireDisconnected() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_5_DELETE_WIRING) {
+            nextStep(); // Advance to Step 6 (Shift Wiring)
         }
     }
 
     public void onAutoRatioTriggered() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_6_AUTO_RATIO) {
+        if (currentStep == TutorialStep.STEP_7_AUTO_RATIO) {
             nextStep();
         }
     }
 
     public void onModuleGrouped() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_7_SUMMARY_MODULE) {
+        if (currentStep == TutorialStep.STEP_8_SUMMARY_MODULE) {
             completeTutorial();
         }
     }
@@ -203,8 +199,8 @@ public class TutorialManager {
         if (!active) return false;
         return switch (currentStep) {
             case STEP_2_ADD_RECIPE -> "add_recipe".equals(buttonKey);
-            case STEP_6_AUTO_RATIO -> "auto_ratio".equals(buttonKey);
-            case STEP_7_SUMMARY_MODULE -> "group_module".equals(buttonKey);
+            case STEP_7_AUTO_RATIO -> "auto_ratio".equals(buttonKey);
+            case STEP_8_SUMMARY_MODULE -> "group_module".equals(buttonKey);
             default -> false;
         };
     }
@@ -216,7 +212,7 @@ public class TutorialManager {
 
     public boolean isNodeBaseTargetButtonGlowing(String nodeId) {
         if (!active) return false;
-        if (currentStep == TutorialStep.STEP_6_AUTO_RATIO) {
+        if (currentStep == TutorialStep.STEP_7_AUTO_RATIO) {
             return turbineNodeId != null && turbineNodeId.equals(nodeId);
         }
         return false;
@@ -224,7 +220,7 @@ public class TutorialManager {
 
     public boolean isPortGlowing(String nodeId, boolean isInput, int portIdx) {
         if (!active) return false;
-        if (currentStep == TutorialStep.STEP_4_NORMAL_WIRING || currentStep == TutorialStep.STEP_5_SHIFT_WIRING) {
+        if (currentStep == TutorialStep.STEP_4_NORMAL_WIRING || currentStep == TutorialStep.STEP_6_SHIFT_WIRING) {
             if (!isInput && portIdx == 0 && boilerNodeId != null && boilerNodeId.equals(nodeId)) {
                 return true;
             }

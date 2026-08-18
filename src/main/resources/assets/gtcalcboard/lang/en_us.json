@@ -139,14 +139,17 @@
   "gui.gtcalcboard.tutorial.step4_title": "Normal Wiring (Inspect Imbalance)",
   "gui.gtcalcboard.tutorial.step4_desc": "Drag from Boiler's [Steam] output port (green) to Turbine's [Steam] input port (blue) normally. (Notice that 500 mB/s produced is wasted on 1 turbine consuming only 100 mB/s)",
 
-  "gui.gtcalcboard.tutorial.step5_title": "Shift + Wiring (100% Auto-Ratio Matching)",
-  "gui.gtcalcboard.tutorial.step5_desc": "✨ Now hold SHIFT while dragging from Boiler output to Turbine input! (Turbine count is instantly calculated to 5.0, achieving 100% perfect balance)",
+  "gui.gtcalcboard.tutorial.step5_title": "Disconnecting Wire Links",
+  "gui.gtcalcboard.tutorial.step5_desc": "Hover your mouse cursor over the connected wire curve and [Right-Click] to sever the connection.",
 
-  "gui.gtcalcboard.tutorial.step6_title": "Set Master Anchor & Auto-Ratio",
-  "gui.gtcalcboard.tutorial.step6_desc": "Click [🎯] on Turbine card to set as Master Anchor, then click [⚖ Auto Ratio] on the toolbar!",
+  "gui.gtcalcboard.tutorial.step6_title": "Shift + Wiring (100% Auto-Ratio Matching)",
+  "gui.gtcalcboard.tutorial.step6_desc": "✨ Now hold SHIFT while dragging from Boiler output to Turbine input! (Turbine count is instantly calculated to 5.0, achieving 100% perfect balance)",
 
-  "gui.gtcalcboard.tutorial.step7_title": "Summary & Modular Packaging",
-  "gui.gtcalcboard.tutorial.step7_desc": "Check total power output in the top-right summary overlay, and click [📦 Group Module] to collapse into a single card!",
+  "gui.gtcalcboard.tutorial.step7_title": "Set Master Anchor & Auto-Ratio",
+  "gui.gtcalcboard.tutorial.step7_desc": "Click [🎯] on Turbine card to set as Master Anchor, then click [⚖ Auto Ratio] on the toolbar!",
+
+  "gui.gtcalcboard.tutorial.step8_title": "Summary & Modular Packaging",
+  "gui.gtcalcboard.tutorial.step8_desc": "Check total power output in the summary overlay, and click [📦 Group Module] to collapse into a single card!",
 
   "gui.gtcalcboard.tutorial.completed_title": "Tutorial Complete!",
   "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [📖 Help] or [🎓 Tutorial] anytime."

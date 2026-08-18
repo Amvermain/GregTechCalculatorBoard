@@ -137,16 +137,19 @@
   "gui.gtcalcboard.tutorial.step3_desc": "불필요한 기계는 카드의 [✕] 버튼을 누르거나, 노드를 클릭하고 Delete 키를 눌러 삭제할 수 있습니다.",
 
   "gui.gtcalcboard.tutorial.step4_title": "일반 와이어 연결 (수치 불일치 확인)",
-  "gui.gtcalcboard.tutorial.step4_desc": "보일러의 [Steam] 출력 포트(초록)에서 터빈의 [Steam] 입력 포트(파랑)로 그냥 드래그하여 연결해 보세요. (보일러 생산 500에 비해 터빈 소비가 100에 불과해 증기가 낭비됩니다)",
+  "gui.gtcalcboard.tutorial.step4_desc": "보일러의 [Steam] 출력 포트(초록)에서 터빈의 [Steam] 입력 포트(파랑)로 마우스 드래그하여 연결해 보세요. (보일러 생산 500mB/s에 비해 터빈 소비가 100mB/s에 불과해 증기가 낭비됩니다)",
 
-  "gui.gtcalcboard.tutorial.step5_title": "Shift + 와이어 연결 (100% 자동 비율 일치)",
-  "gui.gtcalcboard.tutorial.step5_desc": "✨ 이번에는 Shift 키를 누른 채 보일러 출력에서 터빈 입력으로 다시 드래그해 보세요! (터빈 대수가 5.0대로 즉각 자동 계산되며 생산과 소비가 100% 완벽히 일치합니다)",
+  "gui.gtcalcboard.tutorial.step5_title": "와이어 링크 삭제하기",
+  "gui.gtcalcboard.tutorial.step5_desc": "연결된 와이어 링크 선 위에 마우스 커서를 올리고 [마우스 우클릭]하여 와이어 연결을 끊어보세요.",
 
-  "gui.gtcalcboard.tutorial.step6_title": "기준 마스터 지정 & 자동 비율 (Auto-Ratio)",
-  "gui.gtcalcboard.tutorial.step6_desc": "터빈 카드의 [🎯] 버튼을 눌러 기준 마스터로 지정한 뒤, 상단 [⚖ 비율맞춤] 버튼을 클릭해 보세요!",
+  "gui.gtcalcboard.tutorial.step6_title": "Shift + 와이어 연결 (100% 자동 비율 일치)",
+  "gui.gtcalcboard.tutorial.step6_desc": "✨ 이번에는 [Shift 키]를 누른 채 보일러 출력에서 터빈 입력으로 다시 드래그해 보세요! (터빈 대수가 5.0대로 즉각 자동 계산되며 생산과 소비가 100% 완벽히 일치합니다)",
 
-  "gui.gtcalcboard.tutorial.step7_title": "공정 요약 & 복합 모듈 압축",
-  "gui.gtcalcboard.tutorial.step7_desc": "우측 상단 요약창에서 총 발전량을 확인하고, 상단 [📦 모듈화] 버튼을 눌러 복잡한 공정을 하나의 카드로 압축해 보세요!",
+  "gui.gtcalcboard.tutorial.step7_title": "기준 마스터 지정 & 자동 비율 (Auto-Ratio)",
+  "gui.gtcalcboard.tutorial.step7_desc": "터빈 카드의 [🎯] 버튼을 눌러 기준 마스터로 지정한 뒤, 상단 [⚖ 비율맞춤] 버튼을 클릭해 보세요!",
+
+  "gui.gtcalcboard.tutorial.step8_title": "공정 요약 & 복합 모듈 압축",
+  "gui.gtcalcboard.tutorial.step8_desc": "우측 요약창에서 총 발전량을 확인하고, 상단 [📦 모듈화] 버튼을 눌러 복잡한 공정을 하나의 카드로 압축해 보세요!",
 
   "gui.gtcalcboard.tutorial.completed_title": "튜토리얼 완료!",
   "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 거대한 석유화학 및 핵융합 공정을 자유롭게 설계해 보세요! 언제든 상단 [📖 도움말]이나 [🎓 튜토리얼]을 다시 볼 수 있습니다."
