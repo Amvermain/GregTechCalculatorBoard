@@ -417,8 +417,11 @@ public class BoardScreen extends Screen {
             int nh = widget.getHeight();
 
             if (nx + nw >= screenLeft && nx <= screenRight && ny + nh >= screenTop && ny <= screenBottom) {
+                graphics.flush();
+                com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, net.minecraft.client.Minecraft.ON_OSX);
+                com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
                 graphics.pose().pushPose();
-                graphics.pose().translate(0, 0, (i + 1) * 10.0f);
+                graphics.pose().translate(0, 0, (i + 1) * 300.0f);
                 widget.render(graphics, (int) canvasMouseX, (int) canvasMouseY, partialTicks);
                 graphics.flush();
                 graphics.pose().popPose();
@@ -429,6 +432,10 @@ public class BoardScreen extends Screen {
         canvasHandler.renderMarquee(graphics);
 
         graphics.pose().popPose();
+
+        graphics.flush();
+        com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, net.minecraft.client.Minecraft.ON_OSX);
+        com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         // 6. Render Page Tab Bar, Top Toolbar and Summary Overlay
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
@@ -615,6 +622,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (pageTabBar.mouseReleased(mouseX, mouseY, button)) {
+            return true;
+        }
         if (toolbarWidget.mouseReleased(mouseX, mouseY, button)) {
             return true;
         }
@@ -626,6 +636,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (pageTabBar.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+            return true;
+        }
         if (toolbarWidget.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
             return true;
         }
@@ -645,6 +658,9 @@ public class BoardScreen extends Screen {
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (pageTabBar.mouseScrolled(mouseX, mouseY, delta)) {
+            return true;
         }
         if (summaryOverlay.mouseScrolled(mouseX, mouseY, delta, width, height)) {
             return true;
