@@ -130,151 +130,54 @@ public class ParallelHelper {
     private static ParallelStats computeParallelStats(String identifier) {
         ResourceLocation id = ResourceLocation.tryParse(identifier.contains(":") ? identifier : "gtceu:" + identifier);
 
-        // 1. Primary: Direct GTCEu GTRegistries.MACHINES & MachineDefinition MetaMachine inspection
+        // 1. Check ItemStack Tooltip & NBT (Exact pack values e.g. 4x Elite Parallel)
+        // Handled in getParallelStats(ItemStack)
+
+        // 2. GTCEu MachineDefinition inspection (Safe Tier & Property inspection)
         try {
             Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
             Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
             if (machinesRegistry != null) {
-                Method getM = null;
                 for (Method m : machinesRegistry.getClass().getMethods()) {
                     if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == ResourceLocation.class) {
-                        getM = m;
+                        Object machineDef = m.invoke(machinesRegistry, id);
+                        if (machineDef != null) {
+                            int maxPar = extractInt(machineDef, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
+                            boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy");
+                            if (maxPar > 0) {
+                                return new ParallelStats(maxPar, isAbsolute);
+                            }
+                        }
                         break;
-                    }
-                }
-                if (getM != null) {
-                    Object machineDef = getM.invoke(machinesRegistry, id);
-                    if (machineDef != null) {
-                        ParallelStats stats = extractStatsFromMachineDef(machineDef);
-                        if (stats != null) return stats;
                     }
                 }
             }
         } catch (Throwable ignored) {}
 
-        // 2. Secondary: Inspect Block instance via MetaMachineBlock
+        // 3. Inspect Block instance via MetaMachineBlock without recursion
         if (id != null) {
             Block block = BuiltInRegistries.BLOCK.get(id);
             if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
-                ParallelStats stats = extractStatsFromObject(block);
-                if (stats != null) return stats;
-            }
-
-            Item item = ForgeRegistries.ITEMS.getValue(id);
-            if (item instanceof BlockItem bi) {
-                ParallelStats stats = extractStatsFromObject(bi.getBlock());
-                if (stats != null) return stats;
+                int maxPar = extractInt(block, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
+                boolean isAbsolute = extractBoolean(block, "isAbsolute", "isExact", "isFixedEnergy");
+                if (maxPar > 0) return new ParallelStats(maxPar, isAbsolute);
             }
         }
 
-        // 3. Fallback: Derive from name/path
+        // 4. Fallback: Derive from name/path
         boolean isAbs = identifier.contains("absolute") || identifier.contains("절대");
         int par = deriveParallelFromTier(identifier);
         return new ParallelStats(par, isAbs);
     }
 
     /**
-     * Extracts exact parallel stats from a GTCEu MachineDefinition by inspecting its MetaMachine factory / fields.
-     */
-    public static ParallelStats extractStatsFromMachineDef(Object machineDef) {
-        if (machineDef == null) return null;
-
-        // 1. Direct getter methods on MachineDefinition
-        int maxPar = extractInt(machineDef, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
-        boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy");
-        if (maxPar > 0) {
-            return new ParallelStats(maxPar, isAbsolute);
-        }
-
-        // 2. Instantiate or extract MetaMachine from MachineDefinition
-        try {
-            for (Method m : machineDef.getClass().getMethods()) {
-                if (m.getParameterCount() == 1 && (m.getName().contains("create") || m.getName().contains("Machine"))) {
-                    try {
-                        Object machine = m.invoke(machineDef, new Object[]{null});
-                        if (machine != null) {
-                            ParallelStats s = extractStatsFromObject(machine);
-                            if (s != null) return s;
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        // 3. Inspect fields of MachineDefinition for IParallelHatch or ParallelHatchPartMachine
-        try {
-            for (java.lang.reflect.Field f : machineDef.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                Object val = f.get(machineDef);
-                if (val != null) {
-                    ParallelStats s = extractStatsFromObject(val);
-                    if (s != null) return s;
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        return null;
-    }
-
-    /**
-     * Invokes GTCEu IParallelHatch getters or MetaMachine methods via reflection.
+     * Invokes GTCEu IParallelHatch getters or MetaMachine methods via safe reflection without recursion.
      */
     public static ParallelStats extractStatsFromObject(Object target) {
         if (target == null) return null;
 
-        Object machineObj = target;
-
-        // Try getting MachineDefinition from MetaMachineBlock
-        try {
-            for (Method m : target.getClass().getMethods()) {
-                if ((m.getName().equalsIgnoreCase("getMachineDefinition") || m.getName().equalsIgnoreCase("getDefinition")) && m.getParameterCount() == 0) {
-                    Object def = m.invoke(target);
-                    if (def != null) {
-                        ParallelStats s = extractStatsFromMachineDef(def);
-                        if (s != null) return s;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        // Try getting MetaMachine / PartMachine from block entity or block
-        try {
-            for (Method m : target.getClass().getMethods()) {
-                if ((m.getName().equalsIgnoreCase("getMetaMachine") || m.getName().equalsIgnoreCase("getMachine") || m.getName().equalsIgnoreCase("getPartMachine")) && m.getParameterCount() == 0) {
-                    Object res = m.invoke(target);
-                    if (res != null) {
-                        machineObj = res;
-                        break;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        // Check if object implements IParallelHatch or has getMaxParallel / getCurrentParallel
-        int maxPar = extractInt(machineObj, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
-        boolean isAbsolute = extractBoolean(machineObj, "isAbsolute", "isExact", "isFixedEnergy");
-
-        // Inspect declared fields for maxParallel / currentParallel
-        if (maxPar <= 0) {
-            Class<?> curr = machineObj.getClass();
-            while (curr != null && curr != Object.class) {
-                for (java.lang.reflect.Field f : curr.getDeclaredFields()) {
-                    String fName = f.getName().toLowerCase();
-                    if (fName.contains("parallel") || fName.contains("maxpar")) {
-                        try {
-                            f.setAccessible(true);
-                            Object v = f.get(machineObj);
-                            if (v instanceof Number n && n.intValue() > 0) {
-                                maxPar = n.intValue();
-                                break;
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
-                if (maxPar > 0) break;
-                curr = curr.getSuperclass();
-            }
-        }
+        int maxPar = extractInt(target, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
+        boolean isAbsolute = extractBoolean(target, "isAbsolute", "isExact", "isFixedEnergy");
 
         if (maxPar > 0) {
             return new ParallelStats(maxPar, isAbsolute);
