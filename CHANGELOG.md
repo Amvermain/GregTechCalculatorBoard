@@ -8,6 +8,28 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [1.0.4-fix2] - 2026-08-20
+
+### Fixed
+- **World Load & EMI Registration GTCEu Material Registry Premature Access Crash (`DynamicAddonCrawler`, `CalcBoardEmiPlugin`)**:
+  - Fixed an `IllegalStateException` crash caused by asynchronous preloading accessing `GTRegistries.MATERIALS` during the initial game title/EMI entrypoint stage before GTCEu finished world/datapack registration.
+  - Added strict isolation guards to ensure GTCEu internal registries are never queried before the player is fully inside an active world.
+- **Recipe Search Dialog Empty State / Desync on First Open (`RecipeSearchDialog`)**:
+  - Resolved an issue where opening the search dialog immediately after game load displayed `No matching recipes found.` due to desynchronized cache flags while background indexing was in progress.
+  - The dialog now reactively detects background indexing completion and automatically populates the recipe list in real time, displaying `Loading recipes...` while indexing.
+- **100% Text/Name Parsing Removal & Pure Bytecode/API Spec Extraction (`ParallelHelper`)**:
+  - Completely purged all substring, item name, and regex tooltip matching, replacing them with direct `MetaMachine.getCurrentParallel()` method invocation and bytecode inspection of `modifyRecipe` overrides to detect standard vs. constant-power (Absolute) parallel hatches.
+- **Hardcoded String Audit & Complete Localization (`MachineConfigDialog`, `ko_kr.json`, `en_us.json`)**:
+  - Audited and localized all remaining hardcoded UI and tooltip strings including coil temperature, parallel multipliers, speed, time, energy, and constant power badges into formal translatable keys.
+
+### Changed
+- **0ms Instant Addon & Recipe Search Dialog Opening Optimization (`MachineAddonCatalog`, `BoardScreen`, `GregTechCalcBoard`)**:
+  - Eliminated synchronous `refresh()` and `preloadFuture.join()` calls on modal opening, switching to a 100% non-blocking asynchronous preloading pipeline for 0ms dialog openings.
+- **Dedicated Page Creation for Interactive Tutorial (`TutorialManager`)**:
+  - Starting the interactive onboarding tutorial no longer clears existing canvas nodes; instead, it automatically creates a dedicated new page (`🎓 Tutorial`) to protect user work.
+
+---
+
 ## [1.0.4-fix] - 2026-08-19
 
 ### Fixed

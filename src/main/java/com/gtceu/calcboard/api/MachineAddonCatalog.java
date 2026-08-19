@@ -1,23 +1,28 @@
 package com.gtceu.calcboard.api;
 
+import net.minecraft.Util;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
- * Manages the global catalog of crawled and custom MachineAddons.
+ * Manages the global catalog of crawled and custom MachineAddons with asynchronous background preloading.
  */
 public class MachineAddonCatalog {
 
     private static MachineAddonCatalog instance;
 
-    private final List<MachineAddon> allAddons = new ArrayList<>();
-    private final List<MachineAddon> customAddons = new ArrayList<>();
+    private final List<MachineAddon> allAddons = Collections.synchronizedList(new ArrayList<>());
+    private final List<MachineAddon> customAddons = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean isDirty = true;
+    private volatile CompletableFuture<Void> preloadFuture = null;
     private String lastLanguageCode = "";
 
     private MachineAddonCatalog() {
-        // Lazy loaded on first GUI open
+        // Preload in background
+        preloadAsync();
     }
 
     public static synchronized MachineAddonCatalog getInstance() {
@@ -31,11 +36,41 @@ public class MachineAddonCatalog {
         this.isDirty = true;
     }
 
+    /**
+     * Triggers asynchronous background preloading of all dynamic addons and hatches.
+     */
+    public synchronized CompletableFuture<Void> preloadAsync() {
+        if (!isDirty && !allAddons.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (preloadFuture != null && !preloadFuture.isDone()) {
+            return preloadFuture;
+        }
+
+        preloadFuture = CompletableFuture.supplyAsync(DynamicAddonCrawler::crawlAllAddons, Util.backgroundExecutor())
+                .thenAccept(crawled -> {
+                    synchronized (allAddons) {
+                        allAddons.clear();
+                        allAddons.addAll(crawled);
+                        allAddons.addAll(customAddons);
+                        isDirty = false;
+                    }
+                }).exceptionally(ex -> {
+                    isDirty = false;
+                    return null;
+                });
+
+        return preloadFuture;
+    }
+
     public synchronized void refresh() {
-        allAddons.clear();
-        allAddons.addAll(DynamicAddonCrawler.crawlAllAddons());
-        allAddons.addAll(customAddons);
-        this.isDirty = false;
+        List<MachineAddon> crawled = DynamicAddonCrawler.crawlAllAddons();
+        synchronized (allAddons) {
+            allAddons.clear();
+            allAddons.addAll(crawled);
+            allAddons.addAll(customAddons);
+            this.isDirty = false;
+        }
     }
 
     public List<MachineAddon> getAllAddons() {
@@ -46,14 +81,18 @@ public class MachineAddonCatalog {
                 if (currentLang != null && !currentLang.equals(lastLanguageCode)) {
                     lastLanguageCode = currentLang;
                     isDirty = true;
+                    preloadAsync();
                 }
             }
         } catch (Throwable ignored) {}
 
         if (isDirty || allAddons.isEmpty()) {
-            refresh();
+            preloadAsync();
         }
-        return new ArrayList<>(allAddons);
+
+        synchronized (allAddons) {
+            return new ArrayList<>(allAddons);
+        }
     }
 
     public List<MachineAddon> getAddonsByCategory(MachineAddon.Category category) {

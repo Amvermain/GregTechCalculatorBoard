@@ -43,8 +43,12 @@ public class TutorialManager {
         this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
         this.pannedOrZoomed = false;
 
-        // Reset canvas to a clean slate
+        // If current page is not empty, create a dedicated new page for tutorial to protect user's existing work!
         if (screen != null) {
+            if (!screen.getGraph().getNodes().isEmpty()) {
+                String pageName = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tutorial.page_name").getString();
+                com.gtceu.calcboard.api.BoardManager.getInstance().addPage(pageName);
+            }
             screen.getSummaryOverlay().setCollapsed(true);
             screen.getGraph().getNodes().clear();
             screen.getGraph().getConnections().clear();

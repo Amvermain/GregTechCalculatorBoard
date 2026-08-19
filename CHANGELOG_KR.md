@@ -8,6 +8,28 @@
 
 ---
 
+## [1.0.4-fix2] - 2026-08-20
+
+### 버그 수정 (Fixed)
+- **월드 로딩 및 EMI 등록 단계의 GTCEu 머티리얼 레지스트리 조기 접근 크래시 수정 (`DynamicAddonCrawler`, `CalcBoardEmiPlugin`)**:
+  - EMI 등록 단계(`EmiPlugin.register`) 등 타이틀 화면 로딩 중에 백그라운드 프리캐싱이 돌아 GTCEu 머티리얼 레지스트리(`GTRegistries.MATERIALS`)를 조기 참조하여, 월드 진입 시 `Cannot retrieve all materials before registration` 에러와 함께 튕기던 크래시를 완벽히 해결했습니다.
+  - 인게임 월드에 완전히 접속하기 전에는 GTCEu 내부 레지스트리를 일체 건드리지 않도록 안전 격리 가드를 추가했습니다.
+- **레시피 검색창 첫 진입 시 빈 화면/미일치 오류 해결 (`RecipeSearchDialog`)**:
+  - EMI 레시피 인덱싱이 비동기로 완료되었음에도 첫 진입 시 캐시 동기화가 어긋나 `No matching recipes found.`가 뜨던 문제를 해결했습니다.
+  - 백그라운드 인덱싱이 끝나는 즉시 화면이 실시간으로 자동 감지하여 목록을 채우며, 로딩 중에는 `Loading recipes...`가 명확히 표시됩니다.
+- **텍스트/이름 파싱 100% 전면 제거 및 순수 바이트코드/API 스펙 추출 완성 (`ParallelHelper`)**:
+  - 아이템 이름 매칭, 툴팁 정규식 파싱 등 문자열 참조를 완전히 들어내고, `MetaMachine.getCurrentParallel()` 및 `modifyRecipe` 오버라이딩 바이트코드 구조 분석을 통해서만 일반 병렬 해치와 절대 병렬 해치(고정 전력)를 완벽하게 감별하도록 개편했습니다.
+- **하드코딩된 리터럴 텍스트 전수 조사 및 다국어화 (`MachineConfigDialog`, `ko_kr.json`, `en_us.json`)**:
+  - 코일 온도, 병렬/속도/시간/전력 배율 및 고정 전력 텍스트 등 남아있던 모든 고정 문자열을 정식 다국어 키로 등록하여 완벽하게 로컬라이징했습니다.
+
+### 개선 및 변경 (Changed)
+- **애드온 및 레시피 검색창 진입 지연(렉) 0ms 비동기 프리캐싱 최적화 (`MachineAddonCatalog`, `BoardScreen`, `GregTechCalcBoard`)**:
+  - 애드온 창 진입 시 메인 렌더러 스레드를 블로킹하던 동기 `refresh()` 및 `preloadFuture.join()`을 전면 삭제하고 100% 논블로킹 비동기 프리로딩으로 전환하여 지연 시간 0ms로 즉각 열리도록 최적화했습니다.
+- **튜토리얼 실행 시 기존 작업물 보호 및 전용 새 페이지 자동 생성 (`TutorialManager`)**:
+  - 튜토리얼을 시작할 때 기존 페이지의 노드들을 지우지 않고, `🎓 튜토리얼` 전용 신규 페이지 탭을 자동으로 생성하여 열어줌으로써 사용자의 기존 설계 데이터를 완벽하게 보호하도록 개선했습니다.
+
+---
+
 ## [1.0.4-fix] - 2026-08-19
 
 ### 버그 수정 (Fixed)

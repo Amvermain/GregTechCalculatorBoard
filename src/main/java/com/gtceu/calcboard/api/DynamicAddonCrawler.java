@@ -60,12 +60,16 @@ public class DynamicAddonCrawler {
         // 1. Add Universal Built-in Multiblock Traits & Standard Rotors
         addBuiltinTraits(result);
 
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.level == null) {
+            return result;
+        }
+
         // 2. Multi-source NBT ItemStack collector (Recipe outputs, EMI index, Creative tabs)
         Map<Item, ItemStack> nbtItemSamples = new HashMap<>();
 
         // Source A: Recipe Manager Outputs (e.g. start:assembler/ev_kit producing {AugmentData: ...})
         try {
-            Minecraft mc = Minecraft.getInstance();
             if (mc.level != null && mc.level.getRecipeManager() != null) {
                 for (Recipe<?> recipe : mc.level.getRecipeManager().getRecipes()) {
                     try {

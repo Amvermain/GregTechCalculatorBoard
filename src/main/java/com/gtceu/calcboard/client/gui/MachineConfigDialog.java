@@ -56,11 +56,6 @@ public class MachineConfigDialog {
         this.catalogScroll = 0;
         this.rotorGridScroll = 0;
 
-        // Refresh dynamic addon catalog to ensure all registered rotors and items are up-to-date
-        try {
-            MachineAddonCatalog.getInstance().refresh();
-        } catch (Throwable ignored) {}
-
         Minecraft mc = Minecraft.getInstance();
 
         this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.literal("Parallel"));
@@ -278,17 +273,17 @@ public class MachineConfigDialog {
             } else if (hoveredActiveAddon.getCategory() == MachineAddon.Category.COIL) {
                 int coilTemp = hoveredActiveAddon.getCoilTemperature();
                 if (coilTemp > 0) {
-                    tooltip.add(Component.literal("§6♨ Coil Temperature: §f" + coilTemp + "K"));
+                    tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.addon.stat.coil_temp", String.valueOf(coilTemp))));
                 }
                 MachineAddon tailored = hoveredActiveAddon.forMachine(node);
                 if (tailored.getParallelMultiplier() > 1) {
-                    tooltip.add(Component.literal("§a⚡ Parallel Multiplier: §f" + tailored.getParallelMultiplier() + "x"));
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.stat.parallel_mult", String.valueOf(tailored.getParallelMultiplier()))));
                 }
                 if (tailored.getDurationMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§b⏱ Speed Multiplier: §f" + String.format("%.2fx", tailored.getDurationMultiplier())));
+                    tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.addon.stat.speed_mult", String.format("%.2fx", tailored.getDurationMultiplier()))));
                 }
                 if (tailored.getEutMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§e⚡ Energy Multiplier: §f" + String.format("%.2fx", tailored.getEutMultiplier())));
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.energy_mult", String.format("%.2fx", tailored.getEutMultiplier()))));
                 }
                 addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
             } else {
@@ -565,26 +560,28 @@ public class MachineConfigDialog {
                 }
                 MachineAddon tailored = hoveredAddon.forMachine(node);
                 if (tailored.getParallelMultiplier() > 1) {
-                    tooltip.add(Component.literal("§a⚡ Parallel Multiplier: §f" + tailored.getParallelMultiplier() + "x"));
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.stat.parallel_mult", String.valueOf(tailored.getParallelMultiplier()))));
                 }
                 if (tailored.getDurationMultiplier() != 1.0) {
                     double spdPercent = 100.0 / tailored.getDurationMultiplier();
-                    tooltip.add(Component.literal(String.format("§b⏱ Time Multiplier: §f%.2fx §7(%.0f%% Speed)", tailored.getDurationMultiplier(), spdPercent)));
+                    tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.addon.stat.time_mult", String.format("%.2fx", tailored.getDurationMultiplier()), String.format("%.0f", spdPercent))));
                 }
                 if (tailored.getEutMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§e⚡ Energy Multiplier: §f" + String.format("%.2fx", tailored.getEutMultiplier())));
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.energy_mult", String.format("%.2fx", tailored.getEutMultiplier()))));
                 }
                 addFormattedDescriptionLines(tooltip, hoveredAddon.getDescription());
             } else {
                 addFormattedDescriptionLines(tooltip, hoveredAddon.getDescription());
                 if (hoveredAddon.getParallelMultiplier() > 1) {
-                    tooltip.add(Component.literal("§a⚡ Parallel: §f" + hoveredAddon.getParallelMultiplier() + "x"));
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.stat.parallel", String.valueOf(hoveredAddon.getParallelMultiplier()))));
                 }
                 if (hoveredAddon.getDurationMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§b⏱ Time Multiplier: §f" + String.format("%.2fx", hoveredAddon.getDurationMultiplier())));
+                    tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.config.time_mult", String.format("%.2fx", hoveredAddon.getDurationMultiplier()))));
                 }
-                if (hoveredAddon.getEutMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§e⚡ EU/t Multiplier: §f" + String.format("%.2fx", hoveredAddon.getEutMultiplier())));
+                if (hoveredAddon.isPowerConstant()) {
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.eut_mult", "1.00x §7(" + Component.translatable("gui.gtcalcboard.addon.stat.constant_power").getString() + "§7)")));
+                } else if (hoveredAddon.getEutMultiplier() != 1.0) {
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.eut_mult", String.format("%.2fx", hoveredAddon.getEutMultiplier()))));
                 }
             }
 

@@ -47,6 +47,20 @@ public class GregTechCalcBoard {
     }
 
     @SubscribeEvent
+    public void onPlayerLoggedIn(net.minecraftforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) {
+        // Preload addon catalog & recipe search index in background immediately upon logging in!
+        com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().preloadAsync();
+        com.gtceu.calcboard.client.gui.RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+    }
+
+    @SubscribeEvent
+    public void onRecipesUpdated(net.minecraftforge.client.event.RecipesUpdatedEvent event) {
+        com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().markDirty();
+        com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().preloadAsync();
+        com.gtceu.calcboard.client.gui.RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+    }
+
+    @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             while (KeyBindings.OPEN_BOARD.consumeClick()) {

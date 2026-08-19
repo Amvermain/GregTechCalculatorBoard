@@ -141,9 +141,9 @@ public class RecipeSearchDialog {
 
         CompletableFuture.runAsync(() -> {
             try {
+                List<SearchableRecipe> tempList = new ArrayList<>();
                 var recipeManager = EmiApi.getRecipeManager();
                 if (recipeManager != null) {
-                    List<SearchableRecipe> tempList = new ArrayList<>();
                     List<EmiRecipe> recipes = recipeManager.getRecipes();
                     if (recipes != null && !recipes.isEmpty()) {
                         populateList(recipes, tempList);
@@ -151,17 +151,21 @@ public class RecipeSearchDialog {
                         for (EmiRecipeCategory cat : recipeManager.getCategories()) {
                             if (cat == null) continue;
                             List<EmiRecipe> catRecipes = recipeManager.getRecipes(cat);
-                            if (catRecipes != null) {
+                            if (catRecipes != null && !catRecipes.isEmpty()) {
                                 populateList(catRecipes, tempList);
                             }
                         }
                     }
+                }
 
+                if (!tempList.isEmpty()) {
                     synchronized (GLOBAL_RECIPES) {
                         GLOBAL_RECIPES.clear();
                         GLOBAL_RECIPES.addAll(tempList);
                         GLOBAL_CACHED = true;
                     }
+                } else {
+                    GLOBAL_CACHED = false;
                 }
             } catch (Throwable t) {
                 t.printStackTrace();
@@ -223,19 +227,14 @@ public class RecipeSearchDialog {
 
         synchronized (GLOBAL_RECIPES) {
             if (GLOBAL_RECIPES.isEmpty()) {
-                try {
-                    var rm = EmiApi.getRecipeManager();
-                    if (rm != null) {
-                        List<EmiRecipe> all = rm.getRecipes();
-                        if (all != null && !all.isEmpty()) {
-                            populateList(all, GLOBAL_RECIPES);
-                            GLOBAL_CACHED = true;
-                        }
+                // Trigger background caching if not already running, without freezing main thread!
+                ensureGlobalRecipesCachedAsync(() -> {
+                    if (this.visible) {
+                        updateSearchResults(searchBox.getValue());
                     }
-                } catch (Throwable ignored) {}
+                });
+                return;
             }
-
-            if (GLOBAL_RECIPES.isEmpty()) return;
 
             if (lower.isEmpty()) {
                 int limit = Math.min(100, GLOBAL_RECIPES.size());
@@ -309,11 +308,24 @@ public class RecipeSearchDialog {
         graphics.renderOutline(listX, listY, listW, listH, 0xFF3D4455);
 
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
+
+        if (filteredRecipes.isEmpty()) {
+            if (!GLOBAL_RECIPES.isEmpty()) {
+                updateSearchResults(searchBox.getValue());
+            } else if (!GLOBAL_CACHED) {
+                ensureGlobalRecipesCachedAsync(() -> {
+                    if (this.visible) {
+                        updateSearchResults(searchBox.getValue());
+                    }
+                });
+            }
+        }
+
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
         scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
 
         if (filteredRecipes.isEmpty()) {
-            String emptyMsg = !GLOBAL_CACHED 
+            String emptyMsg = (GLOBAL_RECIPES.isEmpty() || !GLOBAL_CACHED)
                 ? "§e" + Component.translatable("gui.gtcalcboard.loading_recipes").getString() 
                 : "§7" + Component.translatable("gui.gtcalcboard.no_matching_recipes").getString();
             graphics.drawCenteredString(font, emptyMsg, listX + listW / 2, listY + listH / 2 - 4, 0xFF888888);

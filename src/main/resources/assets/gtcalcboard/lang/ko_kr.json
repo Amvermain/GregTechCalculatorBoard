@@ -58,6 +58,14 @@
   "gui.gtcalcboard.config.rotor_fuel_efficiency": "연료 효율: %s%% (%s)",
   "gui.gtcalcboard.config.rotor_power_mult": "발전 파워: %s%% (%s)",
   "gui.gtcalcboard.config.rotor_tier_max_eut": "%s 최대 발전: %s",
+  "gui.gtcalcboard.addon.stat.coil_temp": "♨ 코일 온도: %sK",
+  "gui.gtcalcboard.addon.stat.parallel_mult": "⚡ 병렬 배율: %sx",
+  "gui.gtcalcboard.addon.stat.parallel": "⚡ 병렬: %sx",
+  "gui.gtcalcboard.addon.stat.speed_mult": "⏱ 가공 속도: %s",
+  "gui.gtcalcboard.addon.stat.time_mult": "⏱ 시간 배율: %s (%s%% 속도)",
+  "gui.gtcalcboard.addon.stat.energy_mult": "⚡ 전력 배율: %s",
+  "gui.gtcalcboard.addon.stat.eut_mult": "⚡ EU/t 배율: %s",
+  "gui.gtcalcboard.addon.stat.constant_power": "고정 전력",
 
   "gui.gtcalcboard.addon_cat.all": "전체",
   "gui.gtcalcboard.addon_cat.parallel": "⚡ 병렬/키트",
@@ -263,6 +271,7 @@
   "gui.gtcalcboard.hotkey_hud.sever": "와이어 끊기",
   "gui.gtcalcboard.hotkey_hud.delete": "선택 삭제",
 
+  "gui.gtcalcboard.tutorial.page_name": "🎓 튜토리얼",
   "gui.gtcalcboard.tutorial.skip": "건너뛰기",
   "gui.gtcalcboard.tutorial.next": "다음 ➔",
   "gui.gtcalcboard.tutorial.finish": "완료하고 시작하기",

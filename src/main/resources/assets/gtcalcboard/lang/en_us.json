@@ -58,6 +58,14 @@
   "gui.gtcalcboard.config.rotor_fuel_efficiency": "Fuel Efficiency: %s%% (%s)",
   "gui.gtcalcboard.config.rotor_power_mult": "Generation Power: %s%% (%s)",
   "gui.gtcalcboard.config.rotor_tier_max_eut": "%s Max Generation: %s",
+  "gui.gtcalcboard.addon.stat.coil_temp": "♨ Coil Temperature: %sK",
+  "gui.gtcalcboard.addon.stat.parallel_mult": "⚡ Parallel Multiplier: %sx",
+  "gui.gtcalcboard.addon.stat.parallel": "⚡ Parallel: %sx",
+  "gui.gtcalcboard.addon.stat.speed_mult": "⏱ Speed Multiplier: %s",
+  "gui.gtcalcboard.addon.stat.time_mult": "⏱ Time Multiplier: %s (%s%% Speed)",
+  "gui.gtcalcboard.addon.stat.energy_mult": "⚡ Energy Multiplier: %s",
+  "gui.gtcalcboard.addon.stat.eut_mult": "⚡ EU/t Multiplier: %s",
+  "gui.gtcalcboard.addon.stat.constant_power": "Constant Power",
 
   "gui.gtcalcboard.addon_cat.all": "All",
   "gui.gtcalcboard.addon_cat.parallel": "⚡ Parallel",
@@ -263,6 +271,7 @@
   "gui.gtcalcboard.hotkey_hud.sever": "Sever Wire",
   "gui.gtcalcboard.hotkey_hud.delete": "Delete Selected",
 
+  "gui.gtcalcboard.tutorial.page_name": "🎓 Tutorial",
   "gui.gtcalcboard.tutorial.skip": "Skip",
   "gui.gtcalcboard.tutorial.next": "Next ➔",
   "gui.gtcalcboard.tutorial.finish": "Finish & Start",

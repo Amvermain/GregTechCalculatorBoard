@@ -16,8 +16,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
 
     @Override
     public void register(EmiRegistry registry) {
-        // EMI Integration initialized & recipe caching trigger
-        com.gtceu.calcboard.client.gui.RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+        // EMI Recipe Registration Completed Hook (Safe, no GTCEu registry query before world load)
     }
 
     public static void addRecipeToBoard(EmiRecipe recipe) {

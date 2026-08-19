@@ -147,7 +147,9 @@ public class ParallelHelper {
                             Object machine = m.invoke(machineDef, dummyHolder);
                             if (machine != null) {
                                 ParallelStats stats = extractStatsFromMachineInstance(machine);
-                                if (stats != null) return stats;
+                                if (stats != null) {
+                                    return stats;
+                                }
                             }
                         } catch (Throwable ignored) {}
                     }
@@ -156,7 +158,7 @@ public class ParallelHelper {
 
             // 2. Secondary: Direct getter on MachineDefinition if present
             int maxPar = extractInt(machineDef, "getCurrentParallel", "getMaxParallel", "getParallel", "getMaxParallelAmount");
-            boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy");
+            boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy", "isPowerConstant");
             if (maxPar > 0) {
                 return new ParallelStats(maxPar, isAbsolute);
             }
@@ -171,30 +173,51 @@ public class ParallelHelper {
     public static ParallelStats extractStatsFromMachineInstance(Object machine) {
         if (machine == null) return null;
 
-        // Method getters: getCurrentParallel(), getMaxParallel()
+        // 1. Parallel capacity getter: getCurrentParallel(), getMaxParallel()
         int maxPar = extractInt(machine, "getCurrentParallel", "getMaxParallel", "getParallel", "getMaxParallelAmount");
-        boolean isAbsolute = extractBoolean(machine, "isAbsolute", "isExact", "isFixedEnergy");
 
-        // Declared fields inspection (maxParallel, currentParallel)
-        if (maxPar <= 0) {
-            Class<?> curr = machine.getClass();
-            while (curr != null && curr != Object.class) {
-                for (Field f : curr.getDeclaredFields()) {
-                    String fName = f.getName().toLowerCase();
-                    if (fName.equals("maxparallel") || fName.equals("currentparallel") || fName.equals("parallel")) {
-                        try {
-                            f.setAccessible(true);
-                            Object v = f.get(machine);
-                            if (v instanceof Number n && n.intValue() > 0) {
-                                maxPar = n.intValue();
-                                break;
-                            }
-                        } catch (Throwable ignored) {}
+        // 2. Direct boolean queries on MetaMachine methods
+        boolean isAbsolute = extractBoolean(machine, "isAbsolute", "isExact", "isFixedEnergy", "isPowerConstant", "isEnergyFree", "hasFixedEnergy");
+
+        // 3. Inspect declared fields for maxParallel, currentParallel, isAbsolute
+        Class<?> curr = machine.getClass();
+        while (curr != null && curr != Object.class) {
+            for (Field f : curr.getDeclaredFields()) {
+                String fName = f.getName().toLowerCase();
+                try {
+                    f.setAccessible(true);
+                    if (maxPar <= 0 && (fName.equals("maxparallel") || fName.equals("currentparallel") || fName.equals("parallel"))) {
+                        Object v = f.get(machine);
+                        if (v instanceof Number n && n.intValue() > 0) {
+                            maxPar = n.intValue();
+                        }
+                    }
+                    if (!isAbsolute && (fName.equals("isabsolute") || fName.equals("isfixedenergy") || fName.equals("powerconstant") || fName.equals("energyfree"))) {
+                        Object v = f.get(machine);
+                        if (v instanceof Boolean b && b) {
+                            isAbsolute = true;
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+            curr = curr.getSuperclass();
+        }
+
+        // 4. Pure Bytecode / RecipeModifier method inspection:
+        // In vanilla GTCEu, ParallelHatchPartMachine implements standard recipe EUt scaling.
+        // Specialized hatches (such as Absolute Mastery Hatches) override modifyRecipe to disable energy consumption.
+        if (!isAbsolute) {
+            try {
+                Class<?> baseHatchCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.ParallelHatchPartMachine");
+                if (machine.getClass() != baseHatchCls) {
+                    for (Method m : machine.getClass().getMethods()) {
+                        if (m.getName().equals("modifyRecipe") && m.getDeclaringClass() != baseHatchCls) {
+                            isAbsolute = true;
+                            break;
+                        }
                     }
                 }
-                if (maxPar > 0) break;
-                curr = curr.getSuperclass();
-            }
+            } catch (Throwable ignored) {}
         }
 
         if (maxPar > 0) {
@@ -203,6 +226,8 @@ public class ParallelHelper {
 
         return null;
     }
+
+
 
     private static Object getOrCreateDummyHolderProxy() {
         if (DUMMY_HOLDER_PROXY != null) {

@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.BoardManager;
 import com.gtceu.calcboard.api.BoardPage;
 import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.FlowGraphSolver;
+import com.gtceu.calcboard.api.MachineAddonCatalog;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
@@ -177,6 +178,7 @@ public class BoardScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        MachineAddonCatalog.getInstance().preloadAsync();
         this.searchDialog = new RecipeSearchDialog(this);
         this.machineConfigDialog = new MachineConfigDialog(this);
         this.guideDialog = new GuideDialog(this);
