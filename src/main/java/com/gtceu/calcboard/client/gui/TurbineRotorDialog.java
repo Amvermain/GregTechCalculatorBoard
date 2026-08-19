@@ -105,9 +105,9 @@ public class TurbineRotorDialog {
         Map<String, RotorItemEntry> collected = new LinkedHashMap<>();
 
         try {
-            Item rotorItem = ForgeRegistries.ITEMS.getValue(new ResourceLocation("gtceu", "turbine_rotor"));
+            Item rotorItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
             if (rotorItem == null) {
-                rotorItem = BuiltInRegistries.ITEM.get(new ResourceLocation("gtceu", "turbine_rotor"));
+                rotorItem = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
             }
 
             Class<?> gtceuApiCls = Class.forName("com.gregtechceu.gtceu.api.GTCEuAPI");

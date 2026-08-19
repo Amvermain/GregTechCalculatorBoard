@@ -51,8 +51,8 @@ public class HistoryTest {
     public void testAddRemoveNodesUndoRedo() {
         RecipeNode node1 = RecipeNode.create("Node 1", 100.0, 30.0, GTVoltageTier.LV);
         RecipeNode node2 = RecipeNode.create("Node 2", 100.0, 30.0, GTVoltageTier.LV);
-        node1.addOutput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 100.0, 1.0));
-        node2.addInput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 100.0, 1.0));
+        node1.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 100.0, 1.0));
+        node2.addInput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 100.0, 1.0));
 
         graph.addNode(node1);
         graph.addNode(node2);
@@ -82,8 +82,8 @@ public class HistoryTest {
     public void testWireConnectWithShiftScalingUndoRedo() {
         RecipeNode producer = RecipeNode.create("Producer", 100.0, 20.0, GTVoltageTier.LV);
         RecipeNode consumer = RecipeNode.create("Consumer", 100.0, 20.0, GTVoltageTier.LV);
-        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 500.0, 1.0));
-        consumer.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 100.0, 1.0));
+        producer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
+        consumer.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
         consumer.setMachineCount(1.0);
 
         graph.addNode(producer);
@@ -158,9 +158,9 @@ public class HistoryTest {
     public void testGroupAndExpandModuleUndoRedo() {
         RecipeNode nodeA = RecipeNode.create("Node A", 100.0, 20.0, GTVoltageTier.LV);
         RecipeNode nodeB = RecipeNode.create("Node B", 100.0, 20.0, GTVoltageTier.LV);
-        nodeA.addOutput(IngredientStack.item(new ResourceLocation("gtceu", "raw_a"), "Raw A", 10.0, 1.0));
-        nodeB.addInput(IngredientStack.item(new ResourceLocation("gtceu", "raw_a"), "Raw A", 10.0, 1.0));
-        nodeB.addOutput(IngredientStack.item(new ResourceLocation("gtceu", "final_b"), "Final B", 5.0, 1.0));
+        nodeA.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:raw_a"), "Raw A", 10.0, 1.0));
+        nodeB.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:raw_a"), "Raw A", 10.0, 1.0));
+        nodeB.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:final_b"), "Final B", 5.0, 1.0));
 
         graph.addNode(nodeA);
         graph.addNode(nodeB);

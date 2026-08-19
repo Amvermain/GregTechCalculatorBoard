@@ -200,22 +200,62 @@ public class NodeWidget {
         return null;
     }
 
+    public double getInputRate(int index) {
+        if (index >= 0 && index < node.getInputs().size()) {
+            return node.getInputs().get(index).getAmount() * node.getEffectiveCyclesPerSecond();
+        }
+        return 0.0;
+    }
+
+    public double getOutputRate(int index) {
+        if (index >= 0 && index < node.getOutputs().size()) {
+            return node.getOutputs().get(index).getExpectedAmount() * node.getEffectiveCyclesPerSecond();
+        }
+        return 0.0;
+    }
+
+    public double getNominalInputRate(int index) {
+        if (index >= 0 && index < node.getInputs().size()) {
+            return node.getInputs().get(index).getAmount() * node.getCyclesPerSecond();
+        }
+        return 0.0;
+    }
+
+    public double getNominalOutputRate(int index) {
+        if (index >= 0 && index < node.getOutputs().size()) {
+            return node.getOutputs().get(index).getExpectedAmount() * node.getCyclesPerSecond();
+        }
+        return 0.0;
+    }
+
     public Map<IngredientStack, Double> getCachedInputRates() {
         if (cachedInputRates == null) {
-            cachedInputRates = node.calculateInputRates();
+            cachedInputRates = node.calculateEffectiveInputRates();
         }
         return cachedInputRates;
     }
 
     public Map<IngredientStack, Double> getCachedOutputRates() {
         if (cachedOutputRates == null) {
-            cachedOutputRates = node.calculateOutputRates();
+            cachedOutputRates = node.calculateEffectiveOutputRates();
         }
         return cachedOutputRates;
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         NodeCardRenderer.render(this, graphics, mouseX, mouseY, partialTicks);
+    }
+
+    public boolean isModuleBadgeHovered(double mouseX, double mouseY) {
+        if (!node.isModule()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int ctrlY = y + HEADER_HEIGHT + 6;
+        int cardW = getWidth();
+        String machinesBadge = String.format("§d📦 %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
+        int badgeW = Minecraft.getInstance().font.width(machinesBadge);
+        int badgeX = x + cardW - 6 - badgeW;
+        return mouseX >= badgeX - 4 && mouseX <= x + cardW && mouseY >= ctrlY && mouseY <= ctrlY + 16;
     }
 
     public boolean isTierButtonHovered(double mouseX, double mouseY) {
@@ -240,41 +280,32 @@ public class NodeWidget {
         return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
-    public boolean isRotorButtonHovered(double mouseX, double mouseY) {
-        if (node.isModule() || !node.isGenerator()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int row2Y = ctrlY + 18;
-        String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
-        int genW = Math.max(28, Minecraft.getInstance().font.width(genBadge) + 4);
-        int rotorX = x + 42 + genW + 3;
-        String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
-        int rotorW = Math.max(46, Minecraft.getInstance().font.width(rotorText) + 6);
-        return mouseX >= rotorX && mouseX <= rotorX + rotorW && mouseY >= row2Y && mouseY <= row2Y + 14;
-    }
-
-    public boolean isParallelButtonHovered(double mouseX, double mouseY) {
+    public boolean isMachineConfigButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
         int row2Y = ctrlY + 18;
-        int parStartX;
+        int configStartX;
         if (node.isGenerator()) {
             String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
             int genW = Math.max(28, Minecraft.getInstance().font.width(genBadge) + 4);
-            String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
-            int rotorW = Math.max(46, Minecraft.getInstance().font.width(rotorText) + 6);
-            parStartX = x + 42 + genW + 3 + rotorW + 3;
+            configStartX = x + 42 + genW + 3;
         } else {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = Component.translatable(ocKey).getString();
             int ocW = Math.max(50, Minecraft.getInstance().font.width(ocText) + 6);
-            parStartX = x + 42 + ocW + 3;
+            configStartX = x + 42 + ocW + 3;
         }
-        int parW = Math.max(38, (x + getWidth() - 6) - parStartX);
-        return mouseX >= parStartX && mouseX <= parStartX + parW && mouseY >= row2Y && mouseY <= row2Y + 14;
+        return mouseX >= configStartX && mouseX <= x + getWidth() - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    public boolean isRotorButtonHovered(double mouseX, double mouseY) {
+        return isMachineConfigButtonHovered(mouseX, mouseY);
+    }
+
+    public boolean isParallelButtonHovered(double mouseX, double mouseY) {
+        return isMachineConfigButtonHovered(mouseX, mouseY);
     }
 
     public boolean changeTier(int direction) {
@@ -310,6 +341,24 @@ public class NodeWidget {
             boolean fineStep = Screen.hasShiftDown();
             parallelEditor.stepParallel(delta > 0 ? 1 : -1, fineStep);
             return true;
+        }
+
+        int inIdx = getHoveredInputPortIndex(mouseX, mouseY);
+        if (inIdx >= 0 && inIdx < node.getInputs().size()) {
+            IngredientStack in = node.getInputs().get(inIdx);
+            if (in.hasAlternatives()) {
+                in.cycleAlternative(delta > 0 ? -1 : 1);
+                invalidateCache();
+                if (parent != null) {
+                    parent.markSummaryDirty();
+                }
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.4F
+                    )
+                );
+                return true;
+            }
         }
         return false;
     }
@@ -375,9 +424,10 @@ public class NodeWidget {
         }
 
         int ctrlY = y + HEADER_HEIGHT + 6;
+        int countMinusX = x + 36;
 
         // Machine Count Decrement [-]
-        if (mouseX >= x + 44 && mouseX <= x + 58 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+        if (mouseX >= countMinusX && mouseX <= countMinusX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
             double newVal = Math.max(1.0, oldVal - 1);
@@ -390,10 +440,16 @@ public class NodeWidget {
             return true;
         }
 
-        // Machine Count Increment [+]
-        int countBoxW = Math.max(32, Minecraft.getInstance().font.width(countEditor.getDisplayText()) + 8);
-        int afterCountX = x + 60 + countBoxW + 2;
+        // Count Input Box Click
+        int countBoxX = countMinusX + 16;
+        int countBoxW = Math.max(28, Minecraft.getInstance().font.width(countEditor.getDisplayText()) + 6);
+        if (mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+            countEditor.startEditing();
+            return true;
+        }
 
+        // Machine Count Increment [+]
+        int afterCountX = countBoxX + countBoxW + 2;
         if (mouseX >= afterCountX && mouseX <= afterCountX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
@@ -431,12 +487,6 @@ public class NodeWidget {
             return true;
         }
 
-        // Count Input Box Click
-        if (mouseX >= x + 60 && mouseX <= x + 60 + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
-            countEditor.startEditing();
-            return true;
-        }
-
         // Tier Selector Button Click (Row 2, Left: [LV])
         if (isTierButtonHovered(mouseX, mouseY)) {
             commitCountEdit();
@@ -462,15 +512,10 @@ public class NodeWidget {
             return true;
         }
 
-        // Turbine Rotor Dialog Button Click (Row 2: [⚙ 220%])
-        if (isRotorButtonHovered(mouseX, mouseY)) {
-            parent.openTurbineRotorDialog(node);
-            return true;
-        }
-
-        // Interactive Numeric Parallel Box Click (Row 2: [Par: 1x])
-        if (isParallelButtonHovered(mouseX, mouseY)) {
-            parallelEditor.startEditing();
+        // Machine Configuration & Addon Dialog Button Click (Row 2: [⚙ 4x] / [⚙ 220%])
+        if (isMachineConfigButtonHovered(mouseX, mouseY)) {
+            commitCountEdit();
+            parent.openMachineConfigDialog(node);
             return true;
         }
 
@@ -489,6 +534,7 @@ public class NodeWidget {
         }
         return false;
     }
+
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (nameEditor.keyPressed(keyCode, scanCode, modifiers)) return true;

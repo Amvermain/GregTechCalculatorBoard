@@ -43,7 +43,6 @@ public class SummaryOverlay {
         Font font = Minecraft.getInstance().font;
 
         graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 300.0f);
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         int x = screenWidth - WIDTH - 10;

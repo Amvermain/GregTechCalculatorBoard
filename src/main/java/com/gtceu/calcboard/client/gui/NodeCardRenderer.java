@@ -169,11 +169,13 @@ public class NodeCardRenderer {
                 drawBtn(graphics, font, genBadge, nextCtrlX, row2Y, genW, 14, mouseX, mouseY, 0xFF55FF88);
                 nextCtrlX += genW + 3;
 
-                // [⚙ 220%] rotor button
+                // [⚙ 220%] rotor / config button
                 String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
-                int rotorW = Math.max(46, font.width(rotorText) + 6);
+                if (!node.getAddons().isEmpty()) {
+                    rotorText += " (+" + node.getAddons().size() + ")";
+                }
+                int rotorW = Math.max(46, (x + cardW - 6) - nextCtrlX);
                 drawBtn(graphics, font, rotorText, nextCtrlX, row2Y, rotorW, 14, mouseX, mouseY, 0xFFFFAA00);
-                nextCtrlX += rotorW + 3;
             } else {
                 String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
                 String ocText = Component.translatable(ocKey).getString();
@@ -181,38 +183,37 @@ public class NodeCardRenderer {
                 int ocW = Math.max(50, font.width(ocText) + 6);
                 drawBtn(graphics, font, ocText, nextCtrlX, row2Y, ocW, 14, mouseX, mouseY, ocColor);
                 nextCtrlX += ocW + 3;
-            }
 
-            // Interactive Numeric Parallel Box (Fills remaining right area)
-            NodeParallelEditor parEditor = widget.getParallelEditor();
-            String parText = parEditor.getDisplayText();
-            int parW = Math.max(38, (x + cardW - 6) - nextCtrlX);
-            int parX = nextCtrlX;
-            boolean parHover = mouseX >= parX && mouseX <= parX + parW && mouseY >= row2Y && mouseY <= row2Y + 14;
-            boolean isParEditing = parEditor.isEditing();
-            int parBg = isParEditing ? 0xFF0D1B2A : (parHover ? 0xFF252A36 : 0xFF14171E);
-            int parBorder = isParEditing ? 0xFF55FFFF : (parHover ? 0xFF5577AA : 0xFF3D4455);
-            graphics.fill(parX, row2Y, parX + parW, row2Y + 14, parBg);
-            graphics.renderOutline(parX, row2Y, parW, 14, parBorder);
-            graphics.drawCenteredString(font, parText, parX + parW / 2, row2Y + 3, isParEditing ? 0xFF55FFFF : 0xFFFFFFFF);
+                // Unified Machine Config & Parallel Button [⚙ 4x (+1)]
+                String parLabel = "⚙ " + node.getTotalParallel() + "x";
+                if (!node.getAddons().isEmpty()) {
+                    parLabel += " (+" + node.getAddons().size() + ")";
+                }
+                int parW = Math.max(46, (x + cardW - 6) - nextCtrlX);
+                int parX = nextCtrlX;
+                drawBtn(graphics, font, parLabel, parX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF);
+            }
         }
 
         // 8. Recipe Energy & Duration Info
         int infoY = node.isModule() ? (ctrlY + 18) : (row2Y + 18);
-        double totalEUt = node.getTotalEUt();
         double durationSec = node.getEffectiveDurationSeconds();
-        double cyclesPerSec = node.getCyclesPerSecond();
+        double effCps = node.getEffectiveCyclesPerSecond();
 
         String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatNodePower(node);
-        graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
+        if (node.getEfficiency() < 0.999) {
+            String effPercent = String.format("§e⚡%.0f%% ", node.getEfficiency() * 100.0);
+            graphics.drawString(font, effPercent + eutStr, x + 6, infoY, 0xFFFFFFFF, false);
+        } else {
+            graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
+        }
 
         if (node.isModule()) {
             String modTag = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
             int tagW = font.width(modTag);
             graphics.drawString(font, modTag, x + cardW - 6 - tagW, infoY, 0xFFFFFFFF, false);
         } else {
-
-            String cycleStr = String.format("§b%.2fs §7(§f%.2f/s§7)", durationSec, cyclesPerSec);
+            String cycleStr = String.format("§b%.2fs §7(§f%.2f/s§7)", durationSec, effCps);
             int cycleW = font.width(cycleStr);
             graphics.drawString(font, cycleStr, x + cardW - 6 - cycleW, infoY, 0xFFFFFFFF, false);
         }
@@ -224,9 +225,6 @@ public class NodeCardRenderer {
 
         // 9. Input & Output Ports Listing
         int contentY = sepY + 4;
-        Map<IngredientStack, Double> inRates = widget.getCachedInputRates();
-        Map<IngredientStack, Double> outRates = widget.getCachedOutputRates();
-
         List<IngredientStack> inputs = node.getInputs();
         List<IngredientStack> outputs = node.getOutputs();
         int maxRows = Math.max(inputs.size(), outputs.size());
@@ -239,15 +237,14 @@ public class NodeCardRenderer {
             // Render Input (Left side)
             if (i < inputs.size()) {
                 IngredientStack in = inputs.get(i);
-                double rate = inRates.getOrDefault(in, 0.0);
+                double rate = widget.getInputRate(i);
                 int inPortX = x + 4;
                 int inPortY = rowY + 5;
 
                 FlowGraph.PortFlowStats stats = graph != null ? graph.getInputPortStats(node, i) : null;
                 boolean isConnected = stats != null && stats.isConnected();
                 boolean isBalanced = stats != null && stats.isBalanced();
-                boolean isDeficit = stats != null && stats.isDeficit();
-                boolean isSurplus = stats != null && stats.isSurplus();
+                boolean isDeficit = stats != null && stats.isInputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), true, i);
                 int portColor = isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF) : (!isConnected ? 0xFF5599FF : (isBalanced ? 0xFF55FF88 : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
@@ -258,6 +255,9 @@ public class NodeCardRenderer {
                 }
 
                 in.render(graphics, x + 12, rowY - 1);
+                if (in.hasAlternatives()) {
+                    graphics.drawString(font, "§e⟲", x + 21, rowY + 6, 0xFFFFFFFF, true);
+                }
 
                 String rateStr;
                 int textColor;
@@ -268,10 +268,10 @@ public class NodeCardRenderer {
                     rateStr = formatRate(rate, in.isFluid()) + " ✔";
                     textColor = 0xFF55FF88;
                 } else if (isDeficit) {
-                    rateStr = formatNumberOnly(stats.connectedRate(), in.isFluid()) + "/" + formatRate(rate, in.isFluid()) + " ⚠";
+                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, in.isFluid(), "⚠");
                     textColor = 0xFFFFAA33;
                 } else {
-                    rateStr = formatNumberOnly(stats.connectedRate(), in.isFluid()) + "/" + formatRate(rate, in.isFluid()) + " +";
+                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, in.isFluid(), "+");
                     textColor = 0xFF66DDFF;
                 }
                 graphics.drawString(font, rateStr, x + 30, rowY + 4, textColor, false);
@@ -280,15 +280,15 @@ public class NodeCardRenderer {
             // Render Output (Right side)
             if (i < outputs.size()) {
                 IngredientStack out = outputs.get(i);
-                double rate = outRates.getOrDefault(out, 0.0);
+                double rate = widget.getOutputRate(i);
                 int outPortX = x + cardW - 10;
                 int outPortY = rowY + 5;
 
                 FlowGraph.PortFlowStats stats = graph != null ? graph.getOutputPortStats(node, i) : null;
                 boolean isConnected = stats != null && stats.isConnected();
                 boolean isBalanced = stats != null && stats.isBalanced();
-                boolean isSurplus = stats != null && stats.isSurplus(); // Produced > Demanded
-                boolean isDeficit = stats != null && stats.isDeficit(); // Produced < Demanded
+                boolean isSurplus = stats != null && stats.isOutputSurplus(); // Produced > Demanded (Safe / Surplus)
+                boolean isDeficit = stats != null && stats.isOutputDeficit(); // Produced < Demanded (Shortage / Warning)
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), false, i);
                 int portColor = isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (!isConnected ? 0xFF55FF88 : (isBalanced ? 0xFF55FF88 : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
@@ -307,10 +307,10 @@ public class NodeCardRenderer {
                     rateStr = formatRate(rate, out.isFluid()) + " ✔";
                     textColor = 0xFF55FF88;
                 } else if (isSurplus) {
-                    rateStr = formatNumberOnly(stats.connectedRate(), out.isFluid()) + "/" + formatRate(rate, out.isFluid()) + " ↓";
-                    textColor = 0xFFFFDD55;
+                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, out.isFluid(), "+");
+                    textColor = 0xFF66DDFF;
                 } else {
-                    rateStr = formatNumberOnly(stats.connectedRate(), out.isFluid()) + "/" + formatRate(rate, out.isFluid()) + " ⚠";
+                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, out.isFluid(), "⚠");
                     textColor = 0xFFFF6666;
                 }
                 int textW = font.width(rateStr);
@@ -342,22 +342,30 @@ public class NodeCardRenderer {
     public static String formatRate(double rate, boolean isFluid) {
         if (isFluid) {
             if (rate >= 1000.0) {
-                return String.format("%.2f B/s", rate / 1000.0);
+                return String.format("%.2f B/s", rate / 1000.0).replaceAll("\\.?0+ B/s", " B/s");
             }
             return String.format("%.0f mB/s", rate);
         } else {
-            return String.format("%.2f/s", rate).replaceAll("\\.?0+$", "/s");
+            return String.format("%.2f/s", rate).replaceAll("\\.?0+/s", "/s");
         }
     }
 
-    public static String formatNumberOnly(double rate, boolean isFluid) {
+    public static String formatConnectedFraction(double connected, double required, boolean isFluid, String symbol) {
+        String symStr = symbol.isEmpty() ? "" : " " + symbol;
         if (isFluid) {
-            if (rate >= 1000.0) {
-                return String.format("%.2f B", rate / 1000.0).replaceAll("\\.?0+ B", " B");
+            if (required >= 1000.0 || connected >= 1000.0) {
+                double connB = connected / 1000.0;
+                double reqB = required / 1000.0;
+                String connStr = (connB == (long) connB) ? String.format("%d", (long) connB) : String.format("%.2f", connB).replaceAll("\\.?0+$", "");
+                String reqStr = (reqB == (long) reqB) ? String.format("%d", (long) reqB) : String.format("%.2f", reqB).replaceAll("\\.?0+$", "");
+                return connStr + "/" + reqStr + " B/s" + symStr;
+            } else {
+                return String.format("%.0f/%.0f mB/s%s", connected, required, symStr);
             }
-            return String.format("%.0f", rate);
         } else {
-            return String.format("%.2f", rate).replaceAll("\\.?0+$", "");
+            String connStr = (connected == (long) connected) ? String.format("%d", (long) connected) : String.format("%.2f", connected).replaceAll("\\.?0+$", "");
+            String reqStr = (required == (long) required) ? String.format("%d", (long) required) : String.format("%.2f", required).replaceAll("\\.?0+$", "");
+            return connStr + "/" + reqStr + "/s" + symStr;
         }
     }
 }

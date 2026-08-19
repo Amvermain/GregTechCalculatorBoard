@@ -16,7 +16,9 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,7 +40,7 @@ public class BoardScreen extends Screen {
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private final com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog welcomeDialog = new com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
-    private TurbineRotorDialog rotorDialog;
+    private MachineConfigDialog machineConfigDialog;
     private GuideDialog guideDialog;
     private DeletePageConfirmDialog deletePageDialog;
 
@@ -270,7 +272,7 @@ public class BoardScreen extends Screen {
     protected void init() {
         super.init();
         this.searchDialog = new RecipeSearchDialog(this);
-        this.rotorDialog = new TurbineRotorDialog(this);
+        this.machineConfigDialog = new MachineConfigDialog(this);
         this.guideDialog = new GuideDialog(this);
         this.deletePageDialog = new DeletePageConfirmDialog(this);
         rebuildWidgets();
@@ -298,9 +300,7 @@ public class BoardScreen extends Screen {
     }
 
     public void openTurbineRotorDialog(RecipeNode node) {
-        if (rotorDialog != null) {
-            rotorDialog.open(node);
-        }
+        openMachineConfigDialog(node);
     }
 
     public void rebuildWidgets() {
@@ -435,6 +435,9 @@ public class BoardScreen extends Screen {
         double screenTop = -panY / zoom - 50;
         double screenBottom = (-panY + height) / zoom + 50;
 
+        // Compute real-time bottleneck operating efficiencies
+        getGraph().computeNodeEfficiencies();
+
         graphics.flush();
         for (int i = 0; i < nodeWidgets.size(); i++) {
             NodeWidget widget = nodeWidgets.get(i);
@@ -492,22 +495,29 @@ public class BoardScreen extends Screen {
         }
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
 
-        // 7. Render Tooltips only if no modal dialog is open
-        if ((guideDialog == null || !guideDialog.isVisible()) && (searchDialog == null || !searchDialog.isVisible()) && (rotorDialog == null || !rotorDialog.isVisible())) {
-            renderTooltips(graphics, canvasMouseX, canvasMouseY, mouseX, mouseY);
-        }
-
         super.render(graphics, mouseX, mouseY, partialTicks);
 
-        // 8. Top-level Modal Dialogs (Highest Layer)
+        // 7. Render Tooltips only if no modal dialog is open (Highest Layer)
+        if ((guideDialog == null || !guideDialog.isVisible()) && (searchDialog == null || !searchDialog.isVisible()) && (machineConfigDialog == null || !machineConfigDialog.isVisible())) {
+            graphics.flush();
+            com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, net.minecraft.client.Minecraft.ON_OSX);
+            com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 800.0f);
+            renderTooltips(graphics, canvasMouseX, canvasMouseY, mouseX, mouseY);
+            graphics.flush();
+            graphics.pose().popPose();
+        }
+
+        // 8. Top-level Modal Dialogs
         if (deletePageDialog != null && deletePageDialog.isVisible()) {
             deletePageDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (guideDialog != null && guideDialog.isVisible()) {
             guideDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (searchDialog != null && searchDialog.isVisible()) {
             searchDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (rotorDialog != null && rotorDialog.isVisible()) {
-            rotorDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
+        } else if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            machineConfigDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
         }
 
         // 9. Interactive Tutorial Overlay and Welcome Dialog
@@ -521,6 +531,31 @@ public class BoardScreen extends Screen {
             if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
                 if (widget.isExpandButtonHovered(canvasMouseX, canvasMouseY)) {
                     graphics.renderTooltip(font, Component.literal("§d⤢ ").append(Component.translatable("gui.gtcalcboard.tooltip.expand_module")), mouseX, mouseY);
+                    return;
+                }
+                if (widget.isModuleBadgeHovered(canvasMouseX, canvasMouseY)) {
+                    List<Component> tooltip = new ArrayList<>();
+                    RecipeNode modNode = widget.getNode();
+                    int totalMachines = (int) Math.round(modNode.getContainedMachineCount() * modNode.getMachineCount());
+                    tooltip.add(Component.literal("§d📦 " + Component.translatable("gui.gtcalcboard.tooltip.module_breakdown_title", String.valueOf(totalMachines)).getString()));
+
+                    if (modNode.getSubGraph() != null) {
+                        double modMult = modNode.getMachineCount();
+                        Map<String, Double> breakdown = new LinkedHashMap<>();
+                        for (RecipeNode sub : modNode.getSubGraph().getNodes()) {
+                            double actualCount = sub.getMachineCount() * modMult;
+                            breakdown.put(sub.getName(), breakdown.getOrDefault(sub.getName(), 0.0) + actualCount);
+                        }
+                        for (Map.Entry<String, Double> entry : breakdown.entrySet()) {
+                            String countStr = String.format("%.2f", entry.getValue()).replaceAll("\\.?0+$", "");
+                            tooltip.add(Component.literal("  §7• §f" + entry.getKey() + ": §a" + countStr + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
+                        }
+                    }
+                    if (Math.abs(modNode.getMachineCount() - 1.0) > 0.0001) {
+                        String multStr = String.format("%.2f", modNode.getMachineCount()).replaceAll("\\.?0+$", "");
+                        tooltip.add(Component.literal("§8(" + Component.translatable("gui.gtcalcboard.tooltip.module_scale", multStr).getString() + ")"));
+                    }
+                    graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
                     return;
                 }
                 if (widget.isTargetButtonHovered(canvasMouseX, canvasMouseY)) {
@@ -555,10 +590,10 @@ public class BoardScreen extends Screen {
 
                     if (stats.isConnected()) {
                         String supStr = NodeCardRenderer.formatRate(stats.connectedRate(), in.isFluid());
-                        String percentCol = stats.isBalanced() ? "§a" : (stats.isDeficit() ? "§c" : "§b");
+                        String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? "§c" : "§b");
                         String statusStr = stats.isBalanced()
                             ? "§a✔ 100%"
-                            : (stats.isDeficit()
+                            : (stats.isInputDeficit()
                                 ? String.format("§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString())
                                 : String.format("§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString()));
 
@@ -570,6 +605,10 @@ public class BoardScreen extends Screen {
 
                     if (in.getChance() < 1.0) {
                         tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", in.getChance() * 100.0))));
+                    }
+                    if (in.hasAlternatives()) {
+                        int curIdx = in.getAlternatives().indexOf(in.getId()) + 1;
+                        tooltipLines.add(Component.literal("§6[⟲ " + Component.translatable("gui.gtcalcboard.tooltip.scroll_cycle").getString() + "]: §e" + Component.translatable("gui.gtcalcboard.tooltip.tag_alts", String.valueOf(curIdx), String.valueOf(in.getAlternatives().size())).getString()));
                     }
                     tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
@@ -593,11 +632,11 @@ public class BoardScreen extends Screen {
 
                     if (stats.isConnected()) {
                         String demStr = NodeCardRenderer.formatRate(stats.connectedRate(), out.isFluid());
-                        String percentCol = stats.isBalanced() ? "§a" : (stats.isSurplus() ? "§e" : "§c");
+                        String percentCol = stats.isBalanced() ? "§a" : (stats.isOutputSurplus() ? "§b" : "§c");
                         String statusStr = stats.isBalanced()
                             ? "§a✔ 100%"
-                            : (stats.isSurplus()
-                                ? String.format("§e↓ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString())
+                            : (stats.isOutputSurplus()
+                                ? String.format("§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString())
                                 : String.format("§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString()));
 
                         tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.consumed").getString() + ": " + percentCol + demStr + " §7(" + statusStr + "§7)"));
@@ -677,8 +716,8 @@ public class BoardScreen extends Screen {
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseClicked(mouseX, mouseY, button);
         }
-        if (rotorDialog != null && rotorDialog.isVisible()) {
-            return rotorDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            return machineConfigDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
@@ -734,9 +773,6 @@ public class BoardScreen extends Screen {
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseScrolled(mouseX, mouseY, delta);
         }
-        if (rotorDialog != null && rotorDialog.isVisible()) {
-            return rotorDialog.mouseScrolled(mouseX, mouseY, delta, width, height);
-        }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -769,8 +805,8 @@ public class BoardScreen extends Screen {
         if (pageTabBar.charTyped(codePoint, modifiers)) {
             return true;
         }
-        if (rotorDialog != null && rotorDialog.isVisible()) {
-            return rotorDialog.charTyped(codePoint, modifiers);
+        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            return machineConfigDialog.charTyped(codePoint, modifiers);
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.charTyped(codePoint, modifiers);
@@ -813,12 +849,8 @@ public class BoardScreen extends Screen {
         if (pageTabBar.keyPressed(keyCode, scanCode, modifiers)) {
             return true;
         }
-        if (rotorDialog != null && rotorDialog.isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                rotorDialog.close();
-                return true;
-            }
-            return rotorDialog.keyPressed(keyCode, scanCode, modifiers);
+        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            return machineConfigDialog.keyPressed(keyCode, scanCode, modifiers);
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
@@ -929,6 +961,15 @@ public class BoardScreen extends Screen {
 
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
+    public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
+
+    public void openMachineConfigDialog(RecipeNode node) {
+        if (machineConfigDialog == null) {
+            machineConfigDialog = new MachineConfigDialog(this);
+        }
+        machineConfigDialog.open(node);
+    }
+
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }
     public SummaryOverlay getSummaryOverlay() { return summaryOverlay; }
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }

@@ -50,12 +50,12 @@ public enum PowerDisplayMode {
      */
     public String formatNodePower(RecipeNode node) {
         if (node == null) return "0 EU/t";
-        double totalEUt = node.getTotalEUt();
+        double totalEUt = node.getEffectiveTotalEUt();
         GTVoltageTier tier = node.getTargetTier();
         if (tier == null) tier = GTVoltageTier.LV;
         long voltage = tier.getVoltage();
         double amps = totalEUt / (double) voltage;
-        boolean isGen = node.isGenerator() || (node.isModule() && totalEUt > 0.0001);
+        boolean isGen = node.isGenerator();
 
         String genTag = Component.translatable("gui.gtcalcboard.gen_tag").getString();
         String drainTag = Component.translatable("gui.gtcalcboard.drain_tag").getString();

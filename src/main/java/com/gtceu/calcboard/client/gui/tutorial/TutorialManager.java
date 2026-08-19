@@ -106,7 +106,7 @@ public class TutorialManager {
 
         // 1. Boiler: produces Steam 500 mB/s
         RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
-        boiler.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 500.0, 1.0));
+        boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
         boiler.setPosX(-220);
         boiler.setPosY(-50);
         boiler.setMachineCount(1.0);
@@ -116,7 +116,7 @@ public class TutorialManager {
         // 2. Steam Turbine: consumes Steam 100 mB/s per machine, produces EU
         RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
         turbine.setGenerator(true);
-        turbine.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 100.0, 1.0));
+        turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
         turbine.setPosX(60);
         turbine.setPosY(-50);
         turbine.setMachineCount(1.0);

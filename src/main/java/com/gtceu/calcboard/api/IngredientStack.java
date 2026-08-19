@@ -15,10 +15,12 @@ public class IngredientStack {
     }
 
     private final Type type;
-    private final ResourceLocation id;
+    private ResourceLocation id;
     private final String displayName;
     private final double amount;
     private final double chance; // 0.0 ~ 1.0 (1.0 = 100%)
+    private final java.util.List<ResourceLocation> alternatives = new java.util.ArrayList<>();
+    private int selectedAltIndex = 0;
 
     public IngredientStack(Type type, ResourceLocation id, String displayName, double amount, double chance) {
         this.type = type;
@@ -26,6 +28,9 @@ public class IngredientStack {
         this.displayName = displayName;
         this.amount = amount;
         this.chance = Math.max(0.0, Math.min(1.0, chance));
+        if (id != null) {
+            this.alternatives.add(id);
+        }
     }
 
     public static IngredientStack item(ResourceLocation id, String displayName, double amount, double chance) {
@@ -42,6 +47,61 @@ public class IngredientStack {
 
     public ResourceLocation getId() {
         return id;
+    }
+
+    public java.util.List<ResourceLocation> getAlternatives() {
+        return alternatives;
+    }
+
+    public void setAlternatives(java.util.List<ResourceLocation> alts) {
+        this.alternatives.clear();
+        if (alts != null) {
+            for (ResourceLocation r : alts) {
+                if (r != null && !this.alternatives.contains(r)) {
+                    this.alternatives.add(r);
+                }
+            }
+        }
+        if (this.id != null && !this.alternatives.contains(this.id)) {
+            this.alternatives.add(0, this.id);
+        }
+    }
+
+    public void addAlternative(ResourceLocation alt) {
+        if (alt != null && !this.alternatives.contains(alt)) {
+            this.alternatives.add(alt);
+        }
+        if (this.id != null && !this.alternatives.contains(this.id)) {
+            this.alternatives.add(0, this.id);
+        }
+    }
+
+    public boolean hasAlternatives() {
+        return alternatives.size() > 1;
+    }
+
+    public boolean selectAlternative(ResourceLocation targetId) {
+        if (targetId == null) return false;
+        int idx = alternatives.indexOf(targetId);
+        if (idx >= 0) {
+            this.id = targetId;
+            this.selectedAltIndex = idx;
+            return true;
+        }
+        return false;
+    }
+
+    public void cycleAlternative(int delta) {
+        if (alternatives.isEmpty()) return;
+        selectedAltIndex = (selectedAltIndex + delta) % alternatives.size();
+        if (selectedAltIndex < 0) selectedAltIndex += alternatives.size();
+        this.id = alternatives.get(selectedAltIndex);
+    }
+
+    public boolean matchesOrAlternative(IngredientStack other) {
+        if (other == null || other.type != this.type) return false;
+        if (Objects.equals(this.id, other.id)) return true;
+        return other.id != null && this.alternatives.contains(other.id);
     }
 
     public String getDisplayName() {
@@ -122,16 +182,33 @@ public class IngredientStack {
         tag.putString("name", displayName);
         tag.putDouble("amount", amount);
         tag.putDouble("chance", chance);
+        if (!alternatives.isEmpty()) {
+            net.minecraft.nbt.ListTag altList = new net.minecraft.nbt.ListTag();
+            for (ResourceLocation alt : alternatives) {
+                altList.add(net.minecraft.nbt.StringTag.valueOf(alt.toString()));
+            }
+            tag.put("alternatives", altList);
+        }
         return tag;
     }
 
     public static IngredientStack deserializeNBT(CompoundTag tag) {
         Type type = Type.valueOf(tag.getString("type"));
-        ResourceLocation id = tag.contains("id") && !tag.getString("id").isEmpty() ? new ResourceLocation(tag.getString("id")) : null;
+        ResourceLocation id = tag.contains("id") && !tag.getString("id").isEmpty() ? ResourceLocation.tryParse(tag.getString("id")) : null;
         String name = tag.getString("name");
         double amount = tag.getDouble("amount");
         double chance = tag.contains("chance") ? tag.getDouble("chance") : 1.0;
-        return new IngredientStack(type, id, name, amount, chance);
+        IngredientStack stack = new IngredientStack(type, id, name, amount, chance);
+        if (tag.contains("alternatives", 9)) { // 9 = TAG_List
+            net.minecraft.nbt.ListTag altList = tag.getList("alternatives", 8); // 8 = TAG_String
+            java.util.List<ResourceLocation> alts = new java.util.ArrayList<>();
+            for (int i = 0; i < altList.size(); i++) {
+                ResourceLocation altId = ResourceLocation.tryParse(altList.getString(i));
+                if (altId != null) alts.add(altId);
+            }
+            stack.setAlternatives(alts);
+        }
+        return stack;
     }
 
     @Override

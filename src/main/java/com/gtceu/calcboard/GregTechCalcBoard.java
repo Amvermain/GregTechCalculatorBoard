@@ -21,8 +21,8 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 public class GregTechCalcBoard {
     public static final String MOD_ID = "gtcalcboard";
 
-    public GregTechCalcBoard() {
-        var modBus = FMLJavaModLoadingContext.get().getModEventBus();
+    public GregTechCalcBoard(FMLJavaModLoadingContext context) {
+        var modBus = context.getModEventBus();
         modBus.addListener(this::clientSetup);
         modBus.addListener(this::registerKeys);
 

@@ -250,7 +250,10 @@ public class ToolbarWidget {
                     if (from == to) continue;
                     for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
                         var in = to.getInputs().get(inIdx);
-                        if (out.equals(in)) {
+                        if (out.equals(in) || in.matchesOrAlternative(out)) {
+                            if (!out.equals(in)) {
+                                in.selectAlternative(out.getId());
+                            }
                             FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, to.getId(), inIdx);
                             if (!graph.getConnections().contains(edge)) {
                                 graph.addConnection(from.getId(), outIdx, to.getId(), inIdx);

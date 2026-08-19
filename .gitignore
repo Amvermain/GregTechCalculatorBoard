@@ -8,6 +8,14 @@ build/
 bin/
 out/
 
+# Local User Configurations & Deployment Scripts (Private)
+local.properties
+local.gradle
+*.local.*
+deploy.bat
+deploy*.bat
+test-deploy.bat
+
 # IDE Configuration
 .idea/
 *.iml

@@ -13,6 +13,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 
 public class EmiRecipeConverter {
@@ -124,30 +125,27 @@ public class EmiRecipeConverter {
                     if (energyRF > 0) {
                         // Standard conversion: 4 RF = 1 EU
                         double totalEU = (double) energyRF / 4.0;
-                        baseEUt = 32.0; // Standard LV generator output
+                        baseEUt = 32.0; // Standard LV power
                         baseDurationTicks = Math.max(20.0, totalEU / baseEUt);
                         tier = GTVoltageTier.LV;
-                        isGenerator = true;
+
+                        // Only mark as generator if the category is a Thermal Dynamo
+                        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+                        if (catId != null && catId.getPath().toLowerCase().contains("dynamo")) {
+                            isGenerator = true;
+                        }
                     }
                 }
             }
         } catch (Throwable ignored) {}
 
-        // 2. Secondary Generator Check: Category / ID keywords (Dynamo, Generator, Turbine, Fuel, Lapidary)
-        if (!isGenerator) {
-            String checkStr = "";
-            if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-                checkStr += " " + recipe.getCategory().getId().toString();
-            }
-            if (recipe.getId() != null) {
-                checkStr += " " + recipe.getId().toString();
-            }
-            checkStr = checkStr.toLowerCase();
-
-            if (checkStr.contains("dynamo") || checkStr.contains("generator") || checkStr.contains("turbine")
-                    || checkStr.contains("fuel") || checkStr.contains("combustion") || checkStr.contains("lapidary")
-                    || checkStr.contains("stirling") || checkStr.contains("compression") || checkStr.contains("magmatic")
-                    || checkStr.contains("numismatic") || checkStr.contains("gourmand") || checkStr.contains("disenchantment")) {
+        // 2. Secondary Generator Check: Strictly check Category ID (Machine type), NEVER check recipe item/output IDs!
+        if (!isGenerator && recipe.getCategory() != null && recipe.getCategory().getId() != null) {
+            String catPath = recipe.getCategory().getId().getPath().toLowerCase();
+            if (catPath.contains("dynamo") || catPath.contains("turbine")
+                    || catPath.equals("generator") || catPath.endsWith("_generator")
+                    || catPath.equals("combustion_generator") || catPath.equals("semi_fluid_generator")
+                    || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")) {
                 isGenerator = true;
             }
         }
@@ -158,24 +156,62 @@ public class EmiRecipeConverter {
 
         // Convert Inputs
         for (EmiIngredient input : recipe.getInputs()) {
+            long reqAmount = input.getAmount();
+            float reqChance = input.getChance();
+            IngredientStack primaryStack = null;
+            List<ResourceLocation> altIds = new ArrayList<>();
+
             for (EmiStack stack : input.getEmiStacks()) {
-                IngredientStack is = convertEmiStack(stack, stack.getAmount(), stack.getChance());
-                if (is != null) {
-                    node.addInput(is);
-                    break;
+                if (stack == null || stack.isEmpty()) continue;
+                if (isDummyConditionMarker(stack.getId())) continue;
+
+                long finalAmount = reqAmount > 0 ? reqAmount : stack.getAmount();
+                float finalChance = reqChance > 0 ? reqChance : stack.getChance();
+                IngredientStack is = convertEmiStack(stack, finalAmount, finalChance);
+                if (is != null && is.getId() != null) {
+                    if (isDummyConditionMarker(is.getId())) continue;
+                    if (primaryStack == null) {
+                        primaryStack = is;
+                    }
+                    if (!altIds.contains(is.getId())) {
+                        altIds.add(is.getId());
+                    }
                 }
+            }
+
+            if (primaryStack != null) {
+                primaryStack.setAlternatives(altIds);
+                node.addInput(primaryStack);
             }
         }
 
         // Convert Outputs
         for (EmiStack outStack : recipe.getOutputs()) {
+            if (outStack == null || outStack.isEmpty()) continue;
+            if (isDummyConditionMarker(outStack.getId())) continue;
+
             IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), outStack.getChance());
-            if (os != null) {
+            if (os != null && !isDummyConditionMarker(os.getId())) {
                 node.addOutput(os);
             }
         }
 
         return node;
+    }
+
+    public static boolean isDummyConditionMarker(ResourceLocation id) {
+        if (id == null) return false;
+        String path = id.getPath().toLowerCase();
+
+        // Any dummy condition/dimension/planet marker across all mods (gtceu, start_core, kubejs, etc.)
+        if (path.endsWith("_marker") || path.endsWith("_marker_item") || path.endsWith("_marker_block")
+                || path.contains("dimension_marker") || path.contains("biome_marker")
+                || path.contains("planet_marker") || path.contains("environmental_marker")
+                || path.contains("altitude_marker") || path.contains("temperature_marker")) {
+            return true;
+        }
+
+        return false;
     }
 
     private static ResourceLocation findMachineIcon(EmiRecipe recipe) {
@@ -208,23 +244,23 @@ public class EmiRecipeConverter {
                 return catId;
             }
 
-            ResourceLocation lvId = new ResourceLocation(ns, "lv_" + path);
-            if (ForgeRegistries.ITEMS.containsKey(lvId)) {
+            ResourceLocation lvId = ResourceLocation.tryParse(ns + ":lv_" + path);
+            if (lvId != null && ForgeRegistries.ITEMS.containsKey(lvId)) {
                 return lvId;
             }
 
-            ResourceLocation lvId2 = new ResourceLocation(ns, path + "_lv");
-            if (ForgeRegistries.ITEMS.containsKey(lvId2)) {
+            ResourceLocation lvId2 = ResourceLocation.tryParse(ns + ":" + path + "_lv");
+            if (lvId2 != null && ForgeRegistries.ITEMS.containsKey(lvId2)) {
                 return lvId2;
             }
 
-            ResourceLocation gtLvId = new ResourceLocation("gtceu", "lv_" + path);
-            if (ForgeRegistries.ITEMS.containsKey(gtLvId)) {
+            ResourceLocation gtLvId = ResourceLocation.tryParse("gtceu:lv_" + path);
+            if (gtLvId != null && ForgeRegistries.ITEMS.containsKey(gtLvId)) {
                 return gtLvId;
             }
 
-            ResourceLocation gtId = new ResourceLocation("gtceu", path);
-            if (ForgeRegistries.ITEMS.containsKey(gtId)) {
+            ResourceLocation gtId = ResourceLocation.tryParse("gtceu:" + path);
+            if (gtId != null && ForgeRegistries.ITEMS.containsKey(gtId)) {
                 return gtId;
             }
         }
@@ -242,6 +278,18 @@ public class EmiRecipeConverter {
         if (key instanceof Fluid fluid) {
             ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
             return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
+        } else if (key != null && key.getClass().getName().contains("FluidStack")) {
+            try {
+                Method getFluidMethod = key.getClass().getMethod("getFluid");
+                Object fl = getFluidMethod.invoke(key);
+                if (fl instanceof Fluid fluid) {
+                    ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
+                    return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
+                }
+            } catch (Throwable ignored) {}
+            return IngredientStack.fluid(id, displayName, amount, chance);
+        } else if (id != null && ForgeRegistries.FLUIDS.containsKey(id)) {
+            return IngredientStack.fluid(id, displayName, amount, chance);
         } else {
             return IngredientStack.item(id, displayName, amount, chance);
         }

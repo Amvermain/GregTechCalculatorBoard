@@ -780,4 +780,198 @@ public class CalculationTest {
         PowerDisplayMode m3 = mgr.cyclePowerDisplayMode();
         Assertions.assertEquals(PowerDisplayMode.EUT, m3);
     }
+
+    @Test
+    public void testTagAlternativesAndAutoMatching() {
+        IngredientStack input = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diesel"), "Diesel", 1000, 1.0);
+        input.addAlternative(ResourceLocation.tryParse("gtceu:bio_diesel"));
+        input.addAlternative(ResourceLocation.tryParse("thermal:refined_fuel"));
+
+        Assertions.assertTrue(input.hasAlternatives());
+        Assertions.assertEquals(3, input.getAlternatives().size());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:diesel"), input.getId());
+
+        input.cycleAlternative(1);
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:bio_diesel"), input.getId());
+
+        IngredientStack bioDieselOutput = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:bio_diesel"), "Bio Diesel", 1000, 1.0);
+        Assertions.assertTrue(input.matchesOrAlternative(bioDieselOutput));
+
+        input.selectAlternative(bioDieselOutput.getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:bio_diesel"), input.getId());
+        Assertions.assertTrue(input.equals(bioDieselOutput));
+    }
+
+    @Test
+    public void testDuplicateOutputsWithDifferentChances() {
+        RecipeNode greenhouse = RecipeNode.create("Crop Greenhouse", 600.0, 15.0, GTVoltageTier.LV);
+        greenhouse.setMachineCount(1.0);
+        greenhouse.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:potato"), "Potato", 16.0, 1.0));
+        greenhouse.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:potato"), "Potato", 8.0, 0.5));
+
+        FlowGraph graph = new FlowGraph();
+        graph.addNode(greenhouse);
+
+        FlowGraph.PortFlowStats stats0 = graph.getOutputPortStats(greenhouse, 0);
+        FlowGraph.PortFlowStats stats1 = graph.getOutputPortStats(greenhouse, 1);
+
+        Assertions.assertEquals(16.0 / 30.0, stats0.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(4.0 / 30.0, stats1.requiredOrProducedRate(), 0.001);
+        Assertions.assertNotEquals(stats0.requiredOrProducedRate(), stats1.requiredOrProducedRate());
+    }
+
+    @Test
+    public void testModulePowerDisplayConsumingVsGenerating() {
+        // Consuming module (all consumer machines)
+        RecipeNode consumingModule = RecipeNode.create("Compound Process", 20.0, 358.0, GTVoltageTier.LV);
+        consumingModule.setModule(true);
+        consumingModule.setGenerator(false);
+
+        String drainStr = PowerDisplayMode.EUT.formatNodePower(consumingModule);
+        Assertions.assertTrue(drainStr.contains("358.0 EU/t"));
+        Assertions.assertFalse(drainStr.contains("+")); // Must not be formatted as generator
+
+        // Generating module (e.g. steam turbines grouped)
+        RecipeNode generatingModule = RecipeNode.create("Turbine Module", 20.0, 500.0, GTVoltageTier.LV);
+        generatingModule.setModule(true);
+        generatingModule.setGenerator(true);
+
+        String genStr = PowerDisplayMode.EUT.formatNodePower(generatingModule);
+        Assertions.assertTrue(genStr.contains("+500.0 EU/t"));
+    }
+
+    @Test
+    public void testDummyConditionMarkerFiltering() {
+        // Markers that should be filtered out
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:overworld_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:nether_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:the_end_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:dimension_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:biome_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:altitude_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("start_core:abydos_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("sgjourney:chulak_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("kubejs:custom_planet_marker")));
+
+        // Normal items (including those containing 'end', 'world', etc.) that must NEVER be filtered out
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:programmed_circuit")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:integrated_circuit")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:potato")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:lv_electric_motor")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:enderium_ingot")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:ender_pearl")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:end_stone")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("thermal:enderium_dust")));
+        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("create:blender")));
+    }
+
+    @Test
+    public void testBottleneckEfficiencyAndThroughputPropagation() {
+        FlowGraph graph = new FlowGraph();
+
+        // Producer: 20 ticks (1s), produces 80 mB/s of fluid A
+        RecipeNode producer = RecipeNode.create("Producer A", 20.0, 30.0, GTVoltageTier.LV);
+        producer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 80.0, 1.0));
+        producer.setMachineCount(1.0);
+        graph.addNode(producer);
+
+        // Consumer: 20 ticks (1s), requires 100 mB/s of fluid A, produces 50 mB/s of fluid B, consumes 100 EU/t
+        RecipeNode consumer = RecipeNode.create("Consumer B", 20.0, 100.0, GTVoltageTier.LV);
+        consumer.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 100.0, 1.0));
+        consumer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 50.0, 1.0));
+        consumer.setMachineCount(1.0);
+        graph.addNode(consumer);
+
+        // Connect Producer -> Consumer
+        graph.addConnection(producer.getId(), 0, consumer.getId(), 0);
+
+        // Compute efficiencies
+        Map<String, Double> effMap = graph.computeNodeEfficiencies();
+
+        // Producer has no connected inputs -> 100% efficiency
+        Assertions.assertEquals(1.0, effMap.get(producer.getId()), 0.001);
+        Assertions.assertEquals(1.0, producer.getEfficiency(), 0.001);
+
+        // Consumer receives 80 / 100 = 0.80 (80% efficiency)
+        Assertions.assertEquals(0.80, effMap.get(consumer.getId()), 0.001);
+        Assertions.assertEquals(0.80, consumer.getEfficiency(), 0.001);
+
+        // Consumer effective output rate: 50 * 0.80 = 40.0 mB/s
+        Assertions.assertEquals(40.0, consumer.calculateEffectiveOutputRates().values().iterator().next(), 0.001);
+
+        // Consumer effective EU/t: 100 * 0.80 = 80.0 EU/t
+        Assertions.assertEquals(80.0, consumer.getEffectiveTotalEUt(), 0.001);
+
+        // 3. Add Downstream Final Consumer to test cascading flow: requires 40 mB/s of fluid B, produces 10 item C
+        RecipeNode finalNode = RecipeNode.create("Final C", 20.0, 50.0, GTVoltageTier.LV);
+        finalNode.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 40.0, 1.0));
+        finalNode.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron", 10.0, 1.0));
+        finalNode.setMachineCount(1.0);
+        graph.addNode(finalNode);
+
+        graph.addConnection(consumer.getId(), 0, finalNode.getId(), 0);
+
+        graph.computeNodeEfficiencies();
+
+        // Final Node demands 40 mB/s and receives exactly 40 mB/s from 80% running Consumer -> 100% of its capacity!
+        Assertions.assertEquals(1.0, finalNode.getEfficiency(), 0.001);
+        Assertions.assertEquals(10.0, finalNode.calculateEffectiveOutputRates().values().iterator().next(), 0.001);
+
+        // Test Process Summary reflects real bottleneck power & throughput
+        BalanceSummary summary = graph.computeSummary();
+        // Total EU/t: Producer (30) + Consumer (80) + Final (50) = 160 EU/t
+        Assertions.assertEquals(160.0, summary.totalEUt(), 0.001);
+    }
+
+    @Test
+    public void testMachineAddonsAndAbsoluteParallelHatch() {
+        // 1. Test Absolute Parallel Hatch (4x parallel with ZERO extra power consumption)
+        RecipeNode node = RecipeNode.create("Test Pyrolyse", 20.0, 30.0, GTVoltageTier.LV);
+        node.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 100.0, 1.0));
+        node.setMachineCount(1.0);
+
+        MachineAddon absPar = new MachineAddon("start_core:uhv_absolute_parallel_hatch", "에픽 절대 병렬 처리 해치", MachineAddon.Category.PARALLEL, "4x 병렬 (전기 추가 소모 없음)", null);
+        absPar.setParallelMultiplier(4);
+        absPar.setPowerConstant(true);
+        node.addAddon(absPar);
+
+        // Effective parallel = 4
+        Assertions.assertEquals(4, node.getTotalParallel());
+        // CPS scales by 4x -> 1.0 * 4 = 4.0 cycles/sec
+        Assertions.assertEquals(4.0, node.getCyclesPerSecond(), 0.001);
+        // Single machine EU/t remains 30 EU/t (powerConstant = true!)
+        Assertions.assertEquals(30.0, node.getSingleMachineEUt(), 0.001);
+
+        // 2. Test Throughput Boosting Trait (4x Par, 1.6x Time, 0.95x EU)
+        RecipeNode superPyrolyse = RecipeNode.create("Super Pyrolyse", 20.0, 30.0, GTVoltageTier.LV);
+        MachineAddon boost = new MachineAddon("gtceu:throughput_boosting", "처리 부스팅", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        boost.setParallelMultiplier(4);
+        boost.setDurationMultiplier(1.6);
+        boost.setEutMultiplier(0.95);
+        superPyrolyse.addAddon(boost);
+
+        // Duration ticks: 20 * 1.6 = 32.0 ticks (1.6s)
+        Assertions.assertEquals(1.6, superPyrolyse.getEffectiveDurationSeconds(), 0.001);
+        // CPS: (20 / 32) * 4 = 0.625 * 4 = 2.5 cycles/sec
+        Assertions.assertEquals(2.5, superPyrolyse.getCyclesPerSecond(), 0.001);
+        // EU/t: 30 * 0.95 * 4 = 114.0 EU/t
+        Assertions.assertEquals(114.0, superPyrolyse.getSingleMachineEUt(), 0.001);
+
+        // 3. Test Configurable Maintenance Hatch (CMH: 95% speed -> 1/0.95 duration, 90% power)
+        MachineAddon cmh = new MachineAddon("gtceu:cmh", "CMH", MachineAddon.Category.MAINTENANCE, "", null);
+        cmh.setDurationMultiplier(1.0 / 0.95);
+        cmh.setEutMultiplier(0.90);
+        superPyrolyse.addAddon(cmh);
+
+        // Combined EU/t: 30 * (0.95 * 0.90) * 4 = 102.6 EU/t
+        Assertions.assertEquals(102.6, superPyrolyse.getSingleMachineEUt(), 0.001);
+
+        // 4. Test NBT Serialization / Deserialization
+        net.minecraft.nbt.CompoundTag tag = superPyrolyse.serializeNBT();
+        RecipeNode loadedNode = RecipeNode.deserializeNBT(tag);
+        Assertions.assertNotNull(loadedNode);
+        Assertions.assertEquals(2, loadedNode.getAddons().size());
+        Assertions.assertEquals(superPyrolyse.getSingleMachineEUt(), loadedNode.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(superPyrolyse.getCyclesPerSecond(), loadedNode.getCyclesPerSecond(), 0.001);
+    }
 }

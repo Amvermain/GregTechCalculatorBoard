@@ -1,0 +1,7 @@
+# ==========================================================
+# GregTech Calculator Board - Local Developer Configuration
+# ==========================================================
+# Copy this file to 'local.properties' (which is git-ignored).
+#
+# Target instance mods directory for auto-deployment:
+# target.mods.dir=C:/Users/YourUsername/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods

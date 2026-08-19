@@ -81,6 +81,13 @@ public class NodeNameEditor {
             }
             return true;
         }
-        return false;
+        if (keyCode == GLFW.GLFW_KEY_SPACE) {
+            if (buffer.length() < 32) {
+                buffer.append(' ');
+            }
+            return true;
+        }
+        // Consume all other key presses while editing to prevent triggering global shortcuts
+        return true;
     }
 }

@@ -298,6 +298,16 @@ public class CanvasInteractionHandler {
                             if (inPortIdx >= 0) {
                                 RecipeNode fromNode = wireStartNode.getNode();
                                 RecipeNode toNode = targetWidget.getNode();
+
+                                if (wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
+                                    IngredientStack outStack = fromNode.getOutputs().get(wireStartPortIdx);
+                                    IngredientStack inStack = toNode.getInputs().get(inPortIdx);
+                                    if (!outStack.equals(inStack) && inStack.matchesOrAlternative(outStack)) {
+                                        inStack.selectAlternative(outStack.getId());
+                                        targetWidget.invalidateCache();
+                                    }
+                                }
+
                                 FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(fromNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx);
                                 graph.addConnection(fromNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx);
 
@@ -375,6 +385,16 @@ public class CanvasInteractionHandler {
                             if (outPortIdx >= 0) {
                                 RecipeNode fromNode = targetWidget.getNode();   // Producer
                                 RecipeNode toNode = wireStartNode.getNode();    // Consumer
+
+                                if (outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx < toNode.getInputs().size()) {
+                                    IngredientStack outStack = fromNode.getOutputs().get(outPortIdx);
+                                    IngredientStack inStack = toNode.getInputs().get(wireStartPortIdx);
+                                    if (!outStack.equals(inStack) && inStack.matchesOrAlternative(outStack)) {
+                                        inStack.selectAlternative(outStack.getId());
+                                        wireStartNode.invalidateCache();
+                                    }
+                                }
+
                                 FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(fromNode.getId(), outPortIdx, toNode.getId(), wireStartPortIdx);
                                 graph.addConnection(fromNode.getId(), outPortIdx, toNode.getId(), wireStartPortIdx);
 

@@ -43,6 +43,10 @@ public class RecipeNode {
     private boolean isModule = false;
     private FlowGraph subGraph = null;
     private int containedMachineCount = 0;
+    private double efficiency = 1.0;
+
+    // Hardware Addons, Hatches, and Augments
+    private final List<MachineAddon> addons = new ArrayList<>();
 
     public RecipeNode(String id, String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -58,6 +62,7 @@ public class RecipeNode {
         this.rotorEfficiency = 100;
         this.rotorPower = 100;
         this.rotorName = "Standard (100%)";
+        this.efficiency = 1.0;
     }
 
     public static RecipeNode create(String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
@@ -266,18 +271,78 @@ public class RecipeNode {
         this.rotorName = rotorName;
     }
 
+    // Addon Management & Calculations
+    public List<MachineAddon> getAddons() {
+        return addons;
+    }
+
+    public void addAddon(MachineAddon addon) {
+        if (addon != null && !addons.contains(addon)) {
+            addons.add(addon);
+        }
+    }
+
+    public void removeAddon(String addonId) {
+        addons.removeIf(a -> a.getId().equals(addonId));
+    }
+
+    public void clearAddons() {
+        addons.clear();
+    }
+
+    public double getCombinedDurationMultiplier() {
+        double mult = 1.0;
+        for (MachineAddon a : addons) {
+            mult *= a.getDurationMultiplier();
+        }
+        return mult;
+    }
+
+    public double getCombinedEutMultiplier() {
+        double mult = 1.0;
+        for (MachineAddon a : addons) {
+            mult *= a.getEutMultiplier();
+        }
+        return mult;
+    }
+
+    public int getCombinedParallelMultiplier() {
+        int mult = 1;
+        for (MachineAddon a : addons) {
+            mult *= a.getParallelMultiplier();
+        }
+        return mult;
+    }
+
+    public int getTotalParallel() {
+        return Math.max(1, parallel * getCombinedParallelMultiplier());
+    }
+
+    public boolean hasPowerConstantAddon() {
+        for (MachineAddon a : addons) {
+            if (a.isPowerConstant()) return true;
+        }
+        return false;
+    }
+
     // Calculation logic
     public int getTierDelta() {
         return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
+        OverclockMode.OverclockResult baseRes;
         if (isGenerator) {
             // Turbine duration expands with rotor efficiency percentage (e.g. 220% -> 2.2x duration)
             double effectiveDurationTicks = baseDurationTicks * (rotorEfficiency / 100.0);
-            return new OverclockMode.OverclockResult(effectiveDurationTicks, baseEUt, 1.0, 0);
+            baseRes = new OverclockMode.OverclockResult(effectiveDurationTicks, baseEUt, 1.0, 0);
+        } else {
+            baseRes = overclockMode.calculate(baseDurationTicks, baseEUt, getTierDelta());
         }
-        return overclockMode.calculate(baseDurationTicks, baseEUt, getTierDelta());
+
+        double finalDuration = Math.max(1.0, baseRes.durationTicks() * getCombinedDurationMultiplier());
+        double finalEut = Math.max(1.0, baseRes.eut() * getCombinedEutMultiplier());
+        return new OverclockMode.OverclockResult(finalDuration, finalEut, baseRes.batchesPerTick(), baseRes.overclocks());
     }
 
     /**
@@ -291,7 +356,10 @@ public class RecipeNode {
      * Single machine EU/t consumption while running.
      */
     public double getSingleMachineEUt() {
-        return getOverclockResult().eut() * parallel;
+        if (hasPowerConstantAddon()) {
+            return getOverclockResult().eut() * parallel;
+        }
+        return getOverclockResult().eut() * getTotalParallel();
     }
 
     /**
@@ -306,7 +374,7 @@ public class RecipeNode {
      */
     public double getCyclesPerSecond() {
         double singleMachineCyclesPerSec = getOverclockResult().getCyclesPerSecond();
-        return singleMachineCyclesPerSec * machineCount * parallel;
+        return singleMachineCyclesPerSec * machineCount * getTotalParallel();
     }
 
     /**
@@ -333,11 +401,57 @@ public class RecipeNode {
         return rates;
     }
 
+    public double getEfficiency() {
+        return efficiency;
+    }
+
+    public void setEfficiency(double efficiency) {
+        this.efficiency = Math.max(0.0, Math.min(1.0, efficiency));
+    }
+
+    /**
+     * Effective EU/t consumption/generation reflecting bottleneck efficiency.
+     */
+    public double getEffectiveTotalEUt() {
+        return getTotalEUt() * efficiency;
+    }
+
+    /**
+     * Effective recipe executions per second reflecting bottleneck efficiency.
+     */
+    public double getEffectiveCyclesPerSecond() {
+        return getCyclesPerSecond() * efficiency;
+    }
+
+    /**
+     * Calculates effective input consumption rates in items/s or mB/s.
+     */
+    public Map<IngredientStack, Double> calculateEffectiveInputRates() {
+        Map<IngredientStack, Double> rates = new LinkedHashMap<>();
+        double cps = getEffectiveCyclesPerSecond();
+        for (IngredientStack in : inputs) {
+            rates.put(in, in.getAmount() * cps);
+        }
+        return rates;
+    }
+
+    /**
+     * Calculates effective output production rates in items/s or mB/s.
+     */
+    public Map<IngredientStack, Double> calculateEffectiveOutputRates() {
+        Map<IngredientStack, Double> rates = new LinkedHashMap<>();
+        double cps = getEffectiveCyclesPerSecond();
+        for (IngredientStack out : outputs) {
+            rates.put(out, out.getExpectedAmount() * cps);
+        }
+        return rates;
+    }
+
     /**
      * Calculates single machine production rate for a specific output ingredient.
      */
     public double calculateSingleMachineOutputRate(IngredientStack out) {
-        double singleCps = getOverclockResult().getCyclesPerSecond() * parallel;
+        double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
         return out.getExpectedAmount() * singleCps;
     }
 
@@ -398,6 +512,14 @@ public class RecipeNode {
         }
         tag.put("outputs", outList);
 
+        if (!addons.isEmpty()) {
+            ListTag addonList = new ListTag();
+            for (MachineAddon a : addons) {
+                addonList.add(a.serializeNBT());
+            }
+            tag.put("addons", addonList);
+        }
+
         return tag;
     }
 
@@ -410,7 +532,7 @@ public class RecipeNode {
 
         RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
         if (tag.contains("icon")) {
-            node.machineIcon = new ResourceLocation(tag.getString("icon"));
+            node.machineIcon = ResourceLocation.tryParse(tag.getString("icon"));
         }
         if (tag.contains("targetTier")) {
             node.targetTier = GTVoltageTier.valueOf(tag.getString("targetTier"));
@@ -420,6 +542,15 @@ public class RecipeNode {
         }
         if (tag.contains("parallel")) {
             node.parallel = tag.getInt("parallel");
+        }
+        if (tag.contains("addons")) {
+            ListTag addonList = tag.getList("addons", 10);
+            for (int i = 0; i < addonList.size(); i++) {
+                MachineAddon a = MachineAddon.deserializeNBT(addonList.getCompound(i));
+                if (a != null) {
+                    node.addAddon(a);
+                }
+            }
         }
         if (tag.contains("overclockMode")) {
             node.overclockMode = OverclockMode.valueOf(tag.getString("overclockMode"));

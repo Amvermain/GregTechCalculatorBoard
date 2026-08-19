@@ -290,7 +290,8 @@ public class PageTabBarWidget {
                 renameBox = null;
                 return true;
             }
-            return renameBox.keyPressed(keyCode, scanCode, modifiers);
+            renameBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
         }
         return false;
     }
