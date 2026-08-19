@@ -2,7 +2,6 @@ package com.gtceu.calcboard.api;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -137,42 +136,6 @@ public class IngredientStack {
 
     public boolean isFluid() {
         return type == Type.FLUID;
-    }
-
-    public dev.emi.emi.api.stack.EmiStack getEmiStack() {
-        if (id == null) return dev.emi.emi.api.stack.EmiStack.EMPTY;
-        if (type == Type.FLUID) {
-            var fluid = ForgeRegistries.FLUIDS.getValue(id);
-            if (fluid != null) {
-                return dev.emi.emi.api.stack.EmiStack.of(fluid, Math.max(1, (long) amount));
-            }
-        } else {
-            var item = ForgeRegistries.ITEMS.getValue(id);
-            if (item != null) {
-                return dev.emi.emi.api.stack.EmiStack.of(item, Math.max(1, (long) Math.round(amount)));
-            }
-        }
-        return dev.emi.emi.api.stack.EmiStack.EMPTY;
-    }
-
-    public void render(net.minecraft.client.gui.GuiGraphics graphics, int x, int y) {
-        var emiStack = getEmiStack();
-        if (!emiStack.isEmpty()) {
-            emiStack.render(graphics, x, y, 0, dev.emi.emi.api.stack.EmiIngredient.RENDER_ICON);
-            com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
-        } else {
-            graphics.fill(x, y, x + 16, y + 16, isFluid() ? 0xFF3366CC : 0xFF888888);
-        }
-    }
-
-    public ItemStack createItemDisplayStack() {
-        if (type == Type.ITEM && id != null) {
-            var item = ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != Items.AIR) {
-                return new ItemStack(item, Math.max(1, (int) Math.round(amount)));
-            }
-        }
-        return ItemStack.EMPTY;
     }
 
     public CompoundTag serializeNBT() {

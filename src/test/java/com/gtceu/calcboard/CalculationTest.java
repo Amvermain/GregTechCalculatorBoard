@@ -103,19 +103,21 @@ public class CalculationTest {
         turbine.setRotorEfficiency(200);
         turbine.setRotorPower(450);
         
-        // IV Rotor Holder (8,192 EU/t * 4.5 = 36,864 EU/t -> 1,152 parallels!)
+        // IV Rotor Holder (8,192 EU/t * 2.0 * 4.5 = 73,728 EU/t -> 2,304 parallels!)
         turbine.setTargetTier(GTVoltageTier.IV);
-        Assertions.assertEquals(1152, turbine.getParallel());
-        Assertions.assertEquals(36864.0, turbine.getTotalEUt(), 0.001);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(2304, turbine.getParallel());
+        Assertions.assertEquals(73728.0, turbine.getTotalEUt(), 0.001);
         Assertions.assertEquals(4.00, turbine.getEffectiveDurationSeconds(), 0.001);
 
         var scheeliteRates = turbine.calculateInputRates();
-        Assertions.assertEquals(1152.0 / 4.00, scheeliteRates.get(nitrobenzene), 0.01); // 288.0 mB/s
+        Assertions.assertEquals(2304.0 / 4.00, scheeliteRates.get(nitrobenzene), 0.01); // 576.0 mB/s
 
-        // EV Rotor Holder (2,048 EU/t * 4.5 = 9,216 EU/t -> 288 parallels)
+        // EV Rotor Holder (2,048 EU/t * 2.0 * 4.5 = 18,432 EU/t -> 576 parallels)
         turbine.setTargetTier(GTVoltageTier.EV);
-        Assertions.assertEquals(288, turbine.getParallel());
-        Assertions.assertEquals(32.0 * 288, turbine.getTotalEUt(), 0.001);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(576, turbine.getParallel());
+        Assertions.assertEquals(18432.0, turbine.getTotalEUt(), 0.001);
     }
 
     @Test
@@ -705,7 +707,7 @@ public class CalculationTest {
         graph.addConnection(producer.getId(), 0, consumer.getId(), 0);
 
         // Input stats for consumer
-        FlowGraph.PortFlowStats inStats = graph.getInputPortStats(consumer, 0);
+        FlowGraphSolver.PortFlowStats inStats = graph.getInputPortStats(consumer, 0);
         Assertions.assertTrue(inStats.isConnected());
         Assertions.assertEquals(200.0, inStats.requiredOrProducedRate(), 0.001);
         Assertions.assertEquals(200.0, inStats.connectedRate(), 0.001);
@@ -713,7 +715,7 @@ public class CalculationTest {
         Assertions.assertEquals(100.0, inStats.getPercent(), 0.001);
 
         // Output stats for producer
-        FlowGraph.PortFlowStats outStats = graph.getOutputPortStats(producer, 0);
+        FlowGraphSolver.PortFlowStats outStats = graph.getOutputPortStats(producer, 0);
         Assertions.assertTrue(outStats.isConnected());
         Assertions.assertEquals(200.0, outStats.requiredOrProducedRate(), 0.001);
         Assertions.assertEquals(200.0, outStats.connectedRate(), 0.001);
@@ -812,8 +814,8 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
         graph.addNode(greenhouse);
 
-        FlowGraph.PortFlowStats stats0 = graph.getOutputPortStats(greenhouse, 0);
-        FlowGraph.PortFlowStats stats1 = graph.getOutputPortStats(greenhouse, 1);
+        FlowGraphSolver.PortFlowStats stats0 = graph.getOutputPortStats(greenhouse, 0);
+        FlowGraphSolver.PortFlowStats stats1 = graph.getOutputPortStats(greenhouse, 1);
 
         Assertions.assertEquals(16.0 / 30.0, stats0.requiredOrProducedRate(), 0.001);
         Assertions.assertEquals(4.0 / 30.0, stats1.requiredOrProducedRate(), 0.001);
@@ -973,5 +975,164 @@ public class CalculationTest {
         Assertions.assertEquals(2, loadedNode.getAddons().size());
         Assertions.assertEquals(superPyrolyse.getSingleMachineEUt(), loadedNode.getSingleMachineEUt(), 0.001);
         Assertions.assertEquals(superPyrolyse.getCyclesPerSecond(), loadedNode.getCyclesPerSecond(), 0.001);
+    }
+
+    @Test
+    public void testTurbineRotorAutoParallelCalculation() {
+        // Gas Turbine running Nitrobenzene (32 EU/t, LV recipe) with EV Rotor Holder
+        RecipeNode turbine = RecipeNode.create("Gas Turbine (Nitrobenzene)", 20.0, 32.0, GTVoltageTier.LV);
+        turbine.setTargetTier(GTVoltageTier.EV);
+        turbine.setGenerator(true);
+
+        // 1. Equip Titanium Turbine Rotor (130% power) on EV Rotor Holder -> capped at 5,324 EU/t (167 parallel)
+        turbine.setRotorName("Titanium Turbine Rotor");
+        turbine.setRotorEfficiency(115);
+        turbine.setRotorPower(130);
+        turbine.autoCalculateTurbineParallel();
+
+        // 5324 EU/t / 32 EU/t = 166.375 -> 167 parallel!
+        Assertions.assertEquals(167, turbine.getParallel());
+        Assertions.assertEquals(167, turbine.getTotalParallel());
+        // Generator power output is capped at exact Rotor Holder limit (5,324 EU/t)!
+        Assertions.assertEquals(5324.0, turbine.getSingleMachineEUt(), 0.001);
+
+        // 1-b. Equip Iron Turbine Rotor (115% power) on EV Rotor Holder -> capped at 4,710 EU/t (148 parallel!)
+        turbine.setRotorName("Iron Turbine Rotor");
+        turbine.setRotorEfficiency(115);
+        turbine.setRotorPower(115);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(148, turbine.getParallel());
+        Assertions.assertEquals(4710.0, turbine.getSingleMachineEUt(), 0.001);
+
+        // 2. Upgrade Rotor Holder to IV with Titanium -> 21,299 EU/t (666 parallel!)
+        turbine.setRotorName("Titanium Turbine Rotor");
+        turbine.setRotorEfficiency(115);
+        turbine.setRotorPower(130);
+        turbine.setTargetTier(GTVoltageTier.IV);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(666, turbine.getParallel());
+        Assertions.assertEquals(21299.0, turbine.getSingleMachineEUt(), 0.001);
+
+        // 3. Downgrade Rotor Holder to HV -> capped at 1,331 EU/t (42 parallel)
+        turbine.setTargetTier(GTVoltageTier.HV);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(42, turbine.getParallel());
+        Assertions.assertEquals(1331.0, turbine.getSingleMachineEUt(), 0.001);
+
+        // 4. Upgrade Rotor Holder to LuV -> 85,196 EU/t (2,663 parallel)
+        turbine.setTargetTier(GTVoltageTier.LuV);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(2663, turbine.getParallel());
+        Assertions.assertEquals(85196.0, turbine.getSingleMachineEUt(), 0.001);
+
+        // 5. Korean localized name "티타늄 터빈 로터" on LuV
+        turbine.setRotorName("티타늄 터빈 로터");
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(2663, turbine.getParallel());
+        Assertions.assertEquals(85196.0, turbine.getSingleMachineEUt(), 0.001);
+
+        // 6. Equip Infinity Rotor on LuV (300% power) -> 196,608 EU/t -> 6,144 parallel
+        MachineAddon infinityRotor = new MachineAddon("gtceu:infinity_rotor", "Infinity Turbine Rotor", MachineAddon.Category.ROTOR, "200%", null);
+        infinityRotor.setDurationMultiplier(2.0);
+        infinityRotor.setRotorPower(300);
+        turbine.addAddon(infinityRotor);
+        turbine.autoCalculateTurbineParallel();
+        Assertions.assertEquals(6144, turbine.getParallel());
+        Assertions.assertEquals(196608.0, turbine.getSingleMachineEUt(), 0.001);
+    }
+
+    @Test
+    public void testHeatingCoilAddonBonuses() {
+        // 1. Create HSS-G Coil Addon (5400 K)
+        MachineAddon hssgCoil = new MachineAddon("gtceu:hssg_coil_block", "HSS-G Coil Block", MachineAddon.Category.COIL, "5400 K", null);
+        hssgCoil.setCoilTemperature(5400);
+        hssgCoil.setPyrolyseSpeedPercent(250);
+        hssgCoil.setCrackingEnergyPercent(60);
+        hssgCoil.setChemicalSpeedPercent(175);
+        hssgCoil.setChemicalEnergyPercent(80);
+        hssgCoil.setSmelterParallel(128);
+
+        // 2. Pyrolyse Oven: Speed 250% -> Duration 100/250 = 0.40x
+        RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 20.0, 64.0, GTVoltageTier.MV);
+        pyrolyse.addAddon(hssgCoil.forMachine(pyrolyse.getName()));
+        Assertions.assertEquals(0.40, pyrolyse.getEffectiveDurationSeconds(), 0.001); // 20 ticks * 0.40 = 8 ticks = 0.40s
+        Assertions.assertEquals(64.0, pyrolyse.getSingleMachineEUt(), 0.001);
+
+        // 3. Cracking Unit: Energy 60% -> EU/t 0.60x
+        RecipeNode cracker = RecipeNode.create("Cracking Unit", 20.0, 100.0, GTVoltageTier.HV);
+        cracker.addAddon(hssgCoil.forMachine(cracker.getName()));
+        Assertions.assertEquals(1.0, cracker.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(60.0, cracker.getSingleMachineEUt(), 0.001); // 100 * 0.60 = 60 EU/t
+
+        // 4. Chemical Reactor: Speed 175% (0.5714x duration), Energy 80% (0.80x EU/t)
+        RecipeNode lcr = RecipeNode.create("Large Chemical Reactor", 20.0, 100.0, GTVoltageTier.HV);
+        lcr.addAddon(hssgCoil.forMachine(lcr.getName()));
+        Assertions.assertEquals(1.0 / 1.75, lcr.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(80.0, lcr.getSingleMachineEUt(), 0.001); // 100 * 0.80 = 80 EU/t
+
+        // 5. Multi Smelter: Parallel 128x
+        RecipeNode smelter = RecipeNode.create("Multi Smelter", 20.0, 16.0, GTVoltageTier.MV);
+        MachineAddon smelterAddon = hssgCoil.forMachine(smelter.getName());
+        smelter.addAddon(smelterAddon);
+        Assertions.assertEquals(128, smelterAddon.getParallelMultiplier());
+        Assertions.assertEquals(128, smelter.getTotalParallel());
+
+        // 6. EBF (Electric Blast Furnace): 5% EU discount per 900K excess temperature above the recipe's requirement
+        // Case A: 1800K recipe with 5400K HSS-G coil -> 3600K excess (4 tiers) -> 0.95^4 EU/t
+        RecipeNode ebfAluminium = RecipeNode.create("Electric Blast Furnace", 20.0, 100.0, GTVoltageTier.MV);
+        ebfAluminium.setRecipeTemperature(1800);
+        ebfAluminium.addAddon(hssgCoil.forMachine(ebfAluminium));
+        Assertions.assertEquals(100.0 * Math.pow(0.95, 4), ebfAluminium.getSingleMachineEUt(), 0.001);
+
+        // Case B: 3600K recipe with 5400K HSS-G coil -> 1800K excess (2 tiers) -> 0.95^2 EU/t
+        RecipeNode ebfTungsten = RecipeNode.create("Electric Blast Furnace", 20.0, 100.0, GTVoltageTier.MV);
+        ebfTungsten.setRecipeTemperature(3600);
+        ebfTungsten.addAddon(hssgCoil.forMachine(ebfTungsten));
+        Assertions.assertEquals(100.0 * Math.pow(0.95, 2), ebfTungsten.getSingleMachineEUt(), 0.001);
+
+        // Case C: 5400K recipe with 5400K HSS-G coil -> 0K excess (0 tiers) -> 100.0 EU/t (0% discount)
+        RecipeNode ebfNaquadah = RecipeNode.create("Electric Blast Furnace", 20.0, 100.0, GTVoltageTier.MV);
+        ebfNaquadah.setRecipeTemperature(5400);
+        ebfNaquadah.addAddon(hssgCoil.forMachine(ebfNaquadah));
+        Assertions.assertEquals(100.0, ebfNaquadah.getSingleMachineEUt(), 0.001);
+    }
+
+    @Test
+    public void testMachineAddonCompatibilityFiltering() {
+        // 1. Gas Turbine (Generator)
+        RecipeNode turbine = RecipeNode.create("Large Gas Turbine", 40.0, 32.0, GTVoltageTier.LV);
+        turbine.setGenerator(true);
+        turbine.setMultiblock(true);
+        var turbineCats = MachineAddon.getRelevantCategories(turbine);
+        Assertions.assertTrue(turbineCats.contains(MachineAddon.Category.ROTOR));
+        Assertions.assertFalse(turbineCats.contains(MachineAddon.Category.COIL));
+        Assertions.assertTrue(turbineCats.contains(MachineAddon.Category.MAINTENANCE)); // Large Gas Turbine is a multiblock requiring maintenance
+
+        MachineAddon rotor = new MachineAddon("gtceu:titanium_rotor", "Titanium Rotor", MachineAddon.Category.ROTOR, "", null);
+        MachineAddon coil = new MachineAddon("gtceu:kanthal_coil", "Kanthal Coil", MachineAddon.Category.COIL, "", null);
+        Assertions.assertTrue(rotor.isCompatibleWith(turbine));
+        Assertions.assertFalse(coil.isCompatibleWith(turbine));
+
+        // 2. Pyrolyse Oven (Coil Multiblock)
+        RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 20.0, 64.0, GTVoltageTier.MV);
+        pyrolyse.setMultiblock(true);
+        var pyrolyseCats = MachineAddon.getRelevantCategories(pyrolyse);
+        Assertions.assertTrue(pyrolyseCats.contains(MachineAddon.Category.COIL));
+        Assertions.assertTrue(pyrolyseCats.contains(MachineAddon.Category.PARALLEL));
+        Assertions.assertTrue(pyrolyseCats.contains(MachineAddon.Category.MAINTENANCE));
+        Assertions.assertFalse(pyrolyseCats.contains(MachineAddon.Category.ROTOR));
+
+        Assertions.assertTrue(coil.isCompatibleWith(pyrolyse));
+        Assertions.assertFalse(rotor.isCompatibleWith(pyrolyse));
+
+        // 3. Single Block Centrifuge
+        RecipeNode centrifuge = RecipeNode.create("Centrifuge", 20.0, 30.0, GTVoltageTier.LV);
+        var centrifugeCats = MachineAddon.getRelevantCategories(centrifuge);
+        Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.COIL));
+        Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.ROTOR));
+        Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.MAINTENANCE));
+        Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.MULTIBLOCK_TRAIT));
+        Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.PARALLEL));
+        Assertions.assertTrue(centrifugeCats.contains(MachineAddon.Category.CUSTOM));
     }
 }

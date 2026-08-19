@@ -33,9 +33,8 @@ public class NodeCountEditor {
             double parsed = Double.parseDouble(buffer.trim());
             if (parsed > 0 && Math.abs(parsed - oldVal) > 0.0001) {
                 widget.getNode().setMachineCount(parsed);
-                widget.getParent().recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(
+                widget.getParent().recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(
                     widget.getNode().getId(),
-                    com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT,
                     oldVal,
                     parsed
                 ));

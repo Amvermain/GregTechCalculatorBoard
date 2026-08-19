@@ -8,6 +8,39 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [1.0.4] - 2026-08-19
+
+### Added
+- **Interactive Hardware Addon Configuration Modal (`MachineConfigDialog`, `MachineAddon`)**:
+  - **Interactive 3D Item Icon Rack**: Replaced the plain list with a 10-slot visual 3D item icon tray displaying equipped heating coils, maintenance hatches, turbine rotors, and traits simultaneously.
+  - **Quick Addon Actions**: Click equipped icon slots to immediately unequip, or click `[✕ Clear All]` to reset all hardware addons in one click.
+  - **Unified Category Filter & Instant Search**: Filter catalog items across `All`, `♨ Coil`, `⚡ Parallel`, `🔧 Maint`, `⚙ Traits`, and `+ Custom` with real-time text searching.
+  - **Visual Catalog Cards**: Displays high-fidelity 3D item samples, exact stats badges, and `✔` installed indicators with dynamic hover highlights.
+- **Dynamic Flowchart Addon Integration (`NodeCardRenderer`, `BoardTooltipRenderer`, `NodeWidget`)**:
+  - **Mini 3D Addon Tray on Node Cards**: Equipped addons render as compact 14x14 3D item icons directly on the machine count row of recipe cards on the canvas.
+  - **Rich Hardware & Addon Diagnostic Tooltips**: Hovering over the addon tray or `[⚙ 1x (+1)]` button renders an extensive tooltip showing multiblock/singleblock mode, effective parallel multipliers, and a formatted bulleted list of all active addon stats.
+  - **One-Click Config Dialog Access**: Clicking either the mini addon icons or the parallel button opens the hardware configuration dialog.
+- **Cross-Mod Dynamic Addon & Coil Discovery (`DynamicAddonCrawler`)**:
+  - **Java Reflection Engine**: Dynamically introspects `Block` and `ICoilType` / `CoilType` objects in memory across all mods (GTCEu, KubeJS, Star Technology, GregTech addons).
+  - **Multi-Flag Tooltip Analysis**: Parses both advanced and standard tooltip flags to dynamically extract heat capacity, processing speed, energy consumption, and parallel bonuses.
+  - **Full Support for Modpack Custom Coils**: Seamlessly recognizes `kubejs:zalloy_coil_block` (13499K), `kubejs:magmada_alloy_coil_block` (16199K), `draconium`, `awakened`, `infinity`, `hypogen`, `eternity`, etc.
+- **`Multiblock Info` Recipe-Based Dynamic Multiblock Detection (`MultiblockDetector`)**:
+  - Completely removed string name heuristics and replaced them with direct scanning of EMI's `multiblock_info` structure recipes and GTCEu machine definitions, reliably identifying multiblock variants for all processing machines (Large Mixer, Large Chemical Reactor, etc.).
+
+### Changed
+- **Standardized Coil Stat Badges**: All heating coil badges consistently lead with their base heat capacity (`♨ [Temp]K`), clearly differentiating them while appending machine-tailored speed/energy discounts where applicable.
+- **Cleaned Up Catalog Card Layout**: Removed redundant bottom install text labels, eliminating text truncation and expanding space for full item names and stat badges.
+- **Mouse Wheel Interaction Refinement**: Removed accidental mouse wheel scrolling on the parallel button on node cards, preserving wheel scrolling strictly for Voltage Tier cycling and Alternative Ingredients.
+
+### Fixed
+- **Keybind Capture in System Screens (`GregTechCalcBoard`, `KeyBindings`)**: Prevented `ADD_RECIPE` key event intercept inside Minecraft's Options, Controls, Key Binds (`KeyBindsScreen`), Chat, Pause, Death, and Title screens, fixing an issue where rebinding keys would accidentally open the calculator board.
+- **Text Input Focus Guard**: Prevented global hotkey triggers while any `EditBox` or search text field is actively focused.
+- **Shift Requirement & Line Wrapping in Addon Tooltips**: Removed the requirement to hold Shift to view coil stats in calculation dialogs, and replaced long single-line strings with clean multi-line bullet points.
+- **Duplicate Remove Icon**: Fixed a double `✕` bug (`✕ ✕ Remove`) in addon tooltips.
+- **Crawler False Positives**: Filtered out fusion coils, wire coil crafting items (`lv_coil`..`uhv_coil`), non-block parts, and cover items from heating coil and maintenance tabs.
+
+---
+
 ## [1.0.3] - 2026-08-18
 
 ### Added

@@ -280,8 +280,19 @@ public class NodeWidget {
         return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
+    public boolean isAddonTrayHovered(double mouseX, double mouseY) {
+        if (node.isModule() || node.getAddons().isEmpty()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int ctrlY = y + HEADER_HEIGHT + 6;
+        int cardW = getWidth();
+        int trayWidth = Math.min(node.getAddons().size(), 3) * 16 + (node.getAddons().size() > 3 ? 16 : 0);
+        return mouseX >= x + cardW - 6 - trayWidth && mouseX <= x + cardW - 6 && mouseY >= ctrlY - 2 && mouseY <= ctrlY + 16;
+    }
+
     public boolean isMachineConfigButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
+        if (isAddonTrayHovered(mouseX, mouseY)) return true;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
@@ -336,11 +347,6 @@ public class NodeWidget {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (isTierButtonHovered(mouseX, mouseY)) {
             return changeTier(delta > 0 ? +1 : -1);
-        }
-        if (isParallelButtonHovered(mouseX, mouseY)) {
-            boolean fineStep = Screen.hasShiftDown();
-            parallelEditor.stepParallel(delta > 0 ? 1 : -1, fineStep);
-            return true;
         }
 
         int inIdx = getHoveredInputPortIndex(mouseX, mouseY);
@@ -404,7 +410,7 @@ public class NodeWidget {
         // Target Base Node Toggle Button [🎯]
         if (isTargetButtonHovered(mouseX, mouseY)) {
             boolean nowBase = !node.isBaseNode();
-            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.BASE_ANCHOR, !nowBase, nowBase));
+            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.baseAnchor(node.getId(), !nowBase, nowBase));
             parent.getGraph().setBaseNode(nowBase ? node : null);
             parent.rebuildWidgets();
             parent.markSummaryDirty();
@@ -433,7 +439,7 @@ public class NodeWidget {
             double newVal = Math.max(1.0, oldVal - 1);
             if (oldVal != newVal) {
                 node.setMachineCount(newVal);
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+                parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
             }
             updateCountBuffer();
             invalidateCache();
@@ -455,7 +461,7 @@ public class NodeWidget {
             double oldVal = node.getMachineCount();
             double newVal = oldVal + 1;
             node.setMachineCount(newVal);
-            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
             updateCountBuffer();
             invalidateCache();
             return true;
@@ -468,7 +474,7 @@ public class NodeWidget {
             double newVal = Math.max(1.0, Math.floor(oldVal / 2.0));
             if (oldVal != newVal) {
                 node.setMachineCount(newVal);
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+                parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
             }
             updateCountBuffer();
             invalidateCache();
@@ -481,7 +487,7 @@ public class NodeWidget {
             double oldVal = node.getMachineCount();
             double newVal = oldVal * 2.0;
             node.setMachineCount(newVal);
-            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldVal, newVal));
+            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
             updateCountBuffer();
             invalidateCache();
             return true;
@@ -495,7 +501,7 @@ public class NodeWidget {
             changeTier(direction);
             GTVoltageTier newTier = node.getTargetTier();
             if (oldTier != newTier) {
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.TARGET_TIER, oldTier, newTier));
+                parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
             }
             invalidateCache();
             return true;
@@ -507,7 +513,7 @@ public class NodeWidget {
             OverclockMode oldOc = node.getOverclockMode();
             OverclockMode newOc = (oldOc == OverclockMode.STANDARD) ? OverclockMode.PERFECT : OverclockMode.STANDARD;
             node.setOverclockMode(newOc);
-            parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(node.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.OVERCLOCK_MODE, oldOc, newOc));
+            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.overclockMode(node.getId(), oldOc, newOc));
             invalidateCache();
             return true;
         }

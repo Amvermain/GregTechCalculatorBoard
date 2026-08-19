@@ -116,24 +116,59 @@ public class HistoryTest {
 
         // Modify Machine Count (1.0 -> 8.0)
         node.setMachineCount(8.0);
-        historyManager.record(new BoardCommand.ModifyPropertyCommand(
-            node.getId(),
-            BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT,
-            1.0,
-            8.0
-        ));
+        historyManager.record(BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), 1.0, 8.0));
 
         // Modify Custom Name
         node.setName("Sulfuric Acid Line 1");
-        historyManager.record(new BoardCommand.ModifyPropertyCommand(
-            node.getId(),
-            BoardCommand.ModifyPropertyCommand.Property.CUSTOM_NAME,
-            "Chemical Reactor",
-            "Sulfuric Acid Line 1"
-        ));
+        historyManager.record(BoardCommand.ModifyPropertyCommand.customName(node.getId(), "Chemical Reactor", "Sulfuric Acid Line 1"));
 
+        // Modify Tier (LV -> HV)
+        node.setTargetTier(GTVoltageTier.HV);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), GTVoltageTier.LV, GTVoltageTier.HV));
+
+        // Modify OverclockMode (STANDARD -> PERFECT)
+        node.setOverclockMode(com.gtceu.calcboard.api.OverclockMode.PERFECT);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.overclockMode(node.getId(), com.gtceu.calcboard.api.OverclockMode.STANDARD, com.gtceu.calcboard.api.OverclockMode.PERFECT));
+
+        // Modify Parallel (1 -> 16)
+        node.setParallel(16);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.parallel(node.getId(), 1, 16));
+
+        // Modify Base Anchor (false -> true)
+        node.setBaseNode(true);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.baseAnchor(node.getId(), false, true));
+
+        // Modify Rotor Efficiency (100 -> 220)
+        node.setRotorEfficiency(220);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.rotorEfficiency(node.getId(), 100, 220));
+
+        assertEquals(220, node.getRotorEfficiency());
+        assertTrue(node.isBaseNode());
+        assertEquals(16, node.getParallel());
+        assertEquals(com.gtceu.calcboard.api.OverclockMode.PERFECT, node.getOverclockMode());
+        assertEquals(GTVoltageTier.HV, node.getTargetTier());
         assertEquals("Sulfuric Acid Line 1", node.getName());
         assertEquals(8.0, node.getMachineCount(), 0.001);
+
+        // Undo Rotor
+        historyManager.undo(graph);
+        assertEquals(100, node.getRotorEfficiency());
+
+        // Undo Base Anchor
+        historyManager.undo(graph);
+        assertFalse(node.isBaseNode());
+
+        // Undo Parallel
+        historyManager.undo(graph);
+        assertEquals(1, node.getParallel());
+
+        // Undo OC
+        historyManager.undo(graph);
+        assertEquals(com.gtceu.calcboard.api.OverclockMode.STANDARD, node.getOverclockMode());
+
+        // Undo Tier
+        historyManager.undo(graph);
+        assertEquals(GTVoltageTier.LV, node.getTargetTier());
 
         // Undo Name
         historyManager.undo(graph);
@@ -145,13 +180,27 @@ public class HistoryTest {
         assertEquals("Chemical Reactor", node.getName());
         assertEquals(1.0, node.getMachineCount(), 0.001);
 
-        // Redo Count
-        historyManager.redo(graph);
+        // Redo all
+        historyManager.redo(graph); // Count
         assertEquals(8.0, node.getMachineCount(), 0.001);
 
-        // Redo Name
-        historyManager.redo(graph);
+        historyManager.redo(graph); // Name
         assertEquals("Sulfuric Acid Line 1", node.getName());
+
+        historyManager.redo(graph); // Tier
+        assertEquals(GTVoltageTier.HV, node.getTargetTier());
+
+        historyManager.redo(graph); // OC
+        assertEquals(com.gtceu.calcboard.api.OverclockMode.PERFECT, node.getOverclockMode());
+
+        historyManager.redo(graph); // Parallel
+        assertEquals(16, node.getParallel());
+
+        historyManager.redo(graph); // Base Anchor
+        assertTrue(node.isBaseNode());
+
+        historyManager.redo(graph); // Rotor
+        assertEquals(220, node.getRotorEfficiency());
     }
 
     @Test

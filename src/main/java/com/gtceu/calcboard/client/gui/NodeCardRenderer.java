@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.BoardManager;
 import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.api.FlowGraphSolver;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.OverclockMode;
@@ -155,7 +156,34 @@ public class NodeCardRenderer {
             String machinesBadge = String.format("§d📦 %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
             int badgeW = font.width(machinesBadge);
             graphics.drawString(font, machinesBadge, x + cardW - 6 - badgeW, ctrlY + 3, 0xFFFFFFFF, false);
-        } else {
+        } else if (!node.getAddons().isEmpty()) {
+            // Mini Installed Addons Tray on the right of Count row
+            List<com.gtceu.calcboard.api.MachineAddon> addons = node.getAddons();
+            int maxIcons = Math.min(addons.size(), 3);
+            int trayX = x + cardW - 6;
+            for (int a = maxIcons - 1; a >= 0; a--) {
+                var addon = addons.get(a);
+                trayX -= 15;
+                boolean iconHover = mouseX >= trayX && mouseX <= trayX + 14 && mouseY >= ctrlY - 1 && mouseY <= ctrlY + 13;
+                graphics.fill(trayX, ctrlY - 1, trayX + 14, ctrlY + 13, iconHover ? 0xFF2F3B4D : 0xFF181D26);
+                graphics.renderOutline(trayX, ctrlY - 1, 14, 14, iconHover ? 0xFF58D3FF : 0xFF354054);
+                if (!addon.getItemStackSample().isEmpty()) {
+                    graphics.pose().pushPose();
+                    graphics.pose().translate(trayX - 1, ctrlY - 2, 0);
+                    graphics.pose().scale(0.80f, 0.80f, 1.0f);
+                    graphics.renderItem(addon.getItemStackSample(), 1, 1);
+                    graphics.pose().popPose();
+                }
+            }
+            if (addons.size() > 3) {
+                String extraStr = "+" + (addons.size() - 3);
+                int extraW = font.width(extraStr);
+                trayX -= (extraW + 3);
+                graphics.drawString(font, "§b" + extraStr, trayX, ctrlY + 2, 0xFFFFFFFF, false);
+            }
+        }
+
+        if (!node.isModule()) {
             // 6. Second Row Controls: [Tier] + [OC / Rotor] + [Parallel]
             GTVoltageTier tier = node.getTargetTier();
             drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
@@ -241,7 +269,7 @@ public class NodeCardRenderer {
                 int inPortX = x + 4;
                 int inPortY = rowY + 5;
 
-                FlowGraph.PortFlowStats stats = graph != null ? graph.getInputPortStats(node, i) : null;
+                FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getInputPortStats(node, i) : null;
                 boolean isConnected = stats != null && stats.isConnected();
                 boolean isBalanced = stats != null && stats.isBalanced();
                 boolean isDeficit = stats != null && stats.isInputDeficit();
@@ -254,7 +282,7 @@ public class NodeCardRenderer {
                     graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, portColor);
                 }
 
-                in.render(graphics, x + 12, rowY - 1);
+                IngredientRenderer.render(graphics, in, x + 12, rowY - 1);
                 if (in.hasAlternatives()) {
                     graphics.drawString(font, "§e⟲", x + 21, rowY + 6, 0xFFFFFFFF, true);
                 }
@@ -284,7 +312,7 @@ public class NodeCardRenderer {
                 int outPortX = x + cardW - 10;
                 int outPortY = rowY + 5;
 
-                FlowGraph.PortFlowStats stats = graph != null ? graph.getOutputPortStats(node, i) : null;
+                FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getOutputPortStats(node, i) : null;
                 boolean isConnected = stats != null && stats.isConnected();
                 boolean isBalanced = stats != null && stats.isBalanced();
                 boolean isSurplus = stats != null && stats.isOutputSurplus(); // Produced > Demanded (Safe / Surplus)
@@ -316,7 +344,7 @@ public class NodeCardRenderer {
                 int textW = font.width(rateStr);
                 graphics.drawString(font, rateStr, x + cardW - 30 - textW, rowY + 4, textColor, false);
 
-                out.render(graphics, x + cardW - 28, rowY - 1);
+                IngredientRenderer.render(graphics, out, x + cardW - 28, rowY - 1);
             }
         }
 

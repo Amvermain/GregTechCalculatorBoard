@@ -1,7 +1,5 @@
 package com.gtceu.calcboard.api;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
@@ -120,10 +118,6 @@ public class BoardManager {
     public void switchPage(int index) {
         if (index >= 0 && index < pages.size()) {
             this.activePageIndex = index;
-            BoardPage active = getActivePage();
-            BoardScreen.lastPanX = active.getPanX();
-            BoardScreen.lastPanY = active.getPanY();
-            BoardScreen.lastZoom = active.getZoom();
         }
     }
 
@@ -203,10 +197,6 @@ public class BoardManager {
                     this.activePageIndex = 0;
                 }
 
-                BoardPage active = getActivePage();
-                BoardScreen.lastPanX = active.getPanX();
-                BoardScreen.lastPanY = active.getPanY();
-                BoardScreen.lastZoom = active.getZoom();
                 return true;
             }
         } catch (Exception e) {
@@ -216,8 +206,12 @@ public class BoardManager {
     }
 
     public File getSaveDirectory() {
-        Minecraft mc = Minecraft.getInstance();
-        File gameDir = mc.gameDirectory;
+        File gameDir;
+        try {
+            gameDir = net.minecraftforge.fml.loading.FMLPaths.GAMEDIR.get().toFile();
+        } catch (Throwable t) {
+            gameDir = new File(".");
+        }
         File dir = new File(gameDir, "gtcalcboard");
         if (!dir.exists()) {
             dir.mkdirs();

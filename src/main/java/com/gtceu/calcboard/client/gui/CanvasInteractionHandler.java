@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.api.FlowGraphSolver;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
 import net.minecraft.client.Minecraft;
@@ -316,56 +317,23 @@ public class CanvasInteractionHandler {
                                 Double newMachineCount = null;
 
                                 if (shiftDown && wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
-                                    IngredientStack outStack = fromNode.getOutputs().get(wireStartPortIdx);
-                                    double producedRate = fromNode.getCyclesPerSecond() * outStack.getExpectedAmount();
+                                    double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, fromNode, wireStartPortIdx, toNode, inPortIdx);
+                                    newMachineCount = matchedCount;
+                                    toNode.setMachineCount(matchedCount);
+                                    targetWidget.updateCountBuffer();
+                                    targetWidget.invalidateCache();
 
-                                    IngredientStack inStack = toNode.getInputs().get(inPortIdx);
-                                    double singleInRate = toNode.getOverclockResult().getCyclesPerSecond() * toNode.getParallel() * inStack.getAmount();
-
-                                    // Sum other existing supplies flowing into this consumer input port
-                                    double existingSupply = 0.0;
-                                    for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                                        if (edge.toNodeId().equals(toNode.getId()) && edge.inputIndex() == inPortIdx) {
-                                            if (!edge.fromNodeId().equals(fromNode.getId())) {
-                                                RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
-                                                if (otherProd != null && edge.outputIndex() < otherProd.getOutputs().size()) {
-                                                    IngredientStack pOut = otherProd.getOutputs().get(edge.outputIndex());
-                                                    double pRate = otherProd.getCyclesPerSecond() * pOut.getExpectedAmount();
-
-                                                    int outDegree = 0;
-                                                    for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                                                        if (outEdge.fromNodeId().equals(otherProd.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
-                                                            outDegree++;
-                                                        }
-                                                    }
-                                                    existingSupply += pRate / Math.max(1, outDegree);
-                                                }
-                                            }
-                                        }
+                                    Minecraft mc = Minecraft.getInstance();
+                                    if (mc.player != null) {
+                                        mc.player.displayClientMessage(Component.literal("§a✔ ").append(
+                                            Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.0f", matchedCount))
+                                        ), true);
                                     }
-
-                                    double totalAvailableSupply = producedRate + existingSupply;
-
-                                    if (singleInRate > 0.0001) {
-                                        // Forward match (Consumer): Floor so consumer demand never exceeds producer supply (Supply >= Demand)
-                                        double matchedCount = Math.max(1.0, Math.floor((totalAvailableSupply / singleInRate) + 0.00001));
-                                        newMachineCount = matchedCount;
-                                        toNode.setMachineCount(matchedCount);
-                                        targetWidget.updateCountBuffer();
-                                        targetWidget.invalidateCache();
-
-                                        Minecraft mc = Minecraft.getInstance();
-                                        if (mc.player != null) {
-                                            mc.player.displayClientMessage(Component.literal("§a✔ ").append(
-                                                Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.0f", matchedCount))
-                                            ), true);
-                                        }
-                                        mc.getSoundManager().play(
-                                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                                SoundEvents.PLAYER_LEVELUP, 1.2F
-                                            )
-                                        );
-                                    }
+                                    mc.getSoundManager().play(
+                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                            SoundEvents.PLAYER_LEVELUP, 1.2F
+                                        )
+                                    );
                                 } else {
                                     Minecraft.getInstance().getSoundManager().play(
                                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
@@ -403,55 +371,23 @@ public class CanvasInteractionHandler {
                                 Double newMachineCount = null;
 
                                 if (shiftDown && outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx < toNode.getInputs().size()) {
-                                    IngredientStack inStack = toNode.getInputs().get(wireStartPortIdx);
-                                    double totalDemand = toNode.getCyclesPerSecond() * inStack.getAmount();
+                                    double matchedCount = FlowGraphSolver.calculateProducerMatchCount(graph, fromNode, outPortIdx, toNode, wireStartPortIdx);
+                                    newMachineCount = matchedCount;
+                                    fromNode.setMachineCount(matchedCount);
+                                    targetWidget.updateCountBuffer();
+                                    targetWidget.invalidateCache();
 
-                                    // Calculate existing supply already flowing into this input port from OTHER producers
-                                    double existingSupply = 0.0;
-                                    for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                                        if (edge.toNodeId().equals(toNode.getId()) && edge.inputIndex() == wireStartPortIdx) {
-                                            if (!edge.fromNodeId().equals(fromNode.getId())) {
-                                                RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
-                                                if (otherProd != null && edge.outputIndex() < otherProd.getOutputs().size()) {
-                                                    IngredientStack pOut = otherProd.getOutputs().get(edge.outputIndex());
-                                                    double pRate = otherProd.getCyclesPerSecond() * pOut.getExpectedAmount();
-
-                                                    int outDegree = 0;
-                                                    for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                                                        if (outEdge.fromNodeId().equals(otherProd.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
-                                                            outDegree++;
-                                                        }
-                                                    }
-                                                    existingSupply += pRate / Math.max(1, outDegree);
-                                                }
-                                            }
-                                        }
+                                    Minecraft mc = Minecraft.getInstance();
+                                    if (mc.player != null) {
+                                        mc.player.displayClientMessage(Component.literal("§a✔ ").append(
+                                            Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), String.format("%.0f", matchedCount))
+                                        ), true);
                                     }
-
-                                    double netNeededRate = Math.max(0.0, totalDemand - existingSupply);
-                                    IngredientStack outStack = fromNode.getOutputs().get(outPortIdx);
-                                    double singleOutRate = fromNode.getOverclockResult().getCyclesPerSecond() * fromNode.getParallel() * outStack.getExpectedAmount();
-
-                                    if (singleOutRate > 0.0001) {
-                                        double rateToSupply = netNeededRate > 0.0001 ? netNeededRate : singleOutRate;
-                                        double matchedCount = Math.max(1.0, Math.ceil((rateToSupply / singleOutRate) - 0.00001));
-                                        newMachineCount = matchedCount;
-                                        fromNode.setMachineCount(matchedCount);
-                                        targetWidget.updateCountBuffer();
-                                        targetWidget.invalidateCache();
-
-                                        Minecraft mc = Minecraft.getInstance();
-                                        if (mc.player != null) {
-                                            mc.player.displayClientMessage(Component.literal("§a✔ ").append(
-                                                Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), String.format("%.0f", matchedCount))
-                                            ), true);
-                                        }
-                                        mc.getSoundManager().play(
-                                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                                SoundEvents.PLAYER_LEVELUP, 1.2F
-                                            )
-                                        );
-                                    }
+                                    mc.getSoundManager().play(
+                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                            SoundEvents.PLAYER_LEVELUP, 1.2F
+                                        )
+                                    );
                                 } else {
                                     Minecraft.getInstance().getSoundManager().play(
                                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(

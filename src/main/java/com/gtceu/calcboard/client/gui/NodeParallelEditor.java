@@ -35,9 +35,8 @@ public class NodeParallelEditor {
                 int newVal = Math.min(65536, parsed);
                 if (oldVal != newVal) {
                     widget.getNode().setParallel(newVal);
-                    widget.getParent().recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(
+                    widget.getParent().recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.parallel(
                         widget.getNode().getId(),
-                        com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.PARALLEL,
                         oldVal,
                         newVal
                     ));

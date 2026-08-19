@@ -56,6 +56,12 @@ minecraft {
     }
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 repositories {
     mavenCentral()
     maven { url = "https://maven.terraformersmc.com/" }
@@ -63,7 +69,12 @@ repositories {
     maven { url = "https://www.cursemaven.com" }
     maven { url = "https://api.modrinth.com/maven" }
     flatDir {
-        dirs 'libs', "${System.getProperty('user.home')}/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods", 'C:/Users/JongUk/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods'
+        def localMods = localProperties.getProperty('target.mods.dir')
+        def dirsList = ['libs', 'instance/mods', "${System.getProperty('user.home')}/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods"]
+        if (localMods) {
+            dirsList.add(localMods)
+        }
+        dirs dirsList.toArray()
     }
 }
 
@@ -74,14 +85,28 @@ dependencies {
     compileOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
     runtimeOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
 
-    // JEI API (Optional / Fallback)
+    // JEI API & Runtime (Required for Thermal Series native JEI plugin -> EMI bridge)
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+    runtimeOnly fg.deobf("local:jei-${minecraft_version}-forge-${jei_runtime_version}:${jei_runtime_version}")
+
+    // Jade (WAILA / Block Tooltip HUD mod for runClient testing)
+    runtimeOnly fg.deobf("maven.modrinth:jade:11.13.2+forge")
 
     // GregTech Modern (StarT Fork) & LowDragLib (Prism Launcher mods)
     compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
     runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
     runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
+
+    // Thermal Series (CoFH Core, Thermal Foundation, Thermal Expansion, Thermal Cultivation)
+    compileOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
+    runtimeOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
+    compileOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
+    runtimeOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
+    compileOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
+    runtimeOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
+    compileOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
+    runtimeOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
 
     // Create (필요 시 주석 해제)
     // runtimeOnly fg.deobf(name: "create-${minecraft_version}-${create_version}")
@@ -127,12 +152,6 @@ tasks.named('jar', Jar).configure {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-}
-
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withInputStream { localProperties.load(it) }
 }
 
 tasks.register('deployToInstance', Copy) {

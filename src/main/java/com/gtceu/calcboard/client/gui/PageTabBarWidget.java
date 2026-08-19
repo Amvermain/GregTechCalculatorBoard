@@ -192,7 +192,19 @@ public class PageTabBarWidget {
                     lastClickedTabIdx = i;
                     commitRename();
                     if (i != activeIdx) {
+                        BoardPage cur = bm.getActivePage();
+                        if (cur != null) {
+                            cur.setPanX(screen.getPanX());
+                            cur.setPanY(screen.getPanY());
+                            cur.setZoom(screen.getZoom());
+                        }
                         bm.switchPage(i);
+                        BoardPage next = bm.getActivePage();
+                        if (next != null) {
+                            screen.setPanX(next.getPanX());
+                            screen.setPanY(next.getPanY());
+                            screen.setZoom(next.getZoom());
+                        }
                         screen.rebuildWidgets();
                         playClickSound();
                     }

@@ -163,7 +163,7 @@ public class SummaryOverlay {
     }
 
     private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH) {
-        stack.render(graphics, x + 8, y - 2);
+        IngredientRenderer.render(graphics, stack, x + 8, y - 2);
 
         String name = stack.getDisplayName();
         if (name.length() > 13) {

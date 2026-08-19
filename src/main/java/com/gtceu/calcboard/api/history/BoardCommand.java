@@ -221,7 +221,7 @@ public interface BoardCommand {
     /**
      * Node property modification (Count, Tier, OC, Parallel, Rotor, Title, Anchor).
      */
-    class ModifyPropertyCommand implements BoardCommand {
+    class ModifyPropertyCommand<T> implements BoardCommand {
         public enum Property {
             MACHINE_COUNT,
             TARGET_TIER,
@@ -236,14 +236,50 @@ public interface BoardCommand {
 
         private final String nodeId;
         private final Property property;
-        private final Object oldValue;
-        private final Object newValue;
+        private final T oldValue;
+        private final T newValue;
 
-        public ModifyPropertyCommand(String nodeId, Property property, Object oldValue, Object newValue) {
+        public ModifyPropertyCommand(String nodeId, Property property, T oldValue, T newValue) {
             this.nodeId = nodeId;
             this.property = property;
             this.oldValue = oldValue;
             this.newValue = newValue;
+        }
+
+        public static ModifyPropertyCommand<Double> machineCount(String nodeId, double oldVal, double newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.MACHINE_COUNT, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<com.gtceu.calcboard.api.GTVoltageTier> targetTier(String nodeId, com.gtceu.calcboard.api.GTVoltageTier oldVal, com.gtceu.calcboard.api.GTVoltageTier newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.TARGET_TIER, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<com.gtceu.calcboard.api.OverclockMode> overclockMode(String nodeId, com.gtceu.calcboard.api.OverclockMode oldVal, com.gtceu.calcboard.api.OverclockMode newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.OVERCLOCK_MODE, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<Integer> parallel(String nodeId, int oldVal, int newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.PARALLEL, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<String> customName(String nodeId, String oldVal, String newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.CUSTOM_NAME, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<Boolean> baseAnchor(String nodeId, boolean oldVal, boolean newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.BASE_ANCHOR, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<Integer> rotorEfficiency(String nodeId, int oldVal, int newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.ROTOR_EFFICIENCY, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<Integer> rotorPower(String nodeId, int oldVal, int newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.ROTOR_POWER, oldVal, newVal);
+        }
+
+        public static ModifyPropertyCommand<String> rotorName(String nodeId, String oldVal, String newVal) {
+            return new ModifyPropertyCommand<>(nodeId, Property.ROTOR_NAME, oldVal, newVal);
         }
 
         @Override
@@ -256,29 +292,46 @@ public interface BoardCommand {
             applyValue(graph, newValue);
         }
 
-        private void applyValue(FlowGraph graph, Object val) {
+        private void applyValue(FlowGraph graph, T val) {
             RecipeNode node = graph.findNodeById(nodeId);
             if (node == null || val == null) return;
 
             switch (property) {
-                case MACHINE_COUNT -> node.setMachineCount(((Number) val).doubleValue());
-                case TARGET_TIER -> node.setTargetTier((com.gtceu.calcboard.api.GTVoltageTier) val);
-                case OVERCLOCK_MODE -> node.setOverclockMode((com.gtceu.calcboard.api.OverclockMode) val);
-                case PARALLEL -> node.setParallel(((Number) val).intValue());
-                case CUSTOM_NAME -> node.setName((String) val);
+                case MACHINE_COUNT -> {
+                    if (val instanceof Number n) node.setMachineCount(n.doubleValue());
+                }
+                case TARGET_TIER -> {
+                    if (val instanceof com.gtceu.calcboard.api.GTVoltageTier t) node.setTargetTier(t);
+                }
+                case OVERCLOCK_MODE -> {
+                    if (val instanceof com.gtceu.calcboard.api.OverclockMode m) node.setOverclockMode(m);
+                }
+                case PARALLEL -> {
+                    if (val instanceof Number n) node.setParallel(n.intValue());
+                }
+                case CUSTOM_NAME -> {
+                    if (val instanceof String s) node.setName(s);
+                }
                 case BASE_ANCHOR -> {
-                    boolean isBase = (Boolean) val;
-                    if (isBase) {
-                        for (RecipeNode n : graph.getNodes()) {
-                            n.setBaseNode(n.getId().equals(nodeId));
+                    if (val instanceof Boolean b) {
+                        if (b) {
+                            for (RecipeNode n : graph.getNodes()) {
+                                n.setBaseNode(n.getId().equals(nodeId));
+                            }
+                        } else {
+                            node.setBaseNode(false);
                         }
-                    } else {
-                        node.setBaseNode(false);
                     }
                 }
-                case ROTOR_EFFICIENCY -> node.setRotorEfficiency(((Number) val).intValue());
-                case ROTOR_POWER -> node.setRotorPower(((Number) val).intValue());
-                case ROTOR_NAME -> node.setRotorName((String) val);
+                case ROTOR_EFFICIENCY -> {
+                    if (val instanceof Number n) node.setRotorEfficiency(n.intValue());
+                }
+                case ROTOR_POWER -> {
+                    if (val instanceof Number n) node.setRotorPower(n.intValue());
+                }
+                case ROTOR_NAME -> {
+                    if (val instanceof String s) node.setRotorName(s);
+                }
             }
         }
 

@@ -10,7 +10,7 @@ public class KeyBindings {
 
     public static final KeyMapping OPEN_BOARD = new KeyMapping(
         "key.gtcalcboard.open_board",
-        KeyConflictContext.UNIVERSAL,
+        KeyConflictContext.IN_GAME,
         InputConstants.Type.KEYSYM,
         GLFW.GLFW_KEY_B,
         CATEGORY
@@ -18,7 +18,7 @@ public class KeyBindings {
 
     public static final KeyMapping ADD_RECIPE = new KeyMapping(
         "key.gtcalcboard.add_recipe",
-        KeyConflictContext.UNIVERSAL,
+        KeyConflictContext.GUI,
         InputConstants.Type.KEYSYM,
         GLFW.GLFW_KEY_A,
         CATEGORY

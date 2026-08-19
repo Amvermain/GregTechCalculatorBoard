@@ -25,6 +25,7 @@ public class GregTechCalcBoard {
         var modBus = context.getModEventBus();
         modBus.addListener(this::clientSetup);
         modBus.addListener(this::registerKeys);
+        modBus.addListener(this::registerReloadListeners);
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(com.gtceu.calcboard.integration.emi.CalcBoardEmiOverlay.class);
@@ -32,6 +33,12 @@ public class GregTechCalcBoard {
 
     private void clientSetup(final FMLClientSetupEvent event) {
         // Client initialization
+    }
+
+    private void registerReloadListeners(final net.minecraftforge.client.event.RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener) resourceManager -> {
+            com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().refresh();
+        });
     }
 
     private void registerKeys(final RegisterKeyMappingsEvent event) {
@@ -53,7 +60,39 @@ public class GregTechCalcBoard {
 
     @SubscribeEvent
     public void onScreenKeyPressed(ScreenEvent.KeyPressed.Pre event) {
-        if (KeyBindings.ADD_RECIPE.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))) {
+        net.minecraft.client.gui.screens.Screen screen = event.getScreen();
+        if (screen == null) return;
+
+        // 1. Never capture keys in system, options, keybinds, controls, pause, or chat screens
+        if (screen instanceof net.minecraft.client.gui.screens.OptionsScreen
+                || screen instanceof net.minecraft.client.gui.screens.controls.KeyBindsScreen
+                || screen instanceof net.minecraft.client.gui.screens.controls.ControlsScreen
+                || screen instanceof net.minecraft.client.gui.screens.ChatScreen
+                || screen instanceof net.minecraft.client.gui.screens.PauseScreen
+                || screen instanceof net.minecraft.client.gui.screens.TitleScreen
+                || screen instanceof net.minecraft.client.gui.screens.DeathScreen) {
+            return;
+        }
+
+        String screenClass = screen.getClass().getName();
+        if (screenClass.contains("KeyBinds") || screenClass.contains("Controls") || screenClass.contains("options")) {
+            return;
+        }
+
+        // 2. Never capture keys if any EditBox or text input is currently focused
+        var focused = screen.getFocused();
+        if (focused instanceof net.minecraft.client.gui.components.EditBox) {
+            return;
+        }
+        if (focused != null) {
+            String focusedClass = focused.getClass().getName();
+            if (focusedClass.contains("EditBox") || focusedClass.contains("TextField") || focusedClass.contains("Search")) {
+                return;
+            }
+        }
+
+        // 3. Process ADD_RECIPE only when bound and hovering over a recipe in recipe/inventory screens
+        if (!KeyBindings.ADD_RECIPE.isUnbound() && KeyBindings.ADD_RECIPE.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))) {
             try {
                 // If cursor is hovering over an EMI stack / recipe context
                 var interaction = EmiApi.getHoveredStack(true);

@@ -291,9 +291,8 @@ public class ToolbarWidget {
             double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
             double newC = n.getMachineCount();
             if (Math.abs(oldC - newC) > 0.0001) {
-                subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(
+                subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(
                     n.getId(),
-                    com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT,
                     oldC,
                     newC
                 ));
@@ -306,6 +305,7 @@ public class ToolbarWidget {
 
         for (NodeWidget w : screen.getNodeWidgets()) {
             w.updateCountBuffer();
+            w.invalidateCache();
         }
         screen.markSummaryDirty();
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onAutoRatioTriggered();
@@ -319,19 +319,39 @@ public class ToolbarWidget {
     }
 
     public void performMaxThroughputOptimization() {
+        runMaxFlow();
+        
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.literal("§6🚀 ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")), true);
+        }
+        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+    }
+
+    private void runMaxFlow() {
         FlowGraph graph = screen.getGraph();
         RecipeNode baseNode = graph.findBaseNode();
         if (baseNode == null && !graph.getNodes().isEmpty()) {
             baseNode = graph.getNodes().get(0);
         }
 
+        // Snapshot existing settings
         Map<String, Object[]> oldProps = new HashMap<>();
         for (RecipeNode n : graph.getNodes()) {
             oldProps.put(n.getId(), new Object[]{n.getTargetTier(), n.getOverclockMode(), n.getParallel(), n.getMachineCount()});
         }
 
-        graph.optimizeMaxThroughput(true, false);
+        // 1. Maximize Overclock (up to MAX)
+        for (RecipeNode n : graph.getNodes()) {
+            com.gtceu.calcboard.api.GTVoltageTier baseTier = n.getRecipeTier();
+            com.gtceu.calcboard.api.GTVoltageTier targetTier = com.gtceu.calcboard.api.GTVoltageTier.MAX;
+            if (targetTier.ordinal() < baseTier.ordinal()) {
+                targetTier = baseTier;
+            }
+            n.setTargetTier(targetTier);
+        }
 
+        // 2. Propagate auto ratio from anchor
         if (baseNode != null) {
             graph.autoRatioFromAnchor(baseNode);
         }
@@ -341,16 +361,16 @@ public class ToolbarWidget {
             Object[] oldP = oldProps.get(n.getId());
             if (oldP != null) {
                 if (oldP[0] != n.getTargetTier()) {
-                    subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(n.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.TARGET_TIER, oldP[0], n.getTargetTier()));
+                    subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(n.getId(), (com.gtceu.calcboard.api.GTVoltageTier) oldP[0], n.getTargetTier()));
                 }
                 if (oldP[1] != n.getOverclockMode()) {
-                    subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(n.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.OVERCLOCK_MODE, oldP[1], n.getOverclockMode()));
+                    subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.overclockMode(n.getId(), (com.gtceu.calcboard.api.OverclockMode) oldP[1], n.getOverclockMode()));
                 }
                 if (!oldP[2].equals(n.getParallel())) {
-                    subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(n.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.PARALLEL, oldP[2], n.getParallel()));
+                    subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.parallel(n.getId(), (Integer) oldP[2], n.getParallel()));
                 }
                 if (Math.abs(((Double) oldP[3]) - n.getMachineCount()) > 0.0001) {
-                    subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand(n.getId(), com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.Property.MACHINE_COUNT, oldP[3], n.getMachineCount()));
+                    subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), (Double) oldP[3], n.getMachineCount()));
                 }
             }
         }

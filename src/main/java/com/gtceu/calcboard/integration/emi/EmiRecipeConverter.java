@@ -3,10 +3,12 @@ package com.gtceu.calcboard.integration.emi;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.ModCompatHelper;
+import com.gtceu.calcboard.api.MultiblockDetector;
 import com.gtceu.calcboard.api.RecipeNode;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -58,6 +60,7 @@ public class EmiRecipeConverter {
         double baseEUt = 32.0;           // Default LV 32 EU/t
         GTVoltageTier tier = GTVoltageTier.LV;
         boolean isGenerator = false;
+        int backingRecipeTemp = 0;
 
         // 1. Try extracting real GTRecipe details (only when GT is loaded)
         try {
@@ -102,6 +105,30 @@ public class EmiRecipeConverter {
                             }
                         } catch (Throwable ignored) {}
                     }
+                    int recipeTemp = 0;
+                    try {
+                        Field dataField = backing.getClass().getField("data");
+                        Object dataObj = dataField.get(backing);
+                        if (dataObj instanceof CompoundTag tag) {
+                            if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
+                            else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
+                            else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
+                        }
+                    } catch (Throwable ignored) {
+                        try {
+                            Method dataMethod = backing.getClass().getMethod("data");
+                            Object dataObj = dataMethod.invoke(backing);
+                            if (dataObj instanceof CompoundTag tag) {
+                                if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
+                                else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
+                                else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
+                            }
+                        } catch (Throwable ignored2) {}
+                    }
+                    if (recipeTemp > 0) {
+                        // Store recipe temperature on temporary variable to assign to node
+                        backingRecipeTemp = recipeTemp;
+                    }
                 } else if (ModCompatHelper.isThermalLoaded() || ModCompatHelper.isModLoaded("thermal_expansion")) {
                     // Thermal Recipe reflection (Energy in RF / FE)
                     long energyRF = 0;
@@ -129,10 +156,14 @@ public class EmiRecipeConverter {
                         baseDurationTicks = Math.max(20.0, totalEU / baseEUt);
                         tier = GTVoltageTier.LV;
 
-                        // Only mark as generator if the category is a Thermal Dynamo
+                        // Mark as generator if category is a Thermal Dynamo or Fuel type
                         ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
-                        if (catId != null && catId.getPath().toLowerCase().contains("dynamo")) {
-                            isGenerator = true;
+                        if (catId != null) {
+                            String cp = catId.getPath().toLowerCase();
+                            if (cp.contains("dynamo") || cp.contains("fuel") || cp.contains("lapidary") || cp.contains("compression")
+                                    || cp.contains("magmatic") || cp.contains("gourmand") || cp.contains("numismatic") || cp.contains("stirling")) {
+                                isGenerator = true;
+                            }
                         }
                     }
                 }
@@ -142,10 +173,12 @@ public class EmiRecipeConverter {
         // 2. Secondary Generator Check: Strictly check Category ID (Machine type), NEVER check recipe item/output IDs!
         if (!isGenerator && recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             String catPath = recipe.getCategory().getId().getPath().toLowerCase();
+            String catNs = recipe.getCategory().getId().getNamespace().toLowerCase();
             if (catPath.contains("dynamo") || catPath.contains("turbine")
                     || catPath.equals("generator") || catPath.endsWith("_generator")
                     || catPath.equals("combustion_generator") || catPath.equals("semi_fluid_generator")
-                    || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")) {
+                    || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")
+                    || ((catNs.equals("thermal") || catNs.equals("thermal_expansion") || catNs.equals("systeams")) && catPath.contains("fuel"))) {
                 isGenerator = true;
             }
         }
@@ -153,6 +186,9 @@ public class EmiRecipeConverter {
         RecipeNode node = RecipeNode.create(name, baseDurationTicks, baseEUt, tier);
         node.setGenerator(isGenerator);
         node.setMachineIcon(findMachineIcon(recipe));
+        if (backingRecipeTemp > 0) {
+            node.setRecipeTemperature(backingRecipeTemp);
+        }
 
         // Convert Inputs
         for (EmiIngredient input : recipe.getInputs()) {
@@ -196,7 +232,79 @@ public class EmiRecipeConverter {
             }
         }
 
+        node.setAvailableWorkstations(findAllWorkstations(recipe));
+
+        // If ALL available workstations are multiblock controllers (e.g. EBF, Pyrolyse, Cracking, Fusion, Distillation Tower), default to Multiblock mode
+        boolean hasAnySingle = false;
+        boolean hasAnyMulti = false;
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (MultiblockDetector.isMultiblock(ws) || RecipeNode.isMultiblockWorkstation(ws)) {
+                hasAnyMulti = true;
+            } else {
+                hasAnySingle = true;
+            }
+        }
+        if (hasAnyMulti && !hasAnySingle) {
+            node.setMultiblock(true);
+        }
         return node;
+    }
+
+    public static List<ResourceLocation> findAllWorkstations(EmiRecipe recipe) {
+        List<ResourceLocation> list = new ArrayList<>();
+        if (recipe == null) return list;
+
+        // 1. Check recipe.getWorkstations()
+        try {
+            Method m = recipe.getClass().getMethod("getWorkstations");
+            Object res = m.invoke(recipe);
+            if (res instanceof List<?> workstations && !workstations.isEmpty()) {
+                for (Object ws : workstations) {
+                    addEmiIngredientToWorkstations(ws, list);
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 2. Check recipe.getCategory() workstations
+        try {
+            if (recipe.getCategory() != null) {
+                try {
+                    Method mCat = recipe.getCategory().getClass().getMethod("getWorkstations");
+                    Object catRes = mCat.invoke(recipe.getCategory());
+                    if (catRes instanceof List<?> catWorkstations && !catWorkstations.isEmpty()) {
+                        for (Object ws : catWorkstations) {
+                            addEmiIngredientToWorkstations(ws, list);
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
+                try {
+                    var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+                    if (rm != null) {
+                        var catWs = rm.getWorkstations(recipe.getCategory());
+                        if (catWs != null && !catWs.isEmpty()) {
+                            for (Object ws : catWs) {
+                                addEmiIngredientToWorkstations(ws, list);
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+
+        return list;
+    }
+
+    private static void addEmiIngredientToWorkstations(Object ws, List<ResourceLocation> list) {
+        if (ws instanceof EmiIngredient ei) {
+            for (EmiStack es : ei.getEmiStacks()) {
+                if (es != null && !es.isEmpty() && es.getId() != null) {
+                    if (!list.contains(es.getId())) {
+                        list.add(es.getId());
+                    }
+                }
+            }
+        }
     }
 
     public static boolean isDummyConditionMarker(ResourceLocation id) {
