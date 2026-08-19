@@ -124,12 +124,35 @@ public class ParallelHelper {
         if (key.startsWith("gtceu:")) {
             key = key.substring("gtceu:".length());
         }
-
         return STATS_CACHE.computeIfAbsent(key, ParallelHelper::computeParallelStats);
     }
 
     private static ParallelStats computeParallelStats(String identifier) {
         ResourceLocation id = ResourceLocation.tryParse(identifier.contains(":") ? identifier : "gtceu:" + identifier);
+
+        // 1. Primary: Direct GTCEu GTRegistries.MACHINES & MachineDefinition MetaMachine inspection
+        try {
+            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+            if (machinesRegistry != null) {
+                Method getM = null;
+                for (Method m : machinesRegistry.getClass().getMethods()) {
+                    if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == ResourceLocation.class) {
+                        getM = m;
+                        break;
+                    }
+                }
+                if (getM != null) {
+                    Object machineDef = getM.invoke(machinesRegistry, id);
+                    if (machineDef != null) {
+                        ParallelStats stats = extractStatsFromMachineDef(machineDef);
+                        if (stats != null) return stats;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 2. Secondary: Inspect Block instance via MetaMachineBlock
         if (id != null) {
             Block block = BuiltInRegistries.BLOCK.get(id);
             if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
@@ -144,10 +167,53 @@ public class ParallelHelper {
             }
         }
 
-        // Derive from tier progression: EV=4, IV=16, LuV=64, ZPM=256, UV=1024, UHV=4096, UEV=16384, UIV=65536, UXV=262144, OpV=1048576, MAX=2147483647
+        // 3. Fallback: Derive from name/path
         boolean isAbs = identifier.contains("absolute") || identifier.contains("절대");
         int par = deriveParallelFromTier(identifier);
         return new ParallelStats(par, isAbs);
+    }
+
+    /**
+     * Extracts exact parallel stats from a GTCEu MachineDefinition by inspecting its MetaMachine factory / fields.
+     */
+    public static ParallelStats extractStatsFromMachineDef(Object machineDef) {
+        if (machineDef == null) return null;
+
+        // 1. Direct getter methods on MachineDefinition
+        int maxPar = extractInt(machineDef, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
+        boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy");
+        if (maxPar > 0) {
+            return new ParallelStats(maxPar, isAbsolute);
+        }
+
+        // 2. Instantiate or extract MetaMachine from MachineDefinition
+        try {
+            for (Method m : machineDef.getClass().getMethods()) {
+                if (m.getParameterCount() == 1 && (m.getName().contains("create") || m.getName().contains("Machine"))) {
+                    try {
+                        Object machine = m.invoke(machineDef, new Object[]{null});
+                        if (machine != null) {
+                            ParallelStats s = extractStatsFromObject(machine);
+                            if (s != null) return s;
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 3. Inspect fields of MachineDefinition for IParallelHatch or ParallelHatchPartMachine
+        try {
+            for (java.lang.reflect.Field f : machineDef.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object val = f.get(machineDef);
+                if (val != null) {
+                    ParallelStats s = extractStatsFromObject(val);
+                    if (s != null) return s;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return null;
     }
 
     /**
@@ -157,6 +223,19 @@ public class ParallelHelper {
         if (target == null) return null;
 
         Object machineObj = target;
+
+        // Try getting MachineDefinition from MetaMachineBlock
+        try {
+            for (Method m : target.getClass().getMethods()) {
+                if ((m.getName().equalsIgnoreCase("getMachineDefinition") || m.getName().equalsIgnoreCase("getDefinition")) && m.getParameterCount() == 0) {
+                    Object def = m.invoke(target);
+                    if (def != null) {
+                        ParallelStats s = extractStatsFromMachineDef(def);
+                        if (s != null) return s;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
 
         // Try getting MetaMachine / PartMachine from block entity or block
         try {
@@ -175,12 +254,25 @@ public class ParallelHelper {
         int maxPar = extractInt(machineObj, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
         boolean isAbsolute = extractBoolean(machineObj, "isAbsolute", "isExact", "isFixedEnergy");
 
-        // If tier is accessible, compute 4^(tier - EV)
+        // Inspect declared fields for maxParallel / currentParallel
         if (maxPar <= 0) {
-            int tier = extractTierIndex(machineObj);
-            if (tier >= 4) { // EV=4, IV=5, LuV=6, ZPM=7, UV=8, UHV=9, UEV=10, UIV=11, UXV=12, OpV=13, MAX=14
-                int shift = tier - 3; // EV -> 1 (4^1=4), IV -> 2 (4^2=16), etc.
-                maxPar = 1 << (shift * 2);
+            Class<?> curr = machineObj.getClass();
+            while (curr != null && curr != Object.class) {
+                for (java.lang.reflect.Field f : curr.getDeclaredFields()) {
+                    String fName = f.getName().toLowerCase();
+                    if (fName.contains("parallel") || fName.contains("maxpar")) {
+                        try {
+                            f.setAccessible(true);
+                            Object v = f.get(machineObj);
+                            if (v instanceof Number n && n.intValue() > 0) {
+                                maxPar = n.intValue();
+                                break;
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+                if (maxPar > 0) break;
+                curr = curr.getSuperclass();
             }
         }
 
