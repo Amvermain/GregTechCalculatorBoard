@@ -24,12 +24,44 @@ public class ParallelHelper {
         public static final ParallelStats DEFAULT = new ParallelStats(4, false);
     }
 
+    private static final java.util.regex.Pattern PARALLEL_TOOLTIP_PATTERN = java.util.regex.Pattern.compile(
+            "(?:최대\\s*)?([0-9]+)\\s*(?:x\\s*)?(?:병렬|Parallel|Parallels|개\\s*레시피|recipes\\s*at\\s*once)",
+            java.util.regex.Pattern.CASE_INSENSITIVE
+    );
+
     /**
      * Extracts exact parallel stats from an ItemStack or ResourceLocation.
      */
     public static ParallelStats getParallelStats(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return ParallelStats.DEFAULT;
+        }
+
+        // 1. Primary: Extract directly from in-game ItemStack tooltip (matches Star Tech / pack custom tuning like 4x Elite Parallel)
+        String tooltipText = extractTooltipText(stack);
+        if (!tooltipText.isEmpty()) {
+            boolean isAbs = tooltipText.contains("절대") || tooltipText.toLowerCase().contains("absolute");
+            java.util.regex.Matcher m = PARALLEL_TOOLTIP_PATTERN.matcher(tooltipText);
+            if (m.find()) {
+                try {
+                    int p = Integer.parseInt(m.group(1));
+                    if (p > 0) {
+                        return new ParallelStats(p, isAbs);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // 2. Check NBT
+        if (stack.hasTag()) {
+            net.minecraft.nbt.CompoundTag tag = stack.getTag();
+            if (tag.contains("Parallel")) {
+                int p = tag.getInt("Parallel");
+                if (p > 0) return new ParallelStats(p, tag.getBoolean("IsAbsolute"));
+            } else if (tag.contains("MaxParallel")) {
+                int p = tag.getInt("MaxParallel");
+                if (p > 0) return new ParallelStats(p, tag.getBoolean("IsAbsolute"));
+            }
         }
 
         if (stack.getItem() instanceof BlockItem blockItem) {
@@ -42,6 +74,21 @@ public class ParallelHelper {
         }
 
         return ParallelStats.DEFAULT;
+    }
+
+    private static String extractTooltipText(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return "";
+        try {
+            var lines = stack.getTooltipLines(null, net.minecraft.world.item.TooltipFlag.Default.NORMAL);
+            if (lines != null) {
+                StringBuilder sb = new StringBuilder();
+                for (var line : lines) {
+                    sb.append(line.getString()).append(" ");
+                }
+                return sb.toString().trim();
+            }
+        } catch (Throwable ignored) {}
+        return "";
     }
 
     /**
