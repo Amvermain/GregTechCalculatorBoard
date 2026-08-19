@@ -72,7 +72,7 @@ public class CalculationTest {
         // Base: 40 ticks (2.0s), 32 EU/t (LV)
         RecipeNode turbine = RecipeNode.create("Large Gas Turbine", 40.0, 32.0, GTVoltageTier.LV);
         turbine.setGenerator(true);
-        turbine.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "nitrobenzene"), "Nitrobenzene", 1, 1.0));
+        turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:nitrobenzene"), "Nitrobenzene", 1, 1.0));
 
         // 1. Standard Rotor (100%): 2.0s, 32 EU/t
         Assertions.assertEquals(2.0, turbine.getEffectiveDurationSeconds(), 0.001);
@@ -130,18 +130,18 @@ public class CalculationTest {
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven (Charcoal)", 320.0, 64.0, GTVoltageTier.MV);
         pyrolyse.setTargetTier(GTVoltageTier.HV); // 1 OC -> 256 EU/t, 160 ticks (8s -> 0.125 cycles/s)
         pyrolyse.setMachineCount(1.0);
-        pyrolyse.addInput(IngredientStack.item(new ResourceLocation("minecraft", "oak_log"), "Oak Log", 16, 1.0));
-        pyrolyse.addOutput(IngredientStack.item(new ResourceLocation("minecraft", "charcoal"), "Charcoal", 20, 1.0));
-        pyrolyse.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0)); // 1000mB per 8s = 125 mB/s
+        pyrolyse.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 16, 1.0));
+        pyrolyse.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:charcoal"), "Charcoal", 20, 1.0));
+        pyrolyse.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0)); // 1000mB per 8s = 125 mB/s
         graph.addNode(pyrolyse);
 
         // 2. Distillation Tower
         RecipeNode distTower = RecipeNode.create("Distillation Tower (Wood Tar)", 200.0, 120.0, GTVoltageTier.MV);
         distTower.setTargetTier(GTVoltageTier.HV); // 1 OC -> 480 EU/t, 100 ticks (5s -> 0.2 cycles/s)
         distTower.setMachineCount(3.0); // 3 machines -> 0.6 cycles/s
-        distTower.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0)); // consumes 1000 * 0.6 = 600 mB/s
-        distTower.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "creosote"), "Creosote", 500, 1.0)); // produces 500 * 0.6 = 300 mB/s
-        distTower.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "phenol"), "Phenol", 100, 1.0));
+        distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0)); // consumes 1000 * 0.6 = 600 mB/s
+        distTower.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:creosote"), "Creosote", 500, 1.0)); // produces 500 * 0.6 = 300 mB/s
+        distTower.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:phenol"), "Phenol", 100, 1.0));
         graph.addNode(distTower);
 
         BalanceSummary summary = graph.computeSummary();
@@ -151,13 +151,13 @@ public class CalculationTest {
         Assertions.assertEquals(GTVoltageTier.HV, summary.highestVoltageTier());
 
         // Wood Tar: Pyrolyse produces 125 mB/s, DistTower consumes 600 mB/s -> Deficit of 475 mB/s
-        IngredientStack woodTar = IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0);
+        IngredientStack woodTar = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0);
         Double deficit = summary.rawInputs().get(woodTar);
         Assertions.assertNotNull(deficit);
         Assertions.assertEquals(475.0, deficit, 0.001);
 
         // Charcoal output: 20 * 0.125 = 2.5 items/s
-        IngredientStack charcoal = IngredientStack.item(new ResourceLocation("minecraft", "charcoal"), "Charcoal", 20, 1.0);
+        IngredientStack charcoal = IngredientStack.item(ResourceLocation.tryParse("minecraft:charcoal"), "Charcoal", 20, 1.0);
         Double charcoalRate = summary.netOutputs().get(charcoal);
         Assertions.assertNotNull(charcoalRate);
         Assertions.assertEquals(2.5, charcoalRate, 0.001);
@@ -171,12 +171,12 @@ public class CalculationTest {
         node1.setTargetTier(GTVoltageTier.HV);
         node1.setOverclockMode(OverclockMode.PERFECT);
         node1.setParallel(4);
-        node1.addInput(IngredientStack.item(new ResourceLocation("minecraft", "iron_ingot"), "Iron Ingot", 2, 1.0));
-        node1.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "molten_iron"), "Molten Iron", 288, 1.0));
+        node1.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 2, 1.0));
+        node1.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:molten_iron"), "Molten Iron", 288, 1.0));
         graph.addNode(node1);
 
         RecipeNode node2 = RecipeNode.create("Machine B", 80.0, 128.0, GTVoltageTier.MV);
-        node2.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "molten_iron"), "Molten Iron", 144, 1.0));
+        node2.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:molten_iron"), "Molten Iron", 144, 1.0));
         graph.addNode(node2);
 
         graph.addConnection(node1.getId(), 0, node2.getId(), 0);
@@ -210,7 +210,7 @@ public class CalculationTest {
         node.setMachineCount(4.0);
         node.setTargetTier(GTVoltageTier.LV);
         node.setOverclockMode(OverclockMode.STANDARD);
-        node.addOutput(IngredientStack.item(new ResourceLocation("minecraft", "iron_ingot"), "Iron", 1, 1.0));
+        node.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron", 1, 1.0));
 
         double initialRate = node.calculateOutputRates().values().iterator().next(); // 4 machines * (20/100) = 0.8 items/s
         Assertions.assertEquals(0.8, initialRate, 0.001);
@@ -252,14 +252,14 @@ public class CalculationTest {
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 320.0, 64.0, GTVoltageTier.MV);
         pyrolyse.setTargetTier(GTVoltageTier.MV); // 320 ticks (16s -> 0.0625 cycles/s)
         pyrolyse.setMachineCount(1.0);
-        pyrolyse.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0));
+        pyrolyse.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
         graph.addNode(pyrolyse);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
         distTower.setTargetTier(GTVoltageTier.MV); // 100 ticks (5s -> 0.2 cycles/s)
         distTower.setMachineCount(2.0); // 2 machines -> 400 mB/s consumption
-        distTower.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0));
-        distTower.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "creosote"), "Creosote", 500, 1.0));
+        distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
+        distTower.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:creosote"), "Creosote", 500, 1.0));
         distTower.setBaseNode(true);
         graph.addNode(distTower);
 
@@ -274,7 +274,7 @@ public class CalculationTest {
 
         // Summary balance: Wood Tar produced (437.5) >= consumed (400.0) -> surplus in netOutputs, zero deficit
         BalanceSummary summary = graph.computeSummary();
-        IngredientStack woodTar = IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0);
+        IngredientStack woodTar = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0);
         Assertions.assertFalse(summary.rawInputs().containsKey(woodTar));
         Assertions.assertTrue(summary.netOutputs().containsKey(woodTar) || summary.fullyBalanced().containsKey(woodTar));
     }
@@ -284,12 +284,12 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 320.0, 64.0, GTVoltageTier.MV);
-        pyrolyse.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0));
+        pyrolyse.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
         graph.addNode(pyrolyse);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
         distTower.setMachineCount(4.0); // 4 machines
-        distTower.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0));
+        distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
         distTower.setBaseNode(true);
         graph.addNode(distTower);
 
@@ -311,15 +311,15 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode macerator = RecipeNode.create("Macerator", 100.0, 32.0, GTVoltageTier.LV);
-        macerator.addInput(IngredientStack.item(new ResourceLocation("minecraft", "iron_ore"), "Iron Ore", 1, 1.0));
-        macerator.addOutput(IngredientStack.item(new ResourceLocation("gtceu", "crushed_iron_ore"), "Crushed Iron Ore", 2, 1.0));
+        macerator.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1, 1.0));
+        macerator.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2, 1.0));
         macerator.setMachineCount(3.5);
         macerator.setBaseNode(true);
         graph.addNode(macerator);
 
         RecipeNode furnace = RecipeNode.create("Electric Furnace", 60.0, 32.0, GTVoltageTier.LV);
-        furnace.addInput(IngredientStack.item(new ResourceLocation("gtceu", "crushed_iron_ore"), "Crushed Iron Ore", 1, 1.0));
-        furnace.addOutput(IngredientStack.item(new ResourceLocation("minecraft", "iron_ingot"), "Iron Ingot", 1, 1.0));
+        furnace.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1, 1.0));
+        furnace.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 1, 1.0));
         graph.addNode(furnace);
 
         graph.addConnection(macerator.getId(), 0, furnace.getId(), 0);
@@ -393,22 +393,22 @@ public class CalculationTest {
         // 1. Producer A: Log To Creosote (Produces Charcoal 2.5/s, Wood Tar 500 mB/s)
         RecipeNode nodeA = RecipeNode.create("Log To Creosote", 160.0, 1024.0, GTVoltageTier.EV);
         nodeA.setMachineCount(1.0);
-        nodeA.addInput(IngredientStack.item(new ResourceLocation("minecraft", "oak_log"), "Oak Log", 1, 1.0));
-        nodeA.addOutput(IngredientStack.item(new ResourceLocation("minecraft", "charcoal"), "Charcoal", 20, 1.0));
-        nodeA.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 4000, 1.0));
+        nodeA.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 1, 1.0));
+        nodeA.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:charcoal"), "Charcoal", 20, 1.0));
+        nodeA.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 4000, 1.0));
         graph.addNode(nodeA);
 
         // 2. Producer B: Charcoal Extraction (Consumes Charcoal 2.5/s, Produces Wood Tar 250 mB/s)
         RecipeNode nodeB = RecipeNode.create("Charcoal Extraction", 8.0, 1024.0, GTVoltageTier.EV);
         nodeB.setMachineCount(1.0);
-        nodeB.addInput(IngredientStack.item(new ResourceLocation("minecraft", "charcoal"), "Charcoal", 1, 1.0));
-        nodeB.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 100, 1.0));
+        nodeB.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:charcoal"), "Charcoal", 1, 1.0));
+        nodeB.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 100, 1.0));
         graph.addNode(nodeB);
 
         // 3. Consumer C: Distill Wood Tar (Consumes Wood Tar 500 mB/s per machine)
         RecipeNode nodeC = RecipeNode.create("Distill Wood Tar", 60.0, 256.0, GTVoltageTier.HV);
         nodeC.setMachineCount(1.0);
-        nodeC.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1500, 1.0));
+        nodeC.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1500, 1.0));
         graph.addNode(nodeC);
 
         // Connect Node A (Charcoal) -> Node B (Charcoal)
@@ -436,7 +436,7 @@ public class CalculationTest {
 
         // Summary verify: Wood Tar produced >= consumed
         BalanceSummary summary = graph.computeSummary();
-        IngredientStack woodTar = IngredientStack.fluid(new ResourceLocation("gtceu", "wood_tar"), "Wood Tar", 1000, 1.0);
+        IngredientStack woodTar = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0);
         Double netWoodTar = summary.netOutputs().get(woodTar);
         Assertions.assertNotNull(netWoodTar);
         Assertions.assertTrue(netWoodTar >= 0, "Wood tar should have surplus, not deficit: " + netWoodTar);
@@ -474,16 +474,16 @@ public class CalculationTest {
         // 1. Plant A: produces Diluted Sulfuric Acid
         RecipeNode plantA = RecipeNode.create("Plant A", 100.0, 30.0, GTVoltageTier.LV);
         plantA.setMachineCount(2.0);
-        plantA.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "sulfur_trioxide"), "Sulfur Trioxide", 1000, 1.0));
-        plantA.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000, 1.0));
+        plantA.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:sulfur_trioxide"), "Sulfur Trioxide", 1000, 1.0));
+        plantA.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000, 1.0));
         plantA.setPos(100, 100);
         graph.addNode(plantA);
 
         // 2. Plant B: consumes Diluted Sulfuric Acid, produces Sulfuric Acid
         RecipeNode plantB = RecipeNode.create("Plant B", 100.0, 30.0, GTVoltageTier.LV);
         plantB.setMachineCount(2.0);
-        plantB.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000, 1.0));
-        plantB.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "sulfuric_acid"), "Sulfuric Acid", 1000, 1.0));
+        plantB.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000, 1.0));
+        plantB.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:sulfuric_acid"), "Sulfuric Acid", 1000, 1.0));
         plantB.setPos(300, 100);
         graph.addNode(plantB);
 
@@ -516,11 +516,11 @@ public class CalculationTest {
     public void testNodeClipboardCopyAndPaste() {
         FlowGraph graph = new FlowGraph();
         RecipeNode nodeA = RecipeNode.create("Node A", 100.0, 30.0, GTVoltageTier.LV);
-        nodeA.addOutput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 1000, 1.0));
+        nodeA.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000, 1.0));
         graph.addNode(nodeA);
 
         RecipeNode nodeB = RecipeNode.create("Node B", 100.0, 30.0, GTVoltageTier.LV);
-        nodeB.addInput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 1000, 1.0));
+        nodeB.addInput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000, 1.0));
         graph.addNode(nodeB);
 
         graph.addConnection(nodeA.getId(), 0, nodeB.getId(), 0);
@@ -615,21 +615,21 @@ public class CalculationTest {
 
         // 1. Producer: 20 ticks (1.0s), produces 500 mB/s steam (1000 mB/s for 2 machines)
         RecipeNode producer = RecipeNode.create("Boiler", 20.0, 30.0, GTVoltageTier.LV);
-        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 500.0, 1.0));
+        producer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
         producer.setMachineCount(2.0); // Anchor with 2 machines -> 1000 mB/s steam
         producer.setBaseNode(true);
         graph.addNode(producer);
 
         // 2. Middle Consumer: 20 ticks (1.0s), consumes 100 mB/s steam, produces 50 mB/s water
         RecipeNode middle = RecipeNode.create("Steam Turbine", 20.0, 30.0, GTVoltageTier.LV);
-        middle.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "steam"), "Steam", 100.0, 1.0));
-        middle.addOutput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 50.0, 1.0));
+        middle.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
+        middle.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 50.0, 1.0));
         middle.setMachineCount(1.0);
         graph.addNode(middle);
 
         // 3. Final Consumer: 20 ticks (1.0s), consumes 25 mB/s water
         RecipeNode finalConsumer = RecipeNode.create("Electrolyzer", 20.0, 30.0, GTVoltageTier.LV);
-        finalConsumer.addInput(IngredientStack.fluid(new ResourceLocation("minecraft", "water"), "Water", 25.0, 1.0));
+        finalConsumer.addInput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 25.0, 1.0));
         finalConsumer.setMachineCount(1.0);
         graph.addNode(finalConsumer);
 
@@ -656,21 +656,21 @@ public class CalculationTest {
 
         // 1. Producer: 20 ticks (1.0s), produces 200 mB/s
         RecipeNode producer = RecipeNode.create("Producer", 20.0, 30.0, GTVoltageTier.LV);
-        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "fuel"), "Fuel", 200.0, 1.0));
+        producer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fuel"), "Fuel", 200.0, 1.0));
         producer.setMachineCount(1.0);
         graph.addNode(producer);
 
         // 2. Middle (Anchor): 20 ticks (1.0s), consumes 100 mB/s, produces 50 mB/s
         RecipeNode middle = RecipeNode.create("Middle Generator", 20.0, 30.0, GTVoltageTier.LV);
-        middle.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "fuel"), "Fuel", 100.0, 1.0));
-        middle.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "exhaust"), "Exhaust", 50.0, 1.0));
+        middle.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fuel"), "Fuel", 100.0, 1.0));
+        middle.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:exhaust"), "Exhaust", 50.0, 1.0));
         middle.setMachineCount(4.0); // 4 machines -> consumes 400 mB/s fuel, produces 200 mB/s exhaust
         middle.setBaseNode(true);
         graph.addNode(middle);
 
         // 3. Downstream Consumer: 20 ticks (1.0s), consumes 20 mB/s exhaust
         RecipeNode consumer = RecipeNode.create("Exhaust Filter", 20.0, 30.0, GTVoltageTier.LV);
-        consumer.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "exhaust"), "Exhaust", 20.0, 1.0));
+        consumer.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:exhaust"), "Exhaust", 20.0, 1.0));
         consumer.setMachineCount(1.0);
         graph.addNode(consumer);
 
@@ -695,12 +695,12 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode producer = RecipeNode.create("Producer", 20.0, 30.0, GTVoltageTier.LV);
-        producer.addOutput(IngredientStack.fluid(new ResourceLocation("gtceu", "oil"), "Oil", 100.0, 1.0));
+        producer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oil"), "Oil", 100.0, 1.0));
         producer.setMachineCount(2.0); // 200 mB/s oil
         graph.addNode(producer);
 
         RecipeNode consumer = RecipeNode.create("Consumer", 20.0, 30.0, GTVoltageTier.LV);
-        consumer.addInput(IngredientStack.fluid(new ResourceLocation("gtceu", "oil"), "Oil", 50.0, 1.0));
+        consumer.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oil"), "Oil", 50.0, 1.0));
         consumer.setMachineCount(4.0); // 200 mB/s demanded
         graph.addNode(consumer);
 
@@ -923,6 +923,166 @@ public class CalculationTest {
         BalanceSummary summary = graph.computeSummary();
         // Total EU/t: Producer (30) + Consumer (80) + Final (50) = 160 EU/t
         Assertions.assertEquals(160.0, summary.totalEUt(), 0.001);
+    }
+
+    @Test
+    public void testDownstreamBottleneckPropagationToUpstreamPortStats() {
+        FlowGraph graph = new FlowGraph();
+
+        // Producer A (e.g. Mixer): produces 400 mB/s of Fluid A
+        RecipeNode mixer = RecipeNode.create("Mixer", 20.0, 10.0, GTVoltageTier.LV);
+        mixer.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:nitration_mixture"), "Nitration Mixture", 400.0, 1.0));
+        mixer.setMachineCount(1.0);
+        graph.addNode(mixer);
+
+        // Producer B (e.g. Bottleneck Distillation): produces only 50 mB/s of Benzene (demand is 100 mB/s)
+        RecipeNode dist = RecipeNode.create("Distillery", 20.0, 20.0, GTVoltageTier.LV);
+        dist.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:benzene"), "Benzene", 50.0, 1.0));
+        dist.setMachineCount(1.0);
+        graph.addNode(dist);
+
+        // Consumer C (e.g. Chemical Reactor): requires 200 mB/s Nitration Mixture AND 100 mB/s Benzene
+        RecipeNode reactor = RecipeNode.create("Chemical Reactor", 20.0, 200.0, GTVoltageTier.HV);
+        reactor.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:nitration_mixture"), "Nitration Mixture", 200.0, 1.0));
+        reactor.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:benzene"), "Benzene", 100.0, 1.0));
+        reactor.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:nitrobenzene"), "Nitrobenzene", 100.0, 1.0));
+        reactor.setMachineCount(1.0);
+        graph.addNode(reactor);
+
+        // Connect Mixer -> Reactor (Nitration Mixture, input 0)
+        graph.addConnection(mixer.getId(), 0, reactor.getId(), 0);
+        // Connect Dist -> Reactor (Benzene, input 1)
+        graph.addConnection(dist.getId(), 0, reactor.getId(), 1);
+
+        // Compute efficiencies
+        graph.computeSummary();
+
+        // Reactor is bottlenecked by Benzene (50 / 100 = 50% efficiency)
+        Assertions.assertEquals(0.50, reactor.getEfficiency(), 0.001);
+
+        // Mixer output port stats:
+        // Produced = 400 mB/s.
+        // Consumer actual demanded rate = 200 * 0.50 = 100 mB/s (NOT 200 mB/s!)
+        FlowGraphSolver.PortFlowStats mixerOutStats = graph.getOutputPortStats(mixer, 0);
+        Assertions.assertEquals(400.0, mixerOutStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(100.0, mixerOutStats.connectedRate(), 0.001);
+        Assertions.assertTrue(mixerOutStats.isOutputSurplus());
+    }
+
+    @Test
+    public void testMultiProducerPartialSupplyToInputPortStats() {
+        FlowGraph graph = new FlowGraph();
+
+        // 2 Pyrolyse Ovens producing 219 mB/s each = 438 mB/s Wood Tar
+        RecipeNode pyro1 = RecipeNode.create("Pyrolyse 1", 20.0, 30.0, GTVoltageTier.LV);
+        pyro1.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 219.0, 1.0));
+        pyro1.setMachineCount(1.0);
+        graph.addNode(pyro1);
+
+        RecipeNode pyro2 = RecipeNode.create("Pyrolyse 2", 20.0, 30.0, GTVoltageTier.LV);
+        pyro2.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 219.0, 1.0));
+        pyro2.setMachineCount(1.0);
+        graph.addNode(pyro2);
+
+        // Distillation Tower requiring 500 mB/s Wood Tar
+        RecipeNode dist = RecipeNode.create("Distillation Tower", 20.0, 256.0, GTVoltageTier.HV);
+        dist.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 500.0, 1.0));
+        dist.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:benzene"), "Benzene", 100.0, 1.0));
+        dist.setMachineCount(1.0);
+        graph.addNode(dist);
+
+        // Connect both Pyrolyse -> Distillation Tower input 0
+        graph.addConnection(pyro1.getId(), 0, dist.getId(), 0);
+        graph.addConnection(pyro2.getId(), 0, dist.getId(), 0);
+
+        graph.computeSummary();
+
+        // Distillation Tower receives 438 / 500 = 87.6% efficiency
+        Assertions.assertEquals(0.876, dist.getEfficiency(), 0.001);
+
+        // Input port stats on Distillation Tower
+        FlowGraphSolver.PortFlowStats inStats = graph.getInputPortStats(dist, 0);
+        Assertions.assertEquals(500.0, inStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(438.0, inStats.connectedRate(), 0.001);
+        Assertions.assertEquals(2, inStats.connectionCount());
+        Assertions.assertTrue(inStats.isInputDeficit());
+        Assertions.assertFalse(inStats.isBalanced());
+        Assertions.assertEquals(87.6, inStats.getPercent(), 0.01);
+    }
+
+    @Test
+    public void testAutoRatioCircularFeedbackLoopSafety() {
+        // Construct a circular feedback loop: Node A -> Node B -> Node C -> Node A
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode nodeA = RecipeNode.create("Node A", 20.0, 30.0, GTVoltageTier.LV);
+        nodeA.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:mat_c"), "Mat C", 100.0, 1.0));
+        nodeA.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:mat_a"), "Mat A", 100.0, 1.0));
+        nodeA.setMachineCount(2.0);
+        graph.addNode(nodeA);
+
+        RecipeNode nodeB = RecipeNode.create("Node B", 20.0, 30.0, GTVoltageTier.LV);
+        nodeB.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:mat_a"), "Mat A", 100.0, 1.0));
+        nodeB.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:mat_b"), "Mat B", 100.0, 1.0));
+        nodeB.setMachineCount(1.0);
+        graph.addNode(nodeB);
+
+        RecipeNode nodeC = RecipeNode.create("Node C", 20.0, 30.0, GTVoltageTier.LV);
+        nodeC.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:mat_b"), "Mat B", 100.0, 1.0));
+        nodeC.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:mat_c"), "Mat C", 100.0, 1.0));
+        nodeC.setMachineCount(1.0);
+        graph.addNode(nodeC);
+
+        // Circular edges
+        graph.addConnection(nodeA.getId(), 0, nodeB.getId(), 0);
+        graph.addConnection(nodeB.getId(), 0, nodeC.getId(), 0);
+        graph.addConnection(nodeC.getId(), 0, nodeA.getId(), 0);
+
+        // Execute autoRatioFromAnchor with nodeA as anchor (count = 2.0)
+        long start = System.currentTimeMillis();
+        FlowGraphSolver.autoRatioFromAnchor(graph, nodeA, true);
+        long elapsed = System.currentTimeMillis() - start;
+
+        // Must complete within 100ms without getting stuck in infinite loop
+        Assertions.assertTrue(elapsed < 100, "Auto-ratio must terminate quickly even on circular loops");
+
+        // Anchor must strictly retain count = 2.0
+        Assertions.assertEquals(2.0, nodeA.getMachineCount(), 0.001);
+        // Node B and Node C should scale to 2.0 to match Anchor
+        Assertions.assertEquals(2.0, nodeB.getMachineCount(), 0.001);
+        Assertions.assertEquals(2.0, nodeC.getMachineCount(), 0.001);
+    }
+
+    @Test
+    public void testTierChanceBoostOnOverclock() {
+        RecipeNode macerator = RecipeNode.create("Macerator", 20.0, 30.0, GTVoltageTier.LV);
+        macerator.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0, 1.0));
+
+        // Base chance 50% (0.50), +5% boost per tier (0.05)
+        IngredientStack byprod = IngredientStack.item(ResourceLocation.tryParse("gtceu:nickel_dust"), "Nickel Dust", 1.0, 0.50);
+        byprod.setTierChanceBoost(0.05);
+        macerator.addOutput(byprod);
+
+        // 1. At LV (TierDelta = 0): Expected amount = 0.50
+        Assertions.assertEquals(0, macerator.getTierDelta());
+        Assertions.assertEquals(0.50, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
+        Assertions.assertEquals(0.50, macerator.calculateOutputRates().get(byprod), 0.001);
+
+        // 2. At MV (TierDelta = 1): Expected amount = 0.55 * (2x OC speed = 2.0 cps) = 1.10 items/s
+        macerator.setTargetTier(GTVoltageTier.MV);
+        Assertions.assertEquals(1, macerator.getTierDelta());
+        Assertions.assertEquals(0.55, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
+        Assertions.assertEquals(0.55 * 2.0, macerator.calculateOutputRates().get(byprod), 0.001);
+
+        // 3. At HV (TierDelta = 2): Expected amount = 0.60 * (4x OC speed = 4.0 cps) = 2.40 items/s
+        macerator.setTargetTier(GTVoltageTier.HV);
+        Assertions.assertEquals(2, macerator.getTierDelta());
+        Assertions.assertEquals(0.60, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
+        Assertions.assertEquals(0.60 * 4.0, macerator.calculateOutputRates().get(byprod), 0.001);
+
+        // 4. At MAX (TierDelta >= 10): Capped at 100% (1.00)
+        macerator.setTargetTier(GTVoltageTier.MAX);
+        Assertions.assertEquals(1.00, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
     }
 
     @Test

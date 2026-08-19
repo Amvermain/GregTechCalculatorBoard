@@ -122,6 +122,8 @@ public class IngredientStack {
         return displayName != null ? displayName : "";
     }
 
+    private double tierChanceBoost = 0.0; // Additional chance per voltage tier above base recipe tier (e.g. 0.05 = +5% per tier)
+
     public double getAmount() {
         return amount;
     }
@@ -130,8 +132,26 @@ public class IngredientStack {
         return chance;
     }
 
+    public double getTierChanceBoost() {
+        return tierChanceBoost;
+    }
+
+    public void setTierChanceBoost(double tierChanceBoost) {
+        this.tierChanceBoost = Math.max(0.0, tierChanceBoost);
+    }
+
+    public double getEffectiveChance(int tierDelta) {
+        if (chance >= 1.0) return 1.0;
+        if (tierChanceBoost <= 0.0 || tierDelta <= 0) return chance;
+        return Math.min(1.0, Math.max(0.0, chance + tierDelta * tierChanceBoost));
+    }
+
     public double getExpectedAmount() {
         return amount * chance;
+    }
+
+    public double getExpectedAmount(int tierDelta) {
+        return amount * getEffectiveChance(tierDelta);
     }
 
     public boolean isFluid() {
@@ -145,6 +165,9 @@ public class IngredientStack {
         tag.putString("name", displayName);
         tag.putDouble("amount", amount);
         tag.putDouble("chance", chance);
+        if (tierChanceBoost > 0.0) {
+            tag.putDouble("tierChanceBoost", tierChanceBoost);
+        }
         if (!alternatives.isEmpty()) {
             net.minecraft.nbt.ListTag altList = new net.minecraft.nbt.ListTag();
             for (ResourceLocation alt : alternatives) {
@@ -162,6 +185,9 @@ public class IngredientStack {
         double amount = tag.getDouble("amount");
         double chance = tag.contains("chance") ? tag.getDouble("chance") : 1.0;
         IngredientStack stack = new IngredientStack(type, id, name, amount, chance);
+        if (tag.contains("tierChanceBoost")) {
+            stack.setTierChanceBoost(tag.getDouble("tierChanceBoost"));
+        }
         if (tag.contains("alternatives", 9)) { // 9 = TAG_List
             net.minecraft.nbt.ListTag altList = tag.getList("alternatives", 8); // 8 = TAG_String
             java.util.List<ResourceLocation> alts = new java.util.ArrayList<>();

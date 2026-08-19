@@ -43,13 +43,16 @@ public class DynamicAddonCrawler {
     private static final Pattern POWER_OUTPUT_MULT_PATTERN = Pattern.compile("(?:최대\\s*출력|출력|발전량|Power\\s*Output|Max\\s*Output):\\s*([0-9]+(?:\\.[0-9]+)?)\\s*[xX배]", Pattern.CASE_INSENSITIVE);
     private static final Pattern SPEED_PERCENT_PATTERN = Pattern.compile("(?:제작\\s*속도|속도|Machine\\s*Speed|Speed):\\s*\\+?([0-9]+(?:\\.[0-9]+)?)\\s*%", Pattern.CASE_INSENSITIVE);
     private static final Pattern ENERGY_PERCENT_PATTERN = Pattern.compile("(?:전력\\s*소비|에너지\\s*소비|Energy\\s*Consumption):\\s*([+-]?[0-9]+(?:\\.[0-9]+)?)\\s*%", Pattern.CASE_INSENSITIVE);
-    // Coil Stat Patterns
-    private static final Pattern HEAT_PATTERN = Pattern.compile("(?:Base Heat Capacity|Heat Capacity|열\\s*용량|온도|온도\\s*용량):\\s*([0-9]+)\\s*K?", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PYROLYSE_PATTERN = Pattern.compile("(?:Pyrolyse Oven|열분해\\s*오븐).*?(?:Processing Speed|속도|제작\\s*속도):\\s*([0-9]+)\\s*%", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CRACKING_PATTERN = Pattern.compile("(?:Cracking Unit|크래킹\\s*유닛).*?(?:Energy Usage|전력\\s*소비|에너지\\s*소비):\\s*([0-9]+)\\s*%", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CHEMICAL_SPEED_PATTERN = Pattern.compile("(?:Chemical Reactor|화학\\s*반응기).*?(?:Processing Speed|속도|제작\\s*속도):\\s*([0-9]+)\\s*%", Pattern.CASE_INSENSITIVE);
-    private static final Pattern CHEMICAL_ENERGY_PATTERN = Pattern.compile("(?:Chemical Reactor|화학\\s*반응기).*?(?:Energy Usage|전력\\s*소비|에너지\\s*소비):\\s*([0-9]+)\\s*%", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SMELTER_PARALLEL_PATTERN = Pattern.compile("(?:Multi Smelter|다중\\s*제련기).*?(?:Max Parallel|최대\\s*병렬|병렬):\\s*([0-9]+)", Pattern.CASE_INSENSITIVE);
+    // Coil Stat Patterns & Section Matching
+    private static final Pattern HEAT_PATTERN = Pattern.compile("(?:Base\\s*Heat\\s*Capacity|Heat\\s*Capacity|기본\\s*열\\s*용량|열\\s*용량|온도|온도\\s*용량):\\s*([0-9]+)\\s*K?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PYROLYSE_SECTION = Pattern.compile("(?:Pyrolyse\\s*Oven|열분해\\s*오븐)[:\\s]*(.*?)(?=(?:분해기|크래킹|화학\\s*반응기|멀티\\s*용광로|다중\\s*제련기|Cracking|Chemical|Multi\\s*Smelter|$))", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern CRACKING_SECTION = Pattern.compile("(?:Cracking\\s*Unit|Cracker|분해기|크래킹\\s*유닛)[:\\s]*(.*?)(?=(?:열분해|화학\\s*반응기|멀티\\s*용광로|다중\\s*제련기|Pyrolyse|Chemical|Multi\\s*Smelter|$))", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern CHEMICAL_SECTION = Pattern.compile("(?:Chemical\\s*Reactor|화학\\s*반응기)[:\\s]*(.*?)(?=(?:열분해|분해기|크래킹|멀티\\s*용광로|다중\\s*제련기|Pyrolyse|Cracking|Multi\\s*Smelter|$))", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern SMELTER_SECTION = Pattern.compile("(?:Multi\\s*Smelter|멀티\\s*용광로|다중\\s*제련기)[:\\s]*(.*?)(?=(?:열분해|분해기|크래킹|화학\\s*반응기|Pyrolyse|Cracking|Chemical|$))", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
+    private static final Pattern SPEED_VALUE_PATTERN = Pattern.compile("(?:Processing\\s*Speed|가공\\s*속도|제작\\s*속도|속도):\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ENERGY_VALUE_PATTERN = Pattern.compile("(?:Energy\\s*Usage|전력\\s*사용|전력\\s*소비|에너지\\s*소비):\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PARALLEL_VALUE_PATTERN = Pattern.compile("(?:Max\\s*Parallel|최대\\s*병렬\\s*처리|최대\\s*병렬|병렬):\\s*([0-9]+)", Pattern.CASE_INSENSITIVE);
 
     public static List<MachineAddon> crawlAllAddons() {
         List<MachineAddon> result = new ArrayList<>();
@@ -835,58 +838,78 @@ public class DynamicAddonCrawler {
         } catch (Throwable ignored) {}
 
         // 2. Try Tooltip Extraction (both normal and advanced flags)
-        if (heat <= 0) {
-            String fullTooltip = extractAllTooltipText(stack);
-            if (!fullTooltip.isEmpty()) {
+        String fullTooltip = extractAllTooltipText(stack);
+        if (!fullTooltip.isEmpty()) {
+            if (heat <= 0) {
                 Matcher mHeat = HEAT_PATTERN.matcher(fullTooltip);
                 if (mHeat.find()) {
                     try { heat = Integer.parseInt(mHeat.group(1)); } catch (Exception ignored) {}
                 }
-                Matcher mPyro = PYROLYSE_PATTERN.matcher(fullTooltip);
-                if (mPyro.find()) {
-                    try { pyroSpeed = Integer.parseInt(mPyro.group(1)); } catch (Exception ignored) {}
+            }
+
+            Matcher mPyroSec = PYROLYSE_SECTION.matcher(fullTooltip);
+            if (mPyroSec.find()) {
+                String sec = mPyroSec.group(1);
+                Matcher mSpd = SPEED_VALUE_PATTERN.matcher(sec);
+                if (mSpd.find()) {
+                    try { pyroSpeed = (int) Math.round(Double.parseDouble(mSpd.group(1))); } catch (Exception ignored) {}
                 }
-                Matcher mCrack = CRACKING_PATTERN.matcher(fullTooltip);
-                if (mCrack.find()) {
-                    try { crackEnergy = Integer.parseInt(mCrack.group(1)); } catch (Exception ignored) {}
+            }
+
+            Matcher mCrackSec = CRACKING_SECTION.matcher(fullTooltip);
+            if (mCrackSec.find()) {
+                String sec = mCrackSec.group(1);
+                Matcher mE = ENERGY_VALUE_PATTERN.matcher(sec);
+                if (mE.find()) {
+                    try { crackEnergy = (int) Math.round(Double.parseDouble(mE.group(1))); } catch (Exception ignored) {}
                 }
-                Matcher mChemS = CHEMICAL_SPEED_PATTERN.matcher(fullTooltip);
-                if (mChemS.find()) {
-                    try { chemSpeed = Integer.parseInt(mChemS.group(1)); } catch (Exception ignored) {}
+            }
+
+            Matcher mChemSec = CHEMICAL_SECTION.matcher(fullTooltip);
+            if (mChemSec.find()) {
+                String sec = mChemSec.group(1);
+                Matcher mSpd = SPEED_VALUE_PATTERN.matcher(sec);
+                if (mSpd.find()) {
+                    try { chemSpeed = (int) Math.round(Double.parseDouble(mSpd.group(1))); } catch (Exception ignored) {}
                 }
-                Matcher mChemE = CHEMICAL_ENERGY_PATTERN.matcher(fullTooltip);
-                if (mChemE.find()) {
-                    try { chemEnergy = Integer.parseInt(mChemE.group(1)); } catch (Exception ignored) {}
+                Matcher mE = ENERGY_VALUE_PATTERN.matcher(sec);
+                if (mE.find()) {
+                    try { chemEnergy = (int) Math.round(Double.parseDouble(mE.group(1))); } catch (Exception ignored) {}
                 }
-                Matcher mSmelter = SMELTER_PARALLEL_PATTERN.matcher(fullTooltip);
-                if (mSmelter.find()) {
-                    try { smelterPar = Integer.parseInt(mSmelter.group(1)); } catch (Exception ignored) {}
+            }
+
+            Matcher mSmelterSec = SMELTER_SECTION.matcher(fullTooltip);
+            if (mSmelterSec.find()) {
+                String sec = mSmelterSec.group(1);
+                Matcher mPar = PARALLEL_VALUE_PATTERN.matcher(sec);
+                if (mPar.find()) {
+                    try { smelterPar = Integer.parseInt(mPar.group(1)); } catch (Exception ignored) {}
                 }
             }
         }
 
         // 3. Fallbacks for known GT / StarT / KubeJS / Addon coils
-        if (heat <= 0) {
-            if (path.contains("kanthal")) { heat = 2700; pyroSpeed = 150; crackEnergy = 90; chemSpeed = 125; chemEnergy = 95; smelterPar = 32; }
-            else if (path.contains("nichrome")) { heat = 3600; pyroSpeed = 200; crackEnergy = 80; chemSpeed = 150; chemEnergy = 90; smelterPar = 64; }
-            else if (path.contains("rtm") || path.contains("tungstensteel")) { heat = 4500; pyroSpeed = 225; crackEnergy = 70; chemSpeed = 160; chemEnergy = 85; smelterPar = 96; }
-            else if (path.contains("hssg") || path.contains("hss_g")) { heat = 5400; pyroSpeed = 250; crackEnergy = 60; chemSpeed = 175; chemEnergy = 80; smelterPar = 128; }
-            else if (path.contains("hsss") || path.contains("hss_s")) { heat = 6300; pyroSpeed = 300; crackEnergy = 50; chemSpeed = 200; chemEnergy = 75; smelterPar = 192; }
-            else if (path.contains("naquadah_alloy")) { heat = 8100; pyroSpeed = 400; crackEnergy = 30; chemSpeed = 250; chemEnergy = 65; smelterPar = 384; }
-            else if (path.contains("naquadah")) { heat = 7200; pyroSpeed = 350; crackEnergy = 40; chemSpeed = 225; chemEnergy = 70; smelterPar = 256; }
-            else if (path.contains("trinium")) { heat = 9000; pyroSpeed = 450; crackEnergy = 20; chemSpeed = 275; chemEnergy = 60; smelterPar = 512; }
-            else if (path.contains("tritanium")) { heat = 9900; pyroSpeed = 500; crackEnergy = 10; chemSpeed = 300; chemEnergy = 55; smelterPar = 640; }
-            else if (path.contains("draconium")) { heat = 10800; pyroSpeed = 550; crackEnergy = 10; chemSpeed = 325; chemEnergy = 50; smelterPar = 768; }
-            else if (path.contains("awakened")) { heat = 11700; pyroSpeed = 575; crackEnergy = 10; chemSpeed = 340; chemEnergy = 45; smelterPar = 896; }
-            else if (path.contains("infinity")) { heat = 12600; pyroSpeed = 600; crackEnergy = 10; chemSpeed = 350; chemEnergy = 40; smelterPar = 1024; }
-            else if (path.contains("zalloy")) { heat = 13499; pyroSpeed = 450; crackEnergy = 20; chemSpeed = 275; chemEnergy = 60; smelterPar = 768; }
-            else if (path.contains("magmada")) { heat = 16199; pyroSpeed = 500; crackEnergy = 10; chemSpeed = 300; chemEnergy = 55; smelterPar = 1024; }
-            else if (path.contains("hypogen")) { heat = 14400; pyroSpeed = 650; crackEnergy = 10; chemSpeed = 375; chemEnergy = 35; smelterPar = 1152; }
-            else if (path.contains("eternity") || path.contains("neutronium")) { heat = 18000; pyroSpeed = 800; crackEnergy = 10; chemSpeed = 400; chemEnergy = 30; smelterPar = 1536; }
-            else if (path.contains("cupronickel")) { heat = 1800; pyroSpeed = 100; crackEnergy = 100; chemSpeed = 100; chemEnergy = 100; smelterPar = 16; }
+        if (heat <= 0 || chemSpeed == 100 || pyroSpeed == 100) {
+            if (path.contains("kanthal")) { if (heat <= 0) heat = 2700; if (pyroSpeed == 100) pyroSpeed = 150; if (crackEnergy == 100) crackEnergy = 90; if (chemSpeed == 100) chemSpeed = 125; if (chemEnergy == 100) chemEnergy = 95; if (smelterPar == 16) smelterPar = 32; }
+            else if (path.contains("nichrome")) { if (heat <= 0) heat = 3600; if (pyroSpeed == 100) pyroSpeed = 200; if (crackEnergy == 100) crackEnergy = 80; if (chemSpeed == 100) chemSpeed = 150; if (chemEnergy == 100) chemEnergy = 90; if (smelterPar == 16) smelterPar = 64; }
+            else if (path.contains("rtm") || path.contains("tungstensteel")) { if (heat <= 0) heat = 4500; if (pyroSpeed == 100) pyroSpeed = 200; if (crackEnergy == 100) crackEnergy = 70; if (chemSpeed == 100) chemSpeed = 150; if (chemEnergy == 100) chemEnergy = 85; if (smelterPar == 16) smelterPar = 128; }
+            else if (path.contains("hssg") || path.contains("hss_g")) { if (heat <= 0) heat = 5400; if (pyroSpeed == 100) pyroSpeed = 250; if (crackEnergy == 100) crackEnergy = 60; if (chemSpeed == 100) chemSpeed = 175; if (chemEnergy == 100) chemEnergy = 80; if (smelterPar == 16) smelterPar = 192; }
+            else if (path.contains("hsss") || path.contains("hss_s")) { if (heat <= 0) heat = 6300; if (pyroSpeed == 100) pyroSpeed = 300; if (crackEnergy == 100) crackEnergy = 50; if (chemSpeed == 100) chemSpeed = 200; if (chemEnergy == 100) chemEnergy = 75; if (smelterPar == 16) smelterPar = 256; }
+            else if (path.contains("naquadah_alloy")) { if (heat <= 0) heat = 8100; if (pyroSpeed == 100) pyroSpeed = 400; if (crackEnergy == 100) crackEnergy = 30; if (chemSpeed == 100) chemSpeed = 250; if (chemEnergy == 100) chemEnergy = 65; if (smelterPar == 16) smelterPar = 512; }
+            else if (path.contains("naquadah")) { if (heat <= 0) heat = 7200; if (pyroSpeed == 100) pyroSpeed = 350; if (crackEnergy == 100) crackEnergy = 40; if (chemSpeed == 100) chemSpeed = 225; if (chemEnergy == 100) chemEnergy = 70; if (smelterPar == 16) smelterPar = 384; }
+            else if (path.contains("trinium")) { if (heat <= 0) heat = 9000; if (pyroSpeed == 100) pyroSpeed = 450; if (crackEnergy == 100) crackEnergy = 20; if (chemSpeed == 100) chemSpeed = 275; if (chemEnergy == 100) chemEnergy = 60; if (smelterPar == 16) smelterPar = 768; }
+            else if (path.contains("tritanium")) { if (heat <= 0) heat = 9900; if (pyroSpeed == 100) pyroSpeed = 500; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 300; if (chemEnergy == 100) chemEnergy = 55; if (smelterPar == 16) smelterPar = 1024; }
+            else if (path.contains("draconium")) { if (heat <= 0) heat = 10800; if (pyroSpeed == 100) pyroSpeed = 550; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 325; if (chemEnergy == 100) chemEnergy = 50; if (smelterPar == 16) smelterPar = 1024; }
+            else if (path.contains("awakened")) { if (heat <= 0) heat = 11700; if (pyroSpeed == 100) pyroSpeed = 575; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 340; if (chemEnergy == 100) chemEnergy = 45; if (smelterPar == 16) smelterPar = 1024; }
+            else if (path.contains("infinity")) { if (heat <= 0) heat = 12600; if (pyroSpeed == 100) pyroSpeed = 600; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 350; if (chemEnergy == 100) chemEnergy = 40; if (smelterPar == 16) smelterPar = 1024; }
+            else if (path.contains("zalloy")) { if (heat <= 0) heat = 13499; if (pyroSpeed == 100) pyroSpeed = 450; if (crackEnergy == 100) crackEnergy = 20; if (chemSpeed == 100) chemSpeed = 275; if (chemEnergy == 100) chemEnergy = 60; if (smelterPar == 16) smelterPar = 768; }
+            else if (path.contains("magmada")) { if (heat <= 0) heat = 16199; if (pyroSpeed == 100) pyroSpeed = 500; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 300; if (chemEnergy == 100) chemEnergy = 55; if (smelterPar == 16) smelterPar = 1024; }
+            else if (path.contains("hypogen")) { if (heat <= 0) heat = 14400; if (pyroSpeed == 100) pyroSpeed = 650; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 375; if (chemEnergy == 100) chemEnergy = 35; if (smelterPar == 16) smelterPar = 1024; }
+            else if (path.contains("eternity") || path.contains("neutronium")) { if (heat <= 0) heat = 18000; if (pyroSpeed == 100) pyroSpeed = 800; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 400; if (chemEnergy == 100) chemEnergy = 30; if (smelterPar == 16) smelterPar = 1536; }
+            else if (path.contains("cupronickel")) { if (heat <= 0) heat = 1800; }
             else if (path.endsWith("_coil_block") || path.contains("coil_block") || path.contains("heating_coil")) {
                 // Any other custom coil block from any mod / KubeJS
-                heat = 1800;
+                if (heat <= 0) heat = 1800;
             }
         }
 

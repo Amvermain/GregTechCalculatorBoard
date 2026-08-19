@@ -396,7 +396,7 @@ public class MachineConfigDialog {
 
         if (selectedCategory == MachineAddon.Category.ROTOR || (selectedCategory == null && node.isGenerator())) {
             // Standard / None Reset item
-            MachineAddon standardRotor = new MachineAddon("gtceu:standard_rotor", Component.translatable("gui.gtcalcboard.rotor.standard").getString(), MachineAddon.Category.ROTOR, "Reset turbine rotor to default 100%", new ResourceLocation("gtceu:item/standard_rotor"));
+            MachineAddon standardRotor = new MachineAddon("gtceu:standard_rotor", Component.translatable("gui.gtcalcboard.rotor.standard").getString(), MachineAddon.Category.ROTOR, "Reset turbine rotor to default 100%", ResourceLocation.tryParse("gtceu:item/standard_rotor"));
             standardRotor.setDurationMultiplier(1.0);
             standardRotor.setRotorPower(100);
             if (q.isEmpty() || standardRotor.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || "기본".contains(q)) {
@@ -546,7 +546,8 @@ public class MachineConfigDialog {
                     tooltip.add(Component.literal("§a⚡ Parallel Multiplier: §f" + tailored.getParallelMultiplier() + "x"));
                 }
                 if (tailored.getDurationMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§b⏱ Speed Multiplier: §f" + String.format("%.2fx", tailored.getDurationMultiplier())));
+                    double spdPercent = 100.0 / tailored.getDurationMultiplier();
+                    tooltip.add(Component.literal(String.format("§b⏱ Time Multiplier: §f%.2fx §7(%.0f%% Speed)", tailored.getDurationMultiplier(), spdPercent)));
                 }
                 if (tailored.getEutMultiplier() != 1.0) {
                     tooltip.add(Component.literal("§e⚡ Energy Multiplier: §f" + String.format("%.2fx", tailored.getEutMultiplier())));

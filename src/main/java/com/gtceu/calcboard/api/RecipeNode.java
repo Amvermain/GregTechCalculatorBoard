@@ -654,14 +654,20 @@ public class RecipeNode {
         return rates;
     }
 
+    public double getSingleOutputExpectedAmount(int index) {
+        if (index < 0 || index >= outputs.size()) return 0.0;
+        return outputs.get(index).getExpectedAmount(getTierDelta());
+    }
+
     /**
      * Calculates output production rates in items/s or mB/s.
      */
     public Map<IngredientStack, Double> calculateOutputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
+        int tierDelta = getTierDelta();
         for (IngredientStack out : outputs) {
-            rates.put(out, out.getExpectedAmount() * cps);
+            rates.put(out, out.getExpectedAmount(tierDelta) * cps);
         }
         return rates;
     }
@@ -706,8 +712,9 @@ public class RecipeNode {
     public Map<IngredientStack, Double> calculateEffectiveOutputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
+        int tierDelta = getTierDelta();
         for (IngredientStack out : outputs) {
-            rates.put(out, out.getExpectedAmount() * cps);
+            rates.put(out, out.getExpectedAmount(tierDelta) * cps);
         }
         return rates;
     }
@@ -717,7 +724,8 @@ public class RecipeNode {
      */
     public double calculateSingleMachineOutputRate(IngredientStack out) {
         double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
-        return out.getExpectedAmount() * singleCps;
+        int tierDelta = getTierDelta();
+        return out.getExpectedAmount(tierDelta) * singleCps;
     }
 
     public boolean isBaseNode() {

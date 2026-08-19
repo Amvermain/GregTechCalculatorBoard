@@ -16,7 +16,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EmiRecipeConverter {
 
@@ -221,6 +223,9 @@ public class EmiRecipeConverter {
             }
         }
 
+        Map<ResourceLocation, Double> tierBoosts = extractTierChanceBoosts(recipe);
+        boolean isGT = ModCompatHelper.isGTLoaded() && (recipe.getBackingRecipe() != null && recipe.getBackingRecipe().getClass().getName().contains("GTRecipe"));
+
         // Convert Outputs
         for (EmiStack outStack : recipe.getOutputs()) {
             if (outStack == null || outStack.isEmpty()) continue;
@@ -228,6 +233,14 @@ public class EmiRecipeConverter {
 
             IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), outStack.getChance());
             if (os != null && !isDummyConditionMarker(os.getId())) {
+                if (os.getChance() < 1.0) {
+                    if (tierBoosts.containsKey(os.getId())) {
+                        os.setTierChanceBoost(tierBoosts.get(os.getId()));
+                    } else if (isGT) {
+                        // Standard GregTech chanced output default (+5% per tier above base recipe tier)
+                        os.setTierChanceBoost(0.05);
+                    }
+                }
                 node.addOutput(os);
             }
         }
@@ -401,6 +414,98 @@ public class EmiRecipeConverter {
         } else {
             return IngredientStack.item(id, displayName, amount, chance);
         }
+    }
+
+    private static Map<ResourceLocation, Double> extractTierChanceBoosts(EmiRecipe recipe) {
+        Map<ResourceLocation, Double> map = new HashMap<>();
+        if (recipe == null) return map;
+        try {
+            Object backing = recipe.getBackingRecipe();
+            if (backing != null && ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
+                Field outputsField = null;
+                try {
+                    outputsField = backing.getClass().getField("outputs");
+                } catch (Throwable ignored) {
+                    try {
+                        outputsField = backing.getClass().getDeclaredField("outputs");
+                        outputsField.setAccessible(true);
+                    } catch (Throwable ignored2) {}
+                }
+                if (outputsField != null) {
+                    Object outputsObj = outputsField.get(backing);
+                    if (outputsObj instanceof Map<?, ?> outMap) {
+                        for (Object listObj : outMap.values()) {
+                            if (listObj instanceof List<?> list) {
+                                for (Object contentObj : list) {
+                                    if (contentObj == null) continue;
+                                    double boost = 0.0;
+                                    try {
+                                        Field f = contentObj.getClass().getField("tierChanceBoost");
+                                        Object v = f.get(contentObj);
+                                        if (v instanceof Number n) boost = n.doubleValue();
+                                    } catch (Throwable ignored) {
+                                        try {
+                                            Method m = contentObj.getClass().getMethod("tierChanceBoost");
+                                            Object v = m.invoke(contentObj);
+                                            if (v instanceof Number n) boost = n.doubleValue();
+                                        } catch (Throwable ignored2) {
+                                            try {
+                                                Method m = contentObj.getClass().getMethod("getTierChanceBoost");
+                                                Object v = m.invoke(contentObj);
+                                                if (v instanceof Number n) boost = n.doubleValue();
+                                            } catch (Throwable ignored3) {}
+                                        }
+                                    }
+                                    if (boost > 1.0) {
+                                        boost = boost / 10000.0; // e.g. 500 = 5% = 0.05
+                                    }
+                                    if (boost > 0.0) {
+                                        ResourceLocation resId = extractContentResourceId(contentObj);
+                                        if (resId != null) {
+                                            map.put(resId, boost);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return map;
+    }
+
+    private static ResourceLocation extractContentResourceId(Object contentObj) {
+        if (contentObj == null) return null;
+        try {
+            Field f = null;
+            try { f = contentObj.getClass().getField("content"); } catch (Throwable ignored) {
+                try { f = contentObj.getClass().getDeclaredField("content"); f.setAccessible(true); } catch (Throwable ignored2) {}
+            }
+            Object inner = f != null ? f.get(contentObj) : null;
+            if (inner == null) {
+                try {
+                    Method m = contentObj.getClass().getMethod("getContent");
+                    inner = m.invoke(contentObj);
+                } catch (Throwable ignored) {}
+            }
+            if (inner instanceof net.minecraft.world.item.ItemStack is) {
+                return ForgeRegistries.ITEMS.getKey(is.getItem());
+            } else if (inner instanceof net.minecraft.world.item.Item it) {
+                return ForgeRegistries.ITEMS.getKey(it);
+            } else if (inner instanceof Fluid fl) {
+                return ForgeRegistries.FLUIDS.getKey(fl);
+            } else if (inner != null && inner.getClass().getName().contains("FluidStack")) {
+                try {
+                    Method gm = inner.getClass().getMethod("getFluid");
+                    Object flObj = gm.invoke(inner);
+                    if (flObj instanceof Fluid fl) {
+                        return ForgeRegistries.FLUIDS.getKey(fl);
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     public static String formatName(String raw) {

@@ -108,7 +108,25 @@ public final class BoardTooltipRenderer {
                     }
 
                     if (out.getChance() < 1.0) {
-                        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", out.getChance() * 100.0))));
+                        RecipeNode node = widget.getNode();
+                        int tierDelta = node != null ? node.getTierDelta() : 0;
+                        double effChance = out.getEffectiveChance(tierDelta);
+                        if (out.getTierChanceBoost() > 0.0) {
+                            if (tierDelta > 0 && effChance > out.getChance()) {
+                                tooltipLines.add(Component.literal(String.format("§e%s: %.1f%% §7(+%.1f%%/Tier §a→ %.1f%%§7)",
+                                        Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim(),
+                                        out.getChance() * 100.0,
+                                        out.getTierChanceBoost() * 100.0,
+                                        effChance * 100.0)));
+                            } else {
+                                tooltipLines.add(Component.literal(String.format("§e%s: %.1f%% §7(+%.1f%%/Tier)",
+                                        Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim(),
+                                        out.getChance() * 100.0,
+                                        out.getTierChanceBoost() * 100.0)));
+                            }
+                        } else {
+                            tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", out.getChance() * 100.0))));
+                        }
                     }
                     tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));

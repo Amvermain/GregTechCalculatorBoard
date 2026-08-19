@@ -303,6 +303,12 @@ public class BoardScreen extends Screen {
         this.lastMouseX = mouseX;
         this.lastMouseY = mouseY;
 
+        // 0. Update graph calculations and efficiencies if dirty
+        if (summaryDirty || cachedSummary == null) {
+            cachedSummary = FlowGraphSolver.computeSummary(getGraph());
+            summaryDirty = false;
+        }
+
         // 1. Dark Background and Grid
         renderBackground(graphics);
         renderGridBackground(graphics);

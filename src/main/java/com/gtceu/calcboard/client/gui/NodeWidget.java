@@ -209,7 +209,7 @@ public class NodeWidget {
 
     public double getOutputRate(int index) {
         if (index >= 0 && index < node.getOutputs().size()) {
-            return node.getOutputs().get(index).getExpectedAmount() * node.getEffectiveCyclesPerSecond();
+            return node.getOutputs().get(index).getExpectedAmount(node.getTierDelta()) * node.getEffectiveCyclesPerSecond();
         }
         return 0.0;
     }
@@ -223,7 +223,7 @@ public class NodeWidget {
 
     public double getNominalOutputRate(int index) {
         if (index >= 0 && index < node.getOutputs().size()) {
-            return node.getOutputs().get(index).getExpectedAmount() * node.getCyclesPerSecond();
+            return node.getOutputs().get(index).getExpectedAmount(node.getTierDelta()) * node.getCyclesPerSecond();
         }
         return 0.0;
     }
