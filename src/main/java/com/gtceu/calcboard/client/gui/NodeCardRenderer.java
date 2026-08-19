@@ -33,6 +33,12 @@ public class NodeCardRenderer {
         int cardW = widget.getWidth();
         int height = widget.getHeight();
 
+        double zoom = (Minecraft.getInstance().screen instanceof BoardScreen bs) ? bs.getZoom() : BoardScreen.lastZoom;
+        if (zoom < 0.28) {
+            renderLOD(widget, graphics, font, x, y, cardW, height, node);
+            return;
+        }
+
         // 1. Card Background & Golden/Metallic/Module Outlines
         int cardBg = node.isModule() ? 0xF01D172E : (node.isGenerator() ? 0xF0122218 : 0xF01E222B);
         graphics.fill(x, y, x + cardW, y + height, cardBg);
@@ -403,6 +409,39 @@ public class NodeCardRenderer {
             String connStr = (connected == (long) connected) ? String.format("%d", (long) connected) : String.format("%.2f", connected).replaceAll("\\.?0+$", "");
             String reqStr = (required == (long) required) ? String.format("%d", (long) required) : String.format("%.2f", required).replaceAll("\\.?0+$", "");
             return connStr + "/" + reqStr + "/s" + symStr;
+        }
+    }
+
+    private static void renderLOD(NodeWidget widget, GuiGraphics graphics, Font font, int x, int y, int cardW, int height, RecipeNode node) {
+        int cardBg = node.isModule() ? 0xF01D172E : (node.isGenerator() ? 0xF0122218 : 0xF01E222B);
+        graphics.fill(x, y, x + cardW, y + height, cardBg);
+
+        int headerColor = node.isModule() ? 0xFF3D2A5E : (node.isGenerator() ? 0xFF1E482E : 0xFF353C4D);
+        graphics.fill(x, y, x + cardW, y + NodeWidget.HEADER_HEIGHT, headerColor);
+
+        int outlineColor = node.isModule() ? 0xFF9955FF : (node.isBaseNode() ? 0xFFFFD700 : (node.isGenerator() ? 0xFF33AA66 : 0xFF3D4455));
+        graphics.renderOutline(x, y, cardW, height, outlineColor);
+
+        // Header Title (compact)
+        String title = (node.isModule() ? "📦 " : (node.isBaseNode() ? "★ " : (node.isGenerator() ? "⚡ " : ""))) + node.getName();
+        int maxTitleChars = Math.max(6, (cardW - 12) / 6);
+        if (title.length() > maxTitleChars) title = title.substring(0, Math.max(2, maxTitleChars - 2)) + "...";
+        graphics.drawString(font, title, x + 6, y + 6, node.isModule() ? 0xFFFFB3FF : (node.isBaseNode() ? 0xFFFFE066 : (node.isGenerator() ? 0xFF77FFAA : 0xFFE0E0E0)), false);
+
+        // Count Text
+        String countStr = String.format("Count: %.2f", node.getMachineCount());
+        graphics.drawString(font, countStr, x + 6, y + NodeWidget.HEADER_HEIGHT + 6, 0xFF55FFFF, false);
+
+        // Input & Output Port Color Dots
+        for (int i = 0; i < node.getInputs().size(); i++) {
+            int px = Math.round(widget.getInputPortX(i));
+            int py = Math.round(widget.getInputPortY(i));
+            graphics.fill(px - 3, py - 3, px + 3, py + 3, 0xFF5599FF);
+        }
+        for (int i = 0; i < node.getOutputs().size(); i++) {
+            int px = Math.round(widget.getOutputPortX(i));
+            int py = Math.round(widget.getOutputPortY(i));
+            graphics.fill(px - 3, py - 3, px + 3, py + 3, 0xFF55FF88);
         }
     }
 }

@@ -8,6 +8,29 @@
 
 ---
 
+## [1.0.5] - 2026-08-20
+
+### 신규 기능 및 성능 개선 (Added & Improved)
+- **대규모 공정 LOD (Level of Detail) 렌더링 도입 (`NodeCardRenderer`, `BoardScreen`)**:
+  - 캔버스 줌 레벨이 0.28 미만으로 축소될 때, 무거운 3D 아이템 모델과 텍스트를 생략하고 경량 2D 카드 블록으로 자동 전환하여 1,200개 이상의 노드가 배치된 대규모 공정 차트에서도 프레임 저하 없이 원활하게 탐색할 수 있도록 개선했습니다.
+  - LOD 모드 전환 전후의 입/출력 포트 연결점 좌표를 정렬하여 줌 인/아웃 시 와이어 연결선 위치가 어긋나지 않도록 처리했습니다.
+- **연결선(와이어) 및 펄스 점 단일 배치 렌더링 가속 (`ConnectionRenderer`)**:
+  - 수백 개의 베지에 곡선 파이프라인과 흐름 애니메이션 점들을 단 1번의 Draw Call(`QUADS`)로 전송하여 렌더링 부하를 대폭 줄였습니다.
+
+### 버그 수정 (Fixed)
+- **3D 아이템 모델 Z-Index 뚫고 나옴 현상 수정 (`BoardScreen`, `NodeCardRenderer`)**:
+  - 마인크래프트 전역 3D 렌더 버퍼에 쌓인 아이템 모델이 다른 UI 창이나 노드 위로 튀어나오던 현상을 방지하기 위해 노드별 레이어 버퍼 플러시 및 깊이 버퍼 클리어 처리를 적용했습니다.
+- **월드 로딩 시 `Cannot retrieve all materials before registration` 크래시 수정 (`DynamicAddonCrawler`)**:
+  - `MaterialRegistryManager`에 대한 비안전 리플렉션 호출을 제거하여 월드 진입 시 발생하던 `IllegalStateException` 크래시를 수정했습니다.
+- **가이드북 탭 텍스트 잘림 현상 수정 (`GuideDialog`, `ko_kr.json`, `en_us.json`)**:
+  - 가이드북 다이얼로그 및 사이드바 너비를 확장하고 탭 텍스트를 간결화하여 카테고리 텍스트가 잘리지 않도록 개선했습니다.
+
+### 문서 및 번역 정리 (Changed)
+- **문서 및 가이드 설명 정제 (`README.md`, `README_KR.md`, `ko_kr.json`, `en_us.json`)**:
+  - README 및 인게임 가이드의 설명을 담백하고 명확한 기술 문서 형태로 정리했습니다.
+
+---
+
 ## [1.0.4-fix2] - 2026-08-20
 
 ### 버그 수정 (Fixed)

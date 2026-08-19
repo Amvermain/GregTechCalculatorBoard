@@ -12,10 +12,16 @@ import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay;
 import com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
+import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
@@ -323,7 +329,15 @@ public class BoardScreen extends Screen {
         double canvasMouseX = toCanvasX(mouseX);
         double canvasMouseY = toCanvasY(mouseY);
 
-        // 3. Render Static Connection Lines
+        // 5. Render Node Widgets with Viewport Culling
+        double screenLeft = -panX / zoom - 100;
+        double screenRight = (-panX + width) / zoom + 100;
+        double screenTop = -panY / zoom - 100;
+        double screenBottom = (-panY + height) / zoom + 100;
+
+        // 3. Render Static Connection Lines with Batching and Viewport Culling
+        ConnectionRenderer.beginBatch(graphics);
+        List<float[]> visibleWires = new ArrayList<>();
         for (FlowGraph.ConnectionEdge edge : getGraph().getConnections()) {
             RecipeNode fromNode = getGraph().findNodeById(edge.fromNodeId());
             RecipeNode toNode = getGraph().findNodeById(edge.toNodeId());
@@ -336,9 +350,18 @@ public class BoardScreen extends Screen {
                     float x2 = toWidget.getInputPortX(edge.inputIndex());
                     float y2 = toWidget.getInputPortY(edge.inputIndex());
 
+                    float minX = Math.min(x1, x2) - 40;
+                    float maxX = Math.max(x1, x2) + 40;
+                    float minY = Math.min(y1, y2) - 20;
+                    float maxY = Math.max(y1, y2) + 20;
+                    if (maxX < screenLeft || minX > screenRight || maxY < screenTop || minY > screenBottom) {
+                        continue;
+                    }
+
                     boolean isHovered = ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, canvasMouseX, canvasMouseY, 6.0);
                     int lineColor = isHovered ? 0xFFFF3366 : 0xFF00E5FF;
-                    ConnectionRenderer.renderBezier(graphics, x1, y1, x2, y2, lineColor, 2.0f);
+                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, lineColor, 2.0f);
+                    visibleWires.add(new float[]{x1, y1, x2, y2});
                 }
             }
         }
@@ -351,21 +374,29 @@ public class BoardScreen extends Screen {
             if (canvasHandler.isWireStartInput()) {
                 x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-                ConnectionRenderer.renderBezier(graphics, (float) canvasMouseX, (float) canvasMouseY, x1, y1, dragWireColor, 3.0f);
+                ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, dragWireColor, 3.0f);
             } else {
                 x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-                ConnectionRenderer.renderBezier(graphics, x1, y1, (float) canvasMouseX, (float) canvasMouseY, dragWireColor, 3.0f);
+                ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, dragWireColor, 3.0f);
             }
         }
+        ConnectionRenderer.endBatch();
 
-        // 5. Render Node Widgets with Viewport Culling
-        double screenLeft = -panX / zoom - 50;
-        double screenRight = (-panX + width) / zoom + 50;
-        double screenTop = -panY / zoom - 50;
-        double screenBottom = (-panY + height) / zoom + 50;
+        // Draw animated flow pulse dots (Single-batch GPU rendering)
+        if (zoom >= 0.28) {
+            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWires);
+        }
 
-        graphics.flush();
+        // 5. Render Node Widgets with Viewport Culling & Isolated Layering
+        boolean isLOD = (zoom < 0.28);
+        if (!isLOD) {
+            graphics.flush();
+            Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
+            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+            RenderSystem.disableDepthTest();
+        }
+
         for (int i = 0; i < nodeWidgets.size(); i++) {
             NodeWidget widget = nodeWidgets.get(i);
             double nx = widget.getNode().getPosX();
@@ -374,15 +405,17 @@ public class BoardScreen extends Screen {
             int nh = widget.getHeight();
 
             if (nx + nw >= screenLeft && nx <= screenRight && ny + nh >= screenTop && ny <= screenBottom) {
-                graphics.flush();
-                RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-                RenderSystem.disableDepthTest();
-                graphics.pose().pushPose();
-                graphics.pose().translate(0, 0, (i + 1) * 300.0f);
                 widget.render(graphics, (int) canvasMouseX, (int) canvasMouseY, partialTicks);
-                graphics.flush();
-                graphics.pose().popPose();
+                if (!isLOD) {
+                    graphics.flush();
+                    Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
+                    RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+                    RenderSystem.disableDepthTest();
+                }
             }
+        }
+        if (isLOD) {
+            graphics.flush();
         }
 
         // 4.5 Render Quick Add Marker if active
@@ -458,11 +491,33 @@ public class BoardScreen extends Screen {
         int startX = (int) (panX % dotSpacing);
         int startY = (int) (panY % dotSpacing);
 
+        Matrix4f pose = graphics.pose().last().pose();
+        graphics.flush();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+        RenderSystem.disableDepthTest();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+
+        float a = 0x22 / 255.0f;
+        float r = 1.0f, g = 1.0f, b = 1.0f;
+
         for (int x = startX; x < width; x += dotSpacing) {
             for (int y = startY; y < height; y += dotSpacing) {
-                graphics.fill(x, y, x + 1, y + 1, 0x22FFFFFF);
+                buffer.vertex(pose, x, y, 0.0f).color(r, g, b, a).endVertex();
+                buffer.vertex(pose, x + 1, y, 0.0f).color(r, g, b, a).endVertex();
+                buffer.vertex(pose, x + 1, y + 1, 0.0f).color(r, g, b, a).endVertex();
+                buffer.vertex(pose, x, y + 1, 0.0f).color(r, g, b, a).endVertex();
             }
         }
+
+        tesselator.end();
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
     }
 
     public NodeWidget findWidgetForNode(RecipeNode node) {

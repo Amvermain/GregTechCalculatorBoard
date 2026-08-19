@@ -302,29 +302,7 @@ public class DynamicAddonCrawler {
                 }
             } catch (Throwable ignored) {}
 
-            // 2. Secondary: GTCEuAPI.materialManager.getRegistry()
-            if (allMaterials.isEmpty()) {
-                try {
-                    Class<?> gtceuApiCls = Class.forName("com.gregtechceu.gtceu.api.GTCEuAPI");
-                    Object materialManager = gtceuApiCls.getField("materialManager").get(null);
-                    if (materialManager != null) {
-                        for (java.lang.reflect.Method m : materialManager.getClass().getMethods()) {
-                            if (m.getParameterCount() == 0) {
-                                try {
-                                    Object res = m.invoke(materialManager);
-                                    if (res instanceof Iterable<?> it) {
-                                        for (Object mat : it) {
-                                            if (mat != null && !allMaterials.contains(mat)) allMaterials.add(mat);
-                                        }
-                                    }
-                                } catch (Throwable ignored) {}
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-            }
-
-            // 3. Fallback: GTMaterials static fields
+            // 2. Secondary: GTMaterials static fields
             if (allMaterials.isEmpty()) {
                 try {
                     Class<?> gtMaterialsCls = Class.forName("com.gregtechceu.gtceu.common.data.GTMaterials");

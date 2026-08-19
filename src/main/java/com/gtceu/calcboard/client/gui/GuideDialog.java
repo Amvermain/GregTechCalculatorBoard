@@ -19,9 +19,9 @@ public class GuideDialog {
     private int activeCategoryIndex = 0;
     private int scrollOffset = 0;
 
-    private static final int DIALOG_WIDTH = 460;
+    private static final int DIALOG_WIDTH = 500;
     private static final int DIALOG_HEIGHT = 280;
-    private static final int SIDEBAR_WIDTH = 125;
+    private static final int SIDEBAR_WIDTH = 145;
 
     public enum GuideCategory {
         BASICS("gui.gtcalcboard.guide.cat_basics", "gui.gtcalcboard.guide.basics_title", "gui.gtcalcboard.guide.basics_desc"),
@@ -85,8 +85,8 @@ public class GuideDialog {
 
         Font font = Minecraft.getInstance().font;
 
-        int dialogW = Math.min(480, screenWidth - 24);
-        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogW = Math.min(DIALOG_WIDTH, screenWidth - 24);
+        int dialogH = Math.min(DIALOG_HEIGHT, screenHeight - 24);
         int dialogX = (screenWidth - dialogW) / 2;
         int dialogY = (screenHeight - dialogH) / 2;
 
@@ -216,8 +216,8 @@ public class GuideDialog {
 
         int screenWidth = parent.width;
         int screenHeight = parent.height;
-        int dialogW = Math.min(480, screenWidth - 24);
-        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogW = Math.min(DIALOG_WIDTH, screenWidth - 24);
+        int dialogH = Math.min(DIALOG_HEIGHT, screenHeight - 24);
         int dialogX = (screenWidth - dialogW) / 2;
         int dialogY = (screenHeight - dialogH) / 2;
 
@@ -264,13 +264,15 @@ public class GuideDialog {
 
         int screenWidth = parent.width;
         int screenHeight = parent.height;
-        int dialogX = (screenWidth - DIALOG_WIDTH) / 2;
-        int dialogY = (screenHeight - DIALOG_HEIGHT) / 2;
+        int dialogW = Math.min(DIALOG_WIDTH, screenWidth - 24);
+        int dialogH = Math.min(DIALOG_HEIGHT, screenHeight - 24);
+        int dialogX = (screenWidth - dialogW) / 2;
+        int dialogY = (screenHeight - dialogH) / 2;
 
         int contentX = dialogX + SIDEBAR_WIDTH + 18;
         int contentY = dialogY + 32;
-        int contentW = DIALOG_WIDTH - SIDEBAR_WIDTH - 28;
-        int contentH = DIALOG_HEIGHT - 40;
+        int contentW = dialogW - SIDEBAR_WIDTH - 28;
+        int contentH = dialogH - 40;
 
         if (mouseX >= contentX && mouseX <= contentX + contentW && mouseY >= contentY && mouseY <= contentY + contentH) {
             scrollOffset = Math.max(0, Math.min(300, scrollOffset - (int) (delta * 20)));

@@ -8,6 +8,29 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [1.0.5] - 2026-08-20
+
+### Added
+- **Level of Detail (LOD) Rendering for Large Node Charts (`NodeCardRenderer`, `BoardScreen`)**:
+  - Implemented automatic LOD mode switching when zoomed out (`zoom < 0.28`), rendering lightweight 2D card blocks and omitting intensive 3D item models and text to maintain high framerates on massive flowcharts with 1,200+ nodes.
+  - Aligned LOD input/output port attachment points with pixel-perfect precision to prevent visual wire misalignment during zoom transitions.
+- **Single-Batch GPU Wire & Pulse Rendering (`ConnectionRenderer`)**:
+  - Batched all Bezier curve pipeline wires and animated flow pulse dots into single OpenGL `QUADS` vertex draw calls.
+
+### Fixed
+- **3D Item Model Z-Index Ghosting & Layer Leaks (`BoardScreen`, `NodeCardRenderer`)**:
+  - Fixed an issue where Minecraft global 3D render buffer queues bled through foreground GUI cards and overlay modals by adding per-layer buffer flushing and depth buffer clearing.
+- **World Load `Cannot retrieve all materials before registration` Crash (`DynamicAddonCrawler`)**:
+  - Eliminated unsafe reflective method invocations on `MaterialRegistryManager` that triggered an `IllegalStateException` during world entry / pack reload phases.
+- **Guidebook Sidebar Tab Text Truncation (`GuideDialog`, `en_us.json`, `ko_kr.json`)**:
+  - Expanded the guidebook modal width to 500px and sidebar width to 145px, and refined category tab titles to prevent text clipping.
+
+### Changed
+- **Documentation & Localization Polish (`README.md`, `README_KR.md`, `en_us.json`, `ko_kr.json`)**:
+  - Refined documentation and in-game guide descriptions into concise, clear, and technical language.
+
+---
+
 ## [1.0.4-fix2] - 2026-08-20
 
 ### Fixed

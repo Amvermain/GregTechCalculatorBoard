@@ -18,38 +18,46 @@ An in-game node graph calculator for GregTech CEu Modern. Instead of juggling ex
 
 ## Features
 
-### 1. Interactive Node Canvas
+### 1. Interactive Node Canvas & LOD Rendering
 - Drag, pan, and zoom across an infinite canvas.
+- Batched wire rendering and Level of Detail (LOD) mode for large charts with many nodes.
 - Machine cards show processing time, overclock details, exact EU/t draw, and per-second item/fluid throughput.
 - Full EMI integration: add recipes straight from EMI, or hover over ports and press `R` / `U` to look up recipes and uses on the fly.
 
-### 2. Smart Wiring & Auto-Connect
+### 2. Multi-Tab Pages & Composite Modules (Subgraphs)
+- **Multi-Tab Pages**: Create, switch, rename, and manage multiple independent calculation boards.
+- **Composite Modules (`[📦 Module]`)**: Group sub-processes into a single module card and expand (`⤢`) them back when needed.
+
+### 3. Smart Wiring & Auto-Connect
 - Drag from any output port to an input port to draw pipeline connections.
-- Hit **Auto Connect** to automatically link up all matching item and fluid ports across your board in one go.
+- Hit **Auto Connect** to automatically link up matching item and fluid ports across the board.
+- **Smart Match Connect (`Shift + Drag`)**: Automatically scales machine counts with Integer Ceiling when dragging between ports.
 - Right-click any wire or port socket to cut the connection.
 
-### 3. Master Anchor & Bottleneck-Free Auto Ratio (Integer Ceiling)
+### 4. Master Anchor & Auto Ratio (Integer Ceiling)
 - Mark any target product or bottleneck machine as the **Base Anchor** (`🎯`).
-- Hit **Auto Ratio** to instantly rebalance and scale machine counts across the entire upstream and downstream chain with **Integer Ceiling** ($1, 2, 3...$).
-- Enforces $\text{Supply} \ge \text{Demand}$ across all nodes to guarantee that no upstream starvation occurs in real gameplay.
+- Hit **Auto Ratio** to rebalance and scale machine counts across connected nodes with **Integer Ceiling** ($1, 2, 3...$).
+- Enforces $\text{Supply} \ge \text{Demand}$ across nodes to prevent upstream starvation.
 
-### 4. Large Turbine / Generator Simulation & 48+ Rotor Scanner
-- **Dedicated Emerald Theme**: Generator nodes feature a distinctive deep emerald dark theme (`#122218`) and energy green borders (`+EU/t`).
-- **3D Visual Rotor Dialog (`[⚙ 220%]` click)**: Scans 48+ native and modpack-added GT rotors in real-time, rendering distinct item icons, efficiency badges, and localized tooltips.
-- **Rotor Power & Tier Auto Parallel Derivation**: Selecting a rotor or changing voltage tier automatically calculates the turbine's maximum voltage ($V_{\text{max}} = V_{\text{holder}} \times \frac{P_{\text{rotor}}}{100}$) and sets optimal rated parallels (Par) in 1 second.
+### 5. Large Turbine / Generator Simulation & Rotor Selection
+- **Generator Cards**: Distinct emerald panel theme (`+EU/t`) for easy identification.
+- **3D Rotor Dialog (`[⚙ 220%]` click)**: Choose turbine rotors from installed GT addons and modpacks.
+- **Auto Parallel Calculation**: Automatically calculates the turbine's maximum voltage ($V_{\text{max}} = V_{\text{holder}} \times \frac{P_{\text{rotor}}}{100}$) and sets rated parallels (Par).
 
-### 5. Interactive Numeric Parallel Input & Wheel Control
-- **Direct Number Input**: Click `Par` button to type any parallel number directly (e.g. `1152`).
-- **Mouse Wheel Control**: Scroll on the `Par` button to quickly scale by 2x (or `Shift + Wheel` for +/- 1 fine stepping).
+### 6. Interactive Numeric Parallel Input
+- **Direct Number Input**: Click `Par` button to type custom parallel numbers directly (e.g. `1152`).
+- **Mouse Wheel Control**: Scroll on the `Par` button to scale by 2x (or `Shift + Wheel` for +/- 1 stepping).
 
-### 6. Blueprint Sharing
-- **Share (`Ctrl + C`)**: Copies your entire setup (nodes, tiers, counts, wires, and layout) as a compact string (`GTBOARD:...`).
-- **Import (`Ctrl + V`)**: Paste a shared string to load someone else's line layout in a second.
-- Easy to share on Discord, forums, or notes.
+### 7. In-Game Interactive Tutorial
+- Built-in step-by-step interactive tutorial covering recipes, wiring, ratios, and modules.
 
-### 7. Live Process Summary
-- Live overlay tracking total power draw (EU/t) and highest tier required (with generator output subtracted).
-- Real-time breakdown of raw external inputs needed vs. net output products and byproducts.
+### 8. Blueprint Sharing
+- **Share (`Ctrl + C`)**: Copies the board layout and configurations as a string (`GTBOARD:...`).
+- **Import (`Ctrl + V`)**: Paste a shared string to load blueprints.
+
+### 9. Live Process Summary
+- Overlay tracking total power draw (EU/t) and highest tier required.
+- Summary of raw inputs needed vs. net output products and byproducts.
 
 ---
 
@@ -60,6 +68,8 @@ An in-game node graph calculator for GregTech CEu Modern. Instead of juggling ex
 | Open Calculator Board | Configurable in Options -> Controls |
 | Pan Canvas | Right Click + Drag or Middle Click + Drag |
 | Zoom Canvas | Mouse Wheel (Zooms to cursor) |
+| Marquee Box Selection | Left Click + Drag on empty canvas space |
+| Multi-Node Dragging | Drag any selected node to move all selected nodes together |
 | Connect Wire | Left Click & Drag between ports (Output -> Input or Input -> Output) |
 | **Smart Match Connect (Bidirectional)** | **Shift + Drag between ports**<br>• Output -> Input: Scales consumer machine count to producer supply (Integer Ceiling)<br>• Input -> Output: Scales producer machine count to consumer demand (Integer Ceiling) |
 | Disconnect Wire / Port | Right Click on wire or port socket |
@@ -70,11 +80,8 @@ An in-game node graph calculator for GregTech CEu Modern. Instead of juggling ex
 | Change Voltage Tier | Click or Mouse Wheel over Tier button (`LV`, `MV`, `HV`...) |
 | Toggle Overclock Mode | Click `[STD OC]` / `[PERF OC]` button |
 | Blueprint Copy / Paste | `Ctrl + C` (Copy) / `Ctrl + V` (Import) in calculator board |
-| Parallel Factor (Par) | • **Click**: Type custom integer directly (e.g. 1152)<br>• **Right Click**: Halve parallel<br>• **Mouse Wheel**: Multiply/Divide (Shift+Wheel: +1 / -1) |
-| Copy Blueprint | `[Share]` button or `Ctrl + C` |
-| Paste Blueprint | `[Import]` button or `Ctrl + V` |
 | Recipe / Uses Lookup | Hover over port and press `R` (Recipes) or `U` (Uses) |
-| Scroll Top Toolbar | Mouse Wheel or Left Click + Drag over toolbar |
+| Scroll Top Toolbar / Tabs | Mouse Wheel or Left Click + Drag over toolbar / tab bar |
 
 ---
 
@@ -98,7 +105,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.2.jar`.
+The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.5.jar`.
 
 ---
 
