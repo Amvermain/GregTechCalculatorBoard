@@ -3,7 +3,6 @@ package com.gtceu.calcboard.api;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -13,8 +12,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Dynamically queries GTCEu Modern's IParallelHatch and ParallelHatchPartMachine API
- * to extract exact parallel processing capacities and absolute/energy scaling flags without regex parsing.
+ * Dynamically queries GTCEu Modern's MachineDefinition and Tier API
+ * to extract exact parallel processing capacities using code calculations (without tooltip parsing).
  */
 public class ParallelHelper {
 
@@ -24,11 +23,6 @@ public class ParallelHelper {
         public static final ParallelStats DEFAULT = new ParallelStats(4, false);
     }
 
-    private static final java.util.regex.Pattern PARALLEL_TOOLTIP_PATTERN = java.util.regex.Pattern.compile(
-            "(?:최대\\s*)?([0-9]+)\\s*(?:x\\s*)?(?:병렬|Parallel|Parallels|개\\s*레시피|recipes\\s*at\\s*once)",
-            java.util.regex.Pattern.CASE_INSENSITIVE
-    );
-
     /**
      * Extracts exact parallel stats from an ItemStack or ResourceLocation.
      */
@@ -37,30 +31,17 @@ public class ParallelHelper {
             return ParallelStats.DEFAULT;
         }
 
-        // 1. Primary: Extract directly from in-game ItemStack tooltip (matches Star Tech / pack custom tuning like 4x Elite Parallel)
-        String tooltipText = extractTooltipText(stack);
-        if (!tooltipText.isEmpty()) {
-            boolean isAbs = tooltipText.contains("절대") || tooltipText.toLowerCase().contains("absolute");
-            java.util.regex.Matcher m = PARALLEL_TOOLTIP_PATTERN.matcher(tooltipText);
-            if (m.find()) {
-                try {
-                    int p = Integer.parseInt(m.group(1));
-                    if (p > 0) {
-                        return new ParallelStats(p, isAbs);
-                    }
-                } catch (Exception ignored) {}
-            }
-        }
-
-        // 2. Check NBT
+        // Check NBT override if present
         if (stack.hasTag()) {
             net.minecraft.nbt.CompoundTag tag = stack.getTag();
-            if (tag.contains("Parallel")) {
-                int p = tag.getInt("Parallel");
-                if (p > 0) return new ParallelStats(p, tag.getBoolean("IsAbsolute"));
-            } else if (tag.contains("MaxParallel")) {
-                int p = tag.getInt("MaxParallel");
-                if (p > 0) return new ParallelStats(p, tag.getBoolean("IsAbsolute"));
+            if (tag != null) {
+                if (tag.contains("Parallel")) {
+                    int p = tag.getInt("Parallel");
+                    if (p > 0) return new ParallelStats(p, tag.getBoolean("IsAbsolute"));
+                } else if (tag.contains("MaxParallel")) {
+                    int p = tag.getInt("MaxParallel");
+                    if (p > 0) return new ParallelStats(p, tag.getBoolean("IsAbsolute"));
+                }
             }
         }
 
@@ -76,33 +57,26 @@ public class ParallelHelper {
         return ParallelStats.DEFAULT;
     }
 
-    private static String extractTooltipText(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) return "";
-        try {
-            var lines = stack.getTooltipLines(null, net.minecraft.world.item.TooltipFlag.Default.NORMAL);
-            if (lines != null) {
-                StringBuilder sb = new StringBuilder();
-                for (var line : lines) {
-                    sb.append(line.getString()).append(" ");
-                }
-                return sb.toString().trim();
-            }
-        } catch (Throwable ignored) {}
-        return "";
-    }
-
     /**
-     * Extracts exact parallel stats from a Block using GTCEu's IParallelHatch / ParallelHatchPartMachine API.
+     * Extracts exact parallel stats from a Block using GTCEu's MachineDefinition / MetaMachineBlock API.
      */
     public static ParallelStats getParallelStats(Block block) {
         if (block == null) {
             return ParallelStats.DEFAULT;
         }
 
-        ParallelStats stats = extractStatsFromObject(block);
-        if (stats != null) {
-            return stats;
-        }
+        // Try extracting MachineDefinition directly from MetaMachineBlock
+        try {
+            for (Method m : block.getClass().getMethods()) {
+                if ((m.getName().equalsIgnoreCase("getMachineDefinition") || m.getName().equalsIgnoreCase("getDefinition")) && m.getParameterCount() == 0) {
+                    Object def = m.invoke(block);
+                    if (def != null) {
+                        ParallelStats s = extractStatsFromMachineDef(def);
+                        if (s != null) return s;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
 
         ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         if (id != null) {
@@ -129,66 +103,95 @@ public class ParallelHelper {
 
     private static ParallelStats computeParallelStats(String identifier) {
         ResourceLocation id = ResourceLocation.tryParse(identifier.contains(":") ? identifier : "gtceu:" + identifier);
+        boolean isAbs = identifier.contains("absolute") || identifier.contains("절대");
 
-        // 1. Check ItemStack Tooltip & NBT (Exact pack values e.g. 4x Elite Parallel)
-        // Handled in getParallelStats(ItemStack)
-
-        // 2. GTCEu MachineDefinition inspection (Safe Tier & Property inspection)
-        try {
-            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
-            if (machinesRegistry != null) {
-                for (Method m : machinesRegistry.getClass().getMethods()) {
-                    if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == ResourceLocation.class) {
-                        Object machineDef = m.invoke(machinesRegistry, id);
-                        if (machineDef != null) {
-                            int maxPar = extractInt(machineDef, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
-                            boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy");
-                            if (maxPar > 0) {
-                                return new ParallelStats(maxPar, isAbsolute);
+        // 1. Direct GTCEu GTRegistries.MACHINES & MachineDefinition code inspection
+        if (id != null) {
+            try {
+                Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+                if (machinesRegistry != null) {
+                    for (Method m : machinesRegistry.getClass().getMethods()) {
+                        if (m.getParameterCount() == 1 && m.getParameterTypes()[0] == ResourceLocation.class) {
+                            Object machineDef = m.invoke(machinesRegistry, id);
+                            if (machineDef != null) {
+                                ParallelStats stats = extractStatsFromMachineDef(machineDef);
+                                if (stats != null) return stats;
                             }
+                            break;
                         }
-                        break;
                     }
                 }
-            }
-        } catch (Throwable ignored) {}
-
-        // 3. Inspect Block instance via MetaMachineBlock without recursion
-        if (id != null) {
-            Block block = BuiltInRegistries.BLOCK.get(id);
-            if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
-                int maxPar = extractInt(block, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
-                boolean isAbsolute = extractBoolean(block, "isAbsolute", "isExact", "isFixedEnergy");
-                if (maxPar > 0) return new ParallelStats(maxPar, isAbsolute);
-            }
+            } catch (Throwable ignored) {}
         }
 
-        // 4. Fallback: Derive from name/path
-        boolean isAbs = identifier.contains("absolute") || identifier.contains("절대");
+        // 2. Fallback code derivation from tier tokens
         int par = deriveParallelFromTier(identifier);
         return new ParallelStats(par, isAbs);
     }
 
     /**
-     * Invokes GTCEu IParallelHatch getters or MetaMachine methods via safe reflection without recursion.
+     * Extracts exact parallel stats from a GTCEu MachineDefinition by reading its getTier() property.
      */
-    public static ParallelStats extractStatsFromObject(Object target) {
-        if (target == null) return null;
+    public static ParallelStats extractStatsFromMachineDef(Object machineDef) {
+        if (machineDef == null) return null;
 
-        int maxPar = extractInt(target, "getMaxParallel", "getCurrentParallel", "getParallel", "getMaxParallelAmount");
-        boolean isAbsolute = extractBoolean(target, "isAbsolute", "isExact", "isFixedEnergy");
+        try {
+            boolean isAbsolute = false;
+            // Check ID for absolute
+            try {
+                Method getIdM = machineDef.getClass().getMethod("getId");
+                Object idObj = getIdM.invoke(machineDef);
+                if (idObj instanceof ResourceLocation rl && rl.getPath().contains("absolute")) {
+                    isAbsolute = true;
+                }
+            } catch (Throwable ignored) {}
 
-        if (maxPar > 0) {
-            return new ParallelStats(maxPar, isAbsolute);
-        }
+            // Direct getTier() method on MachineDefinition
+            Method getTierM = machineDef.getClass().getMethod("getTier");
+            Object tierObj = getTierM.invoke(machineDef);
+            if (tierObj instanceof Number n) {
+                int tier = n.intValue();
+                int parallel = calculateParallelFromTier(tier);
+                return new ParallelStats(parallel, isAbsolute);
+            }
+        } catch (Throwable ignored) {}
 
         return null;
     }
 
+    /**
+     * Computes the exact GTCEu parallel multiplier based on the machine tier:
+     * EV (4) -> 4x
+     * IV (5) -> 16x
+     * LuV (6) -> 64x
+     * ZPM (7) -> 256x
+     * UV (8) -> 1024x
+     * UHV (9) -> 4096x
+     * UEV (10) -> 16384x
+     * UIV (11) -> 65536x
+     * UXV (12) -> 262144x
+     * OpV (13) -> 1048576x
+     * MAX (14) -> 2147483647
+     */
+    public static int calculateParallelFromTier(int tier) {
+        if (tier <= 4) return 4;         // EV (or lower fallback) -> 4
+        if (tier == 5) return 16;        // IV -> 16
+        if (tier == 6) return 64;        // LuV -> 64
+        if (tier == 7) return 256;       // ZPM -> 256
+        if (tier == 8) return 1024;      // UV -> 1024
+        if (tier == 9) return 4096;      // UHV -> 4096
+        if (tier == 10) return 16384;    // UEV -> 16,384
+        if (tier == 11) return 65536;    // UIV -> 65,536
+        if (tier == 12) return 262144;   // UXV -> 262,144
+        if (tier == 13) return 1048576;  // OpV -> 1,048,576
+        if (tier >= 14) return Integer.MAX_VALUE; // MAX / Creative
+        return 4;
+    }
+
     private static int deriveParallelFromTier(String path) {
         String lower = path.toLowerCase();
-        if (lower.contains("max") || lower.contains("creative")) return 2147483647;
+        if (lower.contains("max") || lower.contains("creative")) return Integer.MAX_VALUE;
         if (lower.contains("opv")) return 1048576;
         if (lower.contains("uxv")) return 262144;
         if (lower.contains("uiv")) return 65536;
@@ -198,54 +201,7 @@ public class ParallelHelper {
         if (lower.contains("zpm")) return 256;
         if (lower.contains("luv")) return 64;
         if (lower.contains("iv")) return 16;
-        if (lower.contains("ev")) return 4;
+        if (lower.contains("ev") || lower.contains("elite") || lower.contains("엘리트") || lower.contains("advanced")) return 4;
         return 4;
-    }
-
-    private static int extractTierIndex(Object obj) {
-        if (obj == null) return -1;
-        try {
-            for (String mName : new String[]{"getTier", "getVoltageTier", "getHatchTier"}) {
-                Method m = obj.getClass().getMethod(mName);
-                if (m.getParameterCount() == 0) {
-                    Object res = m.invoke(obj);
-                    if (res instanceof Number n) return n.intValue();
-                    if (res instanceof Enum<?> e) return e.ordinal();
-                }
-            }
-        } catch (Throwable ignored) {}
-        return -1;
-    }
-
-    private static int extractInt(Object target, String... methodNames) {
-        if (target == null) return 0;
-        for (String mName : methodNames) {
-            try {
-                Method m = target.getClass().getMethod(mName);
-                if (m.getParameterCount() == 0) {
-                    Object val = m.invoke(target);
-                    if (val instanceof Number n) {
-                        return n.intValue();
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-        return 0;
-    }
-
-    private static boolean extractBoolean(Object target, String... methodNames) {
-        if (target == null) return false;
-        for (String mName : methodNames) {
-            try {
-                Method m = target.getClass().getMethod(mName);
-                if (m.getParameterCount() == 0) {
-                    Object val = m.invoke(target);
-                    if (val instanceof Boolean b) {
-                        return b;
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-        return false;
     }
 }

@@ -1544,5 +1544,18 @@ public class CalculationTest {
         Assertions.assertEquals(196608.0, nyinsaneTurbine.getNodeRotorHolderMaxEUt(GTVoltageTier.IV, 100));
     }
 
-
+    @Test
+    public void testGTCEuMachineDefinitionInspection() {
+        try {
+            Class<?> defCls = Class.forName("com.gregtechceu.gtceu.api.machine.MachineDefinition");
+            System.out.println("MachineDefinition methods:");
+            for (java.lang.reflect.Method m : defCls.getMethods()) {
+                if (m.getName().toLowerCase().contains("tier") || m.getName().toLowerCase().contains("type") || m.getName().toLowerCase().contains("machine")) {
+                    System.out.println("  " + m.getName() + " -> " + m.getReturnType().getName());
+                }
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
 }
