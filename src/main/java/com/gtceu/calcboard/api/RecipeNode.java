@@ -369,15 +369,106 @@ public class RecipeNode {
     }
 
     /**
-     * GTCEu Rotor Holder max throughput based on its voltage tier and rotor power %.
-     * In GTCEu: floor(voltage * 2.0 * (rotorPower / 100.0))
-     * e.g. EV (2048V) with 115% Power -> 4,710 EU/t (Iron) -> 148 parallel
-     *      EV (2048V) with 130% Power -> 5,324 EU/t (Titanium) -> 167 parallel
+     * Identifies the base voltage tier for this turbine type (HV for Steam, EV for Gas, IV for Plasma).
      */
-    public static double getRotorHolderMaxEUt(GTVoltageTier tier, int rotorPower) {
-        double voltage = tier != null ? tier.getVoltage() : 2048.0;
+    public GTVoltageTier getTurbineBaseTier() {
+        String m = (getMachineIcon() != null ? getMachineIcon().toString() : "").toLowerCase();
+        String n = (getName() != null ? getName() : "").toLowerCase();
+        if (m.contains("plasma") || n.contains("plasma") || n.contains("플라즈마")) {
+            return GTVoltageTier.IV;
+        }
+        if (m.contains("gas") || n.contains("gas") || n.contains("가스")) {
+            return GTVoltageTier.EV;
+        }
+        if (m.contains("steam") || n.contains("steam") || n.contains("증기")) {
+            return GTVoltageTier.HV;
+        }
+        return GTVoltageTier.EV;
+    }
+
+    /**
+     * Identifies base production EU/t (1,024 for Steam, 4,096 for Gas, 16,384 for Plasma, 196,608 for 12x Nyinsane Plasma).
+     */
+    public double getTurbineBaseProduction() {
+        String m = (getMachineIcon() != null ? getMachineIcon().toString() : "").toLowerCase();
+        String n = (getName() != null ? getName() : "").toLowerCase();
+        if (m.contains("nyinsane") || n.contains("nyinsane")) {
+            return 16384.0 * 12.0; // 12x parallel boosted plasma turbine
+        }
+        if (m.contains("plasma") || n.contains("plasma") || n.contains("플라즈마")) {
+            return 16384.0;
+        }
+        if (m.contains("gas") || n.contains("gas") || n.contains("가스")) {
+            return 4096.0;
+        }
+        if (m.contains("steam") || n.contains("steam") || n.contains("증기")) {
+            return 1024.0;
+        }
+        return 4096.0;
+    }
+
+    public boolean isLargeTurbine() {
+        if (!isGenerator) return false;
+        String n = (name != null ? name : "").toLowerCase();
+        String m = (machineIcon != null ? machineIcon.toString() : "").toLowerCase();
+        return m.contains("large_turbine") || m.contains("nyinsane")
+                || n.contains("large") || n.contains("대형") || n.contains("nyinsane")
+                || addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+    }
+
+    /**
+     * +10% efficiency per Rotor Holder tier above the large turbine's base tier.
+     */
+    public int getTurbineHolderEfficiencyBonus() {
+        if (!isLargeTurbine()) return 0;
+        GTVoltageTier baseTier = getTurbineBaseTier();
+        int tierDelta = Math.max(0, targetTier.ordinal() - baseTier.ordinal());
+        return tierDelta * 10;
+    }
+
+    /**
+     * GTCEu Rotor Holder base throughput (scales by 2x per tier above base tier).
+     */
+    public double getNodeRotorHolderBaseCapacity(GTVoltageTier tier) {
+        if (tier == null) return getTurbineBaseProduction();
+        GTVoltageTier baseTier = getTurbineBaseTier();
+        double baseProd = getTurbineBaseProduction();
+        int delta = tier.ordinal() - baseTier.ordinal();
+        if (delta >= 0) {
+            return baseProd * (1L << delta);
+        } else {
+            return Math.max(128.0, baseProd / (1L << (-delta)));
+        }
+    }
+
+    /**
+     * Fallback static rotor holder base capacity (EV = 4,096 EU/t base).
+     */
+    public static double getRotorHolderBaseCapacity(GTVoltageTier tier) {
+        if (tier == null) return 4096.0;
+        int tierIndex = tier.ordinal();
+        int delta = tierIndex - GTVoltageTier.EV.ordinal();
+        if (delta >= 0) {
+            return 4096.0 * (1L << delta);
+        } else {
+            return Math.max(512.0, 4096.0 / (1L << (-delta)));
+        }
+    }
+
+    /**
+     * GTCEu Rotor Holder max throughput based on its voltage tier and rotor power %.
+     * In GTCEu: floor(baseCapacity * (rotorPower / 100.0))
+     */
+    public double getNodeRotorHolderMaxEUt(GTVoltageTier tier, int rotorPower) {
+        double baseCap = getNodeRotorHolderBaseCapacity(tier);
         double powerMultiplier = (rotorPower > 0 ? rotorPower : 100) / 100.0;
-        return Math.floor(voltage * 2.0 * powerMultiplier);
+        return Math.floor(baseCap * powerMultiplier);
+    }
+
+    public static double getRotorHolderMaxEUt(GTVoltageTier tier, int rotorPower) {
+        double baseCap = getRotorHolderBaseCapacity(tier);
+        double powerMultiplier = (rotorPower > 0 ? rotorPower : 100) / 100.0;
+        return Math.floor(baseCap * powerMultiplier);
     }
 
     public static double getRotorHolderMaxEUt(GTVoltageTier tier) {
@@ -385,70 +476,24 @@ public class RecipeNode {
     }
 
     /**
-     * GTCEu material rotor maximum EU/t capacity.
+     * Dynamically queries GTCEu for material rotor maximum EU/t capacity / durability.
      */
     public static double getRotorMaterialMaxEUt(String rotorName) {
-        if (rotorName == null || rotorName.isEmpty()) return Double.MAX_VALUE;
-        String name = rotorName.toLowerCase();
-
-        if (name.contains("titanium") || name.contains("티타늄")) return 10649.0;
-        if (name.contains("tungsten_carbide") || name.contains("tungsten carbide") || name.contains("탄화 텅스텐") || name.contains("카바이드")) return 19200.0;
-        if (name.contains("tungstensteel") || name.contains("tungsten_steel") || name.contains("텅스텐스틸") || name.contains("텅스텐")) return 19200.0;
-        if (name.contains("tritanium") || name.contains("트리타늄")) return 48000.0;
-        if (name.contains("lutetium") || name.contains("루테튬")) return 64000.0;
-        if (name.contains("enderium") || name.contains("엔더륨")) return 48000.0;
-        if (name.contains("hss-g") || name.contains("hssg")) return 24000.0;
-        if (name.contains("hss-s") || name.contains("hsss")) return 32000.0;
-        if (name.contains("hss-e") || name.contains("hsse")) return 36000.0;
-        if (name.contains("naquadah_alloy") || name.contains("naquadah alloy") || name.contains("나콰다 합금")) return 64000.0;
-        if (name.contains("naquadah") || name.contains("나콰다")) return 48000.0;
-        if (name.contains("infinity") || name.contains("인피니티")) return 96000.0;
-        if (name.contains("rose_gold") || name.contains("rose gold") || name.contains("로즈")) return 16000.0;
-        if (name.contains("neodymium") || name.contains("네오디뮴")) return 9600.0;
-        if (name.contains("chrome") || name.contains("chromium") || name.contains("크롬")) return 9600.0;
-        if (name.contains("stainless") || name.contains("스테인리스")) return 8000.0;
-        if (name.contains("damascus") || name.contains("다마스커스")) return 6400.0;
-        if (name.contains("invar") || name.contains("인바")) return 8000.0;
-        if (name.contains("steel") || name.contains("강철")) return 4800.0;
-        if (name.contains("black_bronze") || name.contains("black bronze") || name.contains("흑청동")) return 4800.0;
-        if (name.contains("bronze") || name.contains("청동")) return 3200.0;
-        if (name.contains("iron") || name.contains("철")) return 3200.0;
-        if (name.contains("carbon") || name.contains("카본") || name.contains("탄소")) return 3200.0;
-        if (name.contains("wood") || name.contains("나무") || name.contains("목재")) return 1600.0;
-
-        return Double.MAX_VALUE;
+        return TurbineRotorHelper.getRotorStats(rotorName).durability();
     }
 
+    /**
+     * Dynamically queries GTCEu for material rotor efficiency.
+     */
+    public static int getRotorMaterialEfficiency(String rotorName) {
+        return TurbineRotorHelper.getRotorStats(rotorName).efficiency();
+    }
+
+    /**
+     * Dynamically queries GTCEu for material rotor power.
+     */
     public static int getRotorMaterialPower(String rotorName) {
-        if (rotorName == null || rotorName.isEmpty()) return 100;
-        String name = rotorName.toLowerCase();
-
-        if (name.contains("infinity") || name.contains("인피니티")) return 300;
-        if (name.contains("neutronium") || name.contains("뉴트로늄")) return 250;
-        if (name.contains("naquadah_alloy") || name.contains("naquadah alloy") || name.contains("나콰다 합금")) return 260;
-        if (name.contains("naquadah") || name.contains("나콰다")) return 240;
-        if (name.contains("tritanium") || name.contains("트리타늄")) return 220;
-        if (name.contains("lutetium") || name.contains("루테튬")) return 220;
-        if (name.contains("enderium") || name.contains("엔더륨")) return 200;
-        if (name.contains("osmiridium") || name.contains("오스미리듐")) return 180;
-        if (name.contains("hss-e") || name.contains("hsse")) return 190;
-        if (name.contains("hss-s") || name.contains("hsss")) return 180;
-        if (name.contains("hss-g") || name.contains("hssg")) return 160;
-        if (name.contains("ultimet") || name.contains("울티멧") || name.contains("얼티멧")) return 160;
-        if (name.contains("tungsten_carbide") || name.contains("tungsten carbide") || name.contains("탄화 텅스텐") || name.contains("카바이드")) return 150;
-        if (name.contains("tungstensteel") || name.contains("tungsten_steel") || name.contains("텅스텐스틸") || name.contains("텅스텐")) return 150;
-        if (name.contains("damascus") || name.contains("다마스커스")) return 140;
-        if (name.contains("titanium") || name.contains("티타늄")) return 130;
-        if (name.contains("chrome") || name.contains("chromium") || name.contains("크롬")) return 130;
-        if (name.contains("stainless") || name.contains("스테인리스")) return 120;
-        if (name.contains("iron") || name.contains("철")) return 115;
-        if (name.contains("black_bronze") || name.contains("흑청동")) return 115;
-        if (name.contains("bronze") || name.contains("청동")) return 110;
-        if (name.contains("steel") || name.contains("강철")) return 115;
-        if (name.contains("carbon") || name.contains("카본") || name.contains("탄소")) return 120;
-        if (name.contains("wood") || name.contains("나무")) return 100;
-
-        return 100;
+        return TurbineRotorHelper.getRotorStats(rotorName).power();
     }
 
     public static int getRotorOptimalParallel(String rotorName, double baseEUt) {
@@ -484,7 +529,7 @@ public class RecipeNode {
             }
         }
 
-        double holderMax = getRotorHolderMaxEUt(targetTier, activePower);
+        double holderMax = getNodeRotorHolderMaxEUt(targetTier, activePower);
         this.parallel = (int) Math.max(1, Math.ceil(holderMax / baseEUt));
     }
 
@@ -571,10 +616,25 @@ public class RecipeNode {
             baseRes = overclockMode.calculate(baseDurationTicks, baseEUt, getTierDelta());
         }
 
-        boolean hasRotorAddon = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
-        double legacyRotorMult = (isGenerator && !hasRotorAddon && rotorEfficiency != 100) ? (rotorEfficiency / 100.0) : 1.0;
+        double finalDuration;
+        if (isGenerator) {
+            if (isTurbine()) {
+                boolean hasRotorAddon = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+                int holderBonus = getTurbineHolderEfficiencyBonus();
+                double rotorMult;
+                if (hasRotorAddon) {
+                    rotorMult = getCombinedDurationMultiplier() + (holderBonus / 100.0);
+                } else {
+                    rotorMult = ((rotorEfficiency > 0 ? rotorEfficiency : 100) + holderBonus) / 100.0;
+                }
+                finalDuration = Math.max(1.0, baseRes.durationTicks() * rotorMult);
+            } else {
+                finalDuration = Math.max(1.0, baseRes.durationTicks() * getCombinedDurationMultiplier());
+            }
+        } else {
+            finalDuration = Math.max(1.0, baseRes.durationTicks() * getCombinedDurationMultiplier());
+        }
 
-        double finalDuration = Math.max(1.0, baseRes.durationTicks() * getCombinedDurationMultiplier() * legacyRotorMult);
         double finalEut = isGenerator ? baseRes.eut() : Math.max(1.0, baseRes.eut() * getCombinedEutMultiplier());
         return new OverclockMode.OverclockResult(finalDuration, finalEut, baseRes.batchesPerTick(), baseRes.overclocks());
     }
@@ -582,7 +642,8 @@ public class RecipeNode {
     public boolean isTurbine() {
         if (!isGenerator) return false;
         String n = (name != null ? name : "").toLowerCase();
-        return n.contains("turbine") || n.contains("터빈") 
+        String m = (machineIcon != null ? machineIcon.toString() : "").toLowerCase();
+        return n.contains("turbine") || n.contains("터빈") || m.contains("turbine")
                 || addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
     }
 
@@ -609,7 +670,7 @@ public class RecipeNode {
             }
         }
 
-        return getRotorHolderMaxEUt(targetTier, activePower);
+        return getNodeRotorHolderMaxEUt(targetTier, activePower);
     }
 
     /**
@@ -649,7 +710,18 @@ public class RecipeNode {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
         for (IngredientStack in : inputs) {
-            rates.put(in, in.getAmount() * cps);
+            double r = in.getAmount() * cps;
+            boolean merged = false;
+            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
+                if (entry.getKey().equals(in)) {
+                    entry.setValue(entry.getValue() + r);
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                rates.put(in, r);
+            }
         }
         return rates;
     }
@@ -660,14 +732,25 @@ public class RecipeNode {
     }
 
     /**
-     * Calculates output production rates in items/s or mB/s.
+     * Calculates output production rates in items/s or mB/s, properly merging multiple output slots of the same item.
      */
     public Map<IngredientStack, Double> calculateOutputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
         int tierDelta = getTierDelta();
         for (IngredientStack out : outputs) {
-            rates.put(out, out.getExpectedAmount(tierDelta) * cps);
+            double r = out.getExpectedAmount(tierDelta) * cps;
+            boolean merged = false;
+            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
+                if (entry.getKey().equals(out)) {
+                    entry.setValue(entry.getValue() + r);
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                rates.put(out, r);
+            }
         }
         return rates;
     }
@@ -701,20 +784,42 @@ public class RecipeNode {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
         for (IngredientStack in : inputs) {
-            rates.put(in, in.getAmount() * cps);
+            double r = in.getAmount() * cps;
+            boolean merged = false;
+            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
+                if (entry.getKey().equals(in)) {
+                    entry.setValue(entry.getValue() + r);
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                rates.put(in, r);
+            }
         }
         return rates;
     }
 
     /**
-     * Calculates effective output production rates in items/s or mB/s.
+     * Calculates effective output production rates in items/s or mB/s, properly merging multiple output slots of the same item.
      */
     public Map<IngredientStack, Double> calculateEffectiveOutputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
         int tierDelta = getTierDelta();
         for (IngredientStack out : outputs) {
-            rates.put(out, out.getExpectedAmount(tierDelta) * cps);
+            double r = out.getExpectedAmount(tierDelta) * cps;
+            boolean merged = false;
+            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
+                if (entry.getKey().equals(out)) {
+                    entry.setValue(entry.getValue() + r);
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                rates.put(out, r);
+            }
         }
         return rates;
     }

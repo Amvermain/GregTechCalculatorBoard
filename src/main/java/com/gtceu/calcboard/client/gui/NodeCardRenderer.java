@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.FlowGraphSolver;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.api.MachineAddon;
 import com.gtceu.calcboard.api.OverclockMode;
 import com.gtceu.calcboard.api.RecipeNode;
 import dev.emi.emi.api.stack.EmiIngredient;
@@ -198,9 +199,17 @@ public class NodeCardRenderer {
                 nextCtrlX += genW + 3;
 
                 // [⚙ 220%] rotor / config button
-                String rotorText = "⚙ " + node.getRotorEfficiency() + "%";
-                if (!node.getAddons().isEmpty()) {
-                    rotorText += " (+" + node.getAddons().size() + ")";
+                int activeEff = node.getRotorEfficiency();
+                for (MachineAddon a : node.getAddons()) {
+                    if (a.getCategory() == MachineAddon.Category.ROTOR) {
+                        activeEff = (int) Math.round(a.getDurationMultiplier() * 100.0);
+                        break;
+                    }
+                }
+                String rotorText = "⚙ " + activeEff + "%";
+                long nonRotorAddons = node.getAddons().stream().filter(a -> a.getCategory() != MachineAddon.Category.ROTOR).count();
+                if (nonRotorAddons > 0) {
+                    rotorText += " (+" + nonRotorAddons + ")";
                 }
                 int rotorW = Math.max(46, (x + cardW - 6) - nextCtrlX);
                 drawBtn(graphics, font, rotorText, nextCtrlX, row2Y, rotorW, 14, mouseX, mouseY, 0xFFFFAA00);

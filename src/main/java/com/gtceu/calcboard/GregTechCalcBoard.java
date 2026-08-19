@@ -37,7 +37,7 @@ public class GregTechCalcBoard {
 
     private void registerReloadListeners(final net.minecraftforge.client.event.RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener) resourceManager -> {
-            com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().refresh();
+            com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().markDirty();
         });
     }
 

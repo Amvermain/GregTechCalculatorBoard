@@ -8,6 +8,39 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [1.0.4-fix] - 2026-08-19
+
+### Fixed
+- **Multi-Slot Duplicate Output Rate Overwrite (`RecipeNode`, `FlowGraphSolver`)**:
+  - Fixed an issue where recipes with multiple output slots of the same item (such as 100% and 85% chance outputs) would overwrite previous slot values during map aggregation, cutting calculated production rates.
+  - Resolves the issue where sustainable production lines incorrectly showed negative raw input deficits in the Process Summary.
+- **World Load MaterialRegistryManager Crash (`MachineAddonCatalog`, `CoilHelper`, `GregTechCalcBoard`)**:
+  - Fixed an `IllegalStateException` crash caused by the addon crawler executing during early resource reload before GTCEu finished registering materials.
+  - Removed blind field reflection and switched the catalog to lazy-load safely on the first time the calculator GUI is opened in-game.
+- **Cupronickel Coil 75% Speed Penalty & Level Formula (`CoilHelper`, `MachineConfigDialog`)**:
+  - Properly applied the 75% processing speed penalty (1.33x duration) for Cupronickel (1800K) coils when installed on Pyrolyse Ovens and Chemical Reactors.
+  - Distinguished card badges by color, rendering speed penalties in red, duration reductions in cyan, and power discounts in gold.
+- **Turbine Rotor Instance API Calling & Dynamic Extraction Fix (`DynamicAddonCrawler`, `TurbineRotorHelper`)**:
+  - Resolved `NullPointerException` where `TurbineRotorBehaviour` instance methods were called as static, which caused rotors to fallback to 100% or misinterpret Enderium durability as efficiency (9180%).
+  - Correctly extracts dynamic material stats (e.g. Scheelite 220%, Enderium 180% efficiency / 300% power, HSS series) directly from active GTCEu item instances.
+- **Deductive Handling for Fixed-Chance Byproducts (`EmiRecipeConverter`)**:
+  - Removed the hardcoded assumption that all GregTech chanced outputs increase by +5% per tier.
+  - Directly inspects `tierChanceBoost` from GTCEu recipe definitions, ensuring recipes with fixed chances (like 85% Certus Quartz crystals) maintain their exact values when overclocked.
+
+### Changed
+- **Configurable Maintenance Hatch (CMH) Presets (`DynamicAddonCrawler`)**:
+  - Replaced ambiguous intermediate values with exact in-game UI modes:
+    - **Max Speed Mode**: **0.9x** Duration (10% faster craft time), **3.0x** maintenance problem occurrence rate (breaks 3x more often, EU power remains 1.0x unchanged).
+    - **Max Eco Mode**: **1.1x** Duration (10% slower craft time), **0.2x** maintenance problem occurrence rate (breaks 80% less often, EU power remains 1.0x unchanged).
+- **Large Turbine Multiblock Physics & Holder Efficiency Scaling (`RecipeNode`)**:
+  - Implemented exact base voltage tiers and production limits for Large Steam Turbine (HV: 1,024 EU/t), Large Gas Turbine (EV: 4,096 EU/t), Large Plasma Turbine (IV: 16,384 EU/t), and Nyinsane Boosted Plasma Turbine (12x Parallel: 196,608 EU/t).
+  - Dynamically calculates the +10% efficiency bonus (runtime extension / fuel reduction) and 2x EU/t scaling for each Rotor Holder tier above the turbine's base tier to match in-game physics.
+- **Type-Based Dynamic Coil & Parallel Hatch Inspection (`CoilHelper`, `ParallelHelper`, `DynamicAddonCrawler`)**:
+  - Replaced keyword-based string heuristics with strict `ICoilType` and `IParallelHatch` interface introspection.
+  - Prevents non-coil decorative blocks (like stairs and slabs) from being mistakenly registered into the catalog.
+
+---
+
 ## [1.0.4] - 2026-08-19
 
 ### Added
@@ -33,7 +66,11 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 - **Mouse Wheel Interaction Refinement**: Removed accidental mouse wheel scrolling on the parallel button on node cards, preserving wheel scrolling strictly for Voltage Tier cycling and Alternative Ingredients.
 
 ### Fixed
-- **Keybind Capture in System Screens (`GregTechCalcBoard`, `KeyBindings`)**: Prevented `ADD_RECIPE` key event intercept inside Minecraft's Options, Controls, Key Binds (`KeyBindsScreen`), Chat, Pause, Death, and Title screens, fixing an issue where rebinding keys would accidentally open the calculator board.
+- **Turbine Rotor Specs & Large Turbine Generation Engine Discrepancy (`RecipeNode`, `DynamicAddonCrawler`, `NodeCardRenderer`)**:
+  - **Scheelite Turbine Rotor Support**: Added exact 220% Efficiency, 225% Power, and 64,000 EU/t capacity to the dynamic crawler and rotor material database.
+  - **IV Large Gas Turbine (LGT) Real Generation Synchronization**: Synchronized IV Rotor Holder (8,192V) with Scheelite Rotor (225%) to match in-game physics precisely at `36,864 EU/t (4.5A IV)`, `1,152 Parallel`, `4.40s (220% Eff)`, and `523.6 mB/s`.
+  - **Generator Node Badge Deduplication**: Directly displays `⚙ 220%` on generator cards and eliminates redundant `(+1)` counts for the rotor itself.
+- **Key Binds / Controls Menu Shortcut Capture Collision (`GregTechCalcBoard`, `KeyBindings`)**: Fixed an issue where typing or binding keys inside Minecraft's Controls menu (`KeyBindsScreen`), options, chat, or pause screens would inadvertently open the calculator board.
 - **Text Input Focus Guard**: Prevented global hotkey triggers while any `EditBox` or search text field is actively focused.
 - **Shift Requirement & Line Wrapping in Addon Tooltips**: Removed the requirement to hold Shift to view coil stats in calculation dialogs, and replaced long single-line strings with clean multi-line bullet points.
 - **Duplicate Remove Icon**: Fixed a double `✕` bug (`✕ ✕ Remove`) in addon tooltips.

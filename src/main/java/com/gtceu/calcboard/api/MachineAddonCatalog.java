@@ -13,9 +13,11 @@ public class MachineAddonCatalog {
 
     private final List<MachineAddon> allAddons = new ArrayList<>();
     private final List<MachineAddon> customAddons = new ArrayList<>();
+    private volatile boolean isDirty = true;
+    private String lastLanguageCode = "";
 
     private MachineAddonCatalog() {
-        refresh();
+        // Lazy loaded on first GUI open
     }
 
     public static synchronized MachineAddonCatalog getInstance() {
@@ -25,13 +27,16 @@ public class MachineAddonCatalog {
         return instance;
     }
 
-    public void refresh() {
+    public void markDirty() {
+        this.isDirty = true;
+    }
+
+    public synchronized void refresh() {
         allAddons.clear();
         allAddons.addAll(DynamicAddonCrawler.crawlAllAddons());
         allAddons.addAll(customAddons);
+        this.isDirty = false;
     }
-
-    private String lastLanguageCode = "";
 
     public List<MachineAddon> getAllAddons() {
         try {
@@ -40,12 +45,12 @@ public class MachineAddonCatalog {
                 String currentLang = mc.getLanguageManager().getSelected();
                 if (currentLang != null && !currentLang.equals(lastLanguageCode)) {
                     lastLanguageCode = currentLang;
-                    refresh();
+                    isDirty = true;
                 }
             }
         } catch (Throwable ignored) {}
 
-        if (allAddons.isEmpty()) {
+        if (isDirty || allAddons.isEmpty()) {
             refresh();
         }
         return new ArrayList<>(allAddons);

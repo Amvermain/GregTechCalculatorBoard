@@ -139,9 +139,11 @@ public class DynamicAddonCrawler {
                     else if ((path.contains("maintenance_hatch") || path.endsWith("_maintenance_hatch") || (path.contains("maintenance") && path.contains("hatch")))
                             && !path.contains("cover") && !path.contains("detector") && !path.contains("casing")
                             && !path.contains("plate") && !path.contains("circuit")) {
-                        MachineAddon addon = parseMaintenanceHatch(stack, id);
-                        if (addon != null && !containsAddonId(result, addon.getId())) {
-                            result.add(addon);
+                        List<MachineAddon> mAddons = parseMaintenanceHatches(stack, id);
+                        for (MachineAddon addon : mAddons) {
+                            if (addon != null && !containsAddonId(result, addon.getId())) {
+                                result.add(addon);
+                            }
                         }
                     }
 
@@ -149,6 +151,12 @@ public class DynamicAddonCrawler {
                     else if ((path.endsWith("_coil_block") || path.equals("coil_block") || path.contains("heating_coil") || (path.contains("coil") && path.contains("block")))
                             && !path.contains("fusion") && !path.contains("voltage") && !path.contains("superconduct")
                             && !path.contains("wire") && !path.contains("motor") && !path.contains("cable")
+                            && !path.contains("slab") && !path.contains("stairs") && !path.contains("wall")
+                            && !path.contains("fence") && !path.contains("pane") && !path.contains("door")
+                            && !path.contains("trapdoor") && !path.contains("button") && !path.contains("pressure")
+                            && !path.contains("pillar") && !path.contains("brick") && !path.contains("tile")
+                            && !path.contains("smooth") && !path.contains("chiseled") && !path.contains("cut")
+                            && !path.contains("polished") && !path.contains("cracked") && !path.contains("casing")
                             && !path.startsWith("lv_") && !path.startsWith("mv_") && !path.startsWith("hv_")
                             && !path.startsWith("ev_") && !path.startsWith("iv_") && !path.startsWith("luv_")
                             && !path.startsWith("zpm_") && !path.startsWith("uv_") && !path.startsWith("uhv_")) {
@@ -212,14 +220,23 @@ public class DynamicAddonCrawler {
         overpressure.setEutMultiplier(1.25);
         list.add(overpressure);
 
-        // Configurable Maintenance Hatch (CMH Default 95% Speed / 90% Power)
-        MachineAddon cmh = new MachineAddon("gtceu:configurable_maintenance_hatch", "gui.gtcalcboard.addon.configurable_maintenance_hatch", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.configurable_maintenance_hatch.desc", ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch"));
-        cmh.setDurationMultiplier(1.0 / 0.95); // 95% speed = 1 / 0.95 duration
-        cmh.setEutMultiplier(0.90);
-        list.add(cmh);
+        // Configurable Maintenance Hatch (Max Speed: 0.9x Duration / 1.0x EU / 3x Break Rate)
+        MachineAddon cmhFast = new MachineAddon("gtceu:configurable_maintenance_hatch_fast", "gui.gtcalcboard.addon.configurable_maintenance_hatch_fast", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.configurable_maintenance_hatch_fast.desc", ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch"));
+        cmhFast.setDurationMultiplier(0.9);
+        cmhFast.setEutMultiplier(1.0);
+        list.add(cmhFast);
+
+        // Configurable Maintenance Hatch (Slow Wear: 1.1x Duration / 1.0x EU / 0.2x Break Rate)
+        MachineAddon cmhEco = new MachineAddon("gtceu:configurable_maintenance_hatch_eco", "gui.gtcalcboard.addon.configurable_maintenance_hatch_eco", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.configurable_maintenance_hatch_eco.desc", ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch"));
+        cmhEco.setDurationMultiplier(1.1);
+        cmhEco.setEutMultiplier(1.0);
+        list.add(cmhEco);
 
         // Discover GTCEu Material Rotors
         discoverGTCEuRotors(list);
+
+        // Discover GTCEu Heating Coils via ICoilType API
+        discoverGTCEuCoils(list);
     }
 
     private static void discoverGTCEuRotors(List<MachineAddon> list) {
@@ -230,21 +247,93 @@ public class DynamicAddonCrawler {
                 rotorItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
             }
 
-            Class<?> gtceuApiCls = Class.forName("com.gregtechceu.gtceu.api.GTCEuAPI");
             Class<?> propertyKeyCls = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey");
             Class<?> materialCls = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.Material");
             Class<?> behaviourCls = Class.forName("com.gregtechceu.gtceu.common.item.TurbineRotorBehaviour");
 
-            Object materialManager = gtceuApiCls.getField("materialManager").get(null);
             Object rotorKey = propertyKeyCls.getField("ROTOR").get(null);
 
-            java.lang.reflect.Method getRegisteredMaterialsMethod = materialManager.getClass().getMethod("getRegisteredMaterials");
             java.lang.reflect.Method hasPropertyMethod = materialCls.getMethod("hasProperty", propertyKeyCls);
             java.lang.reflect.Method getPropertyMethod = materialCls.getMethod("getProperty", propertyKeyCls);
             java.lang.reflect.Method getBehaviourMethod = behaviourCls.getMethod("getBehaviour", ItemStack.class);
             java.lang.reflect.Method setPartMaterialMethod = behaviourCls.getMethod("setPartMaterial", ItemStack.class, materialCls);
 
-            java.util.Collection<?> materials = (java.util.Collection<?>) getRegisteredMaterialsMethod.invoke(materialManager);
+            List<Object> allMaterials = new ArrayList<>();
+
+            // 1. Primary: GTRegistries.MATERIALS (GTCEu 1.20.1 Material Registry)
+            try {
+                Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                Object materialsRegistry = gtRegistriesCls.getField("MATERIALS").get(null);
+                if (materialsRegistry != null) {
+                    if (materialsRegistry instanceof Iterable<?> it) {
+                        for (Object mat : it) {
+                            if (mat != null && !allMaterials.contains(mat)) {
+                                allMaterials.add(mat);
+                            }
+                        }
+                    }
+                    if (allMaterials.isEmpty()) {
+                        for (java.lang.reflect.Method m : materialsRegistry.getClass().getMethods()) {
+                            if (m.getParameterCount() == 0) {
+                                String mName = m.getName().toLowerCase();
+                                if (mName.contains("val") || mName.contains("all") || mName.contains("get") || mName.contains("list") || mName.contains("stream")) {
+                                    try {
+                                        Object res = m.invoke(materialsRegistry);
+                                        if (res instanceof Iterable<?> it) {
+                                            for (Object mat : it) {
+                                                if (mat != null && !allMaterials.contains(mat)) allMaterials.add(mat);
+                                            }
+                                        } else if (res instanceof java.util.stream.Stream<?> str) {
+                                            str.forEach(mat -> { if (mat != null && !allMaterials.contains(mat)) allMaterials.add(mat); });
+                                        } else if (res instanceof java.util.Map<?, ?> map) {
+                                            for (Object mat : map.values()) {
+                                                if (mat != null && !allMaterials.contains(mat)) allMaterials.add(mat);
+                                            }
+                                        }
+                                    } catch (Throwable ignored) {}
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            // 2. Secondary: GTCEuAPI.materialManager.getRegistry()
+            if (allMaterials.isEmpty()) {
+                try {
+                    Class<?> gtceuApiCls = Class.forName("com.gregtechceu.gtceu.api.GTCEuAPI");
+                    Object materialManager = gtceuApiCls.getField("materialManager").get(null);
+                    if (materialManager != null) {
+                        for (java.lang.reflect.Method m : materialManager.getClass().getMethods()) {
+                            if (m.getParameterCount() == 0) {
+                                try {
+                                    Object res = m.invoke(materialManager);
+                                    if (res instanceof Iterable<?> it) {
+                                        for (Object mat : it) {
+                                            if (mat != null && !allMaterials.contains(mat)) allMaterials.add(mat);
+                                        }
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            // 3. Fallback: GTMaterials static fields
+            if (allMaterials.isEmpty()) {
+                try {
+                    Class<?> gtMaterialsCls = Class.forName("com.gregtechceu.gtceu.common.data.GTMaterials");
+                    for (java.lang.reflect.Field f : gtMaterialsCls.getFields()) {
+                        if (materialCls.isAssignableFrom(f.getType())) {
+                            Object mat = f.get(null);
+                            if (mat != null && !allMaterials.contains(mat)) {
+                                allMaterials.add(mat);
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
 
             String rotorPattern = Component.translatable("item.gtceu.turbine_rotor").getString();
             if (rotorPattern.isEmpty() || rotorPattern.contains("item.")) {
@@ -253,90 +342,217 @@ public class DynamicAddonCrawler {
                 rotorPattern = "%s " + rotorPattern;
             }
 
-            if (materials != null && rotorItem != null) {
-                for (Object mat : materials) {
+            for (Object mat : allMaterials) {
+                try {
+                    java.lang.reflect.Method getNameMethod = mat.getClass().getMethod("getName");
+                    String matName = (String) getNameMethod.invoke(mat);
+                    if (matName == null || matName.isEmpty()) continue;
+
+                    Boolean hasRotor = false;
                     try {
-                        Boolean hasRotor = (Boolean) hasPropertyMethod.invoke(mat, rotorKey);
-                        if (hasRotor != null && hasRotor) {
-                            Object prop = getPropertyMethod.invoke(mat, rotorKey);
-                            if (prop != null) {
-                                java.lang.reflect.Method getEffMethod = prop.getClass().getMethod("getEfficiency");
-                                java.lang.reflect.Method getPowerMethod = prop.getClass().getMethod("getPower");
-
-                                double effVal = ((Number) getEffMethod.invoke(prop)).doubleValue();
-                                int eff = (int) Math.round(effVal <= 10.0 ? effVal * 100.0 : effVal);
-                                double powerVal = ((Number) getPowerMethod.invoke(prop)).doubleValue();
-                                int power = (int) Math.round(powerVal <= 10.0 ? powerVal * 100.0 : powerVal);
-
-                                java.lang.reflect.Method getNameMethod = mat.getClass().getMethod("getName");
-                                String matName = (String) getNameMethod.invoke(mat);
-
-                                String matDisplayName = formatMatName(matName);
-                                try {
-                                    java.lang.reflect.Method getLocalizedNameMethod = mat.getClass().getMethod("getLocalizedName");
-                                    Object comp = getLocalizedNameMethod.invoke(mat);
-                                    if (comp instanceof Component c) {
-                                        matDisplayName = c.getString();
-                                    }
-                                } catch (Throwable ignored) {}
-
-                                String displayName = String.format(rotorPattern, matDisplayName);
-
-                                ItemStack stack = new ItemStack(rotorItem);
-                                Object behaviour = getBehaviourMethod.invoke(null, stack);
-                                if (behaviour != null) {
-                                    setPartMaterialMethod.invoke(behaviour, stack, mat);
-                                }
-
-                                String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
-                                MachineAddon rAddon = new MachineAddon("gtceu:rotor_" + matName, displayName, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
-                                rAddon.setDurationMultiplier(eff / 100.0);
-                                rAddon.setEutMultiplier(1.0);
-                                rAddon.setRotorPower(power > 0 ? power : 100);
-
-                                double dynamicMaxEUt = 0.0;
-                                for (java.lang.reflect.Method m : prop.getClass().getMethods()) {
-                                    String mName = m.getName().toLowerCase();
-                                    if (mName.contains("maxeut") || mName.contains("optimaleut") || mName.contains("capacity")) {
-                                        try {
-                                            Object res = m.invoke(prop);
-                                            if (res instanceof Number num && num.doubleValue() > 0) {
-                                                dynamicMaxEUt = num.doubleValue();
-                                                break;
-                                            }
-                                        } catch (Throwable ignored) {}
-                                    }
-                                }
-                                if (dynamicMaxEUt <= 0) {
-                                    dynamicMaxEUt = RecipeNode.getRotorMaterialMaxEUt(matName + " " + displayName);
-                                }
-                                rAddon.setRotorMaxEUt(dynamicMaxEUt);
-                                rAddon.setItemStackSample(stack);
-                                list.add(rAddon);
-                                foundAny = true;
-                            }
-                        }
+                        hasRotor = (Boolean) hasPropertyMethod.invoke(mat, rotorKey);
                     } catch (Throwable ignored) {}
-                }
+
+                    Object prop = null;
+                    try {
+                        prop = getPropertyMethod.invoke(mat, rotorKey);
+                    } catch (Throwable ignored) {}
+
+                    ItemStack stack = rotorItem != null ? new ItemStack(rotorItem) : ItemStack.EMPTY;
+                    Object behaviour = null;
+                    if (!stack.isEmpty()) {
+                        try {
+                            behaviour = getBehaviourMethod.invoke(null, stack);
+                            if (behaviour != null) {
+                                setPartMaterialMethod.invoke(behaviour, stack, mat);
+                            }
+                        } catch (Throwable ignored) {}
+
+                        // Ensure NBT tag is set
+                        if (!stack.hasTag() || !stack.getTag().contains("GT.PartStats")) {
+                            CompoundTag tag = stack.getOrCreateTag();
+                            CompoundTag partStats = new CompoundTag();
+                            partStats.putString("Material", "gtceu:" + matName);
+                            tag.put("GT.PartStats", partStats);
+                            stack.setTag(tag);
+                        }
+                    }
+
+                    int eff = 0;
+                    int power = 100;
+                    double durability = 0.0;
+
+                    // 1. Primary: Extract directly via TurbineRotorBehaviour from stack (reflects StarT fork custom rotor values like 450% power!)
+                    if (behaviour != null && !stack.isEmpty()) {
+                        try {
+                            Method effM = behaviourCls.getMethod("getRotorEfficiency", ItemStack.class);
+                            Method pwrM = behaviourCls.getMethod("getRotorPower", ItemStack.class);
+                            Method durM = behaviourCls.getMethod("getPartMaxDurability", ItemStack.class);
+
+                            Number eNum = (Number) effM.invoke(behaviour, stack);
+                            if (eNum != null && eNum.intValue() > 0) eff = eNum.intValue();
+
+                            Number pNum = (Number) pwrM.invoke(behaviour, stack);
+                            if (pNum != null && pNum.intValue() > 0) power = pNum.intValue();
+
+                            Number dNum = (Number) durM.invoke(behaviour, stack);
+                            if (dNum != null && dNum.doubleValue() > 0) durability = dNum.doubleValue();
+                        } catch (Throwable ignored) {}
+                    }
+
+                    // 2. Secondary: Extract from RotorProperty
+                    if (eff <= 0 && prop != null) {
+                        try {
+                            java.lang.reflect.Method getEffMethod = prop.getClass().getMethod("getEfficiency");
+                            Number effNum = (Number) getEffMethod.invoke(prop);
+                            if (effNum != null) {
+                                double ev = effNum.doubleValue();
+                                if (ev <= 10.0) {
+                                    eff = (int) Math.round(ev * 100.0);
+                                } else if (ev <= 1000.0) {
+                                    eff = (int) Math.round(ev);
+                                } else {
+                                    eff = (int) Math.round(ev / 100.0); // 9180 -> 92 (91.8%), 22000 -> 220
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+
+                        try {
+                            java.lang.reflect.Method getPwrMethod = prop.getClass().getMethod("getPower");
+                            Number pwrNum = (Number) getPwrMethod.invoke(prop);
+                            if (pwrNum != null) {
+                                double pv = pwrNum.doubleValue();
+                                if (pv <= 10.0) {
+                                    power = (int) Math.round(pv * 100.0);
+                                } else if (pv <= 1000.0) {
+                                    power = (int) Math.round(pv);
+                                } else {
+                                    power = (int) Math.round(pv / 100.0);
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+
+                        try {
+                            java.lang.reflect.Method getDurMethod = prop.getClass().getMethod("getDurability");
+                            Number durNum = (Number) getDurMethod.invoke(prop);
+                            if (durNum != null && durNum.doubleValue() > 0) {
+                                durability = durNum.doubleValue();
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+
+                    // Accept if it has property or valid efficiency from GT
+                    if (eff > 0 || (hasRotor != null && hasRotor) || prop != null) {
+                        if (eff <= 0) eff = 100;
+                        if (power <= 0) power = 100;
+
+                        String matDisplayName = formatMatName(matName);
+                        try {
+                            java.lang.reflect.Method getLocalizedNameMethod = mat.getClass().getMethod("getLocalizedName");
+                            Object comp = getLocalizedNameMethod.invoke(mat);
+                            if (comp instanceof Component c) {
+                                matDisplayName = c.getString();
+                            }
+                        } catch (Throwable ignored) {}
+
+                        String displayName = String.format(rotorPattern, matDisplayName);
+                        String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
+                        MachineAddon rAddon = new MachineAddon("gtceu:rotor_" + matName, displayName, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
+                        rAddon.setDurationMultiplier(eff / 100.0);
+                        rAddon.setEutMultiplier(1.0);
+                        rAddon.setRotorPower(power);
+                        rAddon.setRotorMaxEUt(durability > 0 ? durability : TurbineRotorHelper.getRotorStats(matName).durability());
+                        if (!stack.isEmpty()) {
+                            rAddon.setItemStackSample(stack);
+                        }
+
+                        if (list.stream().noneMatch(a -> a.getId().equals(rAddon.getId()) || a.getName().equalsIgnoreCase(rAddon.getName()))) {
+                            list.add(rAddon);
+                            foundAny = true;
+                        }
+                    }
+                } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
 
-        // Standard Turbine Rotors Fallback (if GT reflection found none)
+        // Fallback: Generate real GTCEu TurbineRotor ItemStacks with NBT PartStats
         if (!foundAny) {
-            int[] rotorEffs = {100, 120, 150, 180, 200, 220, 300};
-            String[] matKeys = {"wood", "carbon", "titanium", "tungstensteel", "damascus_steel", "lutetium", "infinity"};
-            for (int i = 0; i < rotorEffs.length; i++) {
-                int eff = rotorEffs[i];
-                String matKey = matKeys[i];
-                String nameKey = "gui.gtcalcboard.addon.rotor." + matKey;
-                String name = Component.translatable("gui.gtcalcboard.addon.rotor_name", Component.translatable(nameKey).getString(), String.valueOf(eff)).getString();
-                String desc = Component.translatable("gui.gtcalcboard.addon.rotor_desc", String.valueOf(eff), String.valueOf(eff)).getString();
-                MachineAddon rAddon = new MachineAddon("gtceu:rotor_" + eff, name, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
+            Item rItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+            if (rItem == null) {
+                rItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+            }
+
+            String[] knownRotorMats = {"wood", "carbon", "bronze", "steel", "damascus_steel", "titanium", "tungstensteel", "tungsten_carbide", "osmiridium", "hssg", "hsss", "hsse", "shellite", "scheelite", "lutetium", "tritanium", "enderium", "naquadah", "naquadah_alloy", "neutronium", "infinity"};
+            for (String kMat : knownRotorMats) {
+                ItemStack stack = rItem != null ? new ItemStack(rItem) : ItemStack.EMPTY;
+                if (!stack.isEmpty()) {
+                    CompoundTag tag = new CompoundTag();
+                    CompoundTag partStats = new CompoundTag();
+                    partStats.putString("Material", "gtceu:" + kMat);
+                    tag.put("GT.PartStats", partStats);
+                    stack.setTag(tag);
+                }
+
+                TurbineRotorHelper.RotorStats stats = TurbineRotorHelper.getRotorStats(stack);
+                int eff = stats.efficiency();
+                int power = stats.power();
+                double durability = stats.durability();
+
+                String displayName = !stack.isEmpty() ? stack.getHoverName().getString() : "";
+                if (displayName.isEmpty() || displayName.contains("item.")) {
+                    displayName = formatMatName(kMat) + " Turbine Rotor";
+                }
+
+                String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
+                MachineAddon rAddon = new MachineAddon("gtceu:rotor_" + kMat, displayName, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
                 rAddon.setDurationMultiplier(eff / 100.0);
-                rAddon.setRotorMaxEUt(RecipeNode.getRotorMaterialMaxEUt(matKey));
-                list.add(rAddon);
+                rAddon.setEutMultiplier(1.0);
+                rAddon.setRotorPower(power);
+                rAddon.setRotorMaxEUt(durability);
+                if (!stack.isEmpty()) {
+                    rAddon.setItemStackSample(stack);
+                }
+
+                if (list.stream().noneMatch(a -> a.getId().equals(rAddon.getId()) || a.getName().equalsIgnoreCase(rAddon.getName()))) {
+                    list.add(rAddon);
+                    foundAny = true;
+                }
             }
         }
+    }
+
+    private static void discoverGTCEuCoils(List<MachineAddon> list) {
+        try {
+            for (Map.Entry<net.minecraft.resources.ResourceKey<net.minecraft.world.level.block.Block>, net.minecraft.world.level.block.Block> entry : net.minecraft.core.registries.BuiltInRegistries.BLOCK.entrySet()) {
+                net.minecraft.world.level.block.Block block = entry.getValue();
+                ResourceLocation id = entry.getKey().location();
+
+                // Pure Type-based check: Block must be a CoilBlock or possess an ICoilType
+                CoilHelper.CoilStats stats = CoilHelper.extractStatsFromBlockObject(block);
+                if (stats != null && stats.temperature() > 0) {
+                    ItemStack stack = new ItemStack(block.asItem());
+                    String displayName = !stack.isEmpty() ? stack.getHoverName().getString() : block.getName().getString();
+
+                    String desc = String.format("♨ Heat: %d K\n• Smelter: %dx Par\n• Pyrolyse: %d%% Spd\n• Cracking: %d%% Energy\n• Chemical Reactor: %d%% Spd, %d%% Energy",
+                            stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
+
+                    MachineAddon addon = new MachineAddon(id.toString(), displayName, MachineAddon.Category.COIL, desc, id);
+                    if (!stack.isEmpty()) {
+                        addon.setItemStackSample(stack);
+                    }
+                    addon.setCoilTemperature(stats.temperature());
+                    addon.setPyrolyseSpeedPercent(stats.pyrolyseSpeedPercent());
+                    addon.setCrackingEnergyPercent(stats.crackingEnergyPercent());
+                    addon.setChemicalSpeedPercent(stats.chemicalSpeedPercent());
+                    addon.setChemicalEnergyPercent(stats.chemicalEnergyPercent());
+                    addon.setSmelterParallel(stats.smelterParallel());
+
+                    if (list.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
+                        list.add(addon);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     private static String formatMatName(String name) {
@@ -351,35 +567,16 @@ public class DynamicAddonCrawler {
     }
 
     private static MachineAddon parseParallelHatch(ItemStack stack, ResourceLocation id) {
-        String path = id.getPath().toLowerCase();
         String name = stack.getHoverName().getString();
-        String tooltipText = extractTooltipText(stack);
 
-        boolean isAbsolute = path.contains("absolute") || tooltipText.contains("전기 추가 소모 없이") || tooltipText.contains("without extra power");
-        int parallel = 4; // Default fallback
+        // 1. Direct GTCEu / IParallelHatch / TieredPartMachine API derivation
+        ParallelHelper.ParallelStats stats = ParallelHelper.getParallelStats(stack);
+        int parallel = stats.maxParallel();
+        boolean isAbsolute = stats.isAbsolute();
 
-        Matcher m = PARALLEL_PATTERN.matcher(tooltipText);
-        if (m.find()) {
-            try {
-                parallel = Integer.parseInt(m.group(1));
-            } catch (Exception ignored) {}
-        } else {
-            // Check tier by name / path
-            if (path.contains("iv")) parallel = 16;
-            else if (path.contains("luv")) parallel = 64;
-            else if (path.contains("zpm")) parallel = 256;
-            else if (path.contains("uv")) parallel = 1024;
-            else if (path.contains("uhv")) parallel = 4096;
-            else if (path.contains("uev")) parallel = 16384;
-            else if (path.contains("uiv")) parallel = 65536;
-            else if (path.contains("ev")) parallel = 4;
-        }
-
-        String desc = !tooltipText.isEmpty()
-                ? tooltipText
-                : (isAbsolute
-                    ? Component.translatable("gui.gtcalcboard.addon.absolute_parallel_hatch_desc", String.valueOf(parallel)).getString()
-                    : Component.translatable("gui.gtcalcboard.addon.parallel_hatch_desc", String.valueOf(parallel)).getString());
+        String desc = isAbsolute
+                ? Component.translatable("gui.gtcalcboard.addon.absolute_parallel_hatch_desc", String.valueOf(parallel)).getString()
+                : Component.translatable("gui.gtcalcboard.addon.parallel_hatch_desc", String.valueOf(parallel)).getString();
 
         MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.PARALLEL, desc, id);
         addon.setParallelMultiplier(parallel);
@@ -390,7 +587,8 @@ public class DynamicAddonCrawler {
         return addon;
     }
 
-    private static MachineAddon parseMaintenanceHatch(ItemStack stack, ResourceLocation id) {
+    private static List<MachineAddon> parseMaintenanceHatches(ItemStack stack, ResourceLocation id) {
+        List<MachineAddon> list = new ArrayList<>();
         String path = id.getPath().toLowerCase();
         String name = stack.getHoverName().getString();
         String nameLower = name.toLowerCase();
@@ -400,47 +598,46 @@ public class DynamicAddonCrawler {
                 || path.contains("plate") || path.contains("circuit")
                 || nameLower.contains("cover") || nameLower.contains("커버")
                 || nameLower.contains("detector") || nameLower.contains("감지기")) {
-            return null;
+            return list;
         }
 
         if (!path.contains("maintenance_hatch") && !path.endsWith("_maintenance_hatch")
                 && (!path.contains("maintenance") || !path.contains("hatch"))) {
-            return null;
+            return list;
         }
 
-        String tooltipText = extractTooltipText(stack);
+        if (path.contains("configurable")) {
+            // 1. Max Speed Mode: 0.9x Duration, 1.0x EU, 0.2x Maintenance Interval
+            MachineAddon fast = new MachineAddon(id + "_fast", 
+                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_fast").getString(), 
+                    MachineAddon.Category.MAINTENANCE, 
+                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_fast.desc").getString(), 
+                    id);
+            fast.setDurationMultiplier(0.9);
+            fast.setEutMultiplier(1.0);
+            fast.setItemStackSample(stack);
+            list.add(fast);
 
-        double durMult = 1.0;
-        double eutMult = 1.0;
-
-        if (path.contains("configurable") || tooltipText.contains("속도") || tooltipText.contains("Speed") || tooltipText.contains("전력") || tooltipText.contains("Power")) {
-            Matcher sm = SPEED_PERCENT_PATTERN.matcher(tooltipText);
-            if (sm.find()) {
-                try {
-                    double spd = Double.parseDouble(sm.group(1));
-                    if (spd > 0) durMult = 100.0 / spd;
-                } catch (Exception ignored) {}
-            }
-            Matcher em = ENERGY_PERCENT_PATTERN.matcher(tooltipText);
-            if (em.find()) {
-                try {
-                    double eut = Double.parseDouble(em.group(1));
-                    eutMult = eut / 100.0;
-                } catch (Exception ignored) {}
-            }
-            if (durMult == 1.0 && eutMult == 1.0) {
-                // Default Configurable Maintenance Hatch bonus: 95% speed (1/0.95 duration) / 90% power
-                durMult = 1.0 / 0.95;
-                eutMult = 0.90;
-            }
+            // 2. Slow Wear Mode: 1.1x Duration, 1.0x EU, 3.0x Maintenance Interval
+            MachineAddon eco = new MachineAddon(id + "_eco", 
+                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_eco").getString(), 
+                    MachineAddon.Category.MAINTENANCE, 
+                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_eco.desc").getString(), 
+                    id);
+            eco.setDurationMultiplier(1.1);
+            eco.setEutMultiplier(1.0);
+            eco.setItemStackSample(stack);
+            list.add(eco);
+        } else {
+            String desc = Component.translatable("gui.gtcalcboard.addon.maintenance_hatch_desc").getString();
+            MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.MAINTENANCE, desc, id);
+            addon.setDurationMultiplier(1.0);
+            addon.setEutMultiplier(1.0);
+            addon.setItemStackSample(stack);
+            list.add(addon);
         }
 
-        String desc = !tooltipText.isEmpty() ? tooltipText : Component.translatable("gui.gtcalcboard.addon.maintenance_hatch_desc").getString();
-        MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.MAINTENANCE, desc, id);
-        addon.setDurationMultiplier(durMult);
-        addon.setEutMultiplier(eutMult);
-        addon.setItemStackSample(stack);
-        return addon;
+        return list;
     }
 
     private static MachineAddon parseTurbineRotor(ItemStack stack, ResourceLocation id) {
@@ -487,41 +684,24 @@ public class DynamicAddonCrawler {
         int power = 100;
         double dynamicMaxEUt = 0.0;
 
-        // 0. Primary: GTCEu TurbineRotorBehaviour -> Material -> RotorProperty API reflection
+        // 0. Primary: GTCEu TurbineRotorBehaviour direct API reflection
         try {
             Class<?> behaviourClass = Class.forName("com.gregtechceu.gtceu.common.item.TurbineRotorBehaviour");
             Method getBehaviourMethod = behaviourClass.getMethod("getBehaviour", ItemStack.class);
             Object behaviour = getBehaviourMethod.invoke(null, stack);
-            if (behaviour != null) {
-                Method getPartMatMethod = behaviour.getClass().getMethod("getPartMaterial", ItemStack.class);
-                Object mat = getPartMatMethod.invoke(behaviour, stack);
-                if (mat != null) {
-                    Class<?> propKeyClass = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey");
-                    Object rotorKey = propKeyClass.getField("ROTOR").get(null);
-                    Method getPropertyMethod = mat.getClass().getMethod("getProperty", propKeyClass);
-                    Object prop = getPropertyMethod.invoke(mat, rotorKey);
-                    if (prop != null) {
-                        Method getEffMethod = prop.getClass().getMethod("getEfficiency");
-                        Method getPowerMethod = prop.getClass().getMethod("getPower");
-                        double effVal = ((Number) getEffMethod.invoke(prop)).doubleValue();
-                        eff = (int) Math.round(effVal <= 10.0 ? effVal * 100.0 : effVal);
-                        double powerVal = ((Number) getPowerMethod.invoke(prop)).doubleValue();
-                        power = (int) Math.round(powerVal <= 10.0 ? powerVal * 100.0 : powerVal);
 
-                        for (Method m : prop.getClass().getMethods()) {
-                            String mName = m.getName().toLowerCase();
-                            if (mName.contains("maxeut") || mName.contains("optimaleut") || mName.contains("capacity")) {
-                                try {
-                                    Object res = m.invoke(prop);
-                                    if (res instanceof Number num && num.doubleValue() > 0) {
-                                        dynamicMaxEUt = num.doubleValue();
-                                        break;
-                                    }
-                                } catch (Throwable ignored) {}
-                            }
-                        }
-                    }
-                }
+            if (behaviour != null) {
+                Method getRotorEffMethod = behaviourClass.getMethod("getRotorEfficiency", ItemStack.class);
+                Method getRotorPwrMethod = behaviourClass.getMethod("getRotorPower", ItemStack.class);
+                Method getRotorDurMethod = behaviourClass.getMethod("getPartMaxDurability", ItemStack.class);
+
+                int bEff = ((Number) getRotorEffMethod.invoke(behaviour, stack)).intValue();
+                int bPwr = ((Number) getRotorPwrMethod.invoke(behaviour, stack)).intValue();
+                int bDur = ((Number) getRotorDurMethod.invoke(behaviour, stack)).intValue();
+
+                if (bEff > 0) eff = bEff;
+                if (bPwr > 0) power = bPwr;
+                if (bDur > 0) dynamicMaxEUt = (double) bDur;
             }
         } catch (Throwable ignored) {}
 
@@ -576,7 +756,7 @@ public class DynamicAddonCrawler {
             } catch (Exception ignored) {}
         }
 
-        String desc = !tooltipText.isEmpty() ? tooltipText : Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
+        String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
         MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.ROTOR, desc, id);
         addon.setDurationMultiplier(Math.max(1.0, eff / 100.0));
         addon.setEutMultiplier(1.0);
@@ -593,19 +773,7 @@ public class DynamicAddonCrawler {
     }
 
     private static int getRotorEfficiencyFromMaterial(String text) {
-        String s = text.toLowerCase();
-        if (s.contains("infinity")) return 300;
-        if (s.contains("naquadah")) return 250;
-        if (s.contains("enderium")) return 240;
-        if (s.contains("lutetium")) return 220;
-        if (s.contains("damascus")) return 200;
-        if (s.contains("tungstensteel") || s.contains("tungsten_steel")) return 180;
-        if (s.contains("titanium")) return 150;
-        if (s.contains("stainless") || s.contains("hsse") || s.contains("hss-e") || s.contains("hss_e")) return 140;
-        if (s.contains("steel") || s.contains("carbon") || s.contains("invar")) return 120;
-        if (s.contains("bronze") || s.contains("iron") || s.contains("magnalium")) return 110;
-        if (s.contains("wood")) return 100;
-        return 100;
+        return RecipeNode.getRotorMaterialEfficiency(text);
     }
 
     private static MachineAddon parseThermalAugment(ItemStack stack, ResourceLocation id) {
@@ -779,160 +947,26 @@ public class DynamicAddonCrawler {
     }
 
     public static MachineAddon parseCoilBlock(ItemStack stack, ResourceLocation id) {
-        String path = id.getPath().toLowerCase();
-        String name = stack.getHoverName().getString();
-        String nameLower = name.toLowerCase();
+        if (stack == null || stack.isEmpty()) return null;
 
-        // Reject fusion coils, voltage wire coils, motor parts, etc.
-        if (path.contains("fusion") || path.contains("voltage") || path.contains("superconduct")
-                || path.contains("motor") || path.contains("cable") || path.contains("wire")
-                || path.startsWith("lv_") || path.startsWith("mv_") || path.startsWith("hv_")
-                || path.startsWith("ev_") || path.startsWith("iv_") || path.startsWith("luv_")
-                || path.startsWith("zpm_") || path.startsWith("uv_") || path.startsWith("uhv_")
-                || path.endsWith("_wire") || path.endsWith("_cable") || path.endsWith("_wire_coil")
-                || nameLower.contains("voltage") || nameLower.contains("fusion")
-                || nameLower.contains("전압") || nameLower.contains("핵융합")
-                || !path.contains("block")) {
-            return null;
-        }
-
-        int heat = 0;
-        int pyroSpeed = 100;
-        int crackEnergy = 100;
-        int chemSpeed = 100;
-        int chemEnergy = 100;
-        int smelterPar = 16;
-
-        // 1. Reflection on Block / ICoilType (GTCEu, KubeJS, Star Technology, GT Addons)
-        try {
-            if (stack.getItem() instanceof BlockItem bi) {
-                Block block = bi.getBlock();
-                Object coilObj = block;
-
-                // Check if block has getCoilType()
-                for (Method m : block.getClass().getMethods()) {
-                    if (m.getName().toLowerCase().contains("coiltype") && m.getParameterCount() == 0) {
-                        try {
-                            Object ct = m.invoke(block);
-                            if (ct != null) {
-                                coilObj = ct;
-                                break;
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
-
-                // Extract properties from coilObj or block
-                heat = extractIntFromObject(coilObj, "getCoilTemperature", "getTemperature", "getHeat", "getHeatCapacity");
-                int ps = extractIntFromObject(coilObj, "getPyrolyseSpeedPercent", "getPyroSpeed", "getPyrolyseSpeed");
-                if (ps > 0) pyroSpeed = ps;
-                int ce = extractIntFromObject(coilObj, "getCrackingEnergyPercent", "getCrackEnergy", "getCrackingEnergy");
-                if (ce > 0) crackEnergy = ce;
-                int cs = extractIntFromObject(coilObj, "getChemicalSpeedPercent", "getChemSpeed", "getChemicalSpeed");
-                if (cs > 0) chemSpeed = cs;
-                int che = extractIntFromObject(coilObj, "getChemicalEnergyPercent", "getChemEnergy", "getChemicalEnergy");
-                if (che > 0) chemEnergy = che;
-                int sp = extractIntFromObject(coilObj, "getSmelterParallel", "getMaxParallel", "getParallel");
-                if (sp > 0) smelterPar = sp;
-            }
-        } catch (Throwable ignored) {}
-
-        // 2. Try Tooltip Extraction (both normal and advanced flags)
-        String fullTooltip = extractAllTooltipText(stack);
-        if (!fullTooltip.isEmpty()) {
-            if (heat <= 0) {
-                Matcher mHeat = HEAT_PATTERN.matcher(fullTooltip);
-                if (mHeat.find()) {
-                    try { heat = Integer.parseInt(mHeat.group(1)); } catch (Exception ignored) {}
-                }
-            }
-
-            Matcher mPyroSec = PYROLYSE_SECTION.matcher(fullTooltip);
-            if (mPyroSec.find()) {
-                String sec = mPyroSec.group(1);
-                Matcher mSpd = SPEED_VALUE_PATTERN.matcher(sec);
-                if (mSpd.find()) {
-                    try { pyroSpeed = (int) Math.round(Double.parseDouble(mSpd.group(1))); } catch (Exception ignored) {}
-                }
-            }
-
-            Matcher mCrackSec = CRACKING_SECTION.matcher(fullTooltip);
-            if (mCrackSec.find()) {
-                String sec = mCrackSec.group(1);
-                Matcher mE = ENERGY_VALUE_PATTERN.matcher(sec);
-                if (mE.find()) {
-                    try { crackEnergy = (int) Math.round(Double.parseDouble(mE.group(1))); } catch (Exception ignored) {}
-                }
-            }
-
-            Matcher mChemSec = CHEMICAL_SECTION.matcher(fullTooltip);
-            if (mChemSec.find()) {
-                String sec = mChemSec.group(1);
-                Matcher mSpd = SPEED_VALUE_PATTERN.matcher(sec);
-                if (mSpd.find()) {
-                    try { chemSpeed = (int) Math.round(Double.parseDouble(mSpd.group(1))); } catch (Exception ignored) {}
-                }
-                Matcher mE = ENERGY_VALUE_PATTERN.matcher(sec);
-                if (mE.find()) {
-                    try { chemEnergy = (int) Math.round(Double.parseDouble(mE.group(1))); } catch (Exception ignored) {}
-                }
-            }
-
-            Matcher mSmelterSec = SMELTER_SECTION.matcher(fullTooltip);
-            if (mSmelterSec.find()) {
-                String sec = mSmelterSec.group(1);
-                Matcher mPar = PARALLEL_VALUE_PATTERN.matcher(sec);
-                if (mPar.find()) {
-                    try { smelterPar = Integer.parseInt(mPar.group(1)); } catch (Exception ignored) {}
-                }
-            }
-        }
-
-        // 3. Fallbacks for known GT / StarT / KubeJS / Addon coils
-        if (heat <= 0 || chemSpeed == 100 || pyroSpeed == 100) {
-            if (path.contains("kanthal")) { if (heat <= 0) heat = 2700; if (pyroSpeed == 100) pyroSpeed = 150; if (crackEnergy == 100) crackEnergy = 90; if (chemSpeed == 100) chemSpeed = 125; if (chemEnergy == 100) chemEnergy = 95; if (smelterPar == 16) smelterPar = 32; }
-            else if (path.contains("nichrome")) { if (heat <= 0) heat = 3600; if (pyroSpeed == 100) pyroSpeed = 200; if (crackEnergy == 100) crackEnergy = 80; if (chemSpeed == 100) chemSpeed = 150; if (chemEnergy == 100) chemEnergy = 90; if (smelterPar == 16) smelterPar = 64; }
-            else if (path.contains("rtm") || path.contains("tungstensteel")) { if (heat <= 0) heat = 4500; if (pyroSpeed == 100) pyroSpeed = 200; if (crackEnergy == 100) crackEnergy = 70; if (chemSpeed == 100) chemSpeed = 150; if (chemEnergy == 100) chemEnergy = 85; if (smelterPar == 16) smelterPar = 128; }
-            else if (path.contains("hssg") || path.contains("hss_g")) { if (heat <= 0) heat = 5400; if (pyroSpeed == 100) pyroSpeed = 250; if (crackEnergy == 100) crackEnergy = 60; if (chemSpeed == 100) chemSpeed = 175; if (chemEnergy == 100) chemEnergy = 80; if (smelterPar == 16) smelterPar = 192; }
-            else if (path.contains("hsss") || path.contains("hss_s")) { if (heat <= 0) heat = 6300; if (pyroSpeed == 100) pyroSpeed = 300; if (crackEnergy == 100) crackEnergy = 50; if (chemSpeed == 100) chemSpeed = 200; if (chemEnergy == 100) chemEnergy = 75; if (smelterPar == 16) smelterPar = 256; }
-            else if (path.contains("naquadah_alloy")) { if (heat <= 0) heat = 8100; if (pyroSpeed == 100) pyroSpeed = 400; if (crackEnergy == 100) crackEnergy = 30; if (chemSpeed == 100) chemSpeed = 250; if (chemEnergy == 100) chemEnergy = 65; if (smelterPar == 16) smelterPar = 512; }
-            else if (path.contains("naquadah")) { if (heat <= 0) heat = 7200; if (pyroSpeed == 100) pyroSpeed = 350; if (crackEnergy == 100) crackEnergy = 40; if (chemSpeed == 100) chemSpeed = 225; if (chemEnergy == 100) chemEnergy = 70; if (smelterPar == 16) smelterPar = 384; }
-            else if (path.contains("trinium")) { if (heat <= 0) heat = 9000; if (pyroSpeed == 100) pyroSpeed = 450; if (crackEnergy == 100) crackEnergy = 20; if (chemSpeed == 100) chemSpeed = 275; if (chemEnergy == 100) chemEnergy = 60; if (smelterPar == 16) smelterPar = 768; }
-            else if (path.contains("tritanium")) { if (heat <= 0) heat = 9900; if (pyroSpeed == 100) pyroSpeed = 500; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 300; if (chemEnergy == 100) chemEnergy = 55; if (smelterPar == 16) smelterPar = 1024; }
-            else if (path.contains("draconium")) { if (heat <= 0) heat = 10800; if (pyroSpeed == 100) pyroSpeed = 550; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 325; if (chemEnergy == 100) chemEnergy = 50; if (smelterPar == 16) smelterPar = 1024; }
-            else if (path.contains("awakened")) { if (heat <= 0) heat = 11700; if (pyroSpeed == 100) pyroSpeed = 575; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 340; if (chemEnergy == 100) chemEnergy = 45; if (smelterPar == 16) smelterPar = 1024; }
-            else if (path.contains("infinity")) { if (heat <= 0) heat = 12600; if (pyroSpeed == 100) pyroSpeed = 600; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 350; if (chemEnergy == 100) chemEnergy = 40; if (smelterPar == 16) smelterPar = 1024; }
-            else if (path.contains("zalloy")) { if (heat <= 0) heat = 13499; if (pyroSpeed == 100) pyroSpeed = 450; if (crackEnergy == 100) crackEnergy = 20; if (chemSpeed == 100) chemSpeed = 275; if (chemEnergy == 100) chemEnergy = 60; if (smelterPar == 16) smelterPar = 768; }
-            else if (path.contains("magmada")) { if (heat <= 0) heat = 16199; if (pyroSpeed == 100) pyroSpeed = 500; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 300; if (chemEnergy == 100) chemEnergy = 55; if (smelterPar == 16) smelterPar = 1024; }
-            else if (path.contains("hypogen")) { if (heat <= 0) heat = 14400; if (pyroSpeed == 100) pyroSpeed = 650; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 375; if (chemEnergy == 100) chemEnergy = 35; if (smelterPar == 16) smelterPar = 1024; }
-            else if (path.contains("eternity") || path.contains("neutronium")) { if (heat <= 0) heat = 18000; if (pyroSpeed == 100) pyroSpeed = 800; if (crackEnergy == 100) crackEnergy = 10; if (chemSpeed == 100) chemSpeed = 400; if (chemEnergy == 100) chemEnergy = 30; if (smelterPar == 16) smelterPar = 1536; }
-            else if (path.contains("cupronickel")) { if (heat <= 0) heat = 1800; }
-            else if (path.endsWith("_coil_block") || path.contains("coil_block") || path.contains("heating_coil")) {
-                // Any other custom coil block from any mod / KubeJS
-                if (heat <= 0) heat = 1800;
-            }
-        }
-
-        if (heat <= 0) {
-            return null; // Reject non-heating-coils
+        // Pure Type-based derivation via CoilHelper
+        CoilHelper.CoilStats stats = CoilHelper.getCoilStats(stack);
+        if (stats == null || stats.temperature() <= 0) {
+            return null; // Not a genuine ICoilType block
         }
 
         String displayName = stack.getHoverName().getString();
-        if (displayName == null || displayName.isEmpty() || displayName.contains("%s")) {
-            displayName = formatMatName(path.replace("_coil_block", "").replace("coil_block", "").replace("gtceu:", "")) + " Coil Block";
-        }
-
         String desc = String.format("♨ Heat: %d K\n• Smelter: %dx Par\n• Pyrolyse: %d%% Spd\n• Cracking: %d%% Energy\n• Chemical Reactor: %d%% Spd, %d%% Energy",
-                heat, smelterPar, pyroSpeed, crackEnergy, chemSpeed, chemEnergy);
+                stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
+
         MachineAddon addon = new MachineAddon(id.toString(), displayName, MachineAddon.Category.COIL, desc, id);
         addon.setItemStackSample(stack);
-        addon.setCoilTemperature(heat);
-        addon.setPyrolyseSpeedPercent(pyroSpeed);
-        addon.setCrackingEnergyPercent(crackEnergy);
-        addon.setChemicalSpeedPercent(chemSpeed);
-        addon.setChemicalEnergyPercent(chemEnergy);
-        addon.setSmelterParallel(smelterPar);
-
+        addon.setCoilTemperature(stats.temperature());
+        addon.setPyrolyseSpeedPercent(stats.pyrolyseSpeedPercent());
+        addon.setCrackingEnergyPercent(stats.crackingEnergyPercent());
+        addon.setChemicalSpeedPercent(stats.chemicalSpeedPercent());
+        addon.setChemicalEnergyPercent(stats.chemicalEnergyPercent());
+        addon.setSmelterParallel(stats.smelterParallel());
         return addon;
     }
 

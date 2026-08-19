@@ -405,7 +405,7 @@ public final class FlowGraphSolver {
 
                     if (totalPortDemand > 0.0001) {
                         double share = req / totalPortDemand;
-                        totalSupplied += Math.min(req, pRate * share);
+                        totalSupplied += pRate * share;
                     }
                     count++;
                 }
@@ -444,9 +444,9 @@ public final class FlowGraphSolver {
 
                     if (totalProducerSupply > 0.0001) {
                         double share = produced / totalProducerSupply;
-                        totalDemanded += Math.min(produced, cReq * share);
+                        totalDemanded += cReq * share;
                     } else {
-                        totalDemanded += Math.min(produced, cReq);
+                        totalDemanded += cReq;
                     }
                     count++;
                 }
@@ -525,11 +525,30 @@ public final class FlowGraphSolver {
         Map<IngredientStack, Double> netOutputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> balanced = new LinkedHashMap<>();
 
-        Set<IngredientStack> allStacks = new HashSet<>();
-        allStacks.addAll(totalProduction.keySet());
-        allStacks.addAll(totalConsumption.keySet());
+        // Deduplicate unique ingredient stacks (merging tag alternatives / compatible items)
+        List<IngredientStack> uniqueStacks = new ArrayList<>();
+        for (IngredientStack s : totalProduction.keySet()) {
+            boolean exists = false;
+            for (IngredientStack u : uniqueStacks) {
+                if (u.equals(s) || u.matchesOrAlternative(s) || s.matchesOrAlternative(u)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) uniqueStacks.add(s);
+        }
+        for (IngredientStack s : totalConsumption.keySet()) {
+            boolean exists = false;
+            for (IngredientStack u : uniqueStacks) {
+                if (u.equals(s) || u.matchesOrAlternative(s) || s.matchesOrAlternative(u)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) uniqueStacks.add(s);
+        }
 
-        for (IngredientStack stack : allStacks) {
+        for (IngredientStack stack : uniqueStacks) {
             double produced = findRate(totalProduction, stack);
             double consumed = findRate(totalConsumption, stack);
             double delta = produced - consumed;
@@ -677,8 +696,9 @@ public final class FlowGraphSolver {
     }
 
     private static void mergeRate(Map<IngredientStack, Double> map, IngredientStack stack, double rate) {
+        if (stack == null) return;
         for (Map.Entry<IngredientStack, Double> entry : map.entrySet()) {
-            if (entry.getKey().equals(stack)) {
+            if (entry.getKey().equals(stack) || entry.getKey().matchesOrAlternative(stack) || stack.matchesOrAlternative(entry.getKey())) {
                 entry.setValue(entry.getValue() + rate);
                 return;
             }
@@ -687,8 +707,9 @@ public final class FlowGraphSolver {
     }
 
     private static double findRate(Map<IngredientStack, Double> map, IngredientStack stack) {
+        if (stack == null) return 0.0;
         for (Map.Entry<IngredientStack, Double> entry : map.entrySet()) {
-            if (entry.getKey().equals(stack)) {
+            if (entry.getKey().equals(stack) || entry.getKey().matchesOrAlternative(stack) || stack.matchesOrAlternative(entry.getKey())) {
                 return entry.getValue();
             }
         }

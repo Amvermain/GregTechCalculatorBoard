@@ -127,14 +127,19 @@ flowchart TD
 
 #### Algorithm 1: Fixed-Point Bottleneck Relaxation
 Computes the operating efficiency of every node under upstream shortages or recycled feedback loops:
+
 1. Initialize all node efficiencies: $\eta_v^{(0)} = 1.0$.
 2. For iteration $k \in [1, 10]$:
    - For each consumer $C$ and connected input port $i$:
-     - Sum available supply from connected producers $P_j$:
-       $$\text{Supply}_{P_j} = \text{NominalRate}_{P_j} \times \eta_{P_j}^{(k-1)}$$
-       $$\text{PortDemand}_{P_j} = \sum_{c \in \text{Consumers}(P_j)} \text{NominalDemand}_c$$
-       $$\text{IncomingSupply}_i = \sum_{P_j} \min\left(\text{NominalDemand}_C, \text{Supply}_{P_j} \times \frac{\text{NominalDemand}_C}{\text{PortDemand}_{P_j}}\right)$$
-     - Port satisfaction: $\rho_i = \frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}$.
+
+$$\text{Supply}_{P_j} = \text{NominalRate}_{P_j} \times \eta_{P_j}^{(k-1)}$$
+
+$$\text{PortDemand}_{P_j} = \sum_{c \in \text{Consumers}(P_j)} \text{NominalDemand}_c$$
+
+$$\text{IncomingSupply}_i = \sum_{P_j} \min\left(\text{NominalDemand}_C, \text{Supply}_{P_j} \times \frac{\text{NominalDemand}_C}{\text{PortDemand}_{P_j}}\right)$$
+
+$$\rho_i = \frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}$$
+
    - Update node efficiency: $\eta_C^{(k)} = \min_i (\rho_i, 1.0)$.
 3. If $\max_v |\eta_v^{(k)} - \eta_v^{(k-1)}| < 10^{-4}$, stop early (converged).
 
@@ -144,7 +149,7 @@ Computes the operating efficiency of every node under upstream shortages or recy
 
 #### Algorithm 3: Dual-Pass BFS Auto-Ratio
 Sizes the machine network from a designated anchor node:
-1. **Upstream Pass**: Traverses backward from consumer inputs to producers, setting producer machine counts so $Supply \ge Demand$.
+1. **Upstream Pass**: Traverses backward from consumer inputs to producers, setting producer machine counts so $\text{Supply} \ge \text{Demand}$.
 2. **Downstream Pass**: Traverses forward from producer outputs to byproduct consumers, sizing consumers to absorb waste streams.
 3. **Cycle Guard**: Limits total iterations to $\max(50, |V| \times 5)$ and per-node visits to $\le 3$, preventing infinite loops on cyclic graphs. Anchor count is preserved.
 
@@ -162,7 +167,7 @@ $$\text{Target Machine Count} = \frac{\text{Source Port Flow Rate}}{\text{Target
 
 - Categories: `COIL`, `PARALLEL`, `MAINTENANCE`, `ROTOR`, `MULTIBLOCK_TRAIT`, `THERMAL_AUGMENT`, `CUSTOM`.
 - Machine-tailored modifiers (`addon.forMachine(node)`):
-  - **EBF**: $5\%$ EU discount per $900\text{K}$ excess temperature: $\text{EUt Mult} = 0.95^{\lfloor (T_{\text{coil}} - T_{\text{recipe}}) / 900 \rfloor}$.
+  - **EBF**: 5% EU discount per 900K excess temperature: $\text{EUt Mult} = 0.95^{\lfloor (T_{\text{coil}} - T_{\text{recipe}}) / 900 \rfloor}$.
   - **LCR**: Speed bonus (e.g. RTM: $150\%$ speed $\to 0.67\times$ duration, $85\%$ energy $\to 0.85\times$ EU/t).
   - **Pyrolyse**: Speed bonus (e.g. Nichrome: $200\%$ speed $\to 0.50\times$ duration).
   - **Cracking**: Energy bonus (e.g. HSS-G: $60\%$ energy $\to 0.60\times$ EU/t).
@@ -211,8 +216,11 @@ flowchart TD
 ### 3.2 Spline Routing (`ConnectionRenderer`)
 
 - Cubic Bezier splines between output socket $(x_1, y_1)$ and input socket $(x_2, y_2)$:
-  $$dx = \max(40.0, |x_2 - x_1| \times 0.5)$$
-  $$P_0 = (x_1, y_1), \quad P_1 = (x_1 + dx, y_1), \quad P_2 = (x_2 - dx, y_2), \quad P_3 = (x_2, y_2)$$
+
+$$dx = \max(40.0, |x_2 - x_1| \times 0.5)$$
+
+$$P_0 = (x_1, y_1), \quad P_1 = (x_1 + dx, y_1), \quad P_2 = (x_2 - dx, y_2), \quad P_3 = (x_2, y_2)$$
+
 - Distance hit testing: Evaluates Euclidean distance from cursor to curve across 30 parametric samples for right-click wire severing.
 
 ---

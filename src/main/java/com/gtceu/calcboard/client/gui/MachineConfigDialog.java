@@ -56,6 +56,11 @@ public class MachineConfigDialog {
         this.catalogScroll = 0;
         this.rotorGridScroll = 0;
 
+        // Refresh dynamic addon catalog to ensure all registered rotors and items are up-to-date
+        try {
+            MachineAddonCatalog.getInstance().refresh();
+        } catch (Throwable ignored) {}
+
         Minecraft mc = Minecraft.getInstance();
 
         this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.literal("Parallel"));
@@ -261,7 +266,16 @@ public class MachineConfigDialog {
             if (!badge.isEmpty()) {
                 tooltip.add(Component.literal(badge));
             }
-            if (hoveredActiveAddon.getCategory() == MachineAddon.Category.COIL) {
+            if (hoveredActiveAddon.getCategory() == MachineAddon.Category.ROTOR) {
+                int eff = (int) Math.round(hoveredActiveAddon.getDurationMultiplier() * 100.0);
+                int pwr = hoveredActiveAddon.getRotorPower() > 0 ? hoveredActiveAddon.getRotorPower() : 100;
+                tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.config.rotor_fuel_efficiency", String.valueOf(eff), String.format("%.2fx", eff / 100.0))));
+                tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.config.rotor_power_mult", String.valueOf(pwr), String.format("%.2fx", pwr / 100.0))));
+                if (node != null && node.getTargetTier() != null) {
+                    double maxEUt = RecipeNode.getRotorHolderMaxEUt(node.getTargetTier(), pwr);
+                    tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.config.rotor_tier_max_eut", node.getTargetTier().getName(), String.format("%,.0f EU/t", maxEUt))));
+                }
+            } else if (hoveredActiveAddon.getCategory() == MachineAddon.Category.COIL) {
                 int coilTemp = hoveredActiveAddon.getCoilTemperature();
                 if (coilTemp > 0) {
                     tooltip.add(Component.literal("§6♨ Coil Temperature: §f" + coilTemp + "K"));
@@ -276,8 +290,10 @@ public class MachineConfigDialog {
                 if (tailored.getEutMultiplier() != 1.0) {
                     tooltip.add(Component.literal("§e⚡ Energy Multiplier: §f" + String.format("%.2fx", tailored.getEutMultiplier())));
                 }
+                addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
+            } else {
+                addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
             }
-            addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         }
@@ -306,9 +322,12 @@ public class MachineConfigDialog {
     public static String formatAddonBadge(MachineAddon addon, RecipeNode node) {
         if (addon == null) return "";
         if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-            int pwr = addon.getRotorPower() > 0 ? addon.getRotorPower() : RecipeNode.getRotorMaterialPower(addon.getName());
             int eff = (int) Math.round(addon.getDurationMultiplier() * 100.0);
-            return String.format("§b⏱%d%% §e⚡%d%%", eff, pwr);
+            int pwr = addon.getRotorPower() > 0 ? addon.getRotorPower() : RecipeNode.getRotorMaterialPower(addon.getName());
+            if (pwr > 0 && pwr != 100) {
+                return String.format("§b⏱%d%% §e⚡%d%%", eff, pwr);
+            }
+            return String.format("§b⏱%d%%", eff);
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
             int coilTemp = addon.getCoilTemperature();
@@ -317,16 +336,17 @@ public class MachineConfigDialog {
             if (evaluated.getParallelMultiplier() > 1) {
                 return heatStr + String.format(" §a⚡%dx", evaluated.getParallelMultiplier());
             }
-            if (evaluated.getDurationMultiplier() != 1.0 && evaluated.getEutMultiplier() != 1.0) {
-                return heatStr + String.format(" §b⏱%.2fx §e⚡%.2fx", evaluated.getDurationMultiplier(), evaluated.getEutMultiplier());
-            }
+            String durStr = "";
             if (evaluated.getDurationMultiplier() != 1.0) {
-                return heatStr + String.format(" §b⏱%.2fx", evaluated.getDurationMultiplier());
+                String col = evaluated.getDurationMultiplier() > 1.0 ? "§c" : "§b";
+                durStr = String.format(" %s⏱%.2fx", col, evaluated.getDurationMultiplier());
             }
+            String eutStr = "";
             if (evaluated.getEutMultiplier() != 1.0) {
-                return heatStr + String.format(" §e⚡%.2fx", evaluated.getEutMultiplier());
+                String col = evaluated.getEutMultiplier() > 1.0 ? "§c" : "§e";
+                eutStr = String.format(" %s⚡%.2fx", col, evaluated.getEutMultiplier());
             }
-            return heatStr;
+            return heatStr + durStr + eutStr;
         }
         if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
             if (addon.getParallelMultiplier() > 1) {
@@ -415,7 +435,9 @@ public class MachineConfigDialog {
                 String name = addon.getName().toLowerCase();
                 String desc = addon.getDescription() != null ? addon.getDescription().toLowerCase() : "";
                 String id = addon.getId().toLowerCase();
-                if (!name.contains(q) && !desc.contains(q) && !id.contains(q)) {
+                String qAlt = q.replace("셀", "셸").replace("셸", "셀");
+                if (!name.contains(q) && !desc.contains(q) && !id.contains(q)
+                        && !name.contains(qAlt) && !desc.contains(qAlt) && !id.contains(qAlt)) {
                     continue;
                 }
             }
@@ -515,7 +537,7 @@ public class MachineConfigDialog {
             graphics.drawString(font, "§f" + aName, bx + 24, by + 7, 0xFFFFFFFF, false);
 
             String statsStr = formatAddonBadge(addon);
-            graphics.drawString(font, font.plainSubstrByWidth(statsStr, cardW - 28), bx + 24, by + 22, 0xFFCCCCCC, false);
+            graphics.drawString(font, statsStr, bx + 24, by + 22, 0xFFCCCCCC, false);
 
             if (hover) {
                 hoveredAddon = addon;

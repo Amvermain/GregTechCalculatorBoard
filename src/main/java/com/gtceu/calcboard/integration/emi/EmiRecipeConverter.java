@@ -236,9 +236,9 @@ public class EmiRecipeConverter {
                 if (os.getChance() < 1.0) {
                     if (tierBoosts.containsKey(os.getId())) {
                         os.setTierChanceBoost(tierBoosts.get(os.getId()));
-                    } else if (isGT) {
-                        // Standard GregTech chanced output default (+5% per tier above base recipe tier)
-                        os.setTierChanceBoost(0.05);
+                    } else {
+                        // Deductive default: If recipe does not specify a tier chance boost, it does not increase with tier
+                        os.setTierChanceBoost(0.0);
                     }
                 }
                 node.addOutput(os);
@@ -459,11 +459,9 @@ public class EmiRecipeConverter {
                                     if (boost > 1.0) {
                                         boost = boost / 10000.0; // e.g. 500 = 5% = 0.05
                                     }
-                                    if (boost > 0.0) {
-                                        ResourceLocation resId = extractContentResourceId(contentObj);
-                                        if (resId != null) {
-                                            map.put(resId, boost);
-                                        }
+                                    ResourceLocation resId = extractContentResourceId(contentObj);
+                                    if (resId != null) {
+                                        map.put(resId, Math.max(0.0, boost));
                                     }
                                 }
                             }
@@ -493,6 +491,11 @@ public class EmiRecipeConverter {
                 return ForgeRegistries.ITEMS.getKey(is.getItem());
             } else if (inner instanceof net.minecraft.world.item.Item it) {
                 return ForgeRegistries.ITEMS.getKey(it);
+            } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
+                net.minecraft.world.item.ItemStack[] items = ing.getItems();
+                if (items.length > 0 && !items[0].isEmpty()) {
+                    return ForgeRegistries.ITEMS.getKey(items[0].getItem());
+                }
             } else if (inner instanceof Fluid fl) {
                 return ForgeRegistries.FLUIDS.getKey(fl);
             } else if (inner != null && inner.getClass().getName().contains("FluidStack")) {
