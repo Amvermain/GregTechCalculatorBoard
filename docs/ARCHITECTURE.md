@@ -127,14 +127,19 @@ flowchart TD
 
 #### Algorithm 1: Fixed-Point Bottleneck Relaxation
 Computes the operating efficiency of every node under upstream shortages or recycled feedback loops:
+
 1. Initialize all node efficiencies: $\eta_v^{(0)} = 1.0$.
 2. For iteration $k \in [1, 10]$:
    - For each consumer $C$ and connected input port $i$:
-     - Sum available supply from connected producers $P_j$:
-       $$\text{Supply}_{P_j} = \text{NominalRate}_{P_j} \times \eta_{P_j}^{(k-1)}$$
-       $$\text{PortDemand}_{P_j} = \sum_{c \in \text{Consumers}(P_j)} \text{NominalDemand}_c$$
-       $$\text{IncomingSupply}_i = \sum_{P_j} \min\left(\text{NominalDemand}_C, \text{Supply}_{P_j} \times \frac{\text{NominalDemand}_C}{\text{PortDemand}_{P_j}}\right)$$
-     - Port satisfaction: $\rho_i = \frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}$.
+
+$$\text{Supply}_{P_j} = \text{NominalRate}_{P_j} \times \eta_{P_j}^{(k-1)}$$
+
+$$\text{PortDemand}_{P_j} = \sum_{c \in \text{Consumers}(P_j)} \text{NominalDemand}_c$$
+
+$$\text{IncomingSupply}_i = \sum_{P_j} \min\left(\text{NominalDemand}_C, \text{Supply}_{P_j} \times \frac{\text{NominalDemand}_C}{\text{PortDemand}_{P_j}}\right)$$
+
+$$\rho_i = \frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}$$
+
    - Update node efficiency: $\eta_C^{(k)} = \min_i (\rho_i, 1.0)$.
 3. If $\max_v |\eta_v^{(k)} - \eta_v^{(k-1)}| < 10^{-4}$, stop early (converged).
 
