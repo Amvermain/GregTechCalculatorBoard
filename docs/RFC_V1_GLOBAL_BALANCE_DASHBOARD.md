@@ -1,9 +1,9 @@
-# RFC: GTCalcBoard v2.0.0 - 전역 종합 수지 대시보드 (Global Factory Balance Dashboard)
+# RFC: GTCalcBoard v1.1.0 - 대상 페이지 종합 수지 대시보드 (Global Balance Dashboard)
 
 * **문서 번호**: RFC-003
-* **대상 버전**: `v2.0.0`
+* **대상 버전**: `v1.1.0` (또는 `v1.0.6+`)
 * **상태**: `PROPOSED / PLANNING`
-* **주제**: 다중 페이지 간 생산량/소비량/전력 전역 통합 집계, 공정 기여도 분석 및 팩토리 대차대조표 GUI
+* **주제**: 다중 페이지 간 생산량/소비량/전력 통합 집계, 공정 기여도 분석 및 종합 대차대조표 GUI
 
 ---
 

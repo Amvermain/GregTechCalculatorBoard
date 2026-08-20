@@ -270,13 +270,13 @@ flowchart TD
 
 ---
 
-## 6. 전역 종합 수지 연동 (Global Factory Balance Integration)
+## 6. 대상 페이지 종합 수지 연동 (Global Balance Integration)
 
-*다중 페이지 간 생산량/소비량/전력 통합 집계 및 대차대조표 분석 기능은 **[RFC-003: 전역 종합 수지 대시보드](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/docs/RFC_V2_GLOBAL_BALANCE_DASHBOARD.md)**에 독립 명세로 분리 정의되었습니다.*
+*다중 페이지 간 생산량/소비량/전력 통합 집계 및 대차대조표 분석 기능은 **[RFC-003: 대상 페이지 종합 수지 대시보드](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/docs/RFC_V1_GLOBAL_BALANCE_DASHBOARD.md)**에 독립 명세로 분리 정의되었습니다.*
 
 * **핵심 연동 포인트**:
-  - 팀 워크스페이스 내 모든 동기화된 페이지들은 `RFC-003`의 `GlobalBalanceAggregator`를 통해 페이지별 입출력을 전역 집계할 수 있습니다.
-  - 팀원들은 툴바의 `[📊 전역 수지]` 버튼을 통해 우리 팀 기지 전체의 잉여/결손 현황을 즉시 파악할 수 있습니다.
+  - 팀 워크스페이스 내 모든 동기화된 페이지들은 `RFC-003`의 `GlobalBalanceAggregator`를 통해 대상 페이지별 입출력을 통합 집계할 수 있습니다.
+  - 팀원들은 툴바의 `[📊 종합 수지]` 버튼을 통해 선택된 대상 페이지들의 잉여/결손 현황을 즉시 파악할 수 있습니다.
 
 ---
 
