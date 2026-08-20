@@ -16,8 +16,8 @@ import java.util.*;
  * Interactive card widget representing a single GregTech recipe machine node on the canvas.
  */
 public class NodeWidget {
-    public static final int WIDTH = 210;
-    public static final int DEFAULT_WIDTH = 210;
+    public static final int WIDTH = 235;
+    public static final int DEFAULT_WIDTH = 235;
     public static final int HEADER_HEIGHT = 20;
 
     private final RecipeNode node;
@@ -417,14 +417,10 @@ public class NodeWidget {
 
             Minecraft mc = Minecraft.getInstance();
             if (nowBase) {
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§6🎯 ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())), true);
-                }
+                BoardToast.show(Component.literal("§6🎯 ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())));
                 mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.2F));
             } else {
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")), true);
-                }
+                BoardToast.show(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")));
             }
             return true;
         }

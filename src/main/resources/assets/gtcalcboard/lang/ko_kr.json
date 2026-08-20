@@ -254,6 +254,7 @@
   "gui.gtcalcboard.tooltip.right_click_sever": "와이어 끊기",
   "gui.gtcalcboard.tooltip.wire_mode_shift": "⚡ 1:1 대수 자동 맞춤 모드",
   "gui.gtcalcboard.tooltip.wire_mode_normal": "일반 연결 (Shift 유지: 1:1 대수 자동 맞춤)",
+  "gui.gtcalcboard.tooltip.power_mode_hint": "(클릭하여 전력 표시 단위 변경: EU/t / A)",
   "gui.gtcalcboard.tooltip.btn_guide": "종합 가이드 및 매뉴얼 열기 (기초, 와이어링, 모듈화, 단축키)",
   "gui.gtcalcboard.tooltip.btn_tutorial": "15초 핵심 와이어링 & 비율 맞춤 튜토리얼 시작",
   "gui.gtcalcboard.tooltip.btn_auto_connect": "자동 연결 (Auto Connect)\n캔버스 내 모든 일치하는 아이템 및 유체 포트를 1초 만에 자동 연결합니다.",

@@ -323,13 +323,10 @@ public class CanvasInteractionHandler {
                                     targetWidget.updateCountBuffer();
                                     targetWidget.invalidateCache();
 
-                                    Minecraft mc = Minecraft.getInstance();
-                                    if (mc.player != null) {
-                                        mc.player.displayClientMessage(Component.literal("§a✔ ").append(
-                                            Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.0f", matchedCount))
-                                        ), true);
-                                    }
-                                    mc.getSoundManager().play(
+                                    BoardToast.show(Component.literal("§a✔ ").append(
+                                        Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.0f", matchedCount))
+                                    ));
+                                    Minecraft.getInstance().getSoundManager().play(
                                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                                             SoundEvents.PLAYER_LEVELUP, 1.2F
                                         )
@@ -377,13 +374,10 @@ public class CanvasInteractionHandler {
                                     targetWidget.updateCountBuffer();
                                     targetWidget.invalidateCache();
 
-                                    Minecraft mc = Minecraft.getInstance();
-                                    if (mc.player != null) {
-                                        mc.player.displayClientMessage(Component.literal("§a✔ ").append(
-                                            Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), String.format("%.0f", matchedCount))
-                                        ), true);
-                                    }
-                                    mc.getSoundManager().play(
+                                    BoardToast.show(Component.literal("§a✔ ").append(
+                                        Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), String.format("%.0f", matchedCount))
+                                    ));
+                                    Minecraft.getInstance().getSoundManager().play(
                                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                                             SoundEvents.PLAYER_LEVELUP, 1.2F
                                         )
@@ -547,11 +541,8 @@ public class CanvasInteractionHandler {
     private void notifyDisconnect(String translatableKey) {
         screen.markSummaryDirty();
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onWireDisconnected();
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§c✕ ").append(Component.translatable(translatableKey)), true);
-        }
-        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        BoardToast.show(Component.literal("§c✕ ").append(Component.translatable(translatableKey)));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
     }
 
     public void renderMarquee(net.minecraft.client.gui.GuiGraphics graphics) {

@@ -63,7 +63,7 @@ public class NodeCountEditor {
     public boolean charTyped(char codePoint, int modifiers) {
         if (!isEditing) return false;
         if (Character.isDigit(codePoint) || (codePoint == '.' && !buffer.contains("."))) {
-            if (buffer.length() < 7) {
+            if (buffer.length() < 10) {
                 buffer += codePoint;
                 return true;
             }

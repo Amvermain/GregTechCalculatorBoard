@@ -308,11 +308,11 @@ public class RecipeNode {
     }
 
     public int getCardWidth() {
-        return Math.max(220, Math.min(500, cardWidth));
+        return Math.max(235, Math.min(500, cardWidth));
     }
 
     public void setCardWidth(int cardWidth) {
-        this.cardWidth = Math.max(220, Math.min(500, cardWidth));
+        this.cardWidth = Math.max(235, Math.min(500, cardWidth));
     }
 
     public int getCardHeight() {

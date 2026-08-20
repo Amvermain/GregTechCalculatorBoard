@@ -142,10 +142,7 @@ public class BoardScreen extends Screen {
                 rebuildWidgets();
                 markSummaryDirty();
                 TutorialManager.getInstance().onUndo();
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§e↶ ").append(Component.translatable("message.gtcalcboard.undo", cmd.getDescription())), true);
-                }
+                BoardToast.show(Component.literal("§e↶ ").append(Component.translatable("message.gtcalcboard.undo", cmd.getDescription())));
             }
         }
     }
@@ -158,10 +155,7 @@ public class BoardScreen extends Screen {
                 rebuildWidgets();
                 markSummaryDirty();
                 TutorialManager.getInstance().onRedo();
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(Component.literal("§a↷ ").append(Component.translatable("message.gtcalcboard.redo", cmd.getDescription())), true);
-                }
+                BoardToast.show(Component.literal("§a↷ ").append(Component.translatable("message.gtcalcboard.redo", cmd.getDescription())));
             }
         }
     }
@@ -482,6 +476,9 @@ public class BoardScreen extends Screen {
         if (welcomeDialog != null && welcomeDialog.isVisible()) {
             welcomeDialog.render(graphics, width, height, mouseX, mouseY);
         }
+
+        // 10. Global Toast Notifications (Top layer)
+        BoardToast.render(graphics, font, width, height);
     }
 
     private void renderGridBackground(GuiGraphics graphics) {

@@ -20,7 +20,9 @@ public class SummaryOverlay {
     private double maxScrollY = 0;
 
     private IngredientStack hoveredStack = null;
+    private double hoveredRate = 0.0;
     private boolean hoveredMachines = false;
+    private boolean hoveredPower = false;
     private BalanceSummary lastSummary = null;
 
     public boolean isCollapsed() {
@@ -80,6 +82,10 @@ public class SummaryOverlay {
         String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
         String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
         int pLabelW = font.width(pLabel) + 6;
+        int maxPowerW = Math.max(10, (x + WIDTH - 8) - (x + 8 + pLabelW));
+        if (font.width(eutStr) > maxPowerW) {
+            eutStr = font.plainSubstrByWidth(eutStr, maxPowerW - 6) + "..";
+        }
         graphics.drawString(font, pLabel, x + 8, powerY, 0xFFFFFFFF, false);
         graphics.drawString(font, eutStr, x + 8 + pLabelW, powerY, 0xFFFFFFFF, false);
 
@@ -91,6 +97,7 @@ public class SummaryOverlay {
         graphics.drawString(font, mCountStr, x + 8 + mLabelW, machinesY, 0xFFFFFFFF, false);
 
         hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
+        hoveredPower = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12;
 
         // Top separator below power & machines
         int headerBottom = machinesY + 14;
@@ -179,10 +186,25 @@ public class SummaryOverlay {
         // Check if hovered
         if (mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
             hoveredStack = stack;
+            hoveredRate = rate;
         }
     }
 
     public void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (hoveredPower && lastSummary != null) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("§6⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
+            double totEUt = lastSummary.totalEUt();
+            var tier = lastSummary.highestVoltageTier();
+            if (tier == null) tier = com.gtceu.calcboard.api.GTVoltageTier.LV;
+            double amps = Math.abs(totEUt) / (double) tier.getVoltage();
+            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7EU/t: §f%,.2f EU/t", totEUt)));
+            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §f%,.4fA %s", amps, tier.getName())));
+            tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.power_mode_hint").getString()));
+            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            return;
+        }
+
         if (hoveredMachines && lastSummary != null && !lastSummary.machineBreakdown().isEmpty()) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
@@ -196,21 +218,16 @@ public class SummaryOverlay {
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
+            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack.isFluid());
+            String ratePrefix = hoveredRate > 0 ? "+" : "";
+            tooltip.add(Component.literal("§7Rate: §f" + ratePrefix + exactRateStr));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         }
     }
 
     private String formatRate(double rate, boolean isFluid) {
-        double absRate = Math.abs(rate);
-        if (isFluid) {
-            if (absRate >= 1000.0) {
-                return String.format("%.2f B/s", rate / 1000.0);
-            }
-            return String.format("%.0f mB/s", rate);
-        } else {
-            return String.format("%.2f/s", rate).replaceAll("\\.?0+$", "/s");
-        }
+        return NodeCardRenderer.formatRate(rate, isFluid);
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
@@ -257,9 +274,7 @@ public class SummaryOverlay {
             var newMode = BoardManager.getInstance().cyclePowerDisplayMode();
             Minecraft mc = Minecraft.getInstance();
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-            if (mc.player != null) {
-                mc.player.displayClientMessage(Component.literal("§e⚡ ").append(Component.translatable("message.gtcalcboard.power_mode_changed", newMode.getDisplayName())), true);
-            }
+            BoardToast.show(Component.literal("§e⚡ ").append(Component.translatable("message.gtcalcboard.power_mode_changed", newMode.getDisplayName())));
             return true;
         }
         return false;

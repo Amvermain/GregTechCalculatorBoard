@@ -770,6 +770,72 @@ public class CalculationTest {
     }
 
     @Test
+    public void testSmallNumberPrecisionFormatting() {
+        // Fluid rates: 0.05 mB/s, 0.005 mB/s must not become "0 mB/s"
+        Assertions.assertEquals("0.05 mB/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.05, true));
+        Assertions.assertEquals("0.005 mB/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.005, true));
+        Assertions.assertEquals("0.25 mB/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.25, true));
+        Assertions.assertEquals("0 mB/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.0, true));
+
+        // Item rates: 0.005/s, 0.001/s must not become "0/s"
+        Assertions.assertEquals("0.05/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.05, false));
+        Assertions.assertEquals("0.005/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.005, false));
+        Assertions.assertEquals("0.001/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.001, false));
+        Assertions.assertEquals("0/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(0.0, false));
+
+        // Compact number
+        Assertions.assertEquals("0.005", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatCompactNumber(0.005));
+        Assertions.assertEquals("0.0005", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatCompactNumber(0.0005));
+
+        // Scientific E-notation for extremely small numbers (< 0.0001)
+        Assertions.assertEquals("1.01E-24", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatCompactNumber(1.01e-24));
+        Assertions.assertEquals("5E-5", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatCompactNumber(0.00005));
+        Assertions.assertEquals("1.25E-6/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(1.25e-6, false));
+        Assertions.assertEquals("1.01E-24 mB/s", com.gtceu.calcboard.client.gui.NodeCardRenderer.formatRate(1.01e-24, true));
+
+        // Small amperes with E-notation
+        Assertions.assertEquals("0.004A LV", PowerDisplayMode.formatAmps(0.004, GTVoltageTier.LV));
+        Assertions.assertEquals("1.01E-24A LV", PowerDisplayMode.formatAmps(1.01e-24, GTVoltageTier.LV));
+
+        // High SI Prefixes (k, M, G, T, P, E, Z, Y)
+        Assertions.assertEquals("1.5k", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(1500));
+        Assertions.assertEquals("2.5M", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(2_500_000));
+        Assertions.assertEquals("3.5G", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(3_500_000_000.0));
+        Assertions.assertEquals("11.8T", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(11_796_470_000_000.0));
+        Assertions.assertEquals("5.2P", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(5.2e15));
+        Assertions.assertEquals("8E", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(8.0e18));
+        Assertions.assertEquals("9.1Z", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(9.1e21));
+        Assertions.assertEquals("4.2Y", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(4.2e24));
+    }
+
+    @Test
+    public void testContinuousWireCollisionDetection() {
+        float x1 = 100f, y1 = 100f;
+        float x2 = 500f, y2 = 300f;
+
+        // Points right on the curve or very close must be detected
+        Assertions.assertTrue(com.gtceu.calcboard.client.gui.ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, 100, 100, 8.0));
+        Assertions.assertTrue(com.gtceu.calcboard.client.gui.ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, 500, 300, 8.0));
+
+        // Intermediate arbitrary points along the curve must be continuously detected
+        for (int i = 0; i <= 50; i++) {
+            float t = i / 50.0f;
+            float it = 1.0f - t;
+            float dx = Math.max(Math.abs(x2 - x1) * 0.5f, 40f);
+            float cx1 = x1 + dx, cy1 = y1, cx2 = x2 - dx, cy2 = y2;
+            float bx = it * it * it * x1 + 3 * it * it * t * cx1 + 3 * it * t * t * cx2 + t * t * t * x2;
+            float by = it * it * it * y1 + 3 * it * it * t * cy1 + 3 * it * t * t * cy2 + t * t * t * y2;
+
+            Assertions.assertTrue(com.gtceu.calcboard.client.gui.ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, bx, by, 8.0),
+                    "Collision detection must succeed at t=" + t);
+        }
+
+        // Far points must not be detected
+        Assertions.assertFalse(com.gtceu.calcboard.client.gui.ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, 100, 500, 8.0));
+        Assertions.assertFalse(com.gtceu.calcboard.client.gui.ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, 800, 100, 8.0));
+    }
+
+    @Test
     public void testBoardManagerPowerDisplayModeCycling() {
         BoardManager mgr = BoardManager.getInstance();
         mgr.setPowerDisplayMode(PowerDisplayMode.EUT);
@@ -783,6 +849,12 @@ public class CalculationTest {
 
         PowerDisplayMode m3 = mgr.cyclePowerDisplayMode();
         Assertions.assertEquals(PowerDisplayMode.EUT, m3);
+
+        // Format summary power SI test
+        double largeEUt = 18_186_905_076_480.0;
+        String formattedSummary = PowerDisplayMode.EUT.formatSummaryPower(largeEUt, GTVoltageTier.UEV);
+        Assertions.assertTrue(formattedSummary.contains("18.2T EU/t") || formattedSummary.contains("18.19T EU/t") || formattedSummary.contains("18.18T EU/t"),
+                "Expected Tera prefix in summary power: " + formattedSummary);
     }
 
     @Test

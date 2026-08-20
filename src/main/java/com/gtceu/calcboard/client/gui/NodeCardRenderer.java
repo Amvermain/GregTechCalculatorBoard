@@ -243,27 +243,26 @@ public class NodeCardRenderer {
         double durationSec = node.getEffectiveDurationSeconds();
         double effCps = node.getEffectiveCyclesPerSecond();
 
-        String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatNodePower(node);
-        if (node.getEfficiency() < 0.999) {
-            String effPercent = String.format("§e⚡%.0f%% ", node.getEfficiency() * 100.0);
-            graphics.drawString(font, effPercent + eutStr, x + 6, infoY, 0xFFFFFFFF, false);
-        } else {
-            graphics.drawString(font, eutStr, x + 6, infoY, 0xFFFFFFFF, false);
-        }
-
+        String rightStr;
         if (node.isModule()) {
-            String modTag = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
-            int tagW = font.width(modTag);
-            graphics.drawString(font, modTag, x + cardW - 6 - tagW, infoY, 0xFFFFFFFF, false);
+            rightStr = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
         } else {
-            String cycleStr = String.format("§b%.2fs §7(§f%.2f/s§7)", durationSec, effCps);
-            int cycleW = font.width(cycleStr);
-            graphics.drawString(font, cycleStr, x + cardW - 6 - cycleW, infoY, 0xFFFFFFFF, false);
+            rightStr = String.format(java.util.Locale.ROOT, "§b%.2fs §7(§f%s/s§7)", durationSec, formatCompactNumber(effCps));
         }
+        int rightW = font.width(rightStr);
+        graphics.drawString(font, rightStr, x + cardW - 6 - rightW, infoY, 0xFFFFFFFF, false);
+
+        String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatNodePower(node);
+        String fullPowerStr = (node.getEfficiency() < 0.999)
+                ? String.format("§e⚡%.0f%% %s", node.getEfficiency() * 100.0, eutStr)
+                : eutStr;
+
+        int maxPowerW = Math.max(20, (cardW - 12) - rightW - 4);
+        String fittedPowerStr = font.plainSubstrByWidth(fullPowerStr, maxPowerW);
+        graphics.drawString(font, fittedPowerStr, x + 6, infoY, 0xFFFFFFFF, false);
 
         // Separator Line
         int sepY = infoY + 14;
-        graphics.fill(x + 4, sepY, x + cardW - 4, sepY + 1, 0xFF353C4D);
         graphics.fill(x + 4, sepY, x + cardW - 4, sepY + 1, 0xFF353C4D);
 
         // 9. Input & Output Ports Listing
@@ -276,9 +275,11 @@ public class NodeCardRenderer {
 
         for (int i = 0; i < maxRows; i++) {
             int rowY = contentY + i * 18;
+            boolean hasInput = (i < inputs.size());
+            boolean hasOutput = (i < outputs.size());
 
             // Render Input (Left side)
-            if (i < inputs.size()) {
+            if (hasInput) {
                 IngredientStack in = inputs.get(i);
                 double rate = widget.getInputRate(i);
                 int inPortX = x + 4;
@@ -317,11 +318,14 @@ public class NodeCardRenderer {
                     rateStr = formatConnectedFraction(stats.connectedRate(), rate, in.isFluid(), "+");
                     textColor = 0xFF66DDFF;
                 }
-                graphics.drawString(font, rateStr, x + 30, rowY + 4, textColor, false);
+
+                int maxInTextW = hasOutput ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
+                String fittedRateStr = font.plainSubstrByWidth(rateStr, maxInTextW);
+                graphics.drawString(font, fittedRateStr, x + 30, rowY + 4, textColor, false);
             }
 
             // Render Output (Right side)
-            if (i < outputs.size()) {
+            if (hasOutput) {
                 IngredientStack out = outputs.get(i);
                 double rate = widget.getOutputRate(i);
                 int outPortX = x + cardW - 10;
@@ -356,7 +360,13 @@ public class NodeCardRenderer {
                     rateStr = formatConnectedFraction(stats.connectedRate(), rate, out.isFluid(), "⚠");
                     textColor = 0xFFFF6666;
                 }
+
+                int maxOutTextW = hasInput ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
                 int textW = font.width(rateStr);
+                if (textW > maxOutTextW) {
+                    rateStr = font.plainSubstrByWidth(rateStr, maxOutTextW);
+                    textW = font.width(rateStr);
+                }
                 graphics.drawString(font, rateStr, x + cardW - 30 - textW, rowY + 4, textColor, false);
 
                 IngredientRenderer.render(graphics, out, x + cardW - 28, rowY - 1);
@@ -382,34 +392,16 @@ public class NodeCardRenderer {
         graphics.drawCenteredString(font, text, bx + bw / 2, by + (bh - 8) / 2, textColor);
     }
 
+    public static String formatCompactNumber(double val) {
+        return FormatUtil.formatCompactNumber(val);
+    }
+
     public static String formatRate(double rate, boolean isFluid) {
-        if (isFluid) {
-            if (rate >= 1000.0) {
-                return String.format("%.2f B/s", rate / 1000.0).replaceAll("\\.?0+ B/s", " B/s");
-            }
-            return String.format("%.0f mB/s", rate);
-        } else {
-            return String.format("%.2f/s", rate).replaceAll("\\.?0+/s", "/s");
-        }
+        return FormatUtil.formatRate(rate, isFluid);
     }
 
     public static String formatConnectedFraction(double connected, double required, boolean isFluid, String symbol) {
-        String symStr = symbol.isEmpty() ? "" : " " + symbol;
-        if (isFluid) {
-            if (required >= 1000.0 || connected >= 1000.0) {
-                double connB = connected / 1000.0;
-                double reqB = required / 1000.0;
-                String connStr = (connB == (long) connB) ? String.format("%d", (long) connB) : String.format("%.2f", connB).replaceAll("\\.?0+$", "");
-                String reqStr = (reqB == (long) reqB) ? String.format("%d", (long) reqB) : String.format("%.2f", reqB).replaceAll("\\.?0+$", "");
-                return connStr + "/" + reqStr + " B/s" + symStr;
-            } else {
-                return String.format("%.0f/%.0f mB/s%s", connected, required, symStr);
-            }
-        } else {
-            String connStr = (connected == (long) connected) ? String.format("%d", (long) connected) : String.format("%.2f", connected).replaceAll("\\.?0+$", "");
-            String reqStr = (required == (long) required) ? String.format("%d", (long) required) : String.format("%.2f", required).replaceAll("\\.?0+$", "");
-            return connStr + "/" + reqStr + "/s" + symStr;
-        }
+        return FormatUtil.formatConnectedFraction(connected, required, isFluid, symbol);
     }
 
     private static void renderLOD(NodeWidget widget, GuiGraphics graphics, Font font, int x, int y, int cardW, int height, RecipeNode node) {

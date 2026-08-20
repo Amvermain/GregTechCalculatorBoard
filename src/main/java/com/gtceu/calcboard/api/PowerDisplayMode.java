@@ -35,14 +35,11 @@ public enum PowerDisplayMode {
      * Formats an Amperes number with up to 2 decimal places cleanly (e.g. 1A, 2.5A, 0.25A).
      */
     public static String formatAmps(double amps, GTVoltageTier tier) {
-        String tierName = tier != null ? tier.getName() : "";
-        if (Math.abs(amps - Math.round(amps)) < 0.001) {
-            return String.format("%.0fA %s", amps, tierName).trim();
-        } else if (Math.abs(amps * 10 - Math.round(amps * 10)) < 0.01) {
-            return String.format("%.1fA %s", amps, tierName).trim();
-        } else {
-            return String.format("%.2fA %s", amps, tierName).trim();
-        }
+        return com.gtceu.calcboard.client.gui.FormatUtil.formatAmps(amps, tier);
+    }
+
+    public static String formatEUtVal(double eut) {
+        return com.gtceu.calcboard.client.gui.FormatUtil.formatEUt(eut);
     }
 
     /**
@@ -59,32 +56,38 @@ public enum PowerDisplayMode {
 
         String genTag = Component.translatable("gui.gtcalcboard.gen_tag").getString();
         String drainTag = Component.translatable("gui.gtcalcboard.drain_tag").getString();
+        String formattedEUt = formatEUtVal(totalEUt);
+        String formattedAmps = formatAmps(amps, tier);
+
+        String formattedAmpsFull = (Math.abs(amps) >= 10_000.0 || (Math.abs(amps) < 0.0001 && amps != 0.0))
+                ? formattedAmps
+                : String.format(java.util.Locale.ROOT, "%.1fA %s", amps, tier.getName());
 
         if (node.isModule()) {
             String tag = isGen ? genTag : drainTag;
             return switch (this) {
                 case EUT -> isGen 
-                    ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, tag)
-                    : String.format("§e%.1f EU/t §7(%s)", totalEUt, tag);
+                    ? String.format("§a+%s §7(%s)", formattedEUt, tag)
+                    : String.format("§e%s §7(%s)", formattedEUt, tag);
                 case AMPS -> isGen
-                    ? String.format("§a+%.1fA %s §7(%s)", amps, tier.getName(), tag)
-                    : String.format("§e%.1fA %s §7(%s)", amps, tier.getName(), tag);
+                    ? String.format("§a+%s §7(%s)", formattedAmpsFull, tag)
+                    : String.format("§e%s §7(%s)", formattedAmpsFull, tag);
                 case BOTH -> isGen
-                    ? String.format("§a+%.1f EU/t §7(%s, %s)", totalEUt, formatAmps(amps, tier), tag)
-                    : String.format("§e%.1f EU/t §7(%s, %s)", totalEUt, formatAmps(amps, tier), tag);
+                    ? String.format("§a+%s §7(%s, %s)", formattedEUt, formattedAmps, tag)
+                    : String.format("§e%s §7(%s, %s)", formattedEUt, formattedAmps, tag);
             };
         }
 
         return switch (this) {
             case EUT -> isGen
-                ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, tier.getName())
-                : String.format("§e%.1f EU/t §7(%s)", totalEUt, tier.getName());
+                ? String.format("§a+%s §7(%s)", formattedEUt, tier.getName())
+                : String.format("§e%s §7(%s)", formattedEUt, tier.getName());
             case AMPS -> isGen
-                ? String.format("§a+%.1fA %s", amps, tier.getName())
-                : String.format("§e%.1fA %s", amps, tier.getName());
+                ? String.format("§a+%s", formattedAmpsFull)
+                : String.format("§e%s", formattedAmpsFull);
             case BOTH -> isGen
-                ? String.format("§a+%.1f EU/t §7(%s)", totalEUt, formatAmps(amps, tier))
-                : String.format("§e%.1f EU/t §7(%s)", totalEUt, formatAmps(amps, tier));
+                ? String.format("§a+%s §7(%s)", formattedEUt, formattedAmps)
+                : String.format("§e%s §7(%s)", formattedEUt, formattedAmps);
         };
     }
 
@@ -99,17 +102,21 @@ public enum PowerDisplayMode {
         if (totalEUt < -0.001) {
             double posEUt = -totalEUt;
             double amps = posEUt / (double) voltage;
+            String formattedEUt = formatEUtVal(posEUt);
+            String formattedAmps = formatAmps(amps, tier);
             return switch (this) {
-                case EUT -> String.format("§a+%,.1f EU/t §7(%s) §2(%s)", posEUt, tier.getName(), genTag);
-                case AMPS -> String.format("§a+%.1fA %s §2(%s)", amps, tier.getName(), genTag);
-                case BOTH -> String.format("§a+%,.1f EU/t §7(%s) §2(%s)", posEUt, formatAmps(amps, tier), genTag);
+                case EUT -> String.format("§a+%s §7(%s) §2(%s)", formattedEUt, tier.getName(), genTag);
+                case AMPS -> String.format("§a+%s §2(%s)", formattedAmps, genTag);
+                case BOTH -> String.format("§a+%s §7(%s) §2(%s)", formattedEUt, formattedAmps, genTag);
             };
         } else {
             double amps = totalEUt / (double) voltage;
+            String formattedEUt = formatEUtVal(totalEUt);
+            String formattedAmps = formatAmps(amps, tier);
             return switch (this) {
-                case EUT -> String.format("§e%,.1f EU/t §7(%s)", totalEUt, tier.getName());
-                case AMPS -> String.format("§e%.1fA %s", amps, tier.getName());
-                case BOTH -> String.format("§e%,.1f EU/t §7(%s)", totalEUt, formatAmps(amps, tier));
+                case EUT -> String.format("§e%s §7(%s)", formattedEUt, tier.getName());
+                case AMPS -> String.format("§e%s", formattedAmps);
+                case BOTH -> String.format("§e%s §7(%s)", formattedEUt, formattedAmps);
             };
         }
     }

@@ -3,6 +3,7 @@ package com.gtceu.calcboard.integration.emi;
 import com.gtceu.calcboard.api.BoardManager;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.BoardToast;
 import dev.emi.emi.api.EmiEntrypoint;
 import dev.emi.emi.api.EmiPlugin;
 import dev.emi.emi.api.EmiRegistry;
@@ -37,11 +38,9 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
 
         BoardManager.getInstance().getActiveGraph().addNode(node);
 
-        if (mc.player != null) {
-            String name = recipe.getId() != null ? recipe.getId().getPath() : "Recipe";
-            if (name.contains("/")) name = name.substring(name.lastIndexOf('/') + 1);
-            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name)), true);
-        }
+        String name = recipe.getId() != null ? recipe.getId().getPath() : "Recipe";
+        if (name.contains("/")) name = name.substring(name.lastIndexOf('/') + 1);
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name)));
 
         mc.getSoundManager().play(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(

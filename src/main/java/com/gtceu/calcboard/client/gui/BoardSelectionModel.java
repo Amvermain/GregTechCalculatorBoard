@@ -101,10 +101,7 @@ public class BoardSelectionModel {
             TutorialManager.getInstance().onNodeRemoved(n);
         }
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§c🗑 ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))), true);
-        }
+        BoardToast.show(Component.literal("§c🗑 ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))));
     }
 
     public void copySelection(BoardScreen screen) {
@@ -116,10 +113,7 @@ public class BoardSelectionModel {
         if (graph == null) return;
 
         NodeClipboard.getInstance().copy(graph, selectedNodeIds);
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copied_components", String.valueOf(selectedNodeIds.size()))), true);
-        }
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copied_components", String.valueOf(selectedNodeIds.size()))));
     }
 
     public void pasteSelection(BoardScreen screen, double canvasX, double canvasY) {
@@ -154,10 +148,7 @@ public class BoardSelectionModel {
         screen.markSummaryDirty();
         TutorialManager.getInstance().onPasted();
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.pasted_components", String.valueOf(newNodes.size()))), true);
-        }
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.pasted_components", String.valueOf(newNodes.size()))));
     }
 
     public void cutSelection(BoardScreen screen) {
@@ -191,10 +182,7 @@ public class BoardSelectionModel {
         screen.markSummaryDirty();
         TutorialManager.getInstance().onCut();
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§6✂ ").append(Component.translatable("message.gtcalcboard.cut_components", String.valueOf(count))), true);
-        }
+        BoardToast.show(Component.literal("§6✂ ").append(Component.translatable("message.gtcalcboard.cut_components", String.valueOf(count))));
     }
 
     public void duplicateSelection(BoardScreen screen, double mouseX, double mouseY) {

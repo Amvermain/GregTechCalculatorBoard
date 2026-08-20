@@ -143,8 +143,8 @@ public class ConnectionRenderer {
     public static boolean isPointNearBezier(float x1, float y1, float x2, float y2, double px, double py, double maxDist) {
         float minX = Math.min(x1, x2) - (float) maxDist - 40f;
         float maxX = Math.max(x1, x2) + (float) maxDist + 40f;
-        float minY = Math.min(y1, y2) - (float) maxDist - 10f;
-        float maxY = Math.max(y1, y2) + (float) maxDist + 10f;
+        float minY = Math.min(y1, y2) - (float) maxDist - 20f;
+        float maxY = Math.max(y1, y2) + (float) maxDist + 20f;
 
         if (px < minX || px > maxX || py < minY || py > maxY) {
             return false;
@@ -157,17 +157,45 @@ public class ConnectionRenderer {
         float cx2 = x2 - dx;
         float cy2 = y2;
 
-        int steps = 16;
-        for (int i = 0; i <= steps; i++) {
+        float chord = (float) Math.hypot(x2 - x1, y2 - y1);
+        float net = (float) (Math.hypot(cx1 - x1, cy1 - y1) + Math.hypot(cx2 - cx1, cy2 - cy1) + Math.hypot(x2 - cx2, y2 - cy2));
+        float arcLen = (chord + net) * 0.5f;
+        int steps = Math.max(20, Math.min(64, (int) (arcLen / 10.0f)));
+
+        double maxDistSq = maxDist * maxDist;
+        float prevX = x1;
+        float prevY = y1;
+
+        for (int i = 1; i <= steps; i++) {
             float t = (float) i / steps;
             float it = 1.0f - t;
             float bx = it * it * it * x1 + 3 * it * it * t * cx1 + 3 * it * t * t * cx2 + t * t * t * x2;
             float by = it * it * it * y1 + 3 * it * it * t * cy1 + 3 * it * t * t * cy2 + t * t * t * y2;
 
-            if (Math.hypot(bx - px, by - py) <= maxDist) {
+            if (distanceToSegmentSquared(px, py, prevX, prevY, bx, by) <= maxDistSq) {
                 return true;
             }
+            prevX = bx;
+            prevY = by;
         }
         return false;
+    }
+
+    private static double distanceToSegmentSquared(double px, double py, double x1, double y1, double x2, double y2) {
+        double segDx = x2 - x1;
+        double segDy = y2 - y1;
+        double l2 = segDx * segDx + segDy * segDy;
+        if (l2 == 0.0) {
+            double dx = px - x1;
+            double dy = py - y1;
+            return dx * dx + dy * dy;
+        }
+        double t = ((px - x1) * segDx + (py - y1) * segDy) / l2;
+        t = Math.max(0.0, Math.min(1.0, t));
+        double projX = x1 + t * segDx;
+        double projY = y1 + t * segDy;
+        double dx = px - projX;
+        double dy = py - projY;
+        return dx * dx + dy * dy;
     }
 }

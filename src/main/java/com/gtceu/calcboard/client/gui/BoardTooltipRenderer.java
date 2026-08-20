@@ -48,25 +48,29 @@ public final class BoardTooltipRenderer {
                     tooltipLines.add(Component.literal("§b[📥 " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
 
                     String reqStr = NodeCardRenderer.formatRate(stats.requiredOrProducedRate(), in.isFluid());
-                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §f" + reqStr));
+                    String exactReq = FormatUtil.formatExactRate(stats.requiredOrProducedRate(), in.isFluid());
+                    String reqDisplay = reqStr.equals(exactReq) ? reqStr : reqStr + " §8(" + exactReq + ")";
+                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §f" + reqDisplay));
 
                     if (stats.isConnected()) {
                         String supStr = NodeCardRenderer.formatRate(stats.connectedRate(), in.isFluid());
+                        String exactSup = FormatUtil.formatExactRate(stats.connectedRate(), in.isFluid());
+                        String supDisplay = supStr.equals(exactSup) ? supStr : supStr + " §8(" + exactSup + ")";
                         String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? "§c" : "§b");
                         String statusStr = stats.isBalanced()
                             ? "§a✔ 100%"
                             : (stats.isInputDeficit()
-                                ? String.format("§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString())
-                                : String.format("§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString()));
+                                ? String.format(java.util.Locale.ROOT, "§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString())
+                                : String.format(java.util.Locale.ROOT, "§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString()));
 
-                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supStr + " §7(" + statusStr + "§7)"));
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay + " §7(" + statusStr + "§7)"));
                         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.connected_producers", String.valueOf(stats.connectionCount())).getString()));
                     } else {
                         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_raw").getString()));
                     }
 
                     if (in.getChance() < 1.0) {
-                        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", in.getChance() * 100.0))));
+                        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", in.getChance() * 100.0))));
                     }
                     if (in.hasAlternatives()) {
                         int curIdx = in.getAlternatives().indexOf(in.getId()) + 1;
@@ -90,18 +94,22 @@ public final class BoardTooltipRenderer {
                     tooltipLines.add(Component.literal("§a[📤 " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
 
                     String prodStr = NodeCardRenderer.formatRate(stats.requiredOrProducedRate(), out.isFluid());
-                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.production").getString() + ": §f" + prodStr));
+                    String exactProd = FormatUtil.formatExactRate(stats.requiredOrProducedRate(), out.isFluid());
+                    String prodDisplay = prodStr.equals(exactProd) ? prodStr : prodStr + " §8(" + exactProd + ")";
+                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.production").getString() + ": §f" + prodDisplay));
 
                     if (stats.isConnected()) {
                         String demStr = NodeCardRenderer.formatRate(stats.connectedRate(), out.isFluid());
+                        String exactDem = FormatUtil.formatExactRate(stats.connectedRate(), out.isFluid());
+                        String demDisplay = demStr.equals(exactDem) ? demStr : demStr + " §8(" + exactDem + ")";
                         String percentCol = stats.isBalanced() ? "§a" : (stats.isOutputSurplus() ? "§b" : "§c");
                         String statusStr = stats.isBalanced()
                             ? "§a✔ 100%"
                             : (stats.isOutputSurplus()
-                                ? String.format("§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString())
-                                : String.format("§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString()));
+                                ? String.format(java.util.Locale.ROOT, "§b+ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.surplus").getString())
+                                : String.format(java.util.Locale.ROOT, "§c⚠ %.1f%% (%s)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.deficit").getString()));
 
-                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.consumed").getString() + ": " + percentCol + demStr + " §7(" + statusStr + "§7)"));
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.consumed").getString() + ": " + percentCol + demDisplay + " §7(" + statusStr + "§7)"));
                         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.connected_consumers", String.valueOf(stats.connectionCount())).getString()));
                     } else {
                         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_final").getString()));
@@ -113,19 +121,19 @@ public final class BoardTooltipRenderer {
                         double effChance = out.getEffectiveChance(tierDelta);
                         if (out.getTierChanceBoost() > 0.0) {
                             if (tierDelta > 0 && effChance > out.getChance()) {
-                                tooltipLines.add(Component.literal(String.format("§e%s: %.1f%% §7(+%.1f%%/Tier §a→ %.1f%%§7)",
+                                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(+%.1f%%/Tier §a→ %.1f%%§7)",
                                         Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim(),
                                         out.getChance() * 100.0,
                                         out.getTierChanceBoost() * 100.0,
                                         effChance * 100.0)));
                             } else {
-                                tooltipLines.add(Component.literal(String.format("§e%s: %.1f%% §7(+%.1f%%/Tier)",
+                                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(+%.1f%%/Tier)",
                                         Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim(),
                                         out.getChance() * 100.0,
                                         out.getTierChanceBoost() * 100.0)));
                             }
                         } else {
-                            tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format("%.1f", out.getChance() * 100.0))));
+                            tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", out.getChance() * 100.0))));
                         }
                     }
                     tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
@@ -134,6 +142,43 @@ public final class BoardTooltipRenderer {
                         tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_sever").getString()));
                     }
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
+                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    return;
+                }
+
+                // Power & Cycle Info Row Hover Tooltip
+                int nodeX = (int) widget.getNode().getPosX();
+                int nodeY = (int) widget.getNode().getPosY();
+                int ctrlY = nodeY + NodeWidget.HEADER_HEIGHT + 6;
+                int row2H = widget.getNode().isModule() ? 0 : 18;
+                int infoY = ctrlY + row2H + 18;
+
+                if (canvasMouseY >= infoY - 2 && canvasMouseY <= infoY + 14 && canvasMouseX >= nodeX && canvasMouseX <= nodeX + widget.getWidth()) {
+                    RecipeNode n = widget.getNode();
+                    List<Component> tooltipLines = new ArrayList<>();
+                    tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
+                    double totEUt = n.getEffectiveTotalEUt();
+                    var tier = n.getTargetTier();
+                    if (tier == null) tier = com.gtceu.calcboard.api.GTVoltageTier.LV;
+                    double amps = totEUt / (double) tier.getVoltage();
+                    tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total EU/t: §f%,.2f EU/t", totEUt)));
+                    tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §f%,.4fA %s", amps, tier.getName())));
+                    tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", n.getEffectiveDurationSeconds(), n.getEffectiveCyclesPerSecond())));
+                    if (n.getEfficiency() < 0.999) {
+                        tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e⚡ Efficiency: §f%.1f%%", n.getEfficiency() * 100.0)));
+                    }
+                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    return;
+                }
+
+                // Machine Count Box Hover Tooltip
+                int countMinusX = nodeX + 36;
+                int countBoxX = countMinusX + 16;
+                int countBoxW = Math.max(28, font.width(widget.getCountEditor().getDisplayText()) + 6);
+                if (canvasMouseX >= countBoxX && canvasMouseX <= countBoxX + countBoxW && canvasMouseY >= ctrlY && canvasMouseY <= ctrlY + 14) {
+                    List<Component> tooltipLines = new ArrayList<>();
+                    tooltipLines.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.count").getString()));
+                    tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Exact Count: §f%,.4f", widget.getNode().getMachineCount())));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;
                 }

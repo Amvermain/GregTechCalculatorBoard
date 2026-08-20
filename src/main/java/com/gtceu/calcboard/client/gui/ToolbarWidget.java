@@ -310,22 +310,15 @@ public class ToolbarWidget {
         screen.markSummaryDirty();
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onAutoRatioTriggered();
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            String baseName = baseNode != null ? baseNode.getName() : "Graph";
-            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)), true);
-        }
-        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+        String baseName = baseNode != null ? baseNode.getName() : "Graph";
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
     }
 
     public void performMaxThroughputOptimization() {
         runMaxFlow();
-        
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§6🚀 ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")), true);
-        }
-        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+        BoardToast.show(Component.literal("§6🚀 ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
     }
 
     private void runMaxFlow() {
@@ -384,11 +377,8 @@ public class ToolbarWidget {
         }
         screen.markSummaryDirty();
 
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§6🚀 ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")), true);
-        }
-        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+        BoardToast.show(Component.literal("§6🚀 ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
     }
 
     public void performGroupIntoModule() {
@@ -397,10 +387,7 @@ public class ToolbarWidget {
         boolean hasSpecificSelection = selectedIds != null && selectedIds.size() >= 2;
 
         if (!hasSpecificSelection && graph.getNodes().size() < 2) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null) {
-                mc.player.displayClientMessage(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.group_min_nodes")), true);
-            }
+            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.group_min_nodes")));
             return;
         }
 
@@ -427,11 +414,8 @@ public class ToolbarWidget {
             screen.markSummaryDirty();
             com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onModuleGrouped();
 
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null) {
-                mc.player.displayClientMessage(Component.literal("§d📦 ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))), true);
-            }
-            mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
+            BoardToast.show(Component.literal("§d📦 ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
         }
     }
 
@@ -440,9 +424,7 @@ public class ToolbarWidget {
         String code = BlueprintCodec.exportToString(graph, screen.getPanX(), screen.getPanY(), screen.getZoom());
         Minecraft mc = Minecraft.getInstance();
         mc.keyboardHandler.setClipboard(code);
-        if (mc.player != null) {
-            mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copy_success")), true);
-        }
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copy_success")));
         mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.3F));
     }
 
@@ -450,9 +432,7 @@ public class ToolbarWidget {
         Minecraft mc = Minecraft.getInstance();
         String clip = mc.keyboardHandler.getClipboard();
         if (clip == null || clip.trim().isEmpty()) {
-            if (mc.player != null) {
-                mc.player.displayClientMessage(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.clipboard_empty")), true);
-            }
+            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.clipboard_empty")));
             return;
         }
 
@@ -467,14 +447,10 @@ public class ToolbarWidget {
             BoardScreen.lastPanY = screen.getPanY();
             BoardScreen.lastZoom = screen.getZoom();
             screen.rebuildWidgets();
-            if (mc.player != null) {
-                mc.player.displayClientMessage(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.import_success", String.valueOf(screen.getGraph().getNodes().size()))), true);
-            }
+            BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.import_success", String.valueOf(screen.getGraph().getNodes().size()))));
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.1F));
         } else {
-            if (mc.player != null) {
-                mc.player.displayClientMessage(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.import_fail")), true);
-            }
+            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.import_fail")));
         }
     }
 }

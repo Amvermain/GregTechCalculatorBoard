@@ -254,6 +254,7 @@
   "gui.gtcalcboard.tooltip.right_click_sever": "Sever Wire",
   "gui.gtcalcboard.tooltip.wire_mode_shift": "⚡ 1:1 Auto-Ratio Matching Mode",
   "gui.gtcalcboard.tooltip.wire_mode_normal": "Normal Connection (Hold Shift: 1:1 Auto-Ratio)",
+  "gui.gtcalcboard.tooltip.power_mode_hint": "(Click to cycle power unit EU/t / A)",
   "gui.gtcalcboard.tooltip.btn_guide": "Open User Guide & Manual Book",
   "gui.gtcalcboard.tooltip.btn_tutorial": "Start 15-Second Core Tutorial",
   "gui.gtcalcboard.tooltip.btn_auto_connect": "Auto Connect\nScans the board and automatically connects all matching item & fluid ports in 1 second.",
