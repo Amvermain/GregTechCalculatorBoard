@@ -1,0 +1,119 @@
+package com.gtceu.calcboard.network.packet.c2s;
+
+import com.gtceu.calcboard.network.NetworkHandler;
+import com.gtceu.calcboard.network.packet.s2c.S2CLockResultPacket;
+import com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspacePacket;
+import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
+import com.gtceu.calcboard.server.storage.*;
+import com.gtceu.calcboard.server.team.TeamProviderRegistry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.UUID;
+import java.util.function.Supplier;
+
+public class C2SCommitWorkspacePacket {
+
+    private final UUID teamId;
+    private final String pageId;
+    private final String pageTitle;
+    private final int revision;
+    private final String commitMessage;
+    private final byte[] compressedNBT;
+    private final int addedNodes;
+    private final int modifiedNodes;
+    private final int deletedNodes;
+
+    public C2SCommitWorkspacePacket(UUID teamId, String pageId, String pageTitle, int revision, String commitMessage, byte[] compressedNBT, int addedNodes, int modifiedNodes, int deletedNodes) {
+        this.teamId = teamId;
+        this.pageId = pageId != null ? pageId : "default";
+        this.pageTitle = pageTitle != null ? pageTitle : "Page";
+        this.revision = revision;
+        this.commitMessage = commitMessage != null ? commitMessage : "";
+        this.compressedNBT = compressedNBT != null ? compressedNBT : new byte[0];
+        this.addedNodes = addedNodes;
+        this.modifiedNodes = modifiedNodes;
+        this.deletedNodes = deletedNodes;
+    }
+
+    public C2SCommitWorkspacePacket(FriendlyByteBuf buf) {
+        this.teamId = buf.readUUID();
+        this.pageId = buf.readUtf(256);
+        this.pageTitle = buf.readUtf(256);
+        this.revision = buf.readVarInt();
+        this.commitMessage = buf.readUtf(1024);
+        this.compressedNBT = buf.readByteArray();
+        this.addedNodes = buf.readVarInt();
+        this.modifiedNodes = buf.readVarInt();
+        this.deletedNodes = buf.readVarInt();
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeUUID(teamId);
+        buf.writeUtf(pageId != null ? pageId : "default");
+        buf.writeUtf(pageTitle != null ? pageTitle : "Page");
+        buf.writeVarInt(revision);
+        buf.writeUtf(commitMessage != null ? commitMessage : "");
+        buf.writeByteArray(compressedNBT != null ? compressedNBT : new byte[0]);
+        buf.writeVarInt(addedNodes);
+        buf.writeVarInt(modifiedNodes);
+        buf.writeVarInt(deletedNodes);
+    }
+
+    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
+        NetworkEvent.Context ctx = ctxSupplier.get();
+        ctx.enqueueWork(() -> {
+            ServerPlayer player = ctx.getSender();
+            if (player == null) return;
+
+            UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
+            if (teamId == null || !teamId.equals(playerTeamId)) {
+                NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(403, "gui.gtcalcboard.error.access_denied"));
+                return;
+            }
+
+            TeamBoardSavedData savedData = TeamBoardSavedData.get(player.serverLevel());
+            if (savedData == null) return;
+
+            String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(teamId);
+            TeamWorkspaceData ws = savedData.getOrCreateWorkspace(teamId, teamName);
+
+            // Update or create page
+            TeamWorkspacePage page = ws.getPage(pageId);
+            if (page == null) {
+                page = new TeamWorkspacePage(pageId, pageTitle, revision + 1, compressedNBT);
+            } else {
+                page.setTitle(pageTitle);
+                page.setPageRevision(revision + 1);
+                page.setCompressedGraphData(compressedNBT);
+            }
+            ws.addOrUpdatePage(page);
+
+            // Record commit history
+            CommitLogEntry commit = new CommitLogEntry(
+                    ws.getGlobalRevision(),
+                    player.getUUID(),
+                    player.getGameProfile().getName(),
+                    System.currentTimeMillis(),
+                    pageId,
+                    commitMessage,
+                    addedNodes,
+                    modifiedNodes,
+                    deletedNodes
+            );
+            ws.addCommit(commit);
+
+            // Release lock after committing
+            WorkspaceLockManager.getInstance().releaseLock(teamId, pageId, player.getUUID());
+
+            // Save world data
+            savedData.saveWorkspace(ws);
+
+            // Broadcast updated workspace and lock release to all team members
+            NetworkHandler.broadcastToTeam(player.serverLevel(), teamId, new S2CSyncWorkspacePacket(ws), null);
+            NetworkHandler.broadcastToTeam(player.serverLevel(), teamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
+        });
+        ctx.setPacketHandled(true);
+    }
+}

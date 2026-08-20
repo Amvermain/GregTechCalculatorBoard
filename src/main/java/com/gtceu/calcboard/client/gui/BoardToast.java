@@ -32,6 +32,10 @@ public final class BoardToast {
         }
     }
 
+    public static void show(String translationKey, Object... args) {
+        show(Component.translatable(translationKey, args));
+    }
+
     /**
      * Renders the active toast at the top-center of the screen.
      */

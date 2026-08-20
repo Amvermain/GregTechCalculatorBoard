@@ -22,13 +22,27 @@ public class GregTechCalcBoard {
     public static final String MOD_ID = "gtcalcboard";
 
     public GregTechCalcBoard(FMLJavaModLoadingContext context) {
+        // Register DisplayTest to make the mod completely optional on both client and server sides
+        context.registerExtensionPoint(
+                net.minecraftforge.fml.IExtensionPoint.DisplayTest.class,
+                () -> new net.minecraftforge.fml.IExtensionPoint.DisplayTest(
+                        () -> net.minecraftforge.fml.IExtensionPoint.DisplayTest.IGNORESERVERONLY,
+                        (remoteVersion, isServer) -> true
+                )
+        );
+
         var modBus = context.getModEventBus();
+        modBus.addListener(this::commonSetup);
         modBus.addListener(this::clientSetup);
         modBus.addListener(this::registerKeys);
         modBus.addListener(this::registerReloadListeners);
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(com.gtceu.calcboard.integration.emi.CalcBoardEmiOverlay.class);
+    }
+
+    private void commonSetup(final net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent event) {
+        event.enqueueWork(com.gtceu.calcboard.network.NetworkHandler::init);
     }
 
     private void clientSetup(final FMLClientSetupEvent event) {
@@ -51,6 +65,16 @@ public class GregTechCalcBoard {
         // Preload addon catalog & recipe search index in background immediately upon logging in!
         com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().preloadAsync();
         com.gtceu.calcboard.client.gui.RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedOut(net.minecraftforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().clear();
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
+        com.gtceu.calcboard.server.storage.WorkspaceLockManager.getInstance().clearAll();
     }
 
     @SubscribeEvent

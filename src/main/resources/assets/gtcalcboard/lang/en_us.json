@@ -314,5 +314,12 @@
   "gui.gtcalcboard.global_balance.click_drilldown_hint": "Click to view page contribution breakdown",
   "gui.gtcalcboard.global_balance.breakdown_header": "Page Production / Consumption Breakdown:",
   "gui.gtcalcboard.global_balance.net_total": "Net Balance Across Pages:",
-  "gui.gtcalcboard.tooltip.btn_global_balance": "Global Balance Dashboard (B)\nCalculates cross-page net production, consumption, power balance, and page contributions."
+  "gui.gtcalcboard.tooltip.btn_global_balance": "Global Balance Dashboard (B)\nCalculates cross-page net production, consumption, power balance, and page contributions.",
+
+  "gui.gtcalcboard.error.access_denied": "Access denied to team workspace.",
+  "gui.gtcalcboard.error.generic": "An error occurred while synchronizing workspace.",
+  "gui.gtcalcboard.toast.workspace_synced": "Synchronized team workspace: %s",
+  "gui.gtcalcboard.toast.lock_acquired": "Acquired edit lock for page: %s",
+  "gui.gtcalcboard.toast.lock_busy": "Page is currently being edited by: %s",
+  "gui.gtcalcboard.toast.error": "Workspace Error: %s"
 }

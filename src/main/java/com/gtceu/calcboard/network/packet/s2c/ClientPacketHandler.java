@@ -1,0 +1,49 @@
+package com.gtceu.calcboard.network.packet.s2c;
+
+import com.gtceu.calcboard.client.gui.BoardToast;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+
+import java.util.UUID;
+
+/**
+ * Handles incoming S2C network packets on the physical client thread.
+ */
+public class ClientPacketHandler {
+
+    public static void handleSyncWorkspace(S2CSyncWorkspacePacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.setCurrentTeamId(packet.getTeamId());
+        state.setCurrentTeamName(packet.getTeamName());
+        state.setGlobalRevision(packet.getGlobalRevision());
+        state.updateRemotePages(packet.getPages());
+        state.updateCommitHistory(packet.getCommits());
+
+        BoardToast.show("gui.gtcalcboard.toast.workspace_synced", packet.getTeamName());
+    }
+
+    public static void handleLockResult(S2CLockResultPacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        Minecraft mc = Minecraft.getInstance();
+        UUID myUUID = mc.player != null ? mc.player.getUUID() : null;
+
+        boolean isMe = myUUID != null && myUUID.equals(packet.getLockHolderUUID());
+        state.setLockHeld(packet.getPageId(), isMe);
+
+        if (packet.isSuccess() && isMe) {
+            BoardToast.show("gui.gtcalcboard.toast.lock_acquired", packet.getPageId());
+        } else if (!packet.isSuccess() && packet.getLockHolderName() != null && !packet.getLockHolderName().isEmpty()) {
+            BoardToast.show("gui.gtcalcboard.toast.lock_busy", packet.getLockHolderName());
+        }
+    }
+
+    public static void handlePresence(S2CBroadcastPresencePacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.updatePresence(packet.getActiveMembers());
+    }
+
+    public static void handleError(S2CWorkspaceErrorPacket packet) {
+        BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.getMessageKey()).getString());
+    }
+}

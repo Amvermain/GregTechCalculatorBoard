@@ -314,5 +314,12 @@
   "gui.gtcalcboard.global_balance.click_drilldown_hint": "클릭 시 페이지별 생산/소비 기여도 상세 표출",
   "gui.gtcalcboard.global_balance.breakdown_header": "페이지별 생산 및 소비 기여도 내역:",
   "gui.gtcalcboard.global_balance.net_total": "대상 페이지 종합 순 수지:",
-  "gui.gtcalcboard.tooltip.btn_global_balance": "대상 페이지 종합 수지 대시보드 (B)\n선택한 여러 페이지들의 생산량, 소비량, 총 전력 및 페이지별 기여도를 종합 집계합니다."
+  "gui.gtcalcboard.tooltip.btn_global_balance": "대상 페이지 종합 수지 대시보드 (B)\n선택한 여러 페이지들의 생산량, 소비량, 총 전력 및 페이지별 기여도를 종합 집계합니다.",
+
+  "gui.gtcalcboard.error.access_denied": "팀 워크스페이스에 대한 접근 권한이 없습니다.",
+  "gui.gtcalcboard.error.generic": "워크스페이스 동기화 중 오류가 발생했습니다.",
+  "gui.gtcalcboard.toast.workspace_synced": "팀 워크스페이스 동기화 완료: %s",
+  "gui.gtcalcboard.toast.lock_acquired": "페이지 편집 권한(Lock) 획득: %s",
+  "gui.gtcalcboard.toast.lock_busy": "해당 페이지는 현재 %s님이 편집 중입니다.",
+  "gui.gtcalcboard.toast.error": "워크스페이스 오류: %s"
 }
