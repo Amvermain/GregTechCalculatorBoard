@@ -19,7 +19,7 @@ public class C2SRequestWorkspacePacket {
     private final String requestedPageId;
 
     public C2SRequestWorkspacePacket(UUID teamId, String requestedPageId) {
-        this.teamId = teamId;
+        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
         this.requestedPageId = requestedPageId != null ? requestedPageId : "";
     }
 
@@ -40,15 +40,15 @@ public class C2SRequestWorkspacePacket {
             if (player == null) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
-            if (teamId == null || !teamId.equals(playerTeamId)) {
+            if (playerTeamId == null) {
                 NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(403, "gui.gtcalcboard.error.access_denied"));
                 return;
             }
 
             TeamBoardSavedData savedData = TeamBoardSavedData.get(player.serverLevel());
             if (savedData != null) {
-                String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(teamId);
-                TeamWorkspaceData ws = savedData.getOrCreateWorkspace(teamId, teamName);
+                String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(playerTeamId);
+                TeamWorkspaceData ws = savedData.getOrCreateWorkspace(playerTeamId, teamName);
                 NetworkHandler.sendToPlayer(player, new S2CSyncWorkspacePacket(ws));
             }
         });

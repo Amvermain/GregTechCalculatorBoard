@@ -27,6 +27,7 @@ import org.lwjgl.opengl.GL11;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Main GUI Screen for GregTech Calculator Board.
@@ -81,6 +82,10 @@ public class BoardScreen extends Screen {
     }
 
     public FlowGraph getGraph() {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isTeamMode()) {
+            return state.getActiveTeamGraph();
+        }
         return BoardManager.getInstance().getActiveGraph();
     }
 
@@ -193,6 +198,11 @@ public class BoardScreen extends Screen {
         this.exportToTeamDialog = new ExportToTeamDialog(this);
         this.recentSavesDialog = new RecentSavesDialog(this);
         rebuildWidgets();
+
+        if (com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode()) {
+            UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, "page_main"));
+        }
 
         if (this.width < 640) {
             summaryOverlay.setCollapsed(true);

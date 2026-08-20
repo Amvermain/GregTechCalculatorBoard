@@ -16,7 +16,7 @@ public class C2SReleaseLockPacket {
     private final String pageId;
 
     public C2SReleaseLockPacket(UUID teamId, String pageId) {
-        this.teamId = teamId;
+        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
         this.pageId = pageId != null ? pageId : "default";
     }
 
@@ -36,10 +36,13 @@ public class C2SReleaseLockPacket {
             ServerPlayer player = ctx.getSender();
             if (player == null) return;
 
-            boolean released = WorkspaceLockManager.getInstance().releaseLock(teamId, pageId, player.getUUID());
+            UUID playerTeamId = com.gtceu.calcboard.server.team.TeamProviderRegistry.getInstance().getPlayerTeamId(player);
+            if (playerTeamId == null) return;
+
+            boolean released = WorkspaceLockManager.getInstance().releaseLock(playerTeamId, pageId, player.getUUID());
             if (released) {
                 // Broadcast unlock to all team members
-                NetworkHandler.broadcastToTeam(player.serverLevel(), teamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
+                NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
             }
         });
         ctx.setPacketHandled(true);

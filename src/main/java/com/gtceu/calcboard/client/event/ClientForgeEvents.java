@@ -30,6 +30,9 @@ public class ClientForgeEvents {
         // Preload addon catalog & recipe search index in background immediately upon logging in!
         MachineAddonCatalog.getInstance().preloadAsync();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+
+        // Preload team workspace in background
+        com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(null, "page_main"));
     }
 
     @SubscribeEvent

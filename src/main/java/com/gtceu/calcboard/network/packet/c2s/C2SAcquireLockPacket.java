@@ -17,7 +17,7 @@ public class C2SAcquireLockPacket {
     private final String pageId;
 
     public C2SAcquireLockPacket(UUID teamId, String pageId) {
-        this.teamId = teamId;
+        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
         this.pageId = pageId != null ? pageId : "default";
     }
 
@@ -38,13 +38,13 @@ public class C2SAcquireLockPacket {
             if (player == null) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
-            if (teamId == null || !teamId.equals(playerTeamId)) {
+            if (playerTeamId == null) {
                 NetworkHandler.sendToPlayer(player, new S2CLockResultPacket(pageId, false, null, "", 0L));
                 return;
             }
 
-            boolean acquired = WorkspaceLockManager.getInstance().acquireLock(teamId, pageId, player.getUUID(), player.getGameProfile().getName());
-            WorkspaceLockManager.LockInfo lock = WorkspaceLockManager.getInstance().getLock(teamId, pageId);
+            boolean acquired = WorkspaceLockManager.getInstance().acquireLock(playerTeamId, pageId, player.getUUID(), player.getGameProfile().getName());
+            WorkspaceLockManager.LockInfo lock = WorkspaceLockManager.getInstance().getLock(playerTeamId, pageId);
 
             UUID holderUUID = lock != null ? lock.getHolderUUID() : null;
             String holderName = lock != null ? lock.getHolderName() : "";
@@ -55,7 +55,7 @@ public class C2SAcquireLockPacket {
 
             // If acquired, broadcast lock state to other team members
             if (acquired) {
-                NetworkHandler.broadcastToTeam(player.serverLevel(), teamId, new S2CLockResultPacket(pageId, true, player.getUUID(), player.getGameProfile().getName(), expires), player.getUUID());
+                NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(pageId, true, player.getUUID(), player.getGameProfile().getName(), expires), player.getUUID());
             }
         });
         ctx.setPacketHandled(true);

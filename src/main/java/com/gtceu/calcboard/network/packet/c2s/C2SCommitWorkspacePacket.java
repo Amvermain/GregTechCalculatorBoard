@@ -26,7 +26,7 @@ public class C2SCommitWorkspacePacket {
     private final int deletedNodes;
 
     public C2SCommitWorkspacePacket(UUID teamId, String pageId, String pageTitle, int revision, String commitMessage, byte[] compressedNBT, int addedNodes, int modifiedNodes, int deletedNodes) {
-        this.teamId = teamId;
+        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
         this.pageId = pageId != null ? pageId : "default";
         this.pageTitle = pageTitle != null ? pageTitle : "Page";
         this.revision = revision;
@@ -68,7 +68,7 @@ public class C2SCommitWorkspacePacket {
             if (player == null) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
-            if (teamId == null || !teamId.equals(playerTeamId)) {
+            if (playerTeamId == null) {
                 NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(403, "gui.gtcalcboard.error.access_denied"));
                 return;
             }
@@ -76,8 +76,8 @@ public class C2SCommitWorkspacePacket {
             TeamBoardSavedData savedData = TeamBoardSavedData.get(player.serverLevel());
             if (savedData == null) return;
 
-            String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(teamId);
-            TeamWorkspaceData ws = savedData.getOrCreateWorkspace(teamId, teamName);
+            String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(playerTeamId);
+            TeamWorkspaceData ws = savedData.getOrCreateWorkspace(playerTeamId, teamName);
 
             // Update or create page
             TeamWorkspacePage page = ws.getPage(pageId);
@@ -105,14 +105,14 @@ public class C2SCommitWorkspacePacket {
             ws.addCommit(commit);
 
             // Release lock after committing
-            WorkspaceLockManager.getInstance().releaseLock(teamId, pageId, player.getUUID());
+            WorkspaceLockManager.getInstance().releaseLock(playerTeamId, pageId, player.getUUID());
 
             // Save world data
-            savedData.saveWorkspace(ws);
+            savedData.setDirty();
 
-            // Broadcast updated workspace and lock release to all team members
-            NetworkHandler.broadcastToTeam(player.serverLevel(), teamId, new S2CSyncWorkspacePacket(ws), null);
-            NetworkHandler.broadcastToTeam(player.serverLevel(), teamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
+            // Broadcast synced workspace and released lock to all team members
+            NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CSyncWorkspacePacket(ws), null);
+            NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
         });
         ctx.setPacketHandled(true);
     }

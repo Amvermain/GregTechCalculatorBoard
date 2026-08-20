@@ -230,7 +230,7 @@ public final class BoardTooltipRenderer {
                 return;
             }
 
-            if (canvasHandler.hasQuickAddMarker()) {
+            if (mouseY >= 64 && canvasHandler.hasQuickAddMarker()) {
                 double qx = canvasHandler.getQuickAddMarkerCanvasX();
                 double qy = canvasHandler.getQuickAddMarkerCanvasY();
                 if (Math.hypot(canvasMouseX - qx, canvasMouseY - qy) <= 14.0) {

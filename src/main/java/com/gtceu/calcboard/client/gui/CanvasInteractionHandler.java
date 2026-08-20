@@ -85,6 +85,10 @@ public class CanvasInteractionHandler {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (mouseY < 64) {
+            return false;
+        }
+
         double canvasMouseX = screen.toCanvasX(mouseX);
         double canvasMouseY = screen.toCanvasY(mouseY);
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();

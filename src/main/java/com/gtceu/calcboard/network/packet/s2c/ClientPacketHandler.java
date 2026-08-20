@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.BoardToast;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.Minecraft;
@@ -20,6 +21,12 @@ public class ClientPacketHandler {
         state.updateRemotePages(packet.getPages());
         state.updateCommitHistory(packet.getCommits());
 
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof BoardScreen bs) {
+            bs.rebuildWidgets();
+            bs.markSummaryDirty();
+        }
+
         BoardToast.show("gui.gtcalcboard.toast.workspace_synced", packet.getTeamName());
     }
 
@@ -31,6 +38,11 @@ public class ClientPacketHandler {
         boolean isMe = myUUID != null && myUUID.equals(packet.getLockHolderUUID());
         state.setLockHeld(packet.getPageId(), isMe);
 
+        if (mc.screen instanceof BoardScreen bs) {
+            bs.rebuildWidgets();
+            bs.markSummaryDirty();
+        }
+
         if (packet.isSuccess() && isMe) {
             BoardToast.show("gui.gtcalcboard.toast.lock_acquired", packet.getPageId());
         } else if (!packet.isSuccess() && packet.getLockHolderName() != null && !packet.getLockHolderName().isEmpty()) {
@@ -41,6 +53,11 @@ public class ClientPacketHandler {
     public static void handlePresence(S2CBroadcastPresencePacket packet) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         state.updatePresence(packet.getActiveMembers());
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof BoardScreen bs) {
+            bs.markSummaryDirty();
+        }
     }
 
     public static void handleError(S2CWorkspaceErrorPacket packet) {

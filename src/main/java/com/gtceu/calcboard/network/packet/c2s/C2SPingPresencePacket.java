@@ -14,7 +14,7 @@ public class C2SPingPresencePacket {
     private final String activePageId;
 
     public C2SPingPresencePacket(UUID teamId, String activePageId) {
-        this.teamId = teamId;
+        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
         this.activePageId = activePageId != null ? activePageId : "default";
     }
 
@@ -34,8 +34,11 @@ public class C2SPingPresencePacket {
             ServerPlayer player = ctx.getSender();
             if (player == null) return;
 
+            UUID playerTeamId = com.gtceu.calcboard.server.team.TeamProviderRegistry.getInstance().getPlayerTeamId(player);
+            if (playerTeamId == null) return;
+
             // Renew heartbeat if player holds the lock
-            WorkspaceLockManager.getInstance().pingHeartbeat(teamId, activePageId, player.getUUID());
+            WorkspaceLockManager.getInstance().pingHeartbeat(playerTeamId, activePageId, player.getUUID());
         });
         ctx.setPacketHandled(true);
     }
