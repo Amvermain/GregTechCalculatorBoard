@@ -1,6 +1,8 @@
 package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.client.gui.FormatUtil;
+import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import net.minecraft.resources.ResourceLocation;
@@ -1763,4 +1765,138 @@ public class CalculationTest {
         Assertions.assertTrue(outDeficit.contains("-4.5k B/s"));
         Assertions.assertTrue(outDeficit.contains("⚠"));
     }
+
+    @Test
+    public void testTurbineShiftConnectAutoRatioMatching() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Producer: Chemical Reactor with nominal 3.25 B/s Benzene (8000 mB / 2.46s = 3250 mB/s at 100% eff)
+        RecipeNode chemReactor = RecipeNode.create("Chemical Reactor (Benzene)", 160.0, 480.0, GTVoltageTier.LV);
+        chemReactor.setTargetTier(GTVoltageTier.HV);
+        chemReactor.setMachineCount(1.0);
+        IngredientStack benzene = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:benzene"), "Benzene", 6500.0, 1.0);
+        chemReactor.addOutput(benzene);
+        graph.addNode(chemReactor);
+
+        // 2. Consumer: Gas Turbine (Base: 40 ticks = 2.0s, baseEUt = 32.0, LV tier, 280% rotor -> 320 parallel -> 57.14 mB/s consumption)
+        RecipeNode turbine = RecipeNode.create("Gas Turbine (Nitrobenzene)", 40.0, 32.0, GTVoltageTier.LV);
+        turbine.setGenerator(true);
+        turbine.setRotorEfficiency(280);
+        turbine.setRotorPower(300);
+        MachineAddon enderiumRotor = new MachineAddon("gtceu:rotor_enderium", "Enderium Turbine Rotor", MachineAddon.Category.ROTOR, "", ResourceLocation.tryParse("gtceu:turbine_rotor"));
+        enderiumRotor.setDurationMultiplier(2.8);
+        enderiumRotor.setRotorPower(300);
+        enderiumRotor.setRotorMaxEUt(264000.0);
+        turbine.addAddon(enderiumRotor);
+        turbine.setParallel(320); // 320A LV holder
+        turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:benzene"), "Benzene", 1.0, 1.0));
+        graph.addNode(turbine);
+
+        // Scenario A: When Producer is running at throttled 1% efficiency (~26.25 mB/s actual output)
+        chemReactor.setEfficiency(26.25 / 3250.0); // ~0.0080769
+        double matchedConsumerCountThrottled = FlowGraphSolver.calculateConsumerMatchCount(graph, chemReactor, 0, turbine, 0);
+        // Available 26.25 mB/s / 57.14 mB/s per turbine < 1.0 -> Turbine MUST stay at 1.0 machine!
+        Assertions.assertEquals(1.0, matchedConsumerCountThrottled, 0.001);
+
+        // Scenario B: When Producer is at 100% nominal efficiency (3,250 mB/s output)
+        chemReactor.setEfficiency(1.0);
+        double matchedConsumerCountFull = FlowGraphSolver.calculateConsumerMatchCount(graph, chemReactor, 0, turbine, 0);
+        // 3,250 mB/s / 57.14 mB/s per turbine = 56.88 -> 56 machines!
+        Assertions.assertEquals(56.0, matchedConsumerCountFull, 0.001);
+
+        // Scenario C: Reverse Shift-Connect (Turbine at 57.14 mB/s demand -> Chemical Reactor at full efficiency 3,250 mB/s)
+        double matchedProducerCount = FlowGraphSolver.calculateProducerMatchCount(graph, chemReactor, 0, turbine, 0);
+        // 57.14 mB/s demand / 3,250 mB/s supply -> 1 Chemical Reactor is ample!
+        Assertions.assertEquals(1.0, matchedProducerCount, 0.001);
+    }
+
+    @Test
+    public void testRecipeFilterConfigAndCategoryDiscovery() {
+        com.gtceu.calcboard.client.gui.search.RecipeFilterConfig config = com.gtceu.calcboard.client.gui.search.RecipeFilterConfig.getInstance();
+        config.resetDefaults();
+
+        // 1. Default exclusions
+        Assertions.assertTrue(config.isCategoryExcluded("gtceu:world_interaction"));
+        Assertions.assertTrue(config.isCategoryExcluded("world_interaction"));
+        Assertions.assertTrue(config.isCategoryExcluded("gtceu:fluid_canning"));
+        Assertions.assertTrue(config.isCategoryExcluded("gtceu:fluid_encapsulation"));
+        Assertions.assertFalse(config.isCategoryExcluded("gtceu:chemical_reactor"));
+
+        // 2. Modify exclusion
+        config.setCategoryExcluded("gtceu:chemical_reactor", true);
+        Assertions.assertTrue(config.isCategoryExcluded("gtceu:chemical_reactor"));
+        config.setCategoryExcluded("gtceu:chemical_reactor", false);
+        Assertions.assertFalse(config.isCategoryExcluded("gtceu:chemical_reactor"));
+
+        // 3. Category Discovery from SearchableRecipes
+        RecipeSearchEngine.SearchableRecipe r1 = new RecipeSearchEngine.SearchableRecipe(
+                new Object(), "Reaction 1", "gtceu", "chemical_reactor", "Chemical Reactor",
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), "", "", ""
+        );
+        RecipeSearchEngine.SearchableRecipe r2 = new RecipeSearchEngine.SearchableRecipe(
+                new Object(), "Reaction 2", "gtceu", "chemical_reactor", "Chemical Reactor",
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), "", "", ""
+        );
+        RecipeSearchEngine.SearchableRecipe r3 = new RecipeSearchEngine.SearchableRecipe(
+                new Object(), "Distillation 1", "gtceu", "distillation_tower", "Distillation Tower",
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), "", "", ""
+        );
+
+        var discovered = RecipeSearchEngine.discoverCategories(List.of(r1, r2, r3));
+        Assertions.assertEquals(2, discovered.size());
+        Assertions.assertEquals(2, discovered.get("chemical_reactor").count());
+        Assertions.assertEquals("Chemical Reactor", discovered.get("chemical_reactor").displayName());
+        Assertions.assertEquals(1, discovered.get("distillation_tower").count());
+        Assertions.assertEquals("Distillation Tower", discovered.get("distillation_tower").displayName());
+
+        // Reset to defaults
+        config.resetDefaults();
+    }
+
+    @Test
+    public void testRateTimeUnitScaling() {
+        try {
+            // 1. PER_SECOND (Default)
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+            Assertions.assertEquals("50 mB/s", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("10/s", FormatUtil.formatRate(10.0, false));
+            Assertions.assertEquals("1.5k B/s", FormatUtil.formatRate(1_500_000.0, true));
+
+            // 2. PER_TICK (/t, factor 0.05)
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_TICK);
+            Assertions.assertEquals("2.5 mB/t", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("0.5/t", FormatUtil.formatRate(10.0, false));
+            Assertions.assertEquals("75 B/t", FormatUtil.formatRate(1_500_000.0, true));
+
+            // 3. PER_MINUTE (/min, factor 60)
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_MINUTE);
+            Assertions.assertEquals("3 B/min", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("600/min", FormatUtil.formatRate(10.0, false));
+
+            // 4. PER_HOUR (/h, factor 3600)
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_HOUR);
+            Assertions.assertEquals("180 B/h", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("36k/h", FormatUtil.formatRate(10.0, false));
+
+            // 5. PER_DAY (/d, factor 86400)
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_DAY);
+            Assertions.assertEquals("4.32k B/d", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("864k/d", FormatUtil.formatRate(10.0, false));
+
+            // 6. Connected I/O scaling
+            String inPerDay = FormatUtil.formatConnectedInput(10.0, 10.0, false, false);
+            Assertions.assertTrue(inPerDay.contains("864k/d"));
+
+            // 7. Exact rate formatting
+            String exactPerMin = FormatUtil.formatExactRate(50.0, true);
+            Assertions.assertTrue(exactPerMin.contains("4,320.00 B/d"));
+
+            // 8. Cycle next
+            Assertions.assertEquals(RateTimeUnit.PER_TICK, RateTimeUnit.PER_DAY.next());
+            Assertions.assertEquals(RateTimeUnit.PER_SECOND, RateTimeUnit.PER_TICK.next());
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
 }
+

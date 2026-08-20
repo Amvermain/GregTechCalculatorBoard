@@ -6,6 +6,9 @@ import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.client.gui.search.RecipeFilterConfig;
+import com.gtceu.calcboard.client.gui.search.RecipeFilterDialog;
+import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.ParsedQuery;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
@@ -56,12 +59,17 @@ public class RecipeSearchDialog {
     private static volatile boolean IS_CACHING = false;
 
     private final List<SearchableRecipe> filteredRecipes = new ArrayList<>();
+    private final RecipeFilterDialog filterDialog = new RecipeFilterDialog();
     private int scrollOffset = 0;
     private boolean visible = false;
     private boolean hasTargetSpawnPos = false;
     private double targetSpawnCanvasX = 0;
     private double targetSpawnCanvasY = 0;
     private ContextualWireTarget contextualWireTarget = null;
+    private SearchableRecipe stickyHoverRecipe = null;
+    private int stickyHoverRowY = 0;
+    private int lastMouseX = 0;
+    private int lastMouseY = 0;
 
     private static final int DIALOG_WIDTH = 360;
     private static final int DIALOG_HEIGHT = 280;
@@ -70,9 +78,11 @@ public class RecipeSearchDialog {
     public RecipeSearchDialog(BoardScreen parent) {
         this.parent = parent;
         Font font = Minecraft.getInstance().font;
-        this.searchBox = new EditBox(font, 0, 0, DIALOG_WIDTH - 24, 16, Component.translatable("gui.gtcalcboard.search"));
+        this.searchBox = new EditBox(font, 0, 0, DIALOG_WIDTH - 48, 16, Component.translatable("gui.gtcalcboard.search"));
         this.searchBox.setResponder(this::onSearchQueryChanged);
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
+
+        this.filterDialog.setOnFilterChanged(() -> updateSearchResults(searchBox.getValue()));
 
         // Trigger background pre-caching immediately
         ensureGlobalRecipesCachedAsync(null);
@@ -186,6 +196,7 @@ public class RecipeSearchDialog {
             updateSearchResults("");
         } else {
             this.contextualWireTarget = null;
+            this.stickyHoverRecipe = null;
         }
     }
 
@@ -295,7 +306,12 @@ public class RecipeSearchDialog {
         String targetName = (hasContext && contextualWireTarget.sourceStack.getDisplayName() != null)
                 ? contextualWireTarget.sourceStack.getDisplayName().toLowerCase(Locale.ROOT) : null;
 
+        RecipeFilterConfig filterConfig = RecipeFilterConfig.getInstance();
+
         for (SearchableRecipe sr : sourceList) {
+            if (filterConfig.isCategoryExcluded(sr.categoryId())) {
+                continue;
+            }
             if (!RecipeSearchEngine.matches(sr, parsedQuery)) {
                 continue;
             }
@@ -320,8 +336,9 @@ public class RecipeSearchDialog {
                         }
                     }
 
-                    // If in contextual mode, exclude non-matches completely
-                    if (contextualScore == 0) {
+                    // If in contextual mode and query is empty, only show matching recipes.
+                    // If user typed a search query, allow general search across all recipes.
+                    if (contextualScore == 0 && (query == null || query.trim().isEmpty())) {
                         continue;
                     }
                 } else {
@@ -342,7 +359,8 @@ public class RecipeSearchDialog {
                         }
                     }
 
-                    if (contextualScore == 0) {
+                    // If in contextual mode and query is empty, only show matching recipes.
+                    if (contextualScore == 0 && (query == null || query.trim().isEmpty())) {
                         continue;
                     }
                 }
@@ -374,6 +392,9 @@ public class RecipeSearchDialog {
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         if (!visible) return;
+
+        this.lastMouseX = mouseX;
+        this.lastMouseY = mouseY;
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 600);
@@ -410,11 +431,34 @@ public class RecipeSearchDialog {
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 12 && mouseY >= closeY && mouseY <= closeY + 12;
         graphics.drawString(font, "✕", closeX, closeY, closeHover ? 0xFFFF5555 : 0xFFAAAAAA, false);
 
-        // Search Input Box
+        // Search Input Box & Filter Button
+        int filterBtnW = 20;
+        int filterBtnH = 16;
+        int filterBtnX = x + dialogW - 12 - filterBtnW;
+        int filterBtnY = y + 30;
+
         searchBox.setX(x + 12);
         searchBox.setY(y + 30);
-        searchBox.setWidth(dialogW - 24);
+        searchBox.setWidth(dialogW - 24 - filterBtnW - 4);
         searchBox.render(graphics, mouseX, mouseY, 0);
+
+        boolean filterHover = mouseX >= filterBtnX && mouseX <= filterBtnX + filterBtnW && mouseY >= filterBtnY && mouseY <= filterBtnY + filterBtnH;
+        boolean filterActive = !RecipeFilterConfig.getInstance().getExcludedCategories().isEmpty();
+        graphics.fill(filterBtnX, filterBtnY, filterBtnX + filterBtnW, filterBtnY + filterBtnH, filterHover ? 0xFF334155 : (filterActive ? 0xFF2A3649 : 0xFF1E293B));
+        graphics.renderOutline(filterBtnX, filterBtnY, filterBtnW, filterBtnH, filterActive ? 0xFF38BDF8 : 0xFF475569);
+        graphics.drawCenteredString(font, "⚙", filterBtnX + filterBtnW / 2, filterBtnY + 4, filterActive ? 0xFF38BDF8 : 0xFF94A3B8);
+
+        if (filterHover && !filterDialog.isVisible()) {
+            String raw = Component.translatable("gui.gtcalcboard.filter.btn_tooltip").getString();
+            if (raw.contains("\n")) {
+                List<Component> lines = java.util.Arrays.stream(raw.split("\n"))
+                        .<Component>map(Component::literal)
+                        .toList();
+                graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+            } else {
+                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.filter.btn_tooltip"), mouseX, mouseY);
+            }
+        }
 
         // Recipe Results List Area
         int listX = x + 12;
@@ -442,6 +486,9 @@ public class RecipeSearchDialog {
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
         scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
 
+        SearchableRecipe newlyHoveredRecipe = null;
+        int newlyHoveredRowY = 0;
+
         if (filteredRecipes.isEmpty()) {
             String emptyMsg = (GLOBAL_RECIPES.isEmpty() || !GLOBAL_CACHED)
                 ? "§e" + Component.translatable("gui.gtcalcboard.loading_recipes").getString() 
@@ -455,8 +502,21 @@ public class RecipeSearchDialog {
                 SearchableRecipe sr = filteredRecipes.get(index);
                 int rowY = listY + i * ROW_HEIGHT;
 
+                // Add button on the right
+                int btnW = 44;
+                int btnH = 18;
+                int btnX = listX + listW - btnW - 6;
+                int btnY = rowY + 7;
+                boolean btnHover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+
                 boolean rowHover = mouseX >= listX && mouseX <= listX + listW && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
-                graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, rowHover ? 0xFF2A3649 : (i % 2 == 0 ? 0xFF1A1E26 : 0xFF161A21));
+                if (rowHover) {
+                    newlyHoveredRecipe = sr;
+                    newlyHoveredRowY = rowY;
+                }
+
+                boolean isRowSelectedOrHovered = rowHover || (stickyHoverRecipe == sr);
+                graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, isRowSelectedOrHovered ? 0xFF2A3649 : (i % 2 == 0 ? 0xFF1A1E26 : 0xFF161A21));
 
                 // Left: Display First Input Stack Icon & Rate
                 if (sr.recipe() instanceof EmiRecipe r) {
@@ -489,13 +549,6 @@ public class RecipeSearchDialog {
                 int maxTextW = listW - 110;
                 graphics.drawString(font, font.plainSubstrByWidth(fullRowText, maxTextW), listX + 64, rowY + 12, 0xFFFFFFFF, false);
 
-                // Add button on the right
-                int btnW = 44;
-                int btnH = 18;
-                int btnX = listX + listW - btnW - 6;
-                int btnY = rowY + 7;
-                boolean btnHover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-
                 graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, btnHover ? 0xFF2A6840 : 0xFF1E4D2F);
                 graphics.renderOutline(btnX, btnY, btnW, btnH, 0xFF359050);
                 graphics.drawCenteredString(font, "➕ " + Component.translatable("gui.gtcalcboard.add_btn").getString(), btnX + btnW / 2, btnY + 5, 0xFFFFFFFF);
@@ -511,16 +564,70 @@ public class RecipeSearchDialog {
             }
         }
 
+        if (newlyHoveredRecipe != null) {
+            stickyHoverRecipe = newlyHoveredRecipe;
+            stickyHoverRowY = newlyHoveredRowY;
+        } else if (stickyHoverRecipe != null) {
+            int[] bounds = RecipeHoverPreviewRenderer.calculatePreviewBounds(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, screenWidth, screenHeight);
+            if (bounds != null) {
+                int cardX = bounds[0];
+                int cardY = bounds[1];
+                int cardW = bounds[2];
+                int cardH = bounds[3];
+
+                int minX = Math.min(x, cardX) - 16;
+                int maxX = Math.max(x + dialogW, cardX + cardW) + 16;
+                int minY = Math.min(y, cardY) - 16;
+                int maxY = Math.max(y + dialogH, cardY + cardH) + 16;
+
+                boolean inBridgeZone = mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
+                if (!inBridgeZone) {
+                    stickyHoverRecipe = null;
+                }
+            } else {
+                stickyHoverRecipe = null;
+            }
+        }
+
+        // Render Floating Recipe Preview Card on Hover
+        if (stickyHoverRecipe != null && !filterDialog.isVisible()) {
+            RecipeHoverPreviewRenderer.renderPreview(graphics, stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, mouseX, mouseY, 0, screenWidth, screenHeight);
+        }
+
         graphics.pose().popPose();
+
+        // Render Filter Dialog if visible
+        if (filterDialog.isVisible()) {
+            filterDialog.render(graphics, mouseX, mouseY, screenWidth, screenHeight);
+        }
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible) return false;
 
+        if (filterDialog.isVisible()) {
+            return filterDialog.mouseClicked(mouseX, mouseY, button, screenWidth, screenHeight);
+        }
+
         int dialogW = Math.min(380, screenWidth - 24);
         int dialogH = Math.min(280, screenHeight - 24);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
+
+        // If mouse is inside the sticky preview card on the right
+        if (stickyHoverRecipe != null) {
+            int[] bounds = RecipeHoverPreviewRenderer.calculatePreviewBounds(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, screenWidth, screenHeight);
+            if (bounds != null && mouseX >= bounds[0] && mouseX <= bounds[0] + bounds[2] && mouseY >= bounds[1] && mouseY <= bounds[1] + bounds[3]) {
+                var hoveredIngredient = RecipeHoverPreviewRenderer.getHoveredIngredient(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, (int) mouseX, (int) mouseY, screenWidth, screenHeight);
+                if (hoveredIngredient != null && !hoveredIngredient.isEmpty()) {
+                    String name = hoveredIngredient.getEmiStacks().get(0).getName().getString();
+                    searchBox.setValue(name);
+                    searchBox.setFocused(true);
+                    return true;
+                }
+                return true;
+            }
+        }
 
         // Click outside closes dialog
         if (mouseX < x || mouseX > x + dialogW || mouseY < y || mouseY > y + dialogH) {
@@ -536,9 +643,23 @@ public class RecipeSearchDialog {
             return true;
         }
 
-        searchBox.mouseClicked(mouseX, mouseY, button);
+        // Filter button [⚙]
+        int filterBtnW = 20;
+        int filterBtnH = 16;
+        int filterBtnX = x + dialogW - 12 - filterBtnW;
+        int filterBtnY = y + 30;
+        if (mouseX >= filterBtnX && mouseX <= filterBtnX + filterBtnW && mouseY >= filterBtnY && mouseY <= filterBtnY + filterBtnH) {
+            synchronized (GLOBAL_RECIPES) {
+                filterDialog.updateCategories(RecipeSearchEngine.discoverCategories(GLOBAL_RECIPES));
+            }
+            filterDialog.setVisible(true);
+            return true;
+        }
 
-        // Click on Add buttons in list
+        searchBox.mouseClicked(mouseX, mouseY, button);
+        searchBox.setFocused(true);
+
+        // Click anywhere on a row in the list to select & add that recipe
         int listX = x + 12;
         int listY = y + 52;
         int listW = dialogW - 24;
@@ -550,126 +671,9 @@ public class RecipeSearchDialog {
             if (index >= filteredRecipes.size()) break;
 
             int rowY = listY + i * ROW_HEIGHT;
-            int btnW = 44;
-            int btnH = 18;
-            int btnX = listX + listW - btnW - 6;
-            int btnY = rowY + 7;
-
-            if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
+            if (mouseX >= listX && mouseX <= listX + listW && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT) {
                 SearchableRecipe sr = filteredRecipes.get(index);
-                RecipeNode node = sr.recipe() instanceof EmiRecipe er ? EmiRecipeConverter.convert(er) : (sr.recipe() instanceof RecipeNode rn ? rn.copy() : null);
-                if (node != null) {
-                    if (contextualWireTarget != null) {
-                        // Place node near drop position
-                        if (!contextualWireTarget.sourceIsInput) {
-                            node.setPosX(contextualWireTarget.canvasX);
-                            node.setPosY(contextualWireTarget.canvasY - 30);
-                        } else {
-                            node.setPosX(contextualWireTarget.canvasX - 245);
-                            node.setPosY(contextualWireTarget.canvasY - 30);
-                        }
-                    } else if (hasTargetSpawnPos) {
-                        node.setPosX(targetSpawnCanvasX - 80);
-                        node.setPosY(targetSpawnCanvasY - 30);
-                    } else {
-                        double[] center = BoardScreen.getNextNodeCenterPosition(screenWidth, screenHeight);
-                        node.setPosX(center[0]);
-                        node.setPosY(center[1]);
-                    }
-
-                    parent.addNode(node);
-
-                    // Perform auto-wire if contextual target is active!
-                    if (contextualWireTarget != null) {
-                        FlowGraph graph = parent.getGraph();
-                        RecipeNode sourceNode = contextualWireTarget.sourceNode;
-                        IngredientStack sourceStack = contextualWireTarget.sourceStack;
-
-                        if (!contextualWireTarget.sourceIsInput) {
-                            // Forward Wire: sourceNode (Output) -> node (Input)
-                            int matchedInIdx = -1;
-                            for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
-                                IngredientStack in = node.getInputs().get(inIdx);
-                                if (in.equals(sourceStack) || in.matchesOrAlternative(sourceStack)) {
-                                    matchedInIdx = inIdx;
-                                    if (!in.equals(sourceStack)) {
-                                        in.selectAlternative(sourceStack.getId());
-                                    }
-                                    break;
-                                }
-                            }
-
-                            if (matchedInIdx >= 0) {
-                                FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
-                                graph.addConnection(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
-
-                                Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
-                                Double newMachineCount = null;
-
-                                if (contextualWireTarget.shiftAutoRatio) {
-                                    double matched = FlowGraphSolver.calculateConsumerMatchCount(graph, sourceNode, contextualWireTarget.sourcePortIdx, node, matchedInIdx);
-                                    newMachineCount = matched;
-                                    node.setMachineCount(matched);
-                                    BoardToast.show(Component.literal("§a⚡ ").append(
-                                        Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
-                                    ));
-                                    Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
-                                } else {
-                                    BoardToast.show(Component.literal("§a✔ ").append(
-                                        Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", sourceNode.getName(), node.getName())
-                                    ));
-                                    Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                                }
-                                parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
-                                TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
-                            }
-                        } else {
-                            // Reverse Wire: node (Output) -> sourceNode (Input)
-                            int matchedOutIdx = -1;
-                            for (int outIdx = 0; outIdx < node.getOutputs().size(); outIdx++) {
-                                IngredientStack out = node.getOutputs().get(outIdx);
-                                if (out.equals(sourceStack) || sourceStack.matchesOrAlternative(out)) {
-                                    matchedOutIdx = outIdx;
-                                    if (!out.equals(sourceStack)) {
-                                        sourceStack.selectAlternative(out.getId());
-                                    }
-                                    break;
-                                }
-                            }
-
-                            if (matchedOutIdx >= 0) {
-                                FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
-                                graph.addConnection(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
-
-                                Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
-                                Double newMachineCount = null;
-
-                                if (contextualWireTarget.shiftAutoRatio) {
-                                    double matched = FlowGraphSolver.calculateProducerMatchCount(graph, node, matchedOutIdx, sourceNode, contextualWireTarget.sourcePortIdx);
-                                    newMachineCount = matched;
-                                    node.setMachineCount(matched);
-                                    BoardToast.show(Component.literal("§a⚡ ").append(
-                                        Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
-                                    ));
-                                    Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
-                                } else {
-                                    BoardToast.show(Component.literal("§a✔ ").append(
-                                        Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", node.getName(), sourceNode.getName())
-                                    ));
-                                    Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                                }
-                                parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
-                                TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
-                            }
-                        }
-
-                        contextualWireTarget = null;
-                        parent.rebuildWidgets();
-                    }
-
-                    parent.markSummaryDirty();
-                    setVisible(false);
-                }
+                addRecipeAt(sr, screenWidth, screenHeight);
                 return true;
             }
         }
@@ -677,26 +681,178 @@ public class RecipeSearchDialog {
         return true;
     }
 
+    public void addRecipeAt(SearchableRecipe sr, int screenWidth, int screenHeight) {
+        if (sr == null) return;
+        RecipeNode node = sr.recipe() instanceof EmiRecipe er ? EmiRecipeConverter.convert(er) : (sr.recipe() instanceof RecipeNode rn ? rn.copy() : null);
+        if (node != null) {
+            if (contextualWireTarget != null) {
+                // Place node near drop position
+                if (!contextualWireTarget.sourceIsInput) {
+                    node.setPosX(contextualWireTarget.canvasX);
+                    node.setPosY(contextualWireTarget.canvasY - 30);
+                } else {
+                    node.setPosX(contextualWireTarget.canvasX - 245);
+                    node.setPosY(contextualWireTarget.canvasY - 30);
+                }
+            } else if (hasTargetSpawnPos) {
+                node.setPosX(targetSpawnCanvasX - 80);
+                node.setPosY(targetSpawnCanvasY - 30);
+            } else {
+                double[] center = BoardScreen.getNextNodeCenterPosition(screenWidth, screenHeight);
+                node.setPosX(center[0]);
+                node.setPosY(center[1]);
+            }
+
+            parent.addNode(node);
+
+            // Perform auto-wire if contextual target is active!
+            if (contextualWireTarget != null) {
+                FlowGraph graph = parent.getGraph();
+                RecipeNode sourceNode = contextualWireTarget.sourceNode;
+                IngredientStack sourceStack = contextualWireTarget.sourceStack;
+
+                if (!contextualWireTarget.sourceIsInput) {
+                    // Forward Wire: sourceNode (Output) -> node (Input)
+                    int matchedInIdx = -1;
+                    for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
+                        IngredientStack in = node.getInputs().get(inIdx);
+                        if (in.equals(sourceStack) || in.matchesOrAlternative(sourceStack)) {
+                            matchedInIdx = inIdx;
+                            if (!in.equals(sourceStack)) {
+                                in.selectAlternative(sourceStack.getId());
+                            }
+                            break;
+                        }
+                    }
+
+                    if (matchedInIdx >= 0) {
+                        FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
+                        graph.addConnection(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
+
+                        Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
+                        Double newMachineCount = null;
+
+                        if (contextualWireTarget.shiftAutoRatio) {
+                            double matched = FlowGraphSolver.calculateConsumerMatchCount(graph, sourceNode, contextualWireTarget.sourcePortIdx, node, matchedInIdx);
+                            newMachineCount = matched;
+                            node.setMachineCount(matched);
+                            BoardToast.show(Component.literal("§a⚡ ").append(
+                                Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
+                            ));
+                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                        } else {
+                            BoardToast.show(Component.literal("§a✔ ").append(
+                                Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", sourceNode.getName(), node.getName())
+                            ));
+                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                        }
+                        parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
+                        TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
+                    }
+                } else {
+                    // Reverse Wire: node (Output) -> sourceNode (Input)
+                    int matchedOutIdx = -1;
+                    for (int outIdx = 0; outIdx < node.getOutputs().size(); outIdx++) {
+                        IngredientStack out = node.getOutputs().get(outIdx);
+                        if (out.equals(sourceStack) || sourceStack.matchesOrAlternative(out)) {
+                            matchedOutIdx = outIdx;
+                            if (!out.equals(sourceStack)) {
+                                sourceStack.selectAlternative(out.getId());
+                            }
+                            break;
+                        }
+                    }
+
+                    if (matchedOutIdx >= 0) {
+                        FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
+                        graph.addConnection(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
+
+                        Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
+                        Double newMachineCount = null;
+
+                        if (contextualWireTarget.shiftAutoRatio) {
+                            double matched = FlowGraphSolver.calculateProducerMatchCount(graph, node, matchedOutIdx, sourceNode, contextualWireTarget.sourcePortIdx);
+                            newMachineCount = matched;
+                            node.setMachineCount(matched);
+                            BoardToast.show(Component.literal("§a⚡ ").append(
+                                Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
+                            ));
+                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                        } else {
+                            BoardToast.show(Component.literal("§a✔ ").append(
+                                Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", node.getName(), sourceNode.getName())
+                            ));
+                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                        }
+                        parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
+                        TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
+                    }
+                }
+
+                contextualWireTarget = null;
+                parent.rebuildWidgets();
+            }
+
+            parent.markSummaryDirty();
+            setVisible(false);
+        }
+    }
+
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!visible) return false;
+        if (filterDialog.isVisible()) {
+            return filterDialog.mouseScrolled(mouseX, mouseY, delta, parent.width, parent.height);
+        }
         int dialogH = Math.min(280, parent.height - 24);
         int listH = dialogH - 60;
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
         if (maxScroll > 0) {
             scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - (int) Math.signum(delta) * 2));
-            return true;
         }
         return true;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!visible) return false;
+        if (filterDialog.isVisible()) {
+            return filterDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (keyCode == 256) { // Escape closes search dialog
+            setVisible(false);
+            return true;
+        }
+        if (keyCode == 257 || keyCode == 335) { // Enter or Numpad Enter adds top recipe
+            if (!filteredRecipes.isEmpty()) {
+                addRecipeAt(filteredRecipes.get(0), parent.width, parent.height);
+                return true;
+            }
+        }
+        // R / U recipe lookup over preview card ingredient
+        if ((keyCode == 82 || keyCode == 85) && stickyHoverRecipe != null) { // R or U
+            int dialogW = Math.min(380, parent.width - 24);
+            int dialogH = Math.min(280, parent.height - 24);
+            int x = (parent.width - dialogW) / 2;
+            int y = (parent.height - dialogH) / 2;
+
+            var hoveredIngredient = RecipeHoverPreviewRenderer.getHoveredIngredient(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, lastMouseX, lastMouseY, parent.width, parent.height);
+            if (hoveredIngredient != null && !hoveredIngredient.isEmpty()) {
+                if (keyCode == 82) { // R
+                    dev.emi.emi.api.EmiApi.displayRecipes(hoveredIngredient);
+                } else { // U
+                    dev.emi.emi.api.EmiApi.displayUses(hoveredIngredient);
+                }
+                return true;
+            }
+        }
         return searchBox.keyPressed(keyCode, scanCode, modifiers);
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
         if (!visible) return false;
+        if (filterDialog.isVisible()) {
+            return filterDialog.charTyped(codePoint, modifiers);
+        }
         return searchBox.charTyped(codePoint, modifiers);
     }
 }

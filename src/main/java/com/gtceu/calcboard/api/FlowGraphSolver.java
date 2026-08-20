@@ -216,7 +216,7 @@ public final class FlowGraphSolver {
 
                 for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
                     IngredientStack inStack = consumer.getInputs().get(inIdx);
-                    double singleInRate = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * inStack.getAmount();
+                    double singleInRate = consumer.calculateSingleMachineInputRate(inStack);
                     if (singleInRate <= 0.0001) continue;
 
                     // Sum up all incoming supplies to this input port from all connected producers
@@ -226,9 +226,8 @@ public final class FlowGraphSolver {
                             RecipeNode p = graph.findNodeById(edge.fromNodeId());
                             if (p != null && edge.outputIndex() < p.getOutputs().size()) {
                                 double pC = downstreamCounts.getOrDefault(p.getId(), p.getMachineCount());
-                                double pCps = p.getOverclockResult().getCyclesPerSecond() * p.getParallel() * pC;
                                 IngredientStack outStack = p.getOutputs().get(edge.outputIndex());
-                                double pRate = outStack.getExpectedAmount(p.getTierDelta()) * pCps;
+                                double pRate = p.calculateSingleMachineOutputRate(outStack) * pC;
 
                                 int outDegree = 0;
                                 for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
@@ -623,10 +622,13 @@ public final class FlowGraphSolver {
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         IngredientStack outStack = producer.getOutputs().get(outPortIdx);
-        double producedRate = producer.getCyclesPerSecond() * outStack.getExpectedAmount(producer.getTierDelta());
+        double prodEff = producer.getEfficiency();
+        // If producer has calculated bottlenecked operating efficiency, match against its actual current output rate!
+        double effFactor = (prodEff > 0.00001) ? prodEff : 1.0;
+        double producedRate = producer.calculateSingleMachineOutputRate(outStack) * producer.getMachineCount() * effFactor;
 
         IngredientStack inStack = consumer.getInputs().get(inPortIdx);
-        double singleInRate = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getParallel() * inStack.getAmount();
+        double singleInRate = consumer.calculateSingleMachineInputRate(inStack);
         if (singleInRate <= 0.0001) return 1.0;
 
         // Sum other existing supplies flowing into this consumer input port
@@ -637,7 +639,8 @@ public final class FlowGraphSolver {
                     RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
                     if (otherProd != null && edge.outputIndex() < otherProd.getOutputs().size()) {
                         IngredientStack pOut = otherProd.getOutputs().get(edge.outputIndex());
-                        double pRate = otherProd.getCyclesPerSecond() * pOut.getExpectedAmount(otherProd.getTierDelta());
+                        double oEff = (otherProd.getEfficiency() > 0.00001) ? otherProd.getEfficiency() : 1.0;
+                        double pRate = otherProd.calculateSingleMachineOutputRate(pOut) * otherProd.getMachineCount() * oEff;
 
                         int outDegree = 0;
                         for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
@@ -663,7 +666,7 @@ public final class FlowGraphSolver {
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         IngredientStack inStack = consumer.getInputs().get(inPortIdx);
-        double totalDemand = consumer.getCyclesPerSecond() * inStack.getAmount();
+        double totalDemand = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount();
 
         // Calculate existing supply already flowing into this input port from other producers
         double existingSupply = 0.0;
@@ -673,7 +676,8 @@ public final class FlowGraphSolver {
                     RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
                     if (otherProd != null && edge.outputIndex() < otherProd.getOutputs().size()) {
                         IngredientStack pOut = otherProd.getOutputs().get(edge.outputIndex());
-                        double pRate = otherProd.getCyclesPerSecond() * pOut.getExpectedAmount(otherProd.getTierDelta());
+                        double oEff = (otherProd.getEfficiency() > 0.00001) ? otherProd.getEfficiency() : 1.0;
+                        double pRate = otherProd.calculateSingleMachineOutputRate(pOut) * otherProd.getMachineCount() * oEff;
 
                         int outDegree = 0;
                         for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
@@ -689,7 +693,8 @@ public final class FlowGraphSolver {
 
         double remainingDemand = Math.max(0.0, totalDemand - existingSupply);
         IngredientStack outStack = producer.getOutputs().get(outPortIdx);
-        double singleOutRate = producer.calculateSingleMachineOutputRate(outStack);
+        double prodEff = (producer.getEfficiency() > 0.00001) ? producer.getEfficiency() : 1.0;
+        double singleOutRate = producer.calculateSingleMachineOutputRate(outStack) * prodEff;
         if (singleOutRate <= 0.0001) return 1.0;
 
         return Math.max(1.0, Math.ceil((remainingDemand / singleOutRate) - 0.00001));

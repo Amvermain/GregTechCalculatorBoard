@@ -66,6 +66,7 @@ public class DynamicAddonCrawler {
         }
 
         // 2. Multi-source NBT ItemStack collector (Recipe outputs, EMI index, Creative tabs)
+        List<ItemStack> sampleStacks = new ArrayList<>();
         Map<Item, ItemStack> nbtItemSamples = new HashMap<>();
 
         // Source A: Recipe Manager Outputs (e.g. start:assembler/ev_kit producing {AugmentData: ...})
@@ -75,6 +76,7 @@ public class DynamicAddonCrawler {
                     try {
                         ItemStack out = recipe.getResultItem(mc.level.registryAccess());
                         if (out != null && !out.isEmpty() && out.hasTag()) {
+                            sampleStacks.add(out);
                             nbtItemSamples.put(out.getItem(), out);
                         }
                     } catch (Throwable ignored) {}
@@ -87,8 +89,11 @@ public class DynamicAddonCrawler {
             for (dev.emi.emi.api.stack.EmiStack emiStack : dev.emi.emi.api.EmiApi.getIndexStacks()) {
                 if (emiStack != null && !emiStack.isEmpty()) {
                     ItemStack is = emiStack.getItemStack();
-                    if (is != null && !is.isEmpty() && is.hasTag()) {
-                        nbtItemSamples.put(is.getItem(), is);
+                    if (is != null && !is.isEmpty()) {
+                        sampleStacks.add(is);
+                        if (is.hasTag()) {
+                            nbtItemSamples.put(is.getItem(), is);
+                        }
                     }
                 }
             }
@@ -98,14 +103,42 @@ public class DynamicAddonCrawler {
         try {
             for (CreativeModeTab tab : CreativeModeTabs.allTabs()) {
                 for (ItemStack s : tab.getDisplayItems()) {
-                    if (s != null && !s.isEmpty() && s.hasTag()) {
-                        nbtItemSamples.put(s.getItem(), s);
+                    if (s != null && !s.isEmpty()) {
+                        sampleStacks.add(s);
+                        if (s.hasTag()) {
+                            nbtItemSamples.put(s.getItem(), s);
+                        }
                     }
                 }
             }
         } catch (Throwable ignored) {}
 
-        // 3. Crawl Forge Item Registry dynamically using NBT-enriched ItemStacks
+        // 3. Process all discovered multi-variant sample ItemStacks (Rotors, Kits, Augments)
+        for (ItemStack s : sampleStacks) {
+            try {
+                if (s == null || s.isEmpty()) continue;
+                ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
+                if (id == null) continue;
+
+                String path = id.getPath().toLowerCase();
+                String namespace = id.getNamespace().toLowerCase();
+
+                if (path.equals("turbine_rotor") || path.endsWith("_turbine_rotor") || (path.contains("rotor") && path.contains("turbine"))) {
+                    MachineAddon addon = parseTurbineRotor(s, id);
+                    if (addon != null && !containsAddonId(result, addon.getId())) {
+                        result.add(addon);
+                    }
+                } else if (path.contains("upgrade_kit") || path.contains("upgrade") || path.contains("augment") || path.contains("arc_kit") || path.contains("_kit")
+                        || namespace.equals("thermal") || namespace.equals("thermal_expansion") || namespace.equals("systeams") || namespace.equals("kubejs")) {
+                    MachineAddon addon = parseThermalAugment(s, id);
+                    if (addon != null && !containsAddonId(result, addon.getId())) {
+                        result.add(addon);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // 4. Crawl Forge Item Registry dynamically using NBT-enriched ItemStacks
         try {
             if (ForgeRegistries.ITEMS != null && !ForgeRegistries.ITEMS.isEmpty()) {
                 for (Item item : ForgeRegistries.ITEMS) {
@@ -244,7 +277,6 @@ public class DynamicAddonCrawler {
     }
 
     private static void discoverGTCEuRotors(List<MachineAddon> list) {
-        boolean foundAny = false;
         try {
             Item rotorItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
             if (rotorItem == null) {
@@ -303,19 +335,17 @@ public class DynamicAddonCrawler {
             } catch (Throwable ignored) {}
 
             // 2. Secondary: GTMaterials static fields
-            if (allMaterials.isEmpty()) {
-                try {
-                    Class<?> gtMaterialsCls = Class.forName("com.gregtechceu.gtceu.common.data.GTMaterials");
-                    for (java.lang.reflect.Field f : gtMaterialsCls.getFields()) {
-                        if (materialCls.isAssignableFrom(f.getType())) {
-                            Object mat = f.get(null);
-                            if (mat != null && !allMaterials.contains(mat)) {
-                                allMaterials.add(mat);
-                            }
+            try {
+                Class<?> gtMaterialsCls = Class.forName("com.gregtechceu.gtceu.common.data.GTMaterials");
+                for (java.lang.reflect.Field f : gtMaterialsCls.getFields()) {
+                    if (materialCls.isAssignableFrom(f.getType())) {
+                        Object mat = f.get(null);
+                        if (mat != null && !allMaterials.contains(mat)) {
+                            allMaterials.add(mat);
                         }
                     }
-                } catch (Throwable ignored) {}
-            }
+                }
+            } catch (Throwable ignored) {}
 
             String rotorPattern = Component.translatable("item.gtceu.turbine_rotor").getString();
             if (rotorPattern.isEmpty() || rotorPattern.contains("item.")) {
@@ -450,55 +480,60 @@ public class DynamicAddonCrawler {
 
                         if (list.stream().noneMatch(a -> a.getId().equals(rAddon.getId()) || a.getName().equalsIgnoreCase(rAddon.getName()))) {
                             list.add(rAddon);
-                            foundAny = true;
                         }
                     }
                 } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
 
-        // Fallback: Generate real GTCEu TurbineRotor ItemStacks with NBT PartStats
-        if (!foundAny) {
-            Item rItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
-            if (rItem == null) {
-                rItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+        // Always register known GTCEu & Star Technology & Modpack rotor materials
+        Item rItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+        if (rItem == null) {
+            rItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+        }
+
+        String[] knownRotorMats = {
+            "wood", "carbon", "bronze", "steel", "damascus_steel", "titanium", "tungstensteel",
+            "tungsten_carbide", "osmiridium", "cobalt_brass", "vanadium_steel", "hssg", "hsss", "hsse",
+            "shellite", "scheelite", "lutetium", "tritanium", "duranium", "enderium", "naquadah",
+            "naquadah_alloy", "enriched_naquadah", "naquadria", "neutronium", "infinity",
+            "stellarium", "adamantine", "vibranium", "draconium", "awakened_draconium", "rhodium_plated_palladium"
+        };
+        for (String kMat : knownRotorMats) {
+            String rId = "gtceu:rotor_" + kMat;
+            if (list.stream().anyMatch(a -> a.getId().equals(rId))) continue;
+
+            ItemStack stack = rItem != null ? new ItemStack(rItem) : ItemStack.EMPTY;
+            if (!stack.isEmpty()) {
+                CompoundTag tag = new CompoundTag();
+                CompoundTag partStats = new CompoundTag();
+                partStats.putString("Material", "gtceu:" + kMat);
+                tag.put("GT.PartStats", partStats);
+                stack.setTag(tag);
             }
 
-            String[] knownRotorMats = {"wood", "carbon", "bronze", "steel", "damascus_steel", "titanium", "tungstensteel", "tungsten_carbide", "osmiridium", "hssg", "hsss", "hsse", "shellite", "scheelite", "lutetium", "tritanium", "enderium", "naquadah", "naquadah_alloy", "neutronium", "infinity"};
-            for (String kMat : knownRotorMats) {
-                ItemStack stack = rItem != null ? new ItemStack(rItem) : ItemStack.EMPTY;
-                if (!stack.isEmpty()) {
-                    CompoundTag tag = new CompoundTag();
-                    CompoundTag partStats = new CompoundTag();
-                    partStats.putString("Material", "gtceu:" + kMat);
-                    tag.put("GT.PartStats", partStats);
-                    stack.setTag(tag);
-                }
+            TurbineRotorHelper.RotorStats stats = stack.isEmpty() ? TurbineRotorHelper.getRotorStats(kMat) : TurbineRotorHelper.getRotorStats(stack);
+            int eff = stats.efficiency();
+            int power = stats.power();
+            double durability = stats.durability();
 
-                TurbineRotorHelper.RotorStats stats = TurbineRotorHelper.getRotorStats(stack);
-                int eff = stats.efficiency();
-                int power = stats.power();
-                double durability = stats.durability();
+            String displayName = !stack.isEmpty() ? stack.getHoverName().getString() : "";
+            if (displayName.isEmpty() || displayName.contains("item.") || displayName.contains("%s")) {
+                displayName = formatMatName(kMat) + " Turbine Rotor";
+            }
 
-                String displayName = !stack.isEmpty() ? stack.getHoverName().getString() : "";
-                if (displayName.isEmpty() || displayName.contains("item.")) {
-                    displayName = formatMatName(kMat) + " Turbine Rotor";
-                }
+            String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
+            MachineAddon rAddon = new MachineAddon(rId, displayName, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
+            rAddon.setDurationMultiplier(eff / 100.0);
+            rAddon.setEutMultiplier(1.0);
+            rAddon.setRotorPower(power);
+            rAddon.setRotorMaxEUt(durability);
+            if (!stack.isEmpty()) {
+                rAddon.setItemStackSample(stack);
+            }
 
-                String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
-                MachineAddon rAddon = new MachineAddon("gtceu:rotor_" + kMat, displayName, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
-                rAddon.setDurationMultiplier(eff / 100.0);
-                rAddon.setEutMultiplier(1.0);
-                rAddon.setRotorPower(power);
-                rAddon.setRotorMaxEUt(durability);
-                if (!stack.isEmpty()) {
-                    rAddon.setItemStackSample(stack);
-                }
-
-                if (list.stream().noneMatch(a -> a.getId().equals(rAddon.getId()) || a.getName().equalsIgnoreCase(rAddon.getName()))) {
-                    list.add(rAddon);
-                    foundAny = true;
-                }
+            if (list.stream().noneMatch(a -> a.getId().equals(rAddon.getId()) || a.getName().equalsIgnoreCase(rAddon.getName()))) {
+                list.add(rAddon);
             }
         }
     }
@@ -657,8 +692,18 @@ public class DynamicAddonCrawler {
             return null;
         }
 
-        if (name.contains("%s")) {
-            return null; // Skip uninstantiated GT template items
+        String matId = null;
+        if (stack.hasTag() && stack.getTag().contains("GT.PartStats")) {
+            matId = stack.getTag().getCompound("GT.PartStats").getString("Material");
+        }
+        String cleanMatName = matId;
+        if (cleanMatName != null && cleanMatName.contains(":")) {
+            cleanMatName = cleanMatName.substring(cleanMatName.indexOf(":") + 1);
+        }
+        String addonId = (cleanMatName != null && !cleanMatName.isEmpty()) ? "gtceu:rotor_" + cleanMatName : id.toString();
+
+        if (name.contains("%s") && cleanMatName != null) {
+            name = formatMatName(cleanMatName) + " Turbine Rotor";
         }
         String tooltipText = extractTooltipText(stack);
 
@@ -666,28 +711,38 @@ public class DynamicAddonCrawler {
         int power = 100;
         double dynamicMaxEUt = 0.0;
 
-        // 0. Primary: GTCEu TurbineRotorBehaviour direct API reflection
-        try {
-            Class<?> behaviourClass = Class.forName("com.gregtechceu.gtceu.common.item.TurbineRotorBehaviour");
-            Method getBehaviourMethod = behaviourClass.getMethod("getBehaviour", ItemStack.class);
-            Object behaviour = getBehaviourMethod.invoke(null, stack);
+        // 0. Primary: GTCEu TurbineRotorBehaviour / TurbineRotorHelper direct API reflection
+        TurbineRotorHelper.RotorStats stats = TurbineRotorHelper.getRotorStats(stack);
+        if (stats != null && stats.efficiency() > 0) {
+            eff = stats.efficiency();
+            power = stats.power();
+            dynamicMaxEUt = stats.durability();
+        }
 
-            if (behaviour != null) {
-                Method getRotorEffMethod = behaviourClass.getMethod("getRotorEfficiency", ItemStack.class);
-                Method getRotorPwrMethod = behaviourClass.getMethod("getRotorPower", ItemStack.class);
-                Method getRotorDurMethod = behaviourClass.getMethod("getPartMaxDurability", ItemStack.class);
+        // 1. Fallback GTCEu TurbineRotorBehaviour direct API reflection
+        if (eff <= 0) {
+            try {
+                Class<?> behaviourClass = Class.forName("com.gregtechceu.gtceu.common.item.TurbineRotorBehaviour");
+                Method getBehaviourMethod = behaviourClass.getMethod("getBehaviour", ItemStack.class);
+                Object behaviour = getBehaviourMethod.invoke(null, stack);
 
-                int bEff = ((Number) getRotorEffMethod.invoke(behaviour, stack)).intValue();
-                int bPwr = ((Number) getRotorPwrMethod.invoke(behaviour, stack)).intValue();
-                int bDur = ((Number) getRotorDurMethod.invoke(behaviour, stack)).intValue();
+                if (behaviour != null) {
+                    Method getRotorEffMethod = behaviourClass.getMethod("getRotorEfficiency", ItemStack.class);
+                    Method getRotorPwrMethod = behaviourClass.getMethod("getRotorPower", ItemStack.class);
+                    Method getRotorDurMethod = behaviourClass.getMethod("getPartMaxDurability", ItemStack.class);
 
-                if (bEff > 0) eff = bEff;
-                if (bPwr > 0) power = bPwr;
-                if (bDur > 0) dynamicMaxEUt = (double) bDur;
-            }
-        } catch (Throwable ignored) {}
+                    int bEff = ((Number) getRotorEffMethod.invoke(behaviour, stack)).intValue();
+                    int bPwr = ((Number) getRotorPwrMethod.invoke(behaviour, stack)).intValue();
+                    int bDur = ((Number) getRotorDurMethod.invoke(behaviour, stack)).intValue();
 
-        // 1. Check NBT tag
+                    if (bEff > 0) eff = bEff;
+                    if (bPwr > 0) power = bPwr;
+                    if (bDur > 0) dynamicMaxEUt = (double) bDur;
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // 2. Check NBT tag
         if (eff <= 0 && stack.hasTag()) {
             CompoundTag tag = stack.getTag();
             if (tag.contains("MaxEfficiency")) {
@@ -697,7 +752,7 @@ public class DynamicAddonCrawler {
             }
         }
 
-        // 2. Check Tooltip Regex
+        // 3. Check Tooltip Regex
         if (eff <= 0) {
             Matcher m = ROTOR_EFF_PATTERN.matcher(tooltipText);
             if (m.find()) {
@@ -716,9 +771,9 @@ public class DynamicAddonCrawler {
             }
         }
 
-        // 3. Match Material Name / Path
+        // 4. Match Material Name / Path
         if (eff <= 0) {
-            eff = getRotorEfficiencyFromMaterial(name + " " + id.getPath());
+            eff = getRotorEfficiencyFromMaterial(name + " " + id.getPath() + (cleanMatName != null ? " " + cleanMatName : ""));
         }
 
         if (eff <= 0) {
@@ -739,12 +794,12 @@ public class DynamicAddonCrawler {
         }
 
         String desc = Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
-        MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.ROTOR, desc, id);
+        MachineAddon addon = new MachineAddon(addonId, name.isEmpty() ? id.getPath() : name, MachineAddon.Category.ROTOR, desc, id);
         addon.setDurationMultiplier(Math.max(1.0, eff / 100.0));
         addon.setEutMultiplier(1.0);
         addon.setRotorPower(power > 0 ? power : 100);
         if (dynamicMaxEUt <= 0 || dynamicMaxEUt == Double.MAX_VALUE) {
-            dynamicMaxEUt = RecipeNode.getRotorMaterialMaxEUt(name + " " + id.getPath());
+            dynamicMaxEUt = RecipeNode.getRotorMaterialMaxEUt(name + " " + id.getPath() + (cleanMatName != null ? " " + cleanMatName : ""));
         }
         if (dynamicMaxEUt == Double.MAX_VALUE || dynamicMaxEUt > 1_000_000_000.0) {
             dynamicMaxEUt = 0.0;

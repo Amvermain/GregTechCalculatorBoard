@@ -381,5 +381,20 @@
   "gui.gtcalcboard.search.consumers_for": "소비 공정 검색: %s",
   "gui.gtcalcboard.search.producers_for": "생산 공정 검색: %s",
   "gui.gtcalcboard.search.search_help": "검색 예시: pyrolyse oil | @gtceu | #logs | !charcoal",
-  "gui.gtcalcboard.toast.drag_auto_connected": "자동 연결됨: %s ➔ %s"
+  "gui.gtcalcboard.toast.drag_auto_connected": "자동 연결됨: %s ➔ %s",
+  "gui.gtcalcboard.filter.btn_tooltip": "레시피 카테고리 필터\n검색 결과에서 제외할 기계 및 카테고리를 설정합니다.",
+  "gui.gtcalcboard.filter.title": "레시피 카테고리 필터",
+  "gui.gtcalcboard.filter.all": "전체 선택",
+  "gui.gtcalcboard.filter.none": "전체 해제",
+  "gui.gtcalcboard.filter.defaults": "기본값",
+  "gui.gtcalcboard.filter.search_hint": "카테고리 검색...",
+  "gui.gtcalcboard.filter.done": "완료",
+  "gui.gtcalcboard.unit.per_tick": "틱당",
+  "gui.gtcalcboard.unit.per_second": "초당",
+  "gui.gtcalcboard.unit.per_minute": "분당",
+  "gui.gtcalcboard.unit.per_hour": "시간당",
+  "gui.gtcalcboard.unit.per_day": "일당",
+  "gui.gtcalcboard.tooltip.btn_time_unit": "시간 단위계 전환 (T)\n클릭하여 유량 표시 시간 단위를 전환합니다:\n/s (초당) ➔ /min (분당) ➔ /h (시간당) ➔ /d (일당) ➔ /t (틱당).",
+  "gui.gtcalcboard.toast.time_unit_changed": "유량 표시 단위: %s (%s)",
+  "gui.gtcalcboard.hotkey_hud.time_unit": "시간 단위"
 }

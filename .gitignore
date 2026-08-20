@@ -29,6 +29,7 @@ test-deploy.bat
 # Minecraft Runtime & Local Test Instance
 run/
 instance/
+config/
 crash-reports/
 logs/
 saves/

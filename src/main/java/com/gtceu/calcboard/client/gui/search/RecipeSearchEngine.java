@@ -21,6 +21,8 @@ import java.util.regex.Pattern;
  */
 public class RecipeSearchEngine {
 
+    public record CategoryInfo(String displayName, int count) {}
+
     public record SearchableRecipe(
             Object recipe,
             String displayName,
@@ -38,6 +40,34 @@ public class RecipeSearchEngine {
             String inputSearchIndex,
             String fullSearchIndex
     ) {}
+
+    public static Map<String, CategoryInfo> discoverCategories(List<SearchableRecipe> allRecipes) {
+        Map<String, CategoryInfo> map = new LinkedHashMap<>();
+        if (allRecipes == null) return map;
+
+        Map<String, Integer> counts = new HashMap<>();
+        Map<String, String> names = new HashMap<>();
+
+        for (SearchableRecipe sr : allRecipes) {
+            String catId = sr.categoryId();
+            if (catId == null || catId.isEmpty()) continue;
+
+            counts.put(catId, counts.getOrDefault(catId, 0) + 1);
+            if (!names.containsKey(catId) || names.get(catId).isEmpty()) {
+                String dName = sr.categoryName();
+                if (dName == null || dName.isEmpty()) {
+                    dName = catId;
+                }
+                names.put(catId, dName);
+            }
+        }
+
+        for (Map.Entry<String, Integer> e : counts.entrySet()) {
+            map.put(e.getKey(), new CategoryInfo(names.getOrDefault(e.getKey(), e.getKey()), e.getValue()));
+        }
+
+        return map;
+    }
 
     public enum MatchType {
         GENERAL,

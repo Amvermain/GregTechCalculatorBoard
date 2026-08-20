@@ -226,7 +226,15 @@ public final class BoardTooltipRenderer {
             if (wireStart != null) {
                 boolean shift = Screen.hasShiftDown();
                 String hintKey = shift ? "gui.gtcalcboard.tooltip.wire_mode_shift" : "gui.gtcalcboard.tooltip.wire_mode_normal";
-                graphics.renderTooltip(font, Component.translatable(hintKey), mouseX, mouseY);
+                String raw = Component.translatable(hintKey).getString();
+                if (raw.contains("\n")) {
+                    List<Component> lines = java.util.Arrays.stream(raw.split("\n"))
+                            .<Component>map(Component::literal)
+                            .toList();
+                    graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+                } else {
+                    graphics.renderTooltip(font, Component.translatable(hintKey), mouseX, mouseY);
+                }
                 return;
             }
 

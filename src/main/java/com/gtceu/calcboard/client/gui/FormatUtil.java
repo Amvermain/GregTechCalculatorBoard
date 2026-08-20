@@ -1,11 +1,13 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.GTVoltageTier;
+import com.gtceu.calcboard.api.RateTimeUnit;
 import java.util.Locale;
 
 /**
  * Standard SI / Metric prefix and scientific notation formatter for numbers, rates, and power.
  * Supports units up to Yotta (10^24) and scientific E-notation for extreme values.
+ * Supports flexible rate time units (/t, /s, /min, /h, /d).
  */
 public final class FormatUtil {
 
@@ -13,7 +15,19 @@ public final class FormatUtil {
         "", "k", "M", "G", "T", "P", "E", "Z", "Y"
     };
 
+    private static RateTimeUnit activeTimeUnit = RateTimeUnit.PER_SECOND;
+
     private FormatUtil() {}
+
+    public static RateTimeUnit getActiveTimeUnit() {
+        return activeTimeUnit;
+    }
+
+    public static void setActiveTimeUnit(RateTimeUnit unit) {
+        if (unit != null) {
+            activeTimeUnit = unit;
+        }
+    }
 
     /**
      * Formats any floating point value with standard SI prefixes (k, M, G, T, P, E, Z, Y)
@@ -62,39 +76,41 @@ public final class FormatUtil {
     }
 
     /**
-     * Formats ingredient rates (fluid in B/s, mB/s or item in /s) with SI units.
+     * Formats ingredient rates (fluid in B/s, mB/s or item in /s) with SI units and active time unit.
      */
     public static String formatRate(double rate, boolean isFluid) {
-        if (rate == 0.0) return isFluid ? "0 mB/s" : "0/s";
-        double abs = Math.abs(rate);
+        double scaledRate = rate * activeTimeUnit.getFactor();
+        String suffix = activeTimeUnit.getSuffix();
+        if (scaledRate == 0.0) return isFluid ? ("0 mB" + suffix) : ("0" + suffix);
+        double abs = Math.abs(scaledRate);
 
         if (isFluid) {
             if (abs >= 1000.0) {
-                return formatCompactNumber(rate / 1000.0) + " B/s";
+                return formatCompactNumber(scaledRate / 1000.0) + " B" + suffix;
             } else if (abs >= 10.0) {
-                return String.format(Locale.ROOT, "%.0f mB/s", rate);
+                return String.format(Locale.ROOT, "%.0f mB%s", scaledRate, suffix);
             } else if (abs >= 1.0) {
-                return String.format(Locale.ROOT, "%.1f mB/s", rate).replaceAll("\\.?0+ mB/s", " mB/s");
+                return String.format(Locale.ROOT, "%.1f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
             } else if (abs >= 0.01) {
-                return String.format(Locale.ROOT, "%.3f mB/s", rate).replaceAll("\\.?0+ mB/s", " mB/s");
+                return String.format(Locale.ROOT, "%.3f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
             } else if (abs >= 0.0001) {
-                return String.format(Locale.ROOT, "%.4f mB/s", rate).replaceAll("\\.?0+ mB/s", " mB/s");
+                return String.format(Locale.ROOT, "%.4f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
             } else {
-                return formatCompactNumber(rate) + " mB/s";
+                return formatCompactNumber(scaledRate) + " mB" + suffix;
             }
         } else {
             if (abs >= 10_000.0) {
-                return formatCompactNumber(rate) + "/s";
+                return formatCompactNumber(scaledRate) + suffix;
             } else if (abs >= 100.0) {
-                return String.format(Locale.ROOT, "%.1f/s", rate).replaceAll("\\.?0+/s", "/s");
+                return String.format(Locale.ROOT, "%.1f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
             } else if (abs >= 1.0) {
-                return String.format(Locale.ROOT, "%.2f/s", rate).replaceAll("\\.?0+/s", "/s");
+                return String.format(Locale.ROOT, "%.2f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
             } else if (abs >= 0.01) {
-                return String.format(Locale.ROOT, "%.3f/s", rate).replaceAll("\\.?0+/s", "/s");
+                return String.format(Locale.ROOT, "%.3f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
             } else if (abs >= 0.0001) {
-                return String.format(Locale.ROOT, "%.4f/s", rate).replaceAll("\\.?0+/s", "/s");
+                return String.format(Locale.ROOT, "%.4f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
             } else {
-                return formatCompactNumber(rate) + "/s";
+                return formatCompactNumber(scaledRate) + suffix;
             }
         }
     }
@@ -105,24 +121,27 @@ public final class FormatUtil {
      * e.g. "+3.48M -3.2M/s +" (Surplus) or "+2.5M -3.2M/s ⚠" (Deficit).
      */
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit) {
+        double scaledSup = supplied * activeTimeUnit.getFactor();
+        double scaledReq = required * activeTimeUnit.getFactor();
+        String suffix = activeTimeUnit.getSuffix();
         String unit;
         String supStr;
         String reqStr;
 
         if (isFluid) {
-            if (required >= 1000.0 || supplied >= 1000.0) {
-                unit = " B/s";
-                supStr = formatCompactNumber(supplied / 1000.0);
-                reqStr = formatCompactNumber(required / 1000.0);
+            if (Math.abs(scaledReq) >= 1000.0 || Math.abs(scaledSup) >= 1000.0) {
+                unit = " B" + suffix;
+                supStr = formatCompactNumber(scaledSup / 1000.0);
+                reqStr = formatCompactNumber(scaledReq / 1000.0);
             } else {
-                unit = " mB/s";
-                supStr = formatCompactNumber(supplied);
-                reqStr = formatCompactNumber(required);
+                unit = " mB" + suffix;
+                supStr = formatCompactNumber(scaledSup);
+                reqStr = formatCompactNumber(scaledReq);
             }
         } else {
-            unit = "/s";
-            supStr = formatCompactNumber(supplied);
-            reqStr = formatCompactNumber(required);
+            unit = suffix;
+            supStr = formatCompactNumber(scaledSup);
+            reqStr = formatCompactNumber(scaledReq);
         }
 
         if (isDeficit) {
@@ -140,24 +159,27 @@ public final class FormatUtil {
      * e.g. "+3.2M -2.0M/s +" (Surplus) or "+3.2M -4.5M/s ⚠" (Deficit).
      */
     public static String formatConnectedOutput(double produced, double demanded, boolean isFluid, boolean isDeficit) {
+        double scaledProd = produced * activeTimeUnit.getFactor();
+        double scaledDem = demanded * activeTimeUnit.getFactor();
+        String suffix = activeTimeUnit.getSuffix();
         String unit;
         String prodStr;
         String demStr;
 
         if (isFluid) {
-            if (produced >= 1000.0 || demanded >= 1000.0) {
-                unit = " B/s";
-                prodStr = formatCompactNumber(produced / 1000.0);
-                demStr = formatCompactNumber(demanded / 1000.0);
+            if (Math.abs(scaledProd) >= 1000.0 || Math.abs(scaledDem) >= 1000.0) {
+                unit = " B" + suffix;
+                prodStr = formatCompactNumber(scaledProd / 1000.0);
+                demStr = formatCompactNumber(scaledDem / 1000.0);
             } else {
-                unit = " mB/s";
-                prodStr = formatCompactNumber(produced);
-                demStr = formatCompactNumber(demanded);
+                unit = " mB" + suffix;
+                prodStr = formatCompactNumber(scaledProd);
+                demStr = formatCompactNumber(scaledDem);
             }
         } else {
-            unit = "/s";
-            prodStr = formatCompactNumber(produced);
-            demStr = formatCompactNumber(demanded);
+            unit = suffix;
+            prodStr = formatCompactNumber(scaledProd);
+            demStr = formatCompactNumber(scaledDem);
         }
 
         if (isDeficit) {
@@ -217,15 +239,17 @@ public final class FormatUtil {
      * Formats an exact raw rate with thousand separators (e.g. "1,080,000.00 B/s" or "3,200,000/s").
      */
     public static String formatExactRate(double rate, boolean isFluid) {
+        double scaled = rate * activeTimeUnit.getFactor();
+        String suffix = activeTimeUnit.getSuffix();
         if (isFluid) {
-            double abs = Math.abs(rate);
+            double abs = Math.abs(scaled);
             if (abs >= 1000.0) {
-                return String.format(Locale.ROOT, "%,.2f B/s", rate / 1000.0);
+                return String.format(Locale.ROOT, "%,.2f B%s", scaled / 1000.0, suffix);
             } else {
-                return String.format(Locale.ROOT, "%,.2f mB/s", rate);
+                return String.format(Locale.ROOT, "%,.2f mB%s", scaled, suffix);
             }
         } else {
-            return String.format(Locale.ROOT, "%,.4f/s", rate).replaceAll("\\.?0+/s", "/s");
+            return String.format(Locale.ROOT, "%,.4f%s", scaled, suffix).replaceAll("\\.?0+" + suffix, suffix);
         }
     }
 

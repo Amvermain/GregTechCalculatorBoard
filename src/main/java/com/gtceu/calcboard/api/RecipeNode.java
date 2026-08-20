@@ -372,6 +372,9 @@ public class RecipeNode {
 
     public void setRotorPower(int rotorPower) {
         this.rotorPower = Math.max(10, Math.min(5000, rotorPower));
+        if (isGenerator) {
+            autoCalculateTurbineParallel();
+        }
     }
 
     /**
@@ -428,8 +431,9 @@ public class RecipeNode {
     public int getTurbineHolderEfficiencyBonus() {
         if (!isLargeTurbine()) return 0;
         GTVoltageTier baseTier = getTurbineBaseTier();
-        int tierDelta = Math.max(0, targetTier.ordinal() - baseTier.ordinal());
-        return tierDelta * 10;
+        if (baseTier == null || targetTier == null) return 0;
+        int delta = targetTier.ordinal() - baseTier.ordinal();
+        return Math.max(0, delta * 10);
     }
 
     /**
@@ -437,13 +441,14 @@ public class RecipeNode {
      */
     public double getNodeRotorHolderBaseCapacity(GTVoltageTier tier) {
         if (tier == null) return getTurbineBaseProduction();
+        int tierIndex = tier.ordinal();
         GTVoltageTier baseTier = getTurbineBaseTier();
+        int delta = tierIndex - baseTier.ordinal();
         double baseProd = getTurbineBaseProduction();
-        int delta = tier.ordinal() - baseTier.ordinal();
         if (delta >= 0) {
             return baseProd * (1L << delta);
         } else {
-            return Math.max(128.0, baseProd / (1L << (-delta)));
+            return Math.max(baseProd / 8.0, baseProd / (1L << (-delta)));
         }
     }
 
@@ -522,8 +527,14 @@ public class RecipeNode {
      * based on target Rotor Holder voltage tier limit, rotor optimal throughput, and base recipe EU/t.
      */
     public void autoCalculateTurbineParallel() {
-        if (!isGenerator) return;
+        if (!isGenerator || !isTurbine()) return;
         if (baseEUt <= 0) return;
+
+        boolean hasRotor = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
+                || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"));
+        if (!hasRotor && rotorEfficiency <= 100 && (rotorPower <= 100 || rotorPower == 0)) {
+            return;
+        }
 
         int activePower = rotorPower > 0 && rotorPower != 100 ? rotorPower : getRotorMaterialPower(rotorName);
         for (MachineAddon addon : addons) {
@@ -545,6 +556,9 @@ public class RecipeNode {
 
     public void setRotorName(String rotorName) {
         this.rotorName = rotorName;
+        if (isGenerator) {
+            autoCalculateTurbineParallel();
+        }
     }
 
     public int getRecipeTemperature() {
@@ -563,15 +577,24 @@ public class RecipeNode {
     public void addAddon(MachineAddon addon) {
         if (addon != null && !addons.contains(addon)) {
             addons.add(addon);
+            if (isGenerator && addon.getCategory() == MachineAddon.Category.ROTOR) {
+                autoCalculateTurbineParallel();
+            }
         }
     }
 
     public void removeAddon(String addonId) {
         addons.removeIf(a -> a.getId().equals(addonId));
+        if (isGenerator) {
+            autoCalculateTurbineParallel();
+        }
     }
 
     public void clearAddons() {
         addons.clear();
+        if (isGenerator) {
+            autoCalculateTurbineParallel();
+        }
     }
 
     public double getCombinedDurationMultiplier() {
@@ -834,9 +857,19 @@ public class RecipeNode {
      * Calculates single machine production rate for a specific output ingredient.
      */
     public double calculateSingleMachineOutputRate(IngredientStack out) {
+        if (out == null) return 0.0;
         double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
         int tierDelta = getTierDelta();
         return out.getExpectedAmount(tierDelta) * singleCps;
+    }
+
+    /**
+     * Calculates single machine consumption rate for a specific input ingredient.
+     */
+    public double calculateSingleMachineInputRate(IngredientStack in) {
+        if (in == null) return 0.0;
+        double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
+        return in.getAmount() * singleCps;
     }
 
     public boolean isBaseNode() {

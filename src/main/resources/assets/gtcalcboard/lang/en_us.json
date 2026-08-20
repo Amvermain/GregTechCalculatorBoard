@@ -381,5 +381,20 @@
   "gui.gtcalcboard.search.consumers_for": "Consumers for: %s",
   "gui.gtcalcboard.search.producers_for": "Producers for: %s",
   "gui.gtcalcboard.search.search_help": "e.g. pyrolyse oil | @gtceu | #logs | !charcoal",
-  "gui.gtcalcboard.toast.drag_auto_connected": "Auto-connected: %s ➔ %s"
+  "gui.gtcalcboard.toast.drag_auto_connected": "Auto-connected: %s ➔ %s",
+  "gui.gtcalcboard.filter.btn_tooltip": "Recipe Category Filter\nExclude noise and unwanted categories from search results.",
+  "gui.gtcalcboard.filter.title": "Recipe Category Filter",
+  "gui.gtcalcboard.filter.all": "All",
+  "gui.gtcalcboard.filter.none": "None",
+  "gui.gtcalcboard.filter.defaults": "Defaults",
+  "gui.gtcalcboard.filter.search_hint": "Filter categories...",
+  "gui.gtcalcboard.filter.done": "Done",
+  "gui.gtcalcboard.unit.per_tick": "Per Tick",
+  "gui.gtcalcboard.unit.per_second": "Per Second",
+  "gui.gtcalcboard.unit.per_minute": "Per Minute",
+  "gui.gtcalcboard.unit.per_hour": "Per Hour",
+  "gui.gtcalcboard.unit.per_day": "Per Day",
+  "gui.gtcalcboard.tooltip.btn_time_unit": "Rate Time Unit Toggle (T)\nClick to cycle flow rate display units:\n/s (Second) ➔ /min (Minute) ➔ /h (Hour) ➔ /d (Day) ➔ /t (Tick).",
+  "gui.gtcalcboard.toast.time_unit_changed": "Display unit: %s (%s)",
+  "gui.gtcalcboard.hotkey_hud.time_unit": "Time Unit"
 }

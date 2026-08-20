@@ -88,6 +88,21 @@ public class ToolbarWidget {
             }
         }));
 
+        // 3.6 Time Unit Toggle (/t, /s, /min, /h, /d)
+        com.gtceu.calcboard.api.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
+        String unitTxt = "§e⏱ " + curUnit.getSuffix() + " ▼";
+        list.add(new ToolbarButtonDef("time_unit", unitTxt, 0xFFFFF176, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(unitTxt) + 12, btn -> {
+            com.gtceu.calcboard.api.RateTimeUnit next = curUnit.next();
+            FormatUtil.setActiveTimeUnit(next);
+            BoardToast.show(Component.literal("§e⏱ ").append(
+                Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), Component.translatable(next.getTranslationKey()).getString())
+            ));
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+            );
+            screen.markSummaryDirty();
+        }));
+
         // 4. Share
         String shareTxt = "📋 " + Component.translatable("gui.gtcalcboard.export").getString();
         list.add(new ToolbarButtonDef("export", shareTxt, 0xFF66DDFF, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(shareTxt) + 12, btn -> copyBlueprintToClipboard()));

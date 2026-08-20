@@ -582,6 +582,11 @@ public class BoardScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTicks);
 
         // 8. Top-level Modal Dialogs (Highest Layer)
+        graphics.flush();
+        Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
+        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+        RenderSystem.disableDepthTest();
+
         if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
             saveToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {

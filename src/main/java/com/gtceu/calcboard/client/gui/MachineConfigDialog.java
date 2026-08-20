@@ -103,6 +103,9 @@ public class MachineConfigDialog {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks, int screenWidth, int screenHeight) {
         if (!visible || node == null) return;
 
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 600);
+
         Minecraft mc = Minecraft.getInstance();
         var font = mc.font;
 
@@ -650,6 +653,8 @@ public class MachineConfigDialog {
 
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
         }
+
+        graphics.pose().popPose();
     }
 
     private void addFormattedDescriptionLines(List<Component> tooltip, String rawDesc) {

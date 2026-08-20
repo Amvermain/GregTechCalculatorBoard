@@ -10,7 +10,7 @@ public class HotkeyHudWidget {
     private boolean expanded = true;
 
     private static final int EXPANDED_WIDTH = 180;
-    private static final int EXPANDED_HEIGHT = 124;
+    private static final int EXPANDED_HEIGHT = 136;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
 
@@ -36,8 +36,8 @@ public class HotkeyHudWidget {
         int screenH = screen.height;
 
         if (!expanded) {
-            // Collapsed Chip [?]
-            int chipX = screenW - COLLAPSED_WIDTH - 8;
+            // Collapsed Chip [?] at Bottom-Left
+            int chipX = 8;
             int chipY = screenH - COLLAPSED_HEIGHT - 8;
 
             boolean hovered = mouseX >= chipX && mouseX <= chipX + COLLAPSED_WIDTH && mouseY >= chipY && mouseY <= chipY + COLLAPSED_HEIGHT;
@@ -57,8 +57,8 @@ public class HotkeyHudWidget {
             return;
         }
 
-        // Expanded Panel
-        int panelX = screenW - EXPANDED_WIDTH - 8;
+        // Expanded Panel at Bottom-Left
+        int panelX = 8;
         int panelY = screenH - EXPANDED_HEIGHT - 8;
 
         // Background & Modern Glowing Border
@@ -78,6 +78,8 @@ public class HotkeyHudWidget {
         // Hotkey lines
         int curY = panelY + 20;
         renderKeyLine(graphics, font, panelX + 6, curY, "B", "gui.gtcalcboard.hotkey_hud.balance");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "T", "gui.gtcalcboard.hotkey_hud.time_unit");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Space / Dbl-Click", "gui.gtcalcboard.hotkey_hud.add");
         curY += 12;
@@ -107,7 +109,7 @@ public class HotkeyHudWidget {
         int screenH = screen.height;
 
         if (!expanded) {
-            int chipX = screenW - COLLAPSED_WIDTH - 8;
+            int chipX = 8;
             int chipY = screenH - COLLAPSED_HEIGHT - 8;
             if (mouseX >= chipX && mouseX <= chipX + COLLAPSED_WIDTH && mouseY >= chipY && mouseY <= chipY + COLLAPSED_HEIGHT) {
                 expanded = true;
@@ -116,7 +118,7 @@ public class HotkeyHudWidget {
             return false;
         }
 
-        int panelX = screenW - EXPANDED_WIDTH - 8;
+        int panelX = 8;
         int panelY = screenH - EXPANDED_HEIGHT - 8;
 
         if (mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + EXPANDED_HEIGHT) {

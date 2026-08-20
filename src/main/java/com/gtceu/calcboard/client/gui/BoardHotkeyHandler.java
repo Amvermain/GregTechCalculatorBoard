@@ -172,6 +172,21 @@ public final class BoardHotkeyHandler {
             }
         }
 
+        // 10. Cycle Time Unit (/t, /s, /min, /h, /d): T
+        if (keyCode == GLFW.GLFW_KEY_T && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+            com.gtceu.calcboard.api.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
+            com.gtceu.calcboard.api.RateTimeUnit next = curUnit.next();
+            FormatUtil.setActiveTimeUnit(next);
+            BoardToast.show(net.minecraft.network.chat.Component.literal("§e⏱ ").append(
+                net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
+            ));
+            net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F)
+            );
+            screen.markSummaryDirty();
+            return true;
+        }
+
         return false;
     }
 }
