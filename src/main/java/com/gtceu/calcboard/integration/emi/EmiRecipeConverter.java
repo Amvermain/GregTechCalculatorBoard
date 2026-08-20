@@ -58,138 +58,16 @@ public class EmiRecipeConverter {
             name = "Recipe";
         }
 
-        double baseDurationTicks = 100.0; // Default 5s
-        double baseEUt = 32.0;           // Default LV 32 EU/t
-        GTVoltageTier tier = GTVoltageTier.LV;
-        boolean isGenerator = false;
-        int backingRecipeTemp = 0;
+        RecipeDetails details = extractRecipeDetails(recipe);
 
-        // 1. Try extracting real GTRecipe details (only when GT is loaded)
-        try {
-            var backing = recipe.getBackingRecipe();
-            if (backing != null) {
-                // If GT is loaded and it's a GTRecipe
-                if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
-                    var durationField = backing.getClass().getField("duration");
-                    baseDurationTicks = durationField.getInt(backing);
-
-                    // Check getOutputEUt (GT Generator recipes)
-                    try {
-                        var getOutputEUtMethod = backing.getClass().getMethod("getOutputEUt");
-                        Object outEnergy = getOutputEUtMethod.invoke(backing);
-                        if (outEnergy != null) {
-                            var voltageMethod = outEnergy.getClass().getMethod("voltage");
-                            var amperageMethod = outEnergy.getClass().getMethod("amperage");
-                            long voltage = (long) voltageMethod.invoke(outEnergy);
-                            long amperage = (long) amperageMethod.invoke(outEnergy);
-                            if (voltage > 0) {
-                                baseEUt = Math.max(1.0, voltage * Math.max(1L, amperage));
-                                tier = GTVoltageTier.getTierForVoltage(voltage);
-                                isGenerator = true;
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-
-                    // If not generator, extract input EU/t
-                    if (!isGenerator) {
-                        try {
-                            var getInputEUtMethod = backing.getClass().getMethod("getInputEUt");
-                            Object energyStack = getInputEUtMethod.invoke(backing);
-                            if (energyStack != null) {
-                                var voltageMethod = energyStack.getClass().getMethod("voltage");
-                                var amperageMethod = energyStack.getClass().getMethod("amperage");
-                                long voltage = (long) voltageMethod.invoke(energyStack);
-                                long amperage = (long) amperageMethod.invoke(energyStack);
-                                if (voltage > 0) {
-                                    baseEUt = Math.max(1.0, voltage * Math.max(1L, amperage));
-                                    tier = GTVoltageTier.getTierForVoltage(voltage);
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                    int recipeTemp = 0;
-                    try {
-                        Field dataField = backing.getClass().getField("data");
-                        Object dataObj = dataField.get(backing);
-                        if (dataObj instanceof CompoundTag tag) {
-                            if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
-                            else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
-                            else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
-                        }
-                    } catch (Throwable ignored) {
-                        try {
-                            Method dataMethod = backing.getClass().getMethod("data");
-                            Object dataObj = dataMethod.invoke(backing);
-                            if (dataObj instanceof CompoundTag tag) {
-                                if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
-                                else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
-                                else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
-                            }
-                        } catch (Throwable ignored2) {}
-                    }
-                    if (recipeTemp > 0) {
-                        // Store recipe temperature on temporary variable to assign to node
-                        backingRecipeTemp = recipeTemp;
-                    }
-                } else if (ModCompatHelper.isThermalLoaded() || ModCompatHelper.isModLoaded("thermal_expansion")) {
-                    // Thermal Recipe reflection (Energy in RF / FE)
-                    long energyRF = 0;
-                    try {
-                        Method getEnergyMethod = backing.getClass().getMethod("getEnergy");
-                        Object res = getEnergyMethod.invoke(backing);
-                        if (res instanceof Number num) {
-                            energyRF = num.longValue();
-                        }
-                    } catch (Throwable ignored) {
-                        try {
-                            Field energyField = backing.getClass().getDeclaredField("energy");
-                            energyField.setAccessible(true);
-                            Object res = energyField.get(backing);
-                            if (res instanceof Number num) {
-                                energyRF = num.longValue();
-                            }
-                        } catch (Throwable ignored2) {}
-                    }
-
-                    if (energyRF > 0) {
-                        // Standard conversion: 4 RF = 1 EU
-                        double totalEU = (double) energyRF / 4.0;
-                        baseEUt = 32.0; // Standard LV power
-                        baseDurationTicks = Math.max(20.0, totalEU / baseEUt);
-                        tier = GTVoltageTier.LV;
-
-                        // Mark as generator if category is a Thermal Dynamo or Fuel type
-                        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
-                        if (catId != null) {
-                            String cp = catId.getPath().toLowerCase();
-                            if (cp.contains("dynamo") || cp.contains("fuel") || cp.contains("lapidary") || cp.contains("compression")
-                                    || cp.contains("magmatic") || cp.contains("gourmand") || cp.contains("numismatic") || cp.contains("stirling")) {
-                                isGenerator = true;
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        // 2. Secondary Generator Check: Strictly check Category ID (Machine type), NEVER check recipe item/output IDs!
-        if (!isGenerator && recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-            String catPath = recipe.getCategory().getId().getPath().toLowerCase();
-            String catNs = recipe.getCategory().getId().getNamespace().toLowerCase();
-            if (catPath.contains("dynamo") || catPath.contains("turbine")
-                    || catPath.equals("generator") || catPath.endsWith("_generator")
-                    || catPath.equals("combustion_generator") || catPath.equals("semi_fluid_generator")
-                    || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")
-                    || ((catNs.equals("thermal") || catNs.equals("thermal_expansion") || catNs.equals("systeams")) && catPath.contains("fuel"))) {
-                isGenerator = true;
-            }
-        }
-
-        RecipeNode node = RecipeNode.create(name, baseDurationTicks, baseEUt, tier);
-        node.setGenerator(isGenerator);
+        RecipeNode node = RecipeNode.create(name, details.durationTicks, details.eut, details.tier);
+        node.setGenerator(details.isGenerator);
         node.setMachineIcon(findMachineIcon(recipe));
-        if (backingRecipeTemp > 0) {
-            node.setRecipeTemperature(backingRecipeTemp);
+        if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
+            node.setRecipeCategoryId(recipe.getCategory().getId());
+        }
+        if (details.backingRecipeTemp > 0) {
+            node.setRecipeTemperature(details.backingRecipeTemp);
         }
 
         // Convert Inputs
@@ -245,9 +123,23 @@ public class EmiRecipeConverter {
             }
         }
 
-        node.setAvailableWorkstations(findAllWorkstations(recipe));
+        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+        if (catId != null) {
+            node.setRecipeCategoryId(catId);
+            com.gtceu.calcboard.api.CategoryCapability cap = com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && !cap.availableWorkstations().isEmpty()) {
+                node.setAvailableWorkstations(new ArrayList<>(cap.availableWorkstations()));
+                if (cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
+                    node.setMultiblock(true);
+                }
+            }
+        }
 
-        // If ALL available workstations are multiblock controllers (e.g. EBF, Pyrolyse, Cracking, Fusion, Distillation Tower), default to Multiblock mode
+        if (node.getAvailableWorkstations().isEmpty()) {
+            node.setAvailableWorkstations(findAllWorkstations(recipe));
+        }
+
+        // If ALL available workstations are multiblock controllers, default to Multiblock mode
         boolean hasAnySingle = false;
         boolean hasAnyMulti = false;
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
@@ -521,5 +413,143 @@ public class EmiRecipeConverter {
             }
         }
         return sb.toString().trim();
+    }
+
+    private static class RecipeDetails {
+        double durationTicks = 100.0;
+        double eut = 32.0;
+        GTVoltageTier tier = GTVoltageTier.LV;
+        boolean isGenerator = false;
+        int backingRecipeTemp = 0;
+    }
+
+    private static RecipeDetails extractRecipeDetails(EmiRecipe recipe) {
+        RecipeDetails details = new RecipeDetails();
+        try {
+            var backing = recipe.getBackingRecipe();
+            if (backing != null) {
+                if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
+                    extractGTRecipeDetails(backing, details);
+                } else if (ModCompatHelper.isThermalLoaded() || ModCompatHelper.isModLoaded("thermal_expansion")) {
+                    extractThermalRecipeDetails(recipe, backing, details);
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        if (!details.isGenerator && recipe.getCategory() != null && recipe.getCategory().getId() != null) {
+            details.isGenerator = isGeneratorCategory(recipe.getCategory().getId());
+        }
+
+        return details;
+    }
+
+    private static void extractGTRecipeDetails(Object backing, RecipeDetails details) {
+        try {
+            var durationField = backing.getClass().getField("duration");
+            details.durationTicks = durationField.getInt(backing);
+
+            try {
+                var getOutputEUtMethod = backing.getClass().getMethod("getOutputEUt");
+                Object outEnergy = getOutputEUtMethod.invoke(backing);
+                if (outEnergy != null) {
+                    var voltageMethod = outEnergy.getClass().getMethod("voltage");
+                    var amperageMethod = outEnergy.getClass().getMethod("amperage");
+                    long voltage = (long) voltageMethod.invoke(outEnergy);
+                    long amperage = (long) amperageMethod.invoke(outEnergy);
+                    if (voltage > 0) {
+                        details.eut = Math.max(1.0, voltage * Math.max(1L, amperage));
+                        details.tier = GTVoltageTier.getTierForVoltage(voltage);
+                        details.isGenerator = true;
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            if (!details.isGenerator) {
+                try {
+                    var getInputEUtMethod = backing.getClass().getMethod("getInputEUt");
+                    Object energyStack = getInputEUtMethod.invoke(backing);
+                    if (energyStack != null) {
+                        var voltageMethod = energyStack.getClass().getMethod("voltage");
+                        var amperageMethod = energyStack.getClass().getMethod("amperage");
+                        long voltage = (long) voltageMethod.invoke(energyStack);
+                        long amperage = (long) amperageMethod.invoke(energyStack);
+                        if (voltage > 0) {
+                            details.eut = Math.max(1.0, voltage * Math.max(1L, amperage));
+                            details.tier = GTVoltageTier.getTierForVoltage(voltage);
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            int recipeTemp = 0;
+            try {
+                Field dataField = backing.getClass().getField("data");
+                Object dataObj = dataField.get(backing);
+                if (dataObj instanceof CompoundTag tag) {
+                    if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
+                    else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
+                    else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
+                }
+            } catch (Throwable ignored) {
+                try {
+                    Method dataMethod = backing.getClass().getMethod("data");
+                    Object dataObj = dataMethod.invoke(backing);
+                    if (dataObj instanceof CompoundTag tag) {
+                        if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
+                        else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
+                        else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
+                    }
+                } catch (Throwable ignored2) {}
+            }
+            if (recipeTemp > 0) {
+                details.backingRecipeTemp = recipeTemp;
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void extractThermalRecipeDetails(EmiRecipe recipe, Object backing, RecipeDetails details) {
+        long energyRF = 0;
+        try {
+            Method getEnergyMethod = backing.getClass().getMethod("getEnergy");
+            Object res = getEnergyMethod.invoke(backing);
+            if (res instanceof Number num) {
+                energyRF = num.longValue();
+            }
+        } catch (Throwable ignored) {
+            try {
+                Field energyField = backing.getClass().getDeclaredField("energy");
+                energyField.setAccessible(true);
+                Object res = energyField.get(backing);
+                if (res instanceof Number num) {
+                    energyRF = num.longValue();
+                }
+            } catch (Throwable ignored2) {}
+        }
+
+        if (energyRF > 0) {
+            double totalEU = (double) energyRF / 4.0;
+            details.eut = 32.0;
+            details.durationTicks = Math.max(20.0, totalEU / details.eut);
+            details.tier = GTVoltageTier.LV;
+
+            ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+            if (catId != null) {
+                String cp = catId.getPath().toLowerCase();
+                if (cp.contains("dynamo") || cp.contains("fuel") || cp.contains("lapidary") || cp.contains("compression")
+                        || cp.contains("magmatic") || cp.contains("gourmand") || cp.contains("numismatic") || cp.contains("stirling")) {
+                    details.isGenerator = true;
+                }
+            }
+        }
+    }
+
+    private static boolean isGeneratorCategory(ResourceLocation catId) {
+        String catPath = catId.getPath().toLowerCase();
+        String catNs = catId.getNamespace().toLowerCase();
+        return catPath.contains("dynamo") || catPath.contains("turbine")
+                || catPath.equals("generator") || catPath.endsWith("_generator")
+                || catPath.equals("combustion_generator") || catPath.equals("semi_fluid_generator")
+                || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")
+                || ((catNs.equals("thermal") || catNs.equals("thermal_expansion") || catNs.equals("systeams")) && catPath.contains("fuel"));
     }
 }

@@ -13,6 +13,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a hardware addon, trait, upgrade kit, hatch, or custom multiplier attached to a RecipeNode.
@@ -309,45 +310,7 @@ public class MachineAddon {
      * EBF: 5% EU discount per 900K excess temperature above the recipe's required temperature
      */
     public MachineAddon forMachine(RecipeNode node) {
-        if (this.category != Category.COIL) return this.copy();
-        MachineAddon cp = this.copy();
-        String m = (node != null && node.getName() != null ? node.getName() : "").toLowerCase();
-
-        if (m.contains("blast") || m.contains("ebf") || m.contains("고로") || m.contains("전기로")) {
-            int reqTemp = node != null ? node.getRecipeTemperature() : 0;
-            if (reqTemp > 0 && coilTemperature > reqTemp) {
-                int excessTemp = coilTemperature - reqTemp;
-                int tiersAbove = excessTemp / 900;
-                // GTCEu: 5% EU discount per 900K excess temperature above the recipe's required temperature
-                cp.setEutMultiplier(Math.pow(0.95, tiersAbove));
-            } else {
-                cp.setEutMultiplier(1.0);
-            }
-            cp.setDurationMultiplier(1.0);
-            cp.setParallelMultiplier(1);
-        } else if (m.contains("pyrolyse") || m.contains("열분해")) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, pyrolyseSpeedPercent));
-            cp.setEutMultiplier(1.0);
-            cp.setParallelMultiplier(1);
-        } else if (m.contains("crack") || m.contains("분해")) {
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(crackingEnergyPercent / 100.0);
-            cp.setParallelMultiplier(1);
-        } else if (m.contains("chemical") || m.contains("reactor") || m.contains("lcr") || m.contains("화학")) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, chemicalSpeedPercent));
-            cp.setEutMultiplier(chemicalEnergyPercent / 100.0);
-            cp.setParallelMultiplier(1);
-        } else if (m.contains("smelter") || m.contains("alloy") || m.contains("furnace") 
-                || m.contains("제련") || m.contains("화로") || m.contains("합금")) {
-            cp.setParallelMultiplier(Math.max(1, smelterParallel));
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(1.0);
-        } else {
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(1.0);
-            cp.setParallelMultiplier(1);
-        }
-        return cp;
+        return CoilHelper.tailorCoilAddon(this, node);
     }
 
     public MachineAddon forMachine(String machineName) {
@@ -361,19 +324,17 @@ public class MachineAddon {
         if (node == null) return true;
         if (category == Category.CUSTOM) return true;
 
-        String name = (node.getName() != null ? node.getName() : "").toLowerCase();
-        String iconPath = (node.getMachineIcon() != null ? node.getMachineIcon().toString() : "").toLowerCase();
-        boolean isGen = node.isGenerator() || name.contains("turbine") || name.contains("generator") 
-                || name.contains("dynamo") || name.contains("터빈") || name.contains("발전기") || name.contains("다이내모");
-
-        boolean isThermal = iconPath.contains("thermal") || name.contains("thermal") || name.contains("dynamo") 
-                || name.contains("다이내모") || name.contains("써멀");
-
-        boolean isMb = node.isMultiblock();
+        boolean isThermal = isThermalMachine(node);
+        boolean isTurbine = isTurbineMachine(node);
+        boolean isGen = node.isGenerator();
+        boolean isMb = node.isMultiblock() || node.hasMultiblockOption();
         boolean isCoil = isMb && node.canUseCoils();
 
+        if (category == Category.THERMAL_AUGMENT) {
+            return isThermal;
+        }
         if (category == Category.ROTOR) {
-            return isGen;
+            return isTurbine;
         }
         if (category == Category.COIL) {
             return !isGen && isCoil;
@@ -384,9 +345,6 @@ public class MachineAddon {
         if (category == Category.MAINTENANCE) {
             return isMb;
         }
-        if (category == Category.THERMAL_AUGMENT) {
-            return isThermal;
-        }
         if (category == Category.PARALLEL) {
             return !isGen && isMb;
         }
@@ -394,50 +352,46 @@ public class MachineAddon {
         return true;
     }
 
-    public static boolean isCoilMachine(String name, String iconPath) {
-        String n = name != null ? name.toLowerCase() : "";
-        String p = iconPath != null ? iconPath.toLowerCase() : "";
+    public static boolean isThermalMachine(RecipeNode node) {
+        return ThermalAugmentHelper.isThermalMachine(node);
+    }
 
-        return n.contains("pyrolyse") || n.contains("열분해") || n.contains("피롤라이즈")
-                || n.contains("blast") || n.contains("ebf") || n.contains("고로")
-                || n.contains("crack") || n.contains("크래킹")
-                || n.contains("lcr") || n.contains("대형 화학") || n.contains("large chemical")
-                || n.contains("multi_smelter") || n.contains("multismelter") || n.contains("multi smelter")
-                || n.contains("다중 제련") || n.contains("다중제련") || n.contains("mega_alloy") || n.contains("메가 합금")
-                || n.contains("mega smelter") || n.contains("메가 제련")
-                || n.contains("fusion") || n.contains("융합")
-                || p.contains("pyrolyse") || p.contains("blast") || p.contains("cracking")
-                || p.contains("large_chemical_reactor") || p.contains("multi_smelter") || p.contains("fusion");
+    public static boolean isTurbineMachine(RecipeNode node) {
+        if (node == null) return false;
+        return node.isTurbine();
     }
 
     /**
      * Returns the list of applicable addon categories for the given RecipeNode machine.
      */
     public static List<Category> getRelevantCategories(RecipeNode node) {
-        List<Category> cats = new ArrayList<>();
         if (node == null) {
-            cats.addAll(List.of(Category.values()));
+            return List.of(Category.values());
+        }
+
+        if (node.getRecipeCategoryId() != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
+            if (cap != null && cap != CategoryCapability.DEFAULT) {
+                return cap.getActiveCategoriesForNode(node);
+            }
+        }
+
+        List<Category> cats = new ArrayList<>();
+        boolean isThermal = isThermalMachine(node);
+        boolean isTurbine = isTurbineMachine(node);
+        boolean isMb = node.isMultiblock() || node.hasMultiblockOption();
+        boolean isCoil = node.canUseCoils();
+
+        if (isThermal) {
+            cats.add(Category.THERMAL_AUGMENT);
+            cats.add(Category.CUSTOM);
             return cats;
         }
 
-        String name = (node.getName() != null ? node.getName() : "").toLowerCase();
-        String iconPath = (node.getMachineIcon() != null ? node.getMachineIcon().toString() : "").toLowerCase();
-        boolean isGen = node.isGenerator() || name.contains("turbine") || name.contains("generator") 
-                || name.contains("dynamo") || name.contains("터빈") || name.contains("발전기") || name.contains("다이내모");
-
-        boolean isThermal = iconPath.contains("thermal") || name.contains("thermal") || name.contains("dynamo") 
-                || name.contains("다이내모") || name.contains("써멀");
-
-        boolean isMb = node.isMultiblock();
-        boolean isCoil = isMb && node.canUseCoils();
-
-        if (isGen) {
+        if (isTurbine) {
             cats.add(Category.ROTOR);
             if (isMb) {
                 cats.add(Category.MAINTENANCE);
-            }
-            if (isThermal) {
-                cats.add(Category.THERMAL_AUGMENT);
             }
             cats.add(Category.CUSTOM);
             return cats;
@@ -450,9 +404,6 @@ public class MachineAddon {
             cats.add(Category.PARALLEL);
             cats.add(Category.MAINTENANCE);
             cats.add(Category.MULTIBLOCK_TRAIT);
-        }
-        if (isThermal) {
-            cats.add(Category.THERMAL_AUGMENT);
         }
 
         cats.add(Category.CUSTOM);

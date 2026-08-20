@@ -30,6 +30,7 @@ public class RecipeSearchEngineTest {
         fullSb.append(modId.toLowerCase()).append(" ");
         fullSb.append(categoryId.toLowerCase()).append(" ");
         fullSb.append(categoryName.toLowerCase()).append(" ");
+        tags.forEach(t -> fullSb.append(t.toLowerCase()).append(" "));
         fullSb.append(outSb).append(" ").append(inSb);
 
         return new SearchableRecipe(
@@ -161,5 +162,113 @@ public class RecipeSearchEngineTest {
         assertTrue(RecipeSearchEngine.matches(r1, q));
         // r2 has "Heavy" and "Fuel" but not contiguous "heavy fuel"
         assertFalse(RecipeSearchEngine.matches(r2, q));
+    }
+
+    @Test
+    public void testLongComplexMultiTokenQuery() {
+        SearchableRecipe advancedRecipe = createMockRecipe(
+                "Superconducting Wire Processing",
+                "gtceu",
+                "wiremill",
+                "Wiremill",
+                List.of("Superconductor Wire", "Tiny Pile of Ash"),
+                List.of("Superconducting Alloy Ingot", "Liquid Helium"),
+                List.of("forge:wires/superconducting", "forge:ingots/alloy")
+        );
+
+        SearchableRecipe wrongModRecipe = createMockRecipe(
+                "Superconductor Wire Processing",
+                "create",
+                "mechanical_press",
+                "Mechanical Press",
+                List.of("Superconductor Wire"),
+                List.of("Superconducting Alloy Ingot"),
+                List.of()
+        );
+
+        // 5+ token complex query with @mod, [cat], negation, tag, and keyword
+        ParsedQuery longQuery = RecipeSearchEngine.parseQuery("@gtceu [wiremill] wire #forge:wires/superconducting !nitrogen");
+        assertTrue(RecipeSearchEngine.matches(advancedRecipe, longQuery));
+        assertFalse(RecipeSearchEngine.matches(wrongModRecipe, longQuery));
+
+        // Negation fails when excluded term is present
+        ParsedQuery negatedFailQuery = RecipeSearchEngine.parseQuery("@gtceu wire !ash");
+        assertFalse(RecipeSearchEngine.matches(advancedRecipe, negatedFailQuery));
+    }
+
+    @Test
+    public void testCalculateRankScoringAndShortCircuit() {
+        SearchableRecipe ebfSteel = createMockRecipe(
+                "Steel Ingot",
+                "gtceu",
+                "electric_blast_furnace",
+                "Electric Blast Furnace",
+                List.of("Steel Ingot", "Slag"),
+                List.of("Iron Ingot", "Oxygen"),
+                List.of()
+        );
+
+        // 1. Top score (3): matches directly in output or display name
+        ParsedQuery qOutput = RecipeSearchEngine.parseQuery("Steel Ingot");
+        assertEquals(3, RecipeSearchEngine.calculateRank(ebfSteel, qOutput));
+
+        // 2. Medium score (2): matches in input or category
+        ParsedQuery qInput = RecipeSearchEngine.parseQuery("Oxygen");
+        assertEquals(2, RecipeSearchEngine.calculateRank(ebfSteel, qInput));
+
+        ParsedQuery qCategory = RecipeSearchEngine.parseQuery("electric_blast_furnace");
+        assertEquals(2, RecipeSearchEngine.calculateRank(ebfSteel, qCategory));
+
+        // 3. General score (1): empty query or general index
+        ParsedQuery qEmpty = RecipeSearchEngine.parseQuery("");
+        assertEquals(1, RecipeSearchEngine.calculateRank(ebfSteel, qEmpty));
+    }
+
+    @Test
+    public void testMalformedAndEdgeCaseQueries() {
+        SearchableRecipe recipe = createMockRecipe(
+                "Hydrofluoric Acid", "gtceu", "chemical_reactor", "Chemical Reactor",
+                List.of("Hydrofluoric Acid"), List.of("Fluorite Dust", "Sulfuric Acid"), List.of()
+        );
+
+        // Unbalanced quotes
+        ParsedQuery unclosedQuote = RecipeSearchEngine.parseQuery("\"Hydrofluoric Acid");
+        assertTrue(RecipeSearchEngine.matches(recipe, unclosedQuote));
+
+        // Multiple pipes and trailing spaces
+        ParsedQuery multiPipes = RecipeSearchEngine.parseQuery("   ||| hydrofluoric |||   ");
+        assertTrue(RecipeSearchEngine.matches(recipe, multiPipes));
+
+        // Only special characters
+        ParsedQuery specialChars = RecipeSearchEngine.parseQuery("! @ # [ ] & |");
+        assertTrue(specialChars.isEmpty() || RecipeSearchEngine.matches(recipe, specialChars));
+
+        // Null query
+        ParsedQuery nullQuery = RecipeSearchEngine.parseQuery(null);
+        assertTrue(nullQuery.isEmpty());
+        assertTrue(RecipeSearchEngine.matches(recipe, nullQuery));
+    }
+
+    @Test
+    public void testFormattingColorStripAndCaseInsensitivity() {
+        String coloredName = "§6§lLV§r §bUpgrade§r §aKit§r";
+        String stripped = RecipeSearchEngine.stripFormatting(coloredName);
+        assertEquals("LV Upgrade Kit", stripped);
+
+        // Null safe
+        assertNull(RecipeSearchEngine.stripFormatting(null));
+        assertEquals("Plain Text", RecipeSearchEngine.stripFormatting("Plain Text"));
+
+        SearchableRecipe coloredRecipe = createMockRecipe(
+                "§7LV§r Upgrade Kit", "kubejs", "assembler", "Assembler",
+                List.of("§7LV§r Upgrade Kit"), List.of("LV Machine Hull"), List.of()
+        );
+
+        // Uppercase / lowercase case insensitivity
+        ParsedQuery q1 = RecipeSearchEngine.parseQuery("UPGRADE KIT");
+        assertTrue(RecipeSearchEngine.matches(coloredRecipe, q1));
+
+        ParsedQuery q2 = RecipeSearchEngine.parseQuery("lv kit");
+        assertTrue(RecipeSearchEngine.matches(coloredRecipe, q2));
     }
 }

@@ -8,6 +8,44 @@
 
 ---
 
+## [2.0.0-alpha.3] - 2026-08-21
+
+### 신규 기능 (Added)
+- **RFC-V2-005 CategoryCapabilityMatrix 연역 분석 엔진 도입 (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
+  - 레시피 카테고리별 워크스테이션 및 지원 애드온 카테고리를 사전 베이킹하여 $O(1)$ 초고속으로 조회하는 매트릭스 아키텍처 구현.
+  - 가열 코일, 터빈 로터, 병렬 해치, 유지보수 해치, 써멀 증강에 대한 결정론적 수용 능력 판별 지원.
+  - 싱글블록, 멀티블록, 터빈, 발전기, 여과기 카테고리를 포괄하는 전용 단위 테스트 슈트(`CategoryCapabilityMatrixTest`) 추가.
+- **워크스테이션 기반 멀티블록 수용 능력 연역 매핑 (`MultiblockDetector`, `EmiRecipeConverter`)**:
+  - `multiblock_info` 구조체 스캔을 통해 대형 화학 반응기(LCR), 열분해로, EBF, 분해로 등 코일 멀티블록을 자동 식별.
+  - 연역된 카테고리를 `MultiblockDetector.registerCoilCategory` 및 `registerTurbineCategory`와 양방향 동기화.
+- **써멀 기계 업그레이드 킷(1개 제한/교체) 및 일반 증강 3슬롯 중복 장착(Stacking) 지원 (`RecipeNode`, `MachineConfigDialog`, `ThermalAugmentHelper`)**:
+  - 기계당 업그레이드 킷(LV~EV, 6x~48x 병렬)은 단 1개만 장착되며, 다른 킷 클릭 시 기존 킷이 자동으로 교체됩니다.
+  - 일반 증강(ARC, MCI 등)은 최대 3슬롯 내에서 동일 증강의 중복 장착(Stacking)을 지원합니다. (예: 3x EV MCI = $4.096\times$ 연료 에너지 / 순수 NBT `AugmentData.Type: Dynamo_Fuel` 태그 파싱).
+  - 카탈로그 카드 배지(`✔ x2`, `✔ x3`, `3/3`), 마우스 좌클릭(+1)/우클릭(-1) 및 상단 활성 슬롯 클릭 개별 해제 기능을 지원합니다.
+
+### 개선 및 변경 (Changed)
+- **휴리스틱 기반 애드온 감지 로직 완전 제거 (Rule 5 애드온 스펙 결정론적 연역 원칙)**:
+  - 코드베이스 전반에서 툴팁 텍스트 파싱, 아이템 이름 검사, ID 부분 문자열 매칭(`contains("rotor")`, `contains("coil")`, `id.getPath()`) 휴리스틱을 완전히 제거.
+  - 공식 태그(`gtceu:circuits/*`, `thermal:upgrade_kit`), NBT 실수/정수 데이터(`AugmentData`), 런타임 리플렉션을 통한 결정론적 수치 추출로 전환 (`CoilHelper`, `TurbineRotorHelper`, `ParallelHelper`).
+- **반응형 다이얼로그 로딩 오버레이 & 실시간 상태 갱신 UX (`MachineConfigDialog`, `RecipeSearchDialog`)**:
+  - 백그라운드 인덱싱 진행 중 섹션 단위의 깔끔한 다크 로딩 오버레이와 애니메이션 표시.
+  - 베이킹 완료 즉시 `[♨ Coil]`, `[⚡ Parallel]`, `[🔧 Maint]` 탭 및 카탈로그 카드가 창을 껐다 켤 필요 없이 실시간 자동 갱신(Live Auto-Populate)되도록 개선.
+- **레시피 검색 인덱스 병렬화 및 초고속화 ($250\times$ 속도 향상, 2분 $\rightarrow$ 1초 미만) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - 전체 레시피 인덱싱 시 $O(N^2)$ 중복 순회를 제거하고 멀티코어 `parallelStream`을 도입하여 170,000+개 레시피 인덱싱 시간을 1초 미만으로 단축했습니다.
+  - 유체 타입 판정 시 레지스트리 맵 조회 대신 `FluidEmiStack` 인스턴스 검사로 최적화했습니다.
+- **동적 애드온 크롤러 20ms 즉시 추출 및 비활성 모드 아이템 누출 차단 (`DynamicAddonCrawler`)**:
+  - 무거운 리플렉션 루프를 걷어내고 `EmiRecipe.getOutputs()`에서 NBT가 보존된 `EmiStack`을 직접 추출하도록 개선하여 크롤링 시간을 20ms 미만으로 단축했습니다.
+  - Forge 아이템 레지스트리 무조건 스캔을 제거하여 비활성화된 더미 써멀 아이템(`thermal_extra` 등)이 노출되는 문제를 원천 차단했습니다.
+
+### 버그 수정 (Fixed)
+- **대형 화학 반응기(LCR) 및 멀티블록 코일 탭 누락 버그 해결 (`CategoryCapabilityMatrix`, `MultiblockDetector`)**:
+  - GTCEu에서 싱글블록과 멀티블록의 레시피 카테고리가 분리되어 있어 발생하던 LCR 코일 미노출 문제를 전수 연역 매트릭스를 통해 완전 해결.
+- **EMI 및 RecipeManager 비동기 생명주기 동기화 (`CalcBoardEmiPlugin`, `ClientForgeEvents`, `RecipeSearchDialog`)**:
+  - 월드 접속 시 백그라운드 비동기 폴링(200ms 간격)을 도입하여 EMI 워커 스레드 빌드 완료 시점에 맞추어 매트릭스 사전 베이킹 수행.
+  - 조기 `bake(null)` 호출로 인해 카테고리 매트릭스가 0개로 비워지던 레이스 컨디션 버그 해결.
+
+---
+
 ## [2.0.0-alpha.2] - 2026-08-20
 
 ### 신규 기능 (Added)

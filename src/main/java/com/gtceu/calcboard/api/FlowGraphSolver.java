@@ -87,13 +87,33 @@ public final class FlowGraphSolver {
         Map<String, Double> upstreamCounts = new HashMap<>();
         upstreamCounts.put(anchor.getId(), targetAnchorCount);
 
-        // ==========================================
-        // 1. UPSTREAM PASS (Supply Anchor & Upstream Inputs with Supply >= Demand)
-        // ==========================================
+        solveUpstreamPass(graph, anchor, upstreamCounts, integerCounts);
+
+        for (Map.Entry<String, Double> entry : upstreamCounts.entrySet()) {
+            RecipeNode n = graph.findNodeById(entry.getKey());
+            if (n != null) {
+                n.setMachineCount(entry.getValue());
+            }
+        }
+
+        Map<String, Double> downstreamCounts = new HashMap<>(upstreamCounts);
+        solveDownstreamPass(graph, anchor, downstreamCounts, upstreamCounts.keySet(), integerCounts);
+
+        for (Map.Entry<String, Double> entry : downstreamCounts.entrySet()) {
+            RecipeNode n = graph.findNodeById(entry.getKey());
+            if (n != null) {
+                n.setMachineCount(entry.getValue());
+            }
+        }
+
+        anchor.setMachineCount(targetAnchorCount);
+        normalizeNodeCounts(graph, anchor, targetAnchorCount, integerCounts);
+    }
+
+    private static void solveUpstreamPass(FlowGraph graph, RecipeNode anchor, Map<String, Double> upstreamCounts, boolean integerCounts) {
         Queue<RecipeNode> upQueue = new ArrayDeque<>();
         upQueue.add(anchor);
 
-        // Cycle Guard: Cap iterations and track per-node visits to prevent infinite loops on circular dependencies
         int maxUpstreamIterations = Math.max(50, graph.getNodes().size() * 5);
         int upIterations = 0;
         Map<String, Integer> upVisitCounts = new HashMap<>();
@@ -102,9 +122,6 @@ public final class FlowGraphSolver {
             upIterations++;
             RecipeNode consumer = upQueue.poll();
             if (consumer == null) continue;
-
-            double consumerCount = upstreamCounts.getOrDefault(consumer.getId(), consumer.getMachineCount());
-            double consumerCps = consumer.getOverclockResult().getCyclesPerSecond() * consumer.getTotalParallel() * consumerCount;
 
             for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
                 List<FlowGraph.ConnectionEdge> inEdges = new ArrayList<>();
@@ -124,27 +141,7 @@ public final class FlowGraphSolver {
                         double singleRate = producer.calculateSingleMachineOutputRate(outStack);
 
                         if (singleRate > 0.0001) {
-                            // Sum total demand from ALL currently known consumers connected to this producer's output port
-                            double totalPortDemand = 0.0;
-                            for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                                if (outEdge.fromNodeId().equals(producer.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
-                                    RecipeNode cNode = graph.findNodeById(outEdge.toNodeId());
-                                    if (cNode != null && outEdge.inputIndex() < cNode.getInputs().size()) {
-                                        double cCount = upstreamCounts.getOrDefault(cNode.getId(), cNode.getMachineCount());
-                                        double cCps = cNode.getOverclockResult().getCyclesPerSecond() * cNode.getTotalParallel() * cCount;
-                                        double cReq = cNode.getInputs().get(outEdge.inputIndex()).getAmount() * cCps;
-
-                                        int inDegree = 0;
-                                        for (FlowGraph.ConnectionEdge iEdge : graph.getConnections()) {
-                                            if (iEdge.toNodeId().equals(cNode.getId()) && iEdge.inputIndex() == outEdge.inputIndex()) {
-                                                inDegree++;
-                                            }
-                                        }
-                                        totalPortDemand += cReq / Math.max(1, inDegree);
-                                    }
-                                }
-                            }
-
+                            double totalPortDemand = calculateTotalConnectedPortDemand(graph, producer, edge.outputIndex(), upstreamCounts);
                             double neededCount = totalPortDemand / singleRate;
                             if (integerCounts) {
                                 neededCount = Math.max(1.0, Math.ceil(neededCount - 0.00001));
@@ -155,7 +152,6 @@ public final class FlowGraphSolver {
                             double prevCount = upstreamCounts.getOrDefault(producer.getId(), 0.0);
                             int visits = upVisitCounts.getOrDefault(producer.getId(), 0);
 
-                            // Allow updating if count increases significantly and hasn't exceeded visit cap
                             if (neededCount > prevCount + 0.0001 && visits < 3) {
                                 upstreamCounts.put(producer.getId(), neededCount);
                                 upVisitCounts.put(producer.getId(), visits + 1);
@@ -166,28 +162,37 @@ public final class FlowGraphSolver {
                 }
             }
         }
+    }
 
-        // Apply upstream calculated counts to graph
-        for (Map.Entry<String, Double> entry : upstreamCounts.entrySet()) {
-            RecipeNode n = graph.findNodeById(entry.getKey());
-            if (n != null) {
-                n.setMachineCount(entry.getValue());
+    private static double calculateTotalConnectedPortDemand(FlowGraph graph, RecipeNode producer, int outputIndex, Map<String, Double> countsMap) {
+        double totalPortDemand = 0.0;
+        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+            if (outEdge.fromNodeId().equals(producer.getId()) && outEdge.outputIndex() == outputIndex) {
+                RecipeNode cNode = graph.findNodeById(outEdge.toNodeId());
+                if (cNode != null && outEdge.inputIndex() < cNode.getInputs().size()) {
+                    double cCount = countsMap.getOrDefault(cNode.getId(), cNode.getMachineCount());
+                    double cCps = cNode.getOverclockResult().getCyclesPerSecond() * cNode.getTotalParallel() * cCount;
+                    double cReq = cNode.getInputs().get(outEdge.inputIndex()).getAmount() * cCps;
+
+                    int inDegree = 0;
+                    for (FlowGraph.ConnectionEdge iEdge : graph.getConnections()) {
+                        if (iEdge.toNodeId().equals(cNode.getId()) && iEdge.inputIndex() == outEdge.inputIndex()) {
+                            inDegree++;
+                        }
+                    }
+                    totalPortDemand += cReq / Math.max(1, inDegree);
+                }
             }
         }
+        return totalPortDemand;
+    }
 
-        // ==========================================
-        // 2. DOWNSTREAM PASS (Consume Anchor & Upstream Outputs with Supply >= Demand)
-        // ==========================================
-        Map<String, Double> downstreamCounts = new HashMap<>(upstreamCounts);
+    private static void solveDownstreamPass(FlowGraph graph, RecipeNode anchor, Map<String, Double> downstreamCounts, Set<String> upstreamNodeIds, boolean integerCounts) {
         Queue<RecipeNode> downQueue = new ArrayDeque<>();
-        Set<String> downVisited = new HashSet<>();
-
-        // Start downstream propagation from anchor and all upstream producers
-        for (String upId : upstreamCounts.keySet()) {
+        for (String upId : upstreamNodeIds) {
             RecipeNode n = graph.findNodeById(upId);
             if (n != null) {
                 downQueue.add(n);
-                downVisited.add(n.getId());
             }
         }
 
@@ -200,12 +205,11 @@ public final class FlowGraphSolver {
             RecipeNode producer = downQueue.poll();
             if (producer == null) continue;
 
-            // Find next consumers that are downstream of this producer
             Set<RecipeNode> nextConsumers = new LinkedHashSet<>();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
                 if (edge.fromNodeId().equals(producer.getId())) {
                     RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-                    if (consumer != null && !consumer.getId().equals(anchor.getId()) && !upstreamCounts.containsKey(consumer.getId())) {
+                    if (consumer != null && !consumer.getId().equals(anchor.getId()) && !upstreamNodeIds.contains(consumer.getId())) {
                         nextConsumers.add(consumer);
                     }
                 }
@@ -219,7 +223,6 @@ public final class FlowGraphSolver {
                     double singleInRate = consumer.calculateSingleMachineInputRate(inStack);
                     if (singleInRate <= 0.0001) continue;
 
-                    // Sum up all incoming supplies to this input port from all connected producers
                     double totalIncomingSupply = 0.0;
                     for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
                         if (edge.toNodeId().equals(consumer.getId()) && edge.inputIndex() == inIdx) {
@@ -263,19 +266,9 @@ public final class FlowGraphSolver {
                 }
             }
         }
+    }
 
-        // Apply downstream calculated counts
-        for (Map.Entry<String, Double> entry : downstreamCounts.entrySet()) {
-            RecipeNode n = graph.findNodeById(entry.getKey());
-            if (n != null) {
-                n.setMachineCount(entry.getValue());
-            }
-        }
-
-        // Always enforce anchor machine count
-        anchor.setMachineCount(targetAnchorCount);
-
-        // Final normalization across the entire graph
+    private static void normalizeNodeCounts(FlowGraph graph, RecipeNode anchor, double targetAnchorCount, boolean integerCounts) {
         for (RecipeNode n : graph.getNodes()) {
             if (n.getId().equals(anchor.getId())) {
                 n.setMachineCount(targetAnchorCount);
@@ -476,7 +469,6 @@ public final class FlowGraphSolver {
 
         for (RecipeNode node : graph.getNodes()) {
             if (node.isModule()) {
-                // Compound Module: aggregate contained machine counts and breakdown recursively
                 int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
                 if (node.getSubGraph() != null) {
                     BalanceSummary subSummary = computeSummary(node.getSubGraph());
@@ -506,46 +498,24 @@ public final class FlowGraphSolver {
                 highestTier = node.getTargetTier();
             }
 
-            // Aggregate effective outputs
             Map<IngredientStack, Double> outRates = node.calculateEffectiveOutputRates();
             for (Map.Entry<IngredientStack, Double> entry : outRates.entrySet()) {
                 mergeRate(totalProduction, entry.getKey(), entry.getValue());
             }
 
-            // Aggregate effective inputs
             Map<IngredientStack, Double> inRates = node.calculateEffectiveInputRates();
             for (Map.Entry<IngredientStack, Double> entry : inRates.entrySet()) {
                 mergeRate(totalConsumption, entry.getKey(), entry.getValue());
             }
         }
 
-        // Compute net balance (Produced - Consumed)
         Map<IngredientStack, Double> rawInputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> netOutputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> balanced = new LinkedHashMap<>();
 
-        // Deduplicate unique ingredient stacks (merging tag alternatives / compatible items)
         List<IngredientStack> uniqueStacks = new ArrayList<>();
-        for (IngredientStack s : totalProduction.keySet()) {
-            boolean exists = false;
-            for (IngredientStack u : uniqueStacks) {
-                if (u.equals(s) || u.matchesOrAlternative(s) || s.matchesOrAlternative(u)) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists) uniqueStacks.add(s);
-        }
-        for (IngredientStack s : totalConsumption.keySet()) {
-            boolean exists = false;
-            for (IngredientStack u : uniqueStacks) {
-                if (u.equals(s) || u.matchesOrAlternative(s) || s.matchesOrAlternative(u)) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists) uniqueStacks.add(s);
-        }
+        collectUniqueStacks(totalProduction.keySet(), uniqueStacks);
+        collectUniqueStacks(totalConsumption.keySet(), uniqueStacks);
 
         for (IngredientStack stack : uniqueStacks) {
             double produced = findRate(totalProduction, stack);
@@ -565,6 +535,19 @@ public final class FlowGraphSolver {
         return new BalanceSummary(netEUt, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption);
     }
 
+    private static void collectUniqueStacks(Set<IngredientStack> source, List<IngredientStack> destination) {
+        for (IngredientStack s : source) {
+            boolean exists = false;
+            for (IngredientStack u : destination) {
+                if (u.equals(s) || u.matchesOrAlternative(s) || s.matchesOrAlternative(u)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) destination.add(s);
+        }
+    }
+
     public static void optimizeMaxThroughput(FlowGraph graph, boolean preferParallels, boolean integerCounts) {
         if (graph == null) return;
         RecipeNode anchor = graph.findBaseNode();
@@ -573,7 +556,6 @@ public final class FlowGraphSolver {
         }
         if (anchor == null) return;
 
-        // 1. Overclock nodes up to MAX
         for (RecipeNode n : graph.getNodes()) {
             GTVoltageTier baseTier = n.getRecipeTier();
             GTVoltageTier targetTier = GTVoltageTier.MAX;
@@ -583,10 +565,8 @@ public final class FlowGraphSolver {
             n.setTargetTier(targetTier);
         }
 
-        // 2. Propagate auto ratio from anchor
         autoRatioFromAnchor(graph, anchor, integerCounts);
 
-        // 3. Balance machine count and parallels
         if (preferParallels || integerCounts) {
             for (RecipeNode n : graph.getNodes()) {
                 if (n == anchor && anchor.isBaseNode()) continue;
@@ -623,7 +603,6 @@ public final class FlowGraphSolver {
 
         IngredientStack outStack = producer.getOutputs().get(outPortIdx);
         double prodEff = producer.getEfficiency();
-        // If producer has calculated bottlenecked operating efficiency, match against its actual current output rate!
         double effFactor = (prodEff > 0.00001) ? prodEff : 1.0;
         double producedRate = producer.calculateSingleMachineOutputRate(outStack) * producer.getMachineCount() * effFactor;
 

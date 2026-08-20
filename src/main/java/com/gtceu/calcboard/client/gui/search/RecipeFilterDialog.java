@@ -33,12 +33,21 @@ public class RecipeFilterDialog {
         return visible;
     }
 
+    private static Map<String, RecipeSearchEngine.CategoryInfo> LAST_DISCOVERED = null;
+
+    public static void updateDiscoveredCategories(Map<String, RecipeSearchEngine.CategoryInfo> discovered) {
+        LAST_DISCOVERED = discovered;
+    }
+
     public void setVisible(boolean visible) {
         this.visible = visible;
         if (visible) {
             scrollOffset = 0;
             searchBox.setValue("");
             searchBox.setFocused(true);
+            if (LAST_DISCOVERED != null) {
+                updateCategories(LAST_DISCOVERED);
+            }
             applyFilter("");
         }
     }
@@ -48,6 +57,7 @@ public class RecipeFilterDialog {
     }
 
     public void updateCategories(Map<String, RecipeSearchEngine.CategoryInfo> discovered) {
+        LAST_DISCOVERED = discovered;
         allCategories.clear();
         if (discovered != null) {
             for (Map.Entry<String, RecipeSearchEngine.CategoryInfo> entry : discovered.entrySet()) {

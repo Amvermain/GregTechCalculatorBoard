@@ -190,9 +190,7 @@ public class RecipeSearchEngine {
                 Object key = stack.getKey();
                 if (key instanceof net.minecraft.world.level.material.Fluid) {
                     isFluid = true;
-                } else if (net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(stack.getId())) {
-                    isFluid = true;
-                } else if (stack.getClass().getName().contains("Fluid")) {
+                } else if (stack instanceof dev.emi.emi.api.stack.FluidEmiStack) {
                     isFluid = true;
                 }
             } catch (Throwable ignored) {}
@@ -251,12 +249,20 @@ public class RecipeSearchEngine {
             String trimmedPart = part.trim();
             if (trimmedPart.isEmpty()) continue;
 
+            if ((trimmedPart.chars().filter(ch -> ch == '\"').count() % 2) != 0) {
+                trimmedPart = trimmedPart + "\"";
+            }
+
             List<QueryTerm> terms = new ArrayList<>();
             Matcher matcher = TOKEN_PATTERN.matcher(trimmedPart);
 
             while (matcher.find()) {
                 String token = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
-                if (token == null || token.isEmpty() || token.equals("&")) continue;
+                if (token == null || token.isEmpty() || token.equals("&") || token.equals("|")
+                        || token.equals("!") || token.equals("@") || token.equals("#") || token.equals("%")
+                        || token.equals("[") || token.equals("]")) {
+                    continue;
+                }
 
                 boolean negated = false;
                 if (token.startsWith("!") && token.length() > 1) {
@@ -322,6 +328,13 @@ public class RecipeSearchEngine {
         return true;
     }
 
+    public static final Pattern COLOR_PATTERN = Pattern.compile("§[0-9a-fk-or]");
+
+    public static String stripFormatting(String str) {
+        if (str == null || str.indexOf('§') == -1) return str;
+        return COLOR_PATTERN.matcher(str).replaceAll("");
+    }
+
     private static boolean matchesTerm(SearchableRecipe recipe, QueryTerm term) {
         String text = term.text();
         return switch (term.type()) {
@@ -369,6 +382,9 @@ public class RecipeSearchEngine {
                 }
                 if (!recipe.inputSearchIndex.contains(t) && !recipe.categoryName.contains(t) && !recipe.categoryId.contains(t)) {
                     allInInputsOrCat = false;
+                }
+                if (!allInOutputs && !allInInputsOrCat) {
+                    break;
                 }
             }
 

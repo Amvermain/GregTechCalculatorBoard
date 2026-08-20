@@ -17,12 +17,13 @@ public class MachineAddonCatalog {
     private final List<MachineAddon> allAddons = Collections.synchronizedList(new ArrayList<>());
     private final List<MachineAddon> customAddons = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean isDirty = true;
+    private volatile boolean isLoading = false;
+    private volatile boolean isDynamicDataLoaded = false;
     private volatile CompletableFuture<Void> preloadFuture = null;
     private String lastLanguageCode = "";
 
     private MachineAddonCatalog() {
-        // Preload in background
-        preloadAsync();
+        // Initial state
     }
 
     public static synchronized MachineAddonCatalog getInstance() {
@@ -32,44 +33,100 @@ public class MachineAddonCatalog {
         return instance;
     }
 
+    public boolean isLoading() {
+        return isLoading;
+    }
+
+    public boolean isReady() {
+        return isDynamicDataLoaded && !isDirty;
+    }
+
     public void markDirty() {
         this.isDirty = true;
+    }
+
+    public synchronized void reset() {
+        synchronized (allAddons) {
+            allAddons.clear();
+            isDynamicDataLoaded = false;
+            isLoading = false;
+            isDirty = true;
+        }
     }
 
     /**
      * Triggers asynchronous background preloading of all dynamic addons and hatches.
      */
     public synchronized CompletableFuture<Void> preloadAsync() {
-        if (!isDirty && !allAddons.isEmpty()) {
+        if (!isDirty && isDynamicDataLoaded) {
             return CompletableFuture.completedFuture(null);
         }
-        if (preloadFuture != null && !preloadFuture.isDone()) {
+        if (isLoading && preloadFuture != null && !preloadFuture.isDone()) {
             return preloadFuture;
         }
 
-        preloadFuture = CompletableFuture.supplyAsync(DynamicAddonCrawler::crawlAllAddons, Util.backgroundExecutor())
-                .thenAccept(crawled -> {
-                    synchronized (allAddons) {
-                        allAddons.clear();
-                        allAddons.addAll(crawled);
-                        allAddons.addAll(customAddons);
-                        isDirty = false;
-                    }
-                }).exceptionally(ex -> {
+        isLoading = true;
+        preloadFuture = CompletableFuture.supplyAsync(() -> {
+            List<MachineAddon> list = new ArrayList<>();
+            list.addAll(DynamicAddonCrawler.getBuiltinTraits());
+            List<MachineAddon> dynamic = DynamicAddonCrawler.crawlDynamicAddons();
+            if (dynamic != null && !dynamic.isEmpty()) {
+                list.addAll(dynamic);
+            }
+            list.addAll(customAddons);
+            return list;
+        }, Util.backgroundExecutor())
+        .thenAccept(completeList -> {
+            synchronized (allAddons) {
+                allAddons.clear();
+                allAddons.addAll(completeList);
+                boolean hasThermal = completeList.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT);
+                if (hasThermal || DynamicAddonCrawler.isRecipeBakingComplete()) {
+                    isDynamicDataLoaded = true;
                     isDirty = false;
-                    return null;
-                });
+                } else {
+                    isDynamicDataLoaded = false;
+                    isDirty = true;
+                }
+                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                        "[GTCalcBoard] [Catalog] Preload completed. {} addons available (Thermal Augments present: {}, Recipe baking complete: {}).",
+                        allAddons.size(), hasThermal, DynamicAddonCrawler.isRecipeBakingComplete()
+                );
+            }
+            isLoading = false;
+        }).exceptionally(ex -> {
+            isLoading = false;
+            return null;
+        });
 
         return preloadFuture;
     }
 
     public synchronized void refresh() {
-        List<MachineAddon> crawled = DynamicAddonCrawler.crawlAllAddons();
-        synchronized (allAddons) {
-            allAddons.clear();
-            allAddons.addAll(crawled);
-            allAddons.addAll(customAddons);
-            this.isDirty = false;
+        isLoading = true;
+        try {
+            List<MachineAddon> list = new ArrayList<>();
+            list.addAll(DynamicAddonCrawler.getBuiltinTraits());
+            List<MachineAddon> dynamic = DynamicAddonCrawler.crawlDynamicAddons();
+            if (dynamic != null && !dynamic.isEmpty()) {
+                list.addAll(dynamic);
+            }
+            list.addAll(customAddons);
+
+            synchronized (allAddons) {
+                allAddons.clear();
+                allAddons.addAll(list);
+                boolean hasThermal = list.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT);
+                if (hasThermal || DynamicAddonCrawler.isRecipeBakingComplete()) {
+                    isDynamicDataLoaded = true;
+                    isDirty = false;
+                } else {
+                    isDynamicDataLoaded = false;
+                    isDirty = true;
+                }
+            }
+        } finally {
+            isLoading = false;
         }
     }
 
@@ -81,16 +138,22 @@ public class MachineAddonCatalog {
                 if (currentLang != null && !currentLang.equals(lastLanguageCode)) {
                     lastLanguageCode = currentLang;
                     isDirty = true;
-                    preloadAsync();
                 }
+            }
+            if (mc != null && mc.level != null && !isDynamicDataLoaded) {
+                isDirty = true;
             }
         } catch (Throwable ignored) {}
 
-        if (isDirty || allAddons.isEmpty()) {
+        if ((isDirty || !isDynamicDataLoaded) && !isLoading) {
             preloadAsync();
         }
 
         synchronized (allAddons) {
+            if (allAddons.isEmpty()) {
+                allAddons.addAll(DynamicAddonCrawler.getBuiltinTraits());
+                allAddons.addAll(customAddons);
+            }
             return new ArrayList<>(allAddons);
         }
     }
@@ -117,54 +180,25 @@ public class MachineAddonCatalog {
         List<MachineAddon> rec = new ArrayList<>();
         if (node == null) return rec;
 
-        String nodeName = node.getName().toLowerCase();
-        boolean isGen = node.isGenerator();
-
-        boolean isThermal = nodeName.contains("thermal") || nodeName.contains("fuel") || nodeName.contains("dynamo")
-                || nodeName.contains("lapidary") || nodeName.contains("compression") || nodeName.contains("magmatic")
-                || nodeName.contains("gourmand") || nodeName.contains("numismatic") || nodeName.contains("stirling")
-                || nodeName.contains("disenchantment")
-                || (node.getMachineIcon() != null && (node.getMachineIcon().getNamespace().equals("thermal")
-                    || node.getMachineIcon().getNamespace().equals("thermal_expansion")
-                    || node.getMachineIcon().getNamespace().equals("systeams")));
-
+        boolean isThermal = MachineAddon.isThermalMachine(node);
+        boolean isTurbine = MachineAddon.isTurbineMachine(node);
         List<MachineAddon> all = getAllAddons();
 
         if (isThermal) {
-            // Thermal Expansion Dynamos & Processing Machines:
-            // Recommend Upgrade Kits (EV, IV, LuV, etc.) & Thermal Augments
             for (MachineAddon addon : all) {
-                if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT
-                        || addon.getId().contains("upgrade_kit")
-                        || addon.getId().contains("augment")
-                        || addon.getId().contains("thermal")) {
+                if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
                     rec.add(addon);
                 }
             }
-        } else if (isGen) {
-            // GregTech Turbines & Power Generators:
-            // Recommend Turbine Rotors
+        } else if (isTurbine) {
             for (MachineAddon addon : all) {
-                if (addon.getCategory() == MachineAddon.Category.ROTOR || addon.getId().contains("rotor")) {
+                if (addon.getCategory() == MachineAddon.Category.ROTOR) {
                     rec.add(addon);
                 }
             }
         } else {
-            // GregTech Multiblocks & Standard Processing Machines:
             for (MachineAddon addon : all) {
-                String aId = addon.getId().toLowerCase();
-                if (nodeName.contains("pyrolyse") && aId.contains("throughput")) {
-                    rec.add(addon);
-                } else if (nodeName.contains("autoclave") && aId.contains("overpressure")) {
-                    rec.add(addon);
-                } else if (addon.getCategory() == MachineAddon.Category.PARALLEL || aId.contains("configurable_maintenance")) {
-                    rec.add(addon);
-                }
-            }
-
-            // Fallback general multiblocks
-            for (MachineAddon addon : all) {
-                if ((addon.getId().contains("throughput") || addon.getId().contains("configurable_maintenance")) && !rec.contains(addon)) {
+                if (addon.isCompatibleWith(node)) {
                     rec.add(addon);
                 }
             }

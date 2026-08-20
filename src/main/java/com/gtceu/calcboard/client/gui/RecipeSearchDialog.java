@@ -57,7 +57,13 @@ public class RecipeSearchDialog {
     private static final List<SearchableRecipe> GLOBAL_RECIPES = Collections.synchronizedList(new ArrayList<>());
     private static volatile boolean GLOBAL_CACHED = false;
     private static volatile boolean IS_CACHING = false;
+    private static final java.util.concurrent.ExecutorService SEARCH_EXECUTOR = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "GTCalcBoard-SearchWorker");
+        t.setDaemon(true);
+        return t;
+    });
 
+    private final java.util.concurrent.atomic.AtomicInteger searchVersion = new java.util.concurrent.atomic.AtomicInteger(0);
     private final List<SearchableRecipe> filteredRecipes = new ArrayList<>();
     private final RecipeFilterDialog filterDialog = new RecipeFilterDialog();
     private int scrollOffset = 0;
@@ -83,51 +89,28 @@ public class RecipeSearchDialog {
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
 
         this.filterDialog.setOnFilterChanged(() -> updateSearchResults(searchBox.getValue()));
-
-        // Trigger background pre-caching immediately
-        ensureGlobalRecipesCachedAsync(null);
     }
 
-    public void openForContextualWire(RecipeNode sourceNode, int sourcePortIdx, boolean sourceIsInput, IngredientStack sourceStack, double canvasX, double canvasY, boolean shiftAutoRatio) {
-        this.contextualWireTarget = new ContextualWireTarget(sourceNode, sourcePortIdx, sourceIsInput, sourceStack, canvasX, canvasY, shiftAutoRatio);
-        this.hasTargetSpawnPos = true;
-        this.targetSpawnCanvasX = canvasX;
-        this.targetSpawnCanvasY = canvasY;
-        setVisible(true);
+    public static void clearGlobalCache() {
+        GLOBAL_RECIPES.clear();
+        GLOBAL_CACHED = false;
+        IS_CACHING = false;
     }
 
-    public void openAt(double canvasX, double canvasY) {
-        this.contextualWireTarget = null;
-        this.hasTargetSpawnPos = true;
-        this.targetSpawnCanvasX = canvasX;
-        this.targetSpawnCanvasY = canvasY;
-        setVisible(true);
+    public static void invalidateCache() {
+        clearGlobalCache();
     }
 
-    public void open() {
-        this.contextualWireTarget = null;
-        this.hasTargetSpawnPos = false;
-        setVisible(true);
+    public static boolean isGlobalCached() {
+        return GLOBAL_CACHED;
     }
 
-    public static void cacheFromRecipes(Collection<EmiRecipe> recipes) {
-        if (recipes == null || recipes.isEmpty()) return;
-        CompletableFuture.runAsync(() -> {
-            List<SearchableRecipe> tempList = new ArrayList<>();
-            for (EmiRecipe recipe : recipes) {
-                SearchableRecipe sr = RecipeSearchEngine.buildIndex(recipe);
-                if (sr != null) tempList.add(sr);
-            }
-            synchronized (GLOBAL_RECIPES) {
-                GLOBAL_RECIPES.clear();
-                GLOBAL_RECIPES.addAll(tempList);
-                GLOBAL_CACHED = true;
-            }
-        });
+    public static int getCachedRecipeCount() {
+        return GLOBAL_RECIPES.size();
     }
 
     public static void ensureGlobalRecipesCachedAsync(Runnable onComplete) {
-        if (GLOBAL_CACHED && !GLOBAL_RECIPES.isEmpty()) {
+        if (GLOBAL_CACHED) {
             if (onComplete != null) onComplete.run();
             return;
         }
@@ -136,56 +119,98 @@ public class RecipeSearchDialog {
 
         CompletableFuture.runAsync(() -> {
             try {
-                List<SearchableRecipe> tempList = new ArrayList<>();
-                var recipeManager = EmiApi.getRecipeManager();
-                if (recipeManager != null) {
-                    List<EmiRecipe> recipes = recipeManager.getRecipes();
-                    if (recipes != null && !recipes.isEmpty()) {
-                        for (EmiRecipe recipe : recipes) {
-                            SearchableRecipe sr = RecipeSearchEngine.buildIndex(recipe);
-                            if (sr != null) tempList.add(sr);
-                        }
-                    } else {
-                        for (EmiRecipeCategory cat : recipeManager.getCategories()) {
-                            if (cat == null) continue;
-                            List<EmiRecipe> catRecipes = recipeManager.getRecipes(cat);
-                            if (catRecipes != null && !catRecipes.isEmpty()) {
-                                for (EmiRecipe recipe : catRecipes) {
-                                    SearchableRecipe sr = RecipeSearchEngine.buildIndex(recipe);
-                                    if (sr != null) tempList.add(sr);
-                                }
-                            }
-                        }
-                    }
+                var emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
+                List<EmiRecipe> recipes = emiManager != null ? emiManager.getRecipes() : null;
+
+                // If EMI is still actively baking on worker thread, retry in background every 200ms (up to 15 times = 3s)
+                int retries = 0;
+                while ((recipes == null || recipes.isEmpty()) && retries < 15) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ignored) {}
+                    emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
+                    recipes = emiManager != null ? emiManager.getRecipes() : null;
+                    retries++;
                 }
 
-                if (!tempList.isEmpty()) {
-                    synchronized (GLOBAL_RECIPES) {
-                        GLOBAL_RECIPES.clear();
-                        GLOBAL_RECIPES.addAll(tempList);
-                        GLOBAL_CACHED = true;
-                    }
-                } else {
-                    GLOBAL_CACHED = false;
+                if (recipes == null || recipes.isEmpty()) {
+                    IS_CACHING = false;
+                    return;
                 }
-            } catch (Throwable t) {
-                t.printStackTrace();
-            } finally {
-                IS_CACHING = false;
+
+                long startNanos = System.nanoTime();
+                // Fast parallel indexing across all CPU cores (reduces 120s+ to < 1s)
+                List<SearchableRecipe> tempList = recipes.parallelStream()
+                        .map(RecipeSearchEngine::buildIndex)
+                        .filter(Objects::nonNull)
+                        .toList();
+
+                synchronized (GLOBAL_RECIPES) {
+                    GLOBAL_RECIPES.clear();
+                    GLOBAL_RECIPES.addAll(tempList);
+                    GLOBAL_CACHED = true;
+                }
+
+                RecipeFilterDialog.updateDiscoveredCategories(RecipeSearchEngine.discoverCategories(tempList));
+                com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().bake(recipes);
+
+                long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                        "[GTCalcBoard] [RecipeSearch] Indexed {} EMI recipes in {}ms across {} CPU cores.",
+                        tempList.size(), elapsedMs, Runtime.getRuntime().availableProcessors()
+                );
+
                 if (onComplete != null) {
                     Minecraft.getInstance().execute(onComplete);
                 }
+            } catch (Throwable t) {
+                IS_CACHING = false;
+            } finally {
+                IS_CACHING = false;
             }
         });
+    }
+
+    public void openForContextualWire(RecipeNode sourceNode, int sourcePortIdx, boolean sourceIsInput, IngredientStack sourceStack, double canvasX, double canvasY, boolean shiftAutoRatio) {
+        this.contextualWireTarget = new ContextualWireTarget(sourceNode, sourcePortIdx, sourceIsInput, sourceStack, canvasX, canvasY, shiftAutoRatio);
+        this.hasTargetSpawnPos = true;
+        this.targetSpawnCanvasX = canvasX;
+        this.targetSpawnCanvasY = canvasY;
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                "[GTCalcBoard] [UI] RecipeSearchDialog opened (Contextual Drag & Search for stack: '{}', isInput: {}).",
+                sourceStack != null ? sourceStack.getDisplayName() : "null", sourceIsInput
+        );
+        setVisible(true, true, canvasX, canvasY);
+    }
+
+    public void openAt(double canvasX, double canvasY) {
+        this.contextualWireTarget = null;
+        this.hasTargetSpawnPos = true;
+        this.targetSpawnCanvasX = canvasX;
+        this.targetSpawnCanvasY = canvasY;
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] RecipeSearchDialog opened at canvas pos ({}, {}).", canvasX, canvasY);
+        setVisible(true, true, canvasX, canvasY);
+    }
+
+    public void open() {
+        this.contextualWireTarget = null;
+        this.hasTargetSpawnPos = false;
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] RecipeSearchDialog opened.");
+        setVisible(true, false, 0, 0);
     }
 
     public boolean isVisible() {
         return visible;
     }
 
-    public void setVisible(boolean visible) {
+    public void setVisible(boolean visible, boolean isLeftClick, double canvasX, double canvasY) {
         this.visible = visible;
         if (visible) {
+            this.scrollOffset = 0;
+            this.hasTargetSpawnPos = isLeftClick;
+            this.targetSpawnCanvasX = canvasX;
+            this.targetSpawnCanvasY = canvasY;
+            this.stickyHoverRecipe = null;
             searchBox.setValue("");
             searchBox.setFocused(true);
             ensureGlobalRecipesCachedAsync(() -> {
@@ -193,16 +218,43 @@ public class RecipeSearchDialog {
                     updateSearchResults(searchBox.getValue());
                 }
             });
-            updateSearchResults("");
+            updateSearchResultsSynchronously("");
         } else {
             this.contextualWireTarget = null;
             this.stickyHoverRecipe = null;
         }
     }
 
+    public void setVisible(boolean visible) {
+        setVisible(visible, false, 0, 0);
+    }
+
     private void onSearchQueryChanged(String query) {
         scrollOffset = 0;
-        updateSearchResults(query);
+        final int currentVersion = searchVersion.incrementAndGet();
+        if (query == null || query.trim().isEmpty()) {
+            updateSearchResultsSynchronously("");
+            return;
+        }
+
+        SEARCH_EXECUTOR.submit(() -> {
+            try {
+                Thread.sleep(50);
+                if (currentVersion != searchVersion.get()) {
+                    return;
+                }
+
+                List<SearchableRecipe> results = computeSearchResults(query);
+                if (currentVersion == searchVersion.get()) {
+                    Minecraft.getInstance().execute(() -> {
+                        if (currentVersion == searchVersion.get()) {
+                            this.filteredRecipes.clear();
+                            this.filteredRecipes.addAll(results);
+                        }
+                    });
+                }
+            } catch (InterruptedException ignored) {}
+        });
     }
 
     public static List<SearchableRecipe> getTutorialDummyRecipes() {
@@ -238,8 +290,8 @@ public class RecipeSearchDialog {
             String categoryName,
             List<String> outputNames,
             List<String> inputNames,
-            List<String> outputFluidIds,
-            List<String> inputFluidIds
+            List<String> outputIds,
+            List<String> inputIds
     ) {
         StringBuilder outSb = new StringBuilder();
         outputNames.forEach(o -> outSb.append(o.toLowerCase(Locale.ROOT)).append(" "));
@@ -248,8 +300,8 @@ public class RecipeSearchDialog {
 
         StringBuilder fullSb = new StringBuilder();
         fullSb.append(template.getName().toLowerCase(Locale.ROOT)).append(" ");
-        fullSb.append(modId).append(" ");
-        fullSb.append(categoryId).append(" ");
+        fullSb.append(modId.toLowerCase(Locale.ROOT)).append(" ");
+        fullSb.append(categoryId.toLowerCase(Locale.ROOT)).append(" ");
         fullSb.append(categoryName.toLowerCase(Locale.ROOT)).append(" ");
         fullSb.append(outSb).append(" ").append(inSb);
 
@@ -261,10 +313,10 @@ public class RecipeSearchDialog {
                 categoryName,
                 outputNames,
                 inputNames,
-                outputNames,
-                inputNames,
-                outputFluidIds,
-                inputFluidIds,
+                outputIds,
+                inputIds,
+                List.of(),
+                List.of(),
                 List.of(),
                 outSb.toString(),
                 inSb.toString(),
@@ -273,7 +325,17 @@ public class RecipeSearchDialog {
     }
 
     private void updateSearchResults(String query) {
+        onSearchQueryChanged(query);
+    }
+
+    private void updateSearchResultsSynchronously(String query) {
+        searchVersion.incrementAndGet();
+        List<SearchableRecipe> results = computeSearchResults(query);
         filteredRecipes.clear();
+        filteredRecipes.addAll(results);
+    }
+
+    private List<SearchableRecipe> computeSearchResults(String query) {
         ParsedQuery parsedQuery = RecipeSearchEngine.parseQuery(query);
 
         boolean isTutorial = TutorialManager.getInstance().isActive();
@@ -288,7 +350,7 @@ public class RecipeSearchDialog {
                             updateSearchResults(searchBox.getValue());
                         }
                     });
-                    return;
+                    return Collections.emptyList();
                 }
                 sourceList = new ArrayList<>(GLOBAL_RECIPES);
             }
@@ -385,9 +447,11 @@ public class RecipeSearchDialog {
         scoredList.sort((a, b) -> Integer.compare(b.score(), a.score()));
 
         int limit = Math.min(150, scoredList.size());
+        List<SearchableRecipe> resultList = new ArrayList<>(limit);
         for (int i = 0; i < limit; i++) {
-            filteredRecipes.add(scoredList.get(i).recipe());
+            resultList.add(scoredList.get(i).recipe());
         }
+        return resultList;
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -490,10 +554,13 @@ public class RecipeSearchDialog {
         int newlyHoveredRowY = 0;
 
         if (filteredRecipes.isEmpty()) {
-            String emptyMsg = (GLOBAL_RECIPES.isEmpty() || !GLOBAL_CACHED)
-                ? "§e" + Component.translatable("gui.gtcalcboard.loading_recipes").getString() 
+            boolean isLoading = GLOBAL_RECIPES.isEmpty() || !GLOBAL_CACHED;
+            long animDots = (System.currentTimeMillis() / 400L) % 4;
+            String dots = ".".repeat((int) animDots);
+            String emptyMsg = isLoading
+                ? "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_recipes").getString() + dots
                 : "§7" + Component.translatable("gui.gtcalcboard.no_matching_recipes").getString();
-            graphics.drawCenteredString(font, emptyMsg, listX + listW / 2, listY + listH / 2 - 4, 0xFF888888);
+            graphics.drawCenteredString(font, emptyMsg, listX + listW / 2, listY + listH / 2 - 4, isLoading ? 0xFFE0C040 : 0xFF888888);
         } else {
             for (int i = 0; i < visibleRows; i++) {
                 int index = scrollOffset + i;
@@ -704,89 +771,19 @@ public class RecipeSearchDialog {
             }
 
             parent.addNode(node);
+            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                    "[GTCalcBoard] [UI] Added recipe node '{}' to board (Category: {}, Outputs: {}).",
+                    node.getName(), node.getRecipeCategoryId(), node.getOutputs().size()
+            );
 
-            // Perform auto-wire if contextual target is active!
             if (contextualWireTarget != null) {
-                FlowGraph graph = parent.getGraph();
                 RecipeNode sourceNode = contextualWireTarget.sourceNode;
                 IngredientStack sourceStack = contextualWireTarget.sourceStack;
 
                 if (!contextualWireTarget.sourceIsInput) {
-                    // Forward Wire: sourceNode (Output) -> node (Input)
-                    int matchedInIdx = -1;
-                    for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
-                        IngredientStack in = node.getInputs().get(inIdx);
-                        if (in.equals(sourceStack) || in.matchesOrAlternative(sourceStack)) {
-                            matchedInIdx = inIdx;
-                            if (!in.equals(sourceStack)) {
-                                in.selectAlternative(sourceStack.getId());
-                            }
-                            break;
-                        }
-                    }
-
-                    if (matchedInIdx >= 0) {
-                        FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
-                        graph.addConnection(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
-
-                        Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
-                        Double newMachineCount = null;
-
-                        if (contextualWireTarget.shiftAutoRatio) {
-                            double matched = FlowGraphSolver.calculateConsumerMatchCount(graph, sourceNode, contextualWireTarget.sourcePortIdx, node, matchedInIdx);
-                            newMachineCount = matched;
-                            node.setMachineCount(matched);
-                            BoardToast.show(Component.literal("§a⚡ ").append(
-                                Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
-                            ));
-                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
-                        } else {
-                            BoardToast.show(Component.literal("§a✔ ").append(
-                                Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", sourceNode.getName(), node.getName())
-                            ));
-                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                        }
-                        parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
-                        TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
-                    }
+                    connectContextualForwardWire(node, sourceNode, sourceStack);
                 } else {
-                    // Reverse Wire: node (Output) -> sourceNode (Input)
-                    int matchedOutIdx = -1;
-                    for (int outIdx = 0; outIdx < node.getOutputs().size(); outIdx++) {
-                        IngredientStack out = node.getOutputs().get(outIdx);
-                        if (out.equals(sourceStack) || sourceStack.matchesOrAlternative(out)) {
-                            matchedOutIdx = outIdx;
-                            if (!out.equals(sourceStack)) {
-                                sourceStack.selectAlternative(out.getId());
-                            }
-                            break;
-                        }
-                    }
-
-                    if (matchedOutIdx >= 0) {
-                        FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
-                        graph.addConnection(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
-
-                        Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
-                        Double newMachineCount = null;
-
-                        if (contextualWireTarget.shiftAutoRatio) {
-                            double matched = FlowGraphSolver.calculateProducerMatchCount(graph, node, matchedOutIdx, sourceNode, contextualWireTarget.sourcePortIdx);
-                            newMachineCount = matched;
-                            node.setMachineCount(matched);
-                            BoardToast.show(Component.literal("§a⚡ ").append(
-                                Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
-                            ));
-                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
-                        } else {
-                            BoardToast.show(Component.literal("§a✔ ").append(
-                                Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", node.getName(), sourceNode.getName())
-                            ));
-                            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-                        }
-                        parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
-                        TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
-                    }
+                    connectContextualReverseWire(node, sourceNode, sourceStack);
                 }
 
                 contextualWireTarget = null;
@@ -795,6 +792,86 @@ public class RecipeSearchDialog {
 
             parent.markSummaryDirty();
             setVisible(false);
+        }
+    }
+
+    private void connectContextualForwardWire(RecipeNode node, RecipeNode sourceNode, IngredientStack sourceStack) {
+        FlowGraph graph = parent.getGraph();
+        int matchedInIdx = -1;
+        for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
+            IngredientStack in = node.getInputs().get(inIdx);
+            if (in.equals(sourceStack) || in.matchesOrAlternative(sourceStack)) {
+                matchedInIdx = inIdx;
+                if (!in.equals(sourceStack)) {
+                    in.selectAlternative(sourceStack.getId());
+                }
+                break;
+            }
+        }
+
+        if (matchedInIdx >= 0) {
+            FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
+            graph.addConnection(sourceNode.getId(), contextualWireTarget.sourcePortIdx, node.getId(), matchedInIdx);
+
+            Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
+            Double newMachineCount = null;
+
+            if (contextualWireTarget.shiftAutoRatio) {
+                double matched = FlowGraphSolver.calculateConsumerMatchCount(graph, sourceNode, contextualWireTarget.sourcePortIdx, node, matchedInIdx);
+                newMachineCount = matched;
+                node.setMachineCount(matched);
+                BoardToast.show(Component.literal("§a⚡ ").append(
+                    Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
+                ));
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            } else {
+                BoardToast.show(Component.literal("§a✔ ").append(
+                    Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", sourceNode.getName(), node.getName())
+                ));
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            }
+            parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
+            TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
+        }
+    }
+
+    private void connectContextualReverseWire(RecipeNode node, RecipeNode sourceNode, IngredientStack sourceStack) {
+        FlowGraph graph = parent.getGraph();
+        int matchedOutIdx = -1;
+        for (int outIdx = 0; outIdx < node.getOutputs().size(); outIdx++) {
+            IngredientStack out = node.getOutputs().get(outIdx);
+            if (out.equals(sourceStack) || sourceStack.matchesOrAlternative(out)) {
+                matchedOutIdx = outIdx;
+                if (!out.equals(sourceStack)) {
+                    sourceStack.selectAlternative(out.getId());
+                }
+                break;
+            }
+        }
+
+        if (matchedOutIdx >= 0) {
+            FlowGraph.ConnectionEdge newEdge = new FlowGraph.ConnectionEdge(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
+            graph.addConnection(node.getId(), matchedOutIdx, sourceNode.getId(), contextualWireTarget.sourcePortIdx);
+
+            Double oldMachineCount = contextualWireTarget.shiftAutoRatio ? node.getMachineCount() : null;
+            Double newMachineCount = null;
+
+            if (contextualWireTarget.shiftAutoRatio) {
+                double matched = FlowGraphSolver.calculateProducerMatchCount(graph, node, matchedOutIdx, sourceNode, contextualWireTarget.sourcePortIdx);
+                newMachineCount = matched;
+                node.setMachineCount(matched);
+                BoardToast.show(Component.literal("§a⚡ ").append(
+                    Component.translatable("message.gtcalcboard.shift_connect_matched", node.getName(), String.format("%.0f", matched))
+                ));
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            } else {
+                BoardToast.show(Component.literal("§a✔ ").append(
+                    Component.translatable("gui.gtcalcboard.toast.drag_auto_connected", node.getName(), sourceNode.getName())
+                ));
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            }
+            parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
+            TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
         }
     }
 

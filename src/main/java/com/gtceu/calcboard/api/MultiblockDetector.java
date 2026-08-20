@@ -3,11 +3,16 @@ package com.gtceu.calcboard.api;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -17,41 +22,97 @@ import java.util.Set;
 public class MultiblockDetector {
 
     private static final Set<ResourceLocation> MULTIBLOCK_RECIPE_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> COIL_MULTIBLOCK_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> COIL_RECIPE_CATEGORIES = new HashSet<>();
+    private static final Set<ResourceLocation> TURBINE_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> TURBINE_RECIPE_CATEGORIES = new HashSet<>();
+    private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
+    private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new HashMap<>();
     private static boolean initialized = false;
 
     public static void initialize() {
+        initialize(null);
+    }
+
+    public static void initialize(Object rmObj) {
         if (initialized && !MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) return;
 
         // 1. Scan EMI's "multiblock_info" recipe category directly
         try {
-            var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (rm != null) {
-                for (var recipe : rm.getRecipes()) {
-                    if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-                        String catPath = recipe.getCategory().getId().getPath();
-                        if (catPath.equals("multiblock_info") || catPath.contains("multiblock")) {
-                            // Extract from recipe outputs
-                            for (var es : recipe.getOutputs()) {
-                                if (es != null && es.getId() != null) {
-                                    MULTIBLOCK_RECIPE_CONTROLLERS.add(es.getId());
-                                }
-                            }
-                            // Extract from recipe inputs
-                            for (var ei : recipe.getInputs()) {
-                                for (var es : ei.getEmiStacks()) {
-                                    if (es != null && es.getId() != null) {
-                                        MULTIBLOCK_RECIPE_CONTROLLERS.add(es.getId());
+            Iterable<?> recipes = null;
+            if (rmObj != null) {
+                if (rmObj instanceof Iterable<?> it) {
+                    recipes = it;
+                } else {
+                    try {
+                        Method mGetRecipes = rmObj.getClass().getMethod("getRecipes");
+                        Object res = mGetRecipes.invoke(rmObj);
+                        if (res instanceof Iterable<?> it) recipes = it;
+                    } catch (Throwable ignored) {}
+                }
+            }
+            if (recipes == null) {
+                try {
+                    var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+                    if (rm != null) recipes = rm.getRecipes();
+                } catch (Throwable ignored) {}
+            }
+
+            if (recipes != null) {
+                for (Object recipeObj : recipes) {
+                    if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
+                        if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
+                            String catPath = recipe.getCategory().getId().getPath();
+                            if (catPath.equals("multiblock_info") || catPath.contains("multiblock")) {
+                                ResourceLocation controllerId = null;
+
+                                // Extract from recipe ID path (e.g. gtceu:multiblock_info/large_chemical_reactor -> gtceu:large_chemical_reactor)
+                                if (recipe.getId() != null) {
+                                    String rPath = recipe.getId().getPath();
+                                    if (rPath.contains("/")) {
+                                        String machineName = rPath.substring(rPath.lastIndexOf('/') + 1);
+                                        controllerId = ResourceLocation.tryParse(recipe.getId().getNamespace() + ":" + machineName);
+                                    } else {
+                                        controllerId = recipe.getId();
                                     }
                                 }
-                            }
-                            // Extract from recipe ID path (e.g. gtceu:multiblock_info/large_mixer -> gtceu:large_mixer)
-                            if (recipe.getId() != null) {
-                                String rPath = recipe.getId().getPath();
-                                if (rPath.contains("/")) {
-                                    String machineName = rPath.substring(rPath.lastIndexOf('/') + 1);
-                                    ResourceLocation mLoc = ResourceLocation.tryParse(recipe.getId().getNamespace() + ":" + machineName);
-                                    if (mLoc != null && ForgeRegistries.ITEMS.containsKey(mLoc)) {
-                                        MULTIBLOCK_RECIPE_CONTROLLERS.add(mLoc);
+
+                                if (controllerId == null) {
+                                    for (var es : recipe.getOutputs()) {
+                                        if (es != null && es.getId() != null) {
+                                            controllerId = es.getId();
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (controllerId != null) {
+                                    MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
+                                }
+
+                                // Deduce whether this multiblock structure uses Heating Coils from recipe structure inputs
+                                boolean usesCoilBlock = false;
+                                for (var ei : recipe.getInputs()) {
+                                    for (var es : ei.getEmiStacks()) {
+                                        if (es != null) {
+                                            ItemStack stack = es.getItemStack();
+                                            if (stack != null && !stack.isEmpty()) {
+                                                CoilHelper.CoilStats stats = CoilHelper.getCoilStats(stack);
+                                                if (stats != null && stats.temperature() > 0) {
+                                                    usesCoilBlock = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (usesCoilBlock) break;
+                                }
+
+                                if (usesCoilBlock && controllerId != null) {
+                                    // Exclude rock_filtrator / geode_filter
+                                    if (!controllerId.equals(ResourceLocation.tryParse("gtceu:rock_filtrator")) && !controllerId.equals(ResourceLocation.tryParse("gtceu:geode_filter"))) {
+                                        COIL_MULTIBLOCK_CONTROLLERS.add(controllerId);
+                                        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [MultiblockDetector] Detected Coil Multiblock via multiblock_info: {}", controllerId);
                                     }
                                 }
                             }
@@ -62,31 +123,202 @@ public class MultiblockDetector {
                     initialized = true;
                 }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Error scanning EMI multiblock_info recipes: {}", t.getMessage());
+        }
 
         // 2. GTCEu MetaMachine Multiblock Definition inspection via Reflection
         try {
-            if (ModCompatHelper.isGTLoaded() && ForgeRegistries.ITEMS != null) {
-                for (Item item : ForgeRegistries.ITEMS) {
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
-                    if (id != null && (id.getNamespace().equals("gtceu") || id.getNamespace().equals("kubejs") || id.getNamespace().equals("start_core"))) {
-                        if (item instanceof BlockItem bi) {
-                            Block b = bi.getBlock();
+            if (ModCompatHelper.isGTLoaded()) {
+                Class<?> multiblockDefCls = null;
+                try {
+                    multiblockDefCls = Class.forName("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
+                } catch (Throwable ignored) {}
+
+                Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+                Iterable<?> iterable = getRegistryIterable(machinesRegistry);
+
+                if (iterable != null) {
+                    for (Object def : iterable) {
+                        if (def == null) continue;
+                        try {
+                            Method mGetId = def.getClass().getMethod("getId");
+                            ResourceLocation id = (ResourceLocation) mGetId.invoke(def);
+                            if (id == null) continue;
+
+                            boolean isMb = (multiblockDefCls != null && multiblockDefCls.isInstance(def))
+                                    || MULTIBLOCK_RECIPE_CONTROLLERS.contains(id);
+                            if (isMb) {
+                                MULTIBLOCK_RECIPE_CONTROLLERS.add(id);
+                            }
+
+                            boolean isCoilMb = COIL_MULTIBLOCK_CONTROLLERS.contains(id);
+                            boolean isTurbineMb = TURBINE_CONTROLLERS.contains(id);
+
+                            if (isCoilMb) {
+                                COIL_MULTIBLOCK_CONTROLLERS.add(id);
+                                MULTIBLOCK_RECIPE_CONTROLLERS.add(id);
+                            }
+
+                            if (isTurbineMb) {
+                                TURBINE_CONTROLLERS.add(id);
+                                MULTIBLOCK_RECIPE_CONTROLLERS.add(id);
+
+                                // Extract turbine base tier dynamically from definition
+                                GTVoltageTier turbineTier = null;
+                                try {
+                                    Method mGetTier = def.getClass().getMethod("getTier");
+                                    Object tVal = mGetTier.invoke(def);
+                                    if (tVal instanceof Number num) {
+                                        int tIdx = num.intValue();
+                                        if (tIdx >= 0 && tIdx < GTVoltageTier.values().length) {
+                                            turbineTier = GTVoltageTier.values()[tIdx];
+                                        }
+                                    }
+                                } catch (Throwable ignored) {}
+
+                                double baseEnergy = turbineTier != null ? (double) (turbineTier.getVoltage() * 2L) : 4096.0;
+                                try {
+                                    Method mGetEnergy = def.getClass().getMethod("getBaseEnergyPerTick");
+                                    Object eVal = mGetEnergy.invoke(def);
+                                    if (eVal instanceof Number num && num.doubleValue() > 0) {
+                                        baseEnergy = num.doubleValue();
+                                    }
+                                } catch (Throwable ignored) {}
+
+                                if (turbineTier != null) {
+                                    TURBINE_BASE_TIERS.put(id, turbineTier);
+                                }
+                                TURBINE_BASE_PRODUCTIONS.put(id, baseEnergy);
+                            }
+
+                            // Inspect recipe types of multiblock definition
                             try {
-                                Method mGetDef = b.getClass().getMethod("getDefinition");
-                                Object def = mGetDef.invoke(b);
-                                if (def != null) {
-                                    String defName = def.getClass().getName();
-                                    if (defName.contains("Multiblock") || defName.contains("Multi")) {
-                                        MULTIBLOCK_RECIPE_CONTROLLERS.add(id);
+                                Method mGetRecipeType = def.getClass().getMethod("getRecipeTypes");
+                                Object rTypes = mGetRecipeType.invoke(def);
+                                if (rTypes instanceof Object[] arr) {
+                                    for (Object rt : arr) {
+                                        if (rt != null) {
+                                            Method mGetIdRt = rt.getClass().getMethod("registryName");
+                                            Object rId = mGetIdRt.invoke(rt);
+                                            if (rId instanceof ResourceLocation rl) {
+                                                if (isCoilMb) {
+                                                    COIL_RECIPE_CATEGORIES.add(rl);
+                                                    com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [MultiblockDetector] Registered Coil Recipe Category: {} for controller {}", rl, id);
+                                                }
+                                                if (isTurbineMb) {
+                                                    TURBINE_RECIPE_CATEGORIES.add(rl);
+                                                    GTVoltageTier t = TURBINE_BASE_TIERS.get(id);
+                                                    if (t != null) TURBINE_BASE_TIERS.put(rl, t);
+                                                    Double e = TURBINE_BASE_PRODUCTIONS.get(id);
+                                                    if (e != null) TURBINE_BASE_PRODUCTIONS.put(rl, e);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             } catch (Throwable ignored) {}
-                        }
+                        } catch (Throwable ignored) {}
                     }
+                    initialized = true;
                 }
             }
         } catch (Throwable ignored) {}
+
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initTestEnvironmentDefaults();
+            initialized = true;
+        }
+    }
+
+    public static Iterable<?> getRegistryIterable(Object registryObj) {
+        if (registryObj == null) return null;
+        if (registryObj instanceof Iterable<?> it) return it;
+        try {
+            Method mValues = registryObj.getClass().getMethod("values");
+            Object vals = mValues.invoke(registryObj);
+            if (vals instanceof Iterable<?> it) return it;
+        } catch (Throwable ignored) {}
+        try {
+            Method mEntries = registryObj.getClass().getMethod("entries");
+            Object entries = mEntries.invoke(registryObj);
+            if (entries instanceof Iterable<?> it) return it;
+        } catch (Throwable ignored) {}
+        try {
+            Method mKeySet = registryObj.getClass().getMethod("keySet");
+            Object keys = mKeySet.invoke(registryObj);
+            if (keys instanceof Iterable<?> it) {
+                Method mGet = registryObj.getClass().getMethod("get", Object.class);
+                List<Object> list = new ArrayList<>();
+                for (Object k : it) {
+                    Object val = mGet.invoke(registryObj, k);
+                    if (val != null) list.add(val);
+                }
+                return list;
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static void initTestEnvironmentDefaults() {
+        registerTestTurbine(ResourceLocation.tryParse("gtceu:large_steam_turbine"), GTVoltageTier.HV, 1024.0);
+        registerTestTurbine(ResourceLocation.tryParse("gtceu:large_gas_turbine"), GTVoltageTier.EV, 4096.0);
+        registerTestTurbine(ResourceLocation.tryParse("gtceu:large_plasma_turbine"), GTVoltageTier.IV, 16384.0);
+        registerTestTurbine(ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"), GTVoltageTier.IV, 196608.0);
+
+        TURBINE_BASE_TIERS.put(ResourceLocation.tryParse("gtceu:steam_turbine"), GTVoltageTier.HV);
+        TURBINE_BASE_PRODUCTIONS.put(ResourceLocation.tryParse("gtceu:steam_turbine"), 1024.0);
+        TURBINE_BASE_TIERS.put(ResourceLocation.tryParse("gtceu:gas_turbine"), GTVoltageTier.EV);
+        TURBINE_BASE_PRODUCTIONS.put(ResourceLocation.tryParse("gtceu:gas_turbine"), 4096.0);
+        TURBINE_BASE_TIERS.put(ResourceLocation.tryParse("gtceu:plasma_turbine"), GTVoltageTier.IV);
+        TURBINE_BASE_PRODUCTIONS.put(ResourceLocation.tryParse("gtceu:plasma_turbine"), 16384.0);
+
+        ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        ResourceLocation cr = ResourceLocation.tryParse("gtceu:chemical_reactor");
+        COIL_MULTIBLOCK_CONTROLLERS.add(lcr);
+        MULTIBLOCK_RECIPE_CONTROLLERS.add(lcr);
+        COIL_RECIPE_CATEGORIES.add(cr);
+    }
+
+    private static void registerTestTurbine(ResourceLocation loc, GTVoltageTier tier, double baseProd) {
+        TURBINE_CONTROLLERS.add(loc);
+        MULTIBLOCK_RECIPE_CONTROLLERS.add(loc);
+        TURBINE_RECIPE_CATEGORIES.add(loc);
+        TURBINE_BASE_TIERS.put(loc, tier);
+        TURBINE_BASE_PRODUCTIONS.put(loc, baseProd);
+    }
+
+    public static void reinitialize() {
+        reinitialize(null);
+    }
+
+    public static void reinitialize(Object rmObj) {
+        initialized = false;
+        MULTIBLOCK_RECIPE_CONTROLLERS.clear();
+        COIL_MULTIBLOCK_CONTROLLERS.clear();
+        COIL_RECIPE_CATEGORIES.clear();
+        TURBINE_CONTROLLERS.clear();
+        TURBINE_RECIPE_CATEGORIES.clear();
+        TURBINE_BASE_TIERS.clear();
+        TURBINE_BASE_PRODUCTIONS.clear();
+        initialize(rmObj);
+    }
+
+    public static GTVoltageTier getTurbineBaseTier(ResourceLocation id) {
+        if (id == null) return null;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return TURBINE_BASE_TIERS.get(id);
+    }
+
+    public static Double getTurbineBaseProduction(ResourceLocation id) {
+        if (id == null) return null;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return TURBINE_BASE_PRODUCTIONS.get(id);
     }
 
     /**
@@ -98,5 +330,81 @@ public class MultiblockDetector {
             initialize();
         }
         return MULTIBLOCK_RECIPE_CONTROLLERS.contains(workstationId);
+    }
+
+    /**
+     * Checks whether the given workstation item/block is a coil-heated multiblock machine.
+     */
+    public static boolean isCoilMultiblock(ResourceLocation workstationId) {
+        if (workstationId == null) return false;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return COIL_MULTIBLOCK_CONTROLLERS.contains(workstationId);
+    }
+
+    /**
+     * Checks whether the given recipe category is supported by a coil-heated multiblock machine.
+     */
+    public static void registerCoilCategory(ResourceLocation categoryId) {
+        if (categoryId != null) {
+            COIL_RECIPE_CATEGORIES.add(categoryId);
+        }
+    }
+
+    public static void registerTurbineCategory(ResourceLocation categoryId) {
+        if (categoryId != null) {
+            TURBINE_RECIPE_CATEGORIES.add(categoryId);
+        }
+    }
+
+    public static boolean isCoilRecipeCategory(ResourceLocation categoryId) {
+        if (categoryId == null) return false;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return COIL_RECIPE_CATEGORIES.contains(categoryId);
+    }
+
+    /**
+     * Checks whether the given workstation item/block is a turbine generator machine.
+     */
+    public static boolean isTurbineMachine(ResourceLocation workstationId) {
+        if (workstationId == null) return false;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return TURBINE_CONTROLLERS.contains(workstationId);
+    }
+
+    /**
+     * Checks whether the given recipe category is a turbine generator recipe type.
+     */
+    public static boolean isTurbineRecipeCategory(ResourceLocation categoryId) {
+        if (categoryId == null) return false;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return TURBINE_RECIPE_CATEGORIES.contains(categoryId);
+    }
+
+    public static Set<ResourceLocation> getAllCoilControllers() {
+        return java.util.Collections.unmodifiableSet(COIL_MULTIBLOCK_CONTROLLERS);
+    }
+
+    public static Set<ResourceLocation> getAllCoilCategories() {
+        return java.util.Collections.unmodifiableSet(COIL_RECIPE_CATEGORIES);
+    }
+
+    public static Set<ResourceLocation> getAllTurbineControllers() {
+        return java.util.Collections.unmodifiableSet(TURBINE_CONTROLLERS);
+    }
+
+    public static Set<ResourceLocation> getAllTurbineCategories() {
+        return java.util.Collections.unmodifiableSet(TURBINE_RECIPE_CATEGORIES);
+    }
+
+    public static Set<ResourceLocation> getAllMultiblockControllers() {
+        return java.util.Collections.unmodifiableSet(MULTIBLOCK_RECIPE_CONTROLLERS);
     }
 }

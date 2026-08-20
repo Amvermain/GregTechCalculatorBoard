@@ -72,7 +72,18 @@ public class RecipeNode {
     }
 
     public static RecipeNode create(String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
-        return new RecipeNode(UUID.randomUUID().toString(), name, baseDurationTicks, baseEUt, recipeTier);
+        RecipeNode node = new RecipeNode(UUID.randomUUID().toString(), name, baseDurationTicks, baseEUt, recipeTier);
+        if (name != null && !name.isEmpty()) {
+            String base = name.contains(" (") ? name.substring(0, name.indexOf(" (")) : name;
+            String sanitized = base.toLowerCase().trim().replace(" ", "_");
+            ResourceLocation loc = ResourceLocation.tryParse("gtceu:" + sanitized);
+            if (loc != null) {
+                node.setMachineIcon(loc);
+                node.setRecipeCategoryId(loc);
+                node.getAvailableWorkstations().add(loc);
+            }
+        }
+        return node;
     }
 
     public RecipeNode copy() {
@@ -191,6 +202,16 @@ public class RecipeNode {
         this.availableWorkstations = availableWorkstations != null ? availableWorkstations : new ArrayList<>();
     }
 
+    private ResourceLocation recipeCategoryId;
+
+    public ResourceLocation getRecipeCategoryId() {
+        return recipeCategoryId;
+    }
+
+    public void setRecipeCategoryId(ResourceLocation recipeCategoryId) {
+        this.recipeCategoryId = recipeCategoryId;
+    }
+
     private boolean isMultiblock = false;
 
     public boolean isMultiblock() {
@@ -203,26 +224,18 @@ public class RecipeNode {
 
     public static boolean isMultiblockWorkstation(ResourceLocation ws) {
         if (ws == null) return false;
-        if (MultiblockDetector.isMultiblock(ws)) {
-            return true;
-        }
-        String path = ws.getPath().toLowerCase();
-        return path.contains("large_") || path.contains("_large") || path.startsWith("t_large_") || path.contains("t_large")
-                || path.contains("multi_") || path.contains("_multi") || path.contains("multismelter")
-                || path.contains("mega_") || path.contains("_mega")
-                || path.contains("pyrolyse") || path.contains("blast_furnace") || path.contains("ebf")
-                || path.contains("cracking") || path.contains("fusion") || path.contains("distillation_tower")
-                || path.contains("cleanroom") || path.contains("greenhouse") || path.contains("processing_array")
-                || path.contains("vacuum_freezer") || path.contains("implosion_compressor");
+        return MultiblockDetector.isMultiblock(ws);
     }
 
     public boolean hasMultiblockOption() {
         if (isGenerator() || isModule()) return false;
         if (isMultiblock() || canUseCoils()) return true;
+        if (recipeCategoryId != null && CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId).hasMultiblockOption()) {
+            return true;
+        }
 
-        // Check if ANY workstation in the recipe's workstation list is a multiblock controller
         for (ResourceLocation ws : availableWorkstations) {
-            if (isMultiblockWorkstation(ws)) {
+            if (isMultiblockWorkstation(ws) || MultiblockDetector.isMultiblock(ws)) {
                 return true;
             }
         }
@@ -249,24 +262,30 @@ public class RecipeNode {
     }
 
     public boolean canUseCoils() {
-        if (MachineAddon.isCoilMachine(name, machineIcon != null ? machineIcon.toString() : "")) {
+        if (recipeTemperature > 0) {
+            return true;
+        }
+        if (recipeCategoryId != null && CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId).canUseCoils()) {
+            return true;
+        }
+        if (machineIcon != null && MultiblockDetector.isCoilMultiblock(machineIcon)) {
+            return true;
+        }
+        if (recipeCategoryId != null && MultiblockDetector.isCoilRecipeCategory(recipeCategoryId)) {
             return true;
         }
         for (ResourceLocation ws : availableWorkstations) {
-            if (MachineAddon.isCoilMachine(ws.getPath(), ws.toString())) {
+            if (MultiblockDetector.isCoilMultiblock(ws)) {
                 return true;
             }
         }
-        String n = name != null ? name.toLowerCase() : "";
-        return n.contains("alloy") || n.contains("furnace") || n.contains("smelter") || n.contains("제련") || n.contains("화로")
-                || n.contains("chemical") || n.contains("화학") || n.contains("blast") || n.contains("고로")
-                || n.contains("pyrolyse") || n.contains("열분해") || n.contains("crack") || n.contains("크래킹");
+        return false;
     }
 
     public boolean canUseMultiblockTraits() {
         if (isMultiblock() || hasMultiblockOption() || canUseCoils()) return true;
         for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws) || isMultiblockWorkstation(ws)) {
+            if (MultiblockDetector.isMultiblock(ws)) {
                 return true;
             }
         }
@@ -378,51 +397,74 @@ public class RecipeNode {
     }
 
     /**
-     * Identifies the base voltage tier for this turbine type (HV for Steam, EV for Gas, IV for Plasma).
+     * Deductively identifies the base voltage tier for this turbine type from GTCEu Machine Definitions or Recipe Category.
      */
     public GTVoltageTier getTurbineBaseTier() {
-        String m = (getMachineIcon() != null ? getMachineIcon().toString() : "").toLowerCase();
-        String n = (getName() != null ? getName() : "").toLowerCase();
-        if (m.contains("plasma") || n.contains("plasma") || n.contains("플라즈마")) {
-            return GTVoltageTier.IV;
+        if (getMachineIcon() != null) {
+            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(getMachineIcon());
+            if (tier != null) return tier;
         }
-        if (m.contains("gas") || n.contains("gas") || n.contains("가스")) {
-            return GTVoltageTier.EV;
+        if (getAvailableWorkstations() != null) {
+            for (ResourceLocation ws : getAvailableWorkstations()) {
+                GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(ws);
+                if (tier != null) return tier;
+            }
         }
-        if (m.contains("steam") || n.contains("steam") || n.contains("증기")) {
-            return GTVoltageTier.HV;
+        if (getRecipeCategoryId() != null) {
+            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(getRecipeCategoryId());
+            if (tier != null) return tier;
+        }
+        if (getName() != null) {
+            String sanitized = getName().toLowerCase().trim().replace(" ", "_");
+            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(ResourceLocation.tryParse("gtceu:" + sanitized));
+            if (tier != null) return tier;
         }
         return GTVoltageTier.EV;
     }
 
     /**
-     * Identifies base production EU/t (1,024 for Steam, 4,096 for Gas, 16,384 for Plasma, 196,608 for 12x Nyinsane Plasma).
+     * Deductively identifies base production EU/t from GTCEu Machine Definition or base tier voltage.
      */
     public double getTurbineBaseProduction() {
-        String m = (getMachineIcon() != null ? getMachineIcon().toString() : "").toLowerCase();
-        String n = (getName() != null ? getName() : "").toLowerCase();
-        if (m.contains("nyinsane") || n.contains("nyinsane")) {
-            return 16384.0 * 12.0; // 12x parallel boosted plasma turbine
+        if (getMachineIcon() != null) {
+            Double prod = MultiblockDetector.getTurbineBaseProduction(getMachineIcon());
+            if (prod != null) return prod;
         }
-        if (m.contains("plasma") || n.contains("plasma") || n.contains("플라즈마")) {
-            return 16384.0;
+        if (getAvailableWorkstations() != null) {
+            for (ResourceLocation ws : getAvailableWorkstations()) {
+                Double prod = MultiblockDetector.getTurbineBaseProduction(ws);
+                if (prod != null) return prod;
+            }
         }
-        if (m.contains("gas") || n.contains("gas") || n.contains("가스")) {
-            return 4096.0;
+        if (getRecipeCategoryId() != null) {
+            Double prod = MultiblockDetector.getTurbineBaseProduction(getRecipeCategoryId());
+            if (prod != null) return prod;
         }
-        if (m.contains("steam") || n.contains("steam") || n.contains("증기")) {
-            return 1024.0;
+        if (getName() != null) {
+            String sanitized = getName().toLowerCase().trim().replace(" ", "_");
+            Double prod = MultiblockDetector.getTurbineBaseProduction(ResourceLocation.tryParse("gtceu:" + sanitized));
+            if (prod != null) return prod;
         }
-        return 4096.0;
+        GTVoltageTier baseTier = getTurbineBaseTier();
+        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 4096.0;
     }
 
     public boolean isLargeTurbine() {
         if (!isGenerator) return false;
-        String n = (name != null ? name : "").toLowerCase();
-        String m = (machineIcon != null ? machineIcon.toString() : "").toLowerCase();
-        return m.contains("large_turbine") || m.contains("nyinsane")
-                || n.contains("large") || n.contains("대형") || n.contains("nyinsane")
-                || addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+        if (addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)) return true;
+        if (rotorEfficiency != 100 || rotorPower != 100 || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"))) return true;
+        if (machineIcon != null && MultiblockDetector.isTurbineMachine(machineIcon)) return true;
+        if (recipeCategoryId != null && MultiblockDetector.isTurbineRecipeCategory(recipeCategoryId)) return true;
+        if (availableWorkstations != null) {
+            for (ResourceLocation ws : availableWorkstations) {
+                if (MultiblockDetector.isTurbineMachine(ws)) return true;
+            }
+        }
+        if (name != null) {
+            String sanitized = name.toLowerCase().trim().replace(" ", "_");
+            if (MultiblockDetector.isTurbineMachine(ResourceLocation.tryParse("gtceu:" + sanitized))) return true;
+        }
+        return false;
     }
 
     /**
@@ -574,12 +616,71 @@ public class RecipeNode {
         return addons;
     }
 
+    public static boolean isThermalUpgradeKit(MachineAddon addon) {
+        if (addon == null) return false;
+        if (addon.getCategory() != MachineAddon.Category.THERMAL_AUGMENT) return false;
+        return addon.getParallelMultiplier() > 1 || addon.getId().contains("upgrade_kit") || addon.getId().contains("tier_upgrade");
+    }
+
     public void addAddon(MachineAddon addon) {
-        if (addon != null && !addons.contains(addon)) {
+        if (addon == null) return;
+
+        // Thermal Upgrade Kit: exactly 1 kit max (replaces existing)
+        if (isThermalUpgradeKit(addon)) {
+            addons.removeIf(RecipeNode::isThermalUpgradeKit);
             addons.add(addon);
-            if (isGenerator && addon.getCategory() == MachineAddon.Category.ROTOR) {
+            return;
+        }
+
+        // Thermal Regular Augments: stackable up to 3 slots max
+        if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
+            long regCount = addons.stream().filter(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && !isThermalUpgradeKit(a)).count();
+            if (regCount < 3) {
+                addons.add(addon);
+            }
+            return;
+        }
+
+        // Rotor (Single)
+        if (addon.getCategory() == MachineAddon.Category.ROTOR) {
+            addons.removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+            addons.add(addon);
+            if (isGenerator) {
                 autoCalculateTurbineParallel();
             }
+            return;
+        }
+
+        // Coil (Single)
+        if (addon.getCategory() == MachineAddon.Category.COIL) {
+            addons.removeIf(a -> a.getCategory() == MachineAddon.Category.COIL);
+            addons.add(addon);
+            return;
+        }
+
+        // Maintenance Hatch (Single)
+        if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
+            addons.removeIf(a -> a.getCategory() == MachineAddon.Category.MAINTENANCE);
+            addons.add(addon);
+            return;
+        }
+
+        // General Multiblock Trait / Hatch / Custom
+        if (!addons.contains(addon)) {
+            addons.add(addon);
+        }
+    }
+
+    public void removeSingleAddon(String addonId) {
+        if (addonId == null) return;
+        for (int i = 0; i < addons.size(); i++) {
+            if (addons.get(i).getId().equals(addonId)) {
+                addons.remove(i);
+                break;
+            }
+        }
+        if (isGenerator) {
+            autoCalculateTurbineParallel();
         }
     }
 
@@ -670,10 +771,35 @@ public class RecipeNode {
 
     public boolean isTurbine() {
         if (!isGenerator) return false;
-        String n = (name != null ? name : "").toLowerCase();
-        String m = (machineIcon != null ? machineIcon.toString() : "").toLowerCase();
-        return n.contains("turbine") || n.contains("터빈") || m.contains("turbine")
-                || addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+        if (MachineAddon.isThermalMachine(this)) return false;
+
+        if (rotorEfficiency != 100 || rotorPower != 100 || (rotorName != null && !rotorName.isEmpty())) {
+            return true;
+        }
+
+        if (recipeCategoryId != null) {
+            if (MultiblockDetector.isTurbineRecipeCategory(recipeCategoryId)) {
+                return true;
+            }
+            if (recipeCategoryId.getNamespace().equals("gtceu")) {
+                String p = recipeCategoryId.getPath();
+                if (p.equals("gas_turbine") || p.equals("steam_turbine") || p.equals("plasma_turbine")) {
+                    return true;
+                }
+            }
+        }
+
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && MultiblockDetector.isTurbineMachine(ws)) {
+                return true;
+            }
+        }
+
+        if (machineIcon != null && MultiblockDetector.isTurbineMachine(machineIcon)) {
+            return true;
+        }
+
+        return addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
     }
 
     /**
@@ -946,6 +1072,10 @@ public class RecipeNode {
             tag.put("workstations", wsList);
         }
 
+        if (recipeCategoryId != null) {
+            tag.putString("recipeCategoryId", recipeCategoryId.toString());
+        }
+
         tag.putBoolean("isMultiblock", isMultiblock);
 
         return tag;
@@ -959,6 +1089,9 @@ public class RecipeNode {
         GTVoltageTier recipeTier = GTVoltageTier.valueOf(tag.getString("recipeTier"));
 
         RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+        if (tag.contains("recipeCategoryId")) {
+            node.recipeCategoryId = ResourceLocation.tryParse(tag.getString("recipeCategoryId"));
+        }
         if (tag.contains("isMultiblock")) {
             node.isMultiblock = tag.getBoolean("isMultiblock");
         }

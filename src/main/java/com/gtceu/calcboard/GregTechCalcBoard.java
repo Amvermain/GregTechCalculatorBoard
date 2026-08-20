@@ -13,6 +13,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 @Mod(GregTechCalcBoard.MOD_ID)
 public class GregTechCalcBoard {
     public static final String MOD_ID = "gtcalcboard";
+    public static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     public GregTechCalcBoard(FMLJavaModLoadingContext context) {
         // Register DisplayTest to make the mod completely optional on both client and server sides

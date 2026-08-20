@@ -18,8 +18,12 @@ public final class BoardHotkeyHandler {
     public static boolean handleKeyPressed(BoardScreen screen, int keyCode, int scanCode, int modifiers, double lastMouseX, double lastMouseY) {
         if (screen == null) return false;
 
-        // 1. Priority ESC handlers (Welcome dialog, active tutorial, modals)
+        // Priority ESC handlers (Active wire drag, Welcome dialog, active tutorial, modals)
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (screen.getCanvasHandler() != null && screen.getCanvasHandler().isDraggingWire()) {
+                screen.getCanvasHandler().cancelWireDrag();
+                return true;
+            }
             if (screen.getWelcomeDialog().isVisible()) {
                 screen.getWelcomeDialog().hide();
                 return true;

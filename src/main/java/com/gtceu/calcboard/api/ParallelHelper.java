@@ -31,7 +31,7 @@ public class ParallelHelper {
      */
     public static ParallelStats getParallelStats(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
-            return ParallelStats.DEFAULT;
+            return null;
         }
 
         // 1. Direct NBT property check
@@ -57,7 +57,7 @@ public class ParallelHelper {
             return getParallelStats(id.toString());
         }
 
-        return ParallelStats.DEFAULT;
+        return null;
     }
 
     /**
@@ -65,7 +65,7 @@ public class ParallelHelper {
      */
     public static ParallelStats getParallelStats(Block block) {
         if (block == null) {
-            return ParallelStats.DEFAULT;
+            return null;
         }
 
         // Try extracting MachineDefinition directly from MetaMachineBlock
@@ -86,7 +86,7 @@ public class ParallelHelper {
             return getParallelStats(id.toString());
         }
 
-        return ParallelStats.DEFAULT;
+        return null;
     }
 
     /**
@@ -94,14 +94,21 @@ public class ParallelHelper {
      */
     public static ParallelStats getParallelStats(String identifier) {
         if (identifier == null || identifier.isEmpty()) {
-            return ParallelStats.DEFAULT;
+            return null;
         }
 
         String key = identifier.toLowerCase().trim();
         if (key.startsWith("gtceu:")) {
             key = key.substring("gtceu:".length());
         }
-        return STATS_CACHE.computeIfAbsent(key, ParallelHelper::computeParallelStats);
+        if (STATS_CACHE.containsKey(key)) {
+            return STATS_CACHE.get(key);
+        }
+        ParallelStats computed = computeParallelStats(key);
+        if (computed != null) {
+            STATS_CACHE.put(key, computed);
+        }
+        return computed;
     }
 
     private static ParallelStats computeParallelStats(String identifier) {
@@ -127,7 +134,7 @@ public class ParallelHelper {
             } catch (Throwable ignored) {}
         }
 
-        return ParallelStats.DEFAULT;
+        return null;
     }
 
     /**
@@ -260,6 +267,7 @@ public class ParallelHelper {
             try {
                 Method m = target.getClass().getMethod(mName);
                 if (m.getParameterCount() == 0) {
+                    m.setAccessible(true);
                     Object val = m.invoke(target);
                     if (val instanceof Number n && n.intValue() > 0) {
                         return n.intValue();
@@ -276,6 +284,7 @@ public class ParallelHelper {
             try {
                 Method m = target.getClass().getMethod(mName);
                 if (m.getParameterCount() == 0) {
+                    m.setAccessible(true);
                     Object val = m.invoke(target);
                     if (val instanceof Boolean b) {
                         return b;
@@ -284,5 +293,28 @@ public class ParallelHelper {
             } catch (Throwable ignored) {}
         }
         return false;
+    }
+
+    public static MachineAddon parseParallelHatch(ItemStack stack, ResourceLocation id) {
+        ParallelStats stats = getParallelStats(stack);
+        if (stats == null || stats.maxParallel() <= 1) {
+            return null;
+        }
+
+        String name = stack.getHoverName().getString();
+        int parallel = stats.maxParallel();
+        boolean isAbsolute = stats.isAbsolute();
+
+        String desc = isAbsolute
+                ? net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.absolute_parallel_hatch_desc", String.valueOf(parallel)).getString()
+                : net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.parallel_hatch_desc", String.valueOf(parallel)).getString();
+
+        MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.PARALLEL, desc, id);
+        addon.setParallelMultiplier(parallel);
+        addon.setPowerConstant(isAbsolute);
+        addon.setDurationMultiplier(1.0);
+        addon.setEutMultiplier(isAbsolute ? 1.0 : parallel);
+        addon.setItemStackSample(stack);
+        return addon;
     }
 }

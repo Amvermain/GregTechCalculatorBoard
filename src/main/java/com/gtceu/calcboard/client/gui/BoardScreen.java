@@ -214,6 +214,14 @@ public class BoardScreen extends Screen {
             BoardManager.getInstance().setHasSeenWelcomePrompt(true);
             BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile());
         }
+
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                "[GTCalcBoard] [UI] BoardScreen opened. (Active Page: '{}', Nodes: {}, Wires: {}, TeamMode: {})",
+                BoardManager.getInstance().getActivePage() != null ? BoardManager.getInstance().getActivePage().getName() : "Main",
+                getGraph().getNodes().size(),
+                getGraph().getConnections().size(),
+                com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode()
+        );
     }
 
     public SaveToTeamDialog getSaveToTeamDialog() {
@@ -885,6 +893,7 @@ public class BoardScreen extends Screen {
             active.setZoom(this.zoom);
         }
         BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), this.panX, this.panY, this.zoom);
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
         super.onClose();
     }
 

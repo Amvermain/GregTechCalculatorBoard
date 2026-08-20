@@ -27,6 +27,7 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged in to world/server. Reloading board data and preloading addon catalog...");
         // Load personal boards scoped to this world / server
         com.gtceu.calcboard.api.BoardManager.getInstance().reloadForCurrentContext();
 
@@ -40,13 +41,16 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged out. Saving local context and resetting caches.");
         com.gtceu.calcboard.api.BoardManager.getInstance().saveForCurrentContext();
         com.gtceu.calcboard.api.BoardManager.getInstance().resetToDefault();
         ClientWorkspaceState.getInstance().clear();
+        MachineAddonCatalog.getInstance().reset();
     }
 
     @SubscribeEvent
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] RecipesUpdatedEvent received. Refreshing addon catalog and recipe search index...");
         MachineAddonCatalog.getInstance().markDirty();
         MachineAddonCatalog.getInstance().preloadAsync();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);

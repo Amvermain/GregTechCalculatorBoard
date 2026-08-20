@@ -17,7 +17,12 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
 
     @Override
     public void register(EmiRegistry registry) {
-        // EMI Recipe Registration Completed Hook (Safe, no GTCEu registry query before world load)
+        // EMI Recipe Registration Completed Hook (Full recipe baking completed!)
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] EmiPlugin.register invoked. EMI recipe baking completed. Refreshing addon catalog and recipe search index...");
+        com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().markDirty();
+        com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().preloadAsync();
+        com.gtceu.calcboard.client.gui.RecipeSearchDialog.invalidateCache();
+        com.gtceu.calcboard.client.gui.RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
     }
 
     public static void addRecipeToBoard(EmiRecipe recipe) {

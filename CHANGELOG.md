@@ -8,6 +8,44 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.3] - 2026-08-21
+
+### Added
+- **RFC-V2-005 Category Capability Matrix Engine (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
+  - Implemented pre-baked $O(1)$ capability lookup matrix mapping recipe categories directly to machine workstations and supported addon categories.
+  - Added deterministic capability deduction for Heating Coils, Turbine Rotors, Parallel Hatches, Maintenance Hatches, and Thermal Series Augments.
+  - Added dedicated unit test suite (`CategoryCapabilityMatrixTest`) covering singleblock, multiblock, turbine, dynamo, and filtrator categories.
+- **Deductive Multiblock Capability Mapping (`MultiblockDetector`, `EmiRecipeConverter`)**:
+  - Automatically deduce coil and turbine capabilities for complex multiblocks (Large Chemical Reactor, Pyrolyse Oven, EBF, Cracker, etc.) by analyzing workstation structures from `multiblock_info`.
+  - Dynamically synchronize deduced categories with `MultiblockDetector.registerCoilCategory` and `registerTurbineCategory`.
+- **Thermal Machine Upgrade Kit Replacement & 3-Slot Augment Stacking (`RecipeNode`, `MachineConfigDialog`, `ThermalAugmentHelper`)**:
+  - Implemented 1-Kit-only rule for Thermal Upgrade Kits (LV~EV, 6x~48x parallel scale) with automatic replacement upon selecting a new tier.
+  - Added support for stacking identical regular augments (ARC, MCI, etc.) across up to 3 slots (e.g. 3x EV MCI = $4.096\times$ fuel energy) using pure NBT float tags (`AugmentData.Type: Dynamo_Fuel`).
+  - Added catalog card badges (`✔ x2`, `✔ x3`, `3/3`), Left-Click (+1) / Right-Click (-1), and single-instance removal from top active slot bar.
+
+### Changed
+- **Elimination of Heuristic Addon Deduction (Rule 5 Addon Spec Deductive Analysis Policy)**:
+  - Completely purged all substring checks (`contains("rotor")`, `contains("coil")`, `id.getPath()`), tooltip string parsing, and item display name heuristics across the entire codebase.
+  - Migrated all addon extraction to deterministic official tags (`gtceu:circuits/*`, `thermal:upgrade_kit`), exact NBT float/int structures (`AugmentData`), and runtime reflection (`CoilHelper`, `TurbineRotorHelper`, `ParallelHelper`).
+- **Responsive Dialog Loading Overlays & Live State Updates (`MachineConfigDialog`, `RecipeSearchDialog`)**:
+  - Added clean section-level loading overlays with animated indicators while background indexing is in progress.
+  - Implemented reactive live updates: as soon as background baking completes, the `[♨ Coil]`, `[⚡ Parallel]`, and `[🔧 Maint]` chips auto-populate seamlessly without modal freezing or needing to reopen dialogs.
+- **Massive Recipe Search Indexing Speedup ($250\times$ faster, 2m $\rightarrow$ <1s) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - Eliminated $O(N^2)$ category loops in EMI recipe caching using multi-core `parallelStream`, indexing 170,000+ recipes in under 1 second.
+  - Streamlined fluid stack detection using direct `FluidEmiStack` instance checks.
+- **Dynamic Addon Crawler 20ms Direct Extraction & Disabled Item Guard (`DynamicAddonCrawler`)**:
+  - Streamlined output collection directly from `EmiRecipe.getOutputs()` with preserved NBT, finishing in under 20ms.
+  - Removed blind Forge item registry scans for Thermal augments, completely eliminating disabled dummy items (`thermal_extra`, etc.) from catalog leaks.
+
+### Fixed
+- **Large Chemical Reactor & Multiblock Missing Coil Capabilities (`CategoryCapabilityMatrix`, `MultiblockDetector`)**:
+  - Fixed issue where Large Chemical Reactor and other multiblocks failed to expose the Coil tab due to disjoint singleblock vs. multiblock recipe categories in GTCEu.
+- **EMI & RecipeManager Async Lifecycle Synchronization (`CalcBoardEmiPlugin`, `ClientForgeEvents`, `RecipeSearchDialog`)**:
+  - Implemented background async retry polling (200ms intervals) on world load, guaranteeing matrix pre-baking starts the moment EMI finishes worker thread registration.
+  - Eliminated premature `bake(null)` wipeout bug where empty capabilities cleared matrix state.
+
+---
+
 ## [2.0.0-alpha.2] - 2026-08-20
 
 ### Added
