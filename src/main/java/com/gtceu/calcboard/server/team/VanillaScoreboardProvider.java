@@ -6,11 +6,14 @@ import net.minecraft.world.scores.Scoreboard;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Team provider using vanilla Minecraft scoreboard teams.
  */
 public class VanillaScoreboardProvider implements ITeamProvider {
+
+    private static final Map<UUID, String> TEAM_NAME_CACHE = new ConcurrentHashMap<>();
 
     @Override
     public UUID getPlayerTeamId(ServerPlayer player) {
@@ -18,20 +21,21 @@ public class VanillaScoreboardProvider implements ITeamProvider {
         Scoreboard scoreboard = player.getScoreboard();
         PlayerTeam team = scoreboard.getPlayersTeam(player.getScoreboardName());
         if (team != null) {
-            return UUID.nameUUIDFromBytes(("vanilla_team:" + team.getName()).getBytes(StandardCharsets.UTF_8));
+            UUID teamId = UUID.nameUUIDFromBytes(("vanilla_team:" + team.getName()).getBytes(StandardCharsets.UTF_8));
+            TEAM_NAME_CACHE.put(teamId, team.getDisplayName().getString());
+            return teamId;
         }
-        return player.getUUID();
+        return null; // Not in a vanilla scoreboard team
     }
 
     @Override
     public String getTeamDisplayName(UUID teamId) {
-        if (teamId == null) return "Unknown Team";
-        return "Vanilla Team (" + teamId.toString().substring(0, 8) + ")";
+        if (teamId == null) return null;
+        return TEAM_NAME_CACHE.get(teamId);
     }
 
     @Override
     public Set<UUID> getTeamMembers(UUID teamId) {
-        // Fallback for vanilla scoreboard team querying
         return Collections.singleton(teamId);
     }
 

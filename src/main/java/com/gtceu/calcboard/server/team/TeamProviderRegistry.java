@@ -2,7 +2,9 @@ package com.gtceu.calcboard.server.team;
 
 import net.minecraft.server.level.ServerPlayer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -30,9 +32,6 @@ public class TeamProviderRegistry {
         return instance;
     }
 
-    /**
-     * Returns the highest-priority active team provider.
-     */
     public ITeamProvider getActiveProvider() {
         for (ITeamProvider provider : providers) {
             if (provider.isAvailable()) {
@@ -43,14 +42,54 @@ public class TeamProviderRegistry {
     }
 
     public UUID getPlayerTeamId(ServerPlayer player) {
-        return getActiveProvider().getPlayerTeamId(player);
+        if (player == null) return null;
+        for (ITeamProvider provider : providers) {
+            if (provider.isAvailable()) {
+                UUID id = provider.getPlayerTeamId(player);
+                if (id != null) {
+                    return id;
+                }
+            }
+        }
+        return fallbackProvider.getPlayerTeamId(player);
     }
 
     public String getTeamDisplayName(UUID teamId) {
-        return getActiveProvider().getTeamDisplayName(teamId);
+        if (teamId == null) return "Shared Workspace";
+        for (ITeamProvider provider : providers) {
+            if (provider.isAvailable()) {
+                String name = provider.getTeamDisplayName(teamId);
+                if (name != null && !name.isEmpty() && !name.startsWith("Unknown")) {
+                    return name;
+                }
+            }
+        }
+        return "Shared Workspace";
+    }
+
+    public Set<UUID> getTeamMembers(UUID teamId) {
+        if (teamId == null) return Collections.emptySet();
+        for (ITeamProvider provider : providers) {
+            if (provider.isAvailable()) {
+                Set<UUID> members = provider.getTeamMembers(teamId);
+                if (members != null && !members.isEmpty()) {
+                    return members;
+                }
+            }
+        }
+        return Collections.emptySet();
     }
 
     public boolean canPlayerEdit(ServerPlayer player, UUID teamId) {
-        return getActiveProvider().canPlayerEdit(player, teamId);
+        if (player == null || teamId == null) return false;
+        for (ITeamProvider provider : providers) {
+            if (provider.isAvailable()) {
+                UUID pTeam = provider.getPlayerTeamId(player);
+                if (pTeam != null && pTeam.equals(teamId)) {
+                    return provider.canPlayerEdit(player, teamId);
+                }
+            }
+        }
+        return fallbackProvider.canPlayerEdit(player, teamId);
     }
 }

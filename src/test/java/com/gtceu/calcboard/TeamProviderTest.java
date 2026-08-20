@@ -20,7 +20,7 @@ public class TeamProviderTest {
 
         UUID dummy = UUID.randomUUID();
         String name = provider.getTeamDisplayName(dummy);
-        assertTrue(name.contains(dummy.toString().substring(0, 8)));
+        assertEquals("Shared Workspace", name);
     }
 
     @Test

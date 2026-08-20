@@ -66,7 +66,7 @@ public class NetworkHandler {
 
     public static void broadcastToTeam(ServerLevel level, UUID teamId, Object msg, UUID excludePlayerUUID) {
         if (level == null || teamId == null) return;
-        Set<UUID> members = TeamProviderRegistry.getInstance().getActiveProvider().getTeamMembers(teamId);
+        Set<UUID> members = TeamProviderRegistry.getInstance().getTeamMembers(teamId);
 
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
             if (excludePlayerUUID != null && player.getUUID().equals(excludePlayerUUID)) {

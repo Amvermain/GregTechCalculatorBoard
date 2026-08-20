@@ -94,7 +94,7 @@ public class PageTabBarWidget {
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         // Enable horizontal scissor so tabs don't overflow outside screen
-        graphics.enableScissor(0, TAB_Y - 2, screen.width, TAB_HEIGHT + 6);
+        graphics.enableScissor(0, TAB_Y - 2, screen.width, TAB_Y + TAB_HEIGHT + 4);
 
         graphics.pose().pushPose();
         graphics.pose().translate((float) -scrollX, 0, 0);
