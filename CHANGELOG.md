@@ -8,6 +8,30 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [1.0.6] - 2026-08-20
+
+### Added
+- **Global Multi-Page Balance Dashboard (`GlobalBalanceDashboardDialog`, `GlobalBalanceAggregator`)**:
+  - Added an interactive modal dashboard to aggregate net material production, consumption, and global EU/t power balance across multiple preset pages (`B` hotkey and `[📊 Global Balance]` toolbar button).
+  - **Page Selection Sidebar**: Select or deselect specific pages with instant re-aggregation to evaluate segmented production lines.
+  - **Flow Tab Filtering & Search**: Categorize flow items into Deficits, Surplus, and Balanced tabs with real-time search filtering.
+  - **Per-Item Page Contribution Drilldown (`ItemContributionPopup`)**: Click any material row to inspect exact per-page production and consumption breakdowns.
+  - **Global Power Balance Bar**: Displays net EU/t generation/consumption, highest active voltage tier badge, and comprehensive tooltips.
+
+### Changed
+- **Supply / Demand Rate Notation Polish (`FormatUtil`, `NodeCardRenderer`)**:
+  - Replaced ambiguous double-slash formatting with clean plus/minus color-coded rate notation (`+3.48M -3.2M/s +` for surplus, `+2.5M -3.2M/s ⚠` for deficit).
+  - Expanded default node card width from `235px` to `245px` for optimal typography fit.
+- **Official GTCEu Modern & Star Technology Fork Variant Switching (`build.gradle`, `gradle.properties`)**:
+  - Introduced `gtceu_variant` configuration property in `gradle.properties` to seamlessly switch between official GTCEu Modern (CurseMaven) and Star Technology Fork (FlatDir) dependencies.
+
+### Fixed
+- **Global Balance Material Row Text Overlap (`GlobalBalanceDashboardDialog`)**:
+  - Replaced hardcoded text coordinates with a strictly chained right-to-left dynamic layout to prevent rate strings and flow detail numbers from colliding.
+  - Expanded dashboard width to `580px` and formatted massive machine counts (e.g. 581M) with compact SI notation.
+
+---
+
 ## [1.0.5] - 2026-08-20
 
 ### Added
