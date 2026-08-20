@@ -27,6 +27,9 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        // Load personal boards scoped to this world / server
+        com.gtceu.calcboard.api.BoardManager.getInstance().reloadForCurrentContext();
+
         // Preload addon catalog & recipe search index in background immediately upon logging in!
         MachineAddonCatalog.getInstance().preloadAsync();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
@@ -37,6 +40,8 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        com.gtceu.calcboard.api.BoardManager.getInstance().saveForCurrentContext();
+        com.gtceu.calcboard.api.BoardManager.getInstance().resetToDefault();
         ClientWorkspaceState.getInstance().clear();
     }
 

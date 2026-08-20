@@ -36,6 +36,30 @@ public class BoardManager {
         }
     }
 
+    public void resetToDefault() {
+        this.pages.clear();
+        this.pages.add(BoardPage.createDefault("Page 1"));
+        this.activePageIndex = 0;
+        this.hasSeenWelcomePrompt = false;
+        this.autoLoaded = false;
+    }
+
+    public void reloadForCurrentContext() {
+        resetToDefault();
+        ensureLoaded();
+    }
+
+    public void saveForCurrentContext() {
+        try {
+            File saveFile = getDefaultSaveFile();
+            if (saveFile != null) {
+                saveToFile(saveFile);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public PowerDisplayMode getPowerDisplayMode() {
         return powerDisplayMode != null ? powerDisplayMode : PowerDisplayMode.EUT;
     }
@@ -133,26 +157,33 @@ public class BoardManager {
     }
 
     public void renamePage(int index, String newName) {
-        if (index >= 0 && index < pages.size() && newName != null && !newName.trim().isEmpty()) {
-            pages.get(index).setName(newName.trim());
+        if (index >= 0 && index < pages.size()) {
+            pages.get(index).setName(newName);
         }
     }
 
     public boolean saveToFile(File file) {
         BoardPage active = getActivePage();
-        return saveToFile(file, active.getPanX(), active.getPanY(), active.getZoom());
+        double px = active != null ? active.getPanX() : 40.0;
+        double py = active != null ? active.getPanY() : 40.0;
+        double zm = active != null ? active.getZoom() : 1.0;
+        return saveToFile(file, px, py, zm);
     }
 
     public boolean saveToFile(File file, double panX, double panY, double zoom) {
         try {
-            if (file.getParentFile() != null && !file.getParentFile().exists()) {
-                file.getParentFile().mkdirs();
+            if (file == null) return false;
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
             }
 
             BoardPage active = getActivePage();
-            active.setPanX(panX);
-            active.setPanY(panY);
-            active.setZoom(zoom);
+            if (active != null) {
+                active.setPanX(panX);
+                active.setPanY(panY);
+                active.setZoom(zoom);
+            }
 
             CompoundTag rootTag = new CompoundTag();
             rootTag.putInt("activePageIndex", activePageIndex);
@@ -231,6 +262,36 @@ public class BoardManager {
     }
 
     public File getDefaultSaveFile() {
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+            try {
+                File clientFile = getClientSaveFile();
+                if (clientFile != null) return clientFile;
+            } catch (Throwable ignored) {}
+        }
         return new File(getSaveDirectory(), "calcboard_save.nbt");
+    }
+
+    private File getClientSaveFile() {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc != null) {
+            // Case 1: Singleplayer world
+            if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
+                try {
+                    File worldRoot = mc.getSingleplayerServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).toFile();
+                    File dir = new File(worldRoot, "gtcalcboard");
+                    if (!dir.exists()) dir.mkdirs();
+                    return new File(dir, "personal_board.nbt");
+                } catch (Throwable ignored) {}
+            }
+
+            // Case 2: Dedicated multiplayer server connection
+            if (mc.getCurrentServer() != null && mc.getCurrentServer().ip != null && !mc.getCurrentServer().ip.isEmpty()) {
+                String safeIp = mc.getCurrentServer().ip.replaceAll("[^a-zA-Z0-9.-]", "_");
+                File dir = new File(getSaveDirectory(), "servers/" + safeIp);
+                if (!dir.exists()) dir.mkdirs();
+                return new File(dir, "personal_board.nbt");
+            }
+        }
+        return null;
     }
 }
