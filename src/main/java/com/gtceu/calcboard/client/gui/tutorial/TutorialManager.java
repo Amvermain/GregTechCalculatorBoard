@@ -88,21 +88,34 @@ public class TutorialManager {
     private void onStepEnter(TutorialStep step) {
         if (currentScreen == null) return;
 
-        if (step == TutorialStep.STEP_2_NORMAL_WIRING) {
-            setupWiringExercise();
+        if (step == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
+            setupDragToSearchExercise();
         } else if (step == TutorialStep.STEP_4_SHIFT_WIRING) {
-            // Reset turbine count to 1.0 so user can experience Shift auto-calculation to 5.0
-            RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
-            if (turbine != null) {
+            // Ensure turbine node exists on canvas (in case user skipped step 2)
+            if (turbineNodeId == null || currentScreen.getGraph().findNodeById(turbineNodeId) == null) {
+                RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
+                turbine.setGenerator(true);
+                turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
+                turbine.setPosX(60);
+                turbine.setPosY(-50);
                 turbine.setMachineCount(1.0);
+                this.turbineNodeId = turbine.getId();
+                currentScreen.getGraph().addNode(turbine);
                 currentScreen.rebuildWidgets();
+            } else {
+                // Reset turbine count to 1.0 so user can experience Shift auto-calculation to 5.0
+                RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+                if (turbine != null) {
+                    turbine.setMachineCount(1.0);
+                    currentScreen.rebuildWidgets();
+                }
             }
         } else if (step == TutorialStep.STEP_5_SUMMARY_MODULE) {
             currentScreen.getSummaryOverlay().setCollapsed(false);
         }
     }
 
-    private void setupWiringExercise() {
+    private void setupDragToSearchExercise() {
         if (currentScreen == null) return;
 
         currentScreen.getGraph().getNodes().clear();
@@ -111,21 +124,11 @@ public class TutorialManager {
         // 1. Boiler: produces Steam 500 mB/s
         RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
         boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
-        boiler.setPosX(-220);
+        boiler.setPosX(-180);
         boiler.setPosY(-50);
         boiler.setMachineCount(1.0);
         this.boilerNodeId = boiler.getId();
         currentScreen.getGraph().addNode(boiler);
-
-        // 2. Steam Turbine: consumes Steam 100 mB/s per machine, produces EU
-        RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
-        turbine.setGenerator(true);
-        turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
-        turbine.setPosX(60);
-        turbine.setPosY(-50);
-        turbine.setMachineCount(1.0);
-        this.turbineNodeId = turbine.getId();
-        currentScreen.getGraph().addNode(turbine);
 
         currentScreen.rebuildWidgets();
     }
@@ -140,6 +143,10 @@ public class TutorialManager {
         if (currentStep == TutorialStep.STEP_1_ADD_RECIPE) {
             this.practiceNodeId = node != null ? node.getId() : null;
             nextStep();
+        } else if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
+            if (node != null && !node.getId().equals(boilerNodeId)) {
+                this.turbineNodeId = node.getId();
+            }
         }
     }
 
@@ -154,7 +161,7 @@ public class TutorialManager {
 
     public void onWireConnected(boolean shiftDown) {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_2_NORMAL_WIRING) {
+        if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
             // Advance to Step 3 (Delete Wiring)
             nextStep();
         } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
@@ -223,7 +230,11 @@ public class TutorialManager {
 
     public boolean isPortGlowing(String nodeId, boolean isInput, int portIdx) {
         if (!active) return false;
-        if (currentStep == TutorialStep.STEP_2_NORMAL_WIRING || currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
+        if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
+            if (!isInput && portIdx == 0 && boilerNodeId != null && boilerNodeId.equals(nodeId)) {
+                return true;
+            }
+        } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
             if (!isInput && portIdx == 0 && boilerNodeId != null && boilerNodeId.equals(nodeId)) {
                 return true;
             }

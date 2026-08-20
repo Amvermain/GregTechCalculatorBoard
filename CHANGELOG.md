@@ -8,6 +8,28 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.2] - 2026-08-20
+
+### Added
+- **Interactive 6-Step Tutorial & Curated Dummy Recipes (`TutorialManager`, `RecipeSearchDialog`)**:
+  - Re-architected interactive onboarding tutorial into 6 clear steps: Step 1 (Add Boiler), Step 2 (Drag-to-Search Turbine & Auto-Wire), Step 3 (Sever Wire), Step 4 (Shift-Drag 1:1 Auto-Ratio), Step 5 (Process Summary & Compound Module `Ctrl+G`), Step 6 (Completion).
+  - Dedicated tutorial workspace isolation (`🎓 Tutorial`) and instant 0ms curated dummy recipes (`Steam Turbine (Tutorial)`, `Boiler (Tutorial)`, `Steam Engine (Tutorial)`) ensuring zero-lag and clutter-free onboarding.
+- **Type-Strict Stack Indexing & Prioritized Search Ranking (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Divided searchable stacks into strict fluid vs. item registry indexing to prevent cross-type query pollution.
+  - Prioritized exact fluid ID matches (+1,000 pts) and generator/multiblock categories over generic crafting table items.
+
+### Changed
+- **Shortcut & Documentation Realignment (`GuideDialog`, `en_us.json`, `ko_kr.json`, `README.md`, `README_KR.md`)**:
+  - Replaced legacy toolbar button references with `Ctrl + G` for modular group packaging across all in-game guides and tutorials.
+  - Comprehensive documentation overhaul with complete feature coverage, dynamic addon crawler details, and matter-of-fact technical tone.
+
+### Fixed
+- **Tutorial Step 2 Auto-Wire Transition (`RecipeSearchDialog`)**:
+  - Resolved an issue where auto-wiring nodes spawned from the search dialog failed to notify `TutorialManager.onWireConnected()`, preventing advancement to Step 3.
+  - Added immediate canvas widget rebuilding upon auto-wire completion.
+
+---
+
 ## [2.0.0-alpha.1] - 2026-08-20
 
 ### Added

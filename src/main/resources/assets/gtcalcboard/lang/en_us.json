@@ -222,25 +222,33 @@
   "gui.gtcalcboard.guide.basics_title": "📑 Chapter 1. Getting Started & Canvas Navigation",
   "gui.gtcalcboard.guide.basics_desc": "### Canvas Navigation & Zooming\n- [Right-Click / Middle-Click Drag]: Freely pan and move the canvas.\n- [Scroll Mouse Wheel]: Smoothly zoom in/out between 0.2x and 3.0x.\n- Top [⊕ Center] Button: Reset viewport back to the origin coordinates.\n\n### Adding Recipes to the Board\n1. In the EMI item list, hover over any item and press [R] (Recipes) or [U] (Uses).\n2. Click the [+] button on the recipe screen to immediately place the machine node onto the board.\n3. Alternatively, click the top [➕ Add] button to search and pick recipes directly from the search dialog.\n\n> 💡 TIP: Resize Cards: Drag the bottom-right corner [◢] of any machine card to freely expand its width and height.",
 
-  "gui.gtcalcboard.guide.cat_wiring": "2. Wiring & Shift|1:1 Auto Ratio Match",
-  "gui.gtcalcboard.guide.wiring_title": "⚡ Chapter 2. Wiring & Shift-Drag Auto Ratio Matching",
+  "gui.gtcalcboard.guide.cat_search": "2. Smart Search|Drag-to-Wire & Query",
+  "gui.gtcalcboard.guide.search_title": "🔍 Chapter 2. Parametric Search & Contextual Auto-Wiring",
+  "gui.gtcalcboard.guide.search_desc": "### Contextual Drag-to-Search & Auto-Wire\n- [Drag Port to Empty Canvas]: Drag a wire from any output port (or input port) and release it on empty canvas space to open the Recipe Search dialog pre-filtered for matching consumers (or producers).\n- Selecting a recipe immediately spawns the machine node at your cursor and [automatically connects the wire]!\n- Hold [Shift] while selecting to automatically solve and match machine counts 1:1.\n\n### Advanced Parametric Search Engine\n- Multi-token [AND] matching: Space or '&' (e.g. `pyrolyse oil` matches recipes with both terms).\n- [OR] matching: '|' (e.g. `oil | creosote` matches either item).\n- [NOT] exclusion: '!' (e.g. `pyrolyse !charcoal` excludes charcoal recipes).\n- Mod prefix: `@gtceu` or `@minecraft`.\n- Item / Fluid tags: `#forge:logs` or `#c:dusts`.\n- Machine category: `[pyrolyse_oven]` or `[chemical_reactor]`.\n- Exact quotes: `\"sulfuric acid\"`.\n\n### Singleplayer Pause Control\n- Click the toolbar [⏸ Pause: ON] / [▶ Pause: OFF] button to decide whether to freeze the singleplayer world while calculating complex lines.",
+
+  "gui.gtcalcboard.guide.cat_wiring": "3. Wiring & Shift|1:1 Auto Ratio Match",
+  "gui.gtcalcboard.guide.wiring_title": "⚡ Chapter 3. Wiring & Shift-Drag Auto Ratio Matching",
   "gui.gtcalcboard.guide.wiring_desc": "### Basic Wire Connections\n- Left-click the [Green Output Port] on a supplier machine, then left-click the [Blue Input Port] on a consumer machine to create a fluid/item connection wire.\n\n### ✨ Shift + Drag Wire Connection (Auto Ratio)\n- Hold down [Shift] while connecting an output port to an input port!\n- The board will instantly analyze supplier production vs consumer consumption and [automatically calculate & scale the consumer machine count] so production and consumption match 1:1.\n- Example: Connect a Chemical Reactor producing 500 mB/s to a Distillation Tower consuming 100 mB/s with Shift $\\rightarrow$ Distillation Tower count becomes [5.0 machines] automatically!\n\n### Disconnecting Wires\n- [Right-click] directly on any wire curve or right-click any connected port to sever the connection.",
 
-  "gui.gtcalcboard.guide.cat_master": "3. Master & Ratio|Anchor & Auto Ratio",
-  "gui.gtcalcboard.guide.master_title": "🎯 Chapter 3. Base Master Anchor & Auto Ratio",
+  "gui.gtcalcboard.guide.cat_master": "4. Master & Ratio|Anchor & Auto Ratio",
+  "gui.gtcalcboard.guide.master_title": "🎯 Chapter 4. Base Master Anchor & Auto Ratio",
   "gui.gtcalcboard.guide.master_desc": "### Base Master Anchor Recipe\n- In a multi-step production line, click the [🎯] button on the top-right of your final target product machine.\n- The machine card will glow [Golden] and serve as the fixed anchor for the entire flowchart.\n\n### Automation Toolbar Tools\n- [⚖ Auto Ratio (Ratio)]: Scales and balances all upstream supplier machines backwards throughout the entire line to match the Master Anchor's exact requirement.\n- [⚡ Auto Connect (Connect)]: Automatically scans all nodes on the canvas and wires matching item/fluid ports.\n- [🚀 Max Flow (Flow)]: Overclocks all nodes to MAX tier and optimizes parallel hatches to compact huge lines into single high-throughput units.\n\n> 💡 TIP: Click [Tier], [STD/PERF OC], [/2], or [x2] on any card to test individual overclocking and parallel efficiency.",
 
-  "gui.gtcalcboard.guide.cat_module": "4. Compound Modules|Group & Subgraphs",
-  "gui.gtcalcboard.guide.module_title": "📦 Chapter 4. Compound Modules (Group & Expand)",
+  "gui.gtcalcboard.guide.cat_module": "5. Compound Modules|Group & Subgraphs",
+  "gui.gtcalcboard.guide.module_title": "📦 Chapter 5. Compound Modules (Group & Expand)",
   "gui.gtcalcboard.guide.module_desc": "### What is a Compound Module?\n- A feature that condenses dozens of interconnected chemical reactors, distillation towers, and centrifuges into a [Single Compound Module Card].\n\n### Key Benefits of Modularization\n1. [Automatic Byproduct Encapsulation]: 100% self-recycled and internally consumed intermediate fluids/items are hidden, exposing only [Raw External Inputs] and [Net Final Outputs].\n2. [Proportional Scaling]: Increasing the module card count (e.g. from 1 to 2 or 4) proportionally scales all internal facilities.\n3. [Accurate Summary Stats]: Total contained machines (e.g. 58 machines) and power generation/consumption are properly aggregated in the Summary Overlay.\n\n### [⤢ Expand] Instant Restoration\n- Click the [⤢] button on the top-right of a module card at any time to restore all individual machines and internal wires onto the canvas.",
 
-  "gui.gtcalcboard.guide.cat_shortcuts": "5. Multi-Select|Batch Move & Edit",
-  "gui.gtcalcboard.guide.shortcuts_title": "🖱️ Chapter 5. Marquee Box Selection, Clipboard, & Renaming",
-  "gui.gtcalcboard.guide.shortcuts_desc": "### Marquee Box Multi-Selection\n- [Left-Click & Drag]: Draw a selection box on empty canvas to select multiple machines at once.\n- [Shift + Left-Click]: Toggle individual machines into or out of selection.\n- [Batch Dragging]: Dragging any selected machine moves all selected machines together while preserving internal wires.\n\n### Undo, Redo, & Shortcuts\n- [Ctrl + Z]: Undo the last action (moving nodes, adding/deleting, connecting wires, grouping, property edits).\n- [Ctrl + Y / Ctrl + Shift + Z]: Redo the previously undone action.\n- [Ctrl + X]: Cut selected machines and internal wires.\n- [Ctrl + C]: Copy selected machines and internal wires to clipboard.\n- [Ctrl + V]: Paste duplicated machines at mouse cursor position with new UUIDs.\n- [Ctrl + D]: Duplicate selected machines instantly.\n- [Delete / Backspace]: Delete selected machines and connections.\n- [Ctrl + A]: Select all machines on the canvas.\n\n### Inline Title Renaming\n- [Double-Click] any machine header title to open the inline text editor.\n- Type your custom name (e.g. [Sulfuric Acid Line 1], [Turbine Generator]) and press [Enter] to save.",
+  "gui.gtcalcboard.guide.cat_team": "6. Team Workspace|Multiplayer Live Sync",
+  "gui.gtcalcboard.guide.team_title": "👥 Chapter 6. Multiplayer Team Workspaces & Live Collaboration",
+  "gui.gtcalcboard.guide.team_desc": "### Real-Time Team Flowcharts\n- On dedicated servers with GregTech Calculator Board installed, team members share live flowchart workspaces with real-time synchronization.\n- Seamlessly integrates with [FTB Teams] and vanilla scoreboard teams.\n\n### Personal Board vs Team Workspace\n- [👤 Personal Board] Tab: Your private calculation workspace. Completely local and private.\n- [👥 Team Workspace] Tabs: Shared team boards synchronized in real time with all teammates.\n- [📤 Export to Team]: Open a personal tab and click [Export to Team] in the top toolbar to publish your design to the team workspace!\n\n### Smart Edit Locks & Teammate Presence\n- Interacting with any node on a team page [automatically acquires a temporary edit lock], preventing simultaneous edit conflicts.\n- Active teammates viewing or editing the current page are displayed in the top presence bar.\n\n### Frictionless Auto-Sync & Save History\n- Changes auto-save in the background (3-second inactivity debounce and screen exit).\n- Click [🕒 Saves] to browse past revision logs and [Copy to Me] to fork past team versions into your personal board.",
 
-  "gui.gtcalcboard.guide.cat_pages": "6. Pages & Share|Tabs & Blueprints",
-  "gui.gtcalcboard.guide.pages_title": "📑 Chapter 6. Multi-Page Preset Tabs & Blueprints",
+  "gui.gtcalcboard.guide.cat_pages": "7. Pages & Share|Tabs & Blueprints",
+  "gui.gtcalcboard.guide.pages_title": "📑 Chapter 7. Multi-Page Preset Tabs & Blueprints",
   "gui.gtcalcboard.guide.pages_desc": "### Top Page Tab Bar (Presets)\n- Organize your builds into separate, independent flowcharts via the top tab bar.\n- [+] Button: Create a new blank board page.\n- [Click Tab]: Instantly switch pages (remembers camera pan & zoom per page).\n- [Right-Click Tab]: Rename the tab inline.\n- [x Button]: Remove unwanted tabs.\n\n### Saving & Blueprint Sharing\n- [💾 Save] / [📂 Load]: Persistently save all tabs and configurations into calcboard_save.nbt.\n- [📋 Share]: Export the entire flowsheet into a compressed [Text Blueprint Code] copied to clipboard.\n- [📥 Import]: Paste a shared blueprint code from friends or the web.\n\n> 💡 TIP: Your progress is automatically preserved even if you exit Minecraft!",
+
+  "gui.gtcalcboard.guide.cat_shortcuts": "8. Multi-Select|Batch Move & Edit",
+  "gui.gtcalcboard.guide.shortcuts_title": "🖱️ Chapter 8. Marquee Box Selection, Clipboard, & Renaming",
+  "gui.gtcalcboard.guide.shortcuts_desc": "### Marquee Box Multi-Selection\n- [Left-Click & Drag]: Draw a selection box on empty canvas to select multiple machines at once.\n- [Shift + Left-Click]: Toggle individual machines into or out of selection.\n- [Batch Dragging]: Dragging any selected machine moves all selected machines together while preserving internal wires.\n\n### Undo, Redo, & Shortcuts\n- [Ctrl + Z]: Undo the last action (moving nodes, adding/deleting, connecting wires, grouping, property edits).\n- [Ctrl + Y / Ctrl + Shift + Z]: Redo the previously undone action.\n- [Ctrl + X]: Cut selected machines and internal wires.\n- [Ctrl + C]: Copy selected machines and internal wires to clipboard.\n- [Ctrl + V]: Paste duplicated machines at mouse cursor position with new UUIDs.\n- [Ctrl + D]: Duplicate selected machines instantly.\n- [Delete / Backspace]: Delete selected machines and connections.\n- [Ctrl + A]: Select all machines on the canvas.\n\n### Inline Title Renaming\n- [Double-Click] any machine header title to open the inline text editor.\n- Type your custom name (e.g. [Sulfuric Acid Line 1], [Turbine Generator]) and press [Enter] to save.",
 
   "gui.gtcalcboard.tutorial_btn": "Tutorial",
   "gui.gtcalcboard.welcome.title": "Welcome to GregTech Calculator Board!",
@@ -281,17 +289,17 @@
   "gui.gtcalcboard.tutorial.step1_title": "Adding Recipe Nodes",
   "gui.gtcalcboard.tutorial.step1_desc": "Click anywhere on empty canvas to spawn [+] button or click [+ Add] on toolbar! (Or press 'A' on EMI recipes)",
 
-  "gui.gtcalcboard.tutorial.step2_title": "Normal Wiring (Inspect Imbalance)",
-  "gui.gtcalcboard.tutorial.step2_desc": "Drag from Boiler's [Steam] output port (green) to Turbine's [Steam] input port (blue) normally.",
+  "gui.gtcalcboard.tutorial.step2_title": "Drag-to-Search & Auto-Wiring",
+  "gui.gtcalcboard.tutorial.step2_desc": "Drag from Boiler's [Steam] output port (green) and release on empty canvas! Select [Steam Turbine] in the search dialog to spawn it pre-wired.",
 
   "gui.gtcalcboard.tutorial.step3_title": "Disconnecting Wire Links",
-  "gui.gtcalcboard.tutorial.step3_desc": "Hover your mouse cursor over the connected wire curve and [Right-Click] to sever the connection.",
+  "gui.gtcalcboard.tutorial.step3_desc": "Hover your mouse cursor over the connected wire curve or port and [Right-Click] to sever the connection.",
 
-  "gui.gtcalcboard.tutorial.step4_title": "Shift + Wiring (100% Auto-Ratio Matching)",
-  "gui.gtcalcboard.tutorial.step4_desc": "✨ Now hold SHIFT while dragging from Boiler output to Turbine input! (Turbine count is instantly calculated to 5.0, achieving 100% perfect balance)",
+  "gui.gtcalcboard.tutorial.step4_title": "Shift + Wiring (1:1 Auto-Ratio Matching)",
+  "gui.gtcalcboard.tutorial.step4_desc": "✨ Hold SHIFT while dragging from Boiler output to Turbine input! Target machine count is instantly scaled to 5.0 to match 500 mB/s supply.",
 
   "gui.gtcalcboard.tutorial.step5_title": "Summary & Modular Packaging (Ctrl + G)",
-  "gui.gtcalcboard.tutorial.step5_desc": "Check total power output in the summary overlay, and click [📦 Group Module] (or Ctrl + G) to collapse into a single card!",
+  "gui.gtcalcboard.tutorial.step5_desc": "Check total power output in the summary overlay, then box-select both machines and press [Ctrl + G] to collapse them into a single card!",
 
   "gui.gtcalcboard.tutorial.completed_title": "Tutorial Complete!",
   "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [Guide] or [Tutorial] anytime.",

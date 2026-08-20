@@ -2,12 +2,14 @@ package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.FlowGraphSolver;
+import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.ParsedQuery;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiRecipe;
@@ -18,6 +20,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.*;
@@ -191,63 +194,181 @@ public class RecipeSearchDialog {
         updateSearchResults(query);
     }
 
+    public static List<SearchableRecipe> getTutorialDummyRecipes() {
+        List<SearchableRecipe> list = new ArrayList<>();
+
+        // 1. Steam Turbine (Tutorial)
+        RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
+        turbine.setGenerator(true);
+        turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
+        list.add(createTutorialSearchableRecipe(turbine, "gtceu", "steam_turbine", "Steam Turbine",
+                List.of(), List.of("Steam"), List.of(), List.of("gtceu:steam", "steam")));
+
+        // 2. Boiler (Tutorial)
+        RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
+        boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
+        list.add(createTutorialSearchableRecipe(boiler, "gtceu", "boiler", "Boiler",
+                List.of("Steam"), List.of(), List.of("gtceu:steam", "steam"), List.of()));
+
+        // 3. Steam Engine (Tutorial)
+        RecipeNode engine = RecipeNode.create("Steam Engine (Tutorial)", 20.0, 32.0, GTVoltageTier.LV);
+        engine.setGenerator(true);
+        engine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 200.0, 1.0));
+        list.add(createTutorialSearchableRecipe(engine, "gtceu", "steam_engine", "Steam Engine",
+                List.of(), List.of("Steam"), List.of(), List.of("gtceu:steam", "steam")));
+
+        return list;
+    }
+
+    private static SearchableRecipe createTutorialSearchableRecipe(
+            RecipeNode template,
+            String modId,
+            String categoryId,
+            String categoryName,
+            List<String> outputNames,
+            List<String> inputNames,
+            List<String> outputFluidIds,
+            List<String> inputFluidIds
+    ) {
+        StringBuilder outSb = new StringBuilder();
+        outputNames.forEach(o -> outSb.append(o.toLowerCase(Locale.ROOT)).append(" "));
+        StringBuilder inSb = new StringBuilder();
+        inputNames.forEach(i -> inSb.append(i.toLowerCase(Locale.ROOT)).append(" "));
+
+        StringBuilder fullSb = new StringBuilder();
+        fullSb.append(template.getName().toLowerCase(Locale.ROOT)).append(" ");
+        fullSb.append(modId).append(" ");
+        fullSb.append(categoryId).append(" ");
+        fullSb.append(categoryName.toLowerCase(Locale.ROOT)).append(" ");
+        fullSb.append(outSb).append(" ").append(inSb);
+
+        return new SearchableRecipe(
+                template,
+                template.getName(),
+                modId,
+                categoryId,
+                categoryName,
+                outputNames,
+                inputNames,
+                outputNames,
+                inputNames,
+                outputFluidIds,
+                inputFluidIds,
+                List.of(),
+                outSb.toString(),
+                inSb.toString(),
+                fullSb.toString()
+        );
+    }
+
     private void updateSearchResults(String query) {
         filteredRecipes.clear();
         ParsedQuery parsedQuery = RecipeSearchEngine.parseQuery(query);
 
-        synchronized (GLOBAL_RECIPES) {
-            if (GLOBAL_RECIPES.isEmpty()) {
-                ensureGlobalRecipesCachedAsync(() -> {
-                    if (this.visible) {
-                        updateSearchResults(searchBox.getValue());
-                    }
-                });
-                return;
+        boolean isTutorial = TutorialManager.getInstance().isActive();
+        List<SearchableRecipe> sourceList;
+        if (isTutorial) {
+            sourceList = getTutorialDummyRecipes();
+        } else {
+            synchronized (GLOBAL_RECIPES) {
+                if (GLOBAL_RECIPES.isEmpty()) {
+                    ensureGlobalRecipesCachedAsync(() -> {
+                        if (this.visible) {
+                            updateSearchResults(searchBox.getValue());
+                        }
+                    });
+                    return;
+                }
+                sourceList = new ArrayList<>(GLOBAL_RECIPES);
+            }
+        }
+
+        record ScoredRecipe(SearchableRecipe recipe, int score) {}
+        List<ScoredRecipe> scoredList = new ArrayList<>();
+
+        boolean hasContext = (contextualWireTarget != null && contextualWireTarget.sourceStack != null);
+        boolean targetIsFluid = hasContext && contextualWireTarget.sourceStack.isFluid();
+        String targetIdPath = (hasContext && contextualWireTarget.sourceStack.getId() != null)
+                ? contextualWireTarget.sourceStack.getId().getPath().toLowerCase(Locale.ROOT) : null;
+        String targetFullId = (hasContext && contextualWireTarget.sourceStack.getId() != null)
+                ? contextualWireTarget.sourceStack.getId().toString().toLowerCase(Locale.ROOT) : null;
+        String targetName = (hasContext && contextualWireTarget.sourceStack.getDisplayName() != null)
+                ? contextualWireTarget.sourceStack.getDisplayName().toLowerCase(Locale.ROOT) : null;
+
+        for (SearchableRecipe sr : sourceList) {
+            if (!RecipeSearchEngine.matches(sr, parsedQuery)) {
+                continue;
             }
 
-            List<SearchableRecipe> rank3 = new ArrayList<>();
-            List<SearchableRecipe> rank2 = new ArrayList<>();
-            List<SearchableRecipe> rank1 = new ArrayList<>();
-
-            String targetIdPath = (contextualWireTarget != null && contextualWireTarget.sourceStack != null && contextualWireTarget.sourceStack.getId() != null)
-                    ? contextualWireTarget.sourceStack.getId().getPath().toLowerCase(Locale.ROOT) : null;
-            String targetFullId = (contextualWireTarget != null && contextualWireTarget.sourceStack != null && contextualWireTarget.sourceStack.getId() != null)
-                    ? contextualWireTarget.sourceStack.getId().toString().toLowerCase(Locale.ROOT) : null;
-            String targetName = (contextualWireTarget != null && contextualWireTarget.sourceStack != null)
-                    ? contextualWireTarget.sourceStack.getDisplayName().toLowerCase(Locale.ROOT) : null;
-
-            for (SearchableRecipe sr : GLOBAL_RECIPES) {
-                if (rank3.size() + rank2.size() + rank1.size() >= 150) break;
-
-                // If contextual wire target is active, filter specifically for consumers / producers
-                if (contextualWireTarget != null) {
-                    boolean contextualMatch = false;
-                    if (!contextualWireTarget.sourceIsInput) {
-                        // Looking for CONSUMERS (recipes with matching input)
-                        if (targetIdPath != null && sr.inputSearchIndex().contains(targetIdPath)) contextualMatch = true;
-                        else if (targetFullId != null && sr.inputSearchIndex().contains(targetFullId)) contextualMatch = true;
-                        else if (targetName != null && sr.inputSearchIndex().contains(targetName)) contextualMatch = true;
+            int contextualScore = 0;
+            if (hasContext) {
+                if (!contextualWireTarget.sourceIsInput) {
+                    // Looking for CONSUMERS (recipes with matching input)
+                    if (targetIsFluid) {
+                        if ((targetFullId != null && sr.inputFluidIds().contains(targetFullId))
+                                || (targetIdPath != null && sr.inputFluidIds().contains(targetIdPath))) {
+                            contextualScore = 1000;
+                        } else if (targetName != null && sr.inputNames().contains(targetName)) {
+                            contextualScore = 500;
+                        }
                     } else {
-                        // Looking for PRODUCERS (recipes with matching output)
-                        if (targetIdPath != null && sr.outputSearchIndex().contains(targetIdPath)) contextualMatch = true;
-                        else if (targetFullId != null && sr.outputSearchIndex().contains(targetFullId)) contextualMatch = true;
-                        else if (targetName != null && sr.outputSearchIndex().contains(targetName)) contextualMatch = true;
+                        if ((targetFullId != null && !sr.inputFluidIds().contains(targetFullId) && sr.inputIds().contains(targetFullId))
+                                || (targetIdPath != null && !sr.inputFluidIds().contains(targetIdPath) && sr.inputIds().contains(targetIdPath))) {
+                            contextualScore = 1000;
+                        } else if (targetName != null && sr.inputNames().contains(targetName)) {
+                            contextualScore = 500;
+                        }
                     }
 
-                    if (!contextualMatch) continue;
-                }
+                    // If in contextual mode, exclude non-matches completely
+                    if (contextualScore == 0) {
+                        continue;
+                    }
+                } else {
+                    // Looking for PRODUCERS (recipes with matching output)
+                    if (targetIsFluid) {
+                        if ((targetFullId != null && sr.outputFluidIds().contains(targetFullId))
+                                || (targetIdPath != null && sr.outputFluidIds().contains(targetIdPath))) {
+                            contextualScore = 1000;
+                        } else if (targetName != null && sr.outputNames().contains(targetName)) {
+                            contextualScore = 500;
+                        }
+                    } else {
+                        if ((targetFullId != null && !sr.outputFluidIds().contains(targetFullId) && sr.outputIds().contains(targetFullId))
+                                || (targetIdPath != null && !sr.outputFluidIds().contains(targetIdPath) && sr.outputIds().contains(targetIdPath))) {
+                            contextualScore = 1000;
+                        } else if (targetName != null && sr.outputNames().contains(targetName)) {
+                            contextualScore = 500;
+                        }
+                    }
 
-                if (RecipeSearchEngine.matches(sr, parsedQuery)) {
-                    int score = RecipeSearchEngine.calculateRank(sr, parsedQuery);
-                    if (score == 3) rank3.add(sr);
-                    else if (score == 2) rank2.add(sr);
-                    else rank1.add(sr);
+                    if (contextualScore == 0) {
+                        continue;
+                    }
                 }
             }
 
-            filteredRecipes.addAll(rank3);
-            filteredRecipes.addAll(rank2);
-            filteredRecipes.addAll(rank1);
+            int queryScore = RecipeSearchEngine.calculateRank(sr, parsedQuery);
+            int totalScore = contextualScore + (queryScore * 10);
+
+            // Priority bonus for machine processing recipes over generic crafting table
+            String cat = sr.categoryId().toLowerCase(Locale.ROOT);
+            if (!cat.equals("crafting") && !cat.equals("minecraft:crafting")) {
+                totalScore += 100;
+            }
+            if (cat.contains("turbine") || cat.contains("generator") || cat.contains("boiler")) {
+                totalScore += 50;
+            }
+
+            scoredList.add(new ScoredRecipe(sr, totalScore));
+        }
+
+        // Sort descending by score
+        scoredList.sort((a, b) -> Integer.compare(b.score(), a.score()));
+
+        int limit = Math.min(150, scoredList.size());
+        for (int i = 0; i < limit; i++) {
+            filteredRecipes.add(scoredList.get(i).recipe());
         }
     }
 
@@ -338,17 +459,27 @@ public class RecipeSearchDialog {
                 graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, rowHover ? 0xFF2A3649 : (i % 2 == 0 ? 0xFF1A1E26 : 0xFF161A21));
 
                 // Left: Display First Input Stack Icon & Rate
-                EmiRecipe r = (EmiRecipe) sr.recipe();
-                if (r != null && !r.getInputs().isEmpty() && !r.getInputs().get(0).getEmiStacks().isEmpty()) {
-                    r.getInputs().get(0).getEmiStacks().get(0).render(graphics, listX + 6, rowY + 8, 0);
-                }
+                if (sr.recipe() instanceof EmiRecipe r) {
+                    if (!r.getInputs().isEmpty() && !r.getInputs().get(0).getEmiStacks().isEmpty()) {
+                        r.getInputs().get(0).getEmiStacks().get(0).render(graphics, listX + 6, rowY + 8, 0);
+                    }
 
-                // Arrow
-                graphics.drawString(font, "➔", listX + 28, rowY + 12, 0xFF657595, false);
+                    // Arrow
+                    graphics.drawString(font, "➔", listX + 28, rowY + 12, 0xFF657595, false);
 
-                // Right of arrow: Display First Output Stack Icon
-                if (!r.getOutputs().isEmpty()) {
-                    r.getOutputs().get(0).render(graphics, listX + 42, rowY + 8, 0);
+                    // Right of arrow: Display First Output Stack Icon
+                    if (!r.getOutputs().isEmpty()) {
+                        r.getOutputs().get(0).render(graphics, listX + 42, rowY + 8, 0);
+                    }
+                } else if (sr.recipe() instanceof RecipeNode rn) {
+                    // Tutorial dummy node preview
+                    if (!rn.getInputs().isEmpty()) {
+                        graphics.drawString(font, "📥", listX + 6, rowY + 12, 0xFFFFFFFF, false);
+                    }
+                    graphics.drawString(font, "➔", listX + 28, rowY + 12, 0xFF657595, false);
+                    if (rn.isGenerator() || !rn.getOutputs().isEmpty()) {
+                        graphics.drawString(font, rn.isGenerator() ? "⚡" : "📦", listX + 42, rowY + 12, 0xFFFFFFFF, false);
+                    }
                 }
 
                 // Display Recipe Name / Machine Category
@@ -426,7 +557,7 @@ public class RecipeSearchDialog {
 
             if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
                 SearchableRecipe sr = filteredRecipes.get(index);
-                RecipeNode node = sr.recipe() instanceof EmiRecipe er ? EmiRecipeConverter.convert(er) : null;
+                RecipeNode node = sr.recipe() instanceof EmiRecipe er ? EmiRecipeConverter.convert(er) : (sr.recipe() instanceof RecipeNode rn ? rn.copy() : null);
                 if (node != null) {
                     if (contextualWireTarget != null) {
                         // Place node near drop position
@@ -490,6 +621,7 @@ public class RecipeSearchDialog {
                                     Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
                                 }
                                 parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
+                                TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
                             }
                         } else {
                             // Reverse Wire: node (Output) -> sourceNode (Input)
@@ -527,10 +659,12 @@ public class RecipeSearchDialog {
                                     Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
                                 }
                                 parent.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, contextualWireTarget.shiftAutoRatio ? node.getId() : null, oldMachineCount, newMachineCount));
+                                TutorialManager.getInstance().onWireConnected(contextualWireTarget.shiftAutoRatio);
                             }
                         }
 
                         contextualWireTarget = null;
+                        parent.rebuildWidgets();
                     }
 
                     parent.markSummaryDirty();

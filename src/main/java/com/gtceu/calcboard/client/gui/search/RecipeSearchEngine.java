@@ -31,6 +31,8 @@ public class RecipeSearchEngine {
             List<String> inputNames,
             List<String> outputIds,
             List<String> inputIds,
+            List<String> outputFluidIds,
+            List<String> inputFluidIds,
             List<String> tags,
             String outputSearchIndex,
             String inputSearchIndex,
@@ -81,18 +83,20 @@ public class RecipeSearchEngine {
 
         List<String> outputNames = new ArrayList<>();
         List<String> outputIds = new ArrayList<>();
+        List<String> outputFluidIds = new ArrayList<>();
         StringBuilder outSb = new StringBuilder();
 
         if (recipe.getOutputs() != null) {
             for (EmiStack out : recipe.getOutputs()) {
                 if (out != null) {
-                    indexStack(out, outputNames, outputIds, outSb);
+                    indexStack(out, outputNames, outputIds, outputFluidIds, outSb);
                 }
             }
         }
 
         List<String> inputNames = new ArrayList<>();
         List<String> inputIds = new ArrayList<>();
+        List<String> inputFluidIds = new ArrayList<>();
         List<String> tags = new ArrayList<>();
         StringBuilder inSb = new StringBuilder();
 
@@ -101,7 +105,7 @@ public class RecipeSearchEngine {
                 if (in != null && in.getEmiStacks() != null) {
                     for (EmiStack stack : in.getEmiStacks()) {
                         if (stack != null) {
-                            indexStack(stack, inputNames, inputIds, inSb);
+                            indexStack(stack, inputNames, inputIds, inputFluidIds, inSb);
                         }
                     }
                 }
@@ -126,6 +130,8 @@ public class RecipeSearchEngine {
                 inputNames,
                 outputIds,
                 inputIds,
+                outputFluidIds,
+                inputFluidIds,
                 tags,
                 outSb.toString(),
                 inSb.toString(),
@@ -133,7 +139,7 @@ public class RecipeSearchEngine {
         );
     }
 
-    private static void indexStack(EmiStack stack, List<String> names, List<String> ids, StringBuilder sb) {
+    private static void indexStack(EmiStack stack, List<String> names, List<String> ids, List<String> fluidIds, StringBuilder sb) {
         try {
             if (stack.getName() != null) {
                 String name = stack.getName().getString().toLowerCase(Locale.ROOT);
@@ -148,6 +154,23 @@ public class RecipeSearchEngine {
             ids.add(fullId);
             ids.add(path);
             sb.append(fullId).append(" ").append(path).append(" ");
+
+            boolean isFluid = false;
+            try {
+                Object key = stack.getKey();
+                if (key instanceof net.minecraft.world.level.material.Fluid) {
+                    isFluid = true;
+                } else if (net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(stack.getId())) {
+                    isFluid = true;
+                } else if (stack.getClass().getName().contains("Fluid")) {
+                    isFluid = true;
+                }
+            } catch (Throwable ignored) {}
+
+            if (isFluid && fluidIds != null) {
+                fluidIds.add(fullId);
+                fluidIds.add(path);
+            }
         }
     }
 

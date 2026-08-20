@@ -75,6 +75,12 @@ public class RecipeNode {
         return new RecipeNode(UUID.randomUUID().toString(), name, baseDurationTicks, baseEUt, recipeTier);
     }
 
+    public RecipeNode copy() {
+        CompoundTag tag = this.serializeNBT();
+        tag.putString("id", UUID.randomUUID().toString());
+        return RecipeNode.deserializeNBT(tag);
+    }
+
     public String getId() {
         return id;
     }

@@ -25,11 +25,13 @@ public class GuideDialog {
 
     public enum GuideCategory {
         BASICS("gui.gtcalcboard.guide.cat_basics", "gui.gtcalcboard.guide.basics_title", "gui.gtcalcboard.guide.basics_desc"),
+        SEARCH("gui.gtcalcboard.guide.cat_search", "gui.gtcalcboard.guide.search_title", "gui.gtcalcboard.guide.search_desc"),
         WIRING("gui.gtcalcboard.guide.cat_wiring", "gui.gtcalcboard.guide.wiring_title", "gui.gtcalcboard.guide.wiring_desc"),
         MASTER("gui.gtcalcboard.guide.cat_master", "gui.gtcalcboard.guide.master_title", "gui.gtcalcboard.guide.master_desc"),
         MODULE("gui.gtcalcboard.guide.cat_module", "gui.gtcalcboard.guide.module_title", "gui.gtcalcboard.guide.module_desc"),
-        SHORTCUTS("gui.gtcalcboard.guide.cat_shortcuts", "gui.gtcalcboard.guide.shortcuts_title", "gui.gtcalcboard.guide.shortcuts_desc"),
-        PAGES("gui.gtcalcboard.guide.cat_pages", "gui.gtcalcboard.guide.pages_title", "gui.gtcalcboard.guide.pages_desc");
+        TEAM("gui.gtcalcboard.guide.cat_team", "gui.gtcalcboard.guide.team_title", "gui.gtcalcboard.guide.team_desc"),
+        PAGES("gui.gtcalcboard.guide.cat_pages", "gui.gtcalcboard.guide.pages_title", "gui.gtcalcboard.guide.pages_desc"),
+        SHORTCUTS("gui.gtcalcboard.guide.cat_shortcuts", "gui.gtcalcboard.guide.shortcuts_title", "gui.gtcalcboard.guide.shortcuts_desc");
 
         private final String tabKey;
         private final String titleKey;
@@ -108,34 +110,36 @@ public class GuideDialog {
 
         // 3. Left Sidebar Tabs
         int sidebarX = dialogX + 6;
-        int sidebarY = dialogY + 30;
+        int sidebarY = dialogY + 28;
+        int tabH = 27;
+        int tabPitch = 30;
         GuideCategory[] categories = GuideCategory.values();
 
         for (int i = 0; i < categories.length; i++) {
             GuideCategory cat = categories[i];
-            int tabY = sidebarY + (i * 38);
+            int tabY = sidebarY + (i * tabPitch);
             boolean isSelected = (i == activeCategoryIndex);
-            boolean isHovered = mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= tabY && mouseY <= tabY + 34;
+            boolean isHovered = mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= tabY && mouseY <= tabY + tabH;
 
             int tabBg = isSelected ? 0xFF25334D : (isHovered ? 0xFF1A2333 : 0xFF141C29);
             int tabBorder = isSelected ? 0xFF00E5FF : (isHovered ? 0xFF4A5F80 : 0xFF283448);
 
-            graphics.fill(sidebarX, tabY, sidebarX + SIDEBAR_WIDTH, tabY + 34, tabBg);
-            graphics.renderOutline(sidebarX, tabY, SIDEBAR_WIDTH, 34, tabBorder);
+            graphics.fill(sidebarX, tabY, sidebarX + SIDEBAR_WIDTH, tabY + tabH, tabBg);
+            graphics.renderOutline(sidebarX, tabY, SIDEBAR_WIDTH, tabH, tabBorder);
 
             if (isSelected) {
                 // Active indicator line on the left
-                graphics.fill(sidebarX, tabY, sidebarX + 3, tabY + 34, 0xFF00E5FF);
+                graphics.fill(sidebarX, tabY, sidebarX + 3, tabY + tabH, 0xFF00E5FF);
             }
 
             // Two-line Tab title
             String tabText = cat.getTabName();
             String[] parts = tabText.split("\\|", 2);
             if (parts.length > 1) {
-                graphics.drawString(font, parts[0], sidebarX + 8, tabY + 6, isSelected ? 0xFF00E5FF : 0xFFE0E0E0, false);
-                graphics.drawString(font, "§7" + parts[1], sidebarX + 8, tabY + 18, isSelected ? 0xFFAADFFF : 0xFF888888, false);
+                graphics.drawString(font, parts[0], sidebarX + 8, tabY + 4, isSelected ? 0xFF00E5FF : 0xFFE0E0E0, false);
+                graphics.drawString(font, "§7" + parts[1], sidebarX + 8, tabY + 15, isSelected ? 0xFFAADFFF : 0xFF888888, false);
             } else {
-                graphics.drawString(font, tabText, sidebarX + 8, tabY + 12, isSelected ? 0xFF00E5FF : 0xFFE0E0E0, false);
+                graphics.drawString(font, tabText, sidebarX + 8, tabY + 9, isSelected ? 0xFF00E5FF : 0xFFE0E0E0, false);
             }
         }
 
@@ -237,12 +241,14 @@ public class GuideDialog {
 
         // Sidebar Tab selection
         int sidebarX = dialogX + 6;
-        int sidebarY = dialogY + 30;
+        int sidebarY = dialogY + 28;
+        int tabH = 27;
+        int tabPitch = 30;
         GuideCategory[] categories = GuideCategory.values();
 
         for (int i = 0; i < categories.length; i++) {
-            int tabY = sidebarY + (i * 38);
-            if (mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= tabY && mouseY <= tabY + 34) {
+            int tabY = sidebarY + (i * tabPitch);
+            if (mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= tabY && mouseY <= tabY + tabH) {
                 if (activeCategoryIndex != i) {
                     activeCategoryIndex = i;
                     scrollOffset = 0;

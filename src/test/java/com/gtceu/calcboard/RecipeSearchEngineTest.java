@@ -42,6 +42,8 @@ public class RecipeSearchEngineTest {
                 inputNames,
                 outputNames,
                 inputNames,
+                List.of(),
+                List.of(),
                 tags,
                 outSb.toString(),
                 inSb.toString(),
