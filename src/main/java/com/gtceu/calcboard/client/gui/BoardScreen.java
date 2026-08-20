@@ -46,11 +46,12 @@ public class BoardScreen extends Screen {
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
-    private final WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
+    private WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
     private MachineConfigDialog machineConfigDialog;
     private GuideDialog guideDialog;
     private DeletePageConfirmDialog deletePageDialog;
+    private GlobalBalanceDashboardDialog globalBalanceDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -183,6 +184,7 @@ public class BoardScreen extends Screen {
         this.machineConfigDialog = new MachineConfigDialog(this);
         this.guideDialog = new GuideDialog(this);
         this.deletePageDialog = new DeletePageConfirmDialog(this);
+        this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
         rebuildWidgets();
 
         if (this.width < 640) {
@@ -201,6 +203,10 @@ public class BoardScreen extends Screen {
         if (deletePageDialog != null) {
             deletePageDialog.open(pageIndex, pageName);
         }
+    }
+
+    public GlobalBalanceDashboardDialog getGlobalBalanceDialog() {
+        return globalBalanceDialog;
     }
 
     public GuideDialog getGuideDialog() {
@@ -298,6 +304,9 @@ public class BoardScreen extends Screen {
 
     public void markSummaryDirty() {
         this.summaryDirty = true;
+        if (globalBalanceDialog != null) {
+            globalBalanceDialog.markDirty();
+        }
     }
 
     @Override
@@ -451,6 +460,7 @@ public class BoardScreen extends Screen {
 
         // 7. Render Tooltips only if no modal dialog is open
         if ((welcomeDialog == null || !welcomeDialog.isVisible())
+            && (globalBalanceDialog == null || !globalBalanceDialog.isVisible())
             && (guideDialog == null || !guideDialog.isVisible())
             && (searchDialog == null || !searchDialog.isVisible())
             && (machineConfigDialog == null || !machineConfigDialog.isVisible())
@@ -463,6 +473,8 @@ public class BoardScreen extends Screen {
         // 8. Top-level Modal Dialogs (Highest Layer)
         if (deletePageDialog != null && deletePageDialog.isVisible()) {
             deletePageDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
+            globalBalanceDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (guideDialog != null && guideDialog.isVisible()) {
             guideDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (searchDialog != null && searchDialog.isVisible()) {
@@ -535,6 +547,9 @@ public class BoardScreen extends Screen {
         if (deletePageDialog != null && deletePageDialog.isVisible()) {
             return deletePageDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
+        if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
+            return globalBalanceDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseClicked(mouseX, mouseY, button);
         }
@@ -592,6 +607,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
+            return globalBalanceDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             return machineConfigDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -627,6 +645,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
+            return globalBalanceDialog.charTyped(codePoint, modifiers);
+        }
         if (pageTabBar.charTyped(codePoint, modifiers)) {
             return true;
         }

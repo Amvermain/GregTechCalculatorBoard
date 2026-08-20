@@ -264,6 +264,7 @@
   "gui.gtcalcboard.tooltip.btn_import": "Import Blueprint\nLoads and reconstructs a flowchart blueprint code from clipboard.",
   "gui.gtcalcboard.hotkey_hud.title": "Hotkeys",
   "gui.gtcalcboard.hotkey_hud.expand": "Expand Hotkey Guide (H)",
+  "gui.gtcalcboard.hotkey_hud.balance": "Global Balance",
   "gui.gtcalcboard.hotkey_hud.add": "Add Recipe",
   "gui.gtcalcboard.hotkey_hud.shift_wire": "Auto Ratio",
   "gui.gtcalcboard.hotkey_hud.group": "Group Module",
@@ -294,5 +295,24 @@
 
   "gui.gtcalcboard.tutorial.completed_title": "Tutorial Complete!",
   "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical and fusion lines! Reopen [Guide] or [Tutorial] anytime.",
-  "gui.gtcalcboard.tutorial.completed_tag": "[Complete]"
+  "gui.gtcalcboard.tutorial.completed_tag": "[Complete]",
+
+  "gui.gtcalcboard.global_balance": "Global Balance",
+  "gui.gtcalcboard.global_balance.modal_title": "Global Balance Dashboard",
+  "gui.gtcalcboard.global_balance.power_surplus": "Power Surplus",
+  "gui.gtcalcboard.global_balance.power_deficit": "Power Deficit",
+  "gui.gtcalcboard.global_balance.power_balanced": "Power 100% Balanced",
+  "gui.gtcalcboard.global_balance.pages_selected": "Pages",
+  "gui.gtcalcboard.global_balance.included_pages": "Included Pages",
+  "gui.gtcalcboard.global_balance.select_all": "All",
+  "gui.gtcalcboard.global_balance.deselect_all": "None",
+  "gui.gtcalcboard.global_balance.tab_deficits": "Deficits",
+  "gui.gtcalcboard.global_balance.tab_surplus": "Surplus",
+  "gui.gtcalcboard.global_balance.tab_balanced": "Balanced",
+  "gui.gtcalcboard.global_balance.balanced_tag": "Balanced",
+  "gui.gtcalcboard.global_balance.net_rate": "Net Flow Rate",
+  "gui.gtcalcboard.global_balance.click_drilldown_hint": "Click to view page contribution breakdown",
+  "gui.gtcalcboard.global_balance.breakdown_header": "Page Production / Consumption Breakdown:",
+  "gui.gtcalcboard.global_balance.net_total": "Net Balance Across Pages:",
+  "gui.gtcalcboard.tooltip.btn_global_balance": "Global Balance Dashboard (B)\nCalculates cross-page net production, consumption, power balance, and page contributions."
 }

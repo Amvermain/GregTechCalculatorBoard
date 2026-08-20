@@ -100,25 +100,81 @@ public final class FormatUtil {
     }
 
     /**
-     * Formats connected fraction rates e.g. "1.5M/2.0M B/s +" or "100/200/s ✔".
+     * Formats an input port's connected rate (incoming supply) vs required rate (machine demand)
+     * using clear + / - notation with color coding to eliminate confusing double slashes.
+     * e.g. "+3.48M -3.2M/s +" (Surplus) or "+2.5M -3.2M/s ⚠" (Deficit).
      */
-    public static String formatConnectedFraction(double connected, double required, boolean isFluid, String symbol) {
-        String symStr = symbol.isEmpty() ? "" : " " + symbol;
+    public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit) {
+        String unit;
+        String supStr;
+        String reqStr;
+
         if (isFluid) {
-            if (required >= 1000.0 || connected >= 1000.0) {
-                String connStr = formatCompactNumber(connected / 1000.0);
-                String reqStr = formatCompactNumber(required / 1000.0);
-                return connStr + "/" + reqStr + " B/s" + symStr;
+            if (required >= 1000.0 || supplied >= 1000.0) {
+                unit = " B/s";
+                supStr = formatCompactNumber(supplied / 1000.0);
+                reqStr = formatCompactNumber(required / 1000.0);
             } else {
-                String connStr = formatCompactNumber(connected);
-                String reqStr = formatCompactNumber(required);
-                return connStr + "/" + reqStr + " mB/s" + symStr;
+                unit = " mB/s";
+                supStr = formatCompactNumber(supplied);
+                reqStr = formatCompactNumber(required);
             }
         } else {
-            String connStr = formatCompactNumber(connected);
-            String reqStr = formatCompactNumber(required);
-            return connStr + "/" + reqStr + "/s" + symStr;
+            unit = "/s";
+            supStr = formatCompactNumber(supplied);
+            reqStr = formatCompactNumber(required);
         }
+
+        if (isDeficit) {
+            // Deficit: Supply in Gold/Orange (+), Machine Demand in Red (-), Warning symbol
+            return "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
+        } else {
+            // Surplus: Supply in Cyan (+), Machine Demand in Light Gray (-), Plus symbol
+            return "§b+" + supStr + " §7-" + reqStr + unit + " §b+";
+        }
+    }
+
+    /**
+     * Formats an output port's produced rate (machine generation) vs demanded rate (downstream consumption)
+     * using clear + / - notation with color coding.
+     * e.g. "+3.2M -2.0M/s +" (Surplus) or "+3.2M -4.5M/s ⚠" (Deficit).
+     */
+    public static String formatConnectedOutput(double produced, double demanded, boolean isFluid, boolean isDeficit) {
+        String unit;
+        String prodStr;
+        String demStr;
+
+        if (isFluid) {
+            if (produced >= 1000.0 || demanded >= 1000.0) {
+                unit = " B/s";
+                prodStr = formatCompactNumber(produced / 1000.0);
+                demStr = formatCompactNumber(demanded / 1000.0);
+            } else {
+                unit = " mB/s";
+                prodStr = formatCompactNumber(produced);
+                demStr = formatCompactNumber(demanded);
+            }
+        } else {
+            unit = "/s";
+            prodStr = formatCompactNumber(produced);
+            demStr = formatCompactNumber(demanded);
+        }
+
+        if (isDeficit) {
+            // Downstream Deficit: Machine produces in Green (+), Downstream Demand exceeds in Red (-), Warning symbol
+            return "§a+" + prodStr + " §c-" + demStr + unit + " §c⚠";
+        } else {
+            // Surplus: Machine produces in Green (+), Downstream Demand in Light Gray (-), Plus symbol
+            return "§a+" + prodStr + " §7-" + demStr + unit + " §b+";
+        }
+    }
+
+    /**
+     * Formats connected fraction rates e.g. "+1.5M -2.0M B/s +" or "+100 -200/s ⚠".
+     */
+    public static String formatConnectedFraction(double connected, double required, boolean isFluid, String symbol) {
+        boolean isDeficit = "⚠".equals(symbol) || connected < required - 0.0001;
+        return formatConnectedInput(connected, required, isFluid, isDeficit);
     }
 
     /**

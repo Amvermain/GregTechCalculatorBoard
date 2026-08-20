@@ -16,8 +16,8 @@ import java.util.*;
  * Interactive card widget representing a single GregTech recipe machine node on the canvas.
  */
 public class NodeWidget {
-    public static final int WIDTH = 235;
-    public static final int DEFAULT_WIDTH = 235;
+    public static final int WIDTH = 245;
+    public static final int DEFAULT_WIDTH = 245;
     public static final int HEADER_HEIGHT = 20;
 
     private final RecipeNode node;

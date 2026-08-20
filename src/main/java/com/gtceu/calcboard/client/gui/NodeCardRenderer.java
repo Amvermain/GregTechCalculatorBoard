@@ -304,24 +304,24 @@ public class NodeCardRenderer {
                 }
 
                 String rateStr;
-                int textColor;
+                int textColor = 0xFFFFFFFF;
                 if (!isConnected) {
-                    rateStr = formatRate(rate, in.isFluid());
+                    rateStr = "§7-" + formatRate(rate, in.isFluid());
                     textColor = 0xFFFFAAAA;
                 } else if (isBalanced) {
-                    rateStr = formatRate(rate, in.isFluid()) + " ✔";
-                    textColor = 0xFF55FF88;
+                    rateStr = "§a" + formatRate(rate, in.isFluid()) + " §2✔";
                 } else if (isDeficit) {
-                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, in.isFluid(), "⚠");
-                    textColor = 0xFFFFAA33;
+                    rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in.isFluid(), true);
                 } else {
-                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, in.isFluid(), "+");
-                    textColor = 0xFF66DDFF;
+                    rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in.isFluid(), false);
                 }
 
                 int maxInTextW = hasOutput ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
-                String fittedRateStr = font.plainSubstrByWidth(rateStr, maxInTextW);
-                graphics.drawString(font, fittedRateStr, x + 30, rowY + 4, textColor, false);
+                int inTextW = font.width(rateStr);
+                if (inTextW > maxInTextW) {
+                    rateStr = font.plainSubstrByWidth(rateStr, maxInTextW);
+                }
+                graphics.drawString(font, rateStr, x + 30, rowY + 4, textColor, false);
             }
 
             // Render Output (Right side)
@@ -346,19 +346,16 @@ public class NodeCardRenderer {
                 }
 
                 String rateStr;
-                int textColor;
+                int textColor = 0xFFFFFFFF;
                 if (!isConnected) {
-                    rateStr = formatRate(rate, out.isFluid());
+                    rateStr = "§a+" + formatRate(rate, out.isFluid());
                     textColor = 0xFFAAFFAA;
                 } else if (isBalanced) {
-                    rateStr = formatRate(rate, out.isFluid()) + " ✔";
-                    textColor = 0xFF55FF88;
+                    rateStr = "§a" + formatRate(rate, out.isFluid()) + " §2✔";
                 } else if (isSurplus) {
-                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, out.isFluid(), "+");
-                    textColor = 0xFF66DDFF;
+                    rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out.isFluid(), false);
                 } else {
-                    rateStr = formatConnectedFraction(stats.connectedRate(), rate, out.isFluid(), "⚠");
-                    textColor = 0xFFFF6666;
+                    rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out.isFluid(), true);
                 }
 
                 int maxOutTextW = hasInput ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);

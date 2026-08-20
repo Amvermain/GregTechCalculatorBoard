@@ -1630,4 +1630,137 @@ public class CalculationTest {
             t.printStackTrace();
         }
     }
+
+    @Test
+    public void testGlobalBalanceMultiPageMaterialAndPowerAggregation() {
+        // Page 1: Oil Refinery -> consumes 2,000 EU/t (HV), produces 500 mB/s Ethylene
+        BoardPage page1 = BoardPage.createDefault("Oil Refinery");
+        RecipeNode cracker = RecipeNode.create("Steam Cracker", 20.0, 2000.0, GTVoltageTier.HV);
+        cracker.setMachineCount(1.0);
+        IngredientStack ethylene = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:ethylene"), "Ethylene", 500.0, 1.0);
+        cracker.addOutput(ethylene);
+        page1.getGraph().addNode(cracker);
+
+        // Page 2: Plastics -> consumes 5,000 EU/t (EV), consumes 300 mB/s Ethylene, produces 100.0 Polyethylene
+        BoardPage page2 = BoardPage.createDefault("Plastics Plant");
+        RecipeNode poly = RecipeNode.create("Polymerizer", 20.0, 5000.0, GTVoltageTier.EV);
+        poly.setMachineCount(1.0);
+        poly.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:ethylene"), "Ethylene", 300.0, 1.0));
+        IngredientStack polyethylene = IngredientStack.item(ResourceLocation.tryParse("gtceu:polyethylene_plate"), "Polyethylene Plate", 100.0, 1.0);
+        poly.addOutput(polyethylene);
+        page2.getGraph().addNode(poly);
+
+        // Page 3: Gas Turbine Power Plant -> generates 30,000 EU/t (EV)
+        BoardPage page3 = BoardPage.createDefault("Turbine Power Station");
+        RecipeNode turbine = RecipeNode.create("Gas Turbine", 20.0, 30000.0, GTVoltageTier.EV);
+        turbine.setGenerator(true);
+        turbine.setMachineCount(1.0);
+        page3.getGraph().addNode(turbine);
+
+        // Aggregate across Page 1, Page 2, Page 3
+        List<BoardPage> selectedPages = List.of(page1, page2, page3);
+        GlobalBalanceSummary summary = GlobalBalanceAggregator.compute(selectedPages);
+
+        // 1. Machine & Tier assertions
+        Assertions.assertEquals(3, summary.totalMachineCount());
+        Assertions.assertEquals(GTVoltageTier.EV, summary.highestVoltageTier());
+
+        // 2. Power Balance: 30,000 Gen - 7,000 Drain = +23,000 Net Gen (Surplus 🟢)
+        Assertions.assertEquals(30000.0, summary.totalGeneratedEUt(), 0.001);
+        Assertions.assertEquals(7000.0, summary.totalConsumedEUt(), 0.001);
+        Assertions.assertEquals(-23000.0, summary.netEUt(), 0.001);
+        Assertions.assertEquals(23000.0, summary.getNetPower(), 0.001);
+        Assertions.assertTrue(summary.isPowerSurplus());
+        Assertions.assertFalse(summary.isPowerDeficit());
+
+        // 3. Material Net Balance:
+        // Ethylene: 500 produced - 300 consumed = +200 mB/s Surplus
+        Double netEthylene = summary.netOutputs().get(ethylene);
+        Assertions.assertNotNull(netEthylene);
+        Assertions.assertEquals(200.0, netEthylene, 0.001);
+        Assertions.assertFalse(summary.rawInputs().containsKey(ethylene));
+
+        // Polyethylene: 100 produced = +100/s Surplus
+        Double netPoly = summary.netOutputs().get(polyethylene);
+        Assertions.assertNotNull(netPoly);
+        Assertions.assertEquals(100.0, netPoly, 0.001);
+
+        // 4. Per-Item Contribution Drilldown:
+        List<GlobalBalanceSummary.PageContribution> ethyleneContribs = summary.getContributionsFor(ethylene);
+        Assertions.assertEquals(2, ethyleneContribs.size());
+
+        var p1Contrib = ethyleneContribs.stream().filter(c -> c.pageId().equals(page1.getId())).findFirst().orElse(null);
+        Assertions.assertNotNull(p1Contrib);
+        Assertions.assertEquals(500.0, p1Contrib.producedRate(), 0.001);
+        Assertions.assertEquals(0.0, p1Contrib.consumedRate(), 0.001);
+        Assertions.assertEquals(500.0, p1Contrib.netRate(), 0.001);
+
+        var p2Contrib = ethyleneContribs.stream().filter(c -> c.pageId().equals(page2.getId())).findFirst().orElse(null);
+        Assertions.assertNotNull(p2Contrib);
+        Assertions.assertEquals(0.0, p2Contrib.producedRate(), 0.001);
+        Assertions.assertEquals(300.0, p2Contrib.consumedRate(), 0.001);
+        Assertions.assertEquals(-300.0, p2Contrib.netRate(), 0.001);
+    }
+
+    @Test
+    public void testGlobalBalanceSelectiveExclusion() {
+        BoardPage page1 = BoardPage.createDefault("Page 1");
+        RecipeNode n1 = RecipeNode.create("Producer", 20.0, 1000.0, GTVoltageTier.LV);
+        n1.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 100.0, 1.0));
+        page1.getGraph().addNode(n1);
+
+        BoardPage page2 = BoardPage.createDefault("Page 2");
+        RecipeNode n2 = RecipeNode.create("Consumer", 20.0, 2000.0, GTVoltageTier.LV);
+        n2.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 250.0, 1.0));
+        page2.getGraph().addNode(n2);
+
+        IngredientStack oxygen = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 100.0, 1.0);
+
+        // Case A: Both Pages Selected -> Oxygen Deficit 150 mB/s (100 - 250 = -150)
+        GlobalBalanceSummary fullSummary = GlobalBalanceAggregator.compute(List.of(page1, page2));
+        Assertions.assertTrue(fullSummary.rawInputs().containsKey(oxygen));
+        Assertions.assertEquals(150.0, fullSummary.rawInputs().get(oxygen), 0.001);
+        Assertions.assertEquals(3000.0, fullSummary.totalConsumedEUt(), 0.001);
+
+        // Case B: Only Page 1 Selected -> Oxygen Surplus 100 mB/s
+        GlobalBalanceSummary p1Summary = GlobalBalanceAggregator.compute(List.of(page1));
+        Assertions.assertTrue(p1Summary.netOutputs().containsKey(oxygen));
+        Assertions.assertEquals(100.0, p1Summary.netOutputs().get(oxygen), 0.001);
+        Assertions.assertEquals(1000.0, p1Summary.totalConsumedEUt(), 0.001);
+
+        // Case C: Only Page 2 Selected -> Oxygen Deficit 250 mB/s
+        GlobalBalanceSummary p2Summary = GlobalBalanceAggregator.compute(List.of(page2));
+        Assertions.assertTrue(p2Summary.rawInputs().containsKey(oxygen));
+        Assertions.assertEquals(250.0, p2Summary.rawInputs().get(oxygen), 0.001);
+        Assertions.assertEquals(2000.0, p2Summary.totalConsumedEUt(), 0.001);
+    }
+
+    @Test
+    public void testConnectedRateFormattingPlusMinusWithoutDoubleSlash() {
+        // Item Input Surplus: Supply 3.48M, Demand 3.2M -> "+3.48M -3.2M/s +"
+        String inSurplus = com.gtceu.calcboard.client.gui.FormatUtil.formatConnectedInput(3_480_000, 3_200_000, false, false);
+        Assertions.assertTrue(inSurplus.contains("+3.48M"));
+        Assertions.assertTrue(inSurplus.contains("-3.2M/s"));
+        Assertions.assertTrue(inSurplus.contains("+"));
+        Assertions.assertFalse(inSurplus.contains("/3.2M/s")); // No double slash!
+
+        // Item Input Deficit: Supply 2.5M, Demand 3.2M -> "+2.5M -3.2M/s ⚠"
+        String inDeficit = com.gtceu.calcboard.client.gui.FormatUtil.formatConnectedInput(2_500_000, 3_200_000, false, true);
+        Assertions.assertTrue(inDeficit.contains("+2.5M"));
+        Assertions.assertTrue(inDeficit.contains("-3.2M/s"));
+        Assertions.assertTrue(inDeficit.contains("⚠"));
+
+        // Fluid Output Surplus: Produced 3.2M mB/s (3.2k B/s), Demanded 2.0M mB/s (2k B/s) -> "+3.2k -2k B/s +"
+        String outSurplus = com.gtceu.calcboard.client.gui.FormatUtil.formatConnectedOutput(3_200_000, 2_000_000, true, false);
+        Assertions.assertTrue(outSurplus.contains("+3.2k"));
+        Assertions.assertTrue(outSurplus.contains("-2k B/s"));
+        Assertions.assertTrue(outSurplus.contains("+"));
+        Assertions.assertFalse(outSurplus.contains("/2")); // No double slash!
+
+        // Fluid Output Deficit: Produced 3.2M mB/s (3.2k B/s), Demanded 4.5M mB/s (4.5k B/s) -> "+3.2k -4.5k B/s ⚠"
+        String outDeficit = com.gtceu.calcboard.client.gui.FormatUtil.formatConnectedOutput(3_200_000, 4_500_000, true, true);
+        Assertions.assertTrue(outDeficit.contains("+3.2k"));
+        Assertions.assertTrue(outDeficit.contains("-4.5k B/s"));
+        Assertions.assertTrue(outDeficit.contains("⚠"));
+    }
 }

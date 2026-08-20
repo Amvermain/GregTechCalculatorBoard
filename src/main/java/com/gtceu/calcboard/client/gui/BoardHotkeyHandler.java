@@ -39,6 +39,14 @@ public final class BoardHotkeyHandler {
             return screen.getDeletePageDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
+        if (screen.getGlobalBalanceDialog() != null && screen.getGlobalBalanceDialog().isVisible()) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                screen.getGlobalBalanceDialog().close();
+                return true;
+            }
+            return screen.getGlobalBalanceDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+
         if (screen.getGuideDialog() != null && screen.getGuideDialog().isVisible()) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 screen.getGuideDialog().close();
@@ -150,6 +158,18 @@ public final class BoardHotkeyHandler {
         if (keyCode == GLFW.GLFW_KEY_H && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
             screen.getHotkeyHudWidget().toggle();
             return true;
+        }
+
+        // 9. Toggle Global Balance Dashboard: B
+        if (keyCode == GLFW.GLFW_KEY_B && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+            if (screen.getGlobalBalanceDialog() != null) {
+                if (screen.getGlobalBalanceDialog().isVisible()) {
+                    screen.getGlobalBalanceDialog().close();
+                } else {
+                    screen.getGlobalBalanceDialog().open();
+                }
+                return true;
+            }
         }
 
         return false;
