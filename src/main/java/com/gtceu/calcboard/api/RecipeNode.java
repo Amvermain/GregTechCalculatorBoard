@@ -40,7 +40,7 @@ public class RecipeNode {
     // Canvas position & Dimensions
     private double posX;
     private double posY;
-    private int cardWidth = 210;  // Default 210, resizable 200-500
+    private int cardWidth = 245;  // Default 245, resizable 245-500
     private int cardHeight = 0;   // 0 = Auto-height, resizable up to 600
 
     // Module / Subgraph Abstraction
@@ -308,11 +308,11 @@ public class RecipeNode {
     }
 
     public int getCardWidth() {
-        return Math.max(235, Math.min(500, cardWidth));
+        return Math.max(245, Math.min(500, cardWidth));
     }
 
     public void setCardWidth(int cardWidth) {
-        this.cardWidth = Math.max(235, Math.min(500, cardWidth));
+        this.cardWidth = Math.max(245, Math.min(500, cardWidth));
     }
 
     public int getCardHeight() {

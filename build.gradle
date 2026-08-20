@@ -68,6 +68,36 @@ repositories {
     maven { url = "https://maven.blamejared.com" }
     maven { url = "https://www.cursemaven.com" }
     maven { url = "https://api.modrinth.com/maven" }
+    maven {
+        name = 'GTCEu Maven'
+        url = 'https://maven.gtceu.com'
+        content {
+            includeGroup 'com.gregtechceu.gtceu'
+        }
+    }
+    maven {
+        name = 'Curios Maven'
+        url = 'https://maven.theillusivec4.top/'
+    }
+    maven {
+        name = 'FirstDarkDev Maven'
+        url = 'https://maven.firstdarkdev.xyz/snapshots'
+        content {
+            includeGroup 'com.lowdragmc.ldlib'
+        }
+    }
+    maven {
+        name = 'Architectury / Rhino'
+        url = 'https://maven.architectury.dev/'
+    }
+    maven {
+        name = 'Latvian / KubeJS'
+        url = 'https://maven.latvian.dev/react/'
+    }
+    maven {
+        name = 'Toma Configuration'
+        url = 'https://maven.toma.dev/'
+    }
     flatDir {
         def localMods = localProperties.getProperty('target.mods.dir')
         def dirsList = ['libs', 'instance/mods', "${System.getProperty('user.home')}/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods"]
@@ -93,10 +123,17 @@ dependencies {
     // Jade (WAILA / Block Tooltip HUD mod for runClient testing)
     runtimeOnly fg.deobf("maven.modrinth:jade:11.13.2+forge")
 
-    // GregTech Modern (StarT Fork) & LowDragLib (Prism Launcher mods)
-    compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-    runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-    runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
+    // GregTech Modern & LowDragLib (Switchable: 'official' or 'start_fork')
+    def gtceuVariant = project.findProperty('gtceu_variant') ?: 'official'
+    if (gtceuVariant == 'start_fork') {
+        compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
+        runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
+        runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
+    } else {
+        compileOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
+        runtimeOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
+        runtimeOnly fg.deobf("curse.maven:ldlib-626676:${ldlib_curseforge_file_id}")
+    }
 
     // Thermal Series (CoFH Core, Thermal Foundation, Thermal Expansion, Thermal Cultivation)
     compileOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")

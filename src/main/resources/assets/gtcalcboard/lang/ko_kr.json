@@ -264,6 +264,7 @@
   "gui.gtcalcboard.tooltip.btn_import": "블루프린트 가져오기 (Import)\n클립보드에 복사된 블루프린트 코드를 읽어와 보드에 즉시 배치합니다.",
   "gui.gtcalcboard.hotkey_hud.title": "단축키",
   "gui.gtcalcboard.hotkey_hud.expand": "단축키 가이드 펼치기 (H)",
+  "gui.gtcalcboard.hotkey_hud.balance": "종합 수지",
   "gui.gtcalcboard.hotkey_hud.add": "레시피 추가",
   "gui.gtcalcboard.hotkey_hud.shift_wire": "비율 자동맞춤",
   "gui.gtcalcboard.hotkey_hud.group": "모듈 묶기",
@@ -294,5 +295,24 @@
 
   "gui.gtcalcboard.tutorial.completed_title": "튜토리얼 완료!",
   "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 거대한 석유화학 및 핵융합 공정을 자유롭게 설계해 보세요! 언제든 상단 [가이드(Guide)]나 [튜토리얼(Tutorial)]을 다시 열어볼 수 있습니다.",
-  "gui.gtcalcboard.tutorial.completed_tag": "[완료]"
+  "gui.gtcalcboard.tutorial.completed_tag": "[완료]",
+
+  "gui.gtcalcboard.global_balance": "종합 수지",
+  "gui.gtcalcboard.global_balance.modal_title": "대상 페이지 종합 수지 대시보드",
+  "gui.gtcalcboard.global_balance.power_surplus": "전력 잉여",
+  "gui.gtcalcboard.global_balance.power_deficit": "전력 결손",
+  "gui.gtcalcboard.global_balance.power_balanced": "전력 100% 자급 균형",
+  "gui.gtcalcboard.global_balance.pages_selected": "페이지 선택됨",
+  "gui.gtcalcboard.global_balance.included_pages": "포함할 대상 페이지",
+  "gui.gtcalcboard.global_balance.select_all": "전체 선택",
+  "gui.gtcalcboard.global_balance.deselect_all": "전체 해제",
+  "gui.gtcalcboard.global_balance.tab_deficits": "결손",
+  "gui.gtcalcboard.global_balance.tab_surplus": "잉여",
+  "gui.gtcalcboard.global_balance.tab_balanced": "균형",
+  "gui.gtcalcboard.global_balance.balanced_tag": "균형",
+  "gui.gtcalcboard.global_balance.net_rate": "대상 페이지 순 수지",
+  "gui.gtcalcboard.global_balance.click_drilldown_hint": "클릭 시 페이지별 생산/소비 기여도 상세 표출",
+  "gui.gtcalcboard.global_balance.breakdown_header": "페이지별 생산 및 소비 기여도 내역:",
+  "gui.gtcalcboard.global_balance.net_total": "대상 페이지 종합 순 수지:",
+  "gui.gtcalcboard.tooltip.btn_global_balance": "대상 페이지 종합 수지 대시보드 (B)\n선택한 여러 페이지들의 생산량, 소비량, 총 전력 및 페이지별 기여도를 종합 집계합니다."
 }
