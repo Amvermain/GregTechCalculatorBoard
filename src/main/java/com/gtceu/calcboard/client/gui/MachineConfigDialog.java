@@ -43,6 +43,9 @@ public class MachineConfigDialog {
     private int catalogScroll = 0;
     private int rotorGridScroll = 0;
 
+    private static final int DIALOG_WIDTH = 460;
+    private static final int DIALOG_HEIGHT = 295;
+
     public MachineConfigDialog(BoardScreen parent) {
         this.parent = parent;
     }
@@ -106,8 +109,8 @@ public class MachineConfigDialog {
         // Dim background
         graphics.fill(0, 0, screenWidth, screenHeight, 0x88000000);
 
-        int dialogW = 410;
-        int dialogH = 280;
+        int dialogW = DIALOG_WIDTH;
+        int dialogH = DIALOG_HEIGHT;
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -198,72 +201,75 @@ public class MachineConfigDialog {
         // Clear All Button (if addons present)
         if (!activeAddons.isEmpty()) {
             int clearAllX = x + dialogW - 80;
-            boolean clHover = mouseX >= clearAllX && mouseX <= clearAllX + 72 && mouseY >= y + 72 && mouseY <= y + 83;
-            graphics.fill(clearAllX, y + 72, clearAllX + 72, y + 83, clHover ? 0xFF662222 : 0xFF3D2020);
-            graphics.renderOutline(clearAllX, y + 72, 72, 11, clHover ? 0xFFA03333 : 0xFF553030);
-            graphics.drawCenteredString(font, Component.translatable("gui.gtcalcboard.config.clear_all").getString(), clearAllX + 36, y + 73, 0xFFFFFFFF);
+            boolean clearHover = mouseX >= clearAllX && mouseX <= clearAllX + 72 && mouseY >= y + 72 && mouseY <= y + 84;
+            graphics.fill(clearAllX, y + 72, clearAllX + 72, y + 84, clearHover ? 0xFF772222 : 0xFF3D2020);
+            graphics.renderOutline(clearAllX, y + 72, 72, 12, clearHover ? 0xFFA03333 : 0xFF553030);
+            graphics.drawCenteredString(font, Component.translatable("gui.gtcalcboard.config.clear_all").getString(), clearAllX + 36, y + 74, 0xFFFFFFFF);
         }
 
-        // Render Pagination buttons for active addons if size > 10
+        // Active Addons Scroll Buttons (◀ / ▶)
         if (activeAddons.size() > 10) {
             int navX = x + dialogW - 150;
-            // Left ◀ button
             boolean leftHover = mouseX >= navX && mouseX <= navX + 16 && mouseY >= y + 72 && mouseY <= y + 84;
-            graphics.fill(navX, y + 72, navX + 16, y + 84, leftHover ? 0xFF3D4558 : 0xFF282D3B);
-            graphics.renderOutline(navX, y + 72, 16, 12, activeAddonsScroll > 0 ? 0xFF589CFF : 0xFF3F4658);
-            graphics.drawCenteredString(font, "◀", navX + 8, y + 74, activeAddonsScroll > 0 ? 0xFF58D3FF : 0xFF666666);
-
-            // Page label: e.g. "1/2"
-            String pageStr = (activeAddonsScroll + 1) + "/" + (maxActiveScroll + 1);
-            graphics.drawCenteredString(font, pageStr, navX + 28, y + 74, 0xFF9CA5B8);
-
-            // Right ▶ button
             boolean rightHover = mouseX >= navX + 40 && mouseX <= navX + 56 && mouseY >= y + 72 && mouseY <= y + 84;
-            graphics.fill(navX + 40, y + 72, navX + 56, y + 84, rightHover ? 0xFF3D4558 : 0xFF282D3B);
-            graphics.renderOutline(navX + 40, y + 72, 16, 12, activeAddonsScroll < maxActiveScroll ? 0xFF589CFF : 0xFF3F4658);
-            graphics.drawCenteredString(font, "▶", navX + 48, y + 74, activeAddonsScroll < maxActiveScroll ? 0xFF58D3FF : 0xFF666666);
+
+            graphics.fill(navX, y + 72, navX + 16, y + 84, leftHover ? 0xFF3E485A : 0xFF242A35);
+            graphics.renderOutline(navX, y + 72, 16, 12, 0xFF4A556B);
+            graphics.drawCenteredString(font, "◀", navX + 8, y + 74, activeAddonsScroll > 0 ? 0xFFFFFFFF : 0xFF666666);
+
+            String pageStr = (activeAddonsScroll + 1) + "/" + (maxActiveScroll + 1);
+            graphics.drawCenteredString(font, pageStr, navX + 28, y + 74, 0xFFAAAAAA);
+
+            graphics.fill(navX + 40, y + 72, navX + 56, y + 84, rightHover ? 0xFF3E485A : 0xFF242A35);
+            graphics.renderOutline(navX + 40, y + 72, 16, 12, 0xFF4A556B);
+            graphics.drawCenteredString(font, "▶", navX + 48, y + 74, activeAddonsScroll < maxActiveScroll ? 0xFFFFFFFF : 0xFF666666);
         }
 
         MachineAddon hoveredActiveAddon = null;
 
         if (activeAddons.isEmpty()) {
-            graphics.drawString(font, Component.literal("§8").append(Component.translatable("gui.gtcalcboard.config.no_addons_installed")).getString(), x + 12, y + 96, 0xFF888888, false);
+            graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.config.no_addons_installed").getString(), x + 10, y + 96, 0xFF888888, false);
         } else {
             int slotSize = 32;
             int slotSpacing = 36;
             int maxShow = Math.min(activeAddons.size(), activeAddonsScroll + 10);
             for (int i = activeAddonsScroll; i < maxShow; i++) {
                 int sx = x + 10 + (i - activeAddonsScroll) * slotSpacing;
+                int sy = y + 86;
+                boolean h = mouseX >= sx && mouseX <= sx + slotSize && mouseY >= sy && mouseY <= sy + slotSize;
+
                 MachineAddon addon = activeAddons.get(i);
+                graphics.fill(sx, sy, sx + slotSize, sy + slotSize, h ? 0xFF352B35 : 0xFF202430);
+                graphics.renderOutline(sx, sy, slotSize, slotSize, h ? 0xFFFF5555 : 0xFF384052);
 
-                boolean slotHover = mouseX >= sx && mouseX <= sx + slotSize && mouseY >= y + 86 && mouseY <= y + 118;
-
-                graphics.fill(sx, y + 86, sx + slotSize, y + 118, slotHover ? 0xFF2A3142 : 0xFF202430);
-                graphics.renderOutline(sx, y + 86, slotSize, slotSize, slotHover ? 0xFF58D3FF : 0xFF384052);
-
-                // Render 3D Item Icon
                 if (!addon.getItemStackSample().isEmpty()) {
-                    graphics.renderItem(addon.getItemStackSample(), sx + 8, y + 90);
+                    graphics.renderItem(addon.getItemStackSample(), sx + 8, sy + 4);
+                } else if (addon.getItemIcon() != null) {
+                    var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(addon.getItemIcon());
+                    if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                        graphics.renderItem(new net.minecraft.world.item.ItemStack(item), sx + 8, sy + 4);
+                    }
                 }
 
-                // Delete badge on hover
-                if (slotHover) {
-                    graphics.drawString(font, "§c✕", sx + 22, y + 86, 0xFFFFFFFF, false);
+                // Sub-stat badge below icon
+                String badge = formatAddonBadge(addon);
+                if (!badge.isEmpty()) {
+                    graphics.drawCenteredString(font, font.plainSubstrByWidth(badge, slotSize + 6), sx + slotSize / 2, sy + 22, 0xFFCCCCCC);
+                }
+
+                if (h) {
                     hoveredActiveAddon = addon;
                 }
             }
         }
 
+        // Active Addon Hover Tooltip
         if (hoveredActiveAddon != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§f" + hoveredActiveAddon.getName()));
-            String badge = formatAddonBadge(hoveredActiveAddon);
-            if (!badge.isEmpty()) {
-                tooltip.add(Component.literal(badge));
-            }
             if (hoveredActiveAddon.getCategory() == MachineAddon.Category.ROTOR) {
                 int eff = (int) Math.round(hoveredActiveAddon.getDurationMultiplier() * 100.0);
-                int pwr = hoveredActiveAddon.getRotorPower() > 0 ? hoveredActiveAddon.getRotorPower() : 100;
+                int pwr = hoveredActiveAddon.getRotorPower() > 0 ? hoveredActiveAddon.getRotorPower() : RecipeNode.getRotorMaterialPower(hoveredActiveAddon.getName());
                 tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.config.rotor_fuel_efficiency", String.valueOf(eff), String.format("%.2fx", eff / 100.0))));
                 tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.config.rotor_power_mult", String.valueOf(pwr), String.format("%.2fx", pwr / 100.0))));
                 if (node != null && node.getTargetTier() != null) {
@@ -273,14 +279,15 @@ public class MachineConfigDialog {
             } else if (hoveredActiveAddon.getCategory() == MachineAddon.Category.COIL) {
                 int coilTemp = hoveredActiveAddon.getCoilTemperature();
                 if (coilTemp > 0) {
-                    tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.addon.stat.coil_temp", String.valueOf(coilTemp))));
+                    tooltip.add(Component.literal("§6♨ Coil Temperature: §f" + coilTemp + "K"));
                 }
                 MachineAddon tailored = hoveredActiveAddon.forMachine(node);
                 if (tailored.getParallelMultiplier() > 1) {
                     tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.stat.parallel_mult", String.valueOf(tailored.getParallelMultiplier()))));
                 }
                 if (tailored.getDurationMultiplier() != 1.0) {
-                    tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.addon.stat.speed_mult", String.format("%.2fx", tailored.getDurationMultiplier()))));
+                    double spdPercent = 100.0 / tailored.getDurationMultiplier();
+                    tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.addon.stat.time_mult", String.format("%.2fx", tailored.getDurationMultiplier()), String.format("%.0f", spdPercent))));
                 }
                 if (tailored.getEutMultiplier() != 1.0) {
                     tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.energy_mult", String.format("%.2fx", tailored.getEutMultiplier()))));
@@ -288,6 +295,17 @@ public class MachineConfigDialog {
                 addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
             } else {
                 addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
+                if (hoveredActiveAddon.getParallelMultiplier() > 1) {
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.stat.parallel", String.valueOf(hoveredActiveAddon.getParallelMultiplier()))));
+                }
+                if (hoveredActiveAddon.getDurationMultiplier() != 1.0) {
+                    tooltip.add(Component.literal("§b").append(Component.translatable("gui.gtcalcboard.config.time_mult", String.format("%.2fx", hoveredActiveAddon.getDurationMultiplier()))));
+                }
+                if (hoveredActiveAddon.isPowerConstant()) {
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.eut_mult", "1.00x §7(" + Component.translatable("gui.gtcalcboard.addon.stat.constant_power").getString() + "§7)")));
+                } else if (hoveredActiveAddon.getEutMultiplier() != 1.0) {
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.stat.eut_mult", String.format("%.2fx", hoveredActiveAddon.getEutMultiplier()))));
+                }
             }
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
@@ -331,33 +349,62 @@ public class MachineConfigDialog {
             if (evaluated.getParallelMultiplier() > 1) {
                 return heatStr + String.format(" §a⚡%dx", evaluated.getParallelMultiplier());
             }
-            String durStr = "";
-            if (evaluated.getDurationMultiplier() != 1.0) {
-                String col = evaluated.getDurationMultiplier() > 1.0 ? "§c" : "§b";
-                durStr = String.format(" %s⏱%.2fx", col, evaluated.getDurationMultiplier());
-            }
-            String eutStr = "";
-            if (evaluated.getEutMultiplier() != 1.0) {
-                String col = evaluated.getEutMultiplier() > 1.0 ? "§c" : "§e";
-                eutStr = String.format(" %s⚡%.2fx", col, evaluated.getEutMultiplier());
-            }
+            String durStr = evaluated.getDurationMultiplier() != 1.0
+                ? String.format(" %s⏱%.2fx", evaluated.getDurationMultiplier() > 1.0 ? "§c" : "§b", evaluated.getDurationMultiplier())
+                : "";
+            String eutStr = evaluated.getEutMultiplier() != 1.0
+                ? String.format(" %s⚡%.2fx", evaluated.getEutMultiplier() > 1.0 ? "§c" : "§e", evaluated.getEutMultiplier())
+                : "";
             return heatStr + durStr + eutStr;
         }
-        if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
-            if (addon.getParallelMultiplier() > 1) {
-                return String.format("§a⚡%dx Par", addon.getParallelMultiplier());
-            }
-        }
         if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
-            if (addon.getDurationMultiplier() != 1.0 || addon.getEutMultiplier() != 1.0) {
-                return String.format("§b⏱%.2fx §e⚡%.2fx", addon.getDurationMultiplier(), addon.getEutMultiplier());
+            if (addon.getDurationMultiplier() != 1.0) {
+                String breakStr = addon.getDurationMultiplier() < 1.0 ? "§c🛡3x Break" : "§a🛡0.2x Break";
+                return String.format("§b⏱%.2fx %s", addon.getDurationMultiplier(), breakStr);
             }
             return "§b🔧 0% Fail";
         }
-        return String.format("§b⏱%.2fx §e⚡%.2fx %s",
-                addon.getDurationMultiplier(),
-                addon.getEutMultiplier(),
-                addon.getParallelMultiplier() > 1 ? ("§a" + addon.getParallelMultiplier() + "x") : "").trim();
+
+        // For Multiblock Traits, Parallel Hatches, Thermal Augments & Custom:
+        StringBuilder sb = new StringBuilder();
+        if (addon.getParallelMultiplier() > 1) {
+            sb.append(String.format("§a⚡%dx ", addon.getParallelMultiplier()));
+        }
+        if (addon.getDurationMultiplier() != 1.0) {
+            String col = addon.getDurationMultiplier() > 1.0 ? "§c" : "§b";
+            sb.append(String.format("%s⏱%.2fx ", col, addon.getDurationMultiplier()));
+        }
+        if (addon.getEutMultiplier() != 1.0) {
+            String col = addon.getEutMultiplier() > 1.0 ? "§c" : "§e";
+            sb.append(String.format("%s⚡%.2fx ", col, addon.getEutMultiplier()));
+        }
+        String res = sb.toString().trim();
+        return !res.isEmpty() ? res : "§71.0x Default";
+    }
+
+    public static String getAddonSubtitle(MachineAddon addon, RecipeNode node) {
+        if (addon == null) return "";
+        if (addon.getCategory() == MachineAddon.Category.ROTOR) {
+            return "§7Turbine Fuel Efficiency";
+        }
+        if (addon.getCategory() == MachineAddon.Category.COIL) {
+            int temp = addon.getCoilTemperature();
+            return temp > 0 ? "§7" + temp + "K Heating Coil" : "§7Heating Coil";
+        }
+        if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
+            return "§7Maintenance Hatch";
+        }
+        if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
+            return addon.isPowerConstant() ? "§7Absolute (0x Extra EU)" : "§7Parallel Hatch";
+        }
+        String desc = addon.getDescription();
+        if (desc != null && !desc.isEmpty()) {
+            String first = desc.split("[,|\\r\\n;]")[0].trim();
+            if (!first.isEmpty() && !first.startsWith("gui.")) {
+                return "§7" + first;
+            }
+        }
+        return "§7Multiblock Trait";
     }
 
     private String getCategoryLabel(MachineAddon.Category cat) {
@@ -480,13 +527,14 @@ public class MachineConfigDialog {
 
         List<MachineAddon> filtered = getFilteredCatalog();
         int totalCards = filtered.size();
-        int maxRows = (int) Math.ceil((double) totalCards / 4.0);
+        int cols = 3;
+        int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
         int visibleRows = 2;
         int maxScroll = Math.max(0, maxRows - visibleRows);
         if (catalogScroll > maxScroll) catalogScroll = maxScroll;
 
         int gridStartY = startY + 18;
-        int cardW = (width - 12) / 4;
+        int cardW = (width - ((cols - 1) * 4)) / cols;
         int cardH = 50;
 
         if (filtered.isEmpty()) {
@@ -496,12 +544,12 @@ public class MachineConfigDialog {
 
         MachineAddon hoveredAddon = null;
 
-        for (int i = 0; i < 8; i++) {
-            int cardIndex = (catalogScroll * 4) + i;
+        for (int i = 0; i < cols * visibleRows; i++) {
+            int cardIndex = (catalogScroll * cols) + i;
             if (cardIndex >= totalCards) break;
 
-            int col = i % 4;
-            int row = i / 4;
+            int col = i % cols;
+            int row = i / cols;
             int bx = startX + col * (cardW + 4);
             int by = gridStartY + row * (cardH + 4);
 
@@ -528,11 +576,17 @@ public class MachineConfigDialog {
                 graphics.drawString(font, hover ? "§c✕" : "§a✔", bx + cardW - 11, by + 4, 0xFFFFFFFF, false);
             }
 
+            // Line 1: Addon Name
             String aName = font.plainSubstrByWidth(addon.getName(), cardW - 36);
-            graphics.drawString(font, "§f" + aName, bx + 24, by + 7, 0xFFFFFFFF, false);
+            graphics.drawString(font, "§f" + aName, bx + 24, by + 5, 0xFFFFFFFF, false);
 
+            // Line 2: All Active Stat Badges
             String statsStr = formatAddonBadge(addon);
-            graphics.drawString(font, statsStr, bx + 24, by + 22, 0xFFCCCCCC, false);
+            graphics.drawString(font, statsStr, bx + 24, by + 19, 0xFFCCCCCC, false);
+
+            // Line 3: Trait Subtitle / Description Summary
+            String subTitle = font.plainSubstrByWidth(getAddonSubtitle(addon, node), cardW - 28);
+            graphics.drawString(font, subTitle, bx + 24, by + 33, 0xFF888888, false);
 
             if (hover) {
                 hoveredAddon = addon;
@@ -600,16 +654,41 @@ public class MachineConfigDialog {
 
     private void addFormattedDescriptionLines(List<Component> tooltip, String rawDesc) {
         if (rawDesc == null || rawDesc.isEmpty()) return;
-        String[] lines = rawDesc.split("[\\r\\n]+|\\s*\\|\\s*");
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (!trimmed.isEmpty()) {
-                String lower = trimmed.toLowerCase();
-                if (lower.contains("shift") || lower.contains("ctrl") || lower.contains("gregtech ceu modern")) {
-                    continue;
-                }
-                tooltip.add(Component.literal("§7" + trimmed));
+        var mc = Minecraft.getInstance();
+        var font = mc.font;
+
+        String[] chunks = rawDesc.split("[\\r\\n]+|\\s*\\|\\s*|;");
+        for (String chunk : chunks) {
+            String trimmed = chunk.trim();
+            if (trimmed.isEmpty()) continue;
+            String lower = trimmed.toLowerCase();
+            if (lower.contains("shift") || lower.contains("ctrl") || lower.contains("gregtech ceu modern")) {
+                continue;
             }
+
+            if (trimmed.contains(",")) {
+                String[] parts = trimmed.split(",\\s*");
+                for (String part : parts) {
+                    String p = part.trim();
+                    if (!p.isEmpty()) {
+                        addWrappedBullet(tooltip, font, p);
+                    }
+                }
+            } else {
+                addWrappedBullet(tooltip, font, trimmed);
+            }
+        }
+    }
+
+    private void addWrappedBullet(List<Component> tooltip, net.minecraft.client.gui.Font font, String text) {
+        var split = font.split(Component.literal("§7• " + text), 240);
+        for (var seq : split) {
+            StringBuilder sb = new StringBuilder();
+            seq.accept((index, style, codePoint) -> {
+                sb.appendCodePoint(codePoint);
+                return true;
+            });
+            tooltip.add(Component.literal(sb.toString()));
         }
     }
 
@@ -664,8 +743,8 @@ public class MachineConfigDialog {
         Minecraft mc = Minecraft.getInstance();
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
-        int dialogW = 410;
-        int dialogH = 280;
+        int dialogW = DIALOG_WIDTH;
+        int dialogH = DIALOG_HEIGHT;
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -683,10 +762,10 @@ public class MachineConfigDialog {
             }
         }
 
-        // Catalog grid scroll (Bottom area: y+128 to y+280)
+        // Catalog grid scroll (Bottom area: y+128 to y+290)
         if (!isCustomBuilderActive && mouseY >= y + 128) {
             List<MachineAddon> filtered = getFilteredCatalog();
-            int maxRows = (int) Math.ceil((double) filtered.size() / 4.0);
+            int maxRows = (int) Math.ceil((double) filtered.size() / 3.0);
             int maxScroll = Math.max(0, maxRows - 2);
             if (maxScroll > 0) {
                 catalogScroll = Math.max(0, Math.min(maxScroll, catalogScroll - (int) Math.signum(delta)));
@@ -703,8 +782,8 @@ public class MachineConfigDialog {
         Minecraft mc = Minecraft.getInstance();
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
-        int dialogW = 410;
-        int dialogH = 280;
+        int dialogW = DIALOG_WIDTH;
+        int dialogH = DIALOG_HEIGHT;
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -993,16 +1072,17 @@ public class MachineConfigDialog {
 
             List<MachineAddon> filtered = getFilteredCatalog();
             int totalCards = filtered.size();
-            int cardW = (width - 12) / 4;
+            int cols = 3;
+            int cardW = (width - ((cols - 1) * 4)) / cols;
             int cardH = 50;
             int gridStartY = startY + 18;
 
-            for (int i = 0; i < 8; i++) {
-                int cardIndex = (catalogScroll * 4) + i;
+            for (int i = 0; i < cols * 2; i++) {
+                int cardIndex = (catalogScroll * cols) + i;
                 if (cardIndex >= totalCards) break;
 
-                int col = i % 4;
-                int row = i / 4;
+                int col = i % cols;
+                int row = i / cols;
                 int bx = startX + col * (cardW + 4);
                 int by = gridStartY + row * (cardH + 4);
 
