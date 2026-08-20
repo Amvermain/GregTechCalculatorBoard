@@ -317,6 +317,8 @@
   "gui.gtcalcboard.tooltip.btn_global_balance": "Global Balance Dashboard (B)\nCalculates cross-page net production, consumption, power balance, and page contributions.",
 
   "gui.gtcalcboard.error.access_denied": "Access denied to team workspace.",
+  "gui.gtcalcboard.error.delete_no_permission": "Only the Team Owner or Server Admin can delete team pages.",
+  "gui.gtcalcboard.error.cannot_delete_last_page": "Cannot delete the last remaining page in the workspace.",
   "gui.gtcalcboard.error.generic": "An error occurred while synchronizing workspace.",
   "gui.gtcalcboard.toast.workspace_synced": "Synchronized team workspace: %s",
   "gui.gtcalcboard.toast.lock_acquired": "Acquired edit lock for page: %s",
@@ -355,5 +357,17 @@
 
   "gui.gtcalcboard.dialog.recent_saves_title": "Recent Team Saves History",
   "gui.gtcalcboard.dialog.no_saves_history": "No save history available.",
-  "gui.gtcalcboard.dialog.btn_copy_to_me": "Copy to Me"
+  "gui.gtcalcboard.dialog.btn_copy_to_me": "Copy to Me",
+  "gui.gtcalcboard.cancel": "Cancel",
+  "gui.gtcalcboard.config.parallel": "Parallel",
+  "gui.gtcalcboard.search.no_results": "No matching addons or items found.",
+  "gui.gtcalcboard.tooltip.btn_save_team": "Save to Team Board\nSynchronize all modifications with teammates in real-time.",
+  "gui.gtcalcboard.tooltip.btn_cancel_edit": "Finish Editing\nRelease edit lock for this page.",
+  "gui.gtcalcboard.tooltip.btn_copy_to_personal": "Copy to My Board\nCopy this team page to your personal local board as a new tab.",
+  "gui.gtcalcboard.tooltip.btn_recent_saves": "Save History\nView revision history and restore previous saves.",
+  "gui.gtcalcboard.tooltip.btn_export_to_team": "Export to Team Board\nShare your personal board design to the team workspace.",
+  "gui.gtcalcboard.btn_pause_on": "Pause: ON",
+  "gui.gtcalcboard.btn_pause_off": "Pause: OFF",
+  "gui.gtcalcboard.toast.pause_toggle_hint": "Singleplayer Pause set to %s. Reopen board to apply.",
+  "gui.gtcalcboard.tooltip.btn_pause_toggle": "Singleplayer Pause Toggle\nWhen enabled, opening this board pauses the singleplayer game.\n§e(Takes full effect when reopening the board)"
 }

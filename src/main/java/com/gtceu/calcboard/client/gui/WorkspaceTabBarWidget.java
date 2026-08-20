@@ -27,6 +27,7 @@ public class WorkspaceTabBarWidget {
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (!state.isCollaborationEnabled()) return;
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
 
@@ -110,6 +111,7 @@ public class WorkspaceTabBarWidget {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return false;
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (!state.isCollaborationEnabled()) return false;
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
 
@@ -121,10 +123,10 @@ public class WorkspaceTabBarWidget {
         int persW = font.width(personalTxt) + 14;
         if (mouseX >= curX && mouseX <= curX + persW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
             if (state.isTeamMode()) {
+                state.autoCommitAndRelease(screen, state.getActiveTeamPageId());
                 state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
                 screen.rebuildWidgets();
                 screen.markSummaryDirty();
-                BoardToast.show("gui.gtcalcboard.toast.switched_to_personal");
             }
             return true;
         }
@@ -143,7 +145,6 @@ public class WorkspaceTabBarWidget {
                 NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, "page_main"));
                 screen.rebuildWidgets();
                 screen.markSummaryDirty();
-                BoardToast.show("gui.gtcalcboard.toast.switched_to_team", teamName);
             }
             return true;
         }

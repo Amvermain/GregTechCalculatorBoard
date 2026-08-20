@@ -47,6 +47,14 @@ public class VanillaScoreboardProvider implements ITeamProvider {
     }
 
     @Override
+    public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
+        if (player == null || teamId == null) return false;
+        if (player.hasPermissions(2)) return true;
+        UUID playerTeam = getPlayerTeamId(player);
+        return teamId.equals(playerTeam);
+    }
+
+    @Override
     public String getProviderId() {
         return "vanilla_scoreboard";
     }

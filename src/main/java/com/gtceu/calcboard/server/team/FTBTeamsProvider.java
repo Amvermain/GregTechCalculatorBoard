@@ -139,6 +139,52 @@ public class FTBTeamsProvider implements ITeamProvider {
     }
 
     @Override
+    public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
+        if (player == null || teamId == null) return false;
+        if (player.hasPermissions(2)) return true;
+
+        if (!isAvailable()) {
+            return player.getUUID().equals(teamId);
+        }
+
+        try {
+            Object manager = getManagerMethod.invoke(apiInstance);
+            if (manager != null) {
+                Method getTeamById = manager.getClass().getMethod("getTeamByID", UUID.class);
+                Object optionalTeam = getTeamById.invoke(manager, teamId);
+                if (optionalTeam instanceof Optional<?> opt && opt.isPresent()) {
+                    Object team = opt.get();
+                    try {
+                        Method getOwnerMethod = team.getClass().getMethod("getOwner");
+                        Object ownerObj = getOwnerMethod.invoke(team);
+                        if (ownerObj instanceof UUID ownerUUID && ownerUUID.equals(player.getUUID())) {
+                            return true;
+                        }
+                    } catch (Throwable ignored) {}
+
+                    try {
+                        Method isOfficerMethod = team.getClass().getMethod("isOfficer", ServerPlayer.class);
+                        Object isOfficerObj = isOfficerMethod.invoke(team, player);
+                        if (Boolean.TRUE.equals(isOfficerObj)) {
+                            return true;
+                        }
+                    } catch (Throwable ignored) {}
+
+                    try {
+                        Method isOwnerMethod = team.getClass().getMethod("isOwner", ServerPlayer.class);
+                        Object isOwnerObj = isOwnerMethod.invoke(team, player);
+                        if (Boolean.TRUE.equals(isOwnerObj)) {
+                            return true;
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return player.getUUID().equals(teamId);
+    }
+
+    @Override
     public String getProviderId() {
         return "ftbteams";
     }

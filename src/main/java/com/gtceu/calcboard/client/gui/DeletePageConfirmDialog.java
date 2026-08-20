@@ -9,6 +9,7 @@ import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Confirmation dialog shown before deleting a board page tab.
@@ -18,7 +19,9 @@ public class DeletePageConfirmDialog {
     private final BoardScreen parent;
     private boolean visible = false;
     private int targetPageIndex = -1;
+    private String targetPageId = null;
     private String targetPageName = "";
+    private boolean isTeamPage = false;
 
     public DeletePageConfirmDialog(BoardScreen parent) {
         this.parent = parent;
@@ -26,14 +29,26 @@ public class DeletePageConfirmDialog {
 
     public void open(int pageIndex, String pageName) {
         this.targetPageIndex = pageIndex;
+        this.targetPageId = null;
         this.targetPageName = pageName != null ? pageName : "Page " + (pageIndex + 1);
+        this.isTeamPage = false;
+        this.visible = true;
+    }
+
+    public void openTeamPage(String pageId, String pageName) {
+        this.targetPageIndex = -1;
+        this.targetPageId = pageId;
+        this.targetPageName = pageName != null ? pageName : "Team Page";
+        this.isTeamPage = true;
         this.visible = true;
     }
 
     public void close() {
         this.visible = false;
         this.targetPageIndex = -1;
+        this.targetPageId = null;
         this.targetPageName = "";
+        this.isTeamPage = false;
     }
 
     public boolean isVisible() {
@@ -126,12 +141,7 @@ public class DeletePageConfirmDialog {
 
         // Clicked Delete
         if (mouseX >= deleteBtnX && mouseX <= deleteBtnX + btnW && mouseY >= deleteBtnY && mouseY <= deleteBtnY + btnH) {
-            BoardManager.getInstance().removePage(targetPageIndex);
-            parent.rebuildWidgets();
-            close();
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
-            );
+            executeDelete();
             return true;
         }
 
@@ -145,6 +155,20 @@ public class DeletePageConfirmDialog {
         return true;
     }
 
+    private void executeDelete() {
+        if (isTeamPage && targetPageId != null) {
+            UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SDeleteTeamPagePacket(teamId, targetPageId));
+        } else if (targetPageIndex >= 0) {
+            BoardManager.getInstance().removePage(targetPageIndex);
+            parent.rebuildWidgets();
+        }
+        close();
+        Minecraft.getInstance().getSoundManager().play(
+            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
+        );
+    }
+
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!visible) return false;
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
@@ -152,13 +176,7 @@ public class DeletePageConfirmDialog {
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
-            // Confirm delete on Enter
-            BoardManager.getInstance().removePage(targetPageIndex);
-            parent.rebuildWidgets();
-            close();
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
-            );
+            executeDelete();
             return true;
         }
         return true;

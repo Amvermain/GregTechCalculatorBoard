@@ -61,7 +61,7 @@ public class MachineConfigDialog {
 
         Minecraft mc = Minecraft.getInstance();
 
-        this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.literal("Parallel"));
+        this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
         this.parallelBox.setMaxLength(6);
         this.parallelBox.setValue(String.valueOf(node.getParallel()));
         this.parallelBox.setResponder(text -> {

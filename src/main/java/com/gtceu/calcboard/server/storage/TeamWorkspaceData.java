@@ -91,6 +91,14 @@ public class TeamWorkspaceData {
 
     public void addCommit(CommitLogEntry entry) {
         if (entry != null) {
+            if (!commitHistory.isEmpty() && "Auto-saved changes".equals(entry.getMessage())) {
+                CommitLogEntry last = commitHistory.get(commitHistory.size() - 1);
+                if ("Auto-saved changes".equals(last.getMessage()) && last.getAuthorUUID().equals(entry.getAuthorUUID())) {
+                    commitHistory.set(commitHistory.size() - 1, entry);
+                    incrementGlobalRevision();
+                    return;
+                }
+            }
             commitHistory.add(entry);
             // Cap history to last 100 commits to preserve storage
             if (commitHistory.size() > 100) {

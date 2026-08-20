@@ -32,6 +32,12 @@ public interface ITeamProvider {
     boolean canPlayerEdit(ServerPlayer player, UUID teamId);
 
     /**
+     * Checks if the specified player is a team owner/officer or server operator (admin),
+     * granting administrative privileges like deleting shared team pages.
+     */
+    boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId);
+
+    /**
      * Returns the provider identifier (e.g. "ftbteams", "vanilla", "standalone").
      */
     String getProviderId();

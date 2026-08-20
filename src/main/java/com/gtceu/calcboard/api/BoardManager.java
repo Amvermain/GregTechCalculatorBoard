@@ -16,6 +16,7 @@ public class BoardManager {
     private int activePageIndex = 0;
     private boolean hasSeenWelcomePrompt = false;
     private PowerDisplayMode powerDisplayMode = PowerDisplayMode.EUT;
+    private boolean pauseGameInSingleplayer = false;
     private boolean autoLoaded = false;
 
     private BoardManager() {
@@ -41,6 +42,7 @@ public class BoardManager {
         this.pages.add(BoardPage.createDefault("Page 1"));
         this.activePageIndex = 0;
         this.hasSeenWelcomePrompt = false;
+        this.pauseGameInSingleplayer = false;
         this.autoLoaded = false;
     }
 
@@ -79,6 +81,14 @@ public class BoardManager {
 
     public void setHasSeenWelcomePrompt(boolean hasSeenWelcomePrompt) {
         this.hasSeenWelcomePrompt = hasSeenWelcomePrompt;
+    }
+
+    public boolean isPauseGameInSingleplayer() {
+        return pauseGameInSingleplayer;
+    }
+
+    public void setPauseGameInSingleplayer(boolean pauseGameInSingleplayer) {
+        this.pauseGameInSingleplayer = pauseGameInSingleplayer;
     }
 
     public static BoardManager getInstance() {
@@ -189,6 +199,7 @@ public class BoardManager {
             rootTag.putInt("activePageIndex", activePageIndex);
             rootTag.putBoolean("hasSeenWelcomePrompt", hasSeenWelcomePrompt);
             rootTag.putString("powerDisplayMode", getPowerDisplayMode().name());
+            rootTag.putBoolean("pauseGameInSingleplayer", pauseGameInSingleplayer);
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
@@ -215,6 +226,9 @@ public class BoardManager {
                     try {
                         this.powerDisplayMode = PowerDisplayMode.valueOf(rootTag.getString("powerDisplayMode"));
                     } catch (Exception ignored) {}
+                }
+                if (rootTag.contains("pauseGameInSingleplayer")) {
+                    this.pauseGameInSingleplayer = rootTag.getBoolean("pauseGameInSingleplayer");
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);

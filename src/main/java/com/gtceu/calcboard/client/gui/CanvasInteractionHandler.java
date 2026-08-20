@@ -85,7 +85,7 @@ public class CanvasInteractionHandler {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (mouseY < 64) {
+        if (mouseY < screen.getHeaderBottomY()) {
             return false;
         }
 
@@ -105,6 +105,7 @@ public class CanvasInteractionHandler {
                 // Output Port: Left click to start forward wire, Right click to disconnect
                 int outPortIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
                 if (outPortIdx >= 0) {
+                    if (!screen.ensureEditPermission()) return true;
                     if (button == 0) {
                         wireStartNode = widget;
                         wireStartPortIdx = outPortIdx;
@@ -131,6 +132,7 @@ public class CanvasInteractionHandler {
                 // Input Port: Left click to start reverse wire, Right click to disconnect
                 int inPortIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
                 if (inPortIdx >= 0) {
+                    if (!screen.ensureEditPermission()) return true;
                     if (button == 0) {
                         wireStartNode = widget;
                         wireStartPortIdx = inPortIdx;
@@ -156,6 +158,7 @@ public class CanvasInteractionHandler {
 
                 // Resize Handle Dragging
                 if (button == 0 && widget.isResizeHandleHovered(canvasMouseX, canvasMouseY)) {
+                    if (!screen.ensureEditPermission()) return true;
                     resizingNode = widget;
                     resizeStartCanvasX = canvasMouseX;
                     resizeStartCanvasY = canvasMouseY;
@@ -166,6 +169,7 @@ public class CanvasInteractionHandler {
 
                 // Header Double Click -> Start inline title renaming
                 if (button == 0 && widget.checkHeaderDoubleClick(canvasMouseX, canvasMouseY)) {
+                    if (!screen.ensureEditPermission()) return true;
                     return true;
                 }
 
@@ -176,6 +180,7 @@ public class CanvasInteractionHandler {
 
                 // Selection handling on Node click
                 if (button == 0) {
+                    if (!screen.ensureEditPermission()) return true;
                     boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
                     if (shift) {
                         screen.toggleSelectNode(widget.getNode().getId());
@@ -223,6 +228,7 @@ public class CanvasInteractionHandler {
                         float y2 = toWidget.getInputPortY(edge.inputIndex());
 
                         if (ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, canvasMouseX, canvasMouseY, 8.0)) {
+                            if (!screen.ensureEditPermission()) return true;
                             graph.getConnections().remove(edge);
                             screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.DisconnectWireCommand(edge));
                             notifyDisconnect("message.gtcalcboard.disconnect_wire");

@@ -185,11 +185,47 @@ public class RecentSavesDialog {
     }
 
     private void copyCommitToPersonal(CommitLogEntry entry) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         BoardManager bm = BoardManager.getInstance();
-        String newPageName = "Team Rev#" + entry.getRevision() + " (" + entry.getAuthorName() + ")";
+
+        com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage(entry.getPageId());
+        String baseTitle = (remotePage != null && remotePage.getTitle() != null && !remotePage.getTitle().trim().isEmpty())
+                ? remotePage.getTitle() : "Team Design";
+        String newPageName = baseTitle + " (Rev#" + entry.getRevision() + ")";
+
         BoardPage newPage = new BoardPage(newPageName);
+        com.gtceu.calcboard.api.FlowGraph sourceGraph = state.getTeamGraph(entry.getPageId());
+
+        if (sourceGraph == null || sourceGraph.getNodes().isEmpty()) {
+            if (remotePage != null && remotePage.getCompressedGraphData() != null && remotePage.getCompressedGraphData().length > 0) {
+                try {
+                    net.minecraft.nbt.CompoundTag tag = BlueprintCodec.decompressTag(remotePage.getCompressedGraphData());
+                    sourceGraph = com.gtceu.calcboard.api.FlowGraph.deserializeNBT(tag);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        if (sourceGraph == null || sourceGraph.getNodes().isEmpty()) {
+            sourceGraph = screen.getGraph();
+        }
+
+        if (sourceGraph != null) {
+            com.gtceu.calcboard.api.FlowGraph copiedGraph = sourceGraph.copy();
+            for (com.gtceu.calcboard.api.RecipeNode n : copiedGraph.getNodes()) {
+                newPage.getGraph().addNode(n);
+            }
+            for (com.gtceu.calcboard.api.FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
+                newPage.getGraph().getConnections().add(e);
+            }
+        }
+
+        newPage.setPanX(screen.getPanX());
+        newPage.setPanY(screen.getPanY());
+        newPage.setZoom(screen.getZoom());
+
         bm.addPage(newPage);
         bm.setActivePageIndex(bm.getPages().size() - 1);
+        state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
         screen.rebuildWidgets();
         screen.markSummaryDirty();
         BoardToast.show("gui.gtcalcboard.toast.copied_to_personal", newPageName);

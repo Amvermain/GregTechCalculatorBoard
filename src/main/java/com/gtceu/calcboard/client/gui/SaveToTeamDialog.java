@@ -36,7 +36,7 @@ public class SaveToTeamDialog {
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
-        this.messageBox = new EditBox(mc.font, x + 12, y + 44, dialogW - 24, 16, Component.literal("Commit Message"));
+        this.messageBox = new EditBox(mc.font, x + 12, y + 44, dialogW - 24, 16, Component.translatable("gui.gtcalcboard.dialog.commit_hint"));
         this.messageBox.setMaxLength(100);
         this.messageBox.setHint(Component.translatable("gui.gtcalcboard.dialog.commit_hint"));
         this.messageBox.setFocused(true);

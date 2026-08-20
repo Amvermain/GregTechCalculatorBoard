@@ -80,7 +80,7 @@ public class PageTabBarWidget {
         for (int i = 0; i < pageTitles.size(); i++) {
             String title = pageTitles.get(i);
             int textW = font.width(title);
-            int tabW = textW + (!isTeam && pageTitles.size() > 1 ? 26 : 16);
+            int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
             totalWidth += tabW + 3;
         }
         int addW = 18;
@@ -93,8 +93,10 @@ public class PageTabBarWidget {
         graphics.pose().translate(0, 0, 300.0f);
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
+        int tabY = screen.getPageTabY();
+
         // Enable horizontal scissor so tabs don't overflow outside screen
-        graphics.enableScissor(0, TAB_Y - 2, screen.width, TAB_Y + TAB_HEIGHT + 4);
+        graphics.enableScissor(0, tabY - 2, screen.width, tabY + TAB_HEIGHT + 4);
 
         graphics.pose().pushPose();
         graphics.pose().translate((float) -scrollX, 0, 0);
@@ -106,31 +108,31 @@ public class PageTabBarWidget {
             boolean isActive = (i == activeIdx);
 
             int textW = font.width(pageName);
-            int tabW = textW + (!isTeam && pageTitles.size() > 1 ? 26 : 16);
+            int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
 
             double virtualMouseX = mouseX + scrollX;
-            boolean hover = virtualMouseX >= curX && virtualMouseX <= curX + tabW && mouseY >= TAB_Y && mouseY <= TAB_Y + TAB_HEIGHT;
+            boolean hover = virtualMouseX >= curX && virtualMouseX <= curX + tabW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
 
             // Draw Tab Background
             int bg = isActive ? (isTeam ? 0xFF1C4232 : 0xFF2A623A) : (hover ? 0xFF353C4D : 0xFF222630);
             int border = isActive ? (isTeam ? 0xFF55FF88 : 0xFF55FF88) : (hover ? 0xFF5577AA : 0xFF3D4455);
-            graphics.fill(curX, TAB_Y, curX + tabW, TAB_Y + TAB_HEIGHT, bg);
-            graphics.renderOutline(curX, TAB_Y, tabW, TAB_HEIGHT, border);
+            graphics.fill(curX, tabY, curX + tabW, tabY + TAB_HEIGHT, bg);
+            graphics.renderOutline(curX, tabY, tabW, TAB_HEIGHT, border);
 
             // Tab Icon & Name
             String prefix = isActive ? "§a📑 " : "§7📄 ";
             if (editingPageIndex == i && renameBox != null) {
                 renameBox.setX(curX + 16);
-                renameBox.setY(TAB_Y + 1);
+                renameBox.setY(tabY + 1);
                 renameBox.render(graphics, (int) virtualMouseX, mouseY, partialTicks);
             } else {
-                graphics.drawString(font, prefix + pageName, curX + 4, TAB_Y + 5, isActive ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+                graphics.drawString(font, prefix + pageName, curX + 4, tabY + 5, isActive ? 0xFFFFFFFF : 0xFFAAAAAA, false);
             }
 
-            // Delete [x] button on tab (if more than 1 page, in local mode only)
-            if (!isTeam && pageTitles.size() > 1 && editingPageIndex != i) {
+            // Delete [x] button on tab (if more than 1 page)
+            if (pageTitles.size() > 1 && editingPageIndex != i) {
                 int closeX = curX + tabW - 12;
-                int closeY = TAB_Y + 4;
+                int closeY = tabY + 4;
                 boolean closeHover = virtualMouseX >= closeX && virtualMouseX <= closeX + 10 && mouseY >= closeY && mouseY <= closeY + 10;
                 graphics.drawString(font, "x", closeX + 1, closeY, closeHover ? 0xFFFF4444 : 0x88888888, false);
             }
@@ -140,10 +142,10 @@ public class PageTabBarWidget {
 
         // Add New Page Button [+]
         double virtualMouseX = mouseX + scrollX;
-        boolean addHover = virtualMouseX >= curX && virtualMouseX <= curX + addW && mouseY >= TAB_Y && mouseY <= TAB_Y + TAB_HEIGHT;
-        graphics.fill(curX, TAB_Y, curX + addW, TAB_Y + TAB_HEIGHT, addHover ? 0xFF2A623A : 0xFF222630);
-        graphics.renderOutline(curX, TAB_Y, addW, TAB_HEIGHT, addHover ? 0xFF55FF88 : 0xFF3D4455);
-        graphics.drawCenteredString(font, "§a+", curX + addW / 2, TAB_Y + 5, 0xFFFFFFFF);
+        boolean addHover = virtualMouseX >= curX && virtualMouseX <= curX + addW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
+        graphics.fill(curX, tabY, curX + addW, tabY + TAB_HEIGHT, addHover ? 0xFF2A623A : 0xFF222630);
+        graphics.renderOutline(curX, tabY, addW, TAB_HEIGHT, addHover ? 0xFF55FF88 : 0xFF3D4455);
+        graphics.drawCenteredString(font, "§a+", curX + addW / 2, tabY + 5, 0xFFFFFFFF);
 
         graphics.pose().popPose();
         graphics.disableScissor();
@@ -151,12 +153,12 @@ public class PageTabBarWidget {
         // Scroll overflow edge indicators
         if (maxScrollX > 0) {
             if (scrollX > 2) {
-                graphics.fill(0, TAB_Y, 14, TAB_Y + TAB_HEIGHT, 0xCC11151C);
-                graphics.drawString(font, "§a«", 2, TAB_Y + 5, 0xFF55FF88, false);
+                graphics.fill(0, tabY, 14, tabY + TAB_HEIGHT, 0xCC11151C);
+                graphics.drawString(font, "§a«", 2, tabY + 5, 0xFF55FF88, false);
             }
             if (scrollX < maxScrollX - 2) {
-                graphics.fill(screen.width - 14, TAB_Y, screen.width, TAB_Y + TAB_HEIGHT, 0xCC11151C);
-                graphics.drawString(font, "§a»", screen.width - 10, TAB_Y + 5, 0xFF55FF88, false);
+                graphics.fill(screen.width - 14, tabY, screen.width, tabY + TAB_HEIGHT, 0xCC11151C);
+                graphics.drawString(font, "§a»", screen.width - 10, tabY + 5, 0xFF55FF88, false);
             }
         }
 
@@ -164,7 +166,8 @@ public class PageTabBarWidget {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (mouseY < TAB_Y || mouseY > TAB_Y + TAB_HEIGHT + 2) {
+        int tabY = screen.getPageTabY();
+        if (mouseY < tabY || mouseY > tabY + TAB_HEIGHT + 2) {
             commitRename();
             return false;
         }
@@ -205,21 +208,28 @@ public class PageTabBarWidget {
         for (int i = 0; i < pageTitles.size(); i++) {
             String pageName = pageTitles.get(i);
             int textW = font.width(pageName);
-            int tabW = textW + (!isTeam && pageTitles.size() > 1 ? 26 : 16);
+            int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
 
             if (virtualMouseX >= curX && virtualMouseX <= curX + tabW) {
-                // 1. Delete [x] button clicked (Local mode only)
-                if (!isTeam && pageTitles.size() > 1 && virtualMouseX >= curX + tabW - 14 && virtualMouseX <= curX + tabW - 2 && button == 0) {
+                // 1. Delete [x] button clicked
+                if (pageTitles.size() > 1 && virtualMouseX >= curX + tabW - 14 && virtualMouseX <= curX + tabW - 2 && button == 0) {
                     commitRename();
-                    BoardManager bm = BoardManager.getInstance();
-                    if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
-                        bm.removePage(i);
-                        screen.rebuildWidgets();
-                        Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
-                        );
+                    if (isTeam) {
+                        if (teamPages != null && i < teamPages.size()) {
+                            TeamWorkspacePage tp = teamPages.get(i);
+                            screen.openDeleteTeamPageDialog(tp.getPageId(), tp.getTitle());
+                        }
                     } else {
-                        screen.openDeletePageDialog(i, pageName);
+                        BoardManager bm = BoardManager.getInstance();
+                        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                            bm.removePage(i);
+                            screen.rebuildWidgets();
+                            Minecraft.getInstance().getSoundManager().play(
+                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
+                            );
+                        } else {
+                            screen.openDeletePageDialog(i, pageName);
+                        }
                     }
                     return true;
                 }
@@ -244,10 +254,14 @@ public class PageTabBarWidget {
 
                     if (isTeam) {
                         if (teamPages != null && i < teamPages.size()) {
-                            teamState.setActiveTeamPageId(teamPages.get(i).getPageId());
-                            screen.rebuildWidgets();
-                            screen.markSummaryDirty();
-                            playClickSound();
+                            String newPageId = teamPages.get(i).getPageId();
+                            if (!newPageId.equals(teamState.getActiveTeamPageId())) {
+                                teamState.autoCommitAndRelease(screen, teamState.getActiveTeamPageId());
+                                teamState.setActiveTeamPageId(newPageId);
+                                screen.rebuildWidgets();
+                                screen.markSummaryDirty();
+                                playClickSound();
+                            }
                         }
                     } else {
                         if (i != activeIdx) {
@@ -330,7 +344,8 @@ public class PageTabBarWidget {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseY >= TAB_Y - 2 && mouseY <= TAB_Y + TAB_HEIGHT + 2) {
+        int tabY = screen.getPageTabY();
+        if (mouseY >= tabY - 2 && mouseY <= tabY + TAB_HEIGHT + 2) {
             if (maxScrollX > 0) {
                 this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX - delta * 30.0));
                 return true;

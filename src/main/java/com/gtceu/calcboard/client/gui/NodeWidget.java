@@ -320,6 +320,7 @@ public class NodeWidget {
     }
 
     public boolean changeTier(int direction) {
+        if (parent != null && !parent.ensureEditPermission()) return false;
         int curIdx = node.getTargetTier().ordinal();
         int minIdx = node.getRecipeTier().ordinal();
         int maxIdx = GTVoltageTier.values().length - 1;
@@ -351,6 +352,7 @@ public class NodeWidget {
 
         int inIdx = getHoveredInputPortIndex(mouseX, mouseY);
         if (inIdx >= 0 && inIdx < node.getInputs().size()) {
+            if (parent != null && !parent.ensureEditPermission()) return true;
             IngredientStack in = node.getInputs().get(inIdx);
             if (in.hasAlternatives()) {
                 in.cycleAlternative(delta > 0 ? -1 : 1);
@@ -376,6 +378,10 @@ public class NodeWidget {
         if (!isPointInside(mouseX, mouseY)) {
             commitCountEdit();
             return false;
+        }
+
+        if (parent != null && !parent.ensureEditPermission()) {
+            return true;
         }
 
         // Module Expand Button [⤢]

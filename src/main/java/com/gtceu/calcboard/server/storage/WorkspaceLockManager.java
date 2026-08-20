@@ -104,6 +104,12 @@ public class WorkspaceLockManager {
         return false;
     }
 
+    public synchronized boolean forceReleaseLock(UUID teamId, String pageId) {
+        if (teamId == null) return false;
+        String key = getLockKey(teamId, pageId);
+        return activeLocks.remove(key) != null;
+    }
+
     public synchronized boolean pingHeartbeat(UUID teamId, String pageId, UUID playerUUID) {
         if (teamId == null || playerUUID == null) return false;
         String key = getLockKey(teamId, pageId);

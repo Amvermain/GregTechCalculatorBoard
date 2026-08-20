@@ -92,4 +92,18 @@ public class TeamProviderRegistry {
         }
         return fallbackProvider.canPlayerEdit(player, teamId);
     }
+
+    public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
+        if (player == null || teamId == null) return false;
+        if (player.hasPermissions(2)) return true;
+        for (ITeamProvider provider : providers) {
+            if (provider.isAvailable()) {
+                UUID pTeam = provider.getPlayerTeamId(player);
+                if (pTeam != null && pTeam.equals(teamId)) {
+                    return provider.canPlayerAdministerTeam(player, teamId);
+                }
+            }
+        }
+        return fallbackProvider.canPlayerAdministerTeam(player, teamId);
+    }
 }

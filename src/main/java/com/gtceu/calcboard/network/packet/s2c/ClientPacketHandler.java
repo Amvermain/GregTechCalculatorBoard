@@ -15,6 +15,7 @@ public class ClientPacketHandler {
 
     public static void handleSyncWorkspace(S2CSyncWorkspacePacket packet) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.setServerSupported(true);
         state.setCurrentTeamId(packet.getTeamId());
         state.setCurrentTeamName(packet.getTeamName());
         state.setGlobalRevision(packet.getGlobalRevision());
@@ -26,8 +27,6 @@ public class ClientPacketHandler {
             bs.rebuildWidgets();
             bs.markSummaryDirty();
         }
-
-        BoardToast.show("gui.gtcalcboard.toast.workspace_synced", packet.getTeamName());
     }
 
     public static void handleLockResult(S2CLockResultPacket packet) {
@@ -43,9 +42,7 @@ public class ClientPacketHandler {
             bs.markSummaryDirty();
         }
 
-        if (packet.isSuccess() && isMe) {
-            BoardToast.show("gui.gtcalcboard.toast.lock_acquired", packet.getPageId());
-        } else if (!packet.isSuccess() && packet.getLockHolderName() != null && !packet.getLockHolderName().isEmpty()) {
+        if (!packet.isSuccess() && packet.getLockHolderName() != null && !packet.getLockHolderName().isEmpty()) {
             BoardToast.show("gui.gtcalcboard.toast.lock_busy", packet.getLockHolderName());
         }
     }

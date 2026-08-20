@@ -317,6 +317,8 @@
   "gui.gtcalcboard.tooltip.btn_global_balance": "대상 페이지 종합 수지 대시보드 (B)\n선택한 여러 페이지들의 생산량, 소비량, 총 전력 및 페이지별 기여도를 종합 집계합니다.",
 
   "gui.gtcalcboard.error.access_denied": "팀 워크스페이스에 대한 접근 권한이 없습니다.",
+  "gui.gtcalcboard.error.delete_no_permission": "팀 오너 또는 서버 관리자(Admin)만 팀 페이지를 삭제할 수 있습니다.",
+  "gui.gtcalcboard.error.cannot_delete_last_page": "워크스페이스에 마지막으로 남은 페이지는 삭제할 수 없습니다.",
   "gui.gtcalcboard.error.generic": "워크스페이스 동기화 중 오류가 발생했습니다.",
   "gui.gtcalcboard.toast.workspace_synced": "팀 워크스페이스 동기화 완료: %s",
   "gui.gtcalcboard.toast.lock_acquired": "페이지 편집 권한(Lock) 획득: %s",
@@ -355,5 +357,17 @@
 
   "gui.gtcalcboard.dialog.recent_saves_title": "팀 보드 최근 저장 기록",
   "gui.gtcalcboard.dialog.no_saves_history": "저장된 기록이 없습니다.",
-  "gui.gtcalcboard.dialog.btn_copy_to_me": "내 보드로 복사"
+  "gui.gtcalcboard.dialog.btn_copy_to_me": "내 보드로 복사",
+  "gui.gtcalcboard.cancel": "취소",
+  "gui.gtcalcboard.config.parallel": "병렬 수",
+  "gui.gtcalcboard.search.no_results": "일치하는 부품이나 아이템이 없습니다.",
+  "gui.gtcalcboard.tooltip.btn_save_team": "팀 보드에 저장\n수정한 내용을 팀 워크스페이스에 저장하고 팀원들과 실시간 동기화합니다.",
+  "gui.gtcalcboard.tooltip.btn_cancel_edit": "편집 종료\n현재 페이지의 편집 권한을 반환하고 편집을 종료합니다.",
+  "gui.gtcalcboard.tooltip.btn_copy_to_personal": "내 보드로 복사\n현재 팀 페이지의 전체 공정을 개인 보드의 새 탭으로 복사합니다.",
+  "gui.gtcalcboard.tooltip.btn_recent_saves": "저장 기록\n팀 보드의 커밋 히스토리를 확인하고 과거 버전을 불러옵니다.",
+  "gui.gtcalcboard.tooltip.btn_export_to_team": "팀으로 내보내기\n현재 개인 보드의 공정 설계를 팀 공유 워크스페이스로 내보냅니다.",
+  "gui.gtcalcboard.btn_pause_on": "일시정지: ON",
+  "gui.gtcalcboard.btn_pause_off": "일시정지: OFF",
+  "gui.gtcalcboard.toast.pause_toggle_hint": "싱글플레이 일시정지: %s (보드를 다시 열면 적용됩니다)",
+  "gui.gtcalcboard.tooltip.btn_pause_toggle": "싱글플레이 일시정지 토글\n활성화 시 계산 보드를 열었을 때 싱글플레이 게임이 일시정지됩니다.\n§e(설정 변경 후 보드를 다시 열었을 때 적용됩니다)"
 }

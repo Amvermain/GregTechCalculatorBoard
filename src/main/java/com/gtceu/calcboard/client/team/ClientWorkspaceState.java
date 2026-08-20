@@ -34,6 +34,8 @@ public class ClientWorkspaceState {
     private final List<S2CBroadcastPresencePacket.MemberPresence> activePresence = new ArrayList<>();
     private final Map<String, Boolean> myHeldLocks = new ConcurrentHashMap<>();
 
+    private boolean serverSupported = false;
+
     private ClientWorkspaceState() {}
 
     public static synchronized ClientWorkspaceState getInstance() {
@@ -43,12 +45,85 @@ public class ClientWorkspaceState {
         return instance;
     }
 
+    public boolean isServerSupported() {
+        return serverSupported;
+    }
+
+    public void setServerSupported(boolean serverSupported) {
+        this.serverSupported = serverSupported;
+    }
+
+    public boolean isCollaborationEnabled() {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc == null || mc.hasSingleplayerServer()) {
+            return false;
+        }
+        return serverSupported && mc.getCurrentServer() != null;
+    }
+
     public WorkspaceMode getCurrentMode() {
         return currentMode;
     }
 
+    private final Set<String> dirtyPages = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    public void markPageDirty(String pageId) {
+        if (pageId != null) {
+            dirtyPages.add(pageId);
+        }
+    }
+
+    public boolean isPageDirty(String pageId) {
+        return pageId != null && dirtyPages.contains(pageId);
+    }
+
+    public void clearPageDirty(String pageId) {
+        if (pageId != null) {
+            dirtyPages.remove(pageId);
+        }
+    }
+
+    public void releaseCurrentLockIfHeld() {
+        String activePageId = getActiveTeamPageId();
+        if (activePageId != null && doesHoldLock(activePageId)) {
+            UUID teamId = getCurrentTeamId() != null ? getCurrentTeamId() : (net.minecraft.client.Minecraft.getInstance().player != null ? net.minecraft.client.Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SReleaseLockPacket(teamId, activePageId));
+            setLockHeld(activePageId, false);
+        }
+    }
+
+    public void autoCommitAndRelease(com.gtceu.calcboard.client.gui.BoardScreen screen, String pageId) {
+        if (pageId == null) pageId = getActiveTeamPageId();
+        if (screen != null && isPageDirty(pageId)) {
+            UUID teamId = getCurrentTeamId() != null ? getCurrentTeamId() : (net.minecraft.client.Minecraft.getInstance().player != null ? net.minecraft.client.Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
+            TeamWorkspacePage remotePage = getRemotePage(pageId);
+            String pageTitle = (remotePage != null && remotePage.getTitle() != null) ? remotePage.getTitle() : "Main Workspace";
+            int rev = getGlobalRevision();
+
+            FlowGraph graph = screen.getGraph();
+            net.minecraft.nbt.CompoundTag tag = graph.serializeNBT();
+            byte[] compressed = com.gtceu.calcboard.api.BlueprintCodec.compressTag(tag);
+            int nodeCount = graph.getNodes().size();
+
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SCommitWorkspacePacket(
+                    teamId, pageId, pageTitle, rev, "Auto-saved changes", compressed, nodeCount, 0, 0
+                )
+            );
+            clearPageDirty(pageId);
+            setLockHeld(pageId, false);
+        } else {
+            releaseCurrentLockIfHeld();
+        }
+    }
+
     public void setCurrentMode(WorkspaceMode currentMode) {
-        this.currentMode = currentMode;
+        if (this.currentMode != currentMode) {
+            if (this.currentMode == WorkspaceMode.TEAM) {
+                releaseCurrentLockIfHeld();
+            }
+            this.currentMode = currentMode;
+        }
     }
 
     public boolean isTeamMode() {
@@ -84,7 +159,8 @@ public class ClientWorkspaceState {
     }
 
     public void setActiveTeamPageId(String activeTeamPageId) {
-        if (activeTeamPageId != null && remotePages.containsKey(activeTeamPageId)) {
+        if (activeTeamPageId != null && !activeTeamPageId.equals(this.activeTeamPageId)) {
+            releaseCurrentLockIfHeld();
             this.activeTeamPageId = activeTeamPageId;
         }
     }
@@ -103,10 +179,25 @@ public class ClientWorkspaceState {
     }
 
     public FlowGraph getActiveTeamGraph() {
-        FlowGraph g = teamGraphs.get(getActiveTeamPageId());
+        return getTeamGraph(getActiveTeamPageId());
+    }
+
+    public FlowGraph getTeamGraph(String pageId) {
+        if (pageId == null) pageId = getActiveTeamPageId();
+        FlowGraph g = teamGraphs.get(pageId);
+        if (g == null) {
+            TeamWorkspacePage p = remotePages.get(pageId);
+            if (p != null && p.getCompressedGraphData() != null && p.getCompressedGraphData().length > 0) {
+                try {
+                    CompoundTag tag = BlueprintCodec.decompressTag(p.getCompressedGraphData());
+                    g = FlowGraph.deserializeNBT(tag);
+                    teamGraphs.put(pageId, g);
+                } catch (Exception ignored) {}
+            }
+        }
         if (g == null) {
             g = new FlowGraph();
-            teamGraphs.put(getActiveTeamPageId(), g);
+            teamGraphs.put(pageId, g);
         }
         return g;
     }
@@ -178,10 +269,12 @@ public class ClientWorkspaceState {
         currentTeamId = null;
         currentTeamName = "Team Workspace";
         activeTeamPageId = "page_main";
+        serverSupported = false;
         remotePages.clear();
         teamGraphs.clear();
         commitHistory.clear();
         activePresence.clear();
         myHeldLocks.clear();
+        dirtyPages.clear();
     }
 }

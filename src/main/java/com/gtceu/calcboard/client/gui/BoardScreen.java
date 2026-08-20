@@ -238,6 +238,12 @@ public class BoardScreen extends Screen {
         }
     }
 
+    public void openDeleteTeamPageDialog(String pageId, String pageName) {
+        if (deletePageDialog != null) {
+            deletePageDialog.openTeamPage(pageId, pageName);
+        }
+    }
+
     public GlobalBalanceDashboardDialog getGlobalBalanceDialog() {
         return globalBalanceDialog;
     }
@@ -274,7 +280,75 @@ public class BoardScreen extends Screen {
         markSummaryDirty();
     }
 
+    public int getPageTabY() {
+        return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 22 : 2;
+    }
+
+    public int getToolbarY() {
+        return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 42 : 22;
+    }
+
+    public int getHeaderBottomY() {
+        return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 64 : 44;
+    }
+
+    private long lastEditTimestamp = 0;
+
+    public void markTeamDirty() {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isTeamMode()) {
+            state.markPageDirty(state.getActiveTeamPageId());
+            this.lastEditTimestamp = System.currentTimeMillis();
+        }
+    }
+
+    public boolean ensureEditPermission() {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (!state.isTeamMode()) {
+            return true;
+        }
+
+        String activePageId = state.getActiveTeamPageId();
+        state.markPageDirty(activePageId);
+        this.lastEditTimestamp = System.currentTimeMillis();
+
+        if (state.doesHoldLock(activePageId)) {
+            return true;
+        }
+
+        com.gtceu.calcboard.server.storage.TeamWorkspacePage page = state.getRemotePage(activePageId);
+        if (page != null && page.isLocked() && !state.doesHoldLock(activePageId)) {
+            String lockHolder = page.getLockHolderUUID() != null ? page.getLockHolderUUID().toString().substring(0, 8) : "Player";
+            com.gtceu.calcboard.client.gui.BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.VILLAGER_NO, 1.0F)
+            );
+            return false;
+        }
+
+        // Auto-acquire lock seamlessly upon editing
+        UUID teamId = state.getCurrentTeamId();
+        com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket(teamId, activePageId));
+        state.setLockHeld(activePageId, true);
+        return true;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isTeamMode()) {
+            String activePageId = state.getActiveTeamPageId();
+            if (state.isPageDirty(activePageId) && lastEditTimestamp > 0 && (System.currentTimeMillis() - lastEditTimestamp > 3000)) {
+                state.autoCommitAndRelease(this, activePageId);
+                rebuildWidgets();
+                markSummaryDirty();
+            }
+        }
+    }
+
     public void addNode(RecipeNode node) {
+        if (!ensureEditPermission()) return;
         getGraph().addNode(node);
         rebuildWidgets();
         TutorialManager.getInstance().onNodeAdded(node);
@@ -792,6 +866,10 @@ public class BoardScreen extends Screen {
 
     @Override
     public void onClose() {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isTeamMode()) {
+            state.autoCommitAndRelease(this, state.getActiveTeamPageId());
+        }
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;
@@ -807,6 +885,6 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean isPauseScreen() {
-        return false;
+        return BoardManager.getInstance().isPauseGameInSingleplayer();
     }
 }

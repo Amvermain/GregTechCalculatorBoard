@@ -37,6 +37,7 @@ public class NetworkHandler {
         registerMessage(C2SAcquireLockPacket.class, C2SAcquireLockPacket::encode, C2SAcquireLockPacket::new, C2SAcquireLockPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SReleaseLockPacket.class, C2SReleaseLockPacket::encode, C2SReleaseLockPacket::new, C2SReleaseLockPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SCommitWorkspacePacket.class, C2SCommitWorkspacePacket::encode, C2SCommitWorkspacePacket::new, C2SCommitWorkspacePacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        registerMessage(C2SDeleteTeamPagePacket.class, C2SDeleteTeamPagePacket::encode, C2SDeleteTeamPagePacket::new, C2SDeleteTeamPagePacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SPingPresencePacket.class, C2SPingPresencePacket::encode, C2SPingPresencePacket::new, C2SPingPresencePacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
 
         // S2C Packets

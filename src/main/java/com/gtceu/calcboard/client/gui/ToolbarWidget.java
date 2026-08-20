@@ -97,68 +97,78 @@ public class ToolbarWidget {
         list.add(new ToolbarButtonDef("import", importTxt, 0xFF66FF88, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(importTxt) + 12, btn -> importBlueprintFromClipboard()));
 
         // 6. Team Collaboration Actions
+        // 6. Team Collaboration Actions
         com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
         if (state.isTeamMode()) {
-            String activePageId = "page_main";
+            String activePageId = state.getActiveTeamPageId();
             boolean hasLock = state.doesHoldLock(activePageId);
 
             if (hasLock) {
-                // [💾 팀에 저장]
-                String saveTxt = "§a💾 " + Component.translatable("gui.gtcalcboard.btn_save_team").getString();
-                list.add(new ToolbarButtonDef("save_team", saveTxt, 0xFF55FF88, 0xFF1C3D26, 0xFF2A5A38, 0xFF3B774E, font.width(saveTxt) + 12, btn -> {
-                    if (screen.getSaveToTeamDialog() != null) {
-                        screen.getSaveToTeamDialog().open();
-                    }
-                }));
-
                 // [✕ 편집 종료]
                 String cancelTxt = "§c✕ " + Component.translatable("gui.gtcalcboard.btn_cancel_edit").getString();
                 list.add(new ToolbarButtonDef("cancel_edit", cancelTxt, 0xFFFF6B6B, 0xFF3D1C1C, 0xFF5A2A2A, 0xFF773B3B, font.width(cancelTxt) + 12, btn -> {
-                    UUID teamId = state.getCurrentTeamId() != null ? state.getCurrentTeamId() : (Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
-                    com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SReleaseLockPacket(teamId, activePageId));
-                    state.setLockHeld(activePageId, false);
-                    BoardToast.show("gui.gtcalcboard.toast.lock_released");
-                }));
-            } else {
-                // [✏️ 편집 시작]
-                String editTxt = "§e✏️ " + Component.translatable("gui.gtcalcboard.btn_start_edit").getString();
-                list.add(new ToolbarButtonDef("start_edit", editTxt, 0xFFFFAA00, 0xFF3D321C, 0xFF5A4A28, 0xFF776433, font.width(editTxt) + 12, btn -> {
-                    UUID teamId = state.getCurrentTeamId() != null ? state.getCurrentTeamId() : (Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
-                    com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket(teamId, activePageId));
-                }));
-
-                // [📋 내 보드로 복사]
-                String copyTxt = "§b📋 " + Component.translatable("gui.gtcalcboard.btn_copy_to_personal").getString();
-                list.add(new ToolbarButtonDef("copy_to_personal", copyTxt, 0xFF66DDFF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(copyTxt) + 12, btn -> {
-                    BoardManager bm = BoardManager.getInstance();
-                    String pageTitle = "Team Copy (" + state.getCurrentTeamName() + ")";
-                    com.gtceu.calcboard.api.BoardPage newPage = new com.gtceu.calcboard.api.BoardPage(pageTitle);
-                    FlowGraph copiedGraph = screen.getGraph().copy();
-                    for (RecipeNode n : copiedGraph.getNodes()) {
-                        newPage.getGraph().addNode(n);
-                    }
-                    for (FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
-                        newPage.getGraph().getConnections().add(e);
-                    }
-                    bm.addPage(newPage);
-                    BoardToast.show("gui.gtcalcboard.toast.copied_to_personal", pageTitle);
-                }));
-
-                // [📜 저장 기록]
-                String historyTxt = "§f📜 " + Component.translatable("gui.gtcalcboard.btn_recent_saves").getString();
-                list.add(new ToolbarButtonDef("recent_saves", historyTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(historyTxt) + 12, btn -> {
-                    if (screen.getRecentSavesDialog() != null) {
-                        screen.getRecentSavesDialog().open();
-                    }
+                    state.autoCommitAndRelease(screen, activePageId);
+                    screen.rebuildWidgets();
+                    screen.markSummaryDirty();
                 }));
             }
-        } else {
+
+            // [📋 내 보드로 복사]
+            String copyTxt = "§b📋 " + Component.translatable("gui.gtcalcboard.btn_copy_to_personal").getString();
+            list.add(new ToolbarButtonDef("copy_to_personal", copyTxt, 0xFF66DDFF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(copyTxt) + 12, btn -> {
+                BoardManager bm = BoardManager.getInstance();
+                com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage(activePageId);
+                String pageTitle = (remotePage != null && remotePage.getTitle() != null && !remotePage.getTitle().trim().isEmpty())
+                    ? remotePage.getTitle() : "Team Page";
+                com.gtceu.calcboard.api.BoardPage newPage = new com.gtceu.calcboard.api.BoardPage(pageTitle);
+                FlowGraph copiedGraph = screen.getGraph().copy();
+                for (RecipeNode n : copiedGraph.getNodes()) {
+                    newPage.getGraph().addNode(n);
+                }
+                for (FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
+                    newPage.getGraph().getConnections().add(e);
+                }
+                bm.addPage(newPage);
+                bm.setActivePageIndex(bm.getPages().size() - 1);
+                state.setCurrentMode(com.gtceu.calcboard.client.team.ClientWorkspaceState.WorkspaceMode.LOCAL);
+                screen.rebuildWidgets();
+                screen.markSummaryDirty();
+                BoardToast.show("gui.gtcalcboard.toast.copied_to_personal", pageTitle);
+            }));
+
+            // [📜 저장 기록]
+            String historyTxt = "§f📜 " + Component.translatable("gui.gtcalcboard.btn_recent_saves").getString();
+            list.add(new ToolbarButtonDef("recent_saves", historyTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(historyTxt) + 12, btn -> {
+                if (screen.getRecentSavesDialog() != null) {
+                    screen.getRecentSavesDialog().open();
+                }
+            }));
+        } else if (state.isCollaborationEnabled()) {
             // [📤 팀 보드로 내보내기]
             String exportTeamTxt = "§a📤 " + Component.translatable("gui.gtcalcboard.btn_export_to_team").getString();
             list.add(new ToolbarButtonDef("export_to_team", exportTeamTxt, 0xFF55FF88, 0xFF1C3D26, 0xFF2A5A38, 0xFF3B774E, font.width(exportTeamTxt) + 12, btn -> {
                 if (screen.getExportToTeamDialog() != null) {
                     screen.getExportToTeamDialog().open();
                 }
+            }));
+        }
+
+        // 7. Singleplayer Pause Toggle
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.hasSingleplayerServer()) {
+            boolean isPaused = BoardManager.getInstance().isPauseGameInSingleplayer();
+            String pauseTxt = isPaused
+                    ? "§b⏸ " + Component.translatable("gui.gtcalcboard.btn_pause_on").getString()
+                    : "§7▶ " + Component.translatable("gui.gtcalcboard.btn_pause_off").getString();
+            int pauseBg = isPaused ? 0xFF1C2C44 : 0xFF222630;
+            int pauseBorder = isPaused ? 0xFF355580 : 0xFF3D4455;
+            list.add(new ToolbarButtonDef("pause_toggle", pauseTxt, isPaused ? 0xFF66DDFF : 0xFFAAAAAA, pauseBg, pauseBg + 0x00151515, pauseBorder, font.width(pauseTxt) + 12, btn -> {
+                boolean nextVal = !BoardManager.getInstance().isPauseGameInSingleplayer();
+                BoardManager.getInstance().setPauseGameInSingleplayer(nextVal);
+                screen.rebuildWidgets();
+                screen.markSummaryDirty();
+                String statusStr = nextVal ? "ON" : "OFF";
+                BoardToast.show(Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.toast.pause_toggle_hint", statusStr)));
             }));
         }
 
@@ -174,7 +184,7 @@ public class ToolbarWidget {
         int width = screen.width;
 
         int tbX = 8;
-        int tbY = 42;
+        int tbY = screen.getToolbarY();
         int tbH = 18;
         int tbW = width - 16;
 
@@ -251,7 +261,8 @@ public class ToolbarWidget {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (mouseY < 40 || mouseY > 62 || mouseX < 8 || mouseX > screen.width - 8) {
+        int tbY = screen.getToolbarY();
+        if (mouseY < tbY - 2 || mouseY > tbY + 20 || mouseX < 8 || mouseX > screen.width - 8) {
             return false;
         }
 
@@ -277,10 +288,11 @@ public class ToolbarWidget {
             String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
             int titleRight = 14 + font.width(titleStr) + 8;
             int curX = titleRight - (int) scrollX;
+            int tbY = screen.getToolbarY();
 
             List<ToolbarButtonDef> buttons = buildButtons(font);
             for (ToolbarButtonDef btn : buttons) {
-                if (dragStartX >= curX && dragStartX <= curX + btn.width && dragStartY >= 42 && dragStartY <= 60) {
+                if (dragStartX >= curX && dragStartX <= curX + btn.width && dragStartY >= tbY && dragStartY <= tbY + 18) {
                     btn.onClick.accept(button);
                     return true;
                 }
@@ -305,7 +317,8 @@ public class ToolbarWidget {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseY >= 40 && mouseY <= 62 && mouseX >= 8 && mouseX <= screen.width - 8) {
+        int tbY = screen.getToolbarY();
+        if (mouseY >= tbY - 2 && mouseY <= tbY + 20 && mouseX >= 8 && mouseX <= screen.width - 8) {
             if (maxScrollX > 0) {
                 scrollX = Math.max(0, Math.min(maxScrollX, scrollX - (delta * 24.0)));
                 return true;
@@ -315,6 +328,7 @@ public class ToolbarWidget {
     }
 
     public void performAutoConnect() {
+        if (!screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
         List<FlowGraph.ConnectionEdge> addedEdges = new ArrayList<>();
         for (RecipeNode from : graph.getNodes()) {
@@ -345,6 +359,7 @@ public class ToolbarWidget {
     }
 
     public void performAutoRatio() {
+        if (!screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
         RecipeNode baseNode = graph.findBaseNode();
         if (baseNode == null && !graph.getNodes().isEmpty()) {
@@ -390,6 +405,7 @@ public class ToolbarWidget {
     }
 
     public void performMaxThroughputOptimization() {
+        if (!screen.ensureEditPermission()) return;
         runMaxFlow();
         BoardToast.show(Component.literal("§6🚀 ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")));
         Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));

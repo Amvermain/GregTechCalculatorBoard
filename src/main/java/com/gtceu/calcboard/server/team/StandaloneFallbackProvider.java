@@ -34,6 +34,12 @@ public class StandaloneFallbackProvider implements ITeamProvider {
     }
 
     @Override
+    public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
+        if (player == null) return false;
+        return player.hasPermissions(2) || GLOBAL_SHARED_TEAM_ID.equals(teamId);
+    }
+
+    @Override
     public String getProviderId() {
         return "standalone";
     }
