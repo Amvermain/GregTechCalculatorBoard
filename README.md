@@ -109,6 +109,12 @@ The compiled jar will be in `build/libs/gtcalcboard-1.20.1-1.0.5.jar`.
 
 ---
 
+## Special Thanks
+
+- **The Reel One** - For providing invaluable UX/UI feedback, thoughtful design suggestions, and continuous community testing.
+
+---
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

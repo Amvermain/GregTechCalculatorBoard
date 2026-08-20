@@ -109,6 +109,12 @@ cd GregTechCalculatorBoard
 
 ---
 
+## Special Thanks (감사의 말)
+
+- **The Reel One** - 계산기 보드의 사용성 개선을 위한 귀중한 UX/UI 피드백, 세심한 디자인 제안 및 지속적인 테스트를 지원해 주셨습니다.
+
+---
+
 ## 라이선스
 
 MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참고하세요.
