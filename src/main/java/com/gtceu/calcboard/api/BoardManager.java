@@ -99,6 +99,17 @@ public class BoardManager {
         return newPage;
     }
 
+    public void addPage(BoardPage page) {
+        if (page != null) {
+            pages.add(page);
+            activePageIndex = pages.size() - 1;
+        }
+    }
+
+    public void setActivePageIndex(int index) {
+        switchPage(index);
+    }
+
     public boolean removePage(int index) {
         if (pages.size() <= 1) {
             // Cannot remove last page, just clear it

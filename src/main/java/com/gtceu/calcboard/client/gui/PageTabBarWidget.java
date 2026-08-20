@@ -64,13 +64,13 @@ public class PageTabBarWidget {
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         // Enable horizontal scissor so tabs don't overflow outside screen
-        graphics.enableScissor(0, 0, screen.width, TAB_HEIGHT + 8);
+        graphics.enableScissor(0, 20, screen.width, TAB_HEIGHT + 26);
 
         graphics.pose().pushPose();
         graphics.pose().translate((float) -scrollX, 0, 0);
 
         int curX = 6;
-        int tabY = 4;
+        int tabY = 22;
 
         for (int i = 0; i < pages.size(); i++) {
             BoardPage page = pages.get(i);
@@ -148,7 +148,7 @@ public class PageTabBarWidget {
 
         double virtualMouseX = mouseX + scrollX;
         int curX = 6;
-        int tabY = 4;
+        int tabY = 22;
 
         for (int i = 0; i < pages.size(); i++) {
             BoardPage page = pages.get(i);

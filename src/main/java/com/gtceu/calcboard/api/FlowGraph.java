@@ -213,4 +213,9 @@ public class FlowGraph {
         }
         return graph;
     }
+
+    public FlowGraph copy() {
+        CompoundTag tag = serializeNBT(0, 0, 1.0);
+        return FlowGraph.deserializeNBT(tag);
+    }
 }

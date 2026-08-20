@@ -49,4 +49,27 @@ public class BlueprintCodec {
         }
         return null;
     }
+
+    public static byte[] compressTag(CompoundTag tag) {
+        if (tag == null) return new byte[0];
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            NbtIo.writeCompressed(tag, baos);
+            return baos.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new byte[0];
+        }
+    }
+
+    public static CompoundTag decompressTag(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) return new CompoundTag();
+        try {
+            ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+            return NbtIo.readCompressed(bais);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new CompoundTag();
+        }
+    }
 }

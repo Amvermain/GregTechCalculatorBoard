@@ -48,8 +48,8 @@ public class SummaryOverlay {
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         int x = screenWidth - WIDTH - 10;
-        int y = 48;
-        int height = screenHeight - 56;
+        int y = 66;
+        int height = screenHeight - 74;
         hoveredStack = null;
         hoveredMachines = false;
 
@@ -234,8 +234,8 @@ public class SummaryOverlay {
         if (collapsed) return false;
 
         int x = screenWidth - WIDTH - 10;
-        int y = 48;
-        int height = screenHeight - 56;
+        int y = 66;
+        int height = screenHeight - 74;
 
         if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + height) {
             if (maxScrollY > 0) {
@@ -251,7 +251,7 @@ public class SummaryOverlay {
             int tabW = 24;
             int tabH = 50;
             int tabX = screenWidth - tabW - 4;
-            int y = 48;
+            int y = 66;
             if (mouseX >= tabX && mouseX <= tabX + tabW && mouseY >= y && mouseY <= y + tabH) {
                 toggle();
                 return true;
@@ -260,7 +260,7 @@ public class SummaryOverlay {
         }
 
         int x = screenWidth - WIDTH - 10;
-        int y = 48;
+        int y = 66;
 
         // Header click -> collapse/expand
         if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + 22) {

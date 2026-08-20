@@ -321,5 +321,39 @@
   "gui.gtcalcboard.toast.workspace_synced": "팀 워크스페이스 동기화 완료: %s",
   "gui.gtcalcboard.toast.lock_acquired": "페이지 편집 권한(Lock) 획득: %s",
   "gui.gtcalcboard.toast.lock_busy": "해당 페이지는 현재 %s님이 편집 중입니다.",
-  "gui.gtcalcboard.toast.error": "워크스페이스 오류: %s"
+  "gui.gtcalcboard.toast.error": "워크스페이스 오류: %s",
+
+  "gui.gtcalcboard.workspace.personal": "내 보드",
+  "gui.gtcalcboard.workspace.team": "팀 보드 (%s)",
+  "gui.gtcalcboard.lock.editing_by_me": "내가 수정 중",
+  "gui.gtcalcboard.lock.locked_by": "%s 수정 중",
+  "gui.gtcalcboard.lock.editable": "수정 가능",
+  "gui.gtcalcboard.presence.online_count": "%s명 접속 중",
+  "gui.gtcalcboard.toast.switched_to_personal": "개인 보드로 전환되었습니다.",
+  "gui.gtcalcboard.toast.switched_to_team": "팀 보드(%s)로 전환되었습니다.",
+
+  "gui.gtcalcboard.btn_save_team": "팀에 저장",
+  "gui.gtcalcboard.btn_cancel_edit": "편집 종료",
+  "gui.gtcalcboard.btn_start_edit": "편집 시작",
+  "gui.gtcalcboard.btn_copy_to_personal": "내 보드로 복사",
+  "gui.gtcalcboard.btn_recent_saves": "저장 기록",
+  "gui.gtcalcboard.btn_export_to_team": "팀으로 내보내기",
+  "gui.gtcalcboard.toast.lock_released": "페이지 편집 권한을 반환했습니다.",
+  "gui.gtcalcboard.toast.copied_to_personal": "개인 보드로 복사 완료: %s",
+  "gui.gtcalcboard.toast.saved_to_team": "팀 워크스페이스에 저장 완료: %s",
+  "gui.gtcalcboard.toast.exported_to_team": "팀 워크스페이스로 내보내기 완료: %s",
+
+  "gui.gtcalcboard.dialog.commit_hint": "저장 설명 입력 (예: 에틸렌 4병렬)",
+  "gui.gtcalcboard.dialog.save_to_team_title": "팀 보드에 저장",
+  "gui.gtcalcboard.dialog.save_to_team_sub": "수정한 내용을 팀원들과 실시간 동기화합니다.",
+  "gui.gtcalcboard.dialog.btn_save_sync": "저장 및 동기화",
+
+  "gui.gtcalcboard.dialog.export_to_team_title": "팀 보드로 공정 내보내기",
+  "gui.gtcalcboard.dialog.export_to_team_sub": "개인 보드의 설계를 팀 워크스페이스로 공유합니다.",
+  "gui.gtcalcboard.dialog.btn_export_new_page": "팀 보드에 새 페이지로 추가",
+  "gui.gtcalcboard.dialog.btn_export_overwrite": "현재 팀 보드에 덮어쓰기",
+
+  "gui.gtcalcboard.dialog.recent_saves_title": "팀 보드 최근 저장 기록",
+  "gui.gtcalcboard.dialog.no_saves_history": "저장된 기록이 없습니다.",
+  "gui.gtcalcboard.dialog.btn_copy_to_me": "내 보드로 복사"
 }

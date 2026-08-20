@@ -41,6 +41,7 @@ public class BoardScreen extends Screen {
 
     // Sub-components & Handlers
     private final BoardSelectionModel selectionModel = new BoardSelectionModel();
+    private final WorkspaceTabBarWidget workspaceTabBar = new WorkspaceTabBarWidget(this);
     private final PageTabBarWidget pageTabBar = new PageTabBarWidget(this);
     private final SummaryOverlay summaryOverlay = new SummaryOverlay();
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
@@ -52,6 +53,9 @@ public class BoardScreen extends Screen {
     private GuideDialog guideDialog;
     private DeletePageConfirmDialog deletePageDialog;
     private GlobalBalanceDashboardDialog globalBalanceDialog;
+    private SaveToTeamDialog saveToTeamDialog;
+    private ExportToTeamDialog exportToTeamDialog;
+    private RecentSavesDialog recentSavesDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -185,6 +189,9 @@ public class BoardScreen extends Screen {
         this.guideDialog = new GuideDialog(this);
         this.deletePageDialog = new DeletePageConfirmDialog(this);
         this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
+        this.saveToTeamDialog = new SaveToTeamDialog(this);
+        this.exportToTeamDialog = new ExportToTeamDialog(this);
+        this.recentSavesDialog = new RecentSavesDialog(this);
         rebuildWidgets();
 
         if (this.width < 640) {
@@ -197,6 +204,22 @@ public class BoardScreen extends Screen {
             BoardManager.getInstance().setHasSeenWelcomePrompt(true);
             BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile());
         }
+    }
+
+    public SaveToTeamDialog getSaveToTeamDialog() {
+        return saveToTeamDialog;
+    }
+
+    public ExportToTeamDialog getExportToTeamDialog() {
+        return exportToTeamDialog;
+    }
+
+    public RecentSavesDialog getRecentSavesDialog() {
+        return recentSavesDialog;
+    }
+
+    public WorkspaceTabBarWidget getWorkspaceTabBar() {
+        return workspaceTabBar;
     }
 
     public void openDeletePageDialog(int pageIndex, String pageName) {
@@ -447,7 +470,8 @@ public class BoardScreen extends Screen {
         RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         RenderSystem.disableDepthTest();
 
-        // 6. Render Page Tab Bar, Top Toolbar, Hotkey HUD and Summary Overlay
+        // 6. Render Workspace Mode Tab Bar, Page Tab Bar, Top Toolbar, Hotkey HUD and Summary Overlay
+        workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
         hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
@@ -464,14 +488,23 @@ public class BoardScreen extends Screen {
             && (guideDialog == null || !guideDialog.isVisible())
             && (searchDialog == null || !searchDialog.isVisible())
             && (machineConfigDialog == null || !machineConfigDialog.isVisible())
-            && (deletePageDialog == null || !deletePageDialog.isVisible())) {
+            && (deletePageDialog == null || !deletePageDialog.isVisible())
+            && (saveToTeamDialog == null || !saveToTeamDialog.isVisible())
+            && (exportToTeamDialog == null || !exportToTeamDialog.isVisible())
+            && (recentSavesDialog == null || !recentSavesDialog.isVisible())) {
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
         }
 
         super.render(graphics, mouseX, mouseY, partialTicks);
 
         // 8. Top-level Modal Dialogs (Highest Layer)
-        if (deletePageDialog != null && deletePageDialog.isVisible()) {
+        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
+            saveToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
+            exportToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
+            recentSavesDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (deletePageDialog != null && deletePageDialog.isVisible()) {
             deletePageDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             globalBalanceDialog.render(graphics, width, height, mouseX, mouseY);
@@ -538,6 +571,15 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
+            return saveToTeamDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
+            return exportToTeamDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
+            return recentSavesDialog.mouseClicked(mouseX, mouseY, button);
+        }
         if (welcomeDialog.mouseClicked(this, width, height, mouseX, mouseY, button)) {
             return true;
         }
@@ -558,6 +600,9 @@ public class BoardScreen extends Screen {
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (workspaceTabBar.mouseClicked(mouseX, mouseY, button)) {
+            return true;
         }
         if (pageTabBar.mouseClicked(mouseX, mouseY, button)) {
             return true;
@@ -607,6 +652,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
+            return recentSavesDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -645,6 +693,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
+            return saveToTeamDialog.charTyped(codePoint, modifiers);
+        }
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.charTyped(codePoint, modifiers);
         }
@@ -668,6 +719,15 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
+            return saveToTeamDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
+            return exportToTeamDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
+            return recentSavesDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (BoardHotkeyHandler.handleKeyPressed(this, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
             return true;
         }

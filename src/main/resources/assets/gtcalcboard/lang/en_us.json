@@ -321,5 +321,39 @@
   "gui.gtcalcboard.toast.workspace_synced": "Synchronized team workspace: %s",
   "gui.gtcalcboard.toast.lock_acquired": "Acquired edit lock for page: %s",
   "gui.gtcalcboard.toast.lock_busy": "Page is currently being edited by: %s",
-  "gui.gtcalcboard.toast.error": "Workspace Error: %s"
+  "gui.gtcalcboard.toast.error": "Workspace Error: %s",
+
+  "gui.gtcalcboard.workspace.personal": "Personal Board",
+  "gui.gtcalcboard.workspace.team": "Team Board (%s)",
+  "gui.gtcalcboard.lock.editing_by_me": "Editing by Me",
+  "gui.gtcalcboard.lock.locked_by": "Locked by %s",
+  "gui.gtcalcboard.lock.editable": "Editable",
+  "gui.gtcalcboard.presence.online_count": "%s Online",
+  "gui.gtcalcboard.toast.switched_to_personal": "Switched to Personal Board.",
+  "gui.gtcalcboard.toast.switched_to_team": "Switched to Team Board: %s",
+
+  "gui.gtcalcboard.btn_save_team": "Save to Team",
+  "gui.gtcalcboard.btn_cancel_edit": "Finish Editing",
+  "gui.gtcalcboard.btn_start_edit": "Start Editing",
+  "gui.gtcalcboard.btn_copy_to_personal": "Copy to My Board",
+  "gui.gtcalcboard.btn_recent_saves": "Save History",
+  "gui.gtcalcboard.btn_export_to_team": "Export to Team",
+  "gui.gtcalcboard.toast.lock_released": "Released page edit lock.",
+  "gui.gtcalcboard.toast.copied_to_personal": "Copied to personal board: %s",
+  "gui.gtcalcboard.toast.saved_to_team": "Saved to team workspace: %s",
+  "gui.gtcalcboard.toast.exported_to_team": "Exported to team workspace: %s",
+
+  "gui.gtcalcboard.dialog.commit_hint": "Enter note (e.g. 4x Ethylene Line)",
+  "gui.gtcalcboard.dialog.save_to_team_title": "Save to Team Board",
+  "gui.gtcalcboard.dialog.save_to_team_sub": "Sync modifications with teammates in real-time.",
+  "gui.gtcalcboard.dialog.btn_save_sync": "Save & Sync",
+
+  "gui.gtcalcboard.dialog.export_to_team_title": "Export to Team Board",
+  "gui.gtcalcboard.dialog.export_to_team_sub": "Share personal design to team workspace.",
+  "gui.gtcalcboard.dialog.btn_export_new_page": "Add as New Page to Team Board",
+  "gui.gtcalcboard.dialog.btn_export_overwrite": "Overwrite Active Team Page",
+
+  "gui.gtcalcboard.dialog.recent_saves_title": "Recent Team Saves History",
+  "gui.gtcalcboard.dialog.no_saves_history": "No save history available.",
+  "gui.gtcalcboard.dialog.btn_copy_to_me": "Copy to Me"
 }

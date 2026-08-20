@@ -23,6 +23,10 @@ public class BoardPage {
         this.graph = graph != null ? graph : new FlowGraph();
     }
 
+    public BoardPage(String name) {
+        this(UUID.randomUUID().toString(), name, new FlowGraph());
+    }
+
     public com.gtceu.calcboard.api.history.HistoryManager getHistoryManager() {
         return historyManager;
     }
