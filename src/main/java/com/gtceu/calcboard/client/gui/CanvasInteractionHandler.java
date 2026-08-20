@@ -299,6 +299,7 @@ public class CanvasInteractionHandler {
                 double canvasMouseY = screen.toCanvasY(mouseY);
                 List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
                 FlowGraph graph = screen.getGraph();
+                boolean connected = false;
 
                 for (NodeWidget targetWidget : nodeWidgets) {
                     if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
@@ -351,6 +352,7 @@ public class CanvasInteractionHandler {
                                 screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(newEdge, shiftDown ? toNode.getId() : null, oldMachineCount, newMachineCount));
                                 screen.markSummaryDirty();
                                 com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onWireConnected(shiftDown);
+                                connected = true;
                                 break;
                             }
                         } 
@@ -402,11 +404,36 @@ public class CanvasInteractionHandler {
                                 screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(newEdge, shiftDown ? fromNode.getId() : null, oldMachineCount, newMachineCount));
                                 screen.markSummaryDirty();
                                 com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onWireConnected(shiftDown);
+                                connected = true;
                                 break;
                             }
                         }
                     }
                 }
+
+                // If not connected to an existing port, check if dropped on empty canvas (Drag-to-Search / Contextual Wire)
+                if (!connected && screen.getSearchDialog() != null) {
+                    double startPortX = wireStartIsInput ? wireStartNode.getInputPortX(wireStartPortIdx) : wireStartNode.getOutputPortX(wireStartPortIdx);
+                    double startPortY = wireStartIsInput ? wireStartNode.getInputPortY(wireStartPortIdx) : wireStartNode.getOutputPortY(wireStartPortIdx);
+                    double dragDist = Math.hypot(canvasMouseX - startPortX, canvasMouseY - startPortY);
+
+                    if (dragDist >= 15.0) {
+                        RecipeNode srcNode = wireStartNode.getNode();
+                        boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                        if (wireStartIsInput) {
+                            if (wireStartPortIdx >= 0 && wireStartPortIdx < srcNode.getInputs().size()) {
+                                IngredientStack stack = srcNode.getInputs().get(wireStartPortIdx);
+                                screen.getSearchDialog().openForContextualWire(srcNode, wireStartPortIdx, true, stack, canvasMouseX, canvasMouseY, shiftDown);
+                            }
+                        } else {
+                            if (wireStartPortIdx >= 0 && wireStartPortIdx < srcNode.getOutputs().size()) {
+                                IngredientStack stack = srcNode.getOutputs().get(wireStartPortIdx);
+                                screen.getSearchDialog().openForContextualWire(srcNode, wireStartPortIdx, false, stack, canvasMouseX, canvasMouseY, shiftDown);
+                            }
+                        }
+                    }
+                }
+
                 wireStartNode = null;
                 wireStartPortIdx = -1;
                 wireStartIsInput = false;

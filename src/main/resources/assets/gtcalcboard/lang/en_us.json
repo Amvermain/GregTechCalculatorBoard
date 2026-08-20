@@ -369,5 +369,9 @@
   "gui.gtcalcboard.btn_pause_on": "Pause: ON",
   "gui.gtcalcboard.btn_pause_off": "Pause: OFF",
   "gui.gtcalcboard.toast.pause_toggle_hint": "Singleplayer Pause set to %s. Reopen board to apply.",
-  "gui.gtcalcboard.tooltip.btn_pause_toggle": "Singleplayer Pause Toggle\nWhen enabled, opening this board pauses the singleplayer game.\n§e(Takes full effect when reopening the board)"
+  "gui.gtcalcboard.tooltip.btn_pause_toggle": "Singleplayer Pause Toggle\nWhen enabled, opening this board pauses the singleplayer game.\n§e(Takes full effect when reopening the board)",
+  "gui.gtcalcboard.search.consumers_for": "Consumers for: %s",
+  "gui.gtcalcboard.search.producers_for": "Producers for: %s",
+  "gui.gtcalcboard.search.search_help": "e.g. pyrolyse oil | @gtceu | #logs | !charcoal",
+  "gui.gtcalcboard.toast.drag_auto_connected": "Auto-connected: %s ➔ %s"
 }

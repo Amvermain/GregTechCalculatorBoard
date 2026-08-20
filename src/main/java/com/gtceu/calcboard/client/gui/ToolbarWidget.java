@@ -240,7 +240,15 @@ public class ToolbarWidget {
 
         if (hoveredBtn != null) {
             String tooltipKey = "gui.gtcalcboard.tooltip.btn_" + hoveredBtn.id;
-            graphics.renderTooltip(font, Component.translatable(tooltipKey), mouseX, mouseY);
+            String raw = Component.translatable(tooltipKey).getString();
+            if (raw.contains("\n")) {
+                List<Component> lines = Arrays.stream(raw.split("\n"))
+                        .<Component>map(Component::literal)
+                        .toList();
+                graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+            } else {
+                graphics.renderTooltip(font, Component.translatable(tooltipKey), mouseX, mouseY);
+            }
         }
     }
 

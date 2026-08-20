@@ -369,5 +369,9 @@
   "gui.gtcalcboard.btn_pause_on": "일시정지: ON",
   "gui.gtcalcboard.btn_pause_off": "일시정지: OFF",
   "gui.gtcalcboard.toast.pause_toggle_hint": "싱글플레이 일시정지: %s (보드를 다시 열면 적용됩니다)",
-  "gui.gtcalcboard.tooltip.btn_pause_toggle": "싱글플레이 일시정지 토글\n활성화 시 계산 보드를 열었을 때 싱글플레이 게임이 일시정지됩니다.\n§e(설정 변경 후 보드를 다시 열었을 때 적용됩니다)"
+  "gui.gtcalcboard.tooltip.btn_pause_toggle": "싱글플레이 일시정지 토글\n활성화 시 계산 보드를 열었을 때 싱글플레이 게임이 일시정지됩니다.\n§e(설정 변경 후 보드를 다시 열었을 때 적용됩니다)",
+  "gui.gtcalcboard.search.consumers_for": "소비 공정 검색: %s",
+  "gui.gtcalcboard.search.producers_for": "생산 공정 검색: %s",
+  "gui.gtcalcboard.search.search_help": "검색 예시: pyrolyse oil | @gtceu | #logs | !charcoal",
+  "gui.gtcalcboard.toast.drag_auto_connected": "자동 연결됨: %s ➔ %s"
 }

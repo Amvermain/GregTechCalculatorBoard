@@ -32,6 +32,13 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 - **Singleplayer Game Pause Toggle (`BoardScreen`, `BoardManager`, `ToolbarWidget`)**:
   - Added an interactive `[⏸ Pause: ON]` / `[▶ Pause: OFF]` toggle button on the singleplayer toolbar (`isPauseScreen` dynamic integration).
   - Allows players to freely choose between pausing the world while calculating complex lines or letting factory automation run in background.
+- **Advanced Parametric & Boolean Recipe Search Engine (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Implemented an EMI/JEI-style boolean and parametric search engine supporting multi-token AND (`&` / spaces), OR (`|`), NOT (`!`), Mod ID (`@gtceu`), Tags (`#logs`), Category/Machine (`[pyrolyse_oven]`), and Quoted phrases (`"..."`).
+  - Full indexing of machine display names, localized categories, inputs, outputs, and registry IDs.
+- **Contextual Drag-to-Search & Auto-Wire Node Creation (`CanvasInteractionHandler`, `RecipeSearchDialog`)**:
+  - Dragging a wire from any port into empty canvas space automatically opens the recipe search dialog pre-filtered for consumers (output drag) or producers (input drag).
+  - Spawns the new machine node at the cursor position and **automatically wires the ports together** in a single seamless action.
+  - Supports `Shift + Drag` for instant 1:1 auto-ratio matching upon creation.
 
 ### Changed
 - **Adaptive Compact Header Layout (`BoardScreen`, `WorkspaceTabBarWidget`, `PageTabBarWidget`)**:
@@ -42,7 +49,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ### Fixed
 - **i18n & Modal Formatting Parity**:
-  - Completed 100% key parity and formatting token alignment across `en_us.json` and `ko_kr.json` (336 translation keys).
+  - Completed 100% key parity and formatting token alignment across `en_us.json` and `ko_kr.json` (340 translation keys).
 
 ---
 

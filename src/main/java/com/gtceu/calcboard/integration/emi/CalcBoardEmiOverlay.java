@@ -36,59 +36,92 @@ public class CalcBoardEmiOverlay {
     private static RecipeButtonTarget getTargetForGroup(Object group, int screenX, int screenY, int bgWidth) {
         try {
             Field rF = findField(group.getClass(), "recipe");
+            Field grpXF = findField(group.getClass(), "x");
             Field grpYF = findField(group.getClass(), "y");
-            if (rF == null) return null;
+            Field grpWF = findField(group.getClass(), "width");
+            Field grpHF = findField(group.getClass(), "height");
+            Field widgetsF = findField(group.getClass(), "widgets");
+            if (rF == null || grpYF == null) return null;
 
             Object recipeObj = rF.get(group);
             if (!(recipeObj instanceof EmiRecipe recipe)) return null;
 
+            int grpX = grpXF != null ? grpXF.getInt(group) : screenX;
+            int grpY = grpYF.getInt(group);
+            int grpW = grpWF != null ? grpWF.getInt(group) : bgWidth;
+            int grpH = grpHF != null ? grpHF.getInt(group) : 32;
+
             Minecraft mc = Minecraft.getInstance();
             int screenGuiW = mc.getWindow().getGuiScaledWidth();
 
-            int btnX = screenX + bgWidth + 1;
-            if (btnX + 13 > screenGuiW) {
-                // If hugging screen edge in low resolution, dock inside the right border
-                btnX = screenX + bgWidth - 13;
-            }
+            int baseX = grpW + 5;
+            int baseY = 0;
 
-            Integer lastButtonBottom = null;
+            // Track occupied grid cells (col, row) in EMI's side button area
+            boolean[][] occupied = new boolean[10][10];
 
-            // Search for EMI's existing side buttons (Favorite, Tree, Fill '+') to dock seamlessly below them
-            for (Field f : group.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                Object val = f.get(group);
-                if (val != null) {
-                    Field wYF = findField(val.getClass(), "y");
-                    Field wHF = findField(val.getClass(), "height");
-                    Field wXF = findField(val.getClass(), "x");
-                    if (wYF != null && wHF != null) {
-                        try {
-                            int wy = wYF.getInt(val);
-                            int wh = wHF.getInt(val);
-                            int wx = wXF != null ? wXF.getInt(val) : 0;
+            if (widgetsF != null) {
+                Object widgetsObj = widgetsF.get(group);
+                if (widgetsObj instanceof List<?> widgetsList) {
+                    // First pass: find base X and base Y of EMI side buttons
+                    Integer minX = null;
+                    Integer minY = null;
+                    for (Object w : widgetsList) {
+                        if (w instanceof dev.emi.emi.api.widget.Widget widget) {
+                            dev.emi.emi.api.widget.Bounds b = widget.getBounds();
+                            if (b != null && b.x() >= grpW - 4 && b.width() <= 16 && b.height() <= 16) {
+                                if (minX == null || b.x() < minX) minX = b.x();
+                                if (minY == null || b.y() < minY) minY = b.y();
+                            }
+                        }
+                    }
 
-                            // Check if this widget is located in the right-side button column
-                            if (wXF == null || Math.abs(wx - (screenX + bgWidth)) <= 12 || Math.abs(wx - bgWidth) <= 12 || wx == 0) {
-                                int actualY = wy >= screenY ? wy : (screenY + wy);
-                                if (lastButtonBottom == null || actualY + wh > lastButtonBottom) {
-                                    lastButtonBottom = actualY + wh;
+                    if (minX != null) baseX = minX;
+                    if (minY != null) baseY = minY;
+
+                    // Second pass: mark occupied grid cells
+                    for (Object w : widgetsList) {
+                        if (w instanceof dev.emi.emi.api.widget.Widget widget) {
+                            dev.emi.emi.api.widget.Bounds b = widget.getBounds();
+                            if (b != null && b.x() >= grpW - 4 && b.width() <= 16 && b.height() <= 16) {
+                                int col = Math.max(0, (int) Math.round((b.x() - baseX) / 14.0));
+                                int row = Math.max(0, (int) Math.round((b.y() - baseY) / 14.0));
+                                if (col < 10 && row < 10) {
+                                    occupied[col][row] = true;
                                 }
                             }
-                        } catch (Throwable ignored) {}
+                        }
                     }
                 }
             }
 
-            int btnY;
-            if (lastButtonBottom != null && lastButtonBottom > screenY) {
-                // Dock directly below the last EMI button ('+' button) with 1px gap
-                btnY = lastButtonBottom + 1;
-            } else if (grpYF != null) {
-                int grpY = grpYF.getInt(group);
-                btnY = (grpY >= screenY ? grpY : screenY + grpY) + 39;
-            } else {
-                btnY = screenY + 41;
+            int maxRows = Math.max(1, (grpH - baseY + 2) / 14);
+
+            int chosenCol = 0;
+            int chosenRow = 0;
+            boolean found = false;
+
+            // Search for first free slot in column-major order (fill col 0 first, then col 1, etc.)
+            for (int c = 0; c < 10 && !found; c++) {
+                for (int r = 0; r < maxRows; r++) {
+                    if (!occupied[c][r]) {
+                        chosenCol = c;
+                        chosenRow = r;
+                        found = true;
+                        break;
+                    }
+                }
             }
+
+            int btnRelX = baseX + chosenCol * 14;
+            int btnRelY = baseY + chosenRow * 14;
+
+            int btnX = grpX + btnRelX;
+            if (btnX + 13 > screenGuiW) {
+                btnX = grpX + grpW - 13 - chosenCol * 14;
+            }
+
+            int btnY = grpY + btnRelY;
 
             return new RecipeButtonTarget(recipe, btnX, btnY, 12, 12);
         } catch (Throwable t) {
@@ -132,10 +165,22 @@ public class CalcBoardEmiOverlay {
 
                     boolean hover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
 
-                    // Draw button matched to EMI dark theme style
-                    graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, hover ? 0xFF3E5A8A : 0xEE1E2430);
-                    graphics.renderOutline(btnX, btnY, btnW, btnH, hover ? 0xFF55AAFF : 0xFF3D4B66);
-                    graphics.drawCenteredString(font, "⚡", btnX + btnW / 2, btnY + 2, hover ? 0xFFFFFF55 : 0xFFAAAAAA);
+                    // Draw button matched to EMI dark theme style & 3D bevel
+                    graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, hover ? 0xFF3D4654 : 0xFF2A2E38);
+
+                    // Top & Left highlight (EMI style 3D border)
+                    graphics.fill(btnX, btnY, btnX + btnW, btnY + 1, hover ? 0xFF657595 : 0xFF424B5D);
+                    graphics.fill(btnX, btnY, btnX + 1, btnY + btnH, hover ? 0xFF657595 : 0xFF424B5D);
+
+                    // Bottom & Right shadow
+                    graphics.fill(btnX, btnY + btnH - 1, btnX + btnW, btnY + btnH, hover ? 0xFF1E232B : 0xFF14171E);
+                    graphics.fill(btnX + btnW - 1, btnY, btnX + btnW, btnY + btnH, hover ? 0xFF1E232B : 0xFF14171E);
+
+                    // Centered Lightning Icon
+                    int textW = font.width("⚡");
+                    int tx = btnX + (btnW - textW) / 2;
+                    int ty = btnY + (btnH - 8) / 2;
+                    graphics.drawString(font, "⚡", tx, ty, hover ? 0xFFFFFF55 : 0xFFB0B8C8, false);
 
                     if (hover) {
                         graphics.renderTooltip(font, List.of(
