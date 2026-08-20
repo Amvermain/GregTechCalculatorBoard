@@ -8,6 +8,44 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.1] - 2026-08-20
+
+### Added
+- **Multiplayer Shared Team Workspace Architecture (`RFC-001`)**:
+  - **Full Client-Server Synchronization**: Introduced bidirectional network protocol (`C2S`/`S2C`) enabling real-time collaboration on shared factory design flowcharts across multiplayer servers.
+  - **Pluggable Multi-Team Provider Backend (`ITeamProvider`, `TeamProviderRegistry`)**:
+    - Full soft-dependency integration with **FTB Teams** via safe runtime reflection.
+    - Automatic fallback support for **Vanilla Scoreboard Teams** and standalone world workspaces.
+  - **Granular Per-Page Edit Locks & Heartbeat (`WorkspaceLockManager`, `S2CLockResultPacket`)**:
+    - Automatic edit lock acquisition upon canvas/machine interactions to prevent concurrent editing collisions.
+    - Locks automatically release upon switching page tabs, closing the GUI, or after timeout expiration.
+  - **Live Teammate Presence & Cursor Tracking (`S2CBroadcastPresencePacket`)**:
+    - Real-time display of active teammates, their currently viewed page tabs, and presence indicators.
+  - **Seamless Frictionless Auto-Sync (Google Docs/Figma Style)**:
+    - 3-second inactivity debounced auto-saving combined with immediate commit on page navigation or screen exit.
+    - Server-side commit squashing in `TeamWorkspaceData` to keep history logs concise and clean.
+  - **Save History & Personal Forking (`RecentSavesDialog`)**:
+    - View revision history logs and fork/restore past team revisions directly into personal board tabs with full node and connection graph cloning.
+  - **Administrative Page Deletion Protection (`C2SDeleteTeamPagePacket`)**:
+    - Deletion of team pages restricted to **Team Owners, Officers, and Server Admins (OPs)**.
+    - Protected last remaining page from deletion to ensure design integrity.
+- **Singleplayer Game Pause Toggle (`BoardScreen`, `BoardManager`, `ToolbarWidget`)**:
+  - Added an interactive `[⏸ Pause: ON]` / `[▶ Pause: OFF]` toggle button on the singleplayer toolbar (`isPauseScreen` dynamic integration).
+  - Allows players to freely choose between pausing the world while calculating complex lines or letting factory automation run in background.
+
+### Changed
+- **Adaptive Compact Header Layout (`BoardScreen`, `WorkspaceTabBarWidget`, `PageTabBarWidget`)**:
+  - Automatically hides team collaboration top bars in singleplayer or non-modded servers to preserve maximum canvas workspace.
+  - Cleaned up redundant manual save buttons in favor of seamless background auto-sync.
+- **Silent Background Collaboration Sync**:
+  - Removed intrusive toast notifications during routine background syncs and lock state transitions while keeping critical conflict alerts.
+
+### Fixed
+- **i18n & Modal Formatting Parity**:
+  - Completed 100% key parity and formatting token alignment across `en_us.json` and `ko_kr.json` (336 translation keys).
+
+---
+
 ## [1.0.6] - 2026-08-20
 
 ### Added
