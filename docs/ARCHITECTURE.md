@@ -1,5 +1,10 @@
 # GregTech Calculator Board - Architecture & Developer Guide
 
+> 📘 **Detailed Code Specifications**:
+> * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](file:///e:/Dev/modding/minecraft/GregTechCalculatorBoard/docs/ko_kr/CODE_SPECIFICATION.md)
+> * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](file:///e:/Dev/modding/minecraft/GregTechCalculatorBoard/docs/en_us/CODE_SPECIFICATION.md)
+> Full v2.0.0 architecture specs, 5 graph algorithms, `CategoryCapabilityMatrix`, and multiplayer concurrency lock protocols are available above.
+
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and 1.7.10 backporting targets for GregTech Calculator Board.
 
 ---

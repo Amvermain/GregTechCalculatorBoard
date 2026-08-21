@@ -147,6 +147,16 @@ cd GregTechCalculatorBoard
 
 ---
 
+## 개발자 & 아키텍처 문서
+
+- **[세부 코드 명세서 (한국어)](docs/ko_kr/CODE_SPECIFICATION.md)**: 전체 시스템 아키텍처, 5대 그래프 알고리즘, 수학 공식, `CategoryCapabilityMatrix`, 멀티플레이어 동시성 락 프로토콜 및 영속화 스키마 수록.
+- **[세부 코드 명세서 (영문)](docs/en_us/CODE_SPECIFICATION.md)**: Full system architecture, 5 graph algorithms, overclocking formulas, and persistence schemas.
+- **[영문 아키텍처 가이드 (Architecture Guide)](docs/ARCHITECTURE.md)**: 내부 엔진 구조 및 렌더링 파이프라인.
+- **[v2.0 개발 계획서 (Development Plan)](docs/DEVELOPMENT_PLAN_V2.md)**: 멀티플레이어 및 FTB Teams 연동 로드맵.
+- **[RFC-V2-005 (CategoryCapabilityMatrix)](docs/RFC_V2_CATEGORY_CAPABILITY_MATRIX.md)**: 결정론적 기계/애드온 수용 능력 사전 분석 시스템 명세.
+
+---
+
 ## Special Thanks (감사의 말)
 
 - **The Reel One** - 계산기 보드의 사용성 개선을 위한 UX/UI 피드백, 디자인 제안 및 지속적인 테스트를 지원해 주셨습니다.

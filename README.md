@@ -147,6 +147,16 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.0.0-alpha.2
 
 ---
 
+## Developer & Architecture Documentation
+
+- **[Detailed Code Specification (Korean)](docs/ko_kr/CODE_SPECIFICATION.md)**: 전체 시스템 아키텍처, 5대 그래프 알고리즘, 오버클럭 연산 공식, `CategoryCapabilityMatrix`, 멀티플레이 동시성 락 프로토콜 및 영속화 스키마.
+- **[Detailed Code Specification (English)](docs/en_us/CODE_SPECIFICATION.md)**: Full system architecture, 5 graph algorithms, overclocking formulas, `CategoryCapabilityMatrix`, multiplayer concurrency lock protocol, and SavedData persistence schemas.
+- **[Architecture & Developer Guide (English)](docs/ARCHITECTURE.md)**: Internal solver engine and canvas rendering pipeline.
+- **[v2.0 Development Plan](docs/DEVELOPMENT_PLAN_V2.md)**: Multiplayer and FTB Teams roadmap.
+- **[RFC-V2-005 (CategoryCapabilityMatrix)](docs/RFC_V2_CATEGORY_CAPABILITY_MATRIX.md)**: Deterministic recipe capability matrix RFC.
+
+---
+
 ## Special Thanks
 
 - **The Reel One** - For providing UX/UI feedback, design suggestions, and community testing.
