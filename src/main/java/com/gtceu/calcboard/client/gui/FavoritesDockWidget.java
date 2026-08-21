@@ -43,11 +43,14 @@ public class FavoritesDockWidget {
     private EmiRecipe hoveredFlyoutRecipe = null;
 
     private static final int DOCK_X = 8;
-    private static final int DOCK_Y = 52;
     private static final int EXPANDED_WIDTH = 145;
     private static final int COLLAPSED_WIDTH = 95;
     private static final int HEADER_HEIGHT = 18;
     private static final int ROW_HEIGHT = 22;
+
+    public int getDockY() {
+        return screen.getHeaderBottomY() + 6;
+    }
 
     private static final int SUB_WIDTH = 185;
     private static final int SUB_ROW_HEIGHT = 28;
@@ -129,6 +132,17 @@ public class FavoritesDockWidget {
             var rm = EmiApi.getRecipeManager();
             if (rm != null) {
                 var filterConfig = com.gtceu.calcboard.client.gui.search.RecipeFilterConfig.getInstance();
+                EmiRecipe defaultRecipe = null;
+                try {
+                    for (var stack : fav.getEmiStacks()) {
+                        EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(stack);
+                        if (def != null) {
+                            defaultRecipe = def;
+                            break;
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
                 for (var stack : fav.getEmiStacks()) {
                     var outRecipes = rm.getRecipesByOutput(stack);
                     if (outRecipes != null && !outRecipes.isEmpty()) {
@@ -145,6 +159,12 @@ public class FavoritesDockWidget {
                         }
                     }
                 }
+
+                // If EMI Default Recipe is set, prioritize it at the top (index 0)
+                if (defaultRecipe != null && list.contains(defaultRecipe)) {
+                    list.remove(defaultRecipe);
+                    list.add(0, defaultRecipe);
+                }
             }
         }
         return list;
@@ -160,41 +180,42 @@ public class FavoritesDockWidget {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 500);
 
+        int dockY = getDockY();
         String countDisplay = loading ? Component.translatable("gui.gtcalcboard.favorites_dock.loading").getString() : String.valueOf(count);
 
         if (!expanded) {
             // Collapsed Tab Button [⭐ Favorites (N / Loading...) ▶]
-            boolean hovered = mouseX >= DOCK_X && mouseX <= DOCK_X + COLLAPSED_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + HEADER_HEIGHT;
+            boolean hovered = mouseX >= DOCK_X && mouseX <= DOCK_X + COLLAPSED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT;
             int bg = hovered ? 0xEE1E293B : 0xAA0F172A;
             int border = hovered ? 0xFFFFD700 : (loading ? 0xFFF59E0B : 0xFF475569);
 
-            graphics.fill(DOCK_X, DOCK_Y, DOCK_X + COLLAPSED_WIDTH, DOCK_Y + HEADER_HEIGHT, bg);
-            graphics.renderOutline(DOCK_X, DOCK_Y, COLLAPSED_WIDTH, HEADER_HEIGHT, border);
+            graphics.fill(DOCK_X, dockY, DOCK_X + COLLAPSED_WIDTH, dockY + HEADER_HEIGHT, bg);
+            graphics.renderOutline(DOCK_X, dockY, COLLAPSED_WIDTH, HEADER_HEIGHT, border);
 
             String title = "⭐ " + Component.translatable("gui.gtcalcboard.favorites").getString() + " (" + countDisplay + ") ▶";
-            graphics.drawString(font, font.plainSubstrByWidth(title, COLLAPSED_WIDTH - 6), DOCK_X + 6, DOCK_Y + 5, hovered ? 0xFFFFD700 : (loading ? 0xFFFDE047 : 0xFFE2E8F0), false);
+            graphics.drawString(font, font.plainSubstrByWidth(title, COLLAPSED_WIDTH - 6), DOCK_X + 6, dockY + 5, hovered ? 0xFFFFD700 : (loading ? 0xFFFDE047 : 0xFFE2E8F0), false);
         } else {
             // Expanded Dock Panel
-            int maxH = Math.min(240, screen.height - DOCK_Y - 60);
+            int maxH = Math.min(240, screen.height - dockY - 60);
             int contentH = maxH - HEADER_HEIGHT;
 
             int bg = 0xF00F172A;
             int border = loading ? 0xFFF59E0B : 0xFF38BDF8;
 
-            graphics.fill(DOCK_X, DOCK_Y, DOCK_X + EXPANDED_WIDTH, DOCK_Y + maxH, bg);
-            graphics.renderOutline(DOCK_X, DOCK_Y, EXPANDED_WIDTH, maxH, border);
+            graphics.fill(DOCK_X, dockY, DOCK_X + EXPANDED_WIDTH, dockY + maxH, bg);
+            graphics.renderOutline(DOCK_X, dockY, EXPANDED_WIDTH, maxH, border);
 
             // Header [⭐ Favorites (N / Loading...) ◀]
-            boolean headerHover = mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + HEADER_HEIGHT;
-            graphics.fill(DOCK_X + 1, DOCK_Y + 1, DOCK_X + EXPANDED_WIDTH - 1, DOCK_Y + HEADER_HEIGHT, headerHover ? 0xFF1E293B : 0xFF172033);
-            graphics.fill(DOCK_X + 1, DOCK_Y + HEADER_HEIGHT, DOCK_X + EXPANDED_WIDTH - 1, DOCK_Y + HEADER_HEIGHT + 1, 0xFF334155);
+            boolean headerHover = mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT;
+            graphics.fill(DOCK_X + 1, dockY + 1, DOCK_X + EXPANDED_WIDTH - 1, dockY + HEADER_HEIGHT, headerHover ? 0xFF1E293B : 0xFF172033);
+            graphics.fill(DOCK_X + 1, dockY + HEADER_HEIGHT, DOCK_X + EXPANDED_WIDTH - 1, dockY + HEADER_HEIGHT + 1, 0xFF334155);
 
             String title = "⭐ " + Component.translatable("gui.gtcalcboard.favorites").getString() + " (" + countDisplay + ")";
-            graphics.drawString(font, font.plainSubstrByWidth(title, EXPANDED_WIDTH - 24), DOCK_X + 6, DOCK_Y + 5, loading ? 0xFFFDE047 : 0xFFFFD700, false);
-            graphics.drawString(font, "◀", DOCK_X + EXPANDED_WIDTH - 14, DOCK_Y + 5, headerHover ? 0xFFFF5555 : 0xFF94A3B8, false);
+            graphics.drawString(font, font.plainSubstrByWidth(title, EXPANDED_WIDTH - 24), DOCK_X + 6, dockY + 5, loading ? 0xFFFDE047 : 0xFFFFD700, false);
+            graphics.drawString(font, "◀", DOCK_X + EXPANDED_WIDTH - 14, dockY + 5, headerHover ? 0xFFFF5555 : 0xFF94A3B8, false);
 
             // Content Area
-            int listY = DOCK_Y + HEADER_HEIGHT + 2;
+            int listY = dockY + HEADER_HEIGHT + 2;
             int listH = contentH - 4;
 
             int subX = DOCK_X + EXPANDED_WIDTH + 3;
@@ -208,16 +229,16 @@ public class FavoritesDockWidget {
             int[] previewBounds = (activeEmiRecipe != null) ? com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer.calculateEmiPreviewBounds(activeEmiRecipe, previewAnchorX, activeEmiRowY, screenW, screenH) : null;
 
             boolean mouseInPreview = previewBounds != null && mouseX >= previewBounds[0] && mouseX <= previewBounds[0] + previewBounds[2] && mouseY >= previewBounds[1] && mouseY <= previewBounds[1] + previewBounds[3];
-            boolean mouseInSub = activeFlyoutFavorite != null && mouseX >= subX && mouseX <= subX + SUB_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + maxH;
-            boolean mouseInMain = mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + maxH;
+            int totalDockRight = (activeFlyoutFavorite != null) ? (subX + SUB_WIDTH) : (DOCK_X + EXPANDED_WIDTH);
+            boolean mouseInDockArea = mouseX >= DOCK_X && mouseX <= totalDockRight && mouseY >= dockY && mouseY <= dockY + maxH;
 
             // Seamless bridge between Sub Panel and Preview Panel so fast/slow cursor movement doesn't drop hover
             boolean mouseInBridge = false;
             if (activeFlyoutFavorite != null && previewBounds != null) {
                 int bridgeLeft = subX + SUB_WIDTH;
                 int bridgeRight = previewBounds[0];
-                int bridgeTop = Math.min(DOCK_Y, previewBounds[1]);
-                int bridgeBottom = Math.max(DOCK_Y + maxH, previewBounds[1] + previewBounds[3]);
+                int bridgeTop = Math.min(dockY, previewBounds[1]);
+                int bridgeBottom = Math.max(dockY + maxH, previewBounds[1] + previewBounds[3]);
                 mouseInBridge = (mouseX >= bridgeLeft && mouseX <= bridgeRight && mouseY >= bridgeTop && mouseY <= bridgeBottom);
             }
 
@@ -259,7 +280,7 @@ public class FavoritesDockWidget {
                                 activeFlyoutRecipes = findRecipesForFavorite(fav);
                                 subScrollY = 0;
                                 activePreviewRecipe = !activeFlyoutRecipes.isEmpty() ? activeFlyoutRecipes.get(0) : null;
-                                activePreviewRowY = DOCK_Y + HEADER_HEIGHT + 2;
+                                activePreviewRowY = dockY + HEADER_HEIGHT + 2;
                             }
                         }
 
@@ -295,14 +316,14 @@ public class FavoritesDockWidget {
                 }
 
                 // Check if mouse left all Main Dock, Sub Panel, Bridge, and Preview Panel
-                if (!mouseInMain && !mouseInSub && !mouseInBridge && !mouseInPreview && !isDragging) {
+                if (!mouseInDockArea && !mouseInBridge && !mouseInPreview && !isDragging) {
                     closeFlyout();
                 }
             }
 
             // Render Sub-Flyout Recipe Selector Panel
             if (activeFlyoutFavorite != null && !activeFlyoutRecipes.isEmpty()) {
-                renderSubFlyout(graphics, font, mouseX, mouseY, subX, DOCK_Y, maxH, mouseInPreview || mouseInBridge);
+                renderSubFlyout(graphics, font, mouseX, mouseY, subX, dockY, maxH, mouseInPreview || mouseInBridge);
             }
         }
 
@@ -357,9 +378,22 @@ public class FavoritesDockWidget {
                     activePreviewRowY = curY;
                 }
 
+                boolean isDefault = false;
+                try {
+                    if (activeFlyoutFavorite != null && !activeFlyoutFavorite.getEmiStacks().isEmpty()) {
+                        EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(activeFlyoutFavorite.getEmiStacks().get(0));
+                        if (def != null && def.equals(recipe)) {
+                            isDefault = true;
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
                 if (rowHover || (previewActive && isSelected)) {
                     graphics.fill(subX + 4, curY, subX + SUB_WIDTH - 4, curY + SUB_ROW_HEIGHT - 2, 0xFF1E293B);
                     graphics.renderOutline(subX + 4, curY, SUB_WIDTH - 8, SUB_ROW_HEIGHT - 2, 0xFFFFD700);
+                } else if (isDefault) {
+                    graphics.fill(subX + 4, curY, subX + SUB_WIDTH - 4, curY + SUB_ROW_HEIGHT - 2, 0xFF1B2436);
+                    graphics.renderOutline(subX + 4, curY, SUB_WIDTH - 8, SUB_ROW_HEIGHT - 2, 0xFF38BDF8);
                 } else {
                     graphics.fill(subX + 4, curY, subX + SUB_WIDTH - 4, curY + SUB_ROW_HEIGHT - 2, 0xFF131C2E);
                 }
@@ -369,7 +403,8 @@ public class FavoritesDockWidget {
 
                 // Recipe / Machine Name Line
                 String machineName = getRecipeWorkstationName(recipe);
-                graphics.drawString(font, font.plainSubstrByWidth(machineName, SUB_WIDTH - 30), subX + 26, curY + 3, (rowHover || (previewActive && isSelected)) ? 0xFFFFD700 : 0xFFFFFFFF, false);
+                String label = isDefault ? ("§6★ §r" + machineName) : machineName;
+                graphics.drawString(font, font.plainSubstrByWidth(label, SUB_WIDTH - 30), subX + 26, curY + 3, (rowHover || (previewActive && isSelected)) ? 0xFFFFD700 : (isDefault ? 0xFF38BDF8 : 0xFFFFFFFF), false);
 
                 // Specs Line (Time / EU/t)
                 RecipeNode node = EmiRecipeConverter.convert(recipe);
@@ -537,8 +572,9 @@ public class FavoritesDockWidget {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int dockY = getDockY();
         if (!expanded) {
-            if (button == 0 && mouseX >= DOCK_X && mouseX <= DOCK_X + COLLAPSED_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + HEADER_HEIGHT) {
+            if (button == 0 && mouseX >= DOCK_X && mouseX <= DOCK_X + COLLAPSED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {
                 toggle();
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
@@ -548,10 +584,10 @@ public class FavoritesDockWidget {
             return false;
         }
 
-        int maxH = Math.min(240, screen.height - DOCK_Y - 60);
+        int maxH = Math.min(240, screen.height - dockY - 60);
 
         // Header click -> Toggle Collapsed
-        if (button == 0 && mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + HEADER_HEIGHT) {
+        if (button == 0 && mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {
             toggle();
             Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
@@ -596,7 +632,7 @@ public class FavoritesDockWidget {
 
         // Sub-Flyout interaction
         if (activeFlyoutFavorite != null && !activeFlyoutRecipes.isEmpty()) {
-            int subListY = DOCK_Y + HEADER_HEIGHT + 2;
+            int subListY = dockY + HEADER_HEIGHT + 2;
             int subListH = maxH - HEADER_HEIGHT - 4;
             if (mouseX >= subX && mouseX <= subX + SUB_WIDTH && mouseY >= subListY && mouseY <= subListY + subListH) {
                 int curY = subListY - (int) subScrollY;
@@ -616,7 +652,7 @@ public class FavoritesDockWidget {
         }
 
         // Main Dock content list
-        int listY = DOCK_Y + HEADER_HEIGHT + 2;
+        int listY = dockY + HEADER_HEIGHT + 2;
         int listH = maxH - HEADER_HEIGHT - 4;
         if (mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= listY && mouseY <= listY + listH) {
             List<EmiFavorite> favorites = getFavorites();
@@ -765,12 +801,13 @@ public class FavoritesDockWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!expanded) return false;
-        int maxH = Math.min(240, screen.height - DOCK_Y - 60);
+        int dockY = getDockY();
+        int maxH = Math.min(240, screen.height - dockY - 60);
 
         // Scroll Sub-Flyout if cursor is on it
         int subX = DOCK_X + EXPANDED_WIDTH + 3;
         if (activeFlyoutFavorite != null && !activeFlyoutRecipes.isEmpty()) {
-            if (mouseX >= subX && mouseX <= subX + SUB_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + maxH) {
+            if (mouseX >= subX && mouseX <= subX + SUB_WIDTH && mouseY >= dockY && mouseY <= dockY + maxH) {
                 if (subMaxScrollY > 0) {
                     subScrollY = Math.max(0, Math.min(subMaxScrollY, subScrollY - delta * SUB_ROW_HEIGHT));
                     return true;
@@ -779,7 +816,7 @@ public class FavoritesDockWidget {
         }
 
         // Scroll Main Dock
-        if (mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= DOCK_Y && mouseY <= DOCK_Y + maxH) {
+        if (mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + maxH) {
             if (maxScrollY > 0) {
                 scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * ROW_HEIGHT));
                 return true;

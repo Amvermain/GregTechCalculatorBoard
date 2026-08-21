@@ -55,10 +55,14 @@ public class ClientWorkspaceState {
 
     public boolean isCollaborationEnabled() {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc == null || mc.hasSingleplayerServer()) {
+        if (mc == null) {
             return false;
         }
-        return serverSupported && mc.getCurrentServer() != null;
+        if (mc.hasSingleplayerServer()) {
+            var singleServer = mc.getSingleplayerServer();
+            return singleServer != null && singleServer.isPublished();
+        }
+        return serverSupported && mc.getConnection() != null;
     }
 
     public WorkspaceMode getCurrentMode() {
@@ -250,6 +254,16 @@ public class ClientWorkspaceState {
         if (presence != null) {
             activePresence.addAll(presence);
         }
+    }
+
+    public String resolvePlayerName(UUID uuid) {
+        if (uuid == null) return "Teammate";
+        for (S2CBroadcastPresencePacket.MemberPresence m : activePresence) {
+            if (uuid.equals(m.getPlayerUUID()) && m.getPlayerName() != null && !m.getPlayerName().isEmpty()) {
+                return m.getPlayerName();
+            }
+        }
+        return "Teammate";
     }
 
     public boolean doesHoldLock(String pageId) {

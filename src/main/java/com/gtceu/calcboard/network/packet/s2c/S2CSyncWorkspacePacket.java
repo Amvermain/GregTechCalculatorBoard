@@ -50,11 +50,13 @@ public class S2CSyncWorkspacePacket {
             int revision = buf.readVarInt();
             boolean hasLock = buf.readBoolean();
             UUID lockHolder = hasLock ? buf.readUUID() : null;
+            String lockHolderName = hasLock ? buf.readUtf(256) : "";
             long lockExpires = hasLock ? buf.readLong() : 0L;
             byte[] data = buf.readByteArray();
 
             TeamWorkspacePage p = new TeamWorkspacePage(pageId, pageTitle, revision, data);
             p.setLockHolderUUID(lockHolder);
+            p.setLockHolderName(lockHolderName);
             p.setLockExpiresTimestamp(lockExpires);
             this.pages.add(p);
         }
@@ -90,6 +92,7 @@ public class S2CSyncWorkspacePacket {
             buf.writeBoolean(isLocked);
             if (isLocked) {
                 buf.writeUUID(p.getLockHolderUUID());
+                buf.writeUtf(p.getLockHolderName() != null ? p.getLockHolderName() : "");
                 buf.writeLong(p.getLockExpiresTimestamp());
             }
             byte[] data = p.getCompressedGraphData();

@@ -8,6 +8,42 @@
 
 ---
 
+## [2.0.0-alpha.5] - 2026-08-22
+
+### 신규 기능 (Added)
+- **EMI 기본 레시피(Default Recipe) 우선 정렬 및 아이콘 표시 (`FavoritesDockWidget`, `RecipeSearchDialog`)**:
+  - EMI에서 설정한 기본 레시피(`Ctrl + 좌클릭`)를 즐겨찾기 서브 메뉴 및 검색 결과에서 우선 정렬되도록 반영.
+  - 검색창 및 즐겨찾기 메뉴에서 기본 레시피에 별표(`★`) 배지와 하이라이트 테두리 적용.
+- **공백 포함 카테고리 검색 지원 (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - `[gas turbine]`, `[large chemical reactor]` 등 공백이 포함된 대괄호 카테고리 검색 지원.
+  - 괄호 없이 검색어를 입력해도 카테고리 구문 일치 항목이 상단에 배치되도록 개선.
+- **보드 열람 팀원 현황(Presence) 및 툴팁 표시 (`TeamPresenceTracker`, `WorkspaceTabBarWidget`)**:
+  - 보드를 열고 있는 팀원 수를 상단에 표시하고, 마우스 호버 시 팀원 닉네임과 열람 중인 탭 페이지를 툴팁으로 안내.
+  - 개인 보드와 팀 보드 탭 전환 시 열람 상태가 갱신되도록 연동.
+
+### 개선 및 버그 수정 (Fixed & Changed)
+- **멀티플레이 팀 워크스페이스 격리 및 LAN 지원 (`FTBTeamsProvider`, `ClientWorkspaceState`)**:
+  - FTB Teams 파티 및 개인 플레이어의 팀 UUID를 분리하여 타 팀 워크스페이스와의 간섭 방지.
+  - LAN 환경(`IntegratedServer.isPublished()`)에서 협업 워크스페이스 동기화 지원.
+- **편집 잠금 상태(Lock Badge) 갱신 및 플레이어 이름 표시 (`WorkspaceTabBarWidget`, `BoardScreen`)**:
+  - 상단 잠금 배지가 현재 활성 탭 페이지의 상태를 추적하도록 수정.
+  - 잠금 배지 및 알림에 UUID 대신 플레이어 닉네임(`Locked by <이름>`)이 표시되도록 개선.
+- **팀 페이지 삭제 권한 검증 (`FTBTeamsProvider`, `TeamProviderRegistry`)**:
+  - FTB Teams 랭크(`OWNER`, `OFFICER`) 및 LAN 호스트 여부를 확인하여 팀 관리자 권한을 가진 플레이어만 팀 페이지를 삭제할 수 있도록 서버 검증 추가.
+- **즐겨찾기 독 로딩 처리 개선 (`FavoritesDockWidget`, `RecipeSearchDialog`)**:
+  - 즐겨찾기 독 로딩을 전체 검색 인덱싱과 분리하여 EMI 로딩 완료 시 즉시 표시되도록 개선.
+  - 백그라운드 인덱싱 대기 로직을 정규 EMI API 확인 방식으로 단순화.
+- **상단 메뉴 빈 영역 조작 및 툴팁 위치 보정 (`CanvasInteractionHandler`, `WorkspaceTabBarWidget`)**:
+  - 상단 헤더 및 툴바의 빈 공간을 클릭/드래그할 때 캔버스 조작이 가능하도록 처리.
+  - 폰트 렌더링 글리치(`\uFE0F`) 수정 및 상단 툴팁이 화면 위로 잘리지 않도록 위치 보정.
+- **검색 결과 0건 시 프리즈 문제 수정 (`RecipeSearchDialog`)**:
+  - 검색 결과가 없을 때 `render()`에서 검색이 반복 호출되던 문제 수정.
+  - 병렬 처리 구간에서 스레드 안전하지 않은 호출을 분리하고 검색 디바운스 적용.
+- **EMI 오버레이 핸들러 정리 (`CalcBoardEmiOverlayHandler`)**:
+  - 사용되지 않는 EMI 오버레이 핸들러 클래스 제거.
+
+---
+
 ## [2.0.0-alpha.4] - 2026-08-21
 
 ### 신규 기능 (Added)

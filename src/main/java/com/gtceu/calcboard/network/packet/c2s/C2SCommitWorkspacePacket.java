@@ -68,7 +68,7 @@ public class C2SCommitWorkspacePacket {
             if (player == null) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
-            if (playerTeamId == null) {
+            if (playerTeamId == null || !TeamProviderRegistry.getInstance().canPlayerEdit(player, playerTeamId)) {
                 NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(403, "gui.gtcalcboard.error.access_denied"));
                 return;
             }

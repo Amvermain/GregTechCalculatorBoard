@@ -121,6 +121,11 @@ public class WorkspaceLockManager {
         return false;
     }
 
+    public boolean isPageLocked(UUID teamId, String pageId) {
+        LockInfo lock = getLock(teamId, pageId);
+        return lock != null && !lock.isExpired();
+    }
+
     public LockInfo getLock(UUID teamId, String pageId) {
         if (teamId == null) return null;
         String key = getLockKey(teamId, pageId);

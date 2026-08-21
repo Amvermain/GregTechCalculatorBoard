@@ -203,17 +203,8 @@ public class ToolbarWidget {
         int tbH = 18;
         int tbW = width - 16;
 
-        // Toolbar background
-        graphics.fill(tbX, tbY, tbX + tbW, tbY + tbH, 0xEE1E222B);
-        graphics.renderOutline(tbX, tbY, tbW, tbH, 0xFF3D4455);
-
-        // Fixed title on the left
         String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
-        graphics.drawString(font, titleStr, 14, tbY + 5, 0xFFFFFFFF, false);
-
         int titleRight = 14 + font.width(titleStr) + 8;
-        int scrollAreaX = titleRight;
-        int scrollAreaW = (tbX + tbW) - scrollAreaX - 4;
 
         List<ToolbarButtonDef> buttons = buildButtons(font);
         int totalBtnW = 0;
@@ -221,8 +212,19 @@ public class ToolbarWidget {
             totalBtnW += btn.width + 3;
         }
 
+        int scrollAreaX = titleRight;
+        int scrollAreaW = (tbX + tbW) - scrollAreaX - 4;
         maxScrollX = Math.max(0, totalBtnW - scrollAreaW);
         scrollX = Math.max(0, Math.min(maxScrollX, scrollX));
+
+        int actualToolbarW = (maxScrollX > 0) ? tbW : Math.min(tbW, (titleRight + totalBtnW) - tbX + 4);
+
+        // Toolbar background
+        graphics.fill(tbX, tbY, tbX + actualToolbarW, tbY + tbH, 0xEE1E222B);
+        graphics.renderOutline(tbX, tbY, actualToolbarW, tbH, 0xFF3D4455);
+
+        // Fixed title on the left
+        graphics.drawString(font, titleStr, 14, tbY + 5, 0xFFFFFFFF, false);
 
         graphics.enableScissor(scrollAreaX, tbY + 1, tbX + tbW - 2, tbY + tbH - 1);
 
@@ -286,6 +288,21 @@ public class ToolbarWidget {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int tbY = screen.getToolbarY();
         if (mouseY < tbY - 2 || mouseY > tbY + 20 || mouseX < 8 || mouseX > screen.width - 8) {
+            return false;
+        }
+
+        Font font = Minecraft.getInstance().font;
+        String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
+        int titleRight = 14 + font.width(titleStr) + 8;
+        List<ToolbarButtonDef> buttons = buildButtons(font);
+        int totalBtnW = 0;
+        for (ToolbarButtonDef btn : buttons) {
+            totalBtnW += btn.width + 3;
+        }
+
+        int contentRight = titleRight + totalBtnW - (int) scrollX;
+        // If mouse is beyond all buttons and toolbar doesn't overflow, let click pass through to canvas
+        if (maxScrollX <= 0 && mouseX > contentRight + 4) {
             return false;
         }
 

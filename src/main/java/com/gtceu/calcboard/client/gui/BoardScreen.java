@@ -201,11 +201,17 @@ public class BoardScreen extends Screen {
         this.recentSavesDialog = new RecentSavesDialog(this);
         rebuildWidgets();
 
-        if (com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode()) {
+        if (com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled()) {
             UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, "page_main"));
+            String pageId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getActiveTeamPageId();
+            boolean isTeamMode = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode();
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, pageId, isTeamMode));
+            if (isTeamMode) {
+                com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, pageId != null ? pageId : "page_main"));
+            }
         }
 
+        RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
         this.summaryOverlay.setCollapsed(BoardManager.getInstance().isSummaryOverlayCollapsed());
         this.hotkeyHudWidget.setExpanded(BoardManager.getInstance().isHotkeyHudExpanded());
         this.favoritesDockWidget.setExpanded(BoardManager.getInstance().isFavoritesDockExpanded());
@@ -307,6 +313,7 @@ public class BoardScreen extends Screen {
     }
 
     private long lastEditTimestamp = 0;
+    private int presencePingTicks = 0;
 
     public void markTeamDirty() {
         com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
@@ -332,7 +339,9 @@ public class BoardScreen extends Screen {
 
         com.gtceu.calcboard.server.storage.TeamWorkspacePage page = state.getRemotePage(activePageId);
         if (page != null && page.isLocked() && !state.doesHoldLock(activePageId)) {
-            String lockHolder = page.getLockHolderUUID() != null ? page.getLockHolderUUID().toString().substring(0, 8) : "Player";
+            String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
+                ? page.getLockHolderName()
+                : state.resolvePlayerName(page.getLockHolderUUID());
             com.gtceu.calcboard.client.gui.BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
             Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.VILLAGER_NO, 1.0F)
@@ -351,6 +360,15 @@ public class BoardScreen extends Screen {
     public void tick() {
         super.tick();
         com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isCollaborationEnabled() && state.isTeamMode()) {
+            presencePingTicks++;
+            if (presencePingTicks >= 40) { // Every 2 seconds
+                presencePingTicks = 0;
+                com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                    new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), true)
+                );
+            }
+        }
         if (state.isTeamMode()) {
             String activePageId = state.getActiveTeamPageId();
             if (state.isPageDirty(activePageId) && lastEditTimestamp > 0 && (System.currentTimeMillis() - lastEditTimestamp > 3000)) {
@@ -593,6 +611,7 @@ public class BoardScreen extends Screen {
             && (recentSavesDialog == null || !recentSavesDialog.isVisible())) {
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
             favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
+            workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
         }
 
         super.render(graphics, mouseX, mouseY, partialTicks);
@@ -900,6 +919,11 @@ public class BoardScreen extends Screen {
     @Override
     public void onClose() {
         com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isCollaborationEnabled() && state.isTeamMode()) {
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false)
+            );
+        }
         if (state.isTeamMode()) {
             state.autoCommitAndRelease(this, state.getActiveTeamPageId());
         }

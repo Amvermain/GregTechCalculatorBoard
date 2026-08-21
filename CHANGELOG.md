@@ -8,6 +8,42 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.5] - 2026-08-22
+
+### Added
+- **EMI Default Recipe Prioritization & Badge (`FavoritesDockWidget`, `RecipeSearchDialog`)**:
+  - Prioritized user-set EMI Default Recipes (`Ctrl + Left Click`) at the top of favorites sub-panels and search results.
+  - Added star (`★`) badge and highlight border to Default Recipes.
+- **Category Query with Spaces Support (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Added support for bracketed category queries containing spaces, such as `[gas turbine]` and `[large chemical reactor]`.
+  - Improved ranking for exact multi-word category matches without brackets.
+- **Board Viewer Presence & Tooltip (`TeamPresenceTracker`, `WorkspaceTabBarWidget`)**:
+  - Displays count of teammates actively viewing the board with a hover tooltip listing player names and open page tabs.
+  - Updates presence state when toggling between Personal Board and Team Board tabs.
+
+### Fixed & Changed
+- **Multiplayer Team Workspace Isolation & LAN Support (`FTBTeamsProvider`, `ClientWorkspaceState`)**:
+  - Isolated team UUIDs for FTB Teams parties and solo players to prevent cross-team workspace access.
+  - Added collaboration synchronization support for LAN published worlds.
+- **Lock Badge Sync & Player Nickname Display (`WorkspaceTabBarWidget`, `BoardScreen`)**:
+  - Updated lock status badge to dynamically track the active page tab.
+  - Displays in-game player names (`Locked by <Name>`) instead of raw UUID substrings in lock badges and toasts.
+- **Team Page Deletion Permission Check (`FTBTeamsProvider`, `TeamProviderRegistry`)**:
+  - Added server-side permission checks verifying FTB Teams ranks (`OWNER`, `OFFICER`) and LAN host status before deleting team pages.
+- **Favorites Dock EMI Loading Decoupling (`FavoritesDockWidget`, `RecipeSearchDialog`)**:
+  - Decoupled Favorites Dock loading from full search cache indexing for faster rendering once EMI finishes loading.
+  - Simplified recipe caching flow using standard EMI APIs.
+- **Header Pass-Through & Tooltip Placement (`CanvasInteractionHandler`, `WorkspaceTabBarWidget`)**:
+  - Allowed canvas drag and click interactions to pass through empty regions of the top header and toolbar.
+  - Fixed Unicode font rendering glitch (`\uFE0F`) and adjusted top-bar tooltip positioning to prevent screen clipping.
+- **Search Freeze on 0 Results (`RecipeSearchDialog`)**:
+  - Fixed an issue where queries with 0 results triggered repeated searches during rendering.
+  - Isolated non-thread-safe calls from parallel streams and added search debouncing.
+- **Cleaned Up EMI Overlay Handler (`CalcBoardEmiOverlayHandler`)**:
+  - Removed unused reflection-based EMI overlay handler class.
+
+---
+
 ## [2.0.0-alpha.4] - 2026-08-21
 
 ### Added

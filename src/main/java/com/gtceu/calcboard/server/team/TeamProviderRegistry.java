@@ -95,7 +95,14 @@ public class TeamProviderRegistry {
 
     public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
         if (player == null || teamId == null) return false;
-        if (player.hasPermissions(2)) return true;
+        if (player.server != null && player.server.isSingleplayer()) {
+            if (player.server.isSingleplayerOwner(player.getGameProfile())) {
+                return true;
+            }
+        } else if (player.hasPermissions(2)) {
+            return true;
+        }
+
         for (ITeamProvider provider : providers) {
             if (provider.isAvailable()) {
                 UUID pTeam = provider.getPlayerTeamId(player);

@@ -7,10 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-/**
- * Unit tests for Core GregTech Calculations, Overclocking math, FlowGraph balance,
- * Bottleneck propagation, and Auto-Ratio algorithms.
- */
 public class CalculationTest {
 
     @Test
@@ -193,6 +189,27 @@ public class CalculationTest {
         double backRate = node.calculateOutputRates().values().iterator().next();
         Assertions.assertEquals(4.0, node.getMachineCount(), 0.001);
         Assertions.assertEquals(0.8, backRate, 0.001);
+    }
+
+    @Test
+    public void testBracketedCategoryQueryParsing() {
+        var query = com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.parseQuery("[gas turbine]");
+        Assertions.assertFalse(query.isEmpty());
+        Assertions.assertEquals(1, query.orGroups().size());
+        var terms = query.orGroups().get(0).terms();
+        Assertions.assertEquals(1, terms.size());
+        Assertions.assertEquals("gas turbine", terms.get(0).text());
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.MatchType.CATEGORY, terms.get(0).type());
+        Assertions.assertFalse(terms.get(0).negated());
+
+        var query2 = com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.parseQuery("[chemical reactor] nitrobenzene");
+        Assertions.assertFalse(query2.isEmpty());
+        var terms2 = query2.orGroups().get(0).terms();
+        Assertions.assertEquals(2, terms2.size());
+        Assertions.assertEquals("chemical reactor", terms2.get(0).text());
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.MatchType.CATEGORY, terms2.get(0).type());
+        Assertions.assertEquals("nitrobenzene", terms2.get(1).text());
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.MatchType.GENERAL, terms2.get(1).type());
     }
 
     @Test

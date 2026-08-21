@@ -7,36 +7,36 @@ import java.util.UUID;
 
 /**
  * Fallback provider when no team mod or vanilla scoreboards are active.
- * Maps players to a world-level shared workspace.
+ * Isolates each player to their own personal workspace to ensure privacy and security.
  */
 public class StandaloneFallbackProvider implements ITeamProvider {
 
-    private static final UUID GLOBAL_SHARED_TEAM_ID = UUID.nameUUIDFromBytes("gtcalcboard:global_shared_workspace".getBytes());
-
     @Override
     public UUID getPlayerTeamId(ServerPlayer player) {
-        return GLOBAL_SHARED_TEAM_ID;
+        return player != null ? player.getUUID() : null;
     }
 
     @Override
     public String getTeamDisplayName(UUID teamId) {
-        return "Shared Workspace";
+        if (teamId == null) return "Personal Workspace";
+        return "Personal (" + teamId.toString().substring(0, 8) + ")";
     }
 
     @Override
     public Set<UUID> getTeamMembers(UUID teamId) {
-        return Collections.emptySet();
+        return teamId != null ? Collections.singleton(teamId) : Collections.emptySet();
     }
 
     @Override
     public boolean canPlayerEdit(ServerPlayer player, UUID teamId) {
-        return true;
+        if (player == null || teamId == null) return false;
+        return player.getUUID().equals(teamId);
     }
 
     @Override
     public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
-        if (player == null) return false;
-        return player.hasPermissions(2) || GLOBAL_SHARED_TEAM_ID.equals(teamId);
+        if (player == null || teamId == null) return false;
+        return player.hasPermissions(2) || player.getUUID().equals(teamId);
     }
 
     @Override

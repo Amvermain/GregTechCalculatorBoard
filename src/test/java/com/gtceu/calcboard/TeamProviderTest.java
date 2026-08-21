@@ -20,7 +20,8 @@ public class TeamProviderTest {
 
         UUID dummy = UUID.randomUUID();
         String name = provider.getTeamDisplayName(dummy);
-        assertEquals("Shared Workspace", name);
+        assertTrue(name.startsWith("Personal"));
+        assertEquals("Personal Workspace", provider.getTeamDisplayName(null));
     }
 
     @Test

@@ -37,6 +37,19 @@ public class ClientPacketHandler {
         boolean isMe = myUUID != null && myUUID.equals(packet.getLockHolderUUID());
         state.setLockHeld(packet.getPageId(), isMe);
 
+        var page = state.getRemotePage(packet.getPageId());
+        if (page != null) {
+            if (packet.isSuccess() || packet.getLockHolderUUID() != null) {
+                page.setLockHolderUUID(packet.getLockHolderUUID());
+                page.setLockHolderName(packet.getLockHolderName());
+                page.setLockExpiresTimestamp(packet.getExpiresTimestamp());
+            } else {
+                page.setLockHolderUUID(null);
+                page.setLockHolderName("");
+                page.setLockExpiresTimestamp(0L);
+            }
+        }
+
         if (mc.screen instanceof BoardScreen bs) {
             bs.rebuildWidgets();
             bs.markSummaryDirty();

@@ -1,5 +1,7 @@
 package com.gtceu.calcboard.server.team;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.fml.ModList;
 
@@ -18,10 +20,6 @@ public class FTBTeamsProvider implements ITeamProvider {
 
     private Object apiInstance = null;
     private Method getManagerMethod = null;
-    private Method getTeamForPlayerMethod = null;
-    private Method getTeamIdMethod = null;
-    private Method getTeamNameMethod = null;
-    private Method getTeamMembersMethod = null;
 
     public FTBTeamsProvider() {
         initReflection();
@@ -34,25 +32,146 @@ public class FTBTeamsProvider implements ITeamProvider {
         try {
             if (ModList.get() != null && ModList.get().isLoaded(FTB_TEAMS_MOD_ID)) {
                 Class<?> apiClass = Class.forName("dev.ftb.mods.ftbteams.api.FTBTeamsAPI");
-                Method apiGetter = apiClass.getMethod("api");
-                this.apiInstance = apiGetter.invoke(null);
+                Method apiGetter = null;
+                for (Method m : apiClass.getMethods()) {
+                    if (m.getParameterCount() == 0 && (m.getName().equals("api") || m.getName().equals("getAPI"))) {
+                        apiGetter = m;
+                        break;
+                    }
+                }
+
+                if (apiGetter != null) {
+                    this.apiInstance = apiGetter.invoke(null);
+                }
 
                 if (this.apiInstance != null) {
-                    Class<?> managerClass = Class.forName("dev.ftb.mods.ftbteams.api.TeamManager");
-                    this.getManagerMethod = apiInstance.getClass().getMethod("getManager");
+                    for (Method m : apiInstance.getClass().getMethods()) {
+                        if (m.getParameterCount() == 0 && (m.getName().equals("getManager") || m.getName().equals("getTeamManager"))) {
+                            this.getManagerMethod = m;
+                            break;
+                        }
+                    }
 
-                    Class<?> teamClass = Class.forName("dev.ftb.mods.ftbteams.api.Team");
-                    this.getTeamForPlayerMethod = managerClass.getMethod("getTeamForPlayer", ServerPlayer.class);
-                    this.getTeamIdMethod = teamClass.getMethod("getId");
-                    this.getTeamNameMethod = teamClass.getMethod("getDisplayName");
-                    this.getTeamMembersMethod = teamClass.getMethod("getMembers");
-
-                    this.isFtbTeamsPresent = true;
+                    if (this.getManagerMethod != null) {
+                        this.isFtbTeamsPresent = true;
+                        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] Successfully hooked into FTB Teams API for team workspace isolation.");
+                    }
                 }
             }
         } catch (Throwable t) {
+            GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Could not initialize FTB Teams API reflection: {}", t.getMessage());
             this.isFtbTeamsPresent = false;
         }
+    }
+
+    private Object getTeamManager() {
+        if (!isAvailable() || apiInstance == null || getManagerMethod == null) return null;
+        try {
+            return getManagerMethod.invoke(apiInstance);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private Object getTeamObjectForPlayer(Object manager, ServerPlayer player) {
+        if (manager == null || player == null) return null;
+        try {
+            // 1. Try getTeamForPlayerID(UUID)
+            for (Method m : manager.getClass().getMethods()) {
+                if (m.getName().equals("getTeamForPlayerID") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == UUID.class) {
+                    Object res = m.invoke(manager, player.getUUID());
+                    if (res instanceof Optional<?> opt) return opt.orElse(null);
+                    if (res != null) return res;
+                }
+            }
+            // 2. Try getTeamForPlayer(Player/ServerPlayer/Entity/UUID)
+            for (Method m : manager.getClass().getMethods()) {
+                if (m.getName().equals("getTeamForPlayer") && m.getParameterCount() == 1) {
+                    Class<?> paramType = m.getParameterTypes()[0];
+                    if (paramType.isAssignableFrom(player.getClass()) || paramType.isAssignableFrom(ServerPlayer.class)) {
+                        Object res = m.invoke(manager, player);
+                        if (res instanceof Optional<?> opt) return opt.orElse(null);
+                        if (res != null) return res;
+                    } else if (paramType == UUID.class) {
+                        Object res = m.invoke(manager, player.getUUID());
+                        if (res instanceof Optional<?> opt) return opt.orElse(null);
+                        if (res != null) return res;
+                    }
+                }
+            }
+            // 3. Try getTeamByID(UUID)
+            for (Method m : manager.getClass().getMethods()) {
+                if (m.getName().equals("getTeamByID") && m.getParameterCount() == 1 && m.getParameterTypes()[0] == UUID.class) {
+                    Object res = m.invoke(manager, player.getUUID());
+                    if (res instanceof Optional<?> opt) return opt.orElse(null);
+                    if (res != null) return res;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private Object getTeamObjectById(Object manager, UUID teamId) {
+        if (manager == null || teamId == null) return null;
+        try {
+            for (Method m : manager.getClass().getMethods()) {
+                if ((m.getName().equals("getTeamByID") || m.getName().equals("getTeamById") || m.getName().equals("getTeam")) && m.getParameterCount() == 1 && m.getParameterTypes()[0] == UUID.class) {
+                    Object res = m.invoke(manager, teamId);
+                    if (res instanceof Optional<?> opt) return opt.orElse(null);
+                    if (res != null) return res;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private UUID extractTeamId(Object team) {
+        if (team == null) return null;
+        try {
+            for (Method m : team.getClass().getMethods()) {
+                if (m.getName().equals("getId") && m.getParameterCount() == 0 && m.getReturnType() == UUID.class) {
+                    return (UUID) m.invoke(team);
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private String extractTeamName(Object team) {
+        if (team == null) return null;
+        try {
+            for (Method m : team.getClass().getMethods()) {
+                if ((m.getName().equals("getDisplayName") || m.getName().equals("getName") || m.getName().equals("getStringName")) && m.getParameterCount() == 0) {
+                    Object res = m.invoke(team);
+                    if (res instanceof Component c) {
+                        return c.getString();
+                    } else if (res != null) {
+                        return res.toString();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private Set<UUID> extractTeamMembers(Object team) {
+        if (team == null) return Collections.emptySet();
+        try {
+            for (Method m : team.getClass().getMethods()) {
+                if ((m.getName().equals("getMembers") || m.getName().equals("getOnlineMembers") || m.getName().equals("getPlayers")) && m.getParameterCount() == 0) {
+                    Object res = m.invoke(team);
+                    if (res instanceof Collection<?> col) {
+                        Set<UUID> set = new HashSet<>();
+                        for (Object item : col) {
+                            if (item instanceof UUID u) set.add(u);
+                            else if (item instanceof net.minecraft.world.entity.player.Player p) set.add(p.getUUID());
+                        }
+                        return set;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return Collections.emptySet();
     }
 
     @Override
@@ -61,19 +180,16 @@ public class FTBTeamsProvider implements ITeamProvider {
             return player != null ? player.getUUID() : null;
         }
 
-        try {
-            Object manager = getManagerMethod.invoke(apiInstance);
-            if (manager != null) {
-                Object optionalTeam = getTeamForPlayerMethod.invoke(manager, player);
-                if (optionalTeam instanceof Optional<?> opt && opt.isPresent()) {
-                    Object team = opt.get();
-                    Object idObj = getTeamIdMethod.invoke(team);
-                    if (idObj instanceof UUID uuid) {
-                        return uuid;
-                    }
+        Object manager = getTeamManager();
+        if (manager != null) {
+            Object team = getTeamObjectForPlayer(manager, player);
+            if (team != null) {
+                UUID id = extractTeamId(team);
+                if (id != null) {
+                    return id;
                 }
             }
-        } catch (Throwable ignored) {}
+        }
 
         return player.getUUID();
     }
@@ -84,49 +200,36 @@ public class FTBTeamsProvider implements ITeamProvider {
             return teamId != null ? "Team " + teamId.toString().substring(0, 8) : "Unknown Team";
         }
 
-        try {
-            Object manager = getManagerMethod.invoke(apiInstance);
-            if (manager != null) {
-                Method getTeamById = manager.getClass().getMethod("getTeamByID", UUID.class);
-                Object optionalTeam = getTeamById.invoke(manager, teamId);
-                if (optionalTeam instanceof Optional<?> opt && opt.isPresent()) {
-                    Object team = opt.get();
-                    Object nameObj = getTeamNameMethod.invoke(team);
-                    if (nameObj != null) {
-                        return nameObj.toString();
-                    }
+        Object manager = getTeamManager();
+        if (manager != null) {
+            Object team = getTeamObjectById(manager, teamId);
+            if (team != null) {
+                String name = extractTeamName(team);
+                if (name != null && !name.isEmpty()) {
+                    return name;
                 }
             }
-        } catch (Throwable ignored) {}
+        }
 
         return "Team (" + teamId.toString().substring(0, 8) + ")";
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Set<UUID> getTeamMembers(UUID teamId) {
         if (!isAvailable() || teamId == null) {
             return teamId != null ? Collections.singleton(teamId) : Collections.emptySet();
         }
 
-        try {
-            Object manager = getManagerMethod.invoke(apiInstance);
-            if (manager != null) {
-                Method getTeamById = manager.getClass().getMethod("getTeamByID", UUID.class);
-                Object optionalTeam = getTeamById.invoke(manager, teamId);
-                if (optionalTeam instanceof Optional<?> opt && opt.isPresent()) {
-                    Object team = opt.get();
-                    Object membersObj = getTeamMembersMethod.invoke(team);
-                    if (membersObj instanceof Collection<?> col) {
-                        Set<UUID> res = new HashSet<>();
-                        for (Object o : col) {
-                            if (o instanceof UUID u) res.add(u);
-                        }
-                        return res;
-                    }
+        Object manager = getTeamManager();
+        if (manager != null) {
+            Object team = getTeamObjectById(manager, teamId);
+            if (team != null) {
+                Set<UUID> members = extractTeamMembers(team);
+                if (!members.isEmpty()) {
+                    return members;
                 }
             }
-        } catch (Throwable ignored) {}
+        }
 
         return Collections.singleton(teamId);
     }
@@ -141,45 +244,64 @@ public class FTBTeamsProvider implements ITeamProvider {
     @Override
     public boolean canPlayerAdministerTeam(ServerPlayer player, UUID teamId) {
         if (player == null || teamId == null) return false;
-        if (player.hasPermissions(2)) return true;
+
+        if (player.server != null && player.server.isSingleplayer()) {
+            if (player.server.isSingleplayerOwner(player.getGameProfile())) {
+                return true;
+            }
+        } else if (player.hasPermissions(2)) {
+            return true;
+        }
 
         if (!isAvailable()) {
             return player.getUUID().equals(teamId);
         }
 
-        try {
-            Object manager = getManagerMethod.invoke(apiInstance);
-            if (manager != null) {
-                Method getTeamById = manager.getClass().getMethod("getTeamByID", UUID.class);
-                Object optionalTeam = getTeamById.invoke(manager, teamId);
-                if (optionalTeam instanceof Optional<?> opt && opt.isPresent()) {
-                    Object team = opt.get();
-                    try {
-                        Method getOwnerMethod = team.getClass().getMethod("getOwner");
-                        Object ownerObj = getOwnerMethod.invoke(team);
-                        if (ownerObj instanceof UUID ownerUUID && ownerUUID.equals(player.getUUID())) {
-                            return true;
+        Object manager = getTeamManager();
+        if (manager != null) {
+            Object team = getTeamObjectById(manager, teamId);
+            if (team != null) {
+                try {
+                    // 1. Direct Owner UUID check
+                    for (Method m : team.getClass().getMethods()) {
+                        if (m.getName().equals("getOwner") && m.getParameterCount() == 0) {
+                            Object owner = m.invoke(team);
+                            if (owner instanceof UUID ownerUUID && ownerUUID.equals(player.getUUID())) {
+                                return true;
+                            }
                         }
-                    } catch (Throwable ignored) {}
-
-                    try {
-                        Method isOfficerMethod = team.getClass().getMethod("isOfficer", ServerPlayer.class);
-                        Object isOfficerObj = isOfficerMethod.invoke(team, player);
-                        if (Boolean.TRUE.equals(isOfficerObj)) {
-                            return true;
+                    }
+                    // 2. FTB Teams getRankForPlayer check
+                    for (Method m : team.getClass().getMethods()) {
+                        if (m.getName().equals("getRankForPlayer") && m.getParameterCount() == 1) {
+                            Class<?> pClass = m.getParameterTypes()[0];
+                            Object target = pClass == UUID.class ? player.getUUID() : player;
+                            Object rank = m.invoke(team, target);
+                            if (rank != null) {
+                                String rankName = rank.toString().toUpperCase(java.util.Locale.ROOT);
+                                if (rankName.contains("OWNER") || rankName.contains("OFFICER") || rankName.contains("ADMIN")) {
+                                    return true;
+                                } else {
+                                    // Player is explicitly a regular MEMBER, ALLY, or NONE -> Deny delete!
+                                    return false;
+                                }
+                            }
                         }
-                    } catch (Throwable ignored) {}
-
-                    try {
-                        Method isOwnerMethod = team.getClass().getMethod("isOwner", ServerPlayer.class);
-                        Object isOwnerObj = isOwnerMethod.invoke(team, player);
-                        if (Boolean.TRUE.equals(isOwnerObj)) {
-                            return true;
+                    }
+                    // 3. Fallback method checks
+                    for (Method m : team.getClass().getMethods()) {
+                        if ((m.getName().equals("isOfficer") || m.getName().equals("isOwner") || m.getName().equals("isAdmin")) && m.getParameterCount() == 1) {
+                            Class<?> pClass = m.getParameterTypes()[0];
+                            Object target = pClass == UUID.class ? player.getUUID() : player;
+                            Object res = m.invoke(team, target);
+                            if (Boolean.TRUE.equals(res)) {
+                                return true;
+                            }
                         }
-                    } catch (Throwable ignored) {}
-                }
+                    }
+                } catch (Throwable ignored) {}
             }
-        } catch (Throwable ignored) {}
+        }
 
         return player.getUUID().equals(teamId);
     }

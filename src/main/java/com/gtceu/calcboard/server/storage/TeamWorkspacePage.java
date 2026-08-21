@@ -12,6 +12,7 @@ public class TeamWorkspacePage {
     private String title;
     private int pageRevision;
     private UUID lockHolderUUID;
+    private String lockHolderName = "";
     private long lockExpiresTimestamp;
     private byte[] compressedGraphData;
 
@@ -20,6 +21,7 @@ public class TeamWorkspacePage {
         this.title = title != null ? title : "Page";
         this.pageRevision = 1;
         this.lockHolderUUID = null;
+        this.lockHolderName = "";
         this.lockExpiresTimestamp = 0L;
         this.compressedGraphData = new byte[0];
     }
@@ -29,6 +31,7 @@ public class TeamWorkspacePage {
         this.title = title != null ? title : "Page";
         this.pageRevision = revision;
         this.lockHolderUUID = null;
+        this.lockHolderName = "";
         this.lockExpiresTimestamp = 0L;
         this.compressedGraphData = compressedGraphData != null ? compressedGraphData : new byte[0];
     }
@@ -69,6 +72,14 @@ public class TeamWorkspacePage {
         this.lockHolderUUID = lockHolderUUID;
     }
 
+    public String getLockHolderName() {
+        return lockHolderName;
+    }
+
+    public void setLockHolderName(String lockHolderName) {
+        this.lockHolderName = lockHolderName != null ? lockHolderName : "";
+    }
+
     public long getLockExpiresTimestamp() {
         return lockExpiresTimestamp;
     }
@@ -96,6 +107,7 @@ public class TeamWorkspacePage {
         tag.putInt("PageRevision", pageRevision);
         if (lockHolderUUID != null) {
             tag.putUUID("LockHolderUUID", lockHolderUUID);
+            tag.putString("LockHolderName", lockHolderName != null ? lockHolderName : "");
             tag.putLong("LockExpires", lockExpiresTimestamp);
         }
         tag.putByteArray("CompressedGraphData", compressedGraphData != null ? compressedGraphData : new byte[0]);
@@ -109,6 +121,9 @@ public class TeamWorkspacePage {
         page.setPageRevision(tag.getInt("PageRevision"));
         if (tag.hasUUID("LockHolderUUID")) {
             page.setLockHolderUUID(tag.getUUID("LockHolderUUID"));
+            if (tag.contains("LockHolderName")) {
+                page.setLockHolderName(tag.getString("LockHolderName"));
+            }
             page.setLockExpiresTimestamp(tag.getLong("LockExpires"));
         }
         page.setCompressedGraphData(tag.getByteArray("CompressedGraphData"));

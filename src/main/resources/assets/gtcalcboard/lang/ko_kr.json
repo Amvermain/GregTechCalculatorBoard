@@ -261,7 +261,7 @@
   "gui.gtcalcboard.guide.pages_desc": "### 상단 다중 페이지 탭 바 (Presets)\n- 보드 상단 탭 바에서 여러 공정을 독립된 탭으로 나누어 작업할 수 있습니다.\n- [+] 버튼: 새로운 빈 탭 페이지를 추가합니다.\n- [탭 클릭]: 해당 공정 탭으로 즉시 전환 (각 탭마다 카메라 위치/줌 개별 기억).\n- [탭 우클릭]: 탭의 이름을 직접 변경할 수 있습니다.\n- [x 버튼]: 필요 없는 탭 페이지를 삭제합니다.\n\n### 보드 저장 및 청사진 공유\n- [💾 저장] / [📂 불러오기]: 현재의 모든 탭과 공정 데이터를 파일(calcboard_save.nbt)에 저장합니다.\n- [📋 공유]: 현재 보드의 전체 설비와 연결 상태를 [텍스트 청사진 코드]로 클립보드에 복사합니다.\n- [📥 가져오기]: 복사한 청사진 코드를 내 보드로 즉시 불러옵니다.\n\n> 💡 TIP: 공정 데이터는 마인크래프트를 종료해도 안전하게 보존됩니다!",
 
   "gui.gtcalcboard.guide.cat_shortcuts": "8. 다중 선택|일괄 이동 및 단축키",
-  "gui.gtcalcboard.guide.shortcuts_title": "🖱️ 8장. 드래그 다중 선택, 클립보드, 이름 변경",
+  "gui.gtcalcboard.guide.shortcuts_title": "🖰 8장. 드래그 다중 선택, 클립보드, 이름 변경",
   "gui.gtcalcboard.guide.shortcuts_desc": "### 드래그 영역 다중 선택 (Marquee Box)\n- [마우스 좌클릭 드래그]: 캔버스 빈 공간에서 드래그하여 여러 기계를 한 번에 다중 선택합니다.\n- [Shift + 좌클릭]: 원하는 기계만 하나씩 선택에 추가하거나 제외합니다.\n- [선택 기계 일괄 이동]: 선택된 기계들 중 하나를 잡고 드래그하면 내부 와이어 연결을 유지하며 함께 이동합니다.\n\n### 실행 취소 및 단축키\n- [Ctrl + Z]: 직전에 수행한 작업(노드 이동/추가/삭제/연결/모듈화/속성편집 등)을 실행 취소(Undo)합니다.\n- [Ctrl + Y / Ctrl + Shift + Z]: 취소했던 작업을 다시 실행(Redo)합니다.\n- [Ctrl + X]: 선택한 기계들과 내부 연결선을 잘라내기(Cut)합니다.\n- [Ctrl + C]: 선택한 기계들과 내부 연결선을 클립보드에 복사합니다.\n- [Ctrl + V]: 마우스 커서 위치에 새 노드로 와이어와 함께 복제 붙여넣기합니다.\n- [Ctrl + D]: 선택한 기계들을 즉시 복제(Duplicate)합니다.\n- [Delete / Backspace]: 선택한 기계들과 연결선을 일괄 삭제합니다.\n- [Ctrl + A]: 보드의 모든 기계를 전체 선택합니다.\n\n### 노드 이름 직접 수정\n- 기계 헤더의 이름 텍스트를 [더블클릭]하면 인라인 입력창이 열립니다.\n- 원하는 공정 이름(예: [황산 1라인], [터빈 발전소])을 직접 타이핑하고 [Enter]를 누르면 저장됩니다.",
 
   "gui.gtcalcboard.tutorial_btn": "튜토리얼",
@@ -353,6 +353,7 @@
   "gui.gtcalcboard.lock.locked_by": "%s 수정 중",
   "gui.gtcalcboard.lock.editable": "수정 가능",
   "gui.gtcalcboard.presence.online_count": "%s명 접속 중",
+  "gui.gtcalcboard.presence.viewing_header": "보드를 보고 있는 팀원 (%s명):",
   "gui.gtcalcboard.toast.switched_to_personal": "개인 보드로 전환되었습니다.",
   "gui.gtcalcboard.toast.switched_to_team": "팀 보드(%s)로 전환되었습니다.",
 

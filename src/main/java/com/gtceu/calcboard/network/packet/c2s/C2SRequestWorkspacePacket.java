@@ -50,6 +50,7 @@ public class C2SRequestWorkspacePacket {
                 String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(playerTeamId);
                 TeamWorkspaceData ws = savedData.getOrCreateWorkspace(playerTeamId, teamName);
                 NetworkHandler.sendToPlayer(player, new S2CSyncWorkspacePacket(ws));
+                NetworkHandler.broadcastPresenceForTeam(player.serverLevel(), playerTeamId);
             }
         });
         ctx.setPacketHandled(true);

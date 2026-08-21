@@ -78,4 +78,23 @@ public class NetworkHandler {
             }
         }
     }
+
+    public static void broadcastPresenceForTeam(ServerLevel level, UUID teamId) {
+        if (level == null || level.getServer() == null || teamId == null) return;
+        java.util.List<S2CBroadcastPresencePacket.MemberPresence> presences = new java.util.ArrayList<>();
+        Set<UUID> members = TeamProviderRegistry.getInstance().getTeamMembers(teamId);
+
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            if (members.contains(player.getUUID()) || teamId.equals(TeamProviderRegistry.getInstance().getPlayerTeamId(player))) {
+                presences.add(new S2CBroadcastPresencePacket.MemberPresence(
+                        player.getUUID(),
+                        player.getGameProfile().getName(),
+                        "page_main",
+                        false
+                ));
+            }
+        }
+
+        broadcastToTeam(level, teamId, new S2CBroadcastPresencePacket(teamId, presences), null);
+    }
 }

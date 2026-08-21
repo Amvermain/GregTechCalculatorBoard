@@ -258,6 +258,9 @@ public class PageTabBarWidget {
                             if (!newPageId.equals(teamState.getActiveTeamPageId())) {
                                 teamState.autoCommitAndRelease(screen, teamState.getActiveTeamPageId());
                                 teamState.setActiveTeamPageId(newPageId);
+                                com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                                    new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), newPageId, true)
+                                );
                                 screen.rebuildWidgets();
                                 screen.markSummaryDirty();
                                 playClickSound();
@@ -309,8 +312,8 @@ public class PageTabBarWidget {
             return true;
         }
 
-        // Clicked on empty tab bar area -> Start drag scrolling
-        if (button == 0 || button == 2) {
+        // If tabs overflow and require scrolling, allow drag-scrolling within the tab track
+        if (maxScrollX > 0 && mouseX <= (curX + addW + 20) && (button == 0 || button == 2)) {
             commitRename();
             this.isDraggingTabBar = true;
             this.dragStartX = mouseX;

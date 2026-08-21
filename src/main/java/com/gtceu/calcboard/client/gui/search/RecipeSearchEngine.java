@@ -82,7 +82,7 @@ public class RecipeSearchEngine {
 
     public record ParsedQuery(List<AndGroup> orGroups, boolean isEmpty) {}
 
-    private static final Pattern TOKEN_PATTERN = Pattern.compile("\"([^\"]*)\"|(\\S+)");
+    private static final Pattern TOKEN_PATTERN = Pattern.compile("\"([^\"]*)\"|\\[([^\\]]*)\\]|(\\S+)");
 
     public static SearchableRecipe buildIndex(EmiRecipe recipe) {
         if (recipe == null) return null;
@@ -257,32 +257,50 @@ public class RecipeSearchEngine {
             Matcher matcher = TOKEN_PATTERN.matcher(trimmedPart);
 
             while (matcher.find()) {
-                String token = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
-                if (token == null || token.isEmpty() || token.equals("&") || token.equals("|")
-                        || token.equals("!") || token.equals("@") || token.equals("#") || token.equals("%")
-                        || token.equals("[") || token.equals("]")) {
-                    continue;
-                }
+                String quoted = matcher.group(1);
+                String bracketed = matcher.group(2);
+                String word = matcher.group(3);
 
-                boolean negated = false;
-                if (token.startsWith("!") && token.length() > 1) {
-                    negated = true;
-                    token = token.substring(1);
-                }
-
+                String token;
                 MatchType type = MatchType.GENERAL;
-                if (token.startsWith("@") && token.length() > 1) {
-                    type = MatchType.MOD_ID;
-                    token = token.substring(1);
-                } else if (token.startsWith("#") && token.length() > 1) {
-                    type = MatchType.TAG;
-                    token = token.substring(1);
-                } else if (token.startsWith("[") && token.length() > 1) {
+                boolean negated = false;
+
+                if (quoted != null) {
+                    token = quoted.trim();
+                    type = MatchType.GENERAL;
+                } else if (bracketed != null) {
+                    token = bracketed.trim();
                     type = MatchType.CATEGORY;
-                    token = token.endsWith("]") ? token.substring(1, token.length() - 1) : token.substring(1);
-                } else if (token.startsWith("%") && token.length() > 1) {
-                    type = MatchType.CATEGORY;
-                    token = token.substring(1);
+                } else {
+                    token = word != null ? word.trim() : "";
+                    if (token.isEmpty() || token.equals("&") || token.equals("|")
+                            || token.equals("!") || token.equals("@") || token.equals("#") || token.equals("%")
+                            || token.equals("[") || token.equals("]")) {
+                        continue;
+                    }
+
+                    if (token.startsWith("!") && token.length() > 1) {
+                        negated = true;
+                        token = token.substring(1);
+                    }
+
+                    if (token.startsWith("@") && token.length() > 1) {
+                        type = MatchType.MOD_ID;
+                        token = token.substring(1);
+                    } else if (token.startsWith("#") && token.length() > 1) {
+                        type = MatchType.TAG;
+                        token = token.substring(1);
+                    } else if (token.startsWith("[") && token.length() > 1) {
+                        type = MatchType.CATEGORY;
+                        token = token.substring(1);
+                    } else if (token.startsWith("%") && token.length() > 1) {
+                        type = MatchType.CATEGORY;
+                        token = token.substring(1);
+                    }
+
+                    if (token.endsWith("]")) {
+                        token = token.substring(0, token.length() - 1);
+                    }
                 }
 
                 token = token.toLowerCase(Locale.ROOT).trim();
@@ -413,33 +431,85 @@ public class RecipeSearchEngine {
 
         int score = 0;
         for (AndGroup group : query.orGroups()) {
+            StringBuilder groupTextSb = new StringBuilder();
+            for (QueryTerm term : group.terms()) {
+                if (!term.negated()) {
+                    if (groupTextSb.length() > 0) groupTextSb.append(" ");
+                    groupTextSb.append(term.text());
+                }
+            }
+            String fullGroupText = groupTextSb.toString().toLowerCase(Locale.ROOT);
+            String fullGroupUnder = fullGroupText.replace(' ', '_');
+
+            String dn = recipe.displayName.toLowerCase(Locale.ROOT);
+            String cat = recipe.categoryName.toLowerCase(Locale.ROOT);
+            String catId = recipe.categoryId.toLowerCase(Locale.ROOT);
+
+            if (!fullGroupText.isEmpty()) {
+                if (dn.equals(fullGroupText)) {
+                    score += 20000;
+                } else if (dn.startsWith(fullGroupText)) {
+                    score += 10000;
+                } else if (dn.contains(fullGroupText)) {
+                    score += 6000;
+                }
+
+                if (cat.equals(fullGroupText) || catId.equals(fullGroupText) || catId.equals(fullGroupUnder)) {
+                    score += 18000;
+                } else if (cat.contains(fullGroupText) || catId.contains(fullGroupText) || catId.contains(fullGroupUnder)) {
+                    score += 9000;
+                }
+            }
+
             for (QueryTerm term : group.terms()) {
                 if (term.negated()) continue;
                 String t = term.text();
-                String dn = recipe.displayName.toLowerCase(Locale.ROOT);
-                String cat = recipe.categoryName.toLowerCase(Locale.ROOT);
-                String catId = recipe.categoryId.toLowerCase(Locale.ROOT);
+                String tUnder = t.replace(' ', '_');
 
-                if (dn.equals(t)) {
-                    score += 10000;
-                } else if (dn.startsWith(t)) {
-                    score += 5000;
-                } else if (dn.contains(t)) {
-                    score += 2500;
-                }
+                if (term.type() == MatchType.CATEGORY) {
+                    if (cat.equals(t) || catId.equals(t) || catId.equals(tUnder)) {
+                        score += 20000;
+                    } else if (cat.contains(t) || catId.contains(t) || catId.contains(tUnder)) {
+                        score += 10000;
+                    }
+                } else if (term.type() == MatchType.MOD_ID) {
+                    if (recipe.modId.equals(t)) {
+                        score += 10000;
+                    } else if (recipe.modId.contains(t)) {
+                        score += 5000;
+                    }
+                } else if (term.type() == MatchType.TAG) {
+                    for (String tag : recipe.tags) {
+                        if (tag.equals(t) || tag.equals(tUnder)) {
+                            score += 8000;
+                            break;
+                        } else if (tag.contains(t) || tag.contains(tUnder)) {
+                            score += 4000;
+                            break;
+                        }
+                    }
+                } else {
+                    if (dn.equals(t)) {
+                        score += 10000;
+                    } else if (dn.startsWith(t)) {
+                        score += 5000;
+                    } else if (dn.contains(t)) {
+                        score += 2500;
+                    }
 
-                if (cat.equals(t) || catId.equals(t)) {
-                    score += 4000;
-                } else if (cat.contains(t) || catId.contains(t)) {
-                    score += 2000;
-                }
+                    if (cat.equals(t) || catId.equals(t) || catId.equals(tUnder)) {
+                        score += 4000;
+                    } else if (cat.contains(t) || catId.contains(t) || catId.contains(tUnder)) {
+                        score += 2000;
+                    }
 
-                if (recipe.outputSearchIndex.contains(t)) {
-                    score += 1500;
-                } else if (recipe.inputSearchIndex.contains(t)) {
-                    score += 800;
-                } else if (recipe.fullSearchIndex.contains(t)) {
-                    score += 100;
+                    if (recipe.outputSearchIndex.contains(t)) {
+                        score += 1500;
+                    } else if (recipe.inputSearchIndex.contains(t)) {
+                        score += 800;
+                    } else if (recipe.fullSearchIndex.contains(t)) {
+                        score += 100;
+                    }
                 }
             }
         }

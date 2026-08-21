@@ -57,11 +57,12 @@ public class RecipeSearchDialog {
     private static final List<SearchableRecipe> GLOBAL_RECIPES = Collections.synchronizedList(new ArrayList<>());
     private static volatile boolean GLOBAL_CACHED = false;
     private static volatile boolean IS_CACHING = false;
-    private static final java.util.concurrent.ExecutorService SEARCH_EXECUTOR = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "GTCalcBoard-SearchWorker");
+    private static final java.util.concurrent.ScheduledExecutorService SEARCH_SCHEDULER = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "GTCalcBoard-SearchScheduler");
         t.setDaemon(true);
         return t;
     });
+    private java.util.concurrent.ScheduledFuture<?> pendingSearchTask = null;
 
     private final java.util.concurrent.atomic.AtomicInteger searchVersion = new java.util.concurrent.atomic.AtomicInteger(0);
     private boolean showFavoritesOnly = false;
@@ -77,6 +78,7 @@ public class RecipeSearchDialog {
     private int stickyHoverRowY = 0;
     private int lastMouseX = 0;
     private int lastMouseY = 0;
+    private EmiRecipe currentContextualDefaultRecipe = null;
 
     private static final int DIALOG_WIDTH = 360;
     private static final int DIALOG_HEIGHT = 280;
@@ -140,31 +142,28 @@ public class RecipeSearchDialog {
         return CACHING_PROGRESS;
     }
 
+    public static boolean isCaching() {
+        return IS_CACHING;
+    }
+
     public static void ensureGlobalRecipesCachedAsync(Runnable onComplete) {
         if (GLOBAL_CACHED) {
             if (onComplete != null) onComplete.run();
             return;
         }
         if (IS_CACHING) return;
+
+        var emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
+        if (emiManager == null || emiManager.getRecipes().isEmpty() || !dev.emi.emi.runtime.EmiReloadManager.isLoaded()) {
+            return;
+        }
+
         IS_CACHING = true;
         CACHING_PROGRESS = new RecipeLoadingProgress(1, 3, "gui.gtcalcboard.loading_recipe_phase.1", "Connecting to EMI Recipe Manager");
 
         CompletableFuture.runAsync(() -> {
             try {
-                var emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-                List<EmiRecipe> recipes = emiManager != null ? emiManager.getRecipes() : null;
-
-                // If EMI is still actively baking on worker thread, retry in background every 200ms (up to 15 times = 3s)
-                int retries = 0;
-                while ((recipes == null || recipes.isEmpty()) && retries < 15) {
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException ignored) {}
-                    emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-                    recipes = emiManager != null ? emiManager.getRecipes() : null;
-                    retries++;
-                }
-
+                List<EmiRecipe> recipes = emiManager.getRecipes();
                 if (recipes == null || recipes.isEmpty()) {
                     IS_CACHING = false;
                     return;
@@ -255,6 +254,7 @@ public class RecipeSearchDialog {
             updateSearchResultsSynchronously("");
         } else {
             this.contextualWireTarget = null;
+            this.currentContextualDefaultRecipe = null;
             this.stickyHoverRecipe = null;
         }
     }
@@ -266,14 +266,19 @@ public class RecipeSearchDialog {
     private void onSearchQueryChanged(String query) {
         scrollOffset = 0;
         final int currentVersion = searchVersion.incrementAndGet();
+
+        if (pendingSearchTask != null) {
+            pendingSearchTask.cancel(false);
+            pendingSearchTask = null;
+        }
+
         if (query == null || query.trim().isEmpty()) {
             updateSearchResultsSynchronously("");
             return;
         }
 
-        SEARCH_EXECUTOR.submit(() -> {
+        pendingSearchTask = SEARCH_SCHEDULER.schedule(() -> {
             try {
-                Thread.sleep(50);
                 if (currentVersion != searchVersion.get()) {
                     return;
                 }
@@ -287,8 +292,10 @@ public class RecipeSearchDialog {
                         }
                     });
                 }
-            } catch (InterruptedException ignored) {}
-        });
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }, 50, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     public static List<SearchableRecipe> getTutorialDummyRecipes() {
@@ -388,7 +395,7 @@ public class RecipeSearchDialog {
             sourceList = GLOBAL_RECIPES;
         }
 
-        record ScoredRecipe(SearchableRecipe recipe, int score) {}
+        record ScoredRecipe(SearchableRecipe recipe, int score, boolean isDefault, boolean isFavorite) {}
 
         boolean hasContext = (contextualWireTarget != null && contextualWireTarget.sourceStack != null);
         boolean targetIsFluid = hasContext && contextualWireTarget.sourceStack.isFluid();
@@ -400,10 +407,35 @@ public class RecipeSearchDialog {
                 ? contextualWireTarget.sourceStack.getDisplayName().toLowerCase(Locale.ROOT) : null;
 
         RecipeFilterConfig filterConfig = RecipeFilterConfig.getInstance();
-        Set<ResourceLocation> favoriteIds = showFavoritesOnly ? getFavoriteRecipeIds() : null;
+        Set<ResourceLocation> allFavoriteIds = getFavoriteRecipeIds();
+        Set<ResourceLocation> favoriteIds = showFavoritesOnly ? allFavoriteIds : null;
         boolean hasQuery = (query != null && !query.trim().isEmpty());
 
-        return sourceList.parallelStream()
+        EmiRecipe contextualDefaultRecipe = null;
+        if (hasContext && contextualWireTarget.sourceStack != null) {
+            try {
+                ResourceLocation id = contextualWireTarget.sourceStack.getId();
+                if (id != null) {
+                    if (targetIsFluid) {
+                        var fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(id);
+                        if (fluid != null) {
+                            var emiStack = dev.emi.emi.api.stack.EmiStack.of(fluid);
+                            contextualDefaultRecipe = dev.emi.emi.bom.BoM.getRecipe(emiStack);
+                        }
+                    } else {
+                        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+                        if (item != null) {
+                            var emiStack = dev.emi.emi.api.stack.EmiStack.of(item);
+                            contextualDefaultRecipe = dev.emi.emi.bom.BoM.getRecipe(emiStack);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+        this.currentContextualDefaultRecipe = contextualDefaultRecipe;
+        final EmiRecipe finalContextualDefault = contextualDefaultRecipe;
+
+        List<ScoredRecipe> candidateList = sourceList.parallelStream()
                 .filter(sr -> {
                     if (showFavoritesOnly) {
                         ResourceLocation rId = (sr.recipe() instanceof EmiRecipe er) ? er.getId() : null;
@@ -469,10 +501,75 @@ public class RecipeSearchDialog {
                             totalScore += 50;
                         }
                     }
-                    return new ScoredRecipe(sr, totalScore);
+
+                    boolean isFav = false;
+                    if (sr.recipe() instanceof EmiRecipe er && er.getId() != null) {
+                        isFav = (allFavoriteIds != null && allFavoriteIds.contains(er.getId()));
+                    }
+                    return new ScoredRecipe(sr, totalScore, false, isFav);
                 })
                 .filter(sr -> !hasContext || !contextualWireTarget.sourceIsInput || sr.score() > 0 || hasQuery)
                 .sorted((a, b) -> Integer.compare(b.score(), a.score()))
+                .limit(200)
+                .toList();
+
+        // 2. Sequential thread-safe resolution of Default Recipe on the top 200 candidates only
+        List<ScoredRecipe> resolvedMatches = new ArrayList<>(candidateList.size());
+        for (ScoredRecipe sr : candidateList) {
+            boolean isDefault = false;
+            if (sr.recipe().recipe() instanceof EmiRecipe er) {
+                if (hasContext && finalContextualDefault != null) {
+                    if (er.getId() != null && er.getId().equals(finalContextualDefault.getId())) {
+                        isDefault = true;
+                    }
+                } else {
+                    try {
+                        for (var out : er.getOutputs()) {
+                            EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(out);
+                            boolean matchesDef = (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
+                                    || dev.emi.emi.bom.BoM.isDefaultRecipe(out, er);
+                            if (matchesDef) {
+                                if (hasQuery) {
+                                    String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
+                                    String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
+                                    String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
+                                    for (var group : parsedQuery.orGroups()) {
+                                        for (var term : group.terms()) {
+                                            if (!term.negated()) {
+                                                String t = term.text();
+                                                if (outName.contains(t) || outId.contains(t) || outPath.contains(t)) {
+                                                    isDefault = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if (isDefault) break;
+                                    }
+                                } else {
+                                    isDefault = true;
+                                }
+                                if (isDefault) break;
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+            resolvedMatches.add(new ScoredRecipe(sr.recipe(), sr.score(), isDefault, sr.isFavorite()));
+        }
+
+        resolvedMatches.sort((a, b) -> {
+            int cmp = Integer.compare(b.score(), a.score());
+            if (cmp != 0) return cmp;
+            if (a.isDefault() != b.isDefault()) {
+                return a.isDefault() ? -1 : 1;
+            }
+            if (a.isFavorite() != b.isFavorite()) {
+                return a.isFavorite() ? -1 : 1;
+            }
+            return a.recipe().displayName().compareTo(b.recipe().displayName());
+        });
+
+        return resolvedMatches.stream()
                 .limit(150)
                 .map(ScoredRecipe::recipe)
                 .toList();
@@ -571,17 +668,6 @@ public class RecipeSearchDialog {
 
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
 
-        if (filteredRecipes.isEmpty()) {
-            if (!GLOBAL_RECIPES.isEmpty()) {
-                updateSearchResults(searchBox.getValue());
-            } else if (!GLOBAL_CACHED) {
-                ensureGlobalRecipesCachedAsync(() -> {
-                    if (this.visible) {
-                        updateSearchResults(searchBox.getValue());
-                    }
-                });
-            }
-        }
 
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
         scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
@@ -646,8 +732,47 @@ public class RecipeSearchDialog {
                     newlyHoveredRowY = rowY;
                 }
 
+                boolean isDefault = false;
+                if (sr.recipe() instanceof EmiRecipe er) {
+                    if (currentContextualDefaultRecipe != null) {
+                        if (er.getId() != null && er.getId().equals(currentContextualDefaultRecipe.getId())) {
+                            isDefault = true;
+                        }
+                    } else {
+                        try {
+                            for (var out : er.getOutputs()) {
+                                EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(out);
+                                boolean matchesDef = (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
+                                        || dev.emi.emi.bom.BoM.isDefaultRecipe(out, er);
+                                if (matchesDef) {
+                                    String q = searchBox.getValue().trim().toLowerCase(Locale.ROOT);
+                                    if (q.isEmpty()) {
+                                        isDefault = true;
+                                    } else {
+                                        String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
+                                        String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
+                                        String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
+                                        if (outName.contains(q) || outId.contains(q) || outPath.contains(q)) {
+                                            isDefault = true;
+                                        }
+                                    }
+                                    if (isDefault) break;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+
                 boolean isRowSelectedOrHovered = rowHover || (stickyHoverRecipe == sr);
-                graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, isRowSelectedOrHovered ? 0xFF2A3649 : (i % 2 == 0 ? 0xFF1A1E26 : 0xFF161A21));
+                if (isRowSelectedOrHovered) {
+                    graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, 0xFF2A3649);
+                    graphics.renderOutline(listX + 1, rowY + 1, listW - 2, ROW_HEIGHT - 2, 0xFFFFD700);
+                } else if (isDefault) {
+                    graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, 0xFF1B2436);
+                    graphics.renderOutline(listX + 1, rowY + 1, listW - 2, ROW_HEIGHT - 2, 0xFF38BDF8);
+                } else {
+                    graphics.fill(listX + 1, rowY + 1, listX + listW - 1, rowY + ROW_HEIGHT - 1, (i % 2 == 0 ? 0xFF1A1E26 : 0xFF161A21));
+                }
 
                 // Left: Display First Input Stack Icon & Rate
                 if (sr.recipe() instanceof EmiRecipe r) {
@@ -673,12 +798,12 @@ public class RecipeSearchDialog {
                     }
                 }
 
-                // Display Recipe Name / Machine Category
                 String rName = sr.displayName();
                 String catText = !sr.categoryName().isEmpty() ? "§7[" + sr.categoryName() + "§7] " : (!sr.categoryId().isEmpty() ? "§7[" + sr.categoryId() + "§7] " : "");
-                String fullRowText = catText + "§f" + rName;
+                String star = isDefault ? "§6★ " : "";
+                String fullRowText = star + catText + (isDefault ? "§b" : "§f") + rName;
                 int maxTextW = listW - 110;
-                graphics.drawString(font, font.plainSubstrByWidth(fullRowText, maxTextW), listX + 64, rowY + 12, 0xFFFFFFFF, false);
+                graphics.drawString(font, font.plainSubstrByWidth(fullRowText, maxTextW), listX + 64, rowY + 12, isDefault ? 0xFF38BDF8 : 0xFFFFFFFF, false);
 
                 graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, btnHover ? 0xFF2A6840 : 0xFF1E4D2F);
                 graphics.renderOutline(btnX, btnY, btnW, btnH, 0xFF359050);

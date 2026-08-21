@@ -100,10 +100,6 @@ public class CanvasInteractionHandler {
             return true;
         }
 
-        if (mouseY < screen.getHeaderBottomY()) {
-            return false;
-        }
-
         double canvasMouseX = screen.toCanvasX(mouseX);
         double canvasMouseY = screen.toCanvasY(mouseY);
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
