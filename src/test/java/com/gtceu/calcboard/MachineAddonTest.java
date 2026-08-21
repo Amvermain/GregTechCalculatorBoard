@@ -248,16 +248,14 @@ public class MachineAddonTest {
     public void testDynamicCoilHelperStats() {
         Object mockCoil = new Object() {
             public int getCoilTemperature() { return 2700; }
-            public int getTier() { return 2; }
-            public int getEnergyDiscount() { return 90; }
-            public int getPyrolyseSpeed() { return 150; }
-            public int getSmelterParallel() { return 32; }
+            public int getTier() { return 1; }
+            public int getLevel() { return 1; }
         };
 
         var kanthal = CoilHelper.extractStatsFromBlockObject(mockCoil);
         Assertions.assertNotNull(kanthal);
         Assertions.assertEquals(2700, kanthal.temperature());
-        Assertions.assertEquals(150, kanthal.pyrolyseSpeedPercent());
+        Assertions.assertEquals(100, kanthal.pyrolyseSpeedPercent());
         Assertions.assertEquals(90, kanthal.crackingEnergyPercent());
         Assertions.assertEquals(32, kanthal.smelterParallel());
 
@@ -551,5 +549,43 @@ public class MachineAddonTest {
         // 2x MCI (1.60^2 = 2.56) * 1x ARC (0.80 duration, 4.0 power)
         Assertions.assertEquals(2.56 * 0.80, dynamo.getCombinedDurationMultiplier(), 0.001);
         Assertions.assertEquals(4.0, dynamo.getCombinedEutMultiplier(), 0.001);
+    }
+
+    @Test
+    public void testCrackerCoilEnergyDiscount() {
+        RecipeNode cracker = RecipeNode.create("Cracker (Heavy Fuel)", 20.0, 384.0, GTVoltageTier.HV);
+        cracker.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:cracker"));
+
+        // 1. Cupronickel (1800K, Tier 0) -> 100% EU/t (1.0x)
+        MachineAddon cupro = new MachineAddon("gtceu:cupronickel_coil", "Cupronickel Coil Block", MachineAddon.Category.COIL, "", null);
+        cupro.setCoilTemperature(1800);
+        cupro.setCrackingEnergyPercent(100);
+        MachineAddon tailoredCupro = cupro.forMachine(cracker);
+        Assertions.assertEquals(1.0, tailoredCupro.getEutMultiplier(), 0.001);
+
+        // 2. HSS-G (5400K, Tier 4) -> 60% EU/t (0.60x, 40% discount)
+        MachineAddon hssg = new MachineAddon("gtceu:hssg_coil", "HSS-G Coil Block", MachineAddon.Category.COIL, "", null);
+        hssg.setCoilTemperature(5400);
+        // tier = 4 -> discount = 4 * 0.1 = 0.4 -> 60%
+        int hssgDiscount = (int) Math.round((1.0 - (4 * 0.1)) * 100.0);
+        hssg.setCrackingEnergyPercent(hssgDiscount);
+        MachineAddon tailoredHssg = hssg.forMachine(cracker);
+        Assertions.assertEquals(0.60, tailoredHssg.getEutMultiplier(), 0.001);
+
+        // 3. Trinium (9001K, Tier 9) -> 10% EU/t (0.10x, 90% discount)
+        MachineAddon trinium = new MachineAddon("gtceu:trinium_coil", "Trinium Coil Block", MachineAddon.Category.COIL, "", null);
+        trinium.setCoilTemperature(9001);
+        trinium.setCrackingEnergyPercent(10);
+        MachineAddon tailoredTrinium = trinium.forMachine(cracker);
+        Assertions.assertEquals(0.10, tailoredTrinium.getEutMultiplier(), 0.001);
+
+        // 4. Abyssal Alloy (18888K, Tier 10) -> 7.5% -> 7% EU/t (0.07x, 92.5% discount)
+        MachineAddon abyssal = new MachineAddon("kubejs:abyssal_alloy_coil_block", "Abyssal Alloy Coil Block", MachineAddon.Category.COIL, "", null);
+        abyssal.setCoilTemperature(18888);
+        // tier = 10 -> discount = 0.9 + (10 - 9) * 0.025 = 0.925 -> 7%
+        int abyssalDiscount = Math.max(1, (int) Math.floor((1.0 - 0.925) * 100.0 + 0.0001));
+        abyssal.setCrackingEnergyPercent(abyssalDiscount);
+        MachineAddon tailoredAbyssal = abyssal.forMachine(cracker);
+        Assertions.assertEquals(0.07, tailoredAbyssal.getEutMultiplier(), 0.001);
     }
 }

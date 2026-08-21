@@ -277,9 +277,9 @@ public class RecipeSearchEngine {
                 } else if (token.startsWith("#") && token.length() > 1) {
                     type = MatchType.TAG;
                     token = token.substring(1);
-                } else if ((token.startsWith("[") && token.endsWith("]")) && token.length() > 2) {
+                } else if (token.startsWith("[") && token.length() > 1) {
                     type = MatchType.CATEGORY;
-                    token = token.substring(1, token.length() - 1);
+                    token = token.endsWith("]") ? token.substring(1, token.length() - 1) : token.substring(1);
                 } else if (token.startsWith("%") && token.length() > 1) {
                     type = MatchType.CATEGORY;
                     token = token.substring(1);
@@ -337,31 +337,38 @@ public class RecipeSearchEngine {
 
     private static boolean matchesTerm(SearchableRecipe recipe, QueryTerm term) {
         String text = term.text();
+        String textSpaced = text.replace('_', ' ');
+        String textUnder = text.replace(' ', '_');
+
         return switch (term.type()) {
             case MOD_ID -> recipe.modId.contains(text);
 
             case TAG -> {
                 for (String t : recipe.tags) {
-                    if (t.contains(text)) yield true;
+                    if (t.contains(text) || t.contains(textUnder)) yield true;
                 }
                 for (String id : recipe.inputIds) {
-                    if (id.contains(text)) yield true;
+                    if (id.contains(text) || id.contains(textUnder)) yield true;
                 }
                 for (String id : recipe.outputIds) {
-                    if (id.contains(text)) yield true;
+                    if (id.contains(text) || id.contains(textUnder)) yield true;
                 }
                 yield false;
             }
 
             case CATEGORY -> recipe.categoryId.contains(text)
-                    || recipe.categoryName.contains(text);
+                    || recipe.categoryId.contains(textUnder)
+                    || recipe.categoryName.contains(text)
+                    || recipe.categoryName.contains(textSpaced);
 
-            case GENERAL -> recipe.fullSearchIndex.contains(text);
+            case GENERAL -> recipe.fullSearchIndex.contains(text)
+                    || (!textSpaced.equals(text) && recipe.fullSearchIndex.contains(textSpaced))
+                    || (!textUnder.equals(text) && recipe.fullSearchIndex.contains(textUnder));
         };
     }
 
     /**
-     * Ranking score:
+     * Categorical ranking score:
      * 3: Query matches directly in outputs or display name
      * 2: Query matches in inputs or category
      * 1: General match in full index
@@ -396,5 +403,47 @@ public class RecipeSearchEngine {
         }
 
         return maxScore;
+    }
+
+    /**
+     * Highly responsive fine-grained relevance score for sorting search results.
+     */
+    public static int calculateRelevanceScore(SearchableRecipe recipe, ParsedQuery query) {
+        if (query.isEmpty()) return 0;
+
+        int score = 0;
+        for (AndGroup group : query.orGroups()) {
+            for (QueryTerm term : group.terms()) {
+                if (term.negated()) continue;
+                String t = term.text();
+                String dn = recipe.displayName.toLowerCase(Locale.ROOT);
+                String cat = recipe.categoryName.toLowerCase(Locale.ROOT);
+                String catId = recipe.categoryId.toLowerCase(Locale.ROOT);
+
+                if (dn.equals(t)) {
+                    score += 10000;
+                } else if (dn.startsWith(t)) {
+                    score += 5000;
+                } else if (dn.contains(t)) {
+                    score += 2500;
+                }
+
+                if (cat.equals(t) || catId.equals(t)) {
+                    score += 4000;
+                } else if (cat.contains(t) || catId.contains(t)) {
+                    score += 2000;
+                }
+
+                if (recipe.outputSearchIndex.contains(t)) {
+                    score += 1500;
+                } else if (recipe.inputSearchIndex.contains(t)) {
+                    score += 800;
+                } else if (recipe.fullSearchIndex.contains(t)) {
+                    score += 100;
+                }
+            }
+        }
+
+        return score;
     }
 }

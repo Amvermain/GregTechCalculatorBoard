@@ -271,4 +271,24 @@ public class RecipeSearchEngineTest {
         ParsedQuery q2 = RecipeSearchEngine.parseQuery("lv kit");
         assertTrue(RecipeSearchEngine.matches(coloredRecipe, q2));
     }
+
+    @Test
+    public void testCategoryBracketQueries() {
+        SearchableRecipe smeltingRecipe = createMockRecipe(
+                "Iron Ingot", "minecraft", "smelting", "Smelting",
+                List.of("Iron Ingot"), List.of("Raw Iron"), List.of()
+        );
+
+        // [smelting] full bracket query
+        ParsedQuery qBracket = RecipeSearchEngine.parseQuery("[smelting]");
+        assertTrue(RecipeSearchEngine.matches(smeltingRecipe, qBracket));
+
+        // [smelt open bracket query during typing
+        ParsedQuery qOpenBracket = RecipeSearchEngine.parseQuery("[smelt");
+        assertTrue(RecipeSearchEngine.matches(smeltingRecipe, qOpenBracket));
+
+        // %smelting percent prefix query
+        ParsedQuery qPercent = RecipeSearchEngine.parseQuery("%smelting");
+        assertTrue(RecipeSearchEngine.matches(smeltingRecipe, qPercent));
+    }
 }

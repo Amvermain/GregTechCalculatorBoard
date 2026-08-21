@@ -224,8 +224,15 @@ public class FavoritesDockWidget {
             if (loading) {
                 int dotCount = (int) ((System.currentTimeMillis() / 400) % 4);
                 String dots = ".".repeat(dotCount);
-                graphics.drawString(font, "§e⏳ " + Component.translatable("gui.gtcalcboard.favorites_dock.loading_emi").getString() + dots, DOCK_X + 8, listY + 8, 0xFFE2E8F0, false);
-                graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.favorites_dock.loading_hint").getString(), DOCK_X + 8, listY + 22, 0xFF64748B, false);
+                var progress = RecipeSearchDialog.getCachingProgress();
+                String phaseText = Component.translatable(progress.phaseKey()).getString();
+                String loadingTitle = "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_recipes_phase",
+                        progress.currentPhase(), progress.totalPhases(), phaseText).getString() + dots;
+                graphics.drawString(font, font.plainSubstrByWidth(loadingTitle, EXPANDED_WIDTH - 16), DOCK_X + 8, listY + 8, 0xFFE2E8F0, false);
+                String detail = (progress.detail() != null && !progress.detail().isEmpty())
+                        ? progress.detail()
+                        : Component.translatable("gui.gtcalcboard.loading_recipe_phase_hint").getString();
+                graphics.drawString(font, font.plainSubstrByWidth("§8" + detail, EXPANDED_WIDTH - 16), DOCK_X + 8, listY + 22, 0xFF64748B, false);
                 closeFlyout();
             } else if (favorites.isEmpty()) {
                 graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.favorites_dock.empty").getString(), DOCK_X + 8, listY + 8, 0xFF888888, false);

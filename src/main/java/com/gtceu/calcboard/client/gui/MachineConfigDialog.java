@@ -365,8 +365,34 @@ public class MachineConfigDialog {
 
             long animDots = (System.currentTimeMillis() / 400L) % 4;
             String dots = ".".repeat((int) animDots);
-            String loadingTitle = "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_addons").getString() + dots;
-            graphics.drawCenteredString(font, loadingTitle, x + dialogW / 2, contentY + contentH / 2 - 6, 0xFFE0C040);
+
+            var progress = MachineAddonCatalog.getInstance().getProgress();
+            String phaseText = Component.translatable(progress.phaseKey()).getString();
+            String phaseTitle = "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_addons_phase",
+                    progress.currentPhase(), progress.totalPhases(), phaseText).getString() + dots;
+
+            int centerY = contentY + (contentH / 2);
+            graphics.drawCenteredString(font, phaseTitle, x + dialogW / 2, centerY - 20, 0xFFE0C040);
+
+            // Progress Bar
+            int barW = Math.min(220, dialogW - 60);
+            int barH = 6;
+            int barX = (x + dialogW / 2) - (barW / 2);
+            int barY = centerY - 4;
+
+            graphics.fill(barX, barY, barX + barW, barY + barH, 0xFF222733);
+            graphics.renderOutline(barX, barY, barW, barH, 0xFF3D4659);
+
+            float fillRatio = Math.max(0.15f, (float) progress.currentPhase() / (float) progress.totalPhases());
+            int fillW = (int) (barW * fillRatio);
+            graphics.fill(barX + 1, barY + 1, barX + fillW - 1, barY + barH - 1, 0xFF4A90E2);
+
+            // Subtitle detail & Warmup hint
+            if (progress.detail() != null && !progress.detail().isEmpty()) {
+                graphics.drawCenteredString(font, "§7" + progress.detail(), x + dialogW / 2, centerY + 8, 0xFFAAAAAA);
+            }
+            String hint = "§8" + Component.translatable("gui.gtcalcboard.loading_phase_hint").getString();
+            graphics.drawCenteredString(font, hint, x + dialogW / 2, centerY + 20, 0xFF666666);
             return;
         }
 
@@ -445,23 +471,27 @@ public class MachineConfigDialog {
             }
         }
         String res = sb.toString().trim();
-        return !res.isEmpty() ? res : "§71.0x Default";
+        return !res.isEmpty() ? res : "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.default").getString();
     }
 
     public static String getAddonSubtitle(MachineAddon addon, RecipeNode node) {
         if (addon == null) return "";
         if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-            return "§7Turbine Fuel Efficiency";
+            return "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.turbine").getString();
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
             int temp = addon.getCoilTemperature();
-            return temp > 0 ? "§7" + temp + "K Heating Coil" : "§7Heating Coil";
+            return temp > 0
+                    ? "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.coil", temp).getString()
+                    : "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.coil_generic").getString();
         }
         if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
-            return "§7Maintenance Hatch";
+            return "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.maintenance").getString();
         }
         if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
-            return addon.isPowerConstant() ? "§7Absolute (0x Extra EU)" : "§7Parallel Hatch";
+            return addon.isPowerConstant()
+                    ? "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.parallel_constant").getString()
+                    : "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.parallel").getString();
         }
         if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
             String desc = addon.getDescription();
@@ -469,9 +499,9 @@ public class MachineConfigDialog {
                 return "§7" + desc;
             }
             if (addon.getParallelMultiplier() > 1) {
-                return String.format("§7Tier Upgrade (%dx)", addon.getParallelMultiplier());
+                return "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.thermal_upgrade", addon.getParallelMultiplier()).getString();
             }
-            return "§7Thermal Augment";
+            return "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.thermal").getString();
         }
         String desc = addon.getDescription();
         if (desc != null && !desc.isEmpty()) {
@@ -480,7 +510,7 @@ public class MachineConfigDialog {
                 return "§7" + first;
             }
         }
-        return "§7Multiblock Trait";
+        return "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.trait").getString();
     }
 
     private String getCategoryLabel(MachineAddon.Category cat) {
@@ -754,26 +784,26 @@ public class MachineConfigDialog {
             long totalRegAugs = node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && !RecipeNode.isThermalUpgradeKit(a)).count();
 
             if (isTherm && !isUpKit) {
-                tooltip.add(Component.literal("§7Thermal Augment Slots §f(" + totalRegAugs + "/3 Used)"));
+                tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
                 if (targetCount > 0) {
-                    tooltip.add(Component.literal("§aInstalled Count: §f" + targetCount + "x"));
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
                     if (totalRegAugs < 3) {
-                        tooltip.add(Component.literal("§a[Left-Click] §fAdd copy (+1)"));
+                        tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
                     }
-                    tooltip.add(Component.literal("§c[Right-Click] §fRemove copy (-1)"));
+                    tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
                 } else {
                     if (totalRegAugs < 3) {
-                        tooltip.add(Component.literal("§a[Left-Click] §fInstall (+1)"));
+                        tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install")));
                     } else {
-                        tooltip.add(Component.literal("§e⚠ All 3 Augment Slots Full"));
+                        tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
                     }
                 }
             } else if (isTherm && isUpKit) {
-                tooltip.add(Component.literal("§6Tier Upgrade: §fSets machine scale to " + targetAddon.getParallelMultiplier() + "x (Max 1 Kit)"));
+                tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.addon.thermal.upgrade_desc", targetAddon.getParallelMultiplier())));
                 if (isInst) {
-                    tooltip.add(Component.literal("§c[Click] §fRemove Upgrade Kit"));
+                    tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
                 } else {
-                    tooltip.add(Component.literal("§a[Click] §fInstall Upgrade Kit (Replaces existing)"));
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install_kit")));
                 }
             } else if (isInst) {
                 tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));

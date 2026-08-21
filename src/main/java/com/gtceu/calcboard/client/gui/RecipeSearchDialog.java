@@ -133,6 +133,13 @@ public class RecipeSearchDialog {
         return GLOBAL_RECIPES.size();
     }
 
+    public record RecipeLoadingProgress(int currentPhase, int totalPhases, String phaseKey, String detail) {}
+    private static volatile RecipeLoadingProgress CACHING_PROGRESS = new RecipeLoadingProgress(1, 3, "gui.gtcalcboard.loading_recipe_phase.1", "");
+
+    public static RecipeLoadingProgress getCachingProgress() {
+        return CACHING_PROGRESS;
+    }
+
     public static void ensureGlobalRecipesCachedAsync(Runnable onComplete) {
         if (GLOBAL_CACHED) {
             if (onComplete != null) onComplete.run();
@@ -140,6 +147,7 @@ public class RecipeSearchDialog {
         }
         if (IS_CACHING) return;
         IS_CACHING = true;
+        CACHING_PROGRESS = new RecipeLoadingProgress(1, 3, "gui.gtcalcboard.loading_recipe_phase.1", "Connecting to EMI Recipe Manager");
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -162,6 +170,7 @@ public class RecipeSearchDialog {
                     return;
                 }
 
+                CACHING_PROGRESS = new RecipeLoadingProgress(2, 3, "gui.gtcalcboard.loading_recipe_phase.2", recipes.size() + " Recipes (" + Runtime.getRuntime().availableProcessors() + " CPU Cores)");
                 long startNanos = System.nanoTime();
                 // Fast parallel indexing across all CPU cores (reduces 120s+ to < 1s)
                 List<SearchableRecipe> tempList = recipes.parallelStream()
@@ -175,6 +184,7 @@ public class RecipeSearchDialog {
                     GLOBAL_CACHED = true;
                 }
 
+                CACHING_PROGRESS = new RecipeLoadingProgress(3, 3, "gui.gtcalcboard.loading_recipe_phase.3", "Baking Machine Capabilities Matrix");
                 RecipeFilterDialog.updateDiscoveredCategories(RecipeSearchEngine.discoverCategories(tempList));
                 com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().bake(recipes);
 
@@ -367,21 +377,18 @@ public class RecipeSearchDialog {
         if (isTutorial) {
             sourceList = getTutorialDummyRecipes();
         } else {
-            synchronized (GLOBAL_RECIPES) {
-                if (GLOBAL_RECIPES.isEmpty()) {
-                    ensureGlobalRecipesCachedAsync(() -> {
-                        if (this.visible) {
-                            updateSearchResults(searchBox.getValue());
-                        }
-                    });
-                    return Collections.emptyList();
-                }
-                sourceList = new ArrayList<>(GLOBAL_RECIPES);
+            if (GLOBAL_RECIPES.isEmpty()) {
+                ensureGlobalRecipesCachedAsync(() -> {
+                    if (this.visible) {
+                        updateSearchResults(searchBox.getValue());
+                    }
+                });
+                return Collections.emptyList();
             }
+            sourceList = GLOBAL_RECIPES;
         }
 
         record ScoredRecipe(SearchableRecipe recipe, int score) {}
-        List<ScoredRecipe> scoredList = new ArrayList<>();
 
         boolean hasContext = (contextualWireTarget != null && contextualWireTarget.sourceStack != null);
         boolean targetIsFluid = hasContext && contextualWireTarget.sourceStack.isFluid();
@@ -394,95 +401,81 @@ public class RecipeSearchDialog {
 
         RecipeFilterConfig filterConfig = RecipeFilterConfig.getInstance();
         Set<ResourceLocation> favoriteIds = showFavoritesOnly ? getFavoriteRecipeIds() : null;
+        boolean hasQuery = (query != null && !query.trim().isEmpty());
 
-        for (SearchableRecipe sr : sourceList) {
-            if (showFavoritesOnly) {
-                ResourceLocation rId = (sr.recipe() instanceof EmiRecipe er) ? er.getId() : null;
-                if (rId == null || favoriteIds == null || !favoriteIds.contains(rId)) {
-                    continue;
-                }
-            }
-            if (filterConfig.isCategoryExcluded(sr.categoryId())) {
-                continue;
-            }
-            if (!RecipeSearchEngine.matches(sr, parsedQuery)) {
-                continue;
-            }
-
-            int contextualScore = 0;
-            if (hasContext) {
-                if (!contextualWireTarget.sourceIsInput) {
-                    // Looking for CONSUMERS (recipes with matching input)
-                    if (targetIsFluid) {
-                        if ((targetFullId != null && sr.inputFluidIds().contains(targetFullId))
-                                || (targetIdPath != null && sr.inputFluidIds().contains(targetIdPath))) {
-                            contextualScore = 1000;
-                        } else if (targetName != null && sr.inputNames().contains(targetName)) {
-                            contextualScore = 500;
+        return sourceList.parallelStream()
+                .filter(sr -> {
+                    if (showFavoritesOnly) {
+                        ResourceLocation rId = (sr.recipe() instanceof EmiRecipe er) ? er.getId() : null;
+                        if (rId == null || favoriteIds == null || !favoriteIds.contains(rId)) {
+                            return false;
                         }
+                    }
+                    if (filterConfig.isCategoryExcluded(sr.categoryId())) {
+                        return false;
+                    }
+                    return RecipeSearchEngine.matches(sr, parsedQuery);
+                })
+                .map(sr -> {
+                    int contextualScore = 0;
+                    if (hasContext) {
+                        if (!contextualWireTarget.sourceIsInput) {
+                            // Looking for CONSUMERS (recipes with matching input)
+                            if (targetIsFluid) {
+                                if ((targetFullId != null && sr.inputFluidIds().contains(targetFullId))
+                                        || (targetIdPath != null && sr.inputFluidIds().contains(targetIdPath))) {
+                                    contextualScore = 10000;
+                                } else if (targetName != null && sr.inputNames().contains(targetName)) {
+                                    contextualScore = 5000;
+                                }
+                            } else {
+                                if ((targetFullId != null && !sr.inputFluidIds().contains(targetFullId) && sr.inputIds().contains(targetFullId))
+                                        || (targetIdPath != null && !sr.inputFluidIds().contains(targetIdPath) && sr.inputIds().contains(targetIdPath))) {
+                                    contextualScore = 10000;
+                                } else if (targetName != null && sr.inputNames().contains(targetName)) {
+                                    contextualScore = 5000;
+                                }
+                            }
+                        } else {
+                            // Looking for PRODUCERS (recipes with matching output)
+                            if (targetIsFluid) {
+                                if ((targetFullId != null && sr.outputFluidIds().contains(targetFullId))
+                                        || (targetIdPath != null && sr.outputFluidIds().contains(targetIdPath))) {
+                                    contextualScore = 10000;
+                                } else if (targetName != null && sr.outputNames().contains(targetName)) {
+                                    contextualScore = 5000;
+                                }
+                            } else {
+                                if ((targetFullId != null && !sr.outputFluidIds().contains(targetFullId) && sr.outputIds().contains(targetFullId))
+                                        || (targetIdPath != null && !sr.outputFluidIds().contains(targetIdPath) && sr.outputIds().contains(targetIdPath))) {
+                                    contextualScore = 10000;
+                                } else if (targetName != null && sr.outputNames().contains(targetName)) {
+                                    contextualScore = 5000;
+                                }
+                            }
+                        }
+                    }
+
+                    int totalScore = contextualScore;
+                    if (hasQuery) {
+                        totalScore += RecipeSearchEngine.calculateRelevanceScore(sr, parsedQuery);
                     } else {
-                        if ((targetFullId != null && !sr.inputFluidIds().contains(targetFullId) && sr.inputIds().contains(targetFullId))
-                                || (targetIdPath != null && !sr.inputFluidIds().contains(targetIdPath) && sr.inputIds().contains(targetIdPath))) {
-                            contextualScore = 1000;
-                        } else if (targetName != null && sr.inputNames().contains(targetName)) {
-                            contextualScore = 500;
+                        // Default recommendations when search query is empty
+                        String cat = sr.categoryId().toLowerCase(Locale.ROOT);
+                        if (!cat.equals("crafting") && !cat.equals("minecraft:crafting")) {
+                            totalScore += 100;
+                        }
+                        if (cat.contains("turbine") || cat.contains("generator") || cat.contains("boiler")) {
+                            totalScore += 50;
                         }
                     }
-
-                    // If in contextual mode and query is empty, only show matching recipes.
-                    // If user typed a search query, allow general search across all recipes.
-                    if (contextualScore == 0 && (query == null || query.trim().isEmpty())) {
-                        continue;
-                    }
-                } else {
-                    // Looking for PRODUCERS (recipes with matching output)
-                    if (targetIsFluid) {
-                        if ((targetFullId != null && sr.outputFluidIds().contains(targetFullId))
-                                || (targetIdPath != null && sr.outputFluidIds().contains(targetIdPath))) {
-                            contextualScore = 1000;
-                        } else if (targetName != null && sr.outputNames().contains(targetName)) {
-                            contextualScore = 500;
-                        }
-                    } else {
-                        if ((targetFullId != null && !sr.outputFluidIds().contains(targetFullId) && sr.outputIds().contains(targetFullId))
-                                || (targetIdPath != null && !sr.outputFluidIds().contains(targetIdPath) && sr.outputIds().contains(targetIdPath))) {
-                            contextualScore = 1000;
-                        } else if (targetName != null && sr.outputNames().contains(targetName)) {
-                            contextualScore = 500;
-                        }
-                    }
-
-                    // If in contextual mode and query is empty, only show matching recipes.
-                    if (contextualScore == 0 && (query == null || query.trim().isEmpty())) {
-                        continue;
-                    }
-                }
-            }
-
-            int queryScore = RecipeSearchEngine.calculateRank(sr, parsedQuery);
-            int totalScore = contextualScore + (queryScore * 10);
-
-            // Priority bonus for machine processing recipes over generic crafting table
-            String cat = sr.categoryId().toLowerCase(Locale.ROOT);
-            if (!cat.equals("crafting") && !cat.equals("minecraft:crafting")) {
-                totalScore += 100;
-            }
-            if (cat.contains("turbine") || cat.contains("generator") || cat.contains("boiler")) {
-                totalScore += 50;
-            }
-
-            scoredList.add(new ScoredRecipe(sr, totalScore));
-        }
-
-        // Sort descending by score
-        scoredList.sort((a, b) -> Integer.compare(b.score(), a.score()));
-
-        int limit = Math.min(150, scoredList.size());
-        List<SearchableRecipe> resultList = new ArrayList<>(limit);
-        for (int i = 0; i < limit; i++) {
-            resultList.add(scoredList.get(i).recipe());
-        }
-        return resultList;
+                    return new ScoredRecipe(sr, totalScore);
+                })
+                .filter(sr -> !hasContext || !contextualWireTarget.sourceIsInput || sr.score() > 0 || hasQuery)
+                .sorted((a, b) -> Integer.compare(b.score(), a.score()))
+                .limit(150)
+                .map(ScoredRecipe::recipe)
+                .toList();
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -600,10 +593,38 @@ public class RecipeSearchDialog {
             boolean isLoading = GLOBAL_RECIPES.isEmpty() || !GLOBAL_CACHED;
             long animDots = (System.currentTimeMillis() / 400L) % 4;
             String dots = ".".repeat((int) animDots);
-            String emptyMsg = isLoading
-                ? "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_recipes").getString() + dots
-                : "§7" + Component.translatable("gui.gtcalcboard.no_matching_recipes").getString();
-            graphics.drawCenteredString(font, emptyMsg, listX + listW / 2, listY + listH / 2 - 4, isLoading ? 0xFFE0C040 : 0xFF888888);
+
+            if (isLoading) {
+                var progress = CACHING_PROGRESS;
+                String phaseText = Component.translatable(progress.phaseKey()).getString();
+                String phaseTitle = "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_recipes_phase",
+                        progress.currentPhase(), progress.totalPhases(), phaseText).getString() + dots;
+
+                int centerY = listY + (listH / 2);
+                graphics.drawCenteredString(font, phaseTitle, listX + listW / 2, centerY - 20, 0xFFE0C040);
+
+                // Progress Bar
+                int barW = Math.min(220, listW - 40);
+                int barH = 6;
+                int barX = (listX + listW / 2) - (barW / 2);
+                int barY = centerY - 4;
+
+                graphics.fill(barX, barY, barX + barW, barY + barH, 0xFF222733);
+                graphics.renderOutline(barX, barY, barW, barH, 0xFF3D4659);
+
+                float fillRatio = Math.max(0.15f, (float) progress.currentPhase() / (float) progress.totalPhases());
+                int fillW = (int) (barW * fillRatio);
+                graphics.fill(barX + 1, barY + 1, barX + fillW - 1, barY + barH - 1, 0xFF4A90E2);
+
+                if (progress.detail() != null && !progress.detail().isEmpty()) {
+                    graphics.drawCenteredString(font, "§7" + progress.detail(), listX + listW / 2, centerY + 8, 0xFFAAAAAA);
+                }
+                String hint = "§8" + Component.translatable("gui.gtcalcboard.loading_recipe_phase_hint").getString();
+                graphics.drawCenteredString(font, hint, listX + listW / 2, centerY + 20, 0xFF666666);
+            } else {
+                String emptyMsg = "§7" + Component.translatable("gui.gtcalcboard.no_matching_recipes").getString();
+                graphics.drawCenteredString(font, emptyMsg, listX + listW / 2, listY + listH / 2 - 4, 0xFF888888);
+            }
         } else {
             for (int i = 0; i < visibleRows; i++) {
                 int index = scrollOffset + i;

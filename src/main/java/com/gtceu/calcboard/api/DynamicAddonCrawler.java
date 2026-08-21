@@ -56,6 +56,7 @@ public class DynamicAddonCrawler {
         List<MachineAddon> result = new ArrayList<>();
 
         // 1. Static Registry Items (GTCEu Rotors from GTRegistries.MATERIALS, Coils from GTRegistries.COILS)
+        MachineAddonCatalog.getInstance().setProgress(2, 4, "gui.gtcalcboard.loading_phase.2", "GTCEu Coils & Hatches");
         try {
             TurbineRotorHelper.discoverGTCEuRotors(result);
             CoilHelper.discoverGTCEuCoils(result);
@@ -63,6 +64,7 @@ public class DynamicAddonCrawler {
         int gtStaticCount = result.size();
 
         // 2. Dynamic Recipe Outputs (Thermal Augments / KubeJS Kits with NBT)
+        MachineAddonCatalog.getInstance().setProgress(3, 4, "gui.gtcalcboard.loading_phase.3", "Recipe Outputs & Augments (" + gtStaticCount + " found)");
         int dynamicAugmentCount = 0;
         Minecraft mc = Minecraft.getInstance();
         List<ItemStack> recipeOutputStacks = new ArrayList<>();
@@ -90,6 +92,7 @@ public class DynamicAddonCrawler {
         }
 
         // 3. Forge Registry Crawl with NBT samples
+        MachineAddonCatalog.getInstance().setProgress(4, 4, "gui.gtcalcboard.loading_phase.4", "Item Registry Cache (" + result.size() + " items)");
         crawlItemRegistry(recipeOutputStacks, result);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;

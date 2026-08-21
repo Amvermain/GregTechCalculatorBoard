@@ -22,6 +22,9 @@ public class MachineAddonCatalog {
     private volatile CompletableFuture<Void> preloadFuture = null;
     private String lastLanguageCode = "";
 
+    public record LoadingProgress(int currentPhase, int totalPhases, String phaseKey, String detail) {}
+    private volatile LoadingProgress currentProgress = new LoadingProgress(1, 4, "gui.gtcalcboard.loading_phase.1", "");
+
     private MachineAddonCatalog() {
         // Initial state
     }
@@ -41,6 +44,14 @@ public class MachineAddonCatalog {
         return isDynamicDataLoaded && !isDirty;
     }
 
+    public LoadingProgress getProgress() {
+        return currentProgress;
+    }
+
+    public void setProgress(int currentPhase, int totalPhases, String phaseKey, String detail) {
+        this.currentProgress = new LoadingProgress(currentPhase, totalPhases, phaseKey, detail != null ? detail : "");
+    }
+
     public void markDirty() {
         this.isDirty = true;
     }
@@ -51,6 +62,7 @@ public class MachineAddonCatalog {
             isDynamicDataLoaded = false;
             isLoading = false;
             isDirty = true;
+            this.currentProgress = new LoadingProgress(1, 4, "gui.gtcalcboard.loading_phase.1", "");
         }
     }
 
@@ -66,9 +78,12 @@ public class MachineAddonCatalog {
         }
 
         isLoading = true;
+        setProgress(1, 4, "gui.gtcalcboard.loading_phase.1", "Builtin Traits & Multiblock Capabilities");
+
         preloadFuture = CompletableFuture.supplyAsync(() -> {
             List<MachineAddon> list = new ArrayList<>();
             list.addAll(DynamicAddonCrawler.getBuiltinTraits());
+
             List<MachineAddon> dynamic = DynamicAddonCrawler.crawlDynamicAddons();
             if (dynamic != null && !dynamic.isEmpty()) {
                 list.addAll(dynamic);
@@ -77,6 +92,7 @@ public class MachineAddonCatalog {
             return list;
         }, Util.backgroundExecutor())
         .thenAccept(completeList -> {
+            setProgress(4, 4, "gui.gtcalcboard.loading_phase.4", completeList.size() + " Addons Ready");
             synchronized (allAddons) {
                 allAddons.clear();
                 allAddons.addAll(completeList);

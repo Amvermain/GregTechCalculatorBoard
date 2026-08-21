@@ -11,27 +11,32 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ## [2.0.0-alpha.4] - 2026-08-21
 
 ### Added
-- **Side Favorites Dock Panel System (`FavoritesDockWidget`, `BoardScreen`)**:
-  - Added a collapsible favorites dock (`[⭐ Favorites (N) ▶]`) on the left of the board screen allowing single-click or drag-and-drop placement of favorited items onto the canvas.
-- **3-Tier Hierarchical Recipe Navigation & Interactive Native EMI Preview (`FavoritesDockWidget`, `RecipeHoverPreviewRenderer`)**:
-  - Hovering over an item favorite reveals a 2nd-tier flyout panel listing all producing recipes (Machine / Time / EU/t).
-  - Hovering over any recipe in the 2nd-tier flyout renders a 3rd-tier floating Native EMI preview card with full interactive widgets.
-  - Seamless mouse transition into the 3rd-tier preview card with hover persistence, allowing slot hovering for EMI tooltips, `R`/`U` key lookups, and single-click recipe node spawning.
-  - Added bridge hitbox between panels to ensure smooth and uninterrupted mouse cursor transitions.
-- **EMI Loading Indicator & State Animation (`FavoritesDockWidget`)**:
-  - Displays `⭐ Favorites (⏳ Loading...)` and animated dots (`⏳ Loading EMI recipes...`) during initial world launch while EMI recipe manager and indices are baking in the background.
+- **Favorites Dock Panel (`FavoritesDockWidget`, `BoardScreen`)**:
+  - Added a collapsible panel on the left of the board screen to place favorited items onto the canvas via single-click or drag-and-drop.
+- **Favorite Recipe Navigation & EMI Preview Integration (`FavoritesDockWidget`, `RecipeHoverPreviewRenderer`)**:
+  - Displays producing recipes and EMI preview cards upon hovering over favorites, supporting slot hover tooltips and R/U key lookups.
+  - Adjusted hover hitboxes between panels for smoother cursor transitions.
+- **Multi-Phase Loading State & Progress Bar (`MachineConfigDialog`, `RecipeSearchDialog`, `FavoritesDockWidget`)**:
+  - Added multi-phase progress text and progress bars to machine hardware config, recipe search, and favorites dock during background indexing.
+- **Bracket Category Search (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Supports filtering recipes by category or machine using bracket syntax (`[smelting]`, `[pyro]`, `%smelting`).
 - **Recipe Category Filter Integration (`FavoritesDockWidget`, `RecipeFilterConfig`)**:
-  - Excluded categories configured in `RecipeFilterDialog` (e.g. `item draining`) are automatically filtered out from favorite recipe exploration and automatic node resolution.
+  - Excluded categories in `RecipeFilterDialog` are automatically omitted from favorite recipe exploration and automatic node placement.
 
 ### Fixed & Changed
-- **EMI Recipe Screen `[+]` (Fill Recipe) One-Click Board Add & Navigation (`CalcBoardEmiOverlayHandler`)**:
-  - Reflection-based dynamic enablement of EMI's `RecipeFillButtonWidget` with custom tooltip (`§a➕ Add Recipe to Board`).
-  - Clicking `[+]` or pressing the bound hotkey adds the recipe and seamlessly opens `BoardScreen`.
-  - Added proper `KeyMapping.ADD_RECIPE` checks respecting `Not Bound` configuration.
-- **Restored Pure `Screen` Hierarchy for `BoardScreen` (`BoardScreen`, `BoardContainerMenu`)**:
-  - Restored `BoardScreen` to extend pure `Screen`, eliminating inventory sidebar icon intrusions from FTB Teams, JourneyMap, and Curios.
-- **Localization (i18n) Synchronization (`en_us.json`, `ko_kr.json`)**:
-  - Cleaned up duplicated blocks in `en_us.json` and synchronized all resource keys 1:1 with `ko_kr.json`.
+- **GTCEu High-Tier Coil Stats Calculation (`CoilHelper`, `MachineAddon`)**:
+  - Corrected formula calculations for high-tier and custom coils (e.g. `Abyssal Alloy Coil` Cracker discount `0.07x`, Pyrolyse speed, LCR, and Multi Smelter parallel).
+  - Prioritized `ICoilType.getTier()` to prevent tier calculation discrepancies.
+- **Recipe Search Performance Optimization (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - Removed unnecessary list copying and applied parallel stream filtering during search to improve query response time.
+- **Search Result Relevance & Ranking Improvements (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - Updated scoring logic to prioritize name and category matches when a query is provided.
+- **EMI Recipe Screen `[+]` Button Integration (`CalcBoardEmiOverlayHandler`)**:
+  - Clicking EMI's `[+]` button or pressing the hotkey now adds the recipe and switches to the board screen.
+- **`BoardScreen` Class Hierarchy Fix (`BoardScreen`, `BoardContainerMenu`)**:
+  - Restored `Screen` inheritance to prevent inventory-related sidebar overlays from rendering over the board.
+- **Language File Cleanup (`en_us.json`, `ko_kr.json`)**:
+  - Removed duplicate keys and synchronized resource entries between English and Korean language files.
 
 ---
 

@@ -127,35 +127,26 @@ public class CoilHelper {
             return null;
         }
 
-        int tier = extractInt(coilTypeObj, "getTier", "getLevel");
-        int level = tier > 0 ? tier : Math.max(0, (heat - 1800) / 900);
+        int rawTier = extractInt(coilTypeObj, "getTier");
+        int rawLevel = extractInt(coilTypeObj, "getLevel");
+        int tier = (rawTier >= 0) ? rawTier : Math.max(0, (heat - 1800) / 900);
+        int level = (rawLevel > 0) ? rawLevel : (tier == 0 ? 1 : Math.max(1, tier));
 
-        int pyroSpeed = extractInt(coilTypeObj, "getPyrolyseSpeedPercent", "getPyrolyseSpeed", "getPyroSpeed");
-        if (pyroSpeed <= 0) {
-            pyroSpeed = level == 0 ? 75 : Math.min(800, 100 + (level - 1) * 50);
-        }
+        // 1. Pyrolyse Oven: tier == 0 ? 75 : 50 * (tier + 1)
+        int pyroSpeed = (tier == 0) ? 75 : (50 * (tier + 1));
 
-        int crackDiscount = extractInt(coilTypeObj, "getCrackingEnergyPercent", "getEnergyDiscount", "getCrackingEnergyDiscount", "getCrackingEnergy");
-        if (crackDiscount <= 0) {
-            crackDiscount = level == 0 ? 100 : Math.max(10, 90 - (level - 1) * 10);
-        }
+        // 2. Cracker: discount = tier <= 9 ? tier * 0.1 : 0.9 + (tier - 9) * 0.025
+        double crackDiscount = tier <= 9 ? (tier * 0.1) : (0.9 + (tier - 9) * 0.025);
+        int crackEnergyPercent = Math.max(1, (int) Math.floor((1.0 - crackDiscount) * 100.0 + 0.0001));
 
-        int chemSpeed = extractInt(coilTypeObj, "getChemicalSpeedPercent", "getChemicalSpeed", "getChemSpeed");
-        if (chemSpeed <= 0) {
-            chemSpeed = level == 0 ? 75 : (100 + (level - 1) * 25);
-        }
+        // 3. Chemical Reactor: speed = 75 + tier * 25, energy = max(50, 100 - tier * 5)
+        int chemSpeed = 75 + (tier * 25);
+        int chemEnergy = Math.max(50, 100 - (tier * 5));
 
-        int chemEnergy = extractInt(coilTypeObj, "getChemicalEnergyPercent", "getChemicalEnergyDiscount", "getChemicalEnergy", "getChemEnergy");
-        if (chemEnergy <= 0) {
-            chemEnergy = level == 0 ? 100 : Math.max(30, 95 - (level - 1) * 5);
-        }
+        // 4. Multi Smelter: parallel = level * 32
+        int smelterPar = level * 32;
 
-        int smelterPar = extractInt(coilTypeObj, "getSmelterParallel", "getMaxParallel", "getParallel");
-        if (smelterPar <= 0) {
-            smelterPar = level == 0 ? 32 : Math.min(2048, 32 * (level + 1));
-        }
-
-        return new CoilStats(heat, pyroSpeed, crackDiscount, chemSpeed, chemEnergy, smelterPar);
+        return new CoilStats(heat, pyroSpeed, crackEnergyPercent, chemSpeed, chemEnergy, smelterPar);
     }
 
     private static Object resolveCoilTypeObject(Object obj) {
@@ -300,9 +291,57 @@ public class CoilHelper {
         ResourceLocation catId = node.getRecipeCategoryId();
         java.util.List<ResourceLocation> wsList = node.getAvailableWorkstations();
         ResourceLocation icon = node.getMachineIcon();
+        String mName = node.getName() != null ? node.getName().toLowerCase(java.util.Locale.ROOT) : "";
 
-        // 1. EBF (Electric Blast Furnace): 5% EU discount per 900K excess temperature above requirement
-        if (reqTemp > 0 || (catId != null && catId.equals(ResourceLocation.tryParse("gtceu:electric_blast_furnace")))) {
+        // 1. Cracking Unit: Energy % -> EU/t (Energy / 100)
+        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:cracker")) || catId.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
+                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:cracker")) || icon.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
+                || wsList.contains(ResourceLocation.tryParse("gtceu:cracker")) || wsList.contains(ResourceLocation.tryParse("gtceu:cracking_unit"))
+                || mName.contains("cracker") || mName.contains("cracking")) {
+            cp.setDurationMultiplier(1.0);
+            cp.setEutMultiplier(source.getCrackingEnergyPercent() / 100.0);
+            cp.setParallelMultiplier(1);
+            return cp;
+        }
+
+        // 2. Pyrolyse Oven: Speed % -> Duration (100 / Speed)
+        if ((catId != null && catId.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
+                || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
+                || wsList.contains(ResourceLocation.tryParse("gtceu:pyrolyse_oven"))
+                || mName.contains("pyrolyse")) {
+            cp.setDurationMultiplier(100.0 / Math.max(1, source.getPyrolyseSpeedPercent()));
+            cp.setEutMultiplier(1.0);
+            cp.setParallelMultiplier(1);
+            return cp;
+        }
+
+        // 3. Large Chemical Reactor / Chemical Reactor: Speed %, Energy %
+        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || catId.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
+                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || icon.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
+                || wsList.contains(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || wsList.contains(ResourceLocation.tryParse("gtceu:chemical_reactor"))
+                || mName.contains("chemical")) {
+            cp.setDurationMultiplier(100.0 / Math.max(1, source.getChemicalSpeedPercent()));
+            cp.setEutMultiplier(source.getChemicalEnergyPercent() / 100.0);
+            cp.setParallelMultiplier(1);
+            return cp;
+        }
+
+        // 4. Multi Smelter / Alloy Smelter: Max Parallel
+        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || catId.equals(ResourceLocation.tryParse("gtceu:alloy_smelter")) || catId.equals(ResourceLocation.tryParse("minecraft:smelting")) || catId.equals(ResourceLocation.tryParse("minecraft:blasting"))))
+                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || icon.equals(ResourceLocation.tryParse("gtceu:alloy_smelter"))))
+                || wsList.contains(ResourceLocation.tryParse("gtceu:multi_smelter")) || wsList.contains(ResourceLocation.tryParse("gtceu:alloy_smelter"))
+                || mName.contains("multi_smelter") || mName.contains("smelter")) {
+            cp.setParallelMultiplier(Math.max(1, source.getSmelterParallel()));
+            cp.setDurationMultiplier(1.0);
+            cp.setEutMultiplier(1.0);
+            return cp;
+        }
+
+        // 5. EBF (Electric Blast Furnace): 5% EU discount per 900K excess temperature above requirement
+        if (reqTemp > 0 || (catId != null && catId.equals(ResourceLocation.tryParse("gtceu:electric_blast_furnace")))
+                || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:electric_blast_furnace")))
+                || wsList.contains(ResourceLocation.tryParse("gtceu:electric_blast_furnace"))
+                || mName.contains("blast")) {
             if (reqTemp > 0 && source.getCoilTemperature() > reqTemp) {
                 int excessTemp = source.getCoilTemperature() - reqTemp;
                 int tiersAbove = excessTemp / 900;
@@ -312,46 +351,6 @@ public class CoilHelper {
             }
             cp.setDurationMultiplier(1.0);
             cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 2. Pyrolyse Oven: Speed % -> Duration (100 / Speed)
-        if ((catId != null && catId.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
-                || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:pyrolyse_oven"))) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, source.getPyrolyseSpeedPercent()));
-            cp.setEutMultiplier(1.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 3. Cracking Unit: Energy % -> EU/t (Energy / 100)
-        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:cracker")) || catId.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
-                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:cracker")) || icon.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:cracker")) || wsList.contains(ResourceLocation.tryParse("gtceu:cracking_unit"))) {
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(source.getCrackingEnergyPercent() / 100.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 4. Large Chemical Reactor / Chemical Reactor: Speed %, Energy %
-        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || catId.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
-                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || icon.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || wsList.contains(ResourceLocation.tryParse("gtceu:chemical_reactor"))) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, source.getChemicalSpeedPercent()));
-            cp.setEutMultiplier(source.getChemicalEnergyPercent() / 100.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 5. Multi Smelter / Alloy Smelter: Max Parallel
-        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || catId.equals(ResourceLocation.tryParse("gtceu:alloy_smelter")) || catId.equals(ResourceLocation.tryParse("minecraft:smelting")) || catId.equals(ResourceLocation.tryParse("minecraft:blasting"))))
-                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || icon.equals(ResourceLocation.tryParse("gtceu:alloy_smelter"))))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:multi_smelter")) || wsList.contains(ResourceLocation.tryParse("gtceu:alloy_smelter"))) {
-            cp.setParallelMultiplier(Math.max(1, source.getSmelterParallel()));
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(1.0);
             return cp;
         }
 
