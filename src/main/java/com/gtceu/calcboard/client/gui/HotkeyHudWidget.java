@@ -5,9 +5,11 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.api.BoardManager;
+
 public class HotkeyHudWidget {
     private final BoardScreen screen;
-    private boolean expanded = true;
+    private boolean expanded;
 
     private static final int EXPANDED_WIDTH = 180;
     private static final int EXPANDED_HEIGHT = 136;
@@ -16,6 +18,7 @@ public class HotkeyHudWidget {
 
     public HotkeyHudWidget(BoardScreen screen) {
         this.screen = screen;
+        this.expanded = BoardManager.getInstance().isHotkeyHudExpanded();
     }
 
     public boolean isExpanded() {
@@ -24,10 +27,11 @@ public class HotkeyHudWidget {
 
     public void setExpanded(boolean expanded) {
         this.expanded = expanded;
+        BoardManager.getInstance().setHotkeyHudExpanded(expanded);
     }
 
     public void toggle() {
-        this.expanded = !this.expanded;
+        setExpanded(!this.expanded);
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
@@ -112,7 +116,7 @@ public class HotkeyHudWidget {
             int chipX = 8;
             int chipY = screenH - COLLAPSED_HEIGHT - 8;
             if (mouseX >= chipX && mouseX <= chipX + COLLAPSED_WIDTH && mouseY >= chipY && mouseY <= chipY + COLLAPSED_HEIGHT) {
-                expanded = true;
+                setExpanded(true);
                 return true;
             }
             return false;
@@ -125,7 +129,7 @@ public class HotkeyHudWidget {
             int minBtnX = panelX + EXPANDED_WIDTH - 14;
             int minBtnY = panelY + 2;
             if (mouseX >= minBtnX && mouseX <= minBtnX + 12 && mouseY >= minBtnY && mouseY <= minBtnY + 12) {
-                expanded = false;
+                setExpanded(false);
                 return true;
             }
             return true; // Consume clicks inside panel

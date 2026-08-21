@@ -3,7 +3,6 @@ package com.gtceu.calcboard.client.event;
 import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.MachineAddonCatalog;
 import com.gtceu.calcboard.client.key.KeyBindings;
-import com.gtceu.calcboard.integration.emi.CalcBoardEmiOverlay;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
@@ -18,7 +17,6 @@ public class ClientModBusEvents {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        MinecraftForge.EVENT_BUS.register(CalcBoardEmiOverlay.class);
     }
 
     @SubscribeEvent

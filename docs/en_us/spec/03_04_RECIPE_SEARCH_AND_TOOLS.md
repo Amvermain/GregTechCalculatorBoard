@@ -149,6 +149,8 @@ Modal for toggling specific recipe categories or blacklisting entire machine typ
 
 Persistent bottom-left HUD showing vital keyboard shortcuts, collapsible via `[-]` or clicking the `[?]` chip:
 
+* **Global UI State Persistence (`BoardManager`)**: Collapsed/expanded state is globally saved to `BoardManager.hotkeyHudExpanded` NBT, preserving the user's preference across page changes and window re-openings.
+
 <div style="background-color: #14171e; padding: 16px; border-radius: 8px; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; font-size: 12px; line-height: 1.4;">
   <!-- Hotkey HUD Widget Container -->
   <div style="background-color: #0b1120; border: 1.5px solid #1e293b; border-radius: 5px; width: 220px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); overflow: hidden;">
@@ -182,6 +184,81 @@ Persistent bottom-left HUD showing vital keyboard shortcuts, collapsible via `[-
       <div style="display: flex; justify-content: space-between;">
         <span style="background: #1e293b; color: #f1f5f9; padding: 0 4px; border-radius: 2px; font-family: monospace;">Ctrl+Z / Y</span>
         <span style="color: #94a3b8;">Undo / Redo</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+### 3.3 Top-Left Collapsible EMI Favorites Dock & Sub-Flyout (`FavoritesDockWidget`)
+
+Dedicated sidebar dock located at the top-left of the board to view pinned EMI favorites in real-time and spawn them onto the canvas with a single click or drag-and-drop:
+
+* **Top-Left Placement**: `x = 8`, `y = 52` (immediately beneath top toolbar).
+* **Collapsible Toggle & Global Persistence**:
+  - `[⭐ Favorites (N) ◀/▶]` tab button to expand or collapse.
+  - UI state (`favoritesDockExpanded`) is persistently saved in global NBT via `BoardManager`.
+* **1:1 Favorite Mapping & Sub-Flyout Recipe Selector**:
+  - **Recipe Favorites**: Instant 1-click or drag-and-drop canvas spawning.
+  - **Item Favorites**: Hovering/selecting opens an interactive **right-side sub-flyout panel** (`185px`) listing all producing recipes with machine icons, durations, and EU/t specs, supporting mouse wheel scrolling and drag-and-drop.
+* **One-Click & Drag-and-Drop Spawning**:
+  - Click: Automatically places node at the next available canvas position.
+  - Drag: Drag any recipe row and release anywhere on the canvas to spawn at that exact coordinate.
+
+#### `FavoritesDockWidget` UI Wireframe
+
+<div style="background-color: #14171e; padding: 16px; border-radius: 8px; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; font-size: 12px; line-height: 1.4;">
+  <div style="display: flex; gap: 8px; align-items: flex-start;">
+    <!-- 1. Main Favorites Dock -->
+    <div style="background: rgba(15, 23, 42, 0.95); border: 1.5px solid #38bdf8; border-radius: 4px; width: 145px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); overflow: hidden;">
+      <!-- Header -->
+      <div style="background: #1e293b; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155;">
+        <span style="color: #ffd700; font-weight: bold; font-size: 11px;">⭐ Favorites (4)</span>
+        <span style="color: #94a3b8; font-size: 10px; cursor: pointer;">◀</span>
+      </div>
+      <!-- List Items -->
+      <div style="padding: 4px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="background: #2a3649; border: 1px solid #38bdf8; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>🧊</span>
+            <span style="color: #ffffff; font-size: 11px; font-weight: bold;">Steel Frame</span>
+          </div>
+          <span style="color: #ffd700; font-size: 10px;">▶</span>
+        </div>
+        <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>📦</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Soul Infused Block</span>
+          </div>
+          <span style="color: #94a3b8; font-size: 10px;">▶</span>
+        </div>
+        <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>⚗️</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Sulfuric Acid</span>
+          </div>
+          <span style="color: #64748b; font-size: 10px;">1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Sub-flyout Recipe Selector -->
+    <div style="background: rgba(11, 17, 30, 0.98); border: 1.5px solid #38bdf8; border-radius: 4px; width: 185px; box-shadow: 0 6px 16px rgba(0,0,0,0.8); overflow: hidden;">
+      <div style="background: #172033; padding: 4px 8px; border-bottom: 1px solid #334155;">
+        <span style="color: #38bdf8; font-weight: bold; font-size: 11px;">Steel Frame (3)</span>
+      </div>
+      <div style="padding: 4px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="background: #1e293b; border: 1px solid #ffd700; border-radius: 3px; padding: 3px 6px; cursor: pointer;">
+          <div style="color: #ffd700; font-size: 11px; font-weight: bold;">Assembler</div>
+          <div style="color: #94a3b8; font-size: 9px;">0.5s | 30 EU/t (LV)</div>
+        </div>
+        <div style="background: #131c2e; border-radius: 3px; padding: 3px 6px; cursor: pointer;">
+          <div style="color: #ffffff; font-size: 11px;">Crafting Table</div>
+          <div style="color: #94a3b8; font-size: 9px;">0.0s | 0 EU/t</div>
+        </div>
+        <div style="background: #131c2e; border-radius: 3px; padding: 3px 6px; cursor: pointer;">
+          <div style="color: #ffffff; font-size: 11px;">Forge Hammer</div>
+          <div style="color: #94a3b8; font-size: 9px;">1.0s | 16 EU/t (LV)</div>
+        </div>
       </div>
     </div>
   </div>

@@ -327,4 +327,40 @@ public class GraphSerializationTest {
         Assertions.assertEquals(250.0, p2Summary.rawInputs().get(oxygen), 0.001);
         Assertions.assertEquals(2000.0, p2Summary.totalConsumedEUt(), 0.001);
     }
+
+    @Test
+    public void testBoardManagerUiStatePersistence() throws Exception {
+        java.io.File tempFile = java.io.File.createTempFile("gtcalcboard_test_uistate", ".dat");
+        tempFile.deleteOnExit();
+
+        BoardManager manager = BoardManager.getInstance();
+        manager.resetToDefault();
+
+        // Default state
+        Assertions.assertFalse(manager.isSummaryOverlayCollapsed());
+        Assertions.assertTrue(manager.isHotkeyHudExpanded());
+        Assertions.assertTrue(manager.isFavoritesDockExpanded());
+
+        // Modify state
+        manager.setSummaryOverlayCollapsed(true);
+        manager.setHotkeyHudExpanded(false);
+        manager.setFavoritesDockExpanded(false);
+        manager.setPowerDisplayMode(PowerDisplayMode.AMPS);
+
+        boolean saved = manager.saveToFile(tempFile);
+        Assertions.assertTrue(saved);
+
+        // Reset and reload
+        manager.resetToDefault();
+        Assertions.assertFalse(manager.isSummaryOverlayCollapsed());
+        Assertions.assertTrue(manager.isHotkeyHudExpanded());
+        Assertions.assertTrue(manager.isFavoritesDockExpanded());
+
+        boolean loaded = manager.loadFromFile(tempFile);
+        Assertions.assertTrue(loaded);
+        Assertions.assertTrue(manager.isSummaryOverlayCollapsed());
+        Assertions.assertFalse(manager.isHotkeyHudExpanded());
+        Assertions.assertFalse(manager.isFavoritesDockExpanded());
+        Assertions.assertEquals(PowerDisplayMode.AMPS, manager.getPowerDisplayMode());
+    }
 }

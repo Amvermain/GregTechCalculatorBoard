@@ -149,6 +149,8 @@
 
 화면 좌측 하단에 상주하며, 주요 키보드 단축키를 안내합니다. 우측 상단의 `[-]` 버튼 또는 `[?]` 칩 클릭으로 접거나 펼칠 수 있습니다.
 
+* **전역 UI 상태 영속화 (`BoardManager`)**: 패널 접기/펼침 상태가 `BoardManager.hotkeyHudExpanded` NBT 태그에 전역 저장되어 보드 창을 닫았다 열어도 사용자의 뷰 설정이 그대로 유지됩니다.
+
 <div style="background-color: #14171e; padding: 16px; border-radius: 8px; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; font-size: 12px; line-height: 1.4;">
   <!-- Hotkey HUD Widget Container -->
   <div style="background-color: #0b1120; border: 1.5px solid #1e293b; border-radius: 5px; width: 220px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); overflow: hidden;">
@@ -182,6 +184,81 @@
       <div style="display: flex; justify-content: space-between;">
         <span style="background: #1e293b; color: #f1f5f9; padding: 0 4px; border-radius: 2px; font-family: monospace;">Ctrl+Z / Y</span>
         <span style="color: #94a3b8;">실행 취소 / 다시 실행</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+### 3.3 좌측 상단 접이식 EMI 즐겨찾기 독 및 서브 플라이아웃 (`FavoritesDockWidget`)
+
+검색창을 열지 않고도 기본 보드 화면에서 EMI 즐겨찾기(`A` 키) 레시피를 실시간으로 확인하고 1클릭으로 캔버스에 배치할 수 있는 전용 사이드 독입니다.
+
+* **좌측 상단 배치**: `x = 8`, `y = 52` (상단 툴바 바로 아래).
+* **접이식 토글 & 전역 영속화**:
+  - `[⭐ 즐겨찾기 (N) ◀/▶]` 버튼으로 펼치기/접기 지원.
+  - UI 상태(`favoritesDockExpanded`)는 `BoardManager`를 통해 NBT에 영구 보존.
+* **1:1 아이템/레시피 매핑 & 우측 서브 플라이아웃 탐색 (`Sub-flyout Recipe Selector`)**:
+  - **레시피 즐겨찾기**: 1클릭 또는 드래그로 즉시 캔버스에 배치.
+  - **아이템 즐겨찾기**: 마우스 호버/선택 시 우측에 **생산 레시피 서브 패널**(`185px`)이 자동으로 열려, 해당 아이템을 만드는 모든 기계별/티어별 레시피를 휠 스크롤로 확인하고 원하는 레시피를 선택/드래그하여 배치 가능.
+* **원클릭 & 드래그 앤 드롭 스폰**:
+  - 아이템/레시피 클릭: 캔버스의 다음 적절한 위치에 노드 자동 생성.
+  - 마우스 드래그: 원하는 레시피를 마우스로 끌어 캔버스 원하는 좌표에 드롭하여 즉시 배치.
+
+#### `FavoritesDockWidget` UI 와이어프레임
+
+<div style="background-color: #14171e; padding: 16px; border-radius: 8px; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; font-size: 12px; line-height: 1.4;">
+  <div style="display: flex; gap: 8px; align-items: flex-start;">
+    <!-- 1. Main Favorites Dock -->
+    <div style="background: rgba(15, 23, 42, 0.95); border: 1.5px solid #38bdf8; border-radius: 4px; width: 145px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); overflow: hidden;">
+      <!-- Header -->
+      <div style="background: #1e293b; padding: 4px 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155;">
+        <span style="color: #ffd700; font-weight: bold; font-size: 11px;">⭐ 즐겨찾기 (4)</span>
+        <span style="color: #94a3b8; font-size: 10px; cursor: pointer;">◀</span>
+      </div>
+      <!-- List Items -->
+      <div style="padding: 4px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="background: #2a3649; border: 1px solid #38bdf8; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>🧊</span>
+            <span style="color: #ffffff; font-size: 11px; font-weight: bold;">강철 프레임</span>
+          </div>
+          <span style="color: #ffd700; font-size: 10px;">▶</span>
+        </div>
+        <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>📦</span>
+            <span style="color: #cbd5e1; font-size: 11px;">영혼 주입 블록</span>
+          </div>
+          <span style="color: #94a3b8; font-size: 10px;">▶</span>
+        </div>
+        <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span>⚗️</span>
+            <span style="color: #cbd5e1; font-size: 11px;">황산 제조</span>
+          </div>
+          <span style="color: #64748b; font-size: 10px;">1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Sub-flyout Recipe Selector -->
+    <div style="background: rgba(11, 17, 30, 0.98); border: 1.5px solid #38bdf8; border-radius: 4px; width: 185px; box-shadow: 0 6px 16px rgba(0,0,0,0.8); overflow: hidden;">
+      <div style="background: #172033; padding: 4px 8px; border-bottom: 1px solid #334155;">
+        <span style="color: #38bdf8; font-weight: bold; font-size: 11px;">강철 프레임 (3)</span>
+      </div>
+      <div style="padding: 4px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="background: #1e293b; border: 1px solid #ffd700; border-radius: 3px; padding: 3px 6px; cursor: pointer;">
+          <div style="color: #ffd700; font-size: 11px; font-weight: bold;">조립기 (Assembler)</div>
+          <div style="color: #94a3b8; font-size: 9px;">0.5s | 30 EU/t (LV)</div>
+        </div>
+        <div style="background: #131c2e; border-radius: 3px; padding: 3px 6px; cursor: pointer;">
+          <div style="color: #ffffff; font-size: 11px;">수작업 조합 (Crafting)</div>
+          <div style="color: #94a3b8; font-size: 9px;">0.0s | 0 EU/t</div>
+        </div>
+        <div style="background: #131c2e; border-radius: 3px; padding: 3px 6px; cursor: pointer;">
+          <div style="color: #ffffff; font-size: 11px;">포징 해머 (Forge Hammer)</div>
+          <div style="color: #94a3b8; font-size: 9px;">1.0s | 16 EU/t (LV)</div>
+        </div>
       </div>
     </div>
   </div>

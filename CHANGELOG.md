@@ -8,6 +8,33 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.4] - 2026-08-21
+
+### Added
+- **Side Favorites Dock Panel System (`FavoritesDockWidget`, `BoardScreen`)**:
+  - Added a collapsible favorites dock (`[⭐ Favorites (N) ▶]`) on the left of the board screen allowing single-click or drag-and-drop placement of favorited items onto the canvas.
+- **3-Tier Hierarchical Recipe Navigation & Interactive Native EMI Preview (`FavoritesDockWidget`, `RecipeHoverPreviewRenderer`)**:
+  - Hovering over an item favorite reveals a 2nd-tier flyout panel listing all producing recipes (Machine / Time / EU/t).
+  - Hovering over any recipe in the 2nd-tier flyout renders a 3rd-tier floating Native EMI preview card with full interactive widgets.
+  - Seamless mouse transition into the 3rd-tier preview card with hover persistence, allowing slot hovering for EMI tooltips, `R`/`U` key lookups, and single-click recipe node spawning.
+  - Added bridge hitbox between panels to ensure smooth and uninterrupted mouse cursor transitions.
+- **EMI Loading Indicator & State Animation (`FavoritesDockWidget`)**:
+  - Displays `⭐ Favorites (⏳ Loading...)` and animated dots (`⏳ Loading EMI recipes...`) during initial world launch while EMI recipe manager and indices are baking in the background.
+- **Recipe Category Filter Integration (`FavoritesDockWidget`, `RecipeFilterConfig`)**:
+  - Excluded categories configured in `RecipeFilterDialog` (e.g. `item draining`) are automatically filtered out from favorite recipe exploration and automatic node resolution.
+
+### Fixed & Changed
+- **EMI Recipe Screen `[+]` (Fill Recipe) One-Click Board Add & Navigation (`CalcBoardEmiOverlayHandler`)**:
+  - Reflection-based dynamic enablement of EMI's `RecipeFillButtonWidget` with custom tooltip (`§a➕ Add Recipe to Board`).
+  - Clicking `[+]` or pressing the bound hotkey adds the recipe and seamlessly opens `BoardScreen`.
+  - Added proper `KeyMapping.ADD_RECIPE` checks respecting `Not Bound` configuration.
+- **Restored Pure `Screen` Hierarchy for `BoardScreen` (`BoardScreen`, `BoardContainerMenu`)**:
+  - Restored `BoardScreen` to extend pure `Screen`, eliminating inventory sidebar icon intrusions from FTB Teams, JourneyMap, and Curios.
+- **Localization (i18n) Synchronization (`en_us.json`, `ko_kr.json`)**:
+  - Cleaned up duplicated blocks in `en_us.json` and synchronized all resource keys 1:1 with `ko_kr.json`.
+
+---
+
 ## [2.0.0-alpha.3] - 2026-08-21
 
 ### Added

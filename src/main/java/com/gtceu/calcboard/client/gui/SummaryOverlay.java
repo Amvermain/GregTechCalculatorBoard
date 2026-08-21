@@ -31,6 +31,7 @@ public class SummaryOverlay {
 
     public void setCollapsed(boolean collapsed) {
         this.collapsed = collapsed;
+        BoardManager.getInstance().setSummaryOverlayCollapsed(collapsed);
     }
 
     public void toggle() {
@@ -38,6 +39,7 @@ public class SummaryOverlay {
         if (collapsed) {
             scrollY = 0;
         }
+        BoardManager.getInstance().setSummaryOverlayCollapsed(this.collapsed);
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {

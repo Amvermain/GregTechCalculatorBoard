@@ -9,6 +9,8 @@
 
 Positioned on the right side of the screen as a persistent or collapsible panel, providing real-time aggregation of total power consumption, active machine counts, raw external inputs, and net final products.
 
+* **Global UI State Persistence (`BoardManager`)**: Clicking the header `[»]` button toggles and commits the collapsed state to `BoardManager.summaryOverlayCollapsed` NBT, preserving user preference across page tab switches and session reloads.
+
 ### 1.1 `SummaryOverlay` UI Wireframe
 
 <div style="background-color: #14171e; padding: 16px; border-radius: 8px; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; font-size: 12px; line-height: 1.4;">

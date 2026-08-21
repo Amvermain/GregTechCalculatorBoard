@@ -330,23 +330,21 @@ public class NodeWidget {
             return false;
         }
 
-        // Only scale down machine count for normal consumer machines. Generators scale up parallels, not reduce count!
-        if (!node.isGenerator()) {
-            double speedRatio = node.getOverclockMode().getSpeedFactor();
-            if (direction > 0) {
-                node.setMachineCount(Math.max(0.01, node.getMachineCount() / speedRatio));
-            } else {
-                node.setMachineCount(node.getMachineCount() * speedRatio);
-            }
-        }
+        GTVoltageTier oldTier = node.getTargetTier();
+        GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
 
-        node.setTargetTier(GTVoltageTier.getByIndex(newIdx));
-        updateCountBuffer();
+        node.setTargetTier(newTier);
+        if (parent != null) {
+            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
+            parent.markSummaryDirty();
+        }
+        invalidateCache();
         return true;
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (isTierButtonHovered(mouseX, mouseY)) {
+            commitCountEdit();
             return changeTier(delta > 0 ? +1 : -1);
         }
 
@@ -498,14 +496,8 @@ public class NodeWidget {
         // Tier Selector Button Click (Row 2, Left: [LV])
         if (isTierButtonHovered(mouseX, mouseY)) {
             commitCountEdit();
-            GTVoltageTier oldTier = node.getTargetTier();
             int direction = (button == 1) ? -1 : 1;
             changeTier(direction);
-            GTVoltageTier newTier = node.getTargetTier();
-            if (oldTier != newTier) {
-                parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
-            }
-            invalidateCache();
             return true;
         }
 

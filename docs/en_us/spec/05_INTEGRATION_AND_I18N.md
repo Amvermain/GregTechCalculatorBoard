@@ -5,27 +5,48 @@
 
 ---
 
-## 1. EMI Recipe Viewer Integration (`com.gtceu.calcboard.integration`)
+## 1. EMI Recipe Viewer Integration (`com.gtceu.calcboard.integration.emi`)
 
-### 1.1 Plugin Lifecycle & Matrix Trigger (`CalcBoardEmiPlugin`)
+GTCalcBoard deeply integrates with EMI (Recipe Viewer) using official recipe handlers and favorites synchronization:
 
-`CalcBoardEmiPlugin` implements `EmiPlugin` and listens for EMI registry completion to trigger asynchronous matrix pre-baking:
+```mermaid
+flowchart TB
+    subgraph EMI["EMI (Recipe Viewer)"]
+        direction LR
+        REG["EMI Registry Complete Event"] ~~~ PLUS["Recipe [+] Button Click"] ~~~ FAV["EMI Favorites"]
+    end
 
-```java
-@Override
-public void register(EmiRegistry registry) {
-    long startTime = System.currentTimeMillis();
-    // 1. Convert and index EMI recipe categories
-    // 2. Pre-bake CategoryCapabilityMatrix in worker thread
-    CategoryCapabilityMatrix.getInstance().bake(registry);
-}
+    subgraph Plugin["CalcBoardEmiPlugin & EmiRecipeHandler"]
+        direction LR
+        BAKE_TRIGGER["CategoryCapabilityMatrix.bake() Async"] ~~~ HOOK["EmiRecipeHandler<br/>(Hooks [+] only when BoardScreen is open)"] ~~~ FAV_LOAD["EmiFavorites.favorites<br/>Extract Pinned Recipes"]
+    end
+
+    subgraph Board["GTCalcBoard Engine"]
+        direction LR
+        CONVERT["EmiRecipeConverter<br/>(EmiRecipe ➔ RecipeNode)"] ~~~ SPAWN["Spawn Node on Active Page"] ~~~ SEARCH_UI["RecipeSearchDialog<br/>[⭐ Favorites] Tab Filtering"]
+    end
+
+    REG --> BAKE_TRIGGER
+    PLUS --> HOOK --> CONVERT --> SPAWN
+    FAV --> FAV_LOAD --> SEARCH_UI
 ```
 
-### 1.2 Recipe Converter (`EmiRecipeConverter`)
+### 1.1 Plugin Lifecycle & Recipe Handler (`CalcBoardEmiPlugin`)
+* Implements `dev.emi.emi.api.EmiPlugin`.
+* Listens for EMI registry completion to trigger asynchronous matrix pre-baking (`CategoryCapabilityMatrix.bake()`).
+* **Registers Official `EmiRecipeHandler`**:
+  - `supportsRecipe(recipe)`: Supports all `EmiRecipe` instances.
+  - `canCraft(recipe, context)`: Active (`true`) only when `Minecraft.getInstance().screen instanceof BoardScreen`.
+  - `craft(recipe, context)`: Spawns the node on the active board page without interfering with standard crafting tables or machine GUIs.
 
+### 1.2 Recipe Search Favorites Filtering (`RecipeSearchDialog`)
+* Directly reads pinned/bookmarked recipes from `dev.emi.emi.registry.EmiFavorites.favorites`.
+* Provides a quick `[⭐ Favorites]` toggle button in the search dialog to load bookmarked recipes with a single click.
+
+### 1.3 Recipe Converter (`EmiRecipeConverter`)
 Converts native `EmiRecipe` objects into pure domain `RecipeNode` representations:
-* Extracts duration in ticks ($EmiRecipe.getDuration()$)
-* Extracts base EU/t ($EmiRecipe.getEnergy()$)
+* Extracts duration in ticks (`recipe.getDuration()`)
+* Extracts base EU/t (`recipe.getEnergy()`)
 * Extracts item/fluid inputs and outputs into `IngredientStack` lists.
 
 ---

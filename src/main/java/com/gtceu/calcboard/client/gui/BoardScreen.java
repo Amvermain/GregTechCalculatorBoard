@@ -27,6 +27,7 @@ import org.lwjgl.opengl.GL11;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.client.gui.screens.Screen;
 import java.util.UUID;
 
 /**
@@ -47,6 +48,7 @@ public class BoardScreen extends Screen {
     private final SummaryOverlay summaryOverlay = new SummaryOverlay();
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
+    private final FavoritesDockWidget favoritesDockWidget = new FavoritesDockWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
@@ -203,6 +205,10 @@ public class BoardScreen extends Screen {
             UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
             com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, "page_main"));
         }
+
+        this.summaryOverlay.setCollapsed(BoardManager.getInstance().isSummaryOverlayCollapsed());
+        this.hotkeyHudWidget.setExpanded(BoardManager.getInstance().isHotkeyHudExpanded());
+        this.favoritesDockWidget.setExpanded(BoardManager.getInstance().isFavoritesDockExpanded());
 
         if (this.width < 640) {
             summaryOverlay.setCollapsed(true);
@@ -562,11 +568,12 @@ public class BoardScreen extends Screen {
         RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         RenderSystem.disableDepthTest();
 
-        // 6. Render Workspace Mode Tab Bar, Page Tab Bar, Top Toolbar, Hotkey HUD and Summary Overlay
+        // 6. Render Workspace Mode Tab Bar, Page Tab Bar, Top Toolbar, Hotkey HUD, Favorites Dock and Summary Overlay
         workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
         hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
+        favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
 
         if (summaryDirty || cachedSummary == null) {
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
@@ -585,6 +592,7 @@ public class BoardScreen extends Screen {
             && (exportToTeamDialog == null || !exportToTeamDialog.isVisible())
             && (recentSavesDialog == null || !recentSavesDialog.isVisible())) {
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
+            favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
         }
 
         super.render(graphics, mouseX, mouseY, partialTicks);
@@ -704,6 +712,9 @@ public class BoardScreen extends Screen {
         if (pageTabBar.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if (favoritesDockWidget.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         if (hotkeyHudWidget.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
@@ -721,6 +732,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (favoritesDockWidget.mouseReleased(mouseX, mouseY, button)) {
+            return true;
+        }
         if (pageTabBar.mouseReleased(mouseX, mouseY, button)) {
             return true;
         }
@@ -735,6 +749,9 @@ public class BoardScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (favoritesDockWidget.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+            return true;
+        }
         if (pageTabBar.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
             return true;
         }
@@ -763,6 +780,9 @@ public class BoardScreen extends Screen {
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (favoritesDockWidget.mouseScrolled(mouseX, mouseY, delta)) {
+            return true;
         }
         if (pageTabBar.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
@@ -892,9 +912,16 @@ public class BoardScreen extends Screen {
             active.setPanY(this.panY);
             active.setZoom(this.zoom);
         }
+        BoardManager.getInstance().setSummaryOverlayCollapsed(this.summaryOverlay.isCollapsed());
+        BoardManager.getInstance().setHotkeyHudExpanded(this.hotkeyHudWidget.isExpanded());
+        BoardManager.getInstance().setFavoritesDockExpanded(this.favoritesDockWidget.isExpanded());
         BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), this.panX, this.panY, this.zoom);
         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
         super.onClose();
+    }
+
+    public FavoritesDockWidget getFavoritesDockWidget() {
+        return favoritesDockWidget;
     }
 
     @Override

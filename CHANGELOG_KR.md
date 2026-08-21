@@ -8,6 +8,33 @@
 
 ---
 
+## [2.0.0-alpha.4] - 2026-08-21
+
+### 신규 기능 (Added)
+- **사이드 즐겨찾기 도크(Favorites Dock) 시스템 탑재 (`FavoritesDockWidget`, `BoardScreen`)**:
+  - 보드 화면 좌측에 접이식 즐겨찾기 패널(`[⭐ Favorites (N) ▶]`)을 추가하여 즐겨찾기 아이템을 클릭하거나 캔버스로 드래그하여 즉시 노드로 배치 지원.
+- **3단계 계층형 레시피 탐색 & Native EMI 프리뷰 인터랙션 (`FavoritesDockWidget`, `RecipeHoverPreviewRenderer`)**:
+  - 아이템 즐겨찾기 마우스 호버 시 2단계 서브 패널에 해당 아이템의 생산 레시피(Machine / Time / EU/t) 목록 노출.
+  - 2단계 서브 패널의 레시피 위에 마우스를 올리면 우측에 3단계 EMI Native 위젯 프리뷰 카드 실시간 렌더링.
+  - 마우스를 3단계 프리뷰 카드로 이동하여 슬롯(재료/결과물) 툴팁 확인, `R`/`U` 키 및 좌/우클릭을 통한 레시피/사용처 조회, 카드 클릭 시 보드 노드 즉시 추가 지원.
+  - 서브 패널과 프리뷰 카드 사이의 브릿지 히트박스를 적용하여 마우스 이동 시 호버 상태가 안정적으로 유지되도록 구현.
+- **EMI 로딩 상태 애니메이션 인디케이터 (`FavoritesDockWidget`)**:
+  - 게임 시작 직후 EMI 레시피 인덱싱이 진행되는 동안 `⭐ 즐겨찾기 (⏳ 로딩 중...)` 및 패널 본문에 움직이는 점 애니메이션(`⏳ EMI 레시피 로딩 중...`)을 표시하여 초기 로딩 경험 대폭 개선.
+- **레시피 카테고리 필터 연동 (`FavoritesDockWidget`, `RecipeFilterConfig`)**:
+  - 카테고리 필터 다이얼로그(`RecipeFilterDialog`)에서 비활성화된 카테고리(예: `item draining` 등)의 레시피를 즐겨찾기 생산 레시피 검색 및 자동 노드 선택에서 완전히 제외.
+
+### 개선 및 버그 수정 (Fixed & Changed)
+- **EMI 레시피 화면 `[+]` (Fill Recipe) 버튼 즉시 보드 추가 및 이동 연동 (`CalcBoardEmiOverlayHandler`)**:
+  - EMI `RecipeFillButtonWidget`을 리플렉션으로 직접 활성화하고 커스텀 툴팁(`§a➕ 보드에 레시피 추가`) 주입.
+  - `[+]` 버튼 클릭 또는 설정된 단축키 입력 시 레시피를 보드에 추가함과 동시에 보드 화면(`BoardScreen`)으로 즉시 전환.
+  - 키바인딩 검사를 적용하여 `Not Bound` 해제 시 미작동하도록 안전 검사 강화.
+- **`BoardScreen` 순수 `Screen` 복구 & Forge/FTB 사이드바 오버레이 침범 원천 차단 (`BoardScreen`, `BoardContainerMenu`)**:
+  - `BoardScreen`을 순수 `Screen` 상속으로 복구하여 FTB Teams, JourneyMap 등의 인벤토리 사이드바 아이콘 침범 문제 완벽 해결.
+- **다국어(i18n) 동기화 및 중복 정리 (`en_us.json`, `ko_kr.json`)**:
+  - `en_us.json` 중복 블록을 전면 정리하고 한국어/영어 리소스 키를 1:1로 완벽 동기화.
+
+---
+
 ## [2.0.0-alpha.3] - 2026-08-21
 
 ### 신규 기능 (Added)

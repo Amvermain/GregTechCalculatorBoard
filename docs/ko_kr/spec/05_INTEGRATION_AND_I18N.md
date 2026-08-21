@@ -7,35 +7,43 @@
 
 ## 1. EMI 레시피 뷰어 연동 (`com.gtceu.calcboard.integration.emi`)
 
-GTCalcBoard는 EMI(Recipe Viewer)와의 긴밀한 연동을 통해 인게임 레시피 검색과 시각적 드래그 앤 드롭을 지원합니다.
+GTCalcBoard는 EMI(Recipe Viewer)와의 긴밀한 연동을 통해 인게임 레시피 검색과 공식 [+] 버튼 훅, 즐겨찾기 연동을 지원합니다.
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph EMI["EMI (Recipe Viewer)"]
-        REG["EMI 레시피 등록 완료 이벤트"]
-        DRAG["EMI 아이콘 드래그"]
+        direction LR
+        REG["EMI 레시피 등록 완료 이벤트"] ~~~ PLUS["레시피 [+] 버튼 클릭"] ~~~ FAV["EMI 즐겨찾기 (Favorites)"]
     end
 
-    subgraph Plugin["CalcBoardEmiPlugin"]
-        BAKE_TRIGGER["CategoryCapabilityMatrix.bake(recipeManager) 비동기 호출"]
-        OVERLAY["CalcBoardEmiOverlay 등록\n(화면 제외 영역 & 드래그 타겟)"]
+    subgraph Plugin["CalcBoardEmiPlugin & EmiRecipeHandler"]
+        direction LR
+        BAKE_TRIGGER["CategoryCapabilityMatrix.bake() 비동기 호출"] ~~~ HOOK["EmiRecipeHandler<br/>(BoardScreen 활성 시에만 노드 추가 훅)"] ~~~ FAV_LOAD["EmiFavorites.favorites<br/>즐겨찾기 레시피 추출"]
     end
 
     subgraph Board["GTCalcBoard Engine"]
-        CONVERT["EmiRecipeConverter\n(EmiRecipe ➔ RecipeNode)"]
-        SPAWN["캔버스에 노드 생성 및 자동 배선"]
+        direction LR
+        CONVERT["EmiRecipeConverter<br/>(EmiRecipe ➔ RecipeNode)"] ~~~ SPAWN["캔버스에 노드 생성 및 알림"] ~~~ SEARCH_UI["RecipeSearchDialog<br/>[⭐ 즐겨찾기] 탭 필터링"]
     end
 
     REG --> BAKE_TRIGGER
-    DRAG --> OVERLAY --> CONVERT --> SPAWN
+    PLUS --> HOOK --> CONVERT --> SPAWN
+    FAV --> FAV_LOAD --> SEARCH_UI
 ```
 
-### 1.1 `CalcBoardEmiPlugin` (플러그인 라이프사이클)
+### 1.1 `CalcBoardEmiPlugin` (플러그인 라이프사이클 및 [+] 훅)
 * `dev.emi.emi.api.EmiPlugin` 인터페이스 구현체.
 * EMI가 전체 레시피를 로드한 직후 `CategoryCapabilityMatrix.bake(recipeManager)`를 비동기로 호출하여 $O(1)$ 수용 능력 매트릭스를 사전 빌드.
-* `BoardScreen` 및 `MachineConfigDialog` 화면 영역을 EMI 오버레이와 충돌하지 않도록 제외 영역(Exclusion Area)으로 등록.
+* **공식 `EmiRecipeHandler` 등록**:
+  - `supportsRecipe(recipe)`: 모든 `EmiRecipe` 지원.
+  - `canCraft(recipe, context)`: 현재 클라이언트의 화면이 `BoardScreen`일 때만 활성화 (`true`).
+  - `craft(recipe, context)`: 일반 인벤토리/제작대 동작을 침범하지 않고, 보드가 열려 있을 때만 활성 보드에 노드를 즉시 배치하고 토스트 알림 출력.
 
-### 1.2 `EmiRecipeConverter` (레시피 변환기)
+### 1.2 `RecipeSearchDialog`의 EMI 즐겨찾기(Favorites) 연동
+* `dev.emi.emi.registry.EmiFavorites.favorites`로부터 플레이어가 `A` 키나 북마크로 등록해 둔 레시피 목록을 실시간으로 획득.
+* 레시피 검색창 상단의 `[⭐ 즐겨찾기]` 토글 버튼을 통해 즐겨찾기된 레시피만 1클릭으로 조회 및 배치 가능.
+
+### 1.3 `EmiRecipeConverter` (레시피 변환기)
 * `EmiRecipe` 인스턴스로부터 입력/출력 `EmiIngredient`를 추출.
 * 아이템/유체 식별자, 수량, 확률, 전압 티어, 소요 틱을 파싱하여 순수 도메인 모델인 `RecipeNode`로 인스턴스화.
 * `CategoryCapabilityMatrix`로부터 연역된 워크스테이션 블록 목록 및 멀티블록 속성을 노드에 즉시 바인딩.

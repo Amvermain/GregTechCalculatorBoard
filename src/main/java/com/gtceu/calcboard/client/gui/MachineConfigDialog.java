@@ -143,15 +143,15 @@ public class MachineConfigDialog {
         var font = mc.font;
 
         // Dim background
-        graphics.fill(0, 0, screenWidth, screenHeight, 0x88000000);
+        graphics.fill(0, 0, screenWidth, screenHeight, 0x99000000);
 
         int dialogW = DIALOG_WIDTH;
         int dialogH = DIALOG_HEIGHT;
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
-        // Main Dialog Frame
-        graphics.fill(x, y, x + dialogW, y + dialogH, 0xF0181A22);
+        // Main Dialog Frame (Fully opaque)
+        graphics.fill(x, y, x + dialogW, y + dialogH, 0xFF181A22);
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Header
@@ -921,6 +921,12 @@ public class MachineConfigDialog {
         int dialogH = DIALOG_HEIGHT;
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
+
+        // Close on outside click
+        if (mouseX < x || mouseX > x + dialogW || mouseY < y || mouseY > y + dialogH) {
+            close();
+            return true;
+        }
 
         // Close button
         if (mouseX >= x + dialogW - 20 && mouseX <= x + dialogW - 4 && mouseY >= y + 4 && mouseY <= y + 18) {

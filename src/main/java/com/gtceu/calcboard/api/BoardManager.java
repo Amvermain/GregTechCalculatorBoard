@@ -17,6 +17,9 @@ public class BoardManager {
     private boolean hasSeenWelcomePrompt = false;
     private PowerDisplayMode powerDisplayMode = PowerDisplayMode.EUT;
     private boolean pauseGameInSingleplayer = false;
+    private boolean summaryOverlayCollapsed = false;
+    private boolean hotkeyHudExpanded = true;
+    private boolean favoritesDockExpanded = true;
     private boolean autoLoaded = false;
 
     private BoardManager() {
@@ -43,6 +46,9 @@ public class BoardManager {
         this.activePageIndex = 0;
         this.hasSeenWelcomePrompt = false;
         this.pauseGameInSingleplayer = false;
+        this.summaryOverlayCollapsed = false;
+        this.hotkeyHudExpanded = true;
+        this.favoritesDockExpanded = true;
         this.autoLoaded = false;
     }
 
@@ -89,6 +95,30 @@ public class BoardManager {
 
     public void setPauseGameInSingleplayer(boolean pauseGameInSingleplayer) {
         this.pauseGameInSingleplayer = pauseGameInSingleplayer;
+    }
+
+    public boolean isSummaryOverlayCollapsed() {
+        return summaryOverlayCollapsed;
+    }
+
+    public void setSummaryOverlayCollapsed(boolean summaryOverlayCollapsed) {
+        this.summaryOverlayCollapsed = summaryOverlayCollapsed;
+    }
+
+    public boolean isHotkeyHudExpanded() {
+        return hotkeyHudExpanded;
+    }
+
+    public void setHotkeyHudExpanded(boolean hotkeyHudExpanded) {
+        this.hotkeyHudExpanded = hotkeyHudExpanded;
+    }
+
+    public boolean isFavoritesDockExpanded() {
+        return favoritesDockExpanded;
+    }
+
+    public void setFavoritesDockExpanded(boolean favoritesDockExpanded) {
+        this.favoritesDockExpanded = favoritesDockExpanded;
     }
 
     public static BoardManager getInstance() {
@@ -200,6 +230,9 @@ public class BoardManager {
             rootTag.putBoolean("hasSeenWelcomePrompt", hasSeenWelcomePrompt);
             rootTag.putString("powerDisplayMode", getPowerDisplayMode().name());
             rootTag.putBoolean("pauseGameInSingleplayer", pauseGameInSingleplayer);
+            rootTag.putBoolean("summaryOverlayCollapsed", summaryOverlayCollapsed);
+            rootTag.putBoolean("hotkeyHudExpanded", hotkeyHudExpanded);
+            rootTag.putBoolean("favoritesDockExpanded", favoritesDockExpanded);
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
@@ -229,6 +262,15 @@ public class BoardManager {
                 }
                 if (rootTag.contains("pauseGameInSingleplayer")) {
                     this.pauseGameInSingleplayer = rootTag.getBoolean("pauseGameInSingleplayer");
+                }
+                if (rootTag.contains("summaryOverlayCollapsed")) {
+                    this.summaryOverlayCollapsed = rootTag.getBoolean("summaryOverlayCollapsed");
+                }
+                if (rootTag.contains("hotkeyHudExpanded")) {
+                    this.hotkeyHudExpanded = rootTag.getBoolean("hotkeyHudExpanded");
+                }
+                if (rootTag.contains("favoritesDockExpanded")) {
+                    this.favoritesDockExpanded = rootTag.getBoolean("favoritesDockExpanded");
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);

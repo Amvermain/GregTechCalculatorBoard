@@ -12,7 +12,10 @@ base {
     archivesName = "${mod_id}"
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
 
 minecraft {
     mappings channel: "${mapping_channel}", version: "${mapping_version}"
@@ -64,6 +67,7 @@ if (localPropertiesFile.exists()) {
 
 repositories {
     mavenCentral()
+    maven { url = "https://maven.minecraftforge.net" }
     maven { url = "https://maven.terraformersmc.com/" }
     maven { url = "https://maven.blamejared.com" }
     maven { url = "https://www.cursemaven.com" }
@@ -225,6 +229,7 @@ tasks.register('deployToInstance', Copy) {
 tasks.register('cleanDeploy') {
     group = 'deployment'
     description = 'Cleans, builds, tests, and deploys jar to local test instance.'
-    dependsOn 'clean', 'deployToInstance'
+    dependsOn 'clean', 'createSrgToMcp', 'deployToInstance'
 }
 tasks.named('deployToInstance').configure { mustRunAfter 'clean' }
+tasks.named('createSrgToMcp').configure { mustRunAfter 'clean' }

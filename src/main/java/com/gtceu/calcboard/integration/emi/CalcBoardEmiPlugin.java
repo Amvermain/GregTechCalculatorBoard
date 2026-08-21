@@ -55,6 +55,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
 
         if (mc.screen instanceof BoardScreen boardScreen) {
             boardScreen.rebuildWidgets();
+            boardScreen.markSummaryDirty();
         } else if (openBoard) {
             mc.setScreen(new BoardScreen());
         }

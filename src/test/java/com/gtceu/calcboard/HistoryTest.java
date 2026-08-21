@@ -258,4 +258,30 @@ public class HistoryTest {
         page2.getHistoryManager().undo(page2.getGraph());
         assertEquals(0, page2.getGraph().getNodes().size());
     }
+
+    @Test
+    public void testTierChangePreservesMachineCountAndSupportsUndo() {
+        RecipeNode node = RecipeNode.create("Large Chemical Reactor", 100.0, 30.0, GTVoltageTier.LV);
+        node.setMachineCount(1.0);
+        graph.addNode(node);
+
+        // Change Tier from LV to LuV (should NOT modify machine count)
+        GTVoltageTier oldTier = node.getTargetTier();
+        GTVoltageTier newTier = GTVoltageTier.LuV;
+        node.setTargetTier(newTier);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
+
+        assertEquals(1.0, node.getMachineCount(), 0.0001, "Machine count must not be halved or altered when changing voltage tier");
+        assertEquals(GTVoltageTier.LuV, node.getTargetTier());
+
+        // Undo
+        historyManager.undo(graph);
+        assertEquals(GTVoltageTier.LV, node.getTargetTier());
+        assertEquals(1.0, node.getMachineCount(), 0.0001);
+
+        // Redo
+        historyManager.redo(graph);
+        assertEquals(GTVoltageTier.LuV, node.getTargetTier());
+        assertEquals(1.0, node.getMachineCount(), 0.0001);
+    }
 }

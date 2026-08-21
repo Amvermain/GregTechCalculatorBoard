@@ -129,6 +129,122 @@ public class RecipeHoverPreviewRenderer {
         }
     }
 
+    public static int[] calculateEmiPreviewBounds(
+            EmiRecipe er,
+            int anchorX,
+            int anchorY,
+            int screenW,
+            int screenH
+    ) {
+        if (er == null) return null;
+
+        EmiPreviewWidgetHolder holder = WIDGET_CACHE.computeIfAbsent(er, r -> {
+            try {
+                EmiPreviewWidgetHolder h = new EmiPreviewWidgetHolder(er.getDisplayWidth(), er.getDisplayHeight());
+                er.addWidgets(h);
+                return h;
+            } catch (Throwable t) {
+                return new EmiPreviewWidgetHolder(Math.max(120, er.getDisplayWidth()), Math.max(40, er.getDisplayHeight()));
+            }
+        });
+
+        int contentW = holder.getWidth();
+        int contentH = holder.getHeight();
+
+        int cardW = Math.max(140, contentW + 16);
+        int cardH = contentH + 28;
+
+        int cardX = anchorX;
+        if (cardX + cardW > screenW - 4) {
+            cardX = Math.max(4, screenW - cardW - 4);
+        }
+
+        int cardY = Math.max(4, Math.min(anchorY - 10, screenH - cardH - 4));
+        return new int[]{cardX, cardY, cardW, cardH};
+    }
+
+    public static dev.emi.emi.api.stack.EmiIngredient getEmiHoveredIngredient(
+            EmiRecipe er,
+            int anchorX,
+            int anchorY,
+            int mouseX,
+            int mouseY,
+            int screenW,
+            int screenH
+    ) {
+        if (er == null) return null;
+        int[] bounds = calculateEmiPreviewBounds(er, anchorX, anchorY, screenW, screenH);
+        if (bounds == null) return null;
+
+        int cardX = bounds[0];
+        int cardY = bounds[1];
+        int originX = cardX + 8;
+        int originY = cardY + 22;
+
+        EmiPreviewWidgetHolder holder = WIDGET_CACHE.get(er);
+        if (holder != null) {
+            return holder.getHoveredIngredient(originX, originY, mouseX, mouseY);
+        }
+        return null;
+    }
+
+    public static void renderEmiPreviewDirect(
+            GuiGraphics graphics,
+            EmiRecipe er,
+            int anchorX,
+            int anchorY,
+            int mouseX,
+            int mouseY,
+            float partialTick,
+            int screenW,
+            int screenH
+    ) {
+        if (er == null) return;
+        Font font = Minecraft.getInstance().font;
+
+        int[] bounds = calculateEmiPreviewBounds(er, anchorX, anchorY, screenW, screenH);
+        if (bounds == null) return;
+
+        int cardX = bounds[0];
+        int cardY = bounds[1];
+        int cardW = bounds[2];
+        int cardH = bounds[3];
+
+        EmiPreviewWidgetHolder holder = WIDGET_CACHE.get(er);
+        if (holder == null) return;
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 600);
+
+        // Dark modern background & border
+        graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0xF00A0F1D);
+        graphics.renderOutline(cardX, cardY, cardW, cardH, 0xFF38BDF8);
+
+        // Header bar
+        graphics.fill(cardX, cardY, cardX + cardW, cardY + 18, 0xFF1E293B);
+
+        String catName = er.getCategory() != null ? er.getCategory().getName().getString() : "";
+        String rName = "";
+        if (!er.getOutputs().isEmpty() && !er.getOutputs().get(0).getEmiStacks().isEmpty()) {
+            rName = er.getOutputs().get(0).getEmiStacks().get(0).getName().getString();
+        } else if (er.getId() != null) {
+            rName = er.getId().getPath();
+        }
+
+        String title = (catName.isEmpty() ? "" : "§7[" + catName + "§7] ") + "§f" + rName;
+        graphics.drawString(font, font.plainSubstrByWidth(title, cardW - 12), cardX + 6, cardY + 5, 0xFFFFFFFF, false);
+
+        // Render Native EMI Widgets
+        int originX = cardX + 8;
+        int originY = cardY + 22;
+        holder.render(graphics, originX, originY, mouseX, mouseY, partialTick);
+
+        // Render tooltips for hovered widget/ingredient
+        holder.renderTooltips(graphics, font, originX, originY, mouseX, mouseY);
+
+        graphics.pose().popPose();
+    }
+
     private static void renderEmiRecipePreview(
             GuiGraphics graphics,
             Font font,

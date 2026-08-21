@@ -9,6 +9,8 @@
 
 화면 우측에 상시 또는 접이식(Collapsed)으로 배치되어, 현재 활성화된 보드 페이지의 총 전력 소비/생산량, 가동 기계 수, 외부 순수 원자재 요구량 및 순수 생산 제품을 실시간으로 결산합니다.
 
+* **전역 UI 상태 영속화 (`BoardManager`)**: 사용자가 패널 헤더 `[»]`를 클릭하여 접거나 펼치면, 해당 상태가 `BoardManager.summaryOverlayCollapsed` NBT 태그에 전역 저장되어 다른 페이지 탭 전환 및 보드 창 재진입 후에도 그대로 유지됩니다.
+
 ### 1.1 `SummaryOverlay` UI 와이어프레임
 
 <div style="background-color: #14171e; padding: 16px; border-radius: 8px; display: inline-block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e0e0e0; font-size: 12px; line-height: 1.4;">

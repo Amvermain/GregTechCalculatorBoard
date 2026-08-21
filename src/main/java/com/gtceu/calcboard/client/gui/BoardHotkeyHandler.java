@@ -63,6 +63,10 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
+        if (screen.getFavoritesDockWidget() != null && screen.getFavoritesDockWidget().keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
+
         if (screen.getMachineConfigDialog() != null && screen.getMachineConfigDialog().isVisible()) {
             return screen.getMachineConfigDialog().keyPressed(keyCode, scanCode, modifiers);
         }

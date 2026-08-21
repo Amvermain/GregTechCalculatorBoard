@@ -64,6 +64,7 @@ public class RecipeSearchDialog {
     });
 
     private final java.util.concurrent.atomic.AtomicInteger searchVersion = new java.util.concurrent.atomic.AtomicInteger(0);
+    private boolean showFavoritesOnly = false;
     private final List<SearchableRecipe> filteredRecipes = new ArrayList<>();
     private final RecipeFilterDialog filterDialog = new RecipeFilterDialog();
     private int scrollOffset = 0;
@@ -89,6 +90,29 @@ public class RecipeSearchDialog {
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
 
         this.filterDialog.setOnFilterChanged(() -> updateSearchResults(searchBox.getValue()));
+    }
+
+    public static Set<ResourceLocation> getFavoriteRecipeIds() {
+        Set<ResourceLocation> ids = new HashSet<>();
+        try {
+            for (var fav : dev.emi.emi.runtime.EmiFavorites.favorites) {
+                if (fav.getRecipe() != null && fav.getRecipe().getId() != null) {
+                    ids.add(fav.getRecipe().getId());
+                } else if (!fav.getEmiStacks().isEmpty()) {
+                    var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+                    if (rm != null) {
+                        for (var stack : fav.getEmiStacks()) {
+                            for (var r : rm.getRecipesByOutput(stack)) {
+                                if (r != null && r.getId() != null) {
+                                    ids.add(r.getId());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return ids;
     }
 
     public static void clearGlobalCache() {
@@ -369,8 +393,15 @@ public class RecipeSearchDialog {
                 ? contextualWireTarget.sourceStack.getDisplayName().toLowerCase(Locale.ROOT) : null;
 
         RecipeFilterConfig filterConfig = RecipeFilterConfig.getInstance();
+        Set<ResourceLocation> favoriteIds = showFavoritesOnly ? getFavoriteRecipeIds() : null;
 
         for (SearchableRecipe sr : sourceList) {
+            if (showFavoritesOnly) {
+                ResourceLocation rId = (sr.recipe() instanceof EmiRecipe er) ? er.getId() : null;
+                if (rId == null || favoriteIds == null || !favoriteIds.contains(rId)) {
+                    continue;
+                }
+            }
             if (filterConfig.isCategoryExcluded(sr.categoryId())) {
                 continue;
             }
@@ -495,22 +526,34 @@ public class RecipeSearchDialog {
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 12 && mouseY >= closeY && mouseY <= closeY + 12;
         graphics.drawString(font, "✕", closeX, closeY, closeHover ? 0xFFFF5555 : 0xFFAAAAAA, false);
 
-        // Search Input Box & Filter Button
-        int filterBtnW = 20;
-        int filterBtnH = 16;
-        int filterBtnX = x + dialogW - 12 - filterBtnW;
-        int filterBtnY = y + 30;
+        // Search Input Box, Favorites Toggle & Filter Button
+        int topBtnW = 20;
+        int topBtnH = 16;
+        int filterBtnX = x + dialogW - 12 - topBtnW;
+        int favBtnX = filterBtnX - topBtnW - 3;
+        int searchBoxW = dialogW - 24 - (topBtnW * 2) - 6;
 
         searchBox.setX(x + 12);
         searchBox.setY(y + 30);
-        searchBox.setWidth(dialogW - 24 - filterBtnW - 4);
+        searchBox.setWidth(searchBoxW);
         searchBox.render(graphics, mouseX, mouseY, 0);
 
-        boolean filterHover = mouseX >= filterBtnX && mouseX <= filterBtnX + filterBtnW && mouseY >= filterBtnY && mouseY <= filterBtnY + filterBtnH;
+        // Favorites Button [⭐]
+        boolean favHover = mouseX >= favBtnX && mouseX <= favBtnX + topBtnW && mouseY >= y + 30 && mouseY <= y + 30 + topBtnH;
+        graphics.fill(favBtnX, y + 30, favBtnX + topBtnW, y + 30 + topBtnH, favHover ? 0xFF3D3A20 : (showFavoritesOnly ? 0xFF353018 : 0xFF1E293B));
+        graphics.renderOutline(favBtnX, y + 30, topBtnW, topBtnH, showFavoritesOnly ? 0xFFFFD700 : (favHover ? 0xFF94A3B8 : 0xFF475569));
+        graphics.drawCenteredString(font, showFavoritesOnly ? "⭐" : "☆", favBtnX + topBtnW / 2, y + 34, showFavoritesOnly ? 0xFFFFD700 : 0xFF94A3B8);
+
+        if (favHover && !filterDialog.isVisible()) {
+            graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.filter.favorites_tooltip"), mouseX, mouseY);
+        }
+
+        // Category Filter Button [⚙]
+        boolean filterHover = mouseX >= filterBtnX && mouseX <= filterBtnX + topBtnW && mouseY >= y + 30 && mouseY <= y + 30 + topBtnH;
         boolean filterActive = !RecipeFilterConfig.getInstance().getExcludedCategories().isEmpty();
-        graphics.fill(filterBtnX, filterBtnY, filterBtnX + filterBtnW, filterBtnY + filterBtnH, filterHover ? 0xFF334155 : (filterActive ? 0xFF2A3649 : 0xFF1E293B));
-        graphics.renderOutline(filterBtnX, filterBtnY, filterBtnW, filterBtnH, filterActive ? 0xFF38BDF8 : 0xFF475569);
-        graphics.drawCenteredString(font, "⚙", filterBtnX + filterBtnW / 2, filterBtnY + 4, filterActive ? 0xFF38BDF8 : 0xFF94A3B8);
+        graphics.fill(filterBtnX, y + 30, filterBtnX + topBtnW, y + 30 + topBtnH, filterHover ? 0xFF334155 : (filterActive ? 0xFF2A3649 : 0xFF1E293B));
+        graphics.renderOutline(filterBtnX, y + 30, topBtnW, topBtnH, filterActive ? 0xFF38BDF8 : 0xFF475569);
+        graphics.drawCenteredString(font, "⚙", filterBtnX + topBtnW / 2, y + 34, filterActive ? 0xFF38BDF8 : 0xFF94A3B8);
 
         if (filterHover && !filterDialog.isVisible()) {
             String raw = Component.translatable("gui.gtcalcboard.filter.btn_tooltip").getString();
@@ -710,12 +753,24 @@ public class RecipeSearchDialog {
             return true;
         }
 
+        // Favorites toggle button [⭐]
+        int btnW = 20;
+        int btnH = 16;
+        int filterBtnX = x + dialogW - 12 - btnW;
+        int favBtnX = filterBtnX - btnW - 3;
+        int btnY = y + 30;
+
+        if (mouseX >= favBtnX && mouseX <= favBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
+            showFavoritesOnly = !showFavoritesOnly;
+            updateSearchResultsSynchronously(searchBox.getValue());
+            Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), showFavoritesOnly ? 1.4F : 1.0F)
+            );
+            return true;
+        }
+
         // Filter button [⚙]
-        int filterBtnW = 20;
-        int filterBtnH = 16;
-        int filterBtnX = x + dialogW - 12 - filterBtnW;
-        int filterBtnY = y + 30;
-        if (mouseX >= filterBtnX && mouseX <= filterBtnX + filterBtnW && mouseY >= filterBtnY && mouseY <= filterBtnY + filterBtnH) {
+        if (mouseX >= filterBtnX && mouseX <= filterBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
             synchronized (GLOBAL_RECIPES) {
                 filterDialog.updateCategories(RecipeSearchEngine.discoverCategories(GLOBAL_RECIPES));
             }

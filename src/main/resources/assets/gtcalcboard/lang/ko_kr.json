@@ -368,6 +368,7 @@
   "gui.gtcalcboard.search.search_help": "검색 예시: pyrolyse oil | @gtceu | #logs | !charcoal",
   "gui.gtcalcboard.toast.drag_auto_connected": "자동 연결됨: %s ➔ %s",
   "gui.gtcalcboard.filter.btn_tooltip": "레시피 카테고리 필터\n검색 결과에서 제외할 기계 및 카테고리를 설정합니다.",
+  "gui.gtcalcboard.filter.favorites_tooltip": "EMI 즐겨찾기(Favorites) 필터\n클릭하여 EMI에서 핀/즐겨찾기한 레시피만 표시합니다.",
   "gui.gtcalcboard.filter.title": "레시피 카테고리 필터",
   "gui.gtcalcboard.filter.all": "전체 선택",
   "gui.gtcalcboard.filter.none": "전체 해제",
@@ -381,5 +382,16 @@
   "gui.gtcalcboard.unit.per_day": "일당",
   "gui.gtcalcboard.tooltip.btn_time_unit": "시간 단위계 전환 (T)\n클릭하여 유량 표시 시간 단위를 전환합니다:\n/s (초당) ➔ /min (분당) ➔ /h (시간당) ➔ /d (일당) ➔ /t (틱당).",
   "gui.gtcalcboard.toast.time_unit_changed": "유량 표시 단위: %s (%s)",
-  "gui.gtcalcboard.hotkey_hud.time_unit": "시간 단위"
+  "gui.gtcalcboard.hotkey_hud.time_unit": "시간 단위",
+  "gui.gtcalcboard.favorites": "즐겨찾기",
+  "gui.gtcalcboard.favorites_dock.title": "즐겨찾기",
+  "gui.gtcalcboard.favorites_dock.empty": "즐겨찾기 없음",
+  "gui.gtcalcboard.favorites_dock.empty_hint": "EMI에서 [A] 키를 눌러 등록",
+  "gui.gtcalcboard.favorites_dock.loading": "로딩 중...",
+  "gui.gtcalcboard.favorites_dock.loading_emi": "EMI 레시피 로딩 중...",
+  "gui.gtcalcboard.favorites_dock.loading_hint": "인덱스를 동기화하는 중입니다.",
+  "gui.gtcalcboard.favorites_dock.click_hint": "클릭 또는 캔버스로 드래그하여 배치",
+  "gui.gtcalcboard.favorites_dock.hover_flyout_hint": "오른쪽 서브 패널에서 레시피 선택",
+  "gui.gtcalcboard.recipes_count": "생산 레시피: %s개",
+  "gui.gtcalcboard.add_to_board": "보드에 레시피 추가"
 }
