@@ -1,7 +1,6 @@
-# RFC: GTCalcBoard v1.1.0 - 캔버스 시각적 구역 프레임 & 주석 시스템 (Canvas Group Frames & Notes)
+# RFC-002: 캔버스 시각적 구역 프레임 & 주석 시스템 (Canvas Group Frames & Notes)
 
-* **문서 번호**: RFC-007
-* **대상 버전**: `v1.1.0` (또는 `v1.0.6+`)
+* **문서 번호**: RFC-002
 * **상태**: `PROPOSED / PLANNING`
 * **주제**: 캔버스 구역 시각적 그룹화 프레임, 일괄 이동 및 컴파운드 모듈과의 유기적 접기/펼치기 연동
 

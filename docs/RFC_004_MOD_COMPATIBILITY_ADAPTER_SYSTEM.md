@@ -1,4 +1,4 @@
-# RFC-V2-006: 모드 호환성 어댑터 시스템 (Mod Compatibility Adapter System)
+# RFC-004: 모드 호환성 어댑터 시스템 (Mod Compatibility Adapter System)
 
 ---
 
@@ -6,8 +6,7 @@
 
 | 항목 | 내용 |
 | :--- | :--- |
-| **문서 번호** | RFC-V2-006 |
-| **대상 버전** | `v2.0.0` (Alpha.5+ / Release Candidate) |
+| **문서 번호** | RFC-004 |
 | **상태** | `PROPOSED` (설계 및 기획 완료) |
 | **관련 컴포넌트** | `CategoryCapabilityMatrix`, `DynamicAddonCrawler`, `MachineAddonCatalog`, `RecipeNode`, `MachineConfigDialog` |
 | **작성 일자** | 2026-08-21 |

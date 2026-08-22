@@ -1,7 +1,6 @@
-# RFC: GTCalcBoard v1.1.0 - 핵융합로 전용 시뮬레이션 & 시동 에너지 계산 (Fusion Reactor Simulation)
+# RFC-003: 핵융합로 전용 시뮬레이션 & 시동 에너지 계산 (Fusion Reactor Simulation)
 
-* **문서 번호**: RFC-008
-* **대상 버전**: `v1.1.0` (또는 `v1.0.6+`)
+* **문서 번호**: RFC-003
 * **상태**: `PROPOSED / PLANNING`
 * **주제**: GregTech CEu Modern 핵융합로(Fusion Reactor Mk1/Mk2/Mk3) 시동 에너지(EU to Start), 지속 가동 전력, 반응로 티어 자동 판정 및 버퍼 계산
 

@@ -1,7 +1,6 @@
-# RFC: GTCalcBoard v1.1.0 - 와이어 정리 및 분기를 위한 경유/정션 노드 (Reroute & Junction Nodes)
+# RFC-001: 와이어 정리 및 분기를 위한 경유/정션 노드 (Reroute & Junction Nodes)
 
-* **문서 번호**: RFC-006
-* **대상 버전**: `v1.1.0` (또는 `v1.0.6+`)
+* **문서 번호**: RFC-001
 * **상태**: `PROPOSED / PLANNING`
 * **주제**: 복잡한 배선 정리, 1:N 분기 및 물류 버스 라인 구성을 위한 경유(Reroute) 중계 노드
 
