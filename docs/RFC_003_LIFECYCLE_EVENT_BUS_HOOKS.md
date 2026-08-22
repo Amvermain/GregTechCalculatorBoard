@@ -1,6 +1,6 @@
-# RFC-006: Forge 라이프사이클 이벤트 버스 & 애드온 훅 시스템 (Lifecycle Event Bus & Hook System)
+# RFC-003: Forge 라이프사이클 이벤트 버스 & 애드온 훅 시스템 (Lifecycle Event Bus & Hook System)
 
-* **문서 번호**: RFC-006
+* **문서 번호**: RFC-003
 * **상태**: `PROPOSED / PLANNING`
 * **주제**: 외부 모드 및 애드온 개발자를 위한 Forge EventBus 기반 커스텀 이벤트(`MinecraftForge.EVENT_BUS`), 노드 라이프사이클 훅 및 확장 인프라
 

@@ -1,6 +1,6 @@
-# RFC-005: 확장형 노드 프로퍼티 & 선언적 특수 기계 컴포넌트 시스템 (Extensible Node Property & Special Capability System)
+# RFC-002: 확장형 노드 프로퍼티 & 선언적 특수 기계 컴포넌트 시스템 (Extensible Node Property & Special Capability System)
 
-* **문서 번호**: RFC-005
+* **문서 번호**: RFC-002
 * **상태**: `PROPOSED / PLANNING`
 * **주제**: 하드코딩 필드 증식을 차단하는 타입 안전한 `NodePropertyStore`, 선언적 `IRecipePropertyExtractor` 파이프라인 및 자동 뱃지 렌더링 인프라
 
