@@ -18,7 +18,8 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
         // EMI Recipe Registration Completed Hook (Full recipe baking completed!)
-        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] EmiPlugin.register invoked. EMI recipe baking completed. Refreshing addon catalog and recipe search index...");
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] EmiPlugin.register invoked. Registering drag-drop handler and refreshing addon catalog...");
+        registry.addDragDropHandler(BoardScreen.class, new BoardEmiDragDropHandler());
         com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().markDirty();
         com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().preloadAsync();
         com.gtceu.calcboard.client.gui.RecipeSearchDialog.invalidateCache();

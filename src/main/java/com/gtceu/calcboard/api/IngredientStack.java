@@ -36,8 +36,24 @@ public class IngredientStack {
         return new IngredientStack(Type.ITEM, id, displayName, amount, chance);
     }
 
+    public static IngredientStack item(ResourceLocation id, String displayName, double amount) {
+        return new IngredientStack(Type.ITEM, id, displayName, amount, 1.0);
+    }
+
     public static IngredientStack fluid(ResourceLocation id, String displayName, double amountMilliBuckets, double chance) {
         return new IngredientStack(Type.FLUID, id, displayName, amountMilliBuckets, chance);
+    }
+
+    public static IngredientStack fluid(ResourceLocation id, String displayName, double amountMilliBuckets) {
+        return new IngredientStack(Type.FLUID, id, displayName, amountMilliBuckets, 1.0);
+    }
+
+    public static IngredientStack stressUnit(double amount) {
+        return new IngredientStack(Type.ITEM, ResourceLocation.tryParse("create:stress_units"), "Stress Units", amount, 1.0);
+    }
+
+    public boolean isStressUnit() {
+        return this.id != null && (this.id.toString().equals("create:stress_units") || this.id.getPath().equals("stress_units"));
     }
 
     public Type getType() {
@@ -64,6 +80,13 @@ public class IngredientStack {
         if (this.id != null && !this.alternatives.contains(this.id)) {
             this.alternatives.add(0, this.id);
         }
+    }
+
+    public IngredientStack copy() {
+        IngredientStack c = new IngredientStack(this.type, this.id, this.displayName, this.amount, this.chance);
+        c.setAlternatives(new java.util.ArrayList<>(this.alternatives));
+        c.selectedAltIndex = this.selectedAltIndex;
+        return c;
     }
 
     public void addAlternative(ResourceLocation alt) {

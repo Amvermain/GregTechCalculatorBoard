@@ -11,8 +11,8 @@ public class HotkeyHudWidget {
     private final BoardScreen screen;
     private boolean expanded;
 
-    private static final int EXPANDED_WIDTH = 180;
-    private static final int EXPANDED_HEIGHT = 136;
+    private static final int EXPANDED_WIDTH = 195;
+    private static final int EXPANDED_HEIGHT = 160;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
 
@@ -85,11 +85,15 @@ public class HotkeyHudWidget {
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "T", "gui.gtcalcboard.hotkey_hud.time_unit");
         curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "J", "gui.gtcalcboard.hotkey_hud.junction");
+        curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Space / Dbl-Click", "gui.gtcalcboard.hotkey_hud.add");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Shift + Drag", "gui.gtcalcboard.hotkey_hud.shift_wire");
         curY += 12;
-        renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + G", "gui.gtcalcboard.hotkey_hud.group");
+        renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + G", "gui.gtcalcboard.hotkey_hud.frame");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + Shift + G", "gui.gtcalcboard.hotkey_hud.group");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + Z / Y", "gui.gtcalcboard.hotkey_hud.undo_redo");
         curY += 12;

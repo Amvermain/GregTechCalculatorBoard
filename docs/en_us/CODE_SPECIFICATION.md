@@ -62,6 +62,7 @@ docs/en_us/spec/
 * **Persistence Schema (`TeamBoardSavedData`)**: `<world>/data/gtcalcboard_workspaces.dat` NBT tag hierarchy and `ITeamProvider` abstraction.
 
 ### 6. [[05] External Mod Integrations & i18n Units](spec/05_INTEGRATION_AND_I18N.md)
+* **Mod Compatibility Adapter System (`com.gtceu.calcboard.compat`)**: SPI priority routing, modular 3-tier sub-packages (`gtceu`, `create`, `thermal`, `systeams`, `vanilla`), dynamic crawler orchestration.
 * **EMI Recipe Viewer**: `CalcBoardEmiPlugin` lifecycle hooks, asynchronous matrix baking trigger, `EmiRecipeConverter`.
 * **Rate Units & Formatting**: `RateTimeUnit` (/t, /s, /min, /h, /d), `FormatUtil` SI power prefixes, bidirectional `en_us`/`ko_kr` synchronization.
 

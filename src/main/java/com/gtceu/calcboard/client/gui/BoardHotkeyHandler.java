@@ -79,6 +79,14 @@ public final class BoardHotkeyHandler {
             return screen.getSearchDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
+        if (screen.getFrameEditDialog() != null && screen.getFrameEditDialog().isVisible()) {
+            return screen.getFrameEditDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        if (screen.getNoteEditDialog() != null && screen.getNoteEditDialog().isVisible()) {
+            return screen.getNoteEditDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+
         // 3. Active inline editing in Node Widgets (Backspace, Enter, Esc, Digits)
         for (NodeWidget w : screen.getNodeWidgets()) {
             if (w.keyPressed(keyCode, scanCode, modifiers)) {
@@ -115,9 +123,19 @@ public final class BoardHotkeyHandler {
                 screen.selectAll();
                 return true;
             } else if (keyCode == GLFW.GLFW_KEY_G) {
-                screen.performGroupIntoModule();
+                if (shift) {
+                    screen.performGroupIntoModule();
+                } else {
+                    screen.createFrameFromSelection();
+                }
                 return true;
             }
+        }
+
+        // 4.5 Insert Junction at Cursor: J
+        if (keyCode == GLFW.GLFW_KEY_J && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+            screen.addRerouteNodeAt(screen.toCanvasX(lastMouseX), screen.toCanvasY(lastMouseY));
+            return true;
         }
 
         // 5. Delete / Backspace: Delete selected nodes

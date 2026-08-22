@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.BoardManager;
+import com.gtceu.calcboard.api.EnergyType;
 import com.gtceu.calcboard.api.FlowGraph;
 import com.gtceu.calcboard.api.FlowGraphSolver;
 import com.gtceu.calcboard.api.GTVoltageTier;
@@ -32,6 +33,11 @@ public class NodeCardRenderer {
         int y = (int) node.getPosY();
         int cardW = widget.getWidth();
         int height = widget.getHeight();
+
+        if (node.isReroute()) {
+            renderRerouteNode(widget, graphics, font, x, y, mouseX, mouseY);
+            return;
+        }
 
         double zoom = (Minecraft.getInstance().screen instanceof BoardScreen bs) ? bs.getZoom() : BoardScreen.lastZoom;
         if (zoom < 0.28) {
@@ -191,51 +197,9 @@ public class NodeCardRenderer {
         }
 
         if (!node.isModule()) {
-            // 6. Second Row Controls: [Tier] + [OC / Rotor] + [Parallel]
-            GTVoltageTier tier = node.getTargetTier();
-            drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
-
-            int nextCtrlX = x + 42;
-
-            if (node.isGenerator()) {
-                // [GEN] / [발전기] badge
-                String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
-                int genW = Math.max(28, font.width(genBadge) + 4);
-                drawBtn(graphics, font, genBadge, nextCtrlX, row2Y, genW, 14, mouseX, mouseY, 0xFF55FF88);
-                nextCtrlX += genW + 3;
-
-                // [⚙ 220%] rotor / config button
-                int activeEff = node.getRotorEfficiency();
-                for (MachineAddon a : node.getAddons()) {
-                    if (a.getCategory() == MachineAddon.Category.ROTOR) {
-                        activeEff = (int) Math.round(a.getDurationMultiplier() * 100.0);
-                        break;
-                    }
-                }
-                String rotorText = "⚙ " + activeEff + "%";
-                long nonRotorAddons = node.getAddons().stream().filter(a -> a.getCategory() != MachineAddon.Category.ROTOR).count();
-                if (nonRotorAddons > 0) {
-                    rotorText += " (+" + nonRotorAddons + ")";
-                }
-                int rotorW = Math.max(46, (x + cardW - 6) - nextCtrlX);
-                drawBtn(graphics, font, rotorText, nextCtrlX, row2Y, rotorW, 14, mouseX, mouseY, 0xFFFFAA00);
-            } else {
-                String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
-                String ocText = Component.translatable(ocKey).getString();
-                int ocColor = node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA;
-                int ocW = Math.max(50, font.width(ocText) + 6);
-                drawBtn(graphics, font, ocText, nextCtrlX, row2Y, ocW, 14, mouseX, mouseY, ocColor);
-                nextCtrlX += ocW + 3;
-
-                // Unified Machine Config & Parallel Button [⚙ 4x (+1)]
-                String parLabel = "⚙ " + node.getTotalParallel() + "x";
-                if (!node.getAddons().isEmpty()) {
-                    parLabel += " (+" + node.getAddons().size() + ")";
-                }
-                int parW = Math.max(46, (x + cardW - 6) - nextCtrlX);
-                int parX = nextCtrlX;
-                drawBtn(graphics, font, parLabel, parX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF);
-            }
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
+            adapter.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
         }
 
         // 8. Recipe Energy & Duration Info
@@ -252,14 +216,13 @@ public class NodeCardRenderer {
         int rightW = font.width(rightStr);
         graphics.drawString(font, rightStr, x + cardW - 6 - rightW, infoY, 0xFFFFFFFF, false);
 
-        String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatNodePower(node);
-        String fullPowerStr = (node.getEfficiency() < 0.999)
-                ? String.format("§e⚡%.0f%% %s", node.getEfficiency() * 100.0, eutStr)
-                : eutStr;
-
         int maxPowerW = Math.max(20, (cardW - 12) - rightW - 4);
-        String fittedPowerStr = font.plainSubstrByWidth(fullPowerStr, maxPowerW);
-        graphics.drawString(font, fittedPowerStr, x + 6, infoY, 0xFFFFFFFF, false);
+        if (!node.isModule()) {
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            String powerStr = adapter.formatEnergyStats(node, BoardManager.getInstance().getPowerDisplayMode());
+            String fittedPowerStr = font.plainSubstrByWidth(powerStr, maxPowerW);
+            graphics.drawString(font, fittedPowerStr, x + 6, infoY, 0xFFFFFFFF, false);
+        }
 
         // Separator Line
         int sepY = infoY + 14;
@@ -306,14 +269,14 @@ public class NodeCardRenderer {
                 String rateStr;
                 int textColor = 0xFFFFFFFF;
                 if (!isConnected) {
-                    rateStr = "§7-" + formatRate(rate, in.isFluid());
+                    rateStr = "§7-" + formatRate(rate, in);
                     textColor = 0xFFFFAAAA;
                 } else if (isBalanced) {
-                    rateStr = "§a" + formatRate(rate, in.isFluid()) + " §2✔";
+                    rateStr = "§a" + formatRate(rate, in) + " §2✔";
                 } else if (isDeficit) {
-                    rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in.isFluid(), true);
+                    rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, true);
                 } else {
-                    rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in.isFluid(), false);
+                    rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, false);
                 }
 
                 int maxInTextW = hasOutput ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
@@ -348,14 +311,14 @@ public class NodeCardRenderer {
                 String rateStr;
                 int textColor = 0xFFFFFFFF;
                 if (!isConnected) {
-                    rateStr = "§a+" + formatRate(rate, out.isFluid());
+                    rateStr = "§a+" + formatRate(rate, out);
                     textColor = 0xFFAAFFAA;
                 } else if (isBalanced) {
-                    rateStr = "§a" + formatRate(rate, out.isFluid()) + " §2✔";
+                    rateStr = "§a" + formatRate(rate, out) + " §2✔";
                 } else if (isSurplus) {
-                    rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out.isFluid(), false);
+                    rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out, false);
                 } else {
-                    rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out.isFluid(), true);
+                    rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out, true);
                 }
 
                 int maxOutTextW = hasInput ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
@@ -378,19 +341,29 @@ public class NodeCardRenderer {
         graphics.drawString(font, "⤡", handleX - 2, handleY - 3, handleColor, false);
     }
 
-    private static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my) {
-        drawBtn(graphics, font, text, bx, by, bw, bh, mx, my, 0xFFFFFFFF);
+    public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my) {
+        drawBtn(graphics, font, text, bx, by, bw, bh, mx, my, 0xFFFFFFFF, false);
     }
 
-    private static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int textColor) {
+    public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int textColor) {
+        drawBtn(graphics, font, text, bx, by, bw, bh, mx, my, textColor, false);
+    }
+
+    public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int textColor, boolean isGlowing) {
         boolean hover = mx >= bx && mx <= bx + bw && my >= by && my <= by + bh;
-        graphics.fill(bx, by, bx + bw, by + bh, hover ? 0xFF3E475A : 0xFF282E3B);
-        graphics.renderOutline(bx, by, bw, bh, hover ? 0xFF657595 : 0xFF3D4455);
+        int bg = isGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBgColor(0xFF282E3B) : (hover ? 0xFF3E475A : 0xFF282E3B);
+        int border = isGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF3D4455) : (hover ? 0xFF657595 : 0xFF3D4455);
+        graphics.fill(bx, by, bx + bw, by + bh, bg);
+        graphics.renderOutline(bx, by, bw, bh, border);
         graphics.drawCenteredString(font, text, bx + bw / 2, by + (bh - 8) / 2, textColor);
     }
 
     public static String formatCompactNumber(double val) {
         return FormatUtil.formatCompactNumber(val);
+    }
+
+    public static String formatRate(double rate, IngredientStack stack) {
+        return FormatUtil.formatRate(rate, stack);
     }
 
     public static String formatRate(double rate, boolean isFluid) {
@@ -431,6 +404,45 @@ public class NodeCardRenderer {
             int px = Math.round(widget.getOutputPortX(i));
             int py = Math.round(widget.getOutputPortY(i));
             graphics.fill(px - 3, py - 3, px + 3, py + 3, 0xFF55FF88);
+        }
+    }
+
+    private static void renderRerouteNode(NodeWidget widget, GuiGraphics graphics, Font font, int x, int y, int mouseX, int mouseY) {
+        RecipeNode node = widget.getNode();
+        boolean isSelected = false;
+        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
+            isSelected = bs.isNodeSelected(node.getId());
+        }
+        boolean isHovered = widget.isPointInside(mouseX, mouseY);
+
+        // 1. Background Capsule (32x32)
+        int bg = isHovered ? 0xF0334155 : 0xF01E293B;
+        graphics.fill(x + 2, y + 2, x + 30, y + 30, bg);
+
+        int border = isSelected ? 0xFF00FFFF : (isHovered ? 0xFF94A3B8 : 0xFF64748B);
+        graphics.renderOutline(x + 2, y + 2, 28, 28, border);
+        if (isSelected) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x8800FFFF);
+        }
+
+        // 2. Input Port Dot (Top: x + 16, y)
+        boolean inHover = widget.getHoveredInputPortIndex(mouseX, mouseY) >= 0;
+        int inDotColor = inHover ? 0xFF00FFFF : 0xFF38BDF8;
+        graphics.fill(x + 14, y, x + 18, y + 4, inDotColor);
+        graphics.renderOutline(x + 13, y - 1, 6, 6, inHover ? 0xFFFFFFFF : 0x88000000);
+
+        // 3. Output Port Dot (Bottom: x + 16, y + 32)
+        boolean outHover = widget.getHoveredOutputPortIndex(mouseX, mouseY) >= 0;
+        int outDotColor = outHover ? 0xFF00FFFF : 0xFF38BDF8;
+        graphics.fill(x + 14, y + 28, x + 18, y + 32, outDotColor);
+        graphics.renderOutline(x + 13, y + 27, 6, 6, outHover ? 0xFFFFFFFF : 0x88000000);
+
+        // 4. Center Icon: Ingredient Icon or 🔀
+        if (!node.getInputs().isEmpty() && node.getInputs().get(0) != null) {
+            IngredientStack stack = node.getInputs().get(0);
+            IngredientRenderer.render(graphics, stack, x + 8, y + 8);
+        } else {
+            graphics.drawString(font, "🔀", x + 10, y + 11, 0xFF94A3B8, false);
         }
     }
 }

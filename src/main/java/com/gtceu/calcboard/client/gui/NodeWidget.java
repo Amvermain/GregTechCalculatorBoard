@@ -93,6 +93,7 @@ public class NodeWidget {
     }
 
     public int calculateAutoHeight() {
+        if (node.isReroute()) return 32;
         int maxRows = Math.max(node.getInputs().size(), node.getOutputs().size());
         int contentStartY = getContentStartY();
         int contentEndY = contentStartY + Math.max(1, maxRows) * 18 + 8;
@@ -100,35 +101,53 @@ public class NodeWidget {
     }
 
     public int getHeight() {
+        if (node.isReroute()) return 32;
         return Math.max(calculateAutoHeight(), node.getCardHeight());
     }
 
     public float getOutputPortX(int index) {
+        if (node.isReroute()) {
+            return (float) (node.getPosX() + 16);
+        }
         return (float) (node.getPosX() + getWidth() - 6);
     }
 
     public float getOutputPortY(int index) {
+        if (node.isReroute()) {
+            return (float) (node.getPosY() + 32);
+        }
         int contentY = getContentStartY();
         return contentY + index * 18 + 8;
     }
 
     public float getInputPortX(int index) {
+        if (node.isReroute()) {
+            return (float) (node.getPosX() + 16);
+        }
         return (float) (node.getPosX() + 6);
     }
 
     public float getInputPortY(int index) {
+        if (node.isReroute()) {
+            return (float) (node.getPosY());
+        }
         int contentY = getContentStartY();
         return contentY + index * 18 + 8;
     }
 
     public boolean isHeaderHovered(double canvasMouseX, double canvasMouseY) {
+        if (node.isReroute()) {
+            return isPointInside(canvasMouseX, canvasMouseY)
+                    && getHoveredInputPortIndex(canvasMouseX, canvasMouseY) < 0
+                    && getHoveredOutputPortIndex(canvasMouseX, canvasMouseY) < 0;
+        }
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         return canvasMouseX >= x && canvasMouseX <= x + getWidth() - 40 && canvasMouseY >= y && canvasMouseY <= y + HEADER_HEIGHT;
     }
 
     public boolean isExpandButtonHovered(double canvasMouseX, double canvasMouseY) {
-        if (!node.isModule()) return false;
+        if (!node.isModule() || node.isReroute()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int expandX = x + getWidth() - 54;
@@ -136,6 +155,7 @@ public class NodeWidget {
     }
 
     public boolean isTargetButtonHovered(double canvasMouseX, double canvasMouseY) {
+        if (node.isReroute()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int targetX = x + getWidth() - 36;
@@ -143,6 +163,7 @@ public class NodeWidget {
     }
 
     public boolean isCloseButtonHovered(double canvasMouseX, double canvasMouseY) {
+        if (node.isReroute()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int closeX = x + getWidth() - 18;
@@ -150,6 +171,7 @@ public class NodeWidget {
     }
 
     public boolean isResizeHandleHovered(double canvasMouseX, double canvasMouseY) {
+        if (node.isReroute()) return false;
         int right = (int) (node.getPosX() + getWidth());
         int bottom = (int) (node.getPosY() + getHeight());
         return canvasMouseX >= right - 12 && canvasMouseX <= right && canvasMouseY >= bottom - 12 && canvasMouseY <= bottom;
@@ -163,6 +185,14 @@ public class NodeWidget {
 
     public int getHoveredInputPortIndex(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        if (node.isReroute()) {
+            // Port dot at (x + 14..18, y..4). Hit zone is top-center 16x12 box
+            if (canvasMouseX >= x + 8 && canvasMouseX <= x + 24 && canvasMouseY >= y - 6 && canvasMouseY <= y + 8) {
+                return 0;
+            }
+            return -1;
+        }
         int contentY = getContentStartY();
 
         for (int i = 0; i < node.getInputs().size(); i++) {
@@ -176,6 +206,14 @@ public class NodeWidget {
 
     public int getHoveredOutputPortIndex(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        if (node.isReroute()) {
+            // Port dot at (x + 14..18, y + 28..32). Hit zone is bottom-center 16x12 box
+            if (canvasMouseX >= x + 8 && canvasMouseX <= x + 24 && canvasMouseY >= y + 24 && canvasMouseY <= y + 38) {
+                return 0;
+            }
+            return -1;
+        }
         int contentY = getContentStartY();
 
         for (int i = 0; i < node.getOutputs().size(); i++) {
@@ -201,31 +239,19 @@ public class NodeWidget {
     }
 
     public double getInputRate(int index) {
-        if (index >= 0 && index < node.getInputs().size()) {
-            return node.getInputs().get(index).getAmount() * node.getEffectiveCyclesPerSecond();
-        }
-        return 0.0;
+        return node.getInputSlotRate(index, true);
     }
 
     public double getOutputRate(int index) {
-        if (index >= 0 && index < node.getOutputs().size()) {
-            return node.getOutputs().get(index).getExpectedAmount(node.getTierDelta()) * node.getEffectiveCyclesPerSecond();
-        }
-        return 0.0;
+        return node.getOutputSlotRate(index, true);
     }
 
     public double getNominalInputRate(int index) {
-        if (index >= 0 && index < node.getInputs().size()) {
-            return node.getInputs().get(index).getAmount() * node.getCyclesPerSecond();
-        }
-        return 0.0;
+        return node.getInputSlotRate(index, false);
     }
 
     public double getNominalOutputRate(int index) {
-        if (index >= 0 && index < node.getOutputs().size()) {
-            return node.getOutputs().get(index).getExpectedAmount(node.getTierDelta()) * node.getCyclesPerSecond();
-        }
-        return 0.0;
+        return node.getOutputSlotRate(index, false);
     }
 
     public Map<IngredientStack, Double> getCachedInputRates() {
@@ -260,24 +286,14 @@ public class NodeWidget {
 
     public boolean isTierButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int row2Y = ctrlY + 18;
-        return mouseX >= x + 6 && mouseX <= x + 38 && mouseY >= row2Y && mouseY <= row2Y + 14;
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        return adapter.isTierOrSpeedControlHovered(node, mouseX, mouseY);
     }
 
     public boolean isOcButtonHovered(double mouseX, double mouseY) {
-        if (node.isModule() || node.isGenerator()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int row2Y = ctrlY + 18;
-        int ocX = x + 42;
-        String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
-        String ocText = Component.translatable(ocKey).getString();
-        int ocW = Math.max(50, Minecraft.getInstance().font.width(ocText) + 6);
-        return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
+        if (node.isModule()) return false;
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        return adapter.isSecondaryControlHovered(node, mouseX, mouseY);
     }
 
     public boolean isAddonTrayHovered(double mouseX, double mouseY) {
@@ -293,22 +309,8 @@ public class NodeWidget {
     public boolean isMachineConfigButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
         if (isAddonTrayHovered(mouseX, mouseY)) return true;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int row2Y = ctrlY + 18;
-        int configStartX;
-        if (node.isGenerator()) {
-            String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
-            int genW = Math.max(28, Minecraft.getInstance().font.width(genBadge) + 4);
-            configStartX = x + 42 + genW + 3;
-        } else {
-            String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
-            String ocText = Component.translatable(ocKey).getString();
-            int ocW = Math.max(50, Minecraft.getInstance().font.width(ocText) + 6);
-            configStartX = x + 42 + ocW + 3;
-        }
-        return mouseX >= configStartX && mouseX <= x + getWidth() - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        return adapter.isMachineConfigHovered(node, mouseX, mouseY);
     }
 
     public boolean isRotorButtonHovered(double mouseX, double mouseY) {
@@ -343,9 +345,11 @@ public class NodeWidget {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (isTierButtonHovered(mouseX, mouseY)) {
-            commitCountEdit();
-            return changeTier(delta > 0 ? +1 : -1);
+        if (!node.isModule()) {
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter.handleControlScroll(this, node, mouseX, mouseY, delta)) {
+                return true;
+            }
         }
 
         int inIdx = getHoveredInputPortIndex(mouseX, mouseY);
@@ -398,6 +402,7 @@ public class NodeWidget {
                 parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ExpandModuleCommand(node, subNodes, subEdges, moduleEdges));
                 parent.rebuildWidgets();
                 parent.markSummaryDirty();
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onModuleExpanded();
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F)
                 );
@@ -493,30 +498,12 @@ public class NodeWidget {
             return true;
         }
 
-        // Tier Selector Button Click (Row 2, Left: [LV])
-        if (isTierButtonHovered(mouseX, mouseY)) {
-            commitCountEdit();
-            int direction = (button == 1) ? -1 : 1;
-            changeTier(direction);
-            return true;
-        }
-
-        // Overclock Mode Button Click (Row 2: [STD OC] / [PERF OC])
-        if (isOcButtonHovered(mouseX, mouseY)) {
-            commitCountEdit();
-            OverclockMode oldOc = node.getOverclockMode();
-            OverclockMode newOc = (oldOc == OverclockMode.STANDARD) ? OverclockMode.PERFECT : OverclockMode.STANDARD;
-            node.setOverclockMode(newOc);
-            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.overclockMode(node.getId(), oldOc, newOc));
-            invalidateCache();
-            return true;
-        }
-
-        // Machine Configuration & Addon Dialog Button Click (Row 2: [⚙ 4x] / [⚙ 220%])
-        if (isMachineConfigButtonHovered(mouseX, mouseY)) {
-            commitCountEdit();
-            parent.openMachineConfigDialog(node);
-            return true;
+        // Delegate row 2 control clicks (Tier/Speed, OC Mode, Machine Config) to IModAdapter
+        if (!node.isModule()) {
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter.handleControlClick(this, node, mouseX, mouseY, button)) {
+                return true;
+            }
         }
 
         return false;

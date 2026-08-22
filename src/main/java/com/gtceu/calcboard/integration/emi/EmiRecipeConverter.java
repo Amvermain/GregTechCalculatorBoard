@@ -23,6 +23,10 @@ import java.util.Map;
 public class EmiRecipeConverter {
 
     public static RecipeNode convert(EmiRecipe recipe) {
+        return convert(recipe, null);
+    }
+
+    public static RecipeNode convert(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
         String catName = null;
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             String catPath = recipe.getCategory().getId().getPath();
@@ -44,7 +48,14 @@ public class EmiRecipeConverter {
         boolean isHash = rawIdPath.length() > 16 && !rawIdPath.contains("_") && rawIdPath.matches("^[a-zA-Z0-9]+$");
 
         String name;
-        if (catName != null && !catName.isEmpty()) {
+        if (preferredWorkstation != null) {
+            String wsName = formatName(preferredWorkstation.getPath());
+            if (inputItemName != null && !inputItemName.isEmpty()) {
+                name = wsName + " (" + inputItemName + ")";
+            } else {
+                name = wsName;
+            }
+        } else if (catName != null && !catName.isEmpty()) {
             if (inputItemName != null && !inputItemName.isEmpty()) {
                 name = catName + " (" + inputItemName + ")";
             } else {
@@ -58,11 +69,12 @@ public class EmiRecipeConverter {
             name = "Recipe";
         }
 
-        RecipeDetails details = extractRecipeDetails(recipe);
+        RecipeDetails details = extractRecipeDetails(recipe, preferredWorkstation);
 
         RecipeNode node = RecipeNode.create(name, details.durationTicks, details.eut, details.tier);
         node.setGenerator(details.isGenerator);
-        node.setMachineIcon(findMachineIcon(recipe));
+        node.setEnergyType(details.energyType);
+        node.setMachineIcon(preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe));
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             node.setRecipeCategoryId(recipe.getCategory().getId());
         }
@@ -121,6 +133,20 @@ public class EmiRecipeConverter {
                 }
                 node.addOutput(os);
             }
+        }
+
+        // Apply Composite Recipe Overrides / Additions from Adapters (e.g. Systeams Water + Fuel -> Steam)
+        if (details.overrideOutputs && !details.customOutputs.isEmpty()) {
+            node.getOutputs().clear();
+            for (IngredientStack cos : details.customOutputs) {
+                node.addOutput(cos.copy());
+            }
+        }
+        for (IngredientStack ein : details.extraInputs) {
+            node.addInput(ein.copy());
+        }
+        for (IngredientStack eout : details.extraOutputs) {
+            node.addOutput(eout.copy());
         }
 
         ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
@@ -415,23 +441,45 @@ public class EmiRecipeConverter {
         return sb.toString().trim();
     }
 
-    private static class RecipeDetails {
-        double durationTicks = 100.0;
-        double eut = 32.0;
-        GTVoltageTier tier = GTVoltageTier.LV;
-        boolean isGenerator = false;
-        int backingRecipeTemp = 0;
+    public static class RecipeDetails {
+        public double durationTicks = 20.0;
+        public double eut = 32.0;
+        public GTVoltageTier tier = GTVoltageTier.LV;
+        public boolean isGenerator = false;
+        public com.gtceu.calcboard.api.EnergyType energyType = com.gtceu.calcboard.api.EnergyType.ELECTRIC_EU;
+        public int backingRecipeTemp = 0;
+        public List<IngredientStack> extraInputs = new ArrayList<>();
+        public List<IngredientStack> extraOutputs = new ArrayList<>();
+        public boolean overrideOutputs = false;
+        public List<IngredientStack> customOutputs = new ArrayList<>();
     }
 
-    private static RecipeDetails extractRecipeDetails(EmiRecipe recipe) {
+    private static RecipeDetails extractRecipeDetails(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
         RecipeDetails details = new RecipeDetails();
         try {
             var backing = recipe.getBackingRecipe();
-            if (backing != null) {
+            ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+
+            if (preferredWorkstation != null && (preferredWorkstation.getNamespace().equals("systeams") || preferredWorkstation.getPath().contains("boiler"))) {
+                if (com.gtceu.calcboard.compat.systeams.SysteamsModAdapter.adaptBoilerRecipe(backing, details, catId)) {
+                    return details;
+                }
+            }
+
+            // Route through ModAdapterRegistry
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForCategory(catId);
+            boolean handled = adapter.adaptRecipeDetails(recipe, backing, details);
+
+            if (!handled && backing != null) {
                 if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
                     extractGTRecipeDetails(backing, details);
-                } else if (ModCompatHelper.isThermalLoaded() || ModCompatHelper.isModLoaded("thermal_expansion")) {
-                    extractThermalRecipeDetails(recipe, backing, details);
+                } else {
+                    for (com.gtceu.calcboard.compat.IModAdapter a : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+                        if (a != adapter && a.adaptRecipeDetails(recipe, backing, details)) {
+                            handled = true;
+                            break;
+                        }
+                    }
                 }
             }
         } catch (Throwable ignored) {}
@@ -527,18 +575,28 @@ public class EmiRecipeConverter {
         }
 
         if (energyRF > 0) {
-            double totalEU = (double) energyRF / 4.0;
-            details.eut = 32.0;
-            details.durationTicks = Math.max(20.0, totalEU / details.eut);
-            details.tier = GTVoltageTier.LV;
-
             ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+            boolean isDynamo = false;
             if (catId != null) {
                 String cp = catId.getPath().toLowerCase();
                 if (cp.contains("dynamo") || cp.contains("fuel") || cp.contains("lapidary") || cp.contains("compression")
-                        || cp.contains("magmatic") || cp.contains("gourmand") || cp.contains("numismatic") || cp.contains("stirling")) {
-                    details.isGenerator = true;
+                        || cp.contains("magmatic") || cp.contains("gourmand") || cp.contains("numismatic") || cp.contains("stirling") || cp.contains("disenchantment")) {
+                    isDynamo = true;
                 }
+            }
+
+            if (isDynamo) {
+                details.isGenerator = true;
+                double basePowerRF = com.gtceu.calcboard.api.ThermalAugmentHelper.getThermalDynamoBasePowerRF(catId);
+                details.eut = basePowerRF / 4.0; // Standard 200 RF/t -> 50 EU/t
+                details.durationTicks = Math.max(1.0, (double) energyRF / basePowerRF);
+                details.tier = GTVoltageTier.LV;
+            } else {
+                details.isGenerator = false;
+                double baseMachPowerRF = com.gtceu.calcboard.api.ThermalAugmentHelper.getThermalMachineBasePowerRF(catId);
+                details.eut = baseMachPowerRF / 4.0; // Standard 20 RF/t -> 5 EU/t
+                details.durationTicks = Math.max(1.0, (double) energyRF / baseMachPowerRF);
+                details.tier = GTVoltageTier.LV;
             }
         }
     }

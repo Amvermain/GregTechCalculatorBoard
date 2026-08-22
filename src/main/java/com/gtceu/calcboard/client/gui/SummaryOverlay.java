@@ -23,6 +23,7 @@ public class SummaryOverlay {
     private double hoveredRate = 0.0;
     private boolean hoveredMachines = false;
     private boolean hoveredPower = false;
+    private boolean hoveredStress = false;
     private BalanceSummary lastSummary = null;
 
     public boolean isCollapsed() {
@@ -79,19 +80,40 @@ public class SummaryOverlay {
         // Collapse button [>>]
         graphics.drawString(font, "»", x + WIDTH - 16, y + 7, 0xFFAAAAAA, false);
 
-        // 2. Fixed Total Power & Machines Section
-        int powerY = y + 26;
-        String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
-        String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
-        int pLabelW = font.width(pLabel) + 6;
-        int maxPowerW = Math.max(10, (x + WIDTH - 8) - (x + 8 + pLabelW));
-        if (font.width(eutStr) > maxPowerW) {
-            eutStr = font.plainSubstrByWidth(eutStr, maxPowerW - 6) + "..";
-        }
-        graphics.drawString(font, pLabel, x + 8, powerY, 0xFFFFFFFF, false);
-        graphics.drawString(font, eutStr, x + 8 + pLabelW, powerY, 0xFFFFFFFF, false);
+        // 2. Fixed Total Power, Stress & Machines Section
+        int curHeaderY = y + 26;
 
-        int machinesY = powerY + 13;
+        // EU Power Line
+        boolean showEU = Math.abs(summary.totalEUt()) > 0.001 || (summary.totalSU() == 0 && summary.totalFE() == 0);
+        int powerY = curHeaderY;
+        if (showEU) {
+            String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
+            String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
+            int pLabelW = font.width(pLabel) + 6;
+            int maxPowerW = Math.max(10, (x + WIDTH - 8) - (x + 8 + pLabelW));
+            if (font.width(eutStr) > maxPowerW) {
+                eutStr = font.plainSubstrByWidth(eutStr, maxPowerW - 6) + "..";
+            }
+            graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
+            graphics.drawString(font, eutStr, x + 8 + pLabelW, curHeaderY, 0xFFFFFFFF, false);
+            curHeaderY += 13;
+        }
+
+        // Kinetic Stress (SU) Line
+        int stressY = curHeaderY;
+        boolean showSU = Math.abs(summary.totalSU()) > 0.001;
+        if (showSU) {
+            String suLabel = "§6" + Component.translatable("gui.gtcalcboard.total_stress").getString();
+            String suValStr = summary.totalSU() >= 0
+                    ? String.format("§a+%,.0f SU", summary.totalSU())
+                    : String.format("§c-%,.0f SU", -summary.totalSU());
+            int suLabelW = font.width(suLabel) + 6;
+            graphics.drawString(font, suLabel, x + 8, curHeaderY, 0xFFFFAA00, false);
+            graphics.drawString(font, suValStr, x + 8 + suLabelW, curHeaderY, 0xFFFFFFFF, false);
+            curHeaderY += 13;
+        }
+
+        int machinesY = curHeaderY;
         String mLabel = "§6" + Component.translatable("gui.gtcalcboard.total_machines").getString();
         String mCountStr = String.format("§f%d%s §7(%s)", summary.totalMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString(), Component.translatable("gui.gtcalcboard.hover_details").getString());
         int mLabelW = font.width(mLabel) + 6;
@@ -99,7 +121,8 @@ public class SummaryOverlay {
         graphics.drawString(font, mCountStr, x + 8 + mLabelW, machinesY, 0xFFFFFFFF, false);
 
         hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
-        hoveredPower = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12;
+        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12;
+        hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
 
         // Top separator below power & machines
         int headerBottom = machinesY + 14;
@@ -203,6 +226,20 @@ public class SummaryOverlay {
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7EU/t: §f%,.2f EU/t", totEUt)));
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §f%,.4fA %s", amps, tier.getName())));
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.power_mode_hint").getString()));
+            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            return;
+        }
+
+        if (hoveredStress && lastSummary != null) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_stress").getString()));
+            double totSU = lastSummary.totalSU();
+            if (totSU >= 0) {
+                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Capacity Surplus: §a+%,.0f SU", totSU)));
+            } else {
+                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Stress Deficit: §c-%,.0f SU", -totSU)));
+                tooltip.add(Component.literal("§4⚠ " + Component.translatable("gui.gtcalcboard.tooltip.overstressed").getString()));
+            }
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
             return;
         }

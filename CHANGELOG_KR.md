@@ -8,6 +8,55 @@
 
 ---
 
+## [2.0.0-alpha.6] - 2026-08-23
+
+### 신규 기능 (Added)
+- **Create 모드 키네틱 시스템 및 스트레스 유닛(SU) 연동 (`CreateModAdapter`, `CreateRecipeHandler`, `CreateGuiHandler`)**:
+  - 대형 물레방아, 물레방아, 풍차 베어링, 증기 기관, 핸드 크랭크, 크리에이티브 모터, 전기 모터 등 키네틱 발전기의 발전량 계산 지원.
+  - 32 RPM 기준 회전 속도(RPM)에 따른 가공 시간 및 스트레스 소비량($\text{Base SU} \times \frac{\text{RPM}}{32}$) 비례 스케일링 적용.
+  - 키네틱 노드 `create:stress_units` 입출력 포트 추가 및 와이어 연결, Auto-Ratio 자동 비율 계산 지원.
+  - Create 가공 레시피(압축, 분쇄, 제분, 교반, 절단, 연마 등)를 SU 소비자 검색 목록에 색인.
+  - Create Crafts & Additions의 알터네이터 및 전기 모터 SU/FE 변환 지원.
+- **중계 및 분기점 노드 (`RecipeNode`, `FlowGraph`, `FlowGraphSolver`)**:
+  - 32x32 크기의 무비용(0 EU/t, 0초) 중계 노드(Reroute & Junction Node) 추가.
+  - 상류/하류 연결에 따른 입출력 규격 자동 지정.
+  - 연결선(Bezier Wire) 더블클릭 시 해당 위치에 분기점 노드 자동 삽입.
+  - Auto-Ratio 계산 시 중계 노드를 통한 유량 전달 지원.
+- **캔버스 그룹 프레임 및 스티커 메모 (`CanvasGroupFrame`, `CanvasStickyNote`, `FrameEditDialog`, `NoteEditDialog`)**:
+  - 8가지 색상의 그룹 프레임(`CanvasGroupFrame`) 추가 (헤더 드래그 일괄 이동, 크기 조절, 프레임 내 노드 모듈화 지원).
+  - 다중 노드 선택 후 `Ctrl + G` 입력 시 바운딩 박스 기반 그룹 프레임 생성.
+  - 캔버스 독립 스티커 메모(`CanvasStickyNote`) 추가 (텍스트 자동 줄바꿈, 색상 변경, 더블클릭 편집).
+  - 프레임 내외 드래그 시 포함/제외 자동 처리.
+  - 그룹 프레임 및 메모를 포함한 복합 모듈 패키징 및 펼치기 지원.
+- **캔버스 4버튼 퀵 액션 마커 ([🔍] [🔀] [🖼] [📝]) (`BoardScreen`, `CanvasInteractionHandler`)**:
+  - 캔버스 빈 공간 클릭 또는 와이어 드롭 시 4개 액션(레시피 검색, 분기점 노드, 그룹 프레임, 스티커 메모) 버튼 표시.
+- **노드 카드 제어기 및 다중 에너지 지원 (`EnergyType`, `NodeCardRenderer`, `NodeWidget`)**:
+  - `EnergyType` 모델 추가 (`ELECTRIC_EU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `KINETIC_SU`, `MANA`).
+  - 써멀 보일러(`HEAT_OR_SELF`): 전압 티어 및 EU/t 표기 대신 보일러 배너와 증기 생산량 표기 적용.
+  - 써멀 다이나모(`ELECTRIC_FE`): 다이나모 배너 및 RF/t 표기 적용, 4 RF = 1 EU 비율로 요약 계산 반영.
+- **인터랙티브 튜토리얼 갱신 (`TutorialStep`, `TutorialManager`, `TutorialOverlay`)**:
+  - 중계 노드, 그룹 프레임, 퀵 액션, 하드웨어 설정창, 복합 모듈 기능을 포함하는 7단계 튜토리얼 코스로 개편.
+- **Systeams 런타임 리플렉션 연동 (`SysteamsModAdapter`, `ThermalModAdapter`)**:
+  - Systeams 설정(`STEAM_RATIO_*`, `SPEED_*`) 및 레시피를 런타임에 조회하도록 연동.
+  - 증기 다이나모(`systeams:steam`)를 증기 소비 발전기로 분류.
+
+### 개선 및 버그 수정 (Fixed & Changed)
+- **애드온 설정창 로딩 속도 개선 및 실시간 동기화 (`DynamicAddonCrawler`, `MachineConfigDialog`)**:
+  - UI 오픈 시 동기 레시피 순회를 제거하고 레지스트리 검색과 백그라운드 NBT 검색으로 분리하여 오픈 지연 해소.
+  - 장착된 애드온 삭제, 전체 삭제(Clear All), 카탈로그 카드 우클릭 제거 시 카탈로그 캐시 갱신 처리.
+- **다이나모 및 보일러 스펙 계산 개선 (`ThermalAugmentHelper`, `DynamicAddonCrawler`)**:
+  - `ThermalFuel`, `SteamFuel` 클래스 상속 계층 및 Forge 태그, KubeJS NBT 태그(`DynEA`, `DynP`, `DynEM`)를 기반으로 스펙을 계산하도록 수정.
+  - KubeJS 업그레이드 키트(`kubejs:lv/mv/hv/ev_upgrade_kit`, `arc_kit`, `mci_kit`) 색인 및 비활성화 아이템 제외 처리.
+- **컨텍스트 레시피 검색 필터링 수정 (`RecipeSearchDialog`)**:
+  - 특정 아이템/유체 검색 상태에서 기계 카테고리(`[chemical reactor]`) 검색 시 일치하지 않는 레시피가 노출되던 문제 수정.
+- **단일블록 기계 설정창 클릭 처리 수정 (`MachineConfigDialog`)**:
+  - 단일블록 써멀 기계 및 보일러에서 키트/애드온 카드 클릭이 동작하지 않던 문제 수정.
+- **다이나모 및 보일러 툴팁 수정 (`BoardTooltipRenderer`)**:
+  - 다이나모 호버 시 소비량으로 표기되던 툴팁을 발전량(`Total Power Generation: +400.00 RF/t`)으로 수정.
+  - 보일러 호버 시 증기 생산량(`Total Steam: +30,000.00 mB/s`) 툴팁 추가.
+
+---
+
 ## [2.0.0-alpha.5] - 2026-08-22
 
 ### 신규 기능 (Added)
@@ -79,9 +128,8 @@
 ## [2.0.0-alpha.3] - 2026-08-21
 
 ### 신규 기능 (Added)
-- **RFC-V2-005 CategoryCapabilityMatrix 연역 분석 엔진 도입 (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
-  - 레시피 카테고리별 워크스테이션 및 지원 애드온 카테고리를 사전 베이킹하여 $O(1)$ 초고속으로 조회하는 매트릭스 아키텍처 구현.
-  - 가열 코일, 터빈 로터, 병렬 해치, 유지보수 해치, 써멀 증강에 대한 결정론적 수용 능력 판별 지원.
+- **CategoryCapabilityMatrix 연역 분석 엔진 도입 (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
+  - `EmiRecipe`의 내부 슬롯 구성, 그렉텍 자바 객체 리플렉션(`GTRecipe`), Forge `Capability` 및 태그 분석을 통해 기계가 가진 특성을 런타임에 안전하게 추출.병렬 해치, 유지보수 해치, 써멀 증강에 대한 결정론적 수용 능력 판별 지원.
   - 싱글블록, 멀티블록, 터빈, 발전기, 여과기 카테고리를 포괄하는 전용 단위 테스트 슈트(`CategoryCapabilityMatrixTest`) 추가.
 - **워크스테이션 기반 멀티블록 수용 능력 연역 매핑 (`MultiblockDetector`, `EmiRecipeConverter`)**:
   - `multiblock_info` 구조체 스캔을 통해 대형 화학 반응기(LCR), 열분해로, EBF, 분해로 등 코일 멀티블록을 자동 식별.
@@ -139,7 +187,7 @@
 ## [2.0.0-alpha.1] - 2026-08-20
 
 ### 신규 기능 (Added)
-- **멀티플레이어 팀 공유 워크스페이스 아키텍처 구축 (`RFC-001`)**:
+- **멀티플레이어 팀 공유 워크스페이스 아키텍처 구축**:
   - **클라이언트-서버 실시간 동기화 프로토콜**: 양방향 네트워크 패킷(`C2S`/`S2C`)을 통해 멀티플레이어 서버에서 팀원들과 동일한 공정 차트를 실시간으로 함께 확인하고 협업할 수 있도록 시스템을 구축했습니다.
   - **모듈식 멀티 팀 프로바이더 백엔드 (`ITeamProvider`, `TeamProviderRegistry`)**:
     - **FTB Teams** 소프트 디펜던시 완벽 연동 (리플렉션을 통한 런타임 안정성 보장).

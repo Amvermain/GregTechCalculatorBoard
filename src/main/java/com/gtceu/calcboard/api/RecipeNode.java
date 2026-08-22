@@ -48,6 +48,41 @@ public class RecipeNode {
     private FlowGraph subGraph = null;
     private int containedMachineCount = 0;
     private double efficiency = 1.0;
+    private EnergyType energyType = EnergyType.ELECTRIC_EU;
+
+    public EnergyType getEnergyType() {
+        if (energyType != null) {
+            return energyType;
+        }
+        if (baseEUt <= 0.0 && !isGenerator) {
+            return EnergyType.HEAT_OR_SELF;
+        }
+        return EnergyType.ELECTRIC_EU;
+    }
+
+    public void setEnergyType(EnergyType energyType) {
+        this.energyType = energyType;
+    }
+
+    // Reroute / Junction Node Abstraction (RFC-001)
+    private boolean isReroute = false;
+
+    // Module N:N Port Mapping Origins (RFC-002)
+    public record PortOrigin(String internalNodeId, int internalPortIndex) {
+        public CompoundTag serializeNBT() {
+            CompoundTag tag = new CompoundTag();
+            tag.putString("nodeId", internalNodeId);
+            tag.putInt("portIdx", internalPortIndex);
+            return tag;
+        }
+
+        public static PortOrigin deserializeNBT(CompoundTag tag) {
+            return new PortOrigin(tag.getString("nodeId"), tag.getInt("portIdx"));
+        }
+    }
+
+    private final List<List<PortOrigin>> moduleInputOrigins = new ArrayList<>();
+    private final List<List<PortOrigin>> moduleOutputOrigins = new ArrayList<>();
 
     // Hardware Addons, Hatches, and Augments
     private final List<MachineAddon> addons = new ArrayList<>();
@@ -83,6 +118,15 @@ public class RecipeNode {
                 node.getAvailableWorkstations().add(loc);
             }
         }
+        return node;
+    }
+
+    public static RecipeNode createReroute(double posX, double posY) {
+        RecipeNode node = new RecipeNode(UUID.randomUUID().toString(), "Reroute", 0.0, 0.0, GTVoltageTier.ULV);
+        node.setReroute(true);
+        node.setPos(posX, posY);
+        node.setCardWidth(32);
+        node.setCardHeight(32);
         return node;
     }
 
@@ -138,19 +182,29 @@ public class RecipeNode {
     }
 
     public double getBaseDurationTicks() {
+        if (isReroute) return 0.0;
         return baseDurationTicks;
     }
 
     public void setBaseDurationTicks(double baseDurationTicks) {
+        if (isReroute) {
+            this.baseDurationTicks = 0.0;
+            return;
+        }
         this.baseDurationTicks = Math.max(1.0, baseDurationTicks);
     }
 
     public double getBaseEUt() {
+        if (isReroute) return 0.0;
         return baseEUt;
     }
 
     public void setBaseEUt(double baseEUt) {
-        this.baseEUt = Math.max(1.0, baseEUt);
+        if (isReroute) {
+            this.baseEUt = 0.0;
+            return;
+        }
+        this.baseEUt = Math.max(0.0, baseEUt);
     }
 
     public GTVoltageTier getRecipeTier() {
@@ -170,9 +224,6 @@ public class RecipeNode {
             this.targetTier = targetTier;
         } else {
             this.targetTier = recipeTier;
-        }
-        if (isGenerator) {
-            autoCalculateTurbineParallel();
         }
     }
 
@@ -213,6 +264,44 @@ public class RecipeNode {
     }
 
     private boolean isMultiblock = false;
+    private int rpm = 32;
+
+    public static final int[] STANDARD_RPMS = {4, 8, 16, 32, 64, 128, 256};
+
+    public int getRpm() {
+        return rpm > 0 ? rpm : 32;
+    }
+
+    public void setRpm(int rpm) {
+        this.rpm = Math.max(1, Math.min(256, rpm));
+    }
+
+    public void cycleRpm(int direction) {
+        int cur = getRpm();
+        int closestIdx = 3; // 32
+        int minDiff = Integer.MAX_VALUE;
+        for (int i = 0; i < STANDARD_RPMS.length; i++) {
+            int diff = Math.abs(STANDARD_RPMS[i] - cur);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+            }
+        }
+        int nextIdx = closestIdx + direction;
+        if (nextIdx < 0) nextIdx = STANDARD_RPMS.length - 1;
+        else if (nextIdx >= STANDARD_RPMS.length) nextIdx = 0;
+        setRpm(STANDARD_RPMS[nextIdx]);
+    }
+
+    public boolean isCreateMachine() {
+        if (energyType == EnergyType.KINETIC_SU) return true;
+        if (machineIcon != null && machineIcon.getNamespace().equals("create")) return true;
+        if (recipeCategoryId != null && recipeCategoryId.getNamespace().equals("create")) return true;
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && ws.getNamespace().equals("create")) return true;
+        }
+        return false;
+    }
 
     public boolean isMultiblock() {
         return isMultiblock;
@@ -228,7 +317,7 @@ public class RecipeNode {
     }
 
     public boolean hasMultiblockOption() {
-        if (isGenerator() || isModule()) return false;
+        if (isModule()) return false;
         if (isMultiblock() || canUseCoils()) return true;
         if (recipeCategoryId != null && CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId).hasMultiblockOption()) {
             return true;
@@ -333,19 +422,65 @@ public class RecipeNode {
     }
 
     public int getCardWidth() {
+        if (isReroute) return 32;
         return Math.max(245, Math.min(500, cardWidth));
     }
 
     public void setCardWidth(int cardWidth) {
+        if (isReroute) {
+            this.cardWidth = 32;
+            return;
+        }
         this.cardWidth = Math.max(245, Math.min(500, cardWidth));
     }
 
     public int getCardHeight() {
+        if (isReroute) return 32;
         return Math.max(0, Math.min(600, cardHeight));
     }
 
     public void setCardHeight(int cardHeight) {
+        if (isReroute) {
+            this.cardHeight = 32;
+            return;
+        }
         this.cardHeight = Math.max(0, Math.min(600, cardHeight));
+    }
+
+    public boolean isReroute() {
+        return isReroute;
+    }
+
+    public void setReroute(boolean reroute) {
+        this.isReroute = reroute;
+        if (reroute) {
+            this.cardWidth = 32;
+            this.cardHeight = 32;
+        }
+    }
+
+    public void bindRerouteIngredient(IngredientStack stack) {
+        if (isReroute && stack != null) {
+            inputs.clear();
+            outputs.clear();
+            inputs.add(stack.copy());
+            outputs.add(stack.copy());
+        }
+    }
+
+    public void unbindRerouteIngredient() {
+        if (isReroute) {
+            inputs.clear();
+            outputs.clear();
+        }
+    }
+
+    public List<List<PortOrigin>> getModuleInputOrigins() {
+        return moduleInputOrigins;
+    }
+
+    public List<List<PortOrigin>> getModuleOutputOrigins() {
+        return moduleOutputOrigins;
     }
 
     public boolean isModule() {
@@ -391,85 +526,25 @@ public class RecipeNode {
 
     public void setRotorPower(int rotorPower) {
         this.rotorPower = Math.max(10, Math.min(5000, rotorPower));
-        if (isGenerator) {
-            autoCalculateTurbineParallel();
-        }
     }
 
     /**
      * Deductively identifies the base voltage tier for this turbine type from GTCEu Machine Definitions or Recipe Category.
      */
     public GTVoltageTier getTurbineBaseTier() {
-        if (getMachineIcon() != null) {
-            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(getMachineIcon());
+        if (recipeCategoryId != null) {
+            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(recipeCategoryId);
             if (tier != null) return tier;
         }
-        if (getAvailableWorkstations() != null) {
-            for (ResourceLocation ws : getAvailableWorkstations()) {
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null) {
                 GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(ws);
                 if (tier != null) return tier;
             }
         }
-        if (getRecipeCategoryId() != null) {
-            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(getRecipeCategoryId());
-            if (tier != null) return tier;
-        }
-        if (getName() != null) {
-            String sanitized = getName().toLowerCase().trim().replace(" ", "_");
-            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(ResourceLocation.tryParse("gtceu:" + sanitized));
-            if (tier != null) return tier;
-        }
         return GTVoltageTier.EV;
     }
 
-    /**
-     * Deductively identifies base production EU/t from GTCEu Machine Definition or base tier voltage.
-     */
-    public double getTurbineBaseProduction() {
-        if (getMachineIcon() != null) {
-            Double prod = MultiblockDetector.getTurbineBaseProduction(getMachineIcon());
-            if (prod != null) return prod;
-        }
-        if (getAvailableWorkstations() != null) {
-            for (ResourceLocation ws : getAvailableWorkstations()) {
-                Double prod = MultiblockDetector.getTurbineBaseProduction(ws);
-                if (prod != null) return prod;
-            }
-        }
-        if (getRecipeCategoryId() != null) {
-            Double prod = MultiblockDetector.getTurbineBaseProduction(getRecipeCategoryId());
-            if (prod != null) return prod;
-        }
-        if (getName() != null) {
-            String sanitized = getName().toLowerCase().trim().replace(" ", "_");
-            Double prod = MultiblockDetector.getTurbineBaseProduction(ResourceLocation.tryParse("gtceu:" + sanitized));
-            if (prod != null) return prod;
-        }
-        GTVoltageTier baseTier = getTurbineBaseTier();
-        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 4096.0;
-    }
-
-    public boolean isLargeTurbine() {
-        if (!isGenerator) return false;
-        if (addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)) return true;
-        if (rotorEfficiency != 100 || rotorPower != 100 || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"))) return true;
-        if (machineIcon != null && MultiblockDetector.isTurbineMachine(machineIcon)) return true;
-        if (recipeCategoryId != null && MultiblockDetector.isTurbineRecipeCategory(recipeCategoryId)) return true;
-        if (availableWorkstations != null) {
-            for (ResourceLocation ws : availableWorkstations) {
-                if (MultiblockDetector.isTurbineMachine(ws)) return true;
-            }
-        }
-        if (name != null) {
-            String sanitized = name.toLowerCase().trim().replace(" ", "_");
-            if (MultiblockDetector.isTurbineMachine(ResourceLocation.tryParse("gtceu:" + sanitized))) return true;
-        }
-        return false;
-    }
-
-    /**
-     * +10% efficiency per Rotor Holder tier above the large turbine's base tier.
-     */
     public int getTurbineHolderEfficiencyBonus() {
         if (!isLargeTurbine()) return 0;
         GTVoltageTier baseTier = getTurbineBaseTier();
@@ -478,9 +553,41 @@ public class RecipeNode {
         return Math.max(0, delta * 10);
     }
 
-    /**
-     * GTCEu Rotor Holder base throughput (scales by 2x per tier above base tier).
-     */
+    public double getTurbineBaseProduction() {
+        if (recipeCategoryId != null) {
+            Double prod = MultiblockDetector.getTurbineBaseProduction(recipeCategoryId);
+            if (prod != null) return prod;
+        }
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null) {
+                Double prod = MultiblockDetector.getTurbineBaseProduction(ws);
+                if (prod != null) return prod;
+            }
+        }
+        GTVoltageTier baseTier = getTurbineBaseTier();
+        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 4096.0;
+    }
+
+    public boolean hasRotorAddon() {
+        if (isCreateMachine() || energyType != EnergyType.ELECTRIC_EU) return false;
+        return addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
+                || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"))
+                || rotorEfficiency != 100
+                || (rotorPower > 0 && rotorPower != 100);
+    }
+
+    public boolean isLargeTurbine() {
+        if (!isGenerator || isCreateMachine() || energyType != EnergyType.ELECTRIC_EU) return false;
+        if (hasRotorAddon()) return true;
+        if (isMultiblock()) return isTurbine();
+        if (name != null) {
+            String sanitized = name.toLowerCase().trim().replace(" ", "_");
+            if (sanitized.contains("large") && sanitized.contains("turbine")) return true;
+            if (MultiblockDetector.isTurbineMachine(ResourceLocation.tryParse("gtceu:" + sanitized))) return true;
+        }
+        return false;
+    }
+
     public double getNodeRotorHolderBaseCapacity(GTVoltageTier tier) {
         if (tier == null) return getTurbineBaseProduction();
         int tierIndex = tier.ordinal();
@@ -569,7 +676,10 @@ public class RecipeNode {
      * based on target Rotor Holder voltage tier limit, rotor optimal throughput, and base recipe EU/t.
      */
     public void autoCalculateTurbineParallel() {
-        if (!isGenerator || !isTurbine()) return;
+        if (!isGenerator || !isLargeTurbine()) {
+            this.parallel = 1;
+            return;
+        }
         if (baseEUt <= 0) return;
 
         boolean hasRotor = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
@@ -598,9 +708,6 @@ public class RecipeNode {
 
     public void setRotorName(String rotorName) {
         this.rotorName = rotorName;
-        if (isGenerator) {
-            autoCalculateTurbineParallel();
-        }
     }
 
     public int getRecipeTemperature() {
@@ -645,9 +752,6 @@ public class RecipeNode {
         if (addon.getCategory() == MachineAddon.Category.ROTOR) {
             addons.removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
             addons.add(addon);
-            if (isGenerator) {
-                autoCalculateTurbineParallel();
-            }
             return;
         }
 
@@ -679,23 +783,14 @@ public class RecipeNode {
                 break;
             }
         }
-        if (isGenerator) {
-            autoCalculateTurbineParallel();
-        }
     }
 
     public void removeAddon(String addonId) {
         addons.removeIf(a -> a.getId().equals(addonId));
-        if (isGenerator) {
-            autoCalculateTurbineParallel();
-        }
     }
 
     public void clearAddons() {
         addons.clear();
-        if (isGenerator) {
-            autoCalculateTurbineParallel();
-        }
     }
 
     public double getCombinedDurationMultiplier() {
@@ -722,7 +817,49 @@ public class RecipeNode {
         return mult;
     }
 
+    public int getEffectiveTurbineParallel() {
+        if (!isLargeTurbine()) return Math.max(1, parallel);
+        if (parallel > 1) return parallel;
+        double cap = getGeneratorMaxEUt();
+        double recipeEUt = Math.abs(getBaseEUt());
+        if (recipeEUt <= 0 || cap >= Double.MAX_VALUE) return Math.max(1, parallel);
+        return (int) Math.max(1, Math.floor(cap / recipeEUt));
+    }
+
+    public boolean isGTGenerator() {
+        if (!isGenerator) return false;
+        if (energyType != EnergyType.ELECTRIC_EU) return false;
+        if (MachineAddon.isThermalMachine(this)) return false;
+        if (recipeCategoryId != null && recipeCategoryId.getNamespace().equals("gtceu")) return true;
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && ws.getNamespace().equals("gtceu")) return true;
+        }
+        if (machineIcon != null && machineIcon.getNamespace().equals("gtceu")) return true;
+        if (name != null && (name.contains("Turbine") || name.contains("Generator"))) return true;
+        return false;
+    }
+
+    public int getEffectiveSingleblockParallel() {
+        if (!isGTGenerator() || isLargeTurbine()) return Math.max(1, parallel);
+        if (parallel > 1) return parallel;
+        double recipeEUt = Math.abs(getBaseEUt());
+        if (recipeEUt > 0 && targetTier != null && recipeEUt < targetTier.getVoltage()) {
+            return (int) Math.max(1, Math.floor((double) targetTier.getVoltage() / recipeEUt));
+        }
+        return Math.max(1, parallel);
+    }
+
     public int getTotalParallel() {
+        if (MachineAddon.isThermalMachine(this)) {
+            return Math.max(1, parallel);
+        }
+        if (isGenerator) {
+            if (isLargeTurbine()) {
+                return getEffectiveTurbineParallel() * getCombinedParallelMultiplier();
+            } else if (isGTGenerator()) {
+                return getEffectiveSingleblockParallel() * getCombinedParallelMultiplier();
+            }
+        }
         return Math.max(1, parallel * getCombinedParallelMultiplier());
     }
 
@@ -739,41 +876,15 @@ public class RecipeNode {
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
-        OverclockMode.OverclockResult baseRes;
-        if (isGenerator) {
-            baseRes = new OverclockMode.OverclockResult(baseDurationTicks, baseEUt, 1.0, 0);
-        } else {
-            baseRes = overclockMode.calculate(baseDurationTicks, baseEUt, getTierDelta());
-        }
-
-        double finalDuration;
-        if (isGenerator) {
-            if (isTurbine()) {
-                boolean hasRotorAddon = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
-                int holderBonus = getTurbineHolderEfficiencyBonus();
-                double rotorMult;
-                if (hasRotorAddon) {
-                    rotorMult = getCombinedDurationMultiplier() + (holderBonus / 100.0);
-                } else {
-                    rotorMult = ((rotorEfficiency > 0 ? rotorEfficiency : 100) + holderBonus) / 100.0;
-                }
-                finalDuration = Math.max(1.0, baseRes.durationTicks() * rotorMult);
-            } else {
-                finalDuration = Math.max(1.0, baseRes.durationTicks() * getCombinedDurationMultiplier());
-            }
-        } else {
-            finalDuration = Math.max(1.0, baseRes.durationTicks() * getCombinedDurationMultiplier());
-        }
-
-        double finalEut = isGenerator ? baseRes.eut() : Math.max(1.0, baseRes.eut() * getCombinedEutMultiplier());
-        return new OverclockMode.OverclockResult(finalDuration, finalEut, baseRes.batchesPerTick(), baseRes.overclocks());
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this);
+        return adapter.computeOverclock(this, targetTier, isGenerator);
     }
 
     public boolean isTurbine() {
-        if (!isGenerator) return false;
+        if (!isGenerator || isCreateMachine() || energyType != EnergyType.ELECTRIC_EU) return false;
         if (MachineAddon.isThermalMachine(this)) return false;
 
-        if (rotorEfficiency != 100 || rotorPower != 100 || (rotorName != null && !rotorName.isEmpty())) {
+        if (rotorEfficiency != 100 || rotorPower != 100 || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"))) {
             return true;
         }
 
@@ -833,9 +944,25 @@ public class RecipeNode {
      */
     public double getSingleMachineEUt() {
         if (isGenerator) {
-            double rawGen = getOverclockResult().eut() * getTotalParallel();
-            double cap = getGeneratorMaxEUt();
-            return Math.min(rawGen, cap);
+            if (isLargeTurbine()) {
+                if (parallel == 1) {
+                    double cap = getGeneratorMaxEUt();
+                    if (cap < Double.MAX_VALUE) {
+                        return cap;
+                    }
+                }
+                double rawGen = getOverclockResult().eut() * getTotalParallel();
+                double cap = getGeneratorMaxEUt();
+                return Math.min(rawGen, cap);
+            } else if (isGTGenerator() && parallel == 1) {
+                double recipeEUt = Math.abs(getBaseEUt());
+                if (recipeEUt < targetTier.getVoltage()) {
+                    double rawGen = getOverclockResult().eut() * getTotalParallel();
+                    double cap = (double) targetTier.getVoltage();
+                    return Math.min(rawGen, cap);
+                }
+            }
+            return getOverclockResult().eut() * getTotalParallel();
         }
         if (hasPowerConstantAddon()) {
             return getOverclockResult().eut() * parallel;
@@ -864,8 +991,13 @@ public class RecipeNode {
     public Map<IngredientStack, Double> calculateInputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
+        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack in : inputs) {
-            double r = in.getAmount() * cps;
+            double amount = in.getAmount();
+            if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
+                amount *= fuelEnergyMult;
+            }
+            double r = amount * cps;
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(in)) {
@@ -881,6 +1013,28 @@ public class RecipeNode {
         return rates;
     }
 
+    public double getInputSlotRate(int index, boolean effective) {
+        if (index < 0 || index >= inputs.size()) return 0.0;
+        IngredientStack in = inputs.get(index);
+        double amount = in.getAmount();
+        if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
+            amount *= Math.max(0.01, getCombinedDurationMultiplier());
+        }
+        double cps = effective ? getEffectiveCyclesPerSecond() : getCyclesPerSecond();
+        return amount * cps;
+    }
+
+    public double getOutputSlotRate(int index, boolean effective) {
+        if (index < 0 || index >= outputs.size()) return 0.0;
+        IngredientStack out = outputs.get(index);
+        double amount = out.getExpectedAmount(getTierDelta());
+        if (out.isFluid() && MachineAddon.isThermalMachine(this) && out.getId() != null && out.getId().getPath().contains("steam")) {
+            amount *= Math.max(0.01, getCombinedDurationMultiplier());
+        }
+        double cps = effective ? getEffectiveCyclesPerSecond() : getCyclesPerSecond();
+        return amount * cps;
+    }
+
     public double getSingleOutputExpectedAmount(int index) {
         if (index < 0 || index >= outputs.size()) return 0.0;
         return outputs.get(index).getExpectedAmount(getTierDelta());
@@ -893,8 +1047,13 @@ public class RecipeNode {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
         int tierDelta = getTierDelta();
+        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack out : outputs) {
-            double r = out.getExpectedAmount(tierDelta) * cps;
+            double amount = out.getExpectedAmount(tierDelta);
+            if (out.isFluid() && MachineAddon.isThermalMachine(this) && out.getId() != null && out.getId().getPath().contains("steam")) {
+                amount *= fuelEnergyMult;
+            }
+            double r = amount * cps;
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(out)) {
@@ -938,8 +1097,13 @@ public class RecipeNode {
     public Map<IngredientStack, Double> calculateEffectiveInputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
+        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack in : inputs) {
-            double r = in.getAmount() * cps;
+            double amount = in.getAmount();
+            if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
+                amount *= fuelEnergyMult;
+            }
+            double r = amount * cps;
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(in)) {
@@ -962,8 +1126,13 @@ public class RecipeNode {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
         int tierDelta = getTierDelta();
+        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack out : outputs) {
-            double r = out.getExpectedAmount(tierDelta) * cps;
+            double amount = out.getExpectedAmount(tierDelta);
+            if (out.isFluid() && MachineAddon.isThermalMachine(this) && out.getId() != null && out.getId().getPath().contains("steam")) {
+                amount *= fuelEnergyMult;
+            }
+            double r = amount * cps;
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(out)) {
@@ -1076,7 +1245,37 @@ public class RecipeNode {
             tag.putString("recipeCategoryId", recipeCategoryId.toString());
         }
 
+        if (energyType != null) {
+            tag.putString("energyType", energyType.name());
+        }
+
+        tag.putInt("rpm", getRpm());
         tag.putBoolean("isMultiblock", isMultiblock);
+        tag.putBoolean("isReroute", isReroute);
+
+        if (!moduleInputOrigins.isEmpty()) {
+            ListTag inOriginsTag = new ListTag();
+            for (List<PortOrigin> origins : moduleInputOrigins) {
+                ListTag slotList = new ListTag();
+                for (PortOrigin o : origins) {
+                    slotList.add(o.serializeNBT());
+                }
+                inOriginsTag.add(slotList);
+            }
+            tag.put("moduleInputOrigins", inOriginsTag);
+        }
+
+        if (!moduleOutputOrigins.isEmpty()) {
+            ListTag outOriginsTag = new ListTag();
+            for (List<PortOrigin> origins : moduleOutputOrigins) {
+                ListTag slotList = new ListTag();
+                for (PortOrigin o : origins) {
+                    slotList.add(o.serializeNBT());
+                }
+                outOriginsTag.add(slotList);
+            }
+            tag.put("moduleOutputOrigins", outOriginsTag);
+        }
 
         return tag;
     }
@@ -1097,6 +1296,9 @@ public class RecipeNode {
         }
         if (tag.contains("icon")) {
             node.machineIcon = ResourceLocation.tryParse(tag.getString("icon"));
+        }
+        if (tag.contains("rpm")) {
+            node.rpm = tag.getInt("rpm");
         }
         if (tag.contains("targetTier")) {
             node.targetTier = GTVoltageTier.valueOf(tag.getString("targetTier"));
@@ -1156,6 +1358,11 @@ public class RecipeNode {
         if (tag.contains("containedMachineCount")) {
             node.containedMachineCount = tag.getInt("containedMachineCount");
         }
+        if (tag.contains("energyType")) {
+            try {
+                node.energyType = EnergyType.valueOf(tag.getString("energyType"));
+            } catch (Throwable ignored) {}
+        }
         if (tag.contains("subGraph")) {
             node.subGraph = FlowGraph.deserializeNBT(tag.getCompound("subGraph"));
         }
@@ -1172,6 +1379,36 @@ public class RecipeNode {
             ListTag outList = tag.getList("outputs", Tag.TAG_COMPOUND);
             for (int i = 0; i < outList.size(); i++) {
                 node.outputs.add(IngredientStack.deserializeNBT(outList.getCompound(i)));
+            }
+        }
+
+        if (tag.contains("isReroute")) {
+            node.isReroute = tag.getBoolean("isReroute");
+            if (node.isReroute) {
+                node.cardWidth = 32;
+                node.cardHeight = 32;
+            }
+        }
+        if (tag.contains("moduleInputOrigins", Tag.TAG_LIST)) {
+            ListTag inOriginsTag = tag.getList("moduleInputOrigins", Tag.TAG_LIST);
+            for (int i = 0; i < inOriginsTag.size(); i++) {
+                ListTag slotList = inOriginsTag.getList(i);
+                List<PortOrigin> origins = new ArrayList<>();
+                for (int j = 0; j < slotList.size(); j++) {
+                    origins.add(PortOrigin.deserializeNBT(slotList.getCompound(j)));
+                }
+                node.moduleInputOrigins.add(origins);
+            }
+        }
+        if (tag.contains("moduleOutputOrigins", Tag.TAG_LIST)) {
+            ListTag outOriginsTag = tag.getList("moduleOutputOrigins", Tag.TAG_LIST);
+            for (int i = 0; i < outOriginsTag.size(); i++) {
+                ListTag slotList = outOriginsTag.getList(i);
+                List<PortOrigin> origins = new ArrayList<>();
+                for (int j = 0; j < slotList.size(); j++) {
+                    origins.add(PortOrigin.deserializeNBT(slotList.getCompound(j)));
+                }
+                node.moduleOutputOrigins.add(origins);
             }
         }
 

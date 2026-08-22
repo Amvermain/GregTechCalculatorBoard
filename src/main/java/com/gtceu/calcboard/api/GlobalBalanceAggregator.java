@@ -51,6 +51,12 @@ public final class GlobalBalanceAggregator {
             // 3. Power Generation vs Consumption calculation per page
             for (RecipeNode node : graph.getNodes()) {
                 double nodeEffectiveEUt = node.getEffectiveTotalEUt();
+                if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+                    nodeEffectiveEUt = nodeEffectiveEUt / 4.0; // 4 RF = 1 EU
+                } else if (node.getEnergyType() != EnergyType.ELECTRIC_EU) {
+                    nodeEffectiveEUt = 0.0;
+                }
+
                 if (node.isGenerator()) {
                     totalGeneratedEUt += nodeEffectiveEUt;
                 } else {

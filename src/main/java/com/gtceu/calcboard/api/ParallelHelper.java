@@ -315,6 +315,7 @@ public class ParallelHelper {
         addon.setDurationMultiplier(1.0);
         addon.setEutMultiplier(isAbsolute ? 1.0 : parallel);
         addon.setItemStackSample(stack);
+        addon.setDiscoverySource("GTCEu MetaMachine Parallel Hatch API [" + id + "]");
         return addon;
     }
 }

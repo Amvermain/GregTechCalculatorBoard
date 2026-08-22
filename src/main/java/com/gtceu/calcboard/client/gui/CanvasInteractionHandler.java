@@ -10,8 +10,10 @@ import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Handles canvas panning, zooming, node dragging, bidirectional wire connections, and line cut interactions.
@@ -43,6 +45,26 @@ public class CanvasInteractionHandler {
     private double boxSelectCurX, boxSelectCurY;
     private final Map<String, double[]> dragStartPositions = new HashMap<>();
 
+    // Frame Dragging & Resizing State (RFC-002)
+    private com.gtceu.calcboard.api.CanvasGroupFrame draggingFrame = null;
+    private com.gtceu.calcboard.api.CanvasGroupFrame resizingFrame = null;
+    private double resizeFrameStartX, resizeFrameStartY;
+    private double origFrameWidth, origFrameHeight;
+    private long lastFrameHeaderClickTime = 0;
+    private com.gtceu.calcboard.api.CanvasGroupFrame lastClickedFrame = null;
+
+    // Sticky Note Dragging & Resizing State
+    private com.gtceu.calcboard.api.CanvasStickyNote draggingNote = null;
+    private com.gtceu.calcboard.api.CanvasStickyNote resizingNote = null;
+    private double resizeNoteStartX, resizeNoteStartY;
+    private double origNoteWidth, origNoteHeight;
+    private long lastNoteHeaderClickTime = 0;
+    private com.gtceu.calcboard.api.CanvasStickyNote lastClickedNote = null;
+
+    // Wire Double-Click Split State (RFC-001)
+    private long lastWireClickTime = 0;
+    private FlowGraph.ConnectionEdge lastClickedEdge = null;
+
     // Quick Add Marker State
     private boolean hasQuickAddMarker = false;
     private double quickAddMarkerCanvasX = 0;
@@ -52,12 +74,48 @@ public class CanvasInteractionHandler {
     private double lastEmptyClickCanvasX = 0;
     private double lastEmptyClickCanvasY = 0;
 
+    // Quick Add Contextual Wire Binding
+    private RecipeNode quickAddWireSourceNode = null;
+    private int quickAddWirePortIdx = -1;
+    private boolean quickAddWireIsInput = false;
+    private IngredientStack quickAddWireStack = null;
+    private boolean quickAddWireShiftAutoRatio = false;
+
     public CanvasInteractionHandler(BoardScreen screen) {
         this.screen = screen;
     }
 
+    private long lastMarkerHoverTime = 0;
+
     public boolean hasQuickAddMarker() {
-        return hasQuickAddMarker && (System.currentTimeMillis() - quickAddMarkerTime < 15000);
+        if (!hasQuickAddMarker) return false;
+        long elapsed = System.currentTimeMillis() - quickAddMarkerTime;
+        if (elapsed > 4000) {
+            clearQuickAddMarker();
+            return false;
+        }
+        return true;
+    }
+
+    public void checkMarkerCursorDistance(double canvasMouseX, double canvasMouseY) {
+        if (!hasQuickAddMarker) return;
+        double minX = quickAddMarkerCanvasX - 48;
+        double maxX = quickAddMarkerCanvasX + 48;
+        double minY = quickAddMarkerCanvasY - 14;
+        double maxY = quickAddMarkerCanvasY + 14;
+
+        double dx = Math.max(0, Math.max(minX - canvasMouseX, canvasMouseX - maxX));
+        double dy = Math.max(0, Math.max(minY - canvasMouseY, canvasMouseY - maxY));
+        double dist = Math.hypot(dx, dy);
+
+        long now = System.currentTimeMillis();
+        if (dist <= 15.0) {
+            lastMarkerHoverTime = now;
+        } else if (dist > 35.0) {
+            if (dist > 60.0 || (now - lastMarkerHoverTime > 350)) {
+                clearQuickAddMarker();
+            }
+        }
     }
 
     public double getQuickAddMarkerCanvasX() {
@@ -68,8 +126,17 @@ public class CanvasInteractionHandler {
         return quickAddMarkerCanvasY;
     }
 
+    public boolean hasQuickAddWireContext() {
+        return quickAddWireSourceNode != null;
+    }
+
     public void clearQuickAddMarker() {
         this.hasQuickAddMarker = false;
+        this.quickAddWireSourceNode = null;
+        this.quickAddWirePortIdx = -1;
+        this.quickAddWireIsInput = false;
+        this.quickAddWireStack = null;
+        this.quickAddWireShiftAutoRatio = false;
     }
 
     public NodeWidget getWireStartNode() {
@@ -215,6 +282,12 @@ public class CanvasInteractionHandler {
                                 dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                             }
                         }
+                        for (String selNoteId : screen.getSelectedNoteIds()) {
+                            com.gtceu.calcboard.api.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
+                            if (sn != null) {
+                                dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                            }
+                        }
                     } else {
                         dragStartPositions.put(widget.getNode().getId(), new double[]{widget.getNode().getPosX(), widget.getNode().getPosY()});
                     }
@@ -224,7 +297,174 @@ public class CanvasInteractionHandler {
             }
         }
 
-        // 2. Right-Click directly on any wire to cut/disconnect it
+        // 2. Left-Click on Wire -> Check Double Click for Split Junction (RFC-001)
+        if (button == 0) {
+            for (FlowGraph.ConnectionEdge edge : new ArrayList<>(graph.getConnections())) {
+                RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+                RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+                if (fromNode != null && toNode != null) {
+                    NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
+                    NodeWidget toWidget = screen.findWidgetForNode(toNode);
+                    if (fromWidget != null && toWidget != null) {
+                        float x1 = fromWidget.getOutputPortX(edge.outputIndex());
+                        float y1 = fromWidget.getOutputPortY(edge.outputIndex());
+                        float x2 = toWidget.getInputPortX(edge.inputIndex());
+                        float y2 = toWidget.getInputPortY(edge.inputIndex());
+
+                        if (ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, canvasMouseX, canvasMouseY, 8.0)) {
+                            long now = System.currentTimeMillis();
+                            if (now - lastWireClickTime < 350 && edge.equals(lastClickedEdge)) {
+                                if (screen.ensureEditPermission()) {
+                                    RecipeNode reroute = RecipeNode.createReroute(canvasMouseX - 16, canvasMouseY - 16);
+                                    if (edge.outputIndex() < fromNode.getOutputs().size()) {
+                                        reroute.bindRerouteIngredient(fromNode.getOutputs().get(edge.outputIndex()));
+                                    }
+                                    graph.addNode(reroute);
+                                    graph.getConnections().remove(edge);
+                                    graph.addConnection(fromNode.getId(), edge.outputIndex(), reroute.getId(), 0);
+                                    graph.addConnection(reroute.getId(), 0, toNode.getId(), edge.inputIndex());
+                                    screen.rebuildWidgets();
+                                    screen.markSummaryDirty();
+                                    com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onJunctionInserted();
+                                    Minecraft.getInstance().getSoundManager().play(
+                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+                                    );
+                                    lastWireClickTime = 0;
+                                    lastClickedEdge = null;
+                                    return true;
+                                }
+                            }
+                            lastWireClickTime = now;
+                            lastClickedEdge = edge;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2.5 Frame Actions & Header Dragging (RFC-002)
+        for (int i = graph.getFrames().size() - 1; i >= 0; i--) {
+            com.gtceu.calcboard.api.CanvasGroupFrame frame = graph.getFrames().get(i);
+            CanvasGroupFrameRenderer.FrameAction action = CanvasGroupFrameRenderer.getClickedAction(frame, canvasMouseX, canvasMouseY);
+            if (action != CanvasGroupFrameRenderer.FrameAction.NONE) {
+                if (!screen.ensureEditPermission()) return true;
+
+                if (action == CanvasGroupFrameRenderer.FrameAction.RESIZE && button == 0) {
+                    resizingFrame = frame;
+                    resizeFrameStartX = canvasMouseX;
+                    resizeFrameStartY = canvasMouseY;
+                    origFrameWidth = frame.getWidth();
+                    origFrameHeight = frame.getHeight();
+                    return true;
+                } else if (action == CanvasGroupFrameRenderer.FrameAction.DELETE && button == 0) {
+                    graph.removeFrame(frame);
+                    screen.markSummaryDirty();
+                    return true;
+                } else if (action == CanvasGroupFrameRenderer.FrameAction.COLOR && button == 0) {
+                    frame.cycleColor();
+                    return true;
+                } else if (action == CanvasGroupFrameRenderer.FrameAction.COLLAPSE && button == 0) {
+                    screen.collapseFrameIntoModule(frame);
+                    return true;
+                } else if (action == CanvasGroupFrameRenderer.FrameAction.NOTE && button == 0) {
+                    screen.openFrameEditDialog(frame);
+                    return true;
+                }
+            } else if (frame.isPointInHeader(canvasMouseX, canvasMouseY) && button == 0) {
+                long now = System.currentTimeMillis();
+                if (now - lastFrameHeaderClickTime < 350 && frame.equals(lastClickedFrame)) {
+                    screen.openFrameEditDialog(frame);
+                    lastFrameHeaderClickTime = 0;
+                    lastClickedFrame = null;
+                    return true;
+                }
+                lastFrameHeaderClickTime = now;
+                lastClickedFrame = frame;
+
+                draggingFrame = frame;
+                lastDragCanvasX = canvasMouseX;
+                lastDragCanvasY = canvasMouseY;
+                dragStartPositions.clear();
+                for (RecipeNode sn : frame.getEnclosedNodes(graph)) {
+                    dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                }
+                for (com.gtceu.calcboard.api.CanvasStickyNote sn : frame.getEnclosedNotes(graph)) {
+                    dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                }
+                dragStartPositions.put(frame.getId(), new double[]{frame.getPosX(), frame.getPosY()});
+                return true;
+            }
+        }
+
+        // 2.6 Sticky Note Actions & Header Dragging
+        for (int i = graph.getStickyNotes().size() - 1; i >= 0; i--) {
+            com.gtceu.calcboard.api.CanvasStickyNote note = graph.getStickyNotes().get(i);
+            CanvasStickyNoteRenderer.NoteAction action = CanvasStickyNoteRenderer.getClickedAction(note, canvasMouseX, canvasMouseY);
+            if (action != CanvasStickyNoteRenderer.NoteAction.NONE) {
+                if (!screen.ensureEditPermission()) return true;
+
+                if (action == CanvasStickyNoteRenderer.NoteAction.RESIZE && button == 0) {
+                    resizingNote = note;
+                    resizeNoteStartX = canvasMouseX;
+                    resizeNoteStartY = canvasMouseY;
+                    origNoteWidth = note.getWidth();
+                    origNoteHeight = note.getHeight();
+                    return true;
+                } else if (action == CanvasStickyNoteRenderer.NoteAction.DELETE && button == 0) {
+                    graph.removeStickyNote(note);
+                    screen.markSummaryDirty();
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+                    return true;
+                } else if (action == CanvasStickyNoteRenderer.NoteAction.COLOR && button == 0) {
+                    note.cycleColor();
+                    screen.markSummaryDirty();
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
+                    return true;
+                }
+            } else if (note.isPointInside(canvasMouseX, canvasMouseY) && button == 0) {
+                long now = System.currentTimeMillis();
+                if (now - lastNoteHeaderClickTime < 350 && note.equals(lastClickedNote)) {
+                    screen.openNoteEditDialog(note);
+                    lastNoteHeaderClickTime = 0;
+                    lastClickedNote = null;
+                    return true;
+                }
+                lastNoteHeaderClickTime = now;
+                lastClickedNote = note;
+
+                boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                if (shift) {
+                    screen.toggleSelectNote(note.getId());
+                } else {
+                    if (!screen.isNoteSelected(note.getId())) {
+                        screen.selectNote(note.getId(), false);
+                    }
+                }
+
+                if (note.isPointInHeader(canvasMouseX, canvasMouseY)) {
+                    draggingNote = note;
+                    lastDragCanvasX = canvasMouseX;
+                    lastDragCanvasY = canvasMouseY;
+                    dragStartPositions.clear();
+                    if (screen.isNoteSelected(note.getId())) {
+                        for (String selId : screen.getSelectedNodeIds()) {
+                            RecipeNode sn = graph.findNodeById(selId);
+                            if (sn != null) dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                        }
+                        for (String selNoteId : screen.getSelectedNoteIds()) {
+                            com.gtceu.calcboard.api.CanvasStickyNote sn = graph.findStickyNoteById(selNoteId);
+                            if (sn != null) dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                        }
+                    } else {
+                        dragStartPositions.put(note.getId(), new double[]{note.getPosX(), note.getPosY()});
+                    }
+                }
+                return true;
+            }
+        }
+
+        // 3. Right-Click directly on any wire to cut/disconnect it
         if (button == 1) {
             for (FlowGraph.ConnectionEdge edge : new ArrayList<>(graph.getConnections())) {
                 RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
@@ -250,17 +490,64 @@ public class CanvasInteractionHandler {
             }
         }
 
-        // 3. Click outside -> Commit all edits
+        // 4. Click outside -> Commit all edits
         for (NodeWidget w : nodeWidgets) {
             w.commitCountEdit();
         }
 
-        // Check clicking on existing Quick Add Marker
+        // Check clicking on existing Quick Action Marker ([🔍] Search, [🔀] Junction, [🖼] Frame, [📝] Note)
         if (button == 0 && hasQuickAddMarker()) {
-            double dist = Math.hypot(canvasMouseX - quickAddMarkerCanvasX, canvasMouseY - quickAddMarkerCanvasY);
-            if (dist <= 16.0) {
-                screen.getSearchDialog().openAt(quickAddMarkerCanvasX, quickAddMarkerCanvasY);
-                hasQuickAddMarker = false;
+            boolean inSearchBtn = canvasMouseX >= quickAddMarkerCanvasX - 44 && canvasMouseX <= quickAddMarkerCanvasX - 24
+                    && canvasMouseY >= quickAddMarkerCanvasY - 10 && canvasMouseY <= quickAddMarkerCanvasY + 10;
+            boolean inJunctionBtn = canvasMouseX >= quickAddMarkerCanvasX - 21 && canvasMouseX <= quickAddMarkerCanvasX - 1
+                    && canvasMouseY >= quickAddMarkerCanvasY - 10 && canvasMouseY <= quickAddMarkerCanvasY + 10;
+            boolean inFrameBtn = canvasMouseX >= quickAddMarkerCanvasX + 2 && canvasMouseX <= quickAddMarkerCanvasX + 22
+                    && canvasMouseY >= quickAddMarkerCanvasY - 10 && canvasMouseY <= quickAddMarkerCanvasY + 10;
+            boolean inNoteBtn = canvasMouseX >= quickAddMarkerCanvasX + 25 && canvasMouseX <= quickAddMarkerCanvasX + 45
+                    && canvasMouseY >= quickAddMarkerCanvasY - 10 && canvasMouseY <= quickAddMarkerCanvasY + 10;
+
+            if (inSearchBtn) {
+                if (hasQuickAddWireContext()) {
+                    screen.getSearchDialog().openForContextualWire(quickAddWireSourceNode, quickAddWirePortIdx, quickAddWireIsInput, quickAddWireStack, quickAddMarkerCanvasX, quickAddMarkerCanvasY, quickAddWireShiftAutoRatio);
+                } else {
+                    screen.getSearchDialog().openAt(quickAddMarkerCanvasX, quickAddMarkerCanvasY);
+                }
+                clearQuickAddMarker();
+                return true;
+            } else if (inJunctionBtn) {
+                if (screen.ensureEditPermission()) {
+                    if (hasQuickAddWireContext()) {
+                        RecipeNode reroute = RecipeNode.createReroute(quickAddMarkerCanvasX - 16, quickAddMarkerCanvasY - 16);
+                        if (quickAddWireStack != null) {
+                            reroute.bindRerouteIngredient(quickAddWireStack);
+                        }
+                        screen.getGraph().addNode(reroute);
+                        if (quickAddWireIsInput) {
+                            screen.getGraph().addConnection(reroute.getId(), 0, quickAddWireSourceNode.getId(), quickAddWirePortIdx);
+                        } else {
+                            screen.getGraph().addConnection(quickAddWireSourceNode.getId(), quickAddWirePortIdx, reroute.getId(), 0);
+                        }
+                        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(java.util.List.of(reroute), java.util.Collections.emptyList(), "Add Junction Node"));
+                        screen.rebuildWidgets();
+                        screen.markSummaryDirty();
+                        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onJunctionInserted();
+                        Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
+                        );
+                    } else {
+                        screen.addRerouteNodeAt(quickAddMarkerCanvasX, quickAddMarkerCanvasY);
+                        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onJunctionInserted();
+                    }
+                }
+                clearQuickAddMarker();
+                return true;
+            } else if (inFrameBtn) {
+                screen.createFrameAt(quickAddMarkerCanvasX, quickAddMarkerCanvasY);
+                clearQuickAddMarker();
+                return true;
+            } else if (inNoteBtn) {
+                screen.createNoteAt(quickAddMarkerCanvasX, quickAddMarkerCanvasY);
+                clearQuickAddMarker();
                 return true;
             }
         }
@@ -350,7 +637,7 @@ public class CanvasInteractionHandler {
                 double maxY = Math.max(boxSelectStartY, boxSelectCurY);
 
                 if (Math.abs(maxX - minX) > 6 || Math.abs(maxY - minY) > 6) {
-                    hasQuickAddMarker = false;
+                    clearQuickAddMarker();
                     for (NodeWidget w : screen.getNodeWidgets()) {
                         double nx = w.getNode().getPosX();
                         double ny = w.getNode().getPosY();
@@ -361,17 +648,54 @@ public class CanvasInteractionHandler {
                             screen.getSelectedNodeIds().add(w.getNode().getId());
                         }
                     }
+                    for (com.gtceu.calcboard.api.CanvasStickyNote note : screen.getGraph().getStickyNotes()) {
+                        double nx = note.getPosX();
+                        double ny = note.getPosY();
+                        double nw = note.getWidth();
+                        double nh = note.getHeight();
+
+                        if (nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY) {
+                            screen.getSelectedNoteIds().add(note.getId());
+                        }
+                    }
                 } else {
                     quickAddMarkerCanvasX = boxSelectStartX;
                     quickAddMarkerCanvasY = boxSelectStartY;
                     quickAddMarkerTime = System.currentTimeMillis();
                     hasQuickAddMarker = true;
+                    quickAddWireSourceNode = null;
+                    quickAddWirePortIdx = -1;
+                    quickAddWireIsInput = false;
+                    quickAddWireStack = null;
+                    quickAddWireShiftAutoRatio = false;
                 }
                 return true;
             }
 
             if (resizingNode != null) {
                 resizingNode = null;
+                return true;
+            }
+
+            if (resizingNote != null) {
+                resizingNote = null;
+                return true;
+            }
+
+            if (draggingNote != null) {
+                draggingNote = null;
+                dragStartPositions.clear();
+                return true;
+            }
+
+            if (resizingFrame != null) {
+                resizingFrame = null;
+                return true;
+            }
+
+            if (draggingFrame != null) {
+                draggingFrame = null;
+                dragStartPositions.clear();
                 return true;
             }
 
@@ -409,6 +733,12 @@ public class CanvasInteractionHandler {
     private void handleForwardWireConnect(NodeWidget targetWidget, FlowGraph graph, int inPortIdx) {
         RecipeNode fromNode = wireStartNode.getNode();
         RecipeNode toNode = targetWidget.getNode();
+
+        if (fromNode.isReroute() && inPortIdx < toNode.getInputs().size()) {
+            fromNode.bindRerouteIngredient(toNode.getInputs().get(inPortIdx));
+        } else if (toNode.isReroute() && wireStartPortIdx < fromNode.getOutputs().size()) {
+            toNode.bindRerouteIngredient(fromNode.getOutputs().get(wireStartPortIdx));
+        }
 
         if (wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
             IngredientStack outStack = fromNode.getOutputs().get(wireStartPortIdx);
@@ -452,6 +782,12 @@ public class CanvasInteractionHandler {
     private void handleReverseWireConnect(NodeWidget targetWidget, FlowGraph graph, int outPortIdx) {
         RecipeNode fromNode = targetWidget.getNode();
         RecipeNode toNode = wireStartNode.getNode();
+
+        if (fromNode.isReroute() && wireStartPortIdx < toNode.getInputs().size()) {
+            fromNode.bindRerouteIngredient(toNode.getInputs().get(wireStartPortIdx));
+        } else if (toNode.isReroute() && outPortIdx < fromNode.getOutputs().size()) {
+            toNode.bindRerouteIngredient(fromNode.getOutputs().get(outPortIdx));
+        }
 
         if (outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx < toNode.getInputs().size()) {
             IngredientStack outStack = fromNode.getOutputs().get(outPortIdx);
@@ -500,17 +836,26 @@ public class CanvasInteractionHandler {
         if (dragDist >= 15.0) {
             RecipeNode srcNode = wireStartNode.getNode();
             boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+            IngredientStack stack = null;
             if (wireStartIsInput) {
                 if (wireStartPortIdx >= 0 && wireStartPortIdx < srcNode.getInputs().size()) {
-                    IngredientStack stack = srcNode.getInputs().get(wireStartPortIdx);
-                    screen.getSearchDialog().openForContextualWire(srcNode, wireStartPortIdx, true, stack, canvasMouseX, canvasMouseY, shiftDown);
+                    stack = srcNode.getInputs().get(wireStartPortIdx);
                 }
             } else {
                 if (wireStartPortIdx >= 0 && wireStartPortIdx < srcNode.getOutputs().size()) {
-                    IngredientStack stack = srcNode.getOutputs().get(wireStartPortIdx);
-                    screen.getSearchDialog().openForContextualWire(srcNode, wireStartPortIdx, false, stack, canvasMouseX, canvasMouseY, shiftDown);
+                    stack = srcNode.getOutputs().get(wireStartPortIdx);
                 }
             }
+
+            this.quickAddMarkerCanvasX = canvasMouseX;
+            this.quickAddMarkerCanvasY = canvasMouseY;
+            this.quickAddMarkerTime = System.currentTimeMillis();
+            this.hasQuickAddMarker = true;
+            this.quickAddWireSourceNode = srcNode;
+            this.quickAddWirePortIdx = wireStartPortIdx;
+            this.quickAddWireIsInput = wireStartIsInput;
+            this.quickAddWireStack = stack;
+            this.quickAddWireShiftAutoRatio = shiftDown;
         }
     }
 
@@ -518,6 +863,73 @@ public class CanvasInteractionHandler {
         if (isBoxSelecting && button == 0) {
             boxSelectCurX = screen.toCanvasX(mouseX);
             boxSelectCurY = screen.toCanvasY(mouseY);
+            return true;
+        }
+
+        if (resizingNote != null && button == 0) {
+            double canvasMouseX = screen.toCanvasX(mouseX);
+            double canvasMouseY = screen.toCanvasY(mouseY);
+            double deltaX = canvasMouseX - resizeNoteStartX;
+            double deltaY = canvasMouseY - resizeNoteStartY;
+            resizingNote.setWidth(Math.max(com.gtceu.calcboard.api.CanvasStickyNote.MIN_WIDTH, origNoteWidth + deltaX));
+            resizingNote.setHeight(Math.max(com.gtceu.calcboard.api.CanvasStickyNote.MIN_HEIGHT, origNoteHeight + deltaY));
+            screen.markSummaryDirty();
+            return true;
+        }
+
+        if (draggingNote != null && button == 0) {
+            double curCanvasX = screen.toCanvasX(mouseX);
+            double curCanvasY = screen.toCanvasY(mouseY);
+            double deltaX = curCanvasX - lastDragCanvasX;
+            double deltaY = curCanvasY - lastDragCanvasY;
+            lastDragCanvasX = curCanvasX;
+            lastDragCanvasY = curCanvasY;
+
+            if (screen.isNoteSelected(draggingNote.getId())) {
+                for (String selId : screen.getSelectedNodeIds()) {
+                    RecipeNode sn = screen.getGraph().findNodeById(selId);
+                    if (sn != null) {
+                        sn.setPos(sn.getPosX() + deltaX, sn.getPosY() + deltaY);
+                    }
+                }
+                for (String selNoteId : screen.getSelectedNoteIds()) {
+                    com.gtceu.calcboard.api.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
+                    if (sn != null) {
+                        sn.moveBy(deltaX, deltaY);
+                    }
+                }
+            } else {
+                draggingNote.moveBy(deltaX, deltaY);
+            }
+            screen.markSummaryDirty();
+            return true;
+        }
+
+        if (resizingFrame != null && button == 0) {
+            double canvasMouseX = screen.toCanvasX(mouseX);
+            double canvasMouseY = screen.toCanvasY(mouseY);
+            double deltaX = canvasMouseX - resizeFrameStartX;
+            double deltaY = canvasMouseY - resizeFrameStartY;
+            resizingFrame.setWidth(Math.max(com.gtceu.calcboard.api.CanvasGroupFrame.MIN_WIDTH, origFrameWidth + deltaX));
+            resizingFrame.setHeight(Math.max(com.gtceu.calcboard.api.CanvasGroupFrame.MIN_HEIGHT, origFrameHeight + deltaY));
+            return true;
+        }
+
+        if (draggingFrame != null && button == 0) {
+            double curCanvasX = screen.toCanvasX(mouseX);
+            double curCanvasY = screen.toCanvasY(mouseY);
+            double deltaX = curCanvasX - lastDragCanvasX;
+            double deltaY = curCanvasY - lastDragCanvasY;
+            lastDragCanvasX = curCanvasX;
+            lastDragCanvasY = curCanvasY;
+
+            draggingFrame.moveBy(deltaX, deltaY);
+            for (RecipeNode n : draggingFrame.getEnclosedNodes(screen.getGraph())) {
+                n.setPos(n.getPosX() + deltaX, n.getPosY() + deltaY);
+            }
+            for (com.gtceu.calcboard.api.CanvasStickyNote n : draggingFrame.getEnclosedNotes(screen.getGraph())) {
+                n.moveBy(deltaX, deltaY);
+            }
             return true;
         }
 
@@ -542,11 +954,17 @@ public class CanvasInteractionHandler {
             lastDragCanvasY = curCanvasY;
 
             if (screen.isNodeSelected(draggingNode.getNode().getId())) {
-                // Move all selected nodes together
+                // Move all selected nodes and notes together
                 for (String selId : screen.getSelectedNodeIds()) {
                     RecipeNode sn = screen.getGraph().findNodeById(selId);
                     if (sn != null) {
                         sn.setPos(sn.getPosX() + deltaX, sn.getPosY() + deltaY);
+                    }
+                }
+                for (String selNoteId : screen.getSelectedNoteIds()) {
+                    com.gtceu.calcboard.api.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
+                    if (sn != null) {
+                        sn.moveBy(deltaX, deltaY);
                     }
                 }
             } else {

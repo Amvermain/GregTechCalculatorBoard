@@ -57,6 +57,7 @@ public class MachineAddon {
     private double eutMultiplier = 1.0;
     private int parallelMultiplier = 1;
     private boolean powerConstant = false; // If true, parallel execution does not scale EU/t (e.g. Absolute Parallel Hatch)
+    private String discoverySource; // Debug provenance metadata (e.g. Recipe Output NBT, Registry, Behavior reflection)
 
     // Machine-specific coil bonus metrics
     private int coilTemperature = 1800;
@@ -310,7 +311,9 @@ public class MachineAddon {
      * EBF: 5% EU discount per 900K excess temperature above the recipe's required temperature
      */
     public MachineAddon forMachine(RecipeNode node) {
-        return CoilHelper.tailorCoilAddon(this, node);
+        if (node == null) return this;
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        return adapter.tailorAddon(this, node);
     }
 
     public MachineAddon forMachine(String machineName) {
@@ -323,33 +326,8 @@ public class MachineAddon {
     public boolean isCompatibleWith(RecipeNode node) {
         if (node == null) return true;
         if (category == Category.CUSTOM) return true;
-
-        boolean isThermal = isThermalMachine(node);
-        boolean isTurbine = isTurbineMachine(node);
-        boolean isGen = node.isGenerator();
-        boolean isMb = node.isMultiblock() || node.hasMultiblockOption();
-        boolean isCoil = isMb && node.canUseCoils();
-
-        if (category == Category.THERMAL_AUGMENT) {
-            return isThermal;
-        }
-        if (category == Category.ROTOR) {
-            return isTurbine;
-        }
-        if (category == Category.COIL) {
-            return !isGen && isCoil;
-        }
-        if (category == Category.MULTIBLOCK_TRAIT) {
-            return !isGen && isMb;
-        }
-        if (category == Category.MAINTENANCE) {
-            return isMb;
-        }
-        if (category == Category.PARALLEL) {
-            return !isGen && isMb;
-        }
-
-        return true;
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        return adapter.isAddonCompatible(node, this);
     }
 
     public static boolean isThermalMachine(RecipeNode node) {
@@ -368,46 +346,16 @@ public class MachineAddon {
         if (node == null) {
             return List.of(Category.values());
         }
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        return adapter.getApplicableAddonCategories(node);
+    }
 
-        if (node.getRecipeCategoryId() != null) {
-            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
-            if (cap != null && cap != CategoryCapability.DEFAULT) {
-                return cap.getActiveCategoriesForNode(node);
-            }
-        }
+    public String getDiscoverySource() {
+        return discoverySource;
+    }
 
-        List<Category> cats = new ArrayList<>();
-        boolean isThermal = isThermalMachine(node);
-        boolean isTurbine = isTurbineMachine(node);
-        boolean isMb = node.isMultiblock() || node.hasMultiblockOption();
-        boolean isCoil = node.canUseCoils();
-
-        if (isThermal) {
-            cats.add(Category.THERMAL_AUGMENT);
-            cats.add(Category.CUSTOM);
-            return cats;
-        }
-
-        if (isTurbine) {
-            cats.add(Category.ROTOR);
-            if (isMb) {
-                cats.add(Category.MAINTENANCE);
-            }
-            cats.add(Category.CUSTOM);
-            return cats;
-        }
-
-        if (isMb) {
-            if (isCoil) {
-                cats.add(Category.COIL);
-            }
-            cats.add(Category.PARALLEL);
-            cats.add(Category.MAINTENANCE);
-            cats.add(Category.MULTIBLOCK_TRAIT);
-        }
-
-        cats.add(Category.CUSTOM);
-        return cats;
+    public void setDiscoverySource(String discoverySource) {
+        this.discoverySource = discoverySource;
     }
 
     public MachineAddon copy() {
@@ -425,6 +373,7 @@ public class MachineAddon {
         cp.setSmelterParallel(this.smelterParallel);
         cp.setRotorMaxEUt(this.rotorMaxEUt);
         cp.setRotorPower(this.rotorPower);
+        cp.setDiscoverySource(this.discoverySource);
         return cp;
     }
 
@@ -449,6 +398,9 @@ public class MachineAddon {
         tag.putInt("smelterPar", smelterParallel);
         tag.putDouble("rotorMaxEUt", rotorMaxEUt);
         tag.putInt("rotorPower", rotorPower);
+        if (discoverySource != null) {
+            tag.putString("discoverySource", discoverySource);
+        }
         return tag;
     }
 
@@ -478,8 +430,7 @@ public class MachineAddon {
         if (tag.contains("smelterPar")) addon.setSmelterParallel(tag.getInt("smelterPar"));
         if (tag.contains("rotorMaxEUt")) addon.setRotorMaxEUt(tag.getDouble("rotorMaxEUt"));
         if (tag.contains("rotorPower")) addon.setRotorPower(tag.getInt("rotorPower"));
-        if (tag.contains("smelterPar")) addon.setSmelterParallel(tag.getInt("smelterPar"));
-        if (tag.contains("rotorMaxEUt")) addon.setRotorMaxEUt(tag.getDouble("rotorMaxEUt"));
+        if (tag.contains("discoverySource")) addon.setDiscoverySource(tag.getString("discoverySource"));
 
         return addon;
     }

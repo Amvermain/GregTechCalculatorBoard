@@ -158,6 +158,40 @@ public class FavoritesDockWidget {
                             }
                         }
                     }
+
+                    // Look up all recipes for categories where this stack is a Workstation
+                    try {
+                        for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : rm.getCategories()) {
+                            if (cat == null || cat.getId() == null) continue;
+                            if (filterConfig.isCategoryExcluded(cat.getId().toString())) continue;
+
+                            var workstations = rm.getWorkstations(cat);
+                            if (workstations != null) {
+                                boolean isWs = false;
+                                for (dev.emi.emi.api.stack.EmiIngredient wsIng : workstations) {
+                                    if (wsIng != null && wsIng.getEmiStacks() != null) {
+                                        for (dev.emi.emi.api.stack.EmiStack wsStack : wsIng.getEmiStacks()) {
+                                            if (wsStack != null && wsStack.isEqual(stack)) {
+                                                isWs = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (isWs) break;
+                                }
+                                if (isWs) {
+                                    List<EmiRecipe> catRecipes = rm.getRecipes(cat);
+                                    if (catRecipes != null) {
+                                        for (EmiRecipe cr : catRecipes) {
+                                            if (cr != null && !list.contains(cr)) {
+                                                list.add(cr);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
                 }
 
                 // If EMI Default Recipe is set, prioritize it at the top (index 0)
@@ -330,7 +364,8 @@ public class FavoritesDockWidget {
         // Render Dragging Ghost Item under Cursor
         if (isDragging) {
             if (draggingFlyoutRecipe != null) {
-                renderRecipeIcon(graphics, draggingFlyoutRecipe, mouseX - 8, mouseY - 8);
+                ResourceLocation prefWs = (activeFlyoutFavorite != null && !activeFlyoutFavorite.getEmiStacks().isEmpty()) ? activeFlyoutFavorite.getEmiStacks().get(0).getId() : null;
+                renderRecipeIcon(graphics, draggingFlyoutRecipe, mouseX - 8, mouseY - 8, prefWs);
                 String name = extractRecipeDisplayName(draggingFlyoutRecipe);
                 graphics.drawString(font, "§a+ " + name, mouseX + 12, mouseY - 4, 0xFFFFFFFF, true);
             } else if (draggingFavorite != null) {
@@ -398,20 +433,35 @@ public class FavoritesDockWidget {
                     graphics.fill(subX + 4, curY, subX + SUB_WIDTH - 4, curY + SUB_ROW_HEIGHT - 2, 0xFF131C2E);
                 }
 
+                ResourceLocation prefWs = (activeFlyoutFavorite != null && !activeFlyoutFavorite.getEmiStacks().isEmpty()) ? activeFlyoutFavorite.getEmiStacks().get(0).getId() : null;
+
                 // Render Workstation / Recipe Icon
-                renderRecipeIcon(graphics, recipe, subX + 6, curY + 4);
+                renderRecipeIcon(graphics, recipe, subX + 6, curY + 4, prefWs);
 
                 // Recipe / Machine Name Line
-                String machineName = getRecipeWorkstationName(recipe);
+                String machineName = getRecipeRowDisplayName(recipe, prefWs);
                 String label = isDefault ? ("§6★ §r" + machineName) : machineName;
                 graphics.drawString(font, font.plainSubstrByWidth(label, SUB_WIDTH - 30), subX + 26, curY + 3, (rowHover || (previewActive && isSelected)) ? 0xFFFFD700 : (isDefault ? 0xFF38BDF8 : 0xFFFFFFFF), false);
 
-                // Specs Line (Time / EU/t)
-                RecipeNode node = EmiRecipeConverter.convert(recipe);
+                // Specs Line (Time / EU/t / Steam)
+                RecipeNode node = EmiRecipeConverter.convert(recipe, prefWs);
                 if (node != null) {
                     double dur = node.getBaseDurationTicks();
                     double eut = node.getBaseEUt();
-                    String spec = String.format("§7%.1fs §8| §e%.0f EU/t §7(%s)", dur / 20.0, eut, node.getTargetTier().name());
+                    String spec;
+                    if (node.isGenerator()) {
+                        spec = String.format("§7%.1fs §8| §a+%.0f EU/t §7(%s)", dur / 20.0, eut, node.getTargetTier().name());
+                    } else if (eut <= 0.0) {
+                        IngredientStack steamOut = node.getOutputs().stream().filter(o -> o.getId() != null && o.getId().getPath().contains("steam")).findFirst().orElse(null);
+                        if (steamOut != null) {
+                            double rate = (steamOut.getAmount() / (dur / 20.0)) / 20.0;
+                            spec = String.format("§7%.1fs §8| §b+%.0f mB/t Steam", dur / 20.0, rate);
+                        } else {
+                            spec = String.format("§7%.1fs §8| §70 EU/t", dur / 20.0);
+                        }
+                    } else {
+                        spec = String.format("§7%.1fs §8| §e%.0f EU/t §7(%s)", dur / 20.0, eut, node.getTargetTier().name());
+                    }
                     graphics.drawString(font, font.plainSubstrByWidth(spec, SUB_WIDTH - 30), subX + 26, curY + 14, 0xFF94A3B8, false);
                 }
             }
@@ -478,21 +528,47 @@ public class FavoritesDockWidget {
         }
     }
 
-    private void renderRecipeIcon(GuiGraphics graphics, EmiRecipe recipe, int x, int y) {
-        // Try Category / Workstation Icon first
+    private void renderRecipeIcon(GuiGraphics graphics, EmiRecipe recipe, int x, int y, ResourceLocation preferredWs) {
+        if (!recipe.getOutputs().isEmpty() && !recipe.getOutputs().get(0).getEmiStacks().isEmpty()) {
+            recipe.getOutputs().get(0).render(graphics, x, y, 0, EmiIngredient.RENDER_ICON);
+            return;
+        }
+        if (!recipe.getInputs().isEmpty() && !recipe.getInputs().get(0).getEmiStacks().isEmpty()) {
+            recipe.getInputs().get(0).render(graphics, x, y, 0, EmiIngredient.RENDER_ICON);
+            return;
+        }
+        if (preferredWs != null) {
+            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(preferredWs);
+            if (item != null) {
+                dev.emi.emi.api.stack.EmiStack.of(item).render(graphics, x, y, 0, EmiIngredient.RENDER_ICON);
+                return;
+            }
+        }
         var workstations = dev.emi.emi.api.EmiApi.getRecipeManager().getWorkstations(recipe.getCategory());
         if (workstations != null && !workstations.isEmpty() && !workstations.get(0).getEmiStacks().isEmpty()) {
             workstations.get(0).getEmiStacks().get(0).render(graphics, x, y, 0, EmiIngredient.RENDER_ICON);
             return;
         }
+        graphics.fill(x, y, x + 16, y + 16, 0xFF4A90E2);
+    }
 
+    private String getRecipeRowDisplayName(EmiRecipe recipe, ResourceLocation preferredWs) {
         if (!recipe.getOutputs().isEmpty()) {
-            recipe.getOutputs().get(0).render(graphics, x, y, 0, EmiIngredient.RENDER_ICON);
-        } else if (!recipe.getInputs().isEmpty()) {
-            recipe.getInputs().get(0).render(graphics, x, y, 0, EmiIngredient.RENDER_ICON);
-        } else {
-            graphics.fill(x, y, x + 16, y + 16, 0xFF4A90E2);
+            var stacks = recipe.getOutputs().get(0).getEmiStacks();
+            if (!stacks.isEmpty() && !stacks.get(0).getName().getString().isEmpty()) {
+                return stacks.get(0).getName().getString();
+            }
         }
+        if (!recipe.getInputs().isEmpty()) {
+            var stacks = recipe.getInputs().get(0).getEmiStacks();
+            if (!stacks.isEmpty() && !stacks.get(0).getName().getString().isEmpty()) {
+                return stacks.get(0).getName().getString();
+            }
+        }
+        if (preferredWs != null) {
+            return EmiRecipeConverter.formatName(preferredWs.getPath());
+        }
+        return getRecipeWorkstationName(recipe);
     }
 
     private String getRecipeWorkstationName(EmiRecipe recipe) {
@@ -746,7 +822,8 @@ public class FavoritesDockWidget {
                     break;
                 }
             }
-            return EmiRecipeConverter.convert(best);
+            ResourceLocation prefWs = !fav.getEmiStacks().isEmpty() ? fav.getEmiStacks().get(0).getId() : null;
+            return EmiRecipeConverter.convert(best, prefWs);
         }
         if (!fav.getEmiStacks().isEmpty()) {
             // Fallback: Create Raw Material Input Node for this item stack
@@ -780,7 +857,8 @@ public class FavoritesDockWidget {
     }
 
     private void spawnRecipeNode(EmiRecipe recipe, double canvasX, double canvasY) {
-        RecipeNode node = EmiRecipeConverter.convert(recipe);
+        ResourceLocation prefWs = (activeFlyoutFavorite != null && !activeFlyoutFavorite.getEmiStacks().isEmpty()) ? activeFlyoutFavorite.getEmiStacks().get(0).getId() : null;
+        RecipeNode node = EmiRecipeConverter.convert(recipe, prefWs);
         if (node == null) return;
 
         node.setPosX(canvasX);

@@ -76,6 +76,7 @@ public class ThermalAugmentHelper {
         MachineAddon addon = parseThermalAugmentTag(augTag, stack.getHoverName().getString(), id);
         if (addon != null) {
             addon.setItemStackSample(stack);
+            addon.setDiscoverySource((stack.hasTag() ? "Active Recipe Output NBT (AugmentData)" : "Thermal IAugmentItem Reflection") + " [" + id + "]");
         }
         return addon;
     }
@@ -132,6 +133,7 @@ public class ThermalAugmentHelper {
         addon.setParallelMultiplier(parallel);
         addon.setEutMultiplier(eutMult);
         addon.setDurationMultiplier(durMult);
+        addon.setDiscoverySource("AugmentData NBT Tag [" + id + "]");
         return addon;
     }
 
@@ -201,7 +203,7 @@ public class ThermalAugmentHelper {
         // 0. Recipe Category ID namespace check
         if (node.getRecipeCategoryId() != null) {
             String ns = node.getRecipeCategoryId().getNamespace().toLowerCase();
-            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("systeams") || ns.equals("cofh_core")) {
+            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams")) {
                 return true;
             }
         }
@@ -219,14 +221,14 @@ public class ThermalAugmentHelper {
         // 2. Namespace fallback
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace().toLowerCase();
-            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("systeams") || ns.equals("cofh_core")) {
+            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams")) {
                 return true;
             }
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null) {
                 String ns = ws.getNamespace().toLowerCase();
-                if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("systeams") || ns.equals("cofh_core")) {
+                if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams")) {
                     return true;
                 }
             }
@@ -249,12 +251,141 @@ public class ThermalAugmentHelper {
                     var dynTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:dynamos"));
                     var machTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("thermal:machines"));
                     var machTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:machines"));
-                    if (h.containsTag(dynTag1) || h.containsTag(dynTag2) || h.containsTag(machTag1) || h.containsTag(machTag2)) {
+                    var boilTag = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:boilers"));
+                    if (h.containsTag(dynTag1) || h.containsTag(dynTag2) || h.containsTag(machTag1) || h.containsTag(machTag2) || h.containsTag(boilTag)) {
                         return true;
                     }
                 }
             }
         } catch (Throwable ignored) {}
         return false;
+    }
+
+    public static boolean isDynamoItem(ResourceLocation id) {
+        if (id == null) return false;
+        try {
+            if (net.minecraftforge.registries.ForgeRegistries.ITEMS == null) return false;
+            net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+            if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                var holder = net.minecraftforge.registries.ForgeRegistries.ITEMS.getHolder(item);
+                if (holder.isPresent()) {
+                    var h = holder.get();
+                    var itemReg = net.minecraft.core.registries.Registries.ITEM;
+                    var dynTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("thermal:dynamos"));
+                    var dynTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:dynamos"));
+                    if (h.containsTag(dynTag1) || h.containsTag(dynTag2)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static boolean isBoilerItem(ResourceLocation id) {
+        if (id == null) return false;
+        try {
+            if (net.minecraftforge.registries.ForgeRegistries.ITEMS == null) return false;
+            net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+            if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                var holder = net.minecraftforge.registries.ForgeRegistries.ITEMS.getHolder(item);
+                if (holder.isPresent()) {
+                    var h = holder.get();
+                    var itemReg = net.minecraft.core.registries.Registries.ITEM;
+                    var boilTag = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:boilers"));
+                    if (h.containsTag(boilTag)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static boolean isDynamoRecipe(Object backing) {
+        if (backing == null) return false;
+        Class<?> cl = backing.getClass();
+        while (cl != null && cl != Object.class) {
+            String name = cl.getName();
+            if (name.equals("cofh.thermal.lib.util.recipes.ThermalFuel") ||
+                name.equals("chiefarug.mods.systeams.recipe.SteamFuel") ||
+                name.endsWith("Fuel") || name.endsWith("FuelRecipe") ||
+                name.contains("DynamoFuel")) {
+                return true;
+            }
+            for (Class<?> iface : cl.getInterfaces()) {
+                String iname = iface.getName();
+                if (iname.contains("Fuel") || iname.contains("Dynamo")) {
+                    return true;
+                }
+            }
+            cl = cl.getSuperclass();
+        }
+        return false;
+    }
+
+    public static boolean isBoilerRecipe(Object backing) {
+        if (backing == null) return false;
+        Class<?> cl = backing.getClass();
+        while (cl != null && cl != Object.class) {
+            String name = cl.getName();
+            if (name.equals("chiefarug.mods.systeams.recipe.BoilingRecipe") ||
+                name.contains("Boil") || name.contains("Boiler")) {
+                return true;
+            }
+            cl = cl.getSuperclass();
+        }
+        return false;
+    }
+
+    public static double getThermalDynamoBasePowerRF(ResourceLocation dynamoId) {
+        // 1. Functional Deduction via Reflection on Thermal Dynamo Block Entity / Config
+        try {
+            Class<?> dynEntityClass = Class.forName("cofh.thermal.expansion.block.entity.dynamo.DynamoBlockEntity");
+            for (java.lang.reflect.Field f : dynEntityClass.getDeclaredFields()) {
+                if (f.getName().equalsIgnoreCase("BASE_POWER") || f.getName().equalsIgnoreCase("DEFAULT_POWER")) {
+                    f.setAccessible(true);
+                    Object val = f.get(null);
+                    if (val instanceof Number num && num.doubleValue() > 0) {
+                        return num.doubleValue();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            Class<?> thermalConfigClass = Class.forName("cofh.thermal.core.config.ThermalCoreConfig");
+            for (java.lang.reflect.Field f : thermalConfigClass.getDeclaredFields()) {
+                if (f.getName().toLowerCase().contains("dynamopower") || f.getName().toLowerCase().contains("defaultpower")) {
+                    f.setAccessible(true);
+                    Object val = f.get(null);
+                    if (val instanceof Number num && num.doubleValue() > 0) {
+                        return num.doubleValue();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // Fallback default for Thermal Expansion 1.20.1 Dynamos (200 RF/t)
+        return 200.0;
+    }
+
+    public static double getThermalMachineBasePowerRF(ResourceLocation machineId) {
+        // 1. Functional Deduction via Reflection on Thermal Machine Block Entity / Config
+        try {
+            Class<?> machEntityClass = Class.forName("cofh.thermal.expansion.block.entity.machine.MachineBlockEntity");
+            for (java.lang.reflect.Field f : machEntityClass.getDeclaredFields()) {
+                if (f.getName().equalsIgnoreCase("BASE_POWER") || f.getName().equalsIgnoreCase("DEFAULT_POWER")) {
+                    f.setAccessible(true);
+                    Object val = f.get(null);
+                    if (val instanceof Number num && num.doubleValue() > 0) {
+                        return num.doubleValue();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // Fallback default for Thermal Expansion 1.20.1 Machines (20 RF/t)
+        return 20.0;
     }
 }

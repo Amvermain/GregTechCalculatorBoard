@@ -172,10 +172,13 @@ public class RecipeSearchDialog {
                 CACHING_PROGRESS = new RecipeLoadingProgress(2, 3, "gui.gtcalcboard.loading_recipe_phase.2", recipes.size() + " Recipes (" + Runtime.getRuntime().availableProcessors() + " CPU Cores)");
                 long startNanos = System.nanoTime();
                 // Fast parallel indexing across all CPU cores (reduces 120s+ to < 1s)
-                List<SearchableRecipe> tempList = recipes.parallelStream()
+                List<SearchableRecipe> tempList = new ArrayList<>(recipes.parallelStream()
                         .map(RecipeSearchEngine::buildIndex)
                         .filter(Objects::nonNull)
-                        .toList();
+                        .toList());
+
+                // Index Create & passive kinetic generators
+                tempList.addAll(com.gtceu.calcboard.compat.create.CreateModAdapter.getVirtualKineticSearchRecipes());
 
                 synchronized (GLOBAL_RECIPES) {
                     GLOBAL_RECIPES.clear();
@@ -305,21 +308,19 @@ public class RecipeSearchDialog {
         RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
         turbine.setGenerator(true);
         turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
-        list.add(createTutorialSearchableRecipe(turbine, "gtceu", "steam_turbine", "Steam Turbine",
-                List.of(), List.of("Steam"), List.of(), List.of("gtceu:steam", "steam")));
+        list.add(createTutorialSearchableRecipe(turbine, "gtceu", "steam_turbine", "Steam Turbine"));
 
         // 2. Boiler (Tutorial)
-        RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
+        RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
+        boiler.setEnergyType(com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF);
         boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
-        list.add(createTutorialSearchableRecipe(boiler, "gtceu", "boiler", "Boiler",
-                List.of("Steam"), List.of(), List.of("gtceu:steam", "steam"), List.of()));
+        list.add(createTutorialSearchableRecipe(boiler, "gtceu", "boiler", "Boiler"));
 
         // 3. Steam Engine (Tutorial)
         RecipeNode engine = RecipeNode.create("Steam Engine (Tutorial)", 20.0, 32.0, GTVoltageTier.LV);
         engine.setGenerator(true);
         engine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 200.0, 1.0));
-        list.add(createTutorialSearchableRecipe(engine, "gtceu", "steam_engine", "Steam Engine",
-                List.of(), List.of("Steam"), List.of(), List.of("gtceu:steam", "steam")));
+        list.add(createTutorialSearchableRecipe(engine, "gtceu", "steam_engine", "Steam Engine"));
 
         return list;
     }
@@ -328,16 +329,54 @@ public class RecipeSearchDialog {
             RecipeNode template,
             String modId,
             String categoryId,
-            String categoryName,
-            List<String> outputNames,
-            List<String> inputNames,
-            List<String> outputIds,
-            List<String> inputIds
+            String categoryName
     ) {
+        List<String> outputNames = new ArrayList<>();
+        List<String> inputNames = new ArrayList<>();
+        List<String> outputIds = new ArrayList<>();
+        List<String> inputIds = new ArrayList<>();
+        List<String> outputFluidIds = new ArrayList<>();
+        List<String> inputFluidIds = new ArrayList<>();
         StringBuilder outSb = new StringBuilder();
-        outputNames.forEach(o -> outSb.append(o.toLowerCase(Locale.ROOT)).append(" "));
         StringBuilder inSb = new StringBuilder();
-        inputNames.forEach(i -> inSb.append(i.toLowerCase(Locale.ROOT)).append(" "));
+
+        for (IngredientStack in : template.getInputs()) {
+            if (in.getDisplayName() != null) {
+                String n = in.getDisplayName().toLowerCase(Locale.ROOT);
+                inputNames.add(n);
+                inSb.append(n).append(" ");
+            }
+            if (in.getId() != null) {
+                String fullId = in.getId().toString().toLowerCase(Locale.ROOT);
+                String path = in.getId().getPath().toLowerCase(Locale.ROOT);
+                inputIds.add(fullId);
+                inputIds.add(path);
+                inSb.append(fullId).append(" ").append(path).append(" ");
+                if (in.isFluid()) {
+                    inputFluidIds.add(fullId);
+                    inputFluidIds.add(path);
+                }
+            }
+        }
+
+        for (IngredientStack out : template.getOutputs()) {
+            if (out.getDisplayName() != null) {
+                String n = out.getDisplayName().toLowerCase(Locale.ROOT);
+                outputNames.add(n);
+                outSb.append(n).append(" ");
+            }
+            if (out.getId() != null) {
+                String fullId = out.getId().toString().toLowerCase(Locale.ROOT);
+                String path = out.getId().getPath().toLowerCase(Locale.ROOT);
+                outputIds.add(fullId);
+                outputIds.add(path);
+                outSb.append(fullId).append(" ").append(path).append(" ");
+                if (out.isFluid()) {
+                    outputFluidIds.add(fullId);
+                    outputFluidIds.add(path);
+                }
+            }
+        }
 
         StringBuilder fullSb = new StringBuilder();
         fullSb.append(template.getName().toLowerCase(Locale.ROOT)).append(" ");
@@ -356,8 +395,8 @@ public class RecipeSearchDialog {
                 inputNames,
                 outputIds,
                 inputIds,
-                List.of(),
-                List.of(),
+                outputFluidIds,
+                inputFluidIds,
                 List.of(),
                 outSb.toString(),
                 inSb.toString(),
@@ -395,7 +434,7 @@ public class RecipeSearchDialog {
             sourceList = GLOBAL_RECIPES;
         }
 
-        record ScoredRecipe(SearchableRecipe recipe, int score, boolean isDefault, boolean isFavorite) {}
+        record ScoredRecipe(SearchableRecipe recipe, int score, int contextualScore, boolean isDefault, boolean isFavorite) {}
 
         boolean hasContext = (contextualWireTarget != null && contextualWireTarget.sourceStack != null);
         boolean targetIsFluid = hasContext && contextualWireTarget.sourceStack.isFluid();
@@ -506,9 +545,9 @@ public class RecipeSearchDialog {
                     if (sr.recipe() instanceof EmiRecipe er && er.getId() != null) {
                         isFav = (allFavoriteIds != null && allFavoriteIds.contains(er.getId()));
                     }
-                    return new ScoredRecipe(sr, totalScore, false, isFav);
+                    return new ScoredRecipe(sr, totalScore, contextualScore, false, isFav);
                 })
-                .filter(sr -> !hasContext || !contextualWireTarget.sourceIsInput || sr.score() > 0 || hasQuery)
+                .filter(sr -> !hasContext || sr.contextualScore() > 0)
                 .sorted((a, b) -> Integer.compare(b.score(), a.score()))
                 .limit(200)
                 .toList();
@@ -554,7 +593,7 @@ public class RecipeSearchDialog {
                     } catch (Throwable ignored) {}
                 }
             }
-            resolvedMatches.add(new ScoredRecipe(sr.recipe(), sr.score(), isDefault, sr.isFavorite()));
+            resolvedMatches.add(new ScoredRecipe(sr.recipe(), sr.score(), sr.contextualScore(), isDefault, sr.isFavorite()));
         }
 
         resolvedMatches.sort((a, b) -> {

@@ -323,6 +323,103 @@ public class MachineAddonTest {
     }
 
     @Test
+    public void testEmiImportedGasTurbineWithEnderiumRotor() {
+        // Simulates an exact node imported from EMI: Name = "Gas Turbine (Nitrobenzene)", Category = "gtceu:gas_turbine", singleblock icon
+        RecipeNode node = RecipeNode.create("Gas Turbine (Nitrobenzene)", 40.0, 32.0, GTVoltageTier.LV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:gas_turbine"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:ev_gas_turbine"));
+        node.setGenerator(true);
+
+        MachineAddon enderiumRotor = new MachineAddon("gtceu:rotor_enderium", "Enderium Turbine Rotor", MachineAddon.Category.ROTOR, "180%", null);
+        enderiumRotor.setDurationMultiplier(1.80);
+        enderiumRotor.setRotorPower(300);
+        enderiumRotor.setRotorMaxEUt(264000.0);
+        node.addAddon(enderiumRotor);
+
+        // 1. EV Rotor Holder (4,096 * 3.0 = 12,288 EU/t -> 384 parallel)
+        node.setTargetTier(GTVoltageTier.EV);
+        Assertions.assertEquals(GTVoltageTier.EV, node.getTurbineBaseTier());
+        Assertions.assertEquals(0, node.getTurbineHolderEfficiencyBonus());
+        Assertions.assertEquals(384, node.getTotalParallel());
+        Assertions.assertEquals(12288.0, node.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(3.60, node.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(106.666, node.getCyclesPerSecond(), 0.01);
+
+        // 2. IV Rotor Holder (8,192 * 3.0 = 24,576 EU/t -> 768 parallel, +10% duration bonus)
+        node.setTargetTier(GTVoltageTier.IV);
+        Assertions.assertEquals(10, node.getTurbineHolderEfficiencyBonus());
+        Assertions.assertEquals(768, node.getTotalParallel());
+        Assertions.assertEquals(24576.0, node.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(3.80, node.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(202.105, node.getCyclesPerSecond(), 0.01);
+    }
+
+    @Test
+    public void testSingleblockGasTurbineGeneration() {
+        // Singleblock HV Gas Turbine: No Rotor, Target Tier = HV (512V) -> Outputs 512 EU/t (1A HV)
+        RecipeNode singleblock = RecipeNode.create("Gas Turbine (Nitrobenzene)", 40.0, 32.0, GTVoltageTier.LV);
+        singleblock.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:gas_turbine"));
+        singleblock.setMachineIcon(ResourceLocation.tryParse("gtceu:hv_gas_turbine"));
+        singleblock.setGenerator(true);
+        singleblock.setTargetTier(GTVoltageTier.HV);
+
+        Assertions.assertFalse(singleblock.isLargeTurbine());
+        Assertions.assertEquals(16, singleblock.getTotalParallel()); // 512 / 32 = 16x
+        Assertions.assertEquals(512.0, singleblock.getSingleMachineEUt(), 0.001); // 1A HV
+        Assertions.assertEquals(2.00, singleblock.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(8.0, singleblock.getCyclesPerSecond(), 0.001); // 16 / 2.0s = 8 mB/s
+    }
+
+    @Test
+    public void testTurbineRotorLifecycleTransitions() {
+        // 1. Initial State: Singleblock HV Gas Turbine
+        RecipeNode node = RecipeNode.create("Gas Turbine (Nitrobenzene)", 40.0, 32.0, GTVoltageTier.LV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:gas_turbine"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:hv_gas_turbine"));
+        node.setGenerator(true);
+        node.setTargetTier(GTVoltageTier.HV);
+
+        Assertions.assertFalse(node.isMultiblock());
+        Assertions.assertFalse(node.isLargeTurbine());
+        Assertions.assertEquals(512.0, node.getSingleMachineEUt(), 0.001); // 1A HV
+        Assertions.assertEquals(8.0, node.getCyclesPerSecond(), 0.001); // 8 mB/s
+
+        // 2. Install Enderium Rotor (180% eff, 300% power) at EV Tier
+        node.setMultiblock(true);
+        node.setTargetTier(GTVoltageTier.EV);
+        MachineAddon enderiumRotor = new MachineAddon("gtceu:rotor_enderium", "Enderium Turbine Rotor", MachineAddon.Category.ROTOR, "180%", null);
+        enderiumRotor.setDurationMultiplier(1.80);
+        enderiumRotor.setRotorPower(300);
+        node.addAddon(enderiumRotor);
+        node.setRotorEfficiency(180);
+        node.setRotorPower(300);
+        node.setRotorName("Enderium Turbine Rotor");
+
+        Assertions.assertTrue(node.isLargeTurbine());
+        Assertions.assertEquals(384, node.getTotalParallel());
+        Assertions.assertEquals(12288.0, node.getSingleMachineEUt(), 0.001); // 6A EV
+        Assertions.assertEquals(3.60, node.getEffectiveDurationSeconds(), 0.001);
+
+        // 3. Uninstall Rotor (Reset to Standard) and return to HV Singleblock
+        node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+        node.setRotorEfficiency(100);
+        node.setRotorPower(100);
+        node.setRotorName("Standard (100%)");
+        node.setParallel(1);
+        node.setMultiblock(false);
+        node.setTargetTier(GTVoltageTier.HV);
+
+        // Verify NO residual 256x or 384x state remains!
+        Assertions.assertFalse(node.isMultiblock());
+        Assertions.assertFalse(node.isLargeTurbine());
+        Assertions.assertEquals(1, node.getParallel());
+        Assertions.assertEquals(16, node.getTotalParallel());
+        Assertions.assertEquals(512.0, node.getSingleMachineEUt(), 0.001); // Clean 1A HV!
+        Assertions.assertEquals(2.00, node.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(8.0, node.getCyclesPerSecond(), 0.001);
+    }
+
+    @Test
     public void testTurbineShiftConnectAutoRatioMatching() {
         FlowGraph graph = new FlowGraph();
 
@@ -552,6 +649,62 @@ public class MachineAddonTest {
     }
 
     @Test
+    public void testLapidaryDynamoWithHVAugmentsCalculation() {
+        // Lapidary Dynamo with Diamond (300,000 RF energy)
+        // Base: 200 RF/t = 50 EU/t, 1500 ticks = 75.0 seconds
+        RecipeNode dynamo = RecipeNode.create("Lapidary Fuel (Diamond)", 1500.0, 50.0, GTVoltageTier.LV);
+        dynamo.setRecipeCategoryId(ResourceLocation.tryParse("thermal:lapidary_fuel"));
+        dynamo.setGenerator(true);
+
+        // 1. HV Upgrade Kit (24x scale)
+        CompoundTag hvKitTag = new CompoundTag();
+        CompoundTag hvKitAug = new CompoundTag();
+        hvKitAug.putInt("Scale", 24);
+        hvKitTag.put("AugmentData", hvKitAug);
+        MachineAddon hvKit = DynamicAddonCrawler.parseThermalAugmentTag(hvKitTag, "HV Upgrade Kit", ResourceLocation.tryParse("kubejs:hv_upgrade_kit"));
+        dynamo.addAddon(hvKit);
+
+        // 2. HV ARC (3.0x power = +200%, 0.85x fuel energy)
+        CompoundTag hvArcTag = new CompoundTag();
+        CompoundTag hvArcAug = new CompoundTag();
+        hvArcAug.putString("Type", "Dynamo");
+        hvArcAug.putFloat("DynamoEnergy", 0.85f);
+        hvArcAug.putFloat("DynamoPower", 2.0f); // 1.0 + 2.0 = 3.0x power
+        hvArcTag.put("AugmentData", hvArcAug);
+        MachineAddon hvArc = DynamicAddonCrawler.parseThermalAugmentTag(hvArcTag, "HV Auxiliary Reaction Chamber", ResourceLocation.tryParse("kubejs:hv_arc_kit"));
+        dynamo.addAddon(hvArc);
+
+        // 3. 2x HV Multi-cycle Injectors Kit (1.45x fuel energy each)
+        CompoundTag hvMciTag = new CompoundTag();
+        CompoundTag hvMciAug = new CompoundTag();
+        hvMciAug.putString("Type", "Dynamo");
+        hvMciAug.putFloat("DynamoEnergy", 1.45f);
+        hvMciTag.put("AugmentData", hvMciAug);
+        MachineAddon hvMci = DynamicAddonCrawler.parseThermalAugmentTag(hvMciTag, "HV Multi-cycle Injectors Kit", ResourceLocation.tryParse("kubejs:hv_mci_kit"));
+        dynamo.addAddon(hvMci.copy());
+        dynamo.addAddon(hvMci.copy());
+
+        // Assert 4 active addons
+        Assertions.assertEquals(4, dynamo.getAddons().size());
+        Assertions.assertEquals(1, dynamo.getTotalParallel()); // Thermal machines process 1 item per machine, scale is applied to power/duration
+
+        // Single machine EU/t: 50 EU/t (200 RF/t) * 3.0 (ARC) * 24 (Scale) = 3600.0 EU/t (14,400 RF/t)
+        Assertions.assertEquals(3600.0, dynamo.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(14400.0, dynamo.getSingleMachineEUt() * 4.0, 0.001);
+
+        // Total fuel energy multiplier: 0.85 * 1.45 * 1.45 = 1.787125
+        double fuelEnergyMult = 0.85 * 1.45 * 1.45;
+        Assertions.assertEquals(fuelEnergyMult, dynamo.getCombinedDurationMultiplier(), 0.001);
+
+        // Effective single machine duration (ticks): 1500 * (1.787125 / (24 * 3.0)) = 37.23177 ticks
+        double expectedDuration = 1500.0 * (fuelEnergyMult / (24.0 * 3.0));
+        Assertions.assertEquals(expectedDuration, dynamo.getOverclockResult().durationTicks(), 0.001);
+
+        // Cycles per second (CPS): 20 / 37.23177 = 0.537175 cycles/s = 32.23 diamonds/min
+        Assertions.assertEquals(20.0 / expectedDuration, dynamo.getCyclesPerSecond(), 0.001);
+    }
+
+    @Test
     public void testCrackerCoilEnergyDiscount() {
         RecipeNode cracker = RecipeNode.create("Cracker (Heavy Fuel)", 20.0, 384.0, GTVoltageTier.HV);
         cracker.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:cracker"));
@@ -587,5 +740,24 @@ public class MachineAddonTest {
         abyssal.setCrackingEnergyPercent(abyssalDiscount);
         MachineAddon tailoredAbyssal = abyssal.forMachine(cracker);
         Assertions.assertEquals(0.07, tailoredAbyssal.getEutMultiplier(), 0.001);
+    }
+
+    @Test
+    public void testMachineAddonDiscoverySourceProvenance() {
+        MachineAddon addon = new MachineAddon("gtceu:cupronickel_coil", "Cupronickel Coil Block", MachineAddon.Category.COIL, "♨ Heat: 1800 K", ResourceLocation.tryParse("gtceu:cupronickel_coil"));
+        addon.setDiscoverySource("GTCEu ICoilType Block API [gtceu:cupronickel_coil]");
+
+        // 1. Check getter
+        Assertions.assertEquals("GTCEu ICoilType Block API [gtceu:cupronickel_coil]", addon.getDiscoverySource());
+
+        // 2. Check copy()
+        MachineAddon cp = addon.copy();
+        Assertions.assertEquals("GTCEu ICoilType Block API [gtceu:cupronickel_coil]", cp.getDiscoverySource());
+
+        // 3. Check NBT serialization / deserialization
+        CompoundTag tag = addon.serializeNBT();
+        MachineAddon loaded = MachineAddon.deserializeNBT(tag);
+        Assertions.assertNotNull(loaded);
+        Assertions.assertEquals("GTCEu ICoilType Block API [gtceu:cupronickel_coil]", loaded.getDiscoverySource());
     }
 }

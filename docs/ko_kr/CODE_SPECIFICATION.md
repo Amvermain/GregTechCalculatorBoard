@@ -62,6 +62,7 @@ docs/spec/
 * **서버 영속화 스키마 (`TeamBoardSavedData`)**: `<world>/data/gtcalcboard_workspaces.dat` NBT 태그 구조 및 `ITeamProvider`
 
 ### 6. [[05] 외부 모드 연동 및 다국어 단위 시스템](spec/05_INTEGRATION_AND_I18N.md)
+* **모드 호환성 어댑터 시스템 (`com.gtceu.calcboard.compat`)**: SPI 우선순위 라우팅, 모드별 3단 분리 서브패키지(`gtceu`, `create`, `thermal`, `systeams`, `vanilla`), 동적 크롤러 오케스트레이션
 * **EMI 레시피 뷰어 연동**: `CalcBoardEmiPlugin` 라이프사이클 훅, 매트릭스 비동기 베이킹 트리거, `EmiRecipeConverter`
 * **시간 단위 환산 및 포맷팅**: `RateTimeUnit` (/t, /s, /min, /h, /d), `FormatUtil` 전력 접두사, 다국어 동기화
 

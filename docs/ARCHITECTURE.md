@@ -35,14 +35,29 @@ graph TD
         BC["BlueprintCodec (NBT & Base64 GZIP Blueprint Codec)"]
     end
 
+    subgraph Compat["Mod Compatibility Layer (com.gtceu.calcboard.compat)"]
+        MAR["ModAdapterRegistry & IModAdapter (Priority Routing SPI)"]
+        subgraph Adapters["Sub-package Adapters (Facade, AddonCrawler, GuiHandler, RecipeHandler)"]
+            GT["gtceu (Coils, Rotors, Hatches, Traits, EU/t)"]
+            CR_MOD["create (RPM/SU, Stress, Kinetic Generators)"]
+            TH["thermal (AugmentData, Dynamos, RF/t)"]
+            SY["systeams (Boilers, Steam mB/s, Steam Dynamos)"]
+            VN["vanilla (Universal Fallback)"]
+        end
+        MAR --> Adapters
+    end
+
     subgraph Integration["Integration Layer (com.gtceu.calcboard.integration)"]
         ERC["Recipe Ingestion (1.20: EMI / 1.7.10: NEI GT_Recipe_Map)"]
         MD["MultiblockDetector (Structure Recipe Scanner)"]
-        DAC["DynamicAddonCrawler (JVM Reflection & Tooltip Parser)"]
+        DAC["DynamicAddonCrawler (Harvests active stacks & orchestrates adapters)"]
     end
 
-    UI -->|Dispatches user actions| Core
+    UI -->|Dispatches user actions & UI rendering| Core
+    UI -->|Delegates custom controls| Compat
     Integration -->|Ingests recipe and machine data| Core
+    Integration -->|Discovers addons| Compat
+    Core -->|Routes machine rules & calculations| Compat
 ```
 
 The core math engine (`com.gtceu.calcboard.api`) has zero dependencies on Minecraft client GUI or rendering classes, allowing it to run in headless environments and pass JUnit tests independently.

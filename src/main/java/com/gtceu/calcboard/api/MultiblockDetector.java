@@ -147,14 +147,34 @@ public class MultiblockDetector {
                             ResourceLocation id = (ResourceLocation) mGetId.invoke(def);
                             if (id == null) continue;
 
+                            Class<?> mCls = null;
+                            try {
+                                Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
+                                mCls = (Class<?>) mGetMachineClass.invoke(def);
+                            } catch (Throwable ignored) {}
+
+                            boolean isTurbineClass = false;
+                            if (mCls != null) {
+                                String mClsName = mCls.getName().toLowerCase();
+                                if (mClsName.contains("largeturbine") || mClsName.contains("largeturbinemanager")) {
+                                    isTurbineClass = true;
+                                }
+                            }
+
                             boolean isMb = (multiblockDefCls != null && multiblockDefCls.isInstance(def))
-                                    || MULTIBLOCK_RECIPE_CONTROLLERS.contains(id);
+                                    || MULTIBLOCK_RECIPE_CONTROLLERS.contains(id)
+                                    || id.getPath().startsWith("large_")
+                                    || id.getPath().contains("nyinsane");
                             if (isMb) {
                                 MULTIBLOCK_RECIPE_CONTROLLERS.add(id);
                             }
 
-                            boolean isCoilMb = COIL_MULTIBLOCK_CONTROLLERS.contains(id);
-                            boolean isTurbineMb = TURBINE_CONTROLLERS.contains(id);
+                            boolean isCoilMb = isMb && COIL_MULTIBLOCK_CONTROLLERS.contains(id);
+                            boolean isTurbineMb = isMb && (isTurbineClass || TURBINE_CONTROLLERS.contains(id)
+                                    || id.getPath().contains("large_steam_turbine")
+                                    || id.getPath().contains("large_gas_turbine")
+                                    || id.getPath().contains("large_plasma_turbine")
+                                    || id.getPath().contains("nyinsane_plasma_turbine"));
 
                             if (isCoilMb) {
                                 COIL_MULTIBLOCK_CONTROLLERS.add(id);
@@ -167,25 +187,36 @@ public class MultiblockDetector {
 
                                 // Extract turbine base tier dynamically from definition
                                 GTVoltageTier turbineTier = null;
-                                try {
-                                    Method mGetTier = def.getClass().getMethod("getTier");
-                                    Object tVal = mGetTier.invoke(def);
-                                    if (tVal instanceof Number num) {
-                                        int tIdx = num.intValue();
-                                        if (tIdx >= 0 && tIdx < GTVoltageTier.values().length) {
-                                            turbineTier = GTVoltageTier.values()[tIdx];
+                                for (String mName : new String[]{"getTier", "tier", "getBaseTier"}) {
+                                    try {
+                                        Method m = def.getClass().getMethod(mName);
+                                        Object tVal = m.invoke(def);
+                                        if (tVal instanceof Number num) {
+                                            int tIdx = num.intValue();
+                                            if (tIdx >= 0 && tIdx < GTVoltageTier.values().length) {
+                                                turbineTier = GTVoltageTier.values()[tIdx];
+                                                break;
+                                            }
+                                        } else if (tVal instanceof Enum<?> en) {
+                                            try {
+                                                turbineTier = GTVoltageTier.valueOf(en.name());
+                                                break;
+                                            } catch (Throwable ignored) {}
                                         }
-                                    }
-                                } catch (Throwable ignored) {}
+                                    } catch (Throwable ignored) {}
+                                }
 
                                 double baseEnergy = turbineTier != null ? (double) (turbineTier.getVoltage() * 2L) : 4096.0;
-                                try {
-                                    Method mGetEnergy = def.getClass().getMethod("getBaseEnergyPerTick");
-                                    Object eVal = mGetEnergy.invoke(def);
-                                    if (eVal instanceof Number num && num.doubleValue() > 0) {
-                                        baseEnergy = num.doubleValue();
-                                    }
-                                } catch (Throwable ignored) {}
+                                for (String mName : new String[]{"getBaseEnergyPerTick", "getBaseEnergy", "getBaseEUt", "getEnergyCapacity"}) {
+                                    try {
+                                        Method m = def.getClass().getMethod(mName);
+                                        Object eVal = m.invoke(def);
+                                        if (eVal instanceof Number num && num.doubleValue() > 0) {
+                                            baseEnergy = num.doubleValue();
+                                            break;
+                                        }
+                                    } catch (Throwable ignored) {}
+                                }
 
                                 if (turbineTier != null) {
                                     TURBINE_BASE_TIERS.put(id, turbineTier);
@@ -200,9 +231,8 @@ public class MultiblockDetector {
                                 if (rTypes instanceof Object[] arr) {
                                     for (Object rt : arr) {
                                         if (rt != null) {
-                                            Method mGetIdRt = rt.getClass().getMethod("registryName");
-                                            Object rId = mGetIdRt.invoke(rt);
-                                            if (rId instanceof ResourceLocation rl) {
+                                            ResourceLocation rl = extractRecipeTypeId(rt);
+                                            if (rl != null) {
                                                 if (isCoilMb) {
                                                     COIL_RECIPE_CATEGORIES.add(rl);
                                                     com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [MultiblockDetector] Registered Coil Recipe Category: {} for controller {}", rl, id);
@@ -230,6 +260,35 @@ public class MultiblockDetector {
             initTestEnvironmentDefaults();
             initialized = true;
         }
+    }
+
+    public static ResourceLocation extractRecipeTypeId(Object rt) {
+        if (rt == null) return null;
+        if (rt instanceof ResourceLocation rl) return rl;
+        try {
+            if (rt instanceof net.minecraft.world.item.crafting.RecipeType<?> rType) {
+                ResourceLocation loc = net.minecraft.core.registries.BuiltInRegistries.RECIPE_TYPE.getKey(rType);
+                if (loc != null && !loc.getPath().equals("air")) return loc;
+                loc = net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES.getKey(rType);
+                if (loc != null && !loc.getPath().equals("air")) return loc;
+            }
+        } catch (Throwable ignored) {}
+        for (String mName : new String[]{"registryName", "getId", "getRegistryName"}) {
+            try {
+                Method m = rt.getClass().getMethod(mName);
+                Object res = m.invoke(rt);
+                if (res instanceof ResourceLocation rl) return rl;
+                if (res instanceof String s) return ResourceLocation.tryParse(s);
+            } catch (Throwable ignored) {}
+        }
+        try {
+            java.lang.reflect.Field f = rt.getClass().getDeclaredField("registryName");
+            f.setAccessible(true);
+            Object res = f.get(rt);
+            if (res instanceof ResourceLocation rl) return rl;
+            if (res instanceof String s) return ResourceLocation.tryParse(s);
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     public static Iterable<?> getRegistryIterable(Object registryObj) {
@@ -273,6 +332,10 @@ public class MultiblockDetector {
         TURBINE_BASE_PRODUCTIONS.put(ResourceLocation.tryParse("gtceu:gas_turbine"), 4096.0);
         TURBINE_BASE_TIERS.put(ResourceLocation.tryParse("gtceu:plasma_turbine"), GTVoltageTier.IV);
         TURBINE_BASE_PRODUCTIONS.put(ResourceLocation.tryParse("gtceu:plasma_turbine"), 16384.0);
+
+        TURBINE_RECIPE_CATEGORIES.add(ResourceLocation.tryParse("gtceu:steam_turbine"));
+        TURBINE_RECIPE_CATEGORIES.add(ResourceLocation.tryParse("gtceu:gas_turbine"));
+        TURBINE_RECIPE_CATEGORIES.add(ResourceLocation.tryParse("gtceu:plasma_turbine"));
 
         ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
         ResourceLocation cr = ResourceLocation.tryParse("gtceu:chemical_reactor");
@@ -385,7 +448,10 @@ public class MultiblockDetector {
         if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
             initialize();
         }
-        return TURBINE_RECIPE_CATEGORIES.contains(categoryId);
+        if (TURBINE_RECIPE_CATEGORIES.contains(categoryId)) return true;
+        String path = categoryId.getPath().toLowerCase();
+        return path.equals("gas_turbine") || path.equals("steam_turbine") || path.equals("plasma_turbine")
+                || path.equals("large_gas_turbine") || path.equals("large_steam_turbine") || path.equals("large_plasma_turbine");
     }
 
     public static Set<ResourceLocation> getAllCoilControllers() {

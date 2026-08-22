@@ -244,6 +244,7 @@ public class CoilHelper {
         addon.setChemicalSpeedPercent(stats.chemicalSpeedPercent());
         addon.setChemicalEnergyPercent(stats.chemicalEnergyPercent());
         addon.setSmelterParallel(stats.smelterParallel());
+        addon.setDiscoverySource("GTCEu ICoilType Block API [" + id + "]");
         return addon;
     }
 
@@ -271,6 +272,7 @@ public class CoilHelper {
                     addon.setChemicalSpeedPercent(stats.chemicalSpeedPercent());
                     addon.setChemicalEnergyPercent(stats.chemicalEnergyPercent());
                     addon.setSmelterParallel(stats.smelterParallel());
+                    addon.setDiscoverySource("GTCEu ICoilType Block API [" + id + "]");
 
                     if (list.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
                         list.add(addon);

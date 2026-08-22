@@ -17,9 +17,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Dynamically queries GTCEu Modern, Thermal Series, and addon item registries
@@ -30,7 +33,11 @@ public class DynamicAddonCrawler {
 
     public static List<MachineAddon> getBuiltinTraits() {
         List<MachineAddon> list = new ArrayList<>();
-        addBuiltinTraits(list);
+        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+            try {
+                adapter.discoverAddons(list, Collections.emptyList());
+            } catch (Throwable ignored) {}
+        }
         return list;
     }
 
@@ -51,63 +58,196 @@ public class DynamicAddonCrawler {
         return false;
     }
 
-    public static List<MachineAddon> crawlDynamicAddons() {
+    public static List<ItemStack> collectAllActiveItemStacks() {
+        List<ItemStack> stacks = new ArrayList<>();
+
+        // 1. If EMI is loaded, EMI recipe manager already aggregates Vanilla, KubeJS, GTCEu, and Thermal recipes in unified form
+        try {
+            var emiRecipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
+            if (emiRecipeManager != null && emiRecipeManager.getRecipes() != null && !emiRecipeManager.getRecipes().isEmpty()) {
+                for (dev.emi.emi.api.recipe.EmiRecipe emiRecipe : emiRecipeManager.getRecipes()) {
+                    if (emiRecipe != null) {
+                        extractRecipeOutputs(emiRecipe, stacks);
+                    }
+                }
+                return stacks;
+            }
+        } catch (Throwable ignored) {}
+
+        // 2. Fallback: Minecraft Level RecipeManager (Vanilla + KubeJS crafting table + Furnace/Smoking/Blasting/Stonecutting)
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.level != null) {
+            try {
+                var recipeManager = mc.level.getRecipeManager();
+                if (recipeManager != null) {
+                    for (Recipe<?> r : recipeManager.getRecipes()) {
+                        extractRecipeOutputs(r, stacks);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // 3. Fallback: GTCEu GTRegistries.RECIPE_TYPES
+        try {
+            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+            Field recipeTypesField = gtRegistriesCls.getField("RECIPE_TYPES");
+            Object recipeTypesRegistry = recipeTypesField.get(null);
+            if (recipeTypesRegistry instanceof Iterable<?> registryIterable) {
+                for (Object recipeType : registryIterable) {
+                    try {
+                        Method getRecipesMethod = recipeType.getClass().getMethod("getRecipes");
+                        Object recipesObj = getRecipesMethod.invoke(recipeType);
+                        if (recipesObj instanceof Collection<?> recipesColl) {
+                            for (Object gtRecipe : recipesColl) {
+                                extractRecipeOutputs(gtRecipe, stacks);
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return stacks;
+    }
+
+    public static void extractRecipeOutputs(Object recipe, List<ItemStack> outputStacks) {
+        if (recipe == null) return;
+        if (recipe instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe) {
+            try {
+                if (emiRecipe.getOutputs() != null) {
+                    for (dev.emi.emi.api.stack.EmiStack es : emiRecipe.getOutputs()) {
+                        extractItemStacks(es, outputStacks);
+                    }
+                }
+            } catch (Throwable ignored) {}
+            return;
+        }
+        if (recipe.getClass().getName().contains("GTRecipe")) {
+            try {
+                Field outputsField = recipe.getClass().getField("outputs");
+                Object outs = outputsField.get(recipe);
+                if (outs != null) {
+                    extractItemStacks(outs, outputStacks);
+                }
+            } catch (Throwable ignored) {
+                try {
+                    Method outputsMethod = recipe.getClass().getMethod("outputs");
+                    Object outs = outputsMethod.invoke(recipe);
+                    if (outs != null) {
+                        extractItemStacks(outs, outputStacks);
+                    }
+                } catch (Throwable ignored2) {}
+            }
+            return;
+        }
+        if (recipe instanceof net.minecraft.world.item.crafting.Recipe<?> r) {
+            Minecraft mc = Minecraft.getInstance();
+            try {
+                ItemStack res = mc != null && mc.level != null ? r.getResultItem(mc.level.registryAccess()) : r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+                if (res != null && !res.isEmpty()) {
+                    outputStacks.add(res);
+                }
+            } catch (Throwable ignored) {
+                try {
+                    ItemStack res = r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+                    if (res != null && !res.isEmpty()) {
+                        outputStacks.add(res);
+                    }
+                } catch (Throwable ignored2) {}
+            }
+            return;
+        }
+        // Fallback for custom recipe types
+        try {
+            var getOutputsM = recipe.getClass().getMethod("getOutputs");
+            Object outs = getOutputsM.invoke(recipe);
+            if (outs != null) {
+                extractItemStacks(outs, outputStacks);
+            }
+        } catch (Throwable ignored) {}
+        try {
+            var getResultM = recipe.getClass().getMethod("getResultItem");
+            Object res = getResultM.invoke(recipe);
+            if (res instanceof ItemStack is && !is.isEmpty()) {
+                outputStacks.add(is);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    public static List<MachineAddon> crawlFastRegistries() {
         long startNanos = System.nanoTime();
         List<MachineAddon> result = new ArrayList<>();
 
-        // 1. Static Registry Items (GTCEu Rotors from GTRegistries.MATERIALS, Coils from GTRegistries.COILS)
-        MachineAddonCatalog.getInstance().setProgress(2, 4, "gui.gtcalcboard.loading_phase.2", "GTCEu Coils & Hatches");
-        try {
-            TurbineRotorHelper.discoverGTCEuRotors(result);
-            CoilHelper.discoverGTCEuCoils(result);
-        } catch (Throwable ignored) {}
-        int gtStaticCount = result.size();
-
-        // 2. Dynamic Recipe Outputs (Thermal Augments / KubeJS Kits with NBT)
-        MachineAddonCatalog.getInstance().setProgress(3, 4, "gui.gtcalcboard.loading_phase.3", "Recipe Outputs & Augments (" + gtStaticCount + " found)");
-        int dynamicAugmentCount = 0;
-        Minecraft mc = Minecraft.getInstance();
-        List<ItemStack> recipeOutputStacks = new ArrayList<>();
-        if (mc != null && mc.level != null) {
-            collectRecipeOutputStacks(mc, recipeOutputStacks);
-
-            for (ItemStack s : recipeOutputStacks) {
-                try {
-                    if (s == null || s.isEmpty()) continue;
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
-                    if (id == null) continue;
-
-                    MachineAddon aug = parseThermalAugment(s, id);
-                    if (aug != null && !containsAddonId(result, aug.getId())) {
-                        result.add(aug);
-                        dynamicAugmentCount++;
-                    }
-
-                    MachineAddon rotor = parseTurbineRotor(s, id);
-                    if (rotor != null && !containsAddonId(result, rotor.getId())) {
-                        result.add(rotor);
-                    }
-                } catch (Throwable ignored) {}
-            }
+        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+            try {
+                adapter.discoverAddons(result, Collections.emptyList());
+            } catch (Throwable ignored) {}
         }
-
-        // 3. Forge Registry Crawl with NBT samples
-        MachineAddonCatalog.getInstance().setProgress(4, 4, "gui.gtcalcboard.loading_phase.4", "Item Registry Cache (" + result.size() + " items)");
-        crawlItemRegistry(recipeOutputStacks, result);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
-                "[GTCalcBoard] [Crawler] Crawled {} total addons (GT Static: {}, Recipe Stacks: {}, Thermal Augments: {}) in {}ms.",
-                result.size(), gtStaticCount, recipeOutputStacks.size(), dynamicAugmentCount, elapsedMs
+                "[GTCalcBoard] [Crawler] Fast Track: Loaded {} registry addons in {}ms.",
+                result.size(), elapsedMs
         );
-
         return result;
     }
 
+    public static boolean isItemDisabledOrHidden(Item item, Set<Item> activeRecipeItems) {
+        if (item == null || item == net.minecraft.world.item.Items.AIR) return true;
+
+        // 1. Check if item has any active crafting recipes
+        if (activeRecipeItems != null && !activeRecipeItems.isEmpty()) {
+            if (!activeRecipeItems.contains(item)) {
+                return true; // No recipe producing this item
+            }
+        }
+
+        // 2. Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers)
+        try {
+            var itemReg = net.minecraft.core.registries.Registries.ITEM;
+            var holder = ForgeRegistries.ITEMS.getHolder(item);
+            if (holder.isPresent()) {
+                var h = holder.get();
+                var hiddenTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("c:hidden_from_recipe_viewers"));
+                var hiddenTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewers"));
+                if (h.containsTag(hiddenTag1) || h.containsTag(hiddenTag2)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return false;
+    }
+
+    public static List<MachineAddon> crawlExhaustiveRecipesParallel(java.util.function.DoubleConsumer progressCallback) {
+        long startNanos = System.nanoTime();
+        List<MachineAddon> extraAddons = Collections.synchronizedList(new ArrayList<>());
+        try {
+            List<ItemStack> activeStacks = collectAllActiveItemStacks();
+            for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+                try {
+                    adapter.discoverAddons(extraAddons, activeStacks);
+                } catch (Throwable ignored) {}
+            }
+            if (progressCallback != null) {
+                progressCallback.accept(1.0);
+            }
+        } catch (Throwable ignored) {}
+
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                "[GTCalcBoard] [Crawler] Exhaustive Track: Completed scan in {}ms, total {} addons.",
+                elapsedMs, extraAddons.size()
+        );
+        return extraAddons;
+    }
+
+    public static List<MachineAddon> crawlDynamicAddons() {
+        return crawlFastRegistries();
+    }
+
     public static List<MachineAddon> crawlAllAddons() {
-        List<MachineAddon> result = new ArrayList<>(getBuiltinTraits());
-        result.addAll(crawlDynamicAddons());
-        return result;
+        return crawlFastRegistries();
     }
 
     public static void extractItemStacks(Object obj, List<ItemStack> outputStacks) {
@@ -166,19 +306,19 @@ public class DynamicAddonCrawler {
         String clName = obj.getClass().getName();
         if (clName.contains("SizedIngredient")) {
             try {
-                Method mGetInner = obj.getClass().getMethod("getInner");
+                java.lang.reflect.Method mGetInner = obj.getClass().getMethod("getInner");
                 Object inner = mGetInner.invoke(obj);
                 if (inner != null && inner != obj) extractItemStacks(inner, outputStacks);
             } catch (Throwable ignored) {}
             try {
-                Method mGetItems = obj.getClass().getMethod("getItems");
+                java.lang.reflect.Method mGetItems = obj.getClass().getMethod("getItems");
                 Object items = mGetItems.invoke(obj);
                 if (items != null && items != obj) extractItemStacks(items, outputStacks);
             } catch (Throwable ignored) {}
         }
         if (clName.contains("Content")) {
             try {
-                Method mGetContent = obj.getClass().getMethod("getContent");
+                java.lang.reflect.Method mGetContent = obj.getClass().getMethod("getContent");
                 Object content = mGetContent.invoke(obj);
                 if (content != null && content != obj) extractItemStacks(content, outputStacks);
             } catch (Throwable ignored) {}
@@ -186,7 +326,7 @@ public class DynamicAddonCrawler {
 
         try {
             Class<?> cl = obj.getClass();
-            for (Field f : cl.getFields()) {
+            for (java.lang.reflect.Field f : cl.getFields()) {
                 try {
                     String fn = f.getName();
                     if (fn.equals("content") || fn.equals("stack") || fn.equals("itemStack") || fn.equals("ingredient") || fn.equals("inner") || fn.equals("outputs")) {
@@ -197,7 +337,7 @@ public class DynamicAddonCrawler {
                     }
                 } catch (Throwable ignored) {}
             }
-            for (Method m : cl.getMethods()) {
+            for (java.lang.reflect.Method m : cl.getMethods()) {
                 try {
                     if (m.getParameterCount() == 0) {
                         String mn = m.getName();
@@ -213,216 +353,6 @@ public class DynamicAddonCrawler {
         } catch (Throwable ignored) {}
     }
 
-    private static void collectRecipeOutputStacks(Minecraft mc, List<ItemStack> recipeOutputStacks) {
-        try {
-            var emiRecipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (emiRecipeManager != null && emiRecipeManager.getRecipes() != null) {
-                for (dev.emi.emi.api.recipe.EmiRecipe emiRecipe : emiRecipeManager.getRecipes()) {
-                    if (emiRecipe == null) continue;
-                    if (emiRecipe.getOutputs() != null) {
-                        for (dev.emi.emi.api.stack.EmiStack out : emiRecipe.getOutputs()) {
-                            if (out == null || out.isEmpty()) continue;
-                            try {
-                                ItemStack s = out.getItemStack();
-                                if (s != null && !s.isEmpty()) {
-                                    if (!s.hasTag() && out.getNbt() != null) {
-                                        s = s.copy();
-                                        s.setTag(out.getNbt().copy());
-                                    }
-                                    recipeOutputStacks.add(s);
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-                    }
-                    try {
-                        extractItemStacks(emiRecipe, recipeOutputStacks);
-                    } catch (Throwable ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        // Also scan RecipeManager directly for GTCEu / Crafting recipes
-        try {
-            if (mc.level != null && mc.level.getRecipeManager() != null) {
-                for (Recipe<?> recipe : mc.level.getRecipeManager().getRecipes()) {
-                    if (recipe == null) continue;
-                    try {
-                        ItemStack out = recipe.getResultItem(mc.level.registryAccess());
-                        if (out != null && !out.isEmpty()) {
-                            recipeOutputStacks.add(out);
-                        }
-                    } catch (Throwable ignored) {}
-                    try {
-                        extractItemStacks(recipe, recipeOutputStacks);
-                    } catch (Throwable ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private static void crawlItemRegistry(List<ItemStack> recipeOutputStacks, List<MachineAddon> result) {
-        try {
-            if (ForgeRegistries.ITEMS == null || ForgeRegistries.ITEMS.isEmpty()) return;
-
-            // Collect samples from recipe outputs for items that need NBT
-            Map<Item, ItemStack> nbtItemSamples = new HashMap<>();
-            for (ItemStack s : recipeOutputStacks) {
-                if (s != null && s.hasTag()) {
-                    nbtItemSamples.put(s.getItem(), s);
-                }
-            }
-
-            for (Item item : ForgeRegistries.ITEMS) {
-                ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
-                if (id == null) continue;
-
-                ItemStack stack = nbtItemSamples.getOrDefault(item, new ItemStack(item));
-
-                MachineAddon coil = parseCoilBlock(stack, id);
-                if (coil != null && !containsAddonId(result, coil.getId())) {
-                    result.add(coil);
-                    continue;
-                }
-
-                MachineAddon parallel = parseParallelHatch(stack, id);
-                if (parallel != null && !containsAddonId(result, parallel.getId())) {
-                    result.add(parallel);
-                    continue;
-                }
-
-                MachineAddon rotor = parseTurbineRotor(stack, id);
-                if (rotor != null && !containsAddonId(result, rotor.getId())) {
-                    result.add(rotor);
-                    continue;
-                }
-
-                if (isMaintenanceHatchItem(item, id)) {
-                    List<MachineAddon> mAddons = parseMaintenanceHatches(stack, id);
-                    for (MachineAddon addon : mAddons) {
-                        if (addon != null && !containsAddonId(result, addon.getId())) {
-                            result.add(addon);
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private static boolean isMaintenanceHatchItem(Item item, ResourceLocation id) {
-        if (item instanceof BlockItem bi) {
-            Block b = bi.getBlock();
-            try {
-                Method mGetDef = b.getClass().getMethod("getDefinition");
-                Object def = mGetDef.invoke(b);
-                if (def != null) {
-                    Class<?> maintPartCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.MaintenanceHatchPartMachine");
-                    Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
-                    Class<?> mCls = (Class<?>) mGetMachineClass.invoke(def);
-                    if (mCls != null && maintPartCls.isAssignableFrom(mCls)) {
-                        return true;
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-        return false;
-    }
-
-    private static boolean containsAddonId(List<MachineAddon> list, String id) {
-        for (MachineAddon a : list) {
-            if (a.getId().equals(id)) return true;
-        }
-        return false;
-    }
-
-    private static void addBuiltinTraits(List<MachineAddon> list) {
-        MachineAddon boost = new MachineAddon("gtceu:throughput_boosting", "gui.gtcalcboard.addon.throughput_boosting", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.throughput_boosting.desc", ResourceLocation.tryParse("gtceu:pyrolyse_oven"));
-        boost.setParallelMultiplier(4);
-        boost.setDurationMultiplier(1.6);
-        boost.setEutMultiplier(0.95);
-        list.add(boost);
-
-        MachineAddon batch = new MachineAddon("gtceu:batch_processing", "gui.gtcalcboard.addon.batch_processing", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.batch_processing.desc", null);
-        batch.setParallelMultiplier(16);
-        batch.setDurationMultiplier(13.0);
-        batch.setEutMultiplier(1.0);
-        list.add(batch);
-
-        MachineAddon overpressure = new MachineAddon("gtceu:overpressure_autoclave", "gui.gtcalcboard.addon.overpressure_autoclave", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.overpressure_autoclave.desc", ResourceLocation.tryParse("gtceu:autoclave"));
-        overpressure.setParallelMultiplier(8);
-        overpressure.setDurationMultiplier(1.5);
-        overpressure.setEutMultiplier(1.25);
-        list.add(overpressure);
-
-        MachineAddon cmhFast = new MachineAddon("gtceu:configurable_maintenance_hatch_fast", "gui.gtcalcboard.addon.configurable_maintenance_hatch_fast", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.configurable_maintenance_hatch_fast.desc", ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch"));
-        cmhFast.setDurationMultiplier(0.9);
-        cmhFast.setEutMultiplier(1.0);
-        list.add(cmhFast);
-
-        MachineAddon cmhEco = new MachineAddon("gtceu:configurable_maintenance_hatch_eco", "gui.gtcalcboard.addon.configurable_maintenance_hatch_eco", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.configurable_maintenance_hatch_eco.desc", ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch"));
-        cmhEco.setDurationMultiplier(1.1);
-        cmhEco.setEutMultiplier(1.0);
-        list.add(cmhEco);
-    }
-
-    private static MachineAddon parseParallelHatch(ItemStack stack, ResourceLocation id) {
-        return ParallelHelper.parseParallelHatch(stack, id);
-    }
-
-    private static boolean isConfigurableMaintenanceHatch(Item item) {
-        if (item instanceof BlockItem bi) {
-            Block b = bi.getBlock();
-            try {
-                Method mGetDef = b.getClass().getMethod("getDefinition");
-                Object def = mGetDef.invoke(b);
-                if (def != null) {
-                    Class<?> cfgMaintCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.ConfigurableMaintenanceHatchPartMachine");
-                    Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
-                    Class<?> mCls = (Class<?>) mGetMachineClass.invoke(def);
-                    if (mCls != null && cfgMaintCls.isAssignableFrom(mCls)) {
-                        return true;
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-        return false;
-    }
-
-    private static List<MachineAddon> parseMaintenanceHatches(ItemStack stack, ResourceLocation id) {
-        List<MachineAddon> list = new ArrayList<>();
-
-        if (isConfigurableMaintenanceHatch(stack.getItem())) {
-            MachineAddon fast = new MachineAddon(id + "_fast", 
-                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_fast").getString(), 
-                    MachineAddon.Category.MAINTENANCE, 
-                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_fast.desc").getString(), 
-                    id);
-            fast.setDurationMultiplier(0.9);
-            fast.setEutMultiplier(1.0);
-            fast.setItemStackSample(stack);
-            list.add(fast);
-
-            MachineAddon eco = new MachineAddon(id + "_eco", 
-                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_eco").getString(), 
-                    MachineAddon.Category.MAINTENANCE, 
-                    Component.translatable("gui.gtcalcboard.addon.configurable_maintenance_hatch_eco.desc").getString(), 
-                    id);
-            eco.setDurationMultiplier(1.1);
-            eco.setEutMultiplier(1.0);
-            eco.setItemStackSample(stack);
-            list.add(eco);
-        } else {
-            String name = stack.getHoverName().getString();
-            String desc = Component.translatable("gui.gtcalcboard.addon.maintenance_hatch_desc").getString();
-            MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.toString() : name, MachineAddon.Category.MAINTENANCE, desc, id);
-            addon.setDurationMultiplier(1.0);
-            addon.setEutMultiplier(1.0);
-            addon.setItemStackSample(stack);
-            list.add(addon);
-        }
-
-        return list;
-    }
-
     public static MachineAddon parseTurbineRotor(ItemStack stack, ResourceLocation id) {
         return TurbineRotorHelper.parseTurbineRotor(stack, id);
     }
@@ -431,7 +361,7 @@ public class DynamicAddonCrawler {
         return ThermalAugmentHelper.parseThermalAugment(stack, id);
     }
 
-    public static MachineAddon parseThermalAugmentTag(CompoundTag rootTag, String name, ResourceLocation id) {
+    public static MachineAddon parseThermalAugmentTag(net.minecraft.nbt.CompoundTag rootTag, String name, ResourceLocation id) {
         return ThermalAugmentHelper.parseThermalAugmentTag(rootTag, name, id);
     }
 

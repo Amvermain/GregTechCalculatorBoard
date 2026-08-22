@@ -291,4 +291,26 @@ public class RecipeSearchEngineTest {
         ParsedQuery qPercent = RecipeSearchEngine.parseQuery("%smelting");
         assertTrue(RecipeSearchEngine.matches(smeltingRecipe, qPercent));
     }
+
+    @Test
+    public void testContextualSearchFiltering() {
+        SearchableRecipe tetrafluoroethyleneRecipe = createMockRecipe(
+                "Tetrafluoroethylene", "gtceu", "chemical_reactor", "Chemical Reactor",
+                List.of("Tetrafluoroethylene"), List.of("Chloroform", "Hydrofluoric Acid"), List.of("gtceu:tetrafluoroethylene")
+        );
+
+        SearchableRecipe ashesRecipe = createMockRecipe(
+                "Ashes", "gtceu", "chemical_reactor", "Chemical Reactor",
+                List.of("Ashes", "Carbon Monoxide"), List.of("Coal", "Oxygen"), List.of("gtceu:ashes")
+        );
+
+        // When looking for producers of Tetrafluoroethylene, ashes recipe does not have it in outputs
+        assertTrue(tetrafluoroethyleneRecipe.outputNames().contains("Tetrafluoroethylene"));
+        assertFalse(ashesRecipe.outputNames().contains("Tetrafluoroethylene"));
+
+        // When searching "[chemical reactor]", both match category
+        ParsedQuery qCategory = RecipeSearchEngine.parseQuery("[chemical reactor]");
+        assertTrue(RecipeSearchEngine.matches(tetrafluoroethyleneRecipe, qCategory));
+        assertTrue(RecipeSearchEngine.matches(ashesRecipe, qCategory));
+    }
 }

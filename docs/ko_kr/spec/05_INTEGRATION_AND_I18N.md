@@ -50,7 +50,52 @@ flowchart TB
 
 ---
 
-## 2. 시간 단위 환산 시스템 (`RateTimeUnit`)
+## 2. 모드 호환성 어댑터 시스템 (`com.gtceu.calcboard.compat`)
+
+GTCalcBoard는 특정 모드에 종속되지 않는 독립적 확장성을 위해 **우선순위 기반 SPI(Service Provider Interface)** 라우팅 시스템을 채택하고 있으며, 단일 책임 원칙(SRP)에 따라 모드별 전용 서브패키지로 모듈화되어 있습니다.
+
+```mermaid
+graph LR
+    subgraph Registry["ModAdapterRegistry"]
+        direction TB
+        R_SYS["systeams (Priority 110)"]
+        R_TH["thermal (Priority 100)"]
+        R_GT["gtceu (Priority 100)"]
+        R_CR["create (Priority 90)"]
+        R_VAN["minecraft (Priority 0 Fallback)"]
+    end
+
+    subgraph ModPackage["모드 전용 서브패키지 구조 (3단 분리)"]
+        Facade["*ModAdapter (경량 파사드 SPI 진입점)"]
+        Crawler["*AddonCrawler (하드웨어/NBT 크롤링)"]
+        Gui["*GuiHandler (UI 패널/툴팁 렌더링)"]
+        Recipe["*RecipeHandler (레시피 리플렉션/변환)"]
+        Facade --> Crawler
+        Facade --> Gui
+        Facade --> Recipe
+    end
+
+    Registry --> ModPackage
+```
+
+### 2.1 패키지별 세부 구조
+
+| 서브패키지 | 주요 컴포넌트 | 전담 역할 및 기능 |
+| :--- | :--- | :--- |
+| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT 다중블록 특성 및 가열 코일/터빈 로터/병렬·유지보수 해치 크롤링<br/>• 전압 티어 및 EU/t 툴팁/미리보기 렌더링<br/>• GTRecipe 리플렉션 및 발전기/소비기 스펙 변환 |
+| `compat.create` | `CreateModAdapter`<br/>`CreateGuiHandler`<br/>`CreateRecipeHandler` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• RPM 속도 제어 버튼 및 Stress Unit (SU) 툴팁 렌더링<br/>• Create 가공 레시피 소요 시간 및 부하 변환 |
+| `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAddonCrawler`<br/>`ThermalGuiHandler`<br/>`ThermalRecipeHandler` | • 서멀 증강 및 KubeJS 커스텀 키트(`AugmentData` NBT) 크롤링<br/>• 다이내모 발전량(RF/t) 툴팁 렌더링<br/>• 서멀 다이내모 및 기계 레시피 변환 |
+| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsGuiHandler`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁 렌더링<br/>• SysteamsConfig 리플렉션 기반 증기 열효율 및 생산량 변환 |
+| `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 타 모드 기본 폴백 처리 |
+
+### 2.2 크롤러 오케스트레이션 및 비활성 아이템 자동 정리 (`DynamicAddonCrawler`)
+* **활성 스택 일괄 수집**: EMI 인덱스(`EmiApi.getIndexStacks()`) 및 인게임 레시피 매니저(`mc.level.getRecipeManager()`)를 순회하여 현재 게임 내에 실제로 활성화된 모든 `ItemStack`과 커스텀 NBT를 수집.
+* **어댑터 위임**: 수집된 활성 스택을 각 모드 어댑터의 `discoverAddons(collector, activeStacks)`로 전달하여 모듈별로 크롤링.
+* **비활성 아이템 자동 제거 (Pruning)**: 모드팩에서 레시피를 삭제하거나 EMI에서 숨긴 아이템(예: 기본 서멀 업그레이드 키트 등)은 카탈로그에서 자동으로 제외되어 깨끗한 설정창을 보장.
+
+---
+
+## 3. 시간 단위 환산 시스템 (`RateTimeUnit`)
 
 아이템 및 유체 흐름률을 다양한 시간 단위로 스케일링하여 표기할 수 있습니다.
 
@@ -62,28 +107,28 @@ flowchart TB
 | `PER_HOUR` | `/h` | $3600.0$ | `gui.gtcalcboard.unit.per_hour` | 시간당 유량 |
 | `PER_DAY` | `/d` | $86400.0$ | `gui.gtcalcboard.unit.per_day` | 일단위 유량 |
 
-### 2.1 단위 변환 공식
+### 3.1 단위 변환 공식
 $$\text{Displayed Rate} = \text{Base Rate (per second)} \times \text{RateTimeUnit.getFactor}()$$
 
 ---
 
-## 3. 수치 포맷팅 규격 (`FormatUtil`)
+## 4. 수치 포맷팅 규격 (`FormatUtil`)
 
 사용자 친화적인 수치 가독성을 위해 다음과 같은 접두사 규칙을 적용합니다:
 
-### 3.1 EU/t 전력 표기 규칙
+### 4.1 EU/t 전력 표기 규칙
 * $0 \dots 999$: 소수점 1자리 (`120.0 EU/t`)
 * $1,000 \dots 999,999$: `k` 접두사 (`1.25k EU/t`)
 * $1,000,000 \dots 999,999,999$: `M` 접두사 (`4.50M EU/t`)
 * $1,000,000,000$ 이상: `G` 접두사 (`12.00G EU/t`)
 
-### 3.2 흐름률(Flow Rate) 표기 규칙
+### 4.2 흐름률(Flow Rate) 표기 규칙
 * 아이템: 정수 또는 소수점 2자리 (`2.50 /s`)
 * 유체: 밀리버킷(`mB`) 단위 표기 (`1,000 mB/s`)
 
 ---
 
-## 4. 다국어(i18n) 키 명명 규칙 및 동기화
+## 5. 다국어(i18n) 키 명명 규칙 및 동기화
 
 모든 UI 텍스트는 `ko_kr.json` 및 `en_us.json` 언어 리소스 파일에 상호 1:1로 동기화되어 관리됩니다.
 

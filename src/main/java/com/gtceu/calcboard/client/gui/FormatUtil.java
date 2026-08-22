@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui;
 
 import com.gtceu.calcboard.api.GTVoltageTier;
+import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RateTimeUnit;
 import java.util.Locale;
 
@@ -78,6 +79,18 @@ public final class FormatUtil {
     /**
      * Formats ingredient rates (fluid in B/s, mB/s or item in /s) with SI units and active time unit.
      */
+    /**
+     * Formats ingredient rates (fluid in B/s, mB/s or item in /s, or SU in SU/s) with SI units and active time unit.
+     */
+    public static String formatRate(double rate, IngredientStack stack) {
+        if (stack != null && stack.isStressUnit()) {
+            double scaledRate = rate * activeTimeUnit.getFactor();
+            String suffix = activeTimeUnit.getSuffix();
+            return formatCompactNumber(scaledRate) + " SU" + suffix;
+        }
+        return formatRate(rate, stack != null && stack.isFluid());
+    }
+
     public static String formatRate(double rate, boolean isFluid) {
         double scaledRate = rate * activeTimeUnit.getFactor();
         String suffix = activeTimeUnit.getSuffix();
@@ -115,11 +128,23 @@ public final class FormatUtil {
         }
     }
 
-    /**
-     * Formats an input port's connected rate (incoming supply) vs required rate (machine demand)
-     * using clear + / - notation with color coding to eliminate confusing double slashes.
-     * e.g. "+3.48M -3.2M/s +" (Surplus) or "+2.5M -3.2M/s ⚠" (Deficit).
-     */
+    public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit) {
+        if (stack != null && stack.isStressUnit()) {
+            double scaledSup = supplied * activeTimeUnit.getFactor();
+            double scaledReq = required * activeTimeUnit.getFactor();
+            String suffix = activeTimeUnit.getSuffix();
+            String unit = " SU" + suffix;
+            String supStr = formatCompactNumber(scaledSup);
+            String reqStr = formatCompactNumber(scaledReq);
+            if (isDeficit) {
+                return "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
+            } else {
+                return "§b+" + supStr + " §7-" + reqStr + unit + " §b+";
+            }
+        }
+        return formatConnectedInput(supplied, required, stack != null && stack.isFluid(), isDeficit);
+    }
+
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit) {
         double scaledSup = supplied * activeTimeUnit.getFactor();
         double scaledReq = required * activeTimeUnit.getFactor();
@@ -153,11 +178,23 @@ public final class FormatUtil {
         }
     }
 
-    /**
-     * Formats an output port's produced rate (machine generation) vs demanded rate (downstream consumption)
-     * using clear + / - notation with color coding.
-     * e.g. "+3.2M -2.0M/s +" (Surplus) or "+3.2M -4.5M/s ⚠" (Deficit).
-     */
+    public static String formatConnectedOutput(double produced, double demanded, IngredientStack stack, boolean isDeficit) {
+        if (stack != null && stack.isStressUnit()) {
+            double scaledProd = produced * activeTimeUnit.getFactor();
+            double scaledDem = demanded * activeTimeUnit.getFactor();
+            String suffix = activeTimeUnit.getSuffix();
+            String unit = " SU" + suffix;
+            String prodStr = formatCompactNumber(scaledProd);
+            String demStr = formatCompactNumber(scaledDem);
+            if (isDeficit) {
+                return "§a+" + prodStr + " §c-" + demStr + unit + " §c⚠";
+            } else {
+                return "§a+" + prodStr + " §b-" + demStr + unit + " §a+";
+            }
+        }
+        return formatConnectedOutput(produced, demanded, stack != null && stack.isFluid(), isDeficit);
+    }
+
     public static String formatConnectedOutput(double produced, double demanded, boolean isFluid, boolean isDeficit) {
         double scaledProd = produced * activeTimeUnit.getFactor();
         double scaledDem = demanded * activeTimeUnit.getFactor();

@@ -1,15 +1,16 @@
 package com.gtceu.calcboard.client.gui.search;
 
+import com.gtceu.calcboard.api.EnergyType;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.client.gui.FormatUtil;
 import com.gtceu.calcboard.client.gui.IngredientRenderer;
 import com.gtceu.calcboard.integration.emi.EmiPreviewWidgetHolder;
 import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.EmiRecipeCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -55,19 +56,31 @@ public class RecipeHoverPreviewRenderer {
             contentW = holder.getWidth();
             contentH = holder.getHeight();
         } else if (sr.recipe() instanceof RecipeNode rn) {
-            contentW = 200;
-            contentH = 60 + Math.max(rn.getInputs().size(), rn.getOutputs().size()) * 18;
+            int inCount = rn.getInputs().size();
+            int outCount = rn.getOutputs().size();
+            int maxRows = Math.max(1, Math.max(inCount, outCount));
+            contentW = (inCount == 0 || outCount == 0) ? 140 : 190;
+            contentH = maxRows * 18 + 4;
         }
 
-        int cardW = Math.max(140, contentW + 16);
-        int cardH = contentH + 28;
+        int cardW = Math.max(130, contentW + 16);
+        int cardH = contentH + 34;
 
-        int cardX = dialogX + dialogW + 6;
-        if (cardX + cardW > screenW - 4) {
+        int rightSpace = screenW - (dialogX + dialogW + 6);
+        int leftSpace = dialogX - 6;
+
+        int cardX;
+        if (rightSpace >= cardW) {
+            cardX = dialogX + dialogW + 6;
+        } else if (leftSpace >= cardW) {
             cardX = dialogX - cardW - 6;
-        }
-        if (cardX < 4) {
-            cardX = Math.max(4, screenW - cardW - 4);
+        } else {
+            // Neither side has enough room: clamp to whichever side has more margin
+            if (rightSpace >= leftSpace) {
+                cardX = Math.min(screenW - cardW - 4, dialogX + dialogW + 6);
+            } else {
+                cardX = Math.max(4, dialogX - cardW - 6);
+            }
         }
 
         int cardY = Math.max(4, Math.min(hoveredRowY - 10, screenH - cardH - 4));
@@ -148,22 +161,20 @@ public class RecipeHoverPreviewRenderer {
             }
         });
 
-        int contentW = holder.getWidth();
-        int contentH = holder.getHeight();
+        int cardW = holder.getWidth() + 16;
+        int cardH = holder.getHeight() + 28;
 
-        int cardW = Math.max(140, contentW + 16);
-        int cardH = contentH + 28;
-
-        int cardX = anchorX;
+        int cardX = anchorX + 16;
         if (cardX + cardW > screenW - 4) {
-            cardX = Math.max(4, screenW - cardW - 4);
+            cardX = anchorX - cardW - 6;
         }
+        if (cardX < 4) cardX = 4;
 
         int cardY = Math.max(4, Math.min(anchorY - 10, screenH - cardH - 4));
         return new int[]{cardX, cardY, cardW, cardH};
     }
 
-    public static dev.emi.emi.api.stack.EmiIngredient getEmiHoveredIngredient(
+    public static dev.emi.emi.api.stack.EmiIngredient getHoveredIngredientFromAnchor(
             EmiRecipe er,
             int anchorX,
             int anchorY,
@@ -175,7 +186,6 @@ public class RecipeHoverPreviewRenderer {
         if (er == null) return null;
         int[] bounds = calculateEmiPreviewBounds(er, anchorX, anchorY, screenW, screenH);
         if (bounds == null) return null;
-
         int cardX = bounds[0];
         int cardY = bounds[1];
         int originX = cardX + 8;
@@ -186,6 +196,18 @@ public class RecipeHoverPreviewRenderer {
             return holder.getHoveredIngredient(originX, originY, mouseX, mouseY);
         }
         return null;
+    }
+
+    public static dev.emi.emi.api.stack.EmiIngredient getEmiHoveredIngredient(
+            EmiRecipe er,
+            int anchorX,
+            int anchorY,
+            int mouseX,
+            int mouseY,
+            int screenW,
+            int screenH
+    ) {
+        return getHoveredIngredientFromAnchor(er, anchorX, anchorY, mouseX, mouseY, screenW, screenH);
     }
 
     public static void renderEmiPreviewDirect(
@@ -199,9 +221,22 @@ public class RecipeHoverPreviewRenderer {
             int screenW,
             int screenH
     ) {
-        if (er == null) return;
-        Font font = Minecraft.getInstance().font;
+        renderEmiRecipePreviewFromAnchor(graphics, Minecraft.getInstance().font, er, anchorX, anchorY, mouseX, mouseY, partialTick, screenW, screenH);
+    }
 
+    public static void renderEmiRecipePreviewFromAnchor(
+            GuiGraphics graphics,
+            Font font,
+            EmiRecipe er,
+            int anchorX,
+            int anchorY,
+            int mouseX,
+            int mouseY,
+            float partialTick,
+            int screenW,
+            int screenH
+    ) {
+        if (er == null) return;
         int[] bounds = calculateEmiPreviewBounds(er, anchorX, anchorY, screenW, screenH);
         if (bounds == null) return;
 
@@ -210,11 +245,19 @@ public class RecipeHoverPreviewRenderer {
         int cardW = bounds[2];
         int cardH = bounds[3];
 
-        EmiPreviewWidgetHolder holder = WIDGET_CACHE.get(er);
-        if (holder == null) return;
+        EmiPreviewWidgetHolder holder = WIDGET_CACHE.computeIfAbsent(er, r -> {
+            try {
+                EmiPreviewWidgetHolder h = new EmiPreviewWidgetHolder(er.getDisplayWidth(), er.getDisplayHeight());
+                er.addWidgets(h);
+                return h;
+            } catch (Throwable t) {
+                return new EmiPreviewWidgetHolder(Math.max(120, er.getDisplayWidth()), Math.max(40, er.getDisplayHeight()));
+            }
+        });
 
+        // Push pose & high z-index
         graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 600);
+        graphics.pose().translate(0, 0, 300);
 
         // Dark modern background & border
         graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0xF00A0F1D);
@@ -223,15 +266,9 @@ public class RecipeHoverPreviewRenderer {
         // Header bar
         graphics.fill(cardX, cardY, cardX + cardW, cardY + 18, 0xFF1E293B);
 
-        String catName = er.getCategory() != null ? er.getCategory().getName().getString() : "";
-        String rName = "";
-        if (!er.getOutputs().isEmpty() && !er.getOutputs().get(0).getEmiStacks().isEmpty()) {
-            rName = er.getOutputs().get(0).getEmiStacks().get(0).getName().getString();
-        } else if (er.getId() != null) {
-            rName = er.getId().getPath();
-        }
-
-        String title = (catName.isEmpty() ? "" : "§7[" + catName + "§7] ") + "§f" + rName;
+        EmiRecipeCategory cat = er.getCategory();
+        String catName = cat != null && cat.getName() != null ? cat.getName().getString() : "";
+        String title = (catName.isEmpty() ? "" : "§7[" + catName + "§7] ") + "§f" + (er.getId() != null ? er.getId().getPath() : "");
         graphics.drawString(font, font.plainSubstrByWidth(title, cardW - 12), cardX + 6, cardY + 5, 0xFFFFFFFF, false);
 
         // Render Native EMI Widgets
@@ -320,20 +357,16 @@ public class RecipeHoverPreviewRenderer {
             int screenW,
             int screenH
     ) {
+        int[] bounds = calculatePreviewBounds(sr, dialogX, dialogY, dialogW, dialogH, hoveredRowY, screenW, screenH);
+        if (bounds == null) return;
+        int cardX = bounds[0];
+        int cardY = bounds[1];
+        int cardW = bounds[2];
+        int cardH = bounds[3];
+
         int inCount = rn.getInputs().size();
         int outCount = rn.getOutputs().size();
         int maxRows = Math.max(1, Math.max(inCount, outCount));
-
-        int cardW = 220;
-        int cardH = 26 + maxRows * 18 + 20;
-
-        int cardX = dialogX + dialogW + 6;
-        if (cardX + cardW > screenW - 4) {
-            cardX = dialogX - cardW - 6;
-        }
-        if (cardX < 4) cardX = 4;
-
-        int cardY = Math.max(4, Math.min(hoveredRowY - 10, screenH - cardH - 4));
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 300);
@@ -350,34 +383,62 @@ public class RecipeHoverPreviewRenderer {
 
         // Content
         int contentY = cardY + 22;
-        for (int i = 0; i < maxRows; i++) {
-            int rowY = contentY + i * 18;
-
-            if (i < inCount) {
-                IngredientStack in = rn.getInputs().get(i);
-                IngredientRenderer.render(graphics, in, cardX + 8, rowY);
-                String amtStr = in.isFluid() ? String.format("%.0f mB", in.getAmount()) : String.format("%.0f", in.getAmount());
-                graphics.drawString(font, font.plainSubstrByWidth(amtStr, 70), cardX + 26, rowY + 5, 0xFFE2E8F0, false);
-            }
-
-            graphics.drawString(font, "➔", cardX + 102, rowY + 5, 0xFF64748B, false);
-
-            if (i < outCount) {
+        if (inCount == 0 && outCount > 0) {
+            // Source Recipe (Produces outputs only)
+            for (int i = 0; i < outCount; i++) {
+                int rowY = contentY + i * 18;
                 IngredientStack out = rn.getOutputs().get(i);
-                IngredientRenderer.render(graphics, out, cardX + 118, rowY);
+                IngredientRenderer.render(graphics, out, cardX + 10, rowY);
                 String amtStr = out.isFluid() ? String.format("%.0f mB", out.getAmount()) : String.format("%.0f", out.getAmount());
                 if (out.getChance() < 0.999) {
                     amtStr += String.format(" §d(%.0f%%)", out.getChance() * 100.0);
                 }
-                graphics.drawString(font, font.plainSubstrByWidth(amtStr, 80), cardX + 136, rowY + 5, 0xFFE2E8F0, false);
+                amtStr += "  §a(Output)";
+                graphics.drawString(font, font.plainSubstrByWidth(amtStr, cardW - 36), cardX + 30, rowY + 5, 0xFFE2E8F0, false);
+            }
+        } else if (outCount == 0 && inCount > 0) {
+            // Sink Recipe (Consumes inputs only)
+            for (int i = 0; i < inCount; i++) {
+                int rowY = contentY + i * 18;
+                IngredientStack in = rn.getInputs().get(i);
+                IngredientRenderer.render(graphics, in, cardX + 10, rowY);
+                String amtStr = in.isFluid() ? String.format("%.0f mB", in.getAmount()) : String.format("%.0f", in.getAmount());
+                amtStr += "  §c(Input)";
+                graphics.drawString(font, font.plainSubstrByWidth(amtStr, cardW - 36), cardX + 30, rowY + 5, 0xFFE2E8F0, false);
+            }
+        } else {
+            for (int i = 0; i < maxRows; i++) {
+                int rowY = contentY + i * 18;
+
+                if (i < inCount) {
+                    IngredientStack in = rn.getInputs().get(i);
+                    IngredientRenderer.render(graphics, in, cardX + 8, rowY);
+                    String amtStr = in.isFluid() ? String.format("%.0f mB", in.getAmount()) : String.format("%.0f", in.getAmount());
+                    graphics.drawString(font, font.plainSubstrByWidth(amtStr, 60), cardX + 26, rowY + 5, 0xFFE2E8F0, false);
+                }
+
+                int arrowX = cardX + (cardW / 2) - 4;
+                graphics.drawString(font, "➔", arrowX, rowY + 5, 0xFF64748B, false);
+
+                if (i < outCount) {
+                    IngredientStack out = rn.getOutputs().get(i);
+                    int outStackX = arrowX + 12;
+                    IngredientRenderer.render(graphics, out, outStackX, rowY);
+                    String amtStr = out.isFluid() ? String.format("%.0f mB", out.getAmount()) : String.format("%.0f", out.getAmount());
+                    if (out.getChance() < 0.999) {
+                        amtStr += String.format(" §d(%.0f%%)", out.getChance() * 100.0);
+                    }
+                    graphics.drawString(font, font.plainSubstrByWidth(amtStr, cardW - (outStackX + 18) - 4), outStackX + 18, rowY + 5, 0xFFE2E8F0, false);
+                }
             }
         }
 
-        // Stats Footer (Duration & EU/t)
+        // Stats Footer (Duration & EU/t / RF/t / Heat)
         int footerY = cardY + cardH - 16;
         graphics.fill(cardX, footerY - 2, cardX + cardW, footerY - 1, 0xFF1E293B);
-        String statsStr = String.format("§b⏱ %.2fs  §e⚡ %s EU/t (%s)", rn.getBaseDurationTicks() / 20.0, FormatUtil.formatCompactNumber(rn.getBaseEUt()), rn.getRecipeTier().name());
-        graphics.drawString(font, statsStr, cardX + 6, footerY + 2, 0xFF94A3B8, false);
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(rn);
+        String statsStr = String.format("§b⏱ %.2fs  %s", rn.getBaseDurationTicks() / 20.0, adapter.formatEnergyStats(rn, com.gtceu.calcboard.api.BoardManager.getInstance().getPowerDisplayMode()));
+        graphics.drawString(font, font.plainSubstrByWidth(statsStr, cardW - 8), cardX + 6, footerY + 2, 0xFF94A3B8, false);
 
         graphics.pose().popPose();
     }

@@ -14,6 +14,8 @@ import java.util.*;
 public class FlowGraph {
     private final List<RecipeNode> nodes = new ArrayList<>();
     private final List<ConnectionEdge> connections = new ArrayList<>();
+    private final List<CanvasGroupFrame> frames = new ArrayList<>();
+    private final List<CanvasStickyNote> stickyNotes = new ArrayList<>();
     private final Map<String, RecipeNode> nodeMap = new HashMap<>();
 
     public record ConnectionEdge(
@@ -49,6 +51,54 @@ public class FlowGraph {
         return connections;
     }
 
+    public List<CanvasGroupFrame> getFrames() {
+        return frames;
+    }
+
+    public List<CanvasStickyNote> getStickyNotes() {
+        return stickyNotes;
+    }
+
+    public void addStickyNote(CanvasStickyNote note) {
+        if (note != null && !stickyNotes.contains(note)) {
+            stickyNotes.add(note);
+        }
+    }
+
+    public void removeStickyNote(CanvasStickyNote note) {
+        if (note != null) {
+            stickyNotes.remove(note);
+        }
+    }
+
+    public CanvasStickyNote findStickyNoteById(String id) {
+        if (id == null) return null;
+        for (CanvasStickyNote n : stickyNotes) {
+            if (n.getId().equals(id)) return n;
+        }
+        return null;
+    }
+
+    public void addFrame(CanvasGroupFrame frame) {
+        if (frame != null && !frames.contains(frame)) {
+            frames.add(frame);
+        }
+    }
+
+    public void removeFrame(CanvasGroupFrame frame) {
+        if (frame != null) {
+            frames.remove(frame);
+        }
+    }
+
+    public CanvasGroupFrame findFrameById(String id) {
+        if (id == null) return null;
+        for (CanvasGroupFrame f : frames) {
+            if (f.getId().equals(id)) return f;
+        }
+        return null;
+    }
+
     public void addNode(RecipeNode node) {
         if (node != null) {
             nodes.add(node);
@@ -61,6 +111,9 @@ public class FlowGraph {
             nodes.remove(node);
             nodeMap.remove(node.getId());
             connections.removeIf(edge -> edge.fromNodeId.equals(node.getId()) || edge.toNodeId.equals(node.getId()));
+            for (CanvasGroupFrame f : frames) {
+                f.removeNode(node.getId());
+            }
         }
     }
 
@@ -94,6 +147,8 @@ public class FlowGraph {
     public void clear() {
         nodes.clear();
         connections.clear();
+        frames.clear();
+        stickyNotes.clear();
         nodeMap.clear();
     }
 
@@ -118,6 +173,12 @@ public class FlowGraph {
                 this.addNode(n);
             }
             this.connections.addAll(other.connections);
+            for (CanvasGroupFrame f : other.frames) {
+                this.frames.add(f.copy());
+            }
+            for (CanvasStickyNote sn : other.stickyNotes) {
+                this.stickyNotes.add(sn.copy());
+            }
         }
     }
 
@@ -162,7 +223,11 @@ public class FlowGraph {
     }
 
     public RecipeNode groupIntoModule(Set<String> targetNodeIds, String moduleName) {
-        return FlowGraphModuleHandler.groupIntoModule(this, targetNodeIds, moduleName);
+        return FlowGraphModuleHandler.groupIntoModule(this, targetNodeIds, moduleName, null);
+    }
+
+    public RecipeNode groupIntoModule(Set<String> targetNodeIds, String moduleName, CanvasGroupFrame primaryFrame) {
+        return FlowGraphModuleHandler.groupIntoModule(this, targetNodeIds, moduleName, primaryFrame);
     }
 
     public boolean expandModule(RecipeNode moduleNode) {
@@ -194,6 +259,23 @@ public class FlowGraph {
             edgeList.add(edge.serializeNBT());
         }
         tag.put("connections", edgeList);
+
+        if (!frames.isEmpty()) {
+            ListTag frameList = new ListTag();
+            for (CanvasGroupFrame f : frames) {
+                frameList.add(f.serializeNBT());
+            }
+            tag.put("frames", frameList);
+        }
+
+        if (!stickyNotes.isEmpty()) {
+            ListTag noteList = new ListTag();
+            for (CanvasStickyNote sn : stickyNotes) {
+                noteList.add(sn.serializeNBT());
+            }
+            tag.put("stickyNotes", noteList);
+        }
+
         return tag;
     }
 
@@ -209,6 +291,18 @@ public class FlowGraph {
             ListTag edgeList = tag.getList("connections", Tag.TAG_COMPOUND);
             for (int i = 0; i < edgeList.size(); i++) {
                 graph.connections.add(ConnectionEdge.deserializeNBT(edgeList.getCompound(i)));
+            }
+        }
+        if (tag.contains("frames", Tag.TAG_LIST)) {
+            ListTag frameList = tag.getList("frames", Tag.TAG_COMPOUND);
+            for (int i = 0; i < frameList.size(); i++) {
+                graph.frames.add(CanvasGroupFrame.deserializeNBT(frameList.getCompound(i)));
+            }
+        }
+        if (tag.contains("stickyNotes", Tag.TAG_LIST)) {
+            ListTag noteList = tag.getList("stickyNotes", Tag.TAG_COMPOUND);
+            for (int i = 0; i < noteList.size(); i++) {
+                graph.stickyNotes.add(CanvasStickyNote.deserializeNBT(noteList.getCompound(i)));
             }
         }
         return graph;

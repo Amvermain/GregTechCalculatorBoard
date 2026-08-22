@@ -105,4 +105,68 @@ public class CategoryCapabilityMatrixTest {
         Assertions.assertNotNull(cap);
         Assertions.assertFalse(cap.canUseCoils());
     }
+
+    @Test
+    void testGasTurbineCapabilityAndRotorCategory() {
+        ResourceLocation gasTurbineCat = ResourceLocation.tryParse("gtceu:gas_turbine");
+        CategoryCapability cap = matrix.getCapability(gasTurbineCat);
+
+        Assertions.assertNotNull(cap);
+        Assertions.assertTrue(cap.isTurbine());
+        Assertions.assertEquals(GTVoltageTier.EV, cap.turbineBaseTier());
+        Assertions.assertEquals(4096.0, cap.turbineBaseProduction());
+
+        RecipeNode turbineNode = RecipeNode.create("Gas Turbine (Nitrobenzene)", 20.0, 32.0, GTVoltageTier.LV);
+        turbineNode.setRecipeCategoryId(gasTurbineCat);
+        turbineNode.setGenerator(true);
+
+        List<MachineAddon.Category> activeCats = cap.getActiveCategoriesForNode(turbineNode);
+        Assertions.assertTrue(activeCats.contains(MachineAddon.Category.ROTOR));
+        Assertions.assertTrue(activeCats.contains(MachineAddon.Category.MAINTENANCE));
+        Assertions.assertFalse(activeCats.contains(MachineAddon.Category.PARALLEL));
+        Assertions.assertFalse(activeCats.contains(MachineAddon.Category.MULTIBLOCK_TRAIT));
+
+        List<MachineAddon.Category> relCats = MachineAddon.getRelevantCategories(turbineNode);
+        Assertions.assertTrue(relCats.contains(MachineAddon.Category.ROTOR));
+        Assertions.assertTrue(relCats.contains(MachineAddon.Category.MAINTENANCE));
+        Assertions.assertFalse(relCats.contains(MachineAddon.Category.PARALLEL));
+    }
+
+    @Test
+    void testCustomMaterialTurbineRotorMatching() {
+        MachineAddon enderiumRotor = new MachineAddon(
+                "gtceu:rotor_enderium",
+                "Enderium Turbine Rotor",
+                MachineAddon.Category.ROTOR,
+                "Turbine Fuel Efficiency 140%",
+                ResourceLocation.tryParse("gtceu:turbine_rotor")
+        );
+        enderiumRotor.setDurationMultiplier(1.40);
+        enderiumRotor.setRotorPower(130);
+
+        RecipeNode node = RecipeNode.create("Gas Turbine (Nitrobenzene)", 20.0, 32.0, GTVoltageTier.LV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:gas_turbine"));
+        node.setGenerator(true);
+
+        Assertions.assertTrue(MachineAddon.isTurbineMachine(node));
+        node.addAddon(enderiumRotor);
+
+        Assertions.assertEquals(1.40, node.getCombinedDurationMultiplier(), 0.001);
+        Assertions.assertEquals("Enderium Turbine Rotor", enderiumRotor.getName());
+        Assertions.assertEquals("gtceu:rotor_enderium", enderiumRotor.getId());
+    }
+
+    @Test
+    void testTwoTrackCatalogLifecycle() {
+        MachineAddonCatalog catalog = MachineAddonCatalog.getInstance();
+        catalog.reset();
+
+        Assertions.assertFalse(catalog.isReady());
+        catalog.ensureFastLoaded();
+        Assertions.assertTrue(catalog.isReady());
+        Assertions.assertFalse(catalog.getAllAddons().isEmpty());
+
+        // Fast load should provide basic traits
+        Assertions.assertTrue(catalog.getAllAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT));
+    }
 }

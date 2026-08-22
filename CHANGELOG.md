@@ -8,6 +8,55 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.6] - 2026-08-23
+
+### Added
+- **Create Mod Kinetic System & Stress Unit (SU) Scaling (`CreateModAdapter`, `CreateRecipeHandler`, `CreateGuiHandler`)**:
+  - Added power generation calculations for Large Water Wheel, Water Wheel, Windmill Bearing, Steam Engine, Hand Crank, Creative Motor, and Electric Motor.
+  - Applied proportional scaling for processing duration and stress impact ($\text{Base SU} \times \frac{\text{RPM}}{32}$) based on rotation speed relative to 32 RPM.
+  - Added `create:stress_units` I/O ports with real-time rate display, wire connections, and Auto-Ratio balancing.
+  - Indexed Create processing recipes (Pressing, Crushing, Milling, Mixing, Cutting, Polishing, Rolling, etc.) under the SU consumer search dialog.
+  - Added SU/FE conversion and UI controls for Create Crafts & Additions Alternator and Electric Motor.
+- **Reroute & Junction Nodes (`RecipeNode`, `FlowGraph`, `FlowGraphSolver`)**:
+  - Added 32x32 zero-cost (0 EU/t, 0s) Reroute & Junction Nodes.
+  - Automatically bound ingredient specifications based on upstream/downstream connections.
+  - Added double-click splitting on wires to insert junction nodes.
+  - Supported pass-through flow during Auto-Ratio calculations.
+- **Canvas Group Frames & Sticky Notes (`CanvasGroupFrame`, `CanvasStickyNote`, `FrameEditDialog`, `NoteEditDialog`)**:
+  - Added 8-color group frames (`CanvasGroupFrame`) supporting header dragging, resizing, and 1-click compound module packaging.
+  - Added bounding-box-based frame creation on selected nodes with `Ctrl + G`.
+  - Added standalone sticky notes (`CanvasStickyNote`) with auto-wrapped text, color cycling, and double-click editing.
+  - Handled automatic containment when dragging nodes in and out of frames.
+  - Supported packaging and expanding compound modules containing group frames and notes.
+- **Canvas 4-Button Quick Action Marker ([🔍] [🔀] [🖼] [📝]) (`BoardScreen`, `CanvasInteractionHandler`)**:
+  - Added quick action marker on empty canvas clicks and wire drops (Recipe Search, Junction Node, Group Frame, Sticky Note).
+- **Node Card Controls & Multi-Energy Framework (`EnergyType`, `NodeCardRenderer`, `NodeWidget`)**:
+  - Added `EnergyType` domain model (`ELECTRIC_EU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `KINETIC_SU`, `MANA`).
+  - Thermal Boilers (`HEAT_OR_SELF`): Replaced voltage tier and EU/t display with Boiler banner and steam production rates.
+  - Thermal Dynamos (`ELECTRIC_FE`): Replaced tier buttons with Dynamo banner and RF/t units, converted to 4 RF = 1 EU for summary calculations.
+- **Updated Interactive Tutorial (`TutorialStep`, `TutorialManager`, `TutorialOverlay`)**:
+  - Restructured tutorial into a 7-step course covering junction nodes, group frames, quick actions, hardware config, and compound modules.
+- **Systeams Runtime Reflection Integration (`SysteamsModAdapter`, `ThermalModAdapter`)**:
+  - Queried Systeams configs (`STEAM_RATIO_*`, `SPEED_*`) and recipes at runtime.
+  - Categorized Steam Dynamo (`systeams:steam`) as a steam-consuming generator.
+
+### Fixed & Changed
+- **Hardware Config Dialog Performance & Synchronization (`DynamicAddonCrawler`, `MachineConfigDialog`)**:
+  - Removed synchronous recipe scans when opening the dialog; separated into registry lookup and background NBT queries to eliminate open latency.
+  - Updated catalog cache invalidation when removing active addons, clicking Clear All, or right-clicking catalog cards.
+- **Dynamo & Boiler Spec Calculation (`ThermalAugmentHelper`, `DynamicAddonCrawler`)**:
+  - Calculated specs based on `ThermalFuel`/`SteamFuel` class hierarchy, Forge tags, and KubeJS NBT tags (`DynEA`, `DynP`, `DynEM`).
+  - Indexed KubeJS upgrade kits (`kubejs:lv/mv/hv/ev_upgrade_kit`, `arc_kit`, `mci_kit`) while excluding disabled dummy items.
+- **Contextual Search Filtering (`RecipeSearchDialog`)**:
+  - Fixed an issue where searching machine categories (`[chemical reactor]`) in Producer/Consumer dialogs returned unmatched recipes.
+- **Singleblock Machine Config Interaction (`MachineConfigDialog`)**:
+  - Fixed click handling for augment kit cards on singleblock thermal machines and boilers.
+- **Dynamo & Boiler Tooltips (`BoardTooltipRenderer`)**:
+  - Corrected dynamo hover tooltip from consumption to generation (`Total Power Generation: +400.00 RF/t`).
+  - Added steam production rate (`Total Steam: +30,000.00 mB/s`) to boiler hover tooltips.
+
+---
+
 ## [2.0.0-alpha.5] - 2026-08-22
 
 ### Added
@@ -79,7 +128,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ## [2.0.0-alpha.3] - 2026-08-21
 
 ### Added
-- **RFC-V2-005 Category Capability Matrix Engine (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
+- **Category Capability Matrix Engine (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
   - Implemented pre-baked $O(1)$ capability lookup matrix mapping recipe categories directly to machine workstations and supported addon categories.
   - Added deterministic capability deduction for Heating Coils, Turbine Rotors, Parallel Hatches, Maintenance Hatches, and Thermal Series Augments.
   - Added dedicated unit test suite (`CategoryCapabilityMatrixTest`) covering singleblock, multiblock, turbine, dynamo, and filtrator categories.
@@ -139,7 +188,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ## [2.0.0-alpha.1] - 2026-08-20
 
 ### Added
-- **Multiplayer Shared Team Workspace Architecture (`RFC-001`)**:
+- **Multiplayer Shared Team Workspace Architecture**:
   - **Full Client-Server Synchronization**: Introduced bidirectional network protocol (`C2S`/`S2C`) enabling real-time collaboration on shared factory design flowcharts across multiplayer servers.
   - **Pluggable Multi-Team Provider Backend (`ITeamProvider`, `TeamProviderRegistry`)**:
     - Full soft-dependency integration with **FTB Teams** via safe runtime reflection.

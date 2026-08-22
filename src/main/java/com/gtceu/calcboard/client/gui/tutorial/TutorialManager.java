@@ -89,40 +89,30 @@ public class TutorialManager {
         if (currentScreen == null) return;
 
         if (step == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
-            setupDragToSearchExercise();
+            setupStep2Exercise();
+        } else if (step == TutorialStep.STEP_3_JUNCTION) {
+            setupStep3Exercise();
         } else if (step == TutorialStep.STEP_4_SHIFT_WIRING) {
-            // Ensure turbine node exists on canvas (in case user skipped step 2)
-            if (turbineNodeId == null || currentScreen.getGraph().findNodeById(turbineNodeId) == null) {
-                RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
-                turbine.setGenerator(true);
-                turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
-                turbine.setPosX(60);
-                turbine.setPosY(-50);
-                turbine.setMachineCount(1.0);
-                this.turbineNodeId = turbine.getId();
-                currentScreen.getGraph().addNode(turbine);
-                currentScreen.rebuildWidgets();
-            } else {
-                // Reset turbine count to 1.0 so user can experience Shift auto-calculation to 5.0
-                RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
-                if (turbine != null) {
-                    turbine.setMachineCount(1.0);
-                    currentScreen.rebuildWidgets();
-                }
-            }
-        } else if (step == TutorialStep.STEP_5_SUMMARY_MODULE) {
-            currentScreen.getSummaryOverlay().setCollapsed(false);
+            setupStep4Exercise();
+        } else if (step == TutorialStep.STEP_5_MACHINE_CONFIG) {
+            setupStep5Exercise();
+        } else if (step == TutorialStep.STEP_6_GROUP_FRAME) {
+            setupStep6Exercise();
+        } else if (step == TutorialStep.STEP_7_COMPOUND_MODULE) {
+            setupStep7Exercise();
         }
     }
 
-    private void setupDragToSearchExercise() {
+    private void setupStep2Exercise() {
         if (currentScreen == null) return;
 
         currentScreen.getGraph().getNodes().clear();
         currentScreen.getGraph().getConnections().clear();
+        currentScreen.getGraph().getFrames().clear();
 
         // 1. Boiler: produces Steam 500 mB/s
-        RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
+        RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
+        boiler.setEnergyType(com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF);
         boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
         boiler.setPosX(-180);
         boiler.setPosY(-50);
@@ -131,6 +121,101 @@ public class TutorialManager {
         currentScreen.getGraph().addNode(boiler);
 
         currentScreen.rebuildWidgets();
+    }
+
+    private void setupStep3Exercise() {
+        if (currentScreen == null) return;
+
+        ensureBoilerAndTurbineExist();
+
+        // Ensure a direct connection exists between Boiler and Turbine for user to double-click
+        RecipeNode boiler = currentScreen.getGraph().findNodeById(boilerNodeId);
+        RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+        if (boiler != null && turbine != null) {
+            boolean hasConn = currentScreen.getGraph().getConnections().stream()
+                    .anyMatch(c -> c.fromNodeId().equals(boiler.getId()) && c.toNodeId().equals(turbine.getId()));
+            if (!hasConn) {
+                currentScreen.getGraph().addConnection(boiler.getId(), 0, turbine.getId(), 0);
+            }
+        }
+        currentScreen.rebuildWidgets();
+    }
+
+    private void setupStep4Exercise() {
+        if (currentScreen == null) return;
+
+        ensureBoilerAndTurbineExist();
+
+        // Reset turbine machine count to 1.0 so user can experience Shift auto-calculation to 5.0
+        RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+        if (turbine != null) {
+            turbine.setMachineCount(1.0);
+        }
+        currentScreen.rebuildWidgets();
+    }
+
+    private void setupStep5Exercise() {
+        if (currentScreen == null) return;
+
+        ensureBoilerAndTurbineExist();
+        RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+        if (turbine != null) {
+            turbine.setMachineCount(5.0);
+        }
+        currentScreen.rebuildWidgets();
+    }
+
+    private void setupStep6Exercise() {
+        if (currentScreen == null) return;
+
+        ensureBoilerAndTurbineExist();
+        currentScreen.getGraph().getFrames().clear();
+        currentScreen.rebuildWidgets();
+    }
+
+    private void setupStep7Exercise() {
+        if (currentScreen == null) return;
+
+        ensureBoilerAndTurbineExist();
+        if (currentScreen.getGraph().getFrames().isEmpty()) {
+            // Auto-create a frame if user skipped step 6
+            RecipeNode boiler = currentScreen.getGraph().findNodeById(boilerNodeId);
+            RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+            if (boiler != null && turbine != null) {
+                String defaultTitle = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.default_frame_name").getString();
+                com.gtceu.calcboard.api.CanvasGroupFrame frame = com.gtceu.calcboard.api.CanvasGroupFrame.createFromNodes(
+                        defaultTitle, java.util.List.of(boiler, turbine), com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE);
+                currentScreen.getGraph().addFrame(frame);
+            }
+        }
+        currentScreen.getSummaryOverlay().setCollapsed(false);
+        currentScreen.rebuildWidgets();
+    }
+
+    private void ensureBoilerAndTurbineExist() {
+        if (currentScreen == null) return;
+
+        if (boilerNodeId == null || currentScreen.getGraph().findNodeById(boilerNodeId) == null) {
+            RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
+            boiler.setEnergyType(com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF);
+            boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
+            boiler.setPosX(-180);
+            boiler.setPosY(-50);
+            boiler.setMachineCount(1.0);
+            this.boilerNodeId = boiler.getId();
+            currentScreen.getGraph().addNode(boiler);
+        }
+
+        if (turbineNodeId == null || currentScreen.getGraph().findNodeById(turbineNodeId) == null) {
+            RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
+            turbine.setGenerator(true);
+            turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
+            turbine.setPosX(80);
+            turbine.setPosY(-50);
+            turbine.setMachineCount(1.0);
+            this.turbineNodeId = turbine.getId();
+            currentScreen.getGraph().addNode(turbine);
+        }
     }
 
     // --- Action Event Triggers ---
@@ -147,6 +232,10 @@ public class TutorialManager {
             if (node != null && !node.getId().equals(boilerNodeId)) {
                 this.turbineNodeId = node.getId();
             }
+        } else if (currentStep == TutorialStep.STEP_3_JUNCTION) {
+            if (node != null && node.isReroute()) {
+                nextStep();
+            }
         }
     }
 
@@ -162,22 +251,41 @@ public class TutorialManager {
     public void onWireConnected(boolean shiftDown) {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
-            // Advance to Step 3 (Delete Wiring)
-            nextStep();
+            nextStep(); // Advance to Step 3 (Junction)
         } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            // Advance to Step 5 (Summary & Module)
-            nextStep();
+            nextStep(); // Advance to Step 5 (Machine Config)
         }
     }
 
     public void onWireDisconnected() {
+    }
+
+    public void onJunctionInserted() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_3_DELETE_WIRING) {
+        if (currentStep == TutorialStep.STEP_3_JUNCTION) {
             nextStep(); // Advance to Step 4 (Shift Wiring)
         }
     }
 
     public void onAutoRatioTriggered() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
+            nextStep(); // Advance to Step 5 (Machine Config)
+        }
+    }
+
+    public void onMachineConfigOpened() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_5_MACHINE_CONFIG) {
+            nextStep(); // Advance to Step 6 (Group Frame)
+        }
+    }
+
+    public void onGroupFramed() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_6_GROUP_FRAME) {
+            nextStep(); // Advance to Step 7 (Compound Module)
+        }
     }
 
     public void onSelectAll() {
@@ -197,7 +305,14 @@ public class TutorialManager {
 
     public void onModuleGrouped() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_5_SUMMARY_MODULE) {
+        if (currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
+            completeTutorial();
+        }
+    }
+
+    public void onModuleExpanded() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
             completeTutorial();
         }
     }
@@ -217,6 +332,10 @@ public class TutorialManager {
     // --- Dynamic Widget Glowing Helpers ---
 
     public boolean isToolbarButtonGlowing(String buttonKey) {
+        if (!active) return false;
+        if (currentStep == TutorialStep.STEP_1_ADD_RECIPE && "add_recipe".equals(buttonKey)) {
+            return true;
+        }
         return false;
     }
 
@@ -225,6 +344,28 @@ public class TutorialManager {
     }
 
     public boolean isNodeBaseTargetButtonGlowing(String nodeId) {
+        return false;
+    }
+
+    public boolean isMachineConfigButtonGlowing(String nodeId) {
+        if (!active) return false;
+        if (currentStep == TutorialStep.STEP_5_MACHINE_CONFIG) {
+            return turbineNodeId != null && turbineNodeId.equals(nodeId);
+        }
+        return false;
+    }
+
+    public boolean isFrameCollapseButtonGlowing(String frameId) {
+        if (!active) return false;
+        return currentStep == TutorialStep.STEP_7_COMPOUND_MODULE;
+    }
+
+    public boolean isWireGlowing(String fromNodeId, String toNodeId) {
+        if (!active) return false;
+        if (currentStep == TutorialStep.STEP_3_JUNCTION) {
+            return (boilerNodeId != null && boilerNodeId.equals(fromNodeId))
+                    || (turbineNodeId != null && turbineNodeId.equals(toNodeId));
+        }
         return false;
     }
 

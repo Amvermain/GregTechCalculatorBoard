@@ -21,13 +21,14 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import net.minecraft.client.gui.screens.Screen;
 import java.util.UUID;
 
 /**
@@ -59,6 +60,8 @@ public class BoardScreen extends Screen {
     private SaveToTeamDialog saveToTeamDialog;
     private ExportToTeamDialog exportToTeamDialog;
     private RecentSavesDialog recentSavesDialog;
+    private FrameEditDialog frameEditDialog;
+    private NoteEditDialog noteEditDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -99,16 +102,32 @@ public class BoardScreen extends Screen {
         return selectionModel.getSelectedNodeIds();
     }
 
+    public Set<String> getSelectedNoteIds() {
+        return selectionModel.getSelectedNoteIds();
+    }
+
     public boolean isNodeSelected(String id) {
         return selectionModel.isSelected(id);
+    }
+
+    public boolean isNoteSelected(String id) {
+        return selectionModel.isNoteSelected(id);
     }
 
     public void selectNode(String id, boolean multi) {
         selectionModel.select(id, multi);
     }
 
+    public void selectNote(String id, boolean multi) {
+        selectionModel.selectNote(id, multi);
+    }
+
     public void toggleSelectNode(String id) {
         selectionModel.toggle(id);
+    }
+
+    public void toggleSelectNote(String id) {
+        selectionModel.toggleNote(id);
     }
 
     public void clearSelection() {
@@ -199,6 +218,8 @@ public class BoardScreen extends Screen {
         this.saveToTeamDialog = new SaveToTeamDialog(this);
         this.exportToTeamDialog = new ExportToTeamDialog(this);
         this.recentSavesDialog = new RecentSavesDialog(this);
+        this.frameEditDialog = new FrameEditDialog(this);
+        this.noteEditDialog = new NoteEditDialog(this);
         rebuildWidgets();
 
         if (com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled()) {
@@ -471,6 +492,10 @@ public class BoardScreen extends Screen {
         double canvasMouseX = toCanvasX(mouseX);
         double canvasMouseY = toCanvasY(mouseY);
 
+        // 2.5 Render Visual Canvas Group Frames & Sticky Notes (Layer below wires and nodes)
+        CanvasGroupFrameRenderer.renderFrames(graphics, getGraph(), canvasMouseX, canvasMouseY, null);
+        CanvasStickyNoteRenderer.renderNotes(graphics, getGraph(), canvasMouseX, canvasMouseY, getSelectedNoteIds());
+
         // 5. Render Node Widgets with Viewport Culling
         double screenLeft = -panX / zoom - 100;
         double screenRight = (-panX + width) / zoom + 100;
@@ -501,8 +526,10 @@ public class BoardScreen extends Screen {
                     }
 
                     boolean isHovered = ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, canvasMouseX, canvasMouseY, 6.0);
-                    int lineColor = isHovered ? 0xFFFF3366 : 0xFF00E5FF;
-                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, lineColor, 2.0f);
+                    boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
+                    int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : 0xFF00E5FF);
+                    float wireThick = isWireGlowing ? 3.5f : 2.0f;
+                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, lineColor, wireThick);
                     visibleWires.add(new float[]{x1, y1, x2, y2});
                 }
             }
@@ -560,21 +587,52 @@ public class BoardScreen extends Screen {
             graphics.flush();
         }
 
-        // 4.5 Render Quick Add Marker if active
+        // 4.5 Render Quick Action Marker ([🔍] Search, [🔀] Junction, [🖼] Frame, [📝] Note) if active
+        canvasHandler.checkMarkerCursorDistance(canvasMouseX, canvasMouseY);
         if (canvasHandler.hasQuickAddMarker()) {
             double qx = canvasHandler.getQuickAddMarkerCanvasX();
             double qy = canvasHandler.getQuickAddMarkerCanvasY();
-            boolean isMarkerHovered = Math.hypot(canvasMouseX - qx, canvasMouseY - qy) <= 14.0;
 
-            int markerBg = isMarkerHovered ? 0xEE10B981 : 0x99059669;
-            int markerBorder = isMarkerHovered ? 0xFF6EE7B7 : 0xCC10B981;
+            boolean searchHovered = canvasMouseX >= qx - 44 && canvasMouseX <= qx - 24 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+            boolean junctionHovered = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+            boolean frameHovered = canvasMouseX >= qx + 2 && canvasMouseX <= qx + 22 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+            boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
 
-            graphics.fill((int)(qx - 10), (int)(qy - 10), (int)(qx + 10), (int)(qy + 10), markerBg);
-            graphics.renderOutline((int)(qx - 10), (int)(qy - 10), 20, 20, markerBorder);
+            // Outer capsule background
+            graphics.fill((int)(qx - 47), (int)(qy - 13), (int)(qx + 48), (int)(qy + 13), 0xDD0F172A);
+            graphics.renderOutline((int)(qx - 47), (int)(qy - 13), 95, 26, 0x88334155);
 
-            String plus = "+";
-            int pw = font.width(plus);
-            graphics.drawString(font, plus, (int)(qx - pw / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+            // 1. [🔍] Search Recipe (Emerald)
+            int searchBg = searchHovered ? 0xEE10B981 : 0xBB059669;
+            int searchBorder = searchHovered ? 0xFF6EE7B7 : 0xCC10B981;
+            graphics.fill((int)(qx - 44), (int)(qy - 10), (int)(qx - 24), (int)(qy + 10), searchBg);
+            graphics.renderOutline((int)(qx - 44), (int)(qy - 10), 20, 20, searchBorder);
+            String searchIcon = "🔍";
+            graphics.drawString(font, searchIcon, (int)(qx - 34 - font.width(searchIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+
+            // 2. [🔀] Insert Junction (Sky/Cyan)
+            int juncBg = junctionHovered ? 0xEE0284C7 : 0xBB0369A1;
+            int juncBorder = junctionHovered ? 0xFF7DD3FC : 0xCC0284C7;
+            graphics.fill((int)(qx - 21), (int)(qy - 10), (int)(qx - 1), (int)(qy + 10), juncBg);
+            graphics.renderOutline((int)(qx - 21), (int)(qy - 10), 20, 20, juncBorder);
+            String juncIcon = "🔀";
+            graphics.drawString(font, juncIcon, (int)(qx - 11 - font.width(juncIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+
+            // 3. [🖼] Group Frame (Purple/Violet)
+            int frameBg = frameHovered ? 0xEE8B5CF6 : 0xBB6D28D9;
+            int frameBorder = frameHovered ? 0xFFC4B5FD : 0xCC7C3AED;
+            graphics.fill((int)(qx + 2), (int)(qy - 10), (int)(qx + 22), (int)(qy + 10), frameBg);
+            graphics.renderOutline((int)(qx + 2), (int)(qy - 10), 20, 20, frameBorder);
+            String frameIcon = "🖼";
+            graphics.drawString(font, frameIcon, (int)(qx + 12 - font.width(frameIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+
+            // 4. [📝] Sticky Note / Memo (Amber/Gold)
+            int noteBg = noteHovered ? 0xEEF59E0B : 0xBBB45309;
+            int noteBorder = noteHovered ? 0xFFFDE68A : 0xCCD97706;
+            graphics.fill((int)(qx + 25), (int)(qy - 10), (int)(qx + 45), (int)(qy + 10), noteBg);
+            graphics.renderOutline((int)(qx + 25), (int)(qy - 10), 20, 20, noteBorder);
+            String noteIcon = "📝";
+            graphics.drawString(font, noteIcon, (int)(qx + 35 - font.width(noteIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
         }
 
         // Render Active Marquee Box Selection
@@ -638,6 +696,10 @@ public class BoardScreen extends Screen {
             searchDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             machineConfigDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
+        } else if (frameEditDialog != null && frameEditDialog.isVisible()) {
+            frameEditDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (noteEditDialog != null && noteEditDialog.isVisible()) {
+            noteEditDialog.render(graphics, width, height, mouseX, mouseY);
         }
 
         // 9. Interactive Tutorial Overlay and Welcome Dialog
@@ -724,6 +786,12 @@ public class BoardScreen extends Screen {
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (frameEditDialog != null && frameEditDialog.isVisible()) {
+            return frameEditDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (noteEditDialog != null && noteEditDialog.isVisible()) {
+            return noteEditDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (workspaceTabBar.mouseClicked(mouseX, mouseY, button)) {
             return true;
@@ -844,6 +912,12 @@ public class BoardScreen extends Screen {
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.charTyped(codePoint, modifiers);
         }
+        if (frameEditDialog != null && frameEditDialog.isVisible()) {
+            return frameEditDialog.charTyped(codePoint, modifiers);
+        }
+        if (noteEditDialog != null && noteEditDialog.isVisible()) {
+            return noteEditDialog.charTyped(codePoint, modifiers);
+        }
 
         for (NodeWidget w : nodeWidgets) {
             if (w.charTyped(codePoint, modifiers)) {
@@ -864,6 +938,12 @@ public class BoardScreen extends Screen {
         if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
             return recentSavesDialog.keyPressed(keyCode, scanCode, modifiers);
         }
+        if (frameEditDialog != null && frameEditDialog.isVisible()) {
+            return frameEditDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (noteEditDialog != null && noteEditDialog.isVisible()) {
+            return noteEditDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (BoardHotkeyHandler.handleKeyPressed(this, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
             return true;
         }
@@ -881,12 +961,172 @@ public class BoardScreen extends Screen {
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
     public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
+    public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
 
     public void openMachineConfigDialog(RecipeNode node) {
         if (machineConfigDialog == null) {
             machineConfigDialog = new MachineConfigDialog(this);
         }
+        TutorialManager.getInstance().onMachineConfigOpened();
         machineConfigDialog.open(node);
+    }
+
+    public void openFrameEditDialog(com.gtceu.calcboard.api.CanvasGroupFrame frame) {
+        if (frameEditDialog == null) {
+            frameEditDialog = new FrameEditDialog(this);
+        }
+        frameEditDialog.open(frame);
+    }
+
+    public void createFrameFromSelection() {
+        if (!ensureEditPermission()) return;
+        FlowGraph graph = getGraph();
+        Set<String> selectedNodeIds = getSelectedNodeIds();
+        Set<String> selectedNoteIds = getSelectedNoteIds();
+
+        List<RecipeNode> selectedNodes = new ArrayList<>();
+        if (selectedNodeIds != null && !selectedNodeIds.isEmpty()) {
+            for (RecipeNode n : graph.getNodes()) {
+                if (selectedNodeIds.contains(n.getId())) {
+                    selectedNodes.add(n);
+                }
+            }
+        }
+        List<com.gtceu.calcboard.api.CanvasStickyNote> selectedNotes = new ArrayList<>();
+        if (selectedNoteIds != null && !selectedNoteIds.isEmpty()) {
+            for (com.gtceu.calcboard.api.CanvasStickyNote note : graph.getStickyNotes()) {
+                if (selectedNoteIds.contains(note.getId())) {
+                    selectedNotes.add(note);
+                }
+            }
+        }
+
+        String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
+        com.gtceu.calcboard.api.CanvasGroupFrame frame;
+        if (!selectedNodes.isEmpty() || !selectedNotes.isEmpty()) {
+            frame = com.gtceu.calcboard.api.CanvasGroupFrame.createFromElements(defaultTitle, selectedNodes, selectedNotes, com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE);
+        } else {
+            double cx = toCanvasX(width / 2.0) - 100;
+            double cy = toCanvasY(height / 2.0) - 60;
+            frame = new com.gtceu.calcboard.api.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE, cx, cy, 200, 120);
+        }
+        graph.addFrame(frame);
+        clearSelection();
+        rebuildWidgets();
+        markSummaryDirty();
+        openFrameEditDialog(frame);
+        TutorialManager.getInstance().onGroupFramed();
+        BoardToast.show(Component.literal("§b").append(Component.translatable("message.gtcalcboard.frame_created")));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+    }
+
+    public void createFrameAt(double canvasX, double canvasY) {
+        if (!ensureEditPermission()) return;
+        if (!getSelectedNodeIds().isEmpty() || !getSelectedNoteIds().isEmpty()) {
+            createFrameFromSelection();
+            return;
+        }
+
+        String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
+        com.gtceu.calcboard.api.CanvasGroupFrame frame = new com.gtceu.calcboard.api.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE, canvasX - 100, canvasY - 60, 200, 120);
+        getGraph().addFrame(frame);
+        clearSelection();
+        rebuildWidgets();
+        markSummaryDirty();
+        openFrameEditDialog(frame);
+        TutorialManager.getInstance().onGroupFramed();
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+    }
+
+    public void createNoteAt(double canvasX, double canvasY) {
+        if (!ensureEditPermission()) return;
+        FlowGraph graph = getGraph();
+        String defaultTitle = Component.translatable("gui.gtcalcboard.default_note_name").getString();
+        com.gtceu.calcboard.api.CanvasStickyNote note = com.gtceu.calcboard.api.CanvasStickyNote.create(
+            defaultTitle,
+            "",
+            com.gtceu.calcboard.api.CanvasStickyNote.COLOR_AMBER,
+            canvasX - 80, canvasY - 50
+        );
+        graph.addStickyNote(note);
+        clearSelection();
+        rebuildWidgets();
+        markSummaryDirty();
+        openNoteEditDialog(note);
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+    }
+
+    public void openNoteEditDialog(com.gtceu.calcboard.api.CanvasStickyNote note) {
+        if (noteEditDialog == null) {
+            noteEditDialog = new NoteEditDialog(this);
+        }
+        noteEditDialog.open(note);
+    }
+
+    public NoteEditDialog getNoteEditDialog() {
+        return noteEditDialog;
+    }
+
+    public void addRerouteNodeAt(double canvasX, double canvasY) {
+        if (!ensureEditPermission()) return;
+        RecipeNode reroute = RecipeNode.createReroute(canvasX - 16, canvasY - 16);
+        getGraph().addNode(reroute);
+        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(java.util.List.of(reroute), java.util.Collections.emptyList(), "Add Junction Node"));
+        rebuildWidgets();
+        markSummaryDirty();
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+    }
+
+    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName) {
+        groupNodesIntoModule(targetNodeIds, moduleName, null);
+    }
+
+    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName, com.gtceu.calcboard.api.CanvasGroupFrame primaryFrame) {
+        if (!ensureEditPermission()) return;
+        FlowGraph graph = getGraph();
+        if (targetNodeIds == null || targetNodeIds.isEmpty()) return;
+
+        List<RecipeNode> origNodes = new ArrayList<>(graph.getNodes());
+        List<FlowGraph.ConnectionEdge> origEdges = new ArrayList<>(graph.getConnections());
+
+        String name = (moduleName != null && !moduleName.trim().isEmpty()) ? moduleName.trim() : Component.translatable("gui.gtcalcboard.default_compound_name").getString();
+        RecipeNode moduleNode = graph.groupIntoModule(targetNodeIds, name, primaryFrame);
+
+        if (moduleNode != null) {
+            List<RecipeNode> groupedNodes = new ArrayList<>();
+            for (RecipeNode n : origNodes) {
+                if (!graph.getNodes().contains(n)) {
+                    groupedNodes.add(n);
+                }
+            }
+            List<FlowGraph.ConnectionEdge> rewires = new ArrayList<>(graph.getConnections());
+            recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.GroupModuleCommand(groupedNodes, moduleNode, origEdges, rewires));
+
+            clearSelection();
+            rebuildWidgets();
+            markSummaryDirty();
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onModuleGrouped();
+
+            BoardToast.show(Component.literal("§d📦 ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
+        }
+    }
+
+    public void collapseFrameIntoModule(com.gtceu.calcboard.api.CanvasGroupFrame frame) {
+        if (!ensureEditPermission()) return;
+        FlowGraph graph = getGraph();
+        if (frame == null) return;
+
+        Set<String> nodeIds = new HashSet<>();
+        for (RecipeNode n : frame.getEnclosedNodes(graph)) {
+            nodeIds.add(n.getId());
+        }
+        if (nodeIds.isEmpty()) {
+            nodeIds.addAll(frame.getContainedNodeIds());
+        }
+        if (nodeIds.isEmpty()) return;
+
+        groupNodesIntoModule(nodeIds, frame.getTitle(), frame);
     }
 
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }

@@ -80,6 +80,7 @@ public class ToolbarWidget {
         String flowTxt = "🚀 " + Component.translatable("gui.gtcalcboard.max_flow").getString();
         list.add(new ToolbarButtonDef("max_flow", flowTxt, 0xFFFFAA00, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(flowTxt) + 12, btn -> performMaxThroughputOptimization()));
 
+
         // 3.5 Global Balance Dashboard
         String balanceTxt = "§b📊 " + Component.translatable("gui.gtcalcboard.global_balance").getString();
         list.add(new ToolbarButtonDef("global_balance", balanceTxt, 0xFF66E5FF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(balanceTxt) + 12, btn -> {

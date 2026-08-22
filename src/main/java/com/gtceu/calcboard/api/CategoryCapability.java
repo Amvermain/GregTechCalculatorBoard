@@ -55,9 +55,9 @@ public record CategoryCapability(
             return cats;
         }
 
-        if (isTurbine) {
+        if (isTurbine || node.isTurbine()) {
             cats.add(MachineAddon.Category.ROTOR);
-            if (node.isMultiblock() || hasMultiblockOption) {
+            if (node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption) {
                 cats.add(MachineAddon.Category.MAINTENANCE);
             }
             cats.add(MachineAddon.Category.CUSTOM);

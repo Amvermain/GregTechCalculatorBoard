@@ -142,6 +142,14 @@ public class RecipeSearchEngine {
             }
         }
 
+        // Index virtual kinetic input for Create machine recipes
+        if (cat != null && cat.getId() != null && ("create".equals(cat.getId().getNamespace()) || "createaddition".equals(cat.getId().getNamespace()))) {
+            inputIds.add("create:stress_units");
+            inputIds.add("stress_units");
+            inputNames.add("stress units");
+            inSb.append("create:stress_units stress_units stress units ");
+        }
+
         StringBuilder fullSb = new StringBuilder();
         fullSb.append(displayName.toLowerCase(Locale.ROOT)).append(" ");
         if (!modId.isEmpty()) fullSb.append(modId).append(" ");
@@ -149,6 +157,35 @@ public class RecipeSearchEngine {
         if (!categoryName.isEmpty()) fullSb.append(categoryName).append(" ");
         if (recipe.getId() != null) fullSb.append(recipe.getId().toString().toLowerCase(Locale.ROOT)).append(" ");
         fullSb.append(outSb).append(" ").append(inSb);
+
+        // Index category workstations (e.g. Lapidary Boiler, Electric Blast Furnace, Large Chemical Reactor)
+        if (cat != null) {
+            try {
+                var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+                if (rm != null) {
+                    var workstations = rm.getWorkstations(cat);
+                    if (workstations != null) {
+                        for (dev.emi.emi.api.stack.EmiIngredient wsIng : workstations) {
+                            if (wsIng != null && wsIng.getEmiStacks() != null) {
+                                for (EmiStack wsStack : wsIng.getEmiStacks()) {
+                                    if (wsStack != null) {
+                                        if (wsStack.getId() != null) {
+                                            fullSb.append(" ").append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
+                                            fullSb.append(" ").append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
+                                        }
+                                        try {
+                                            if (wsStack.getName() != null) {
+                                                fullSb.append(" ").append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
+                                            }
+                                        } catch (Throwable ignored) {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
 
         return new SearchableRecipe(
                 recipe,

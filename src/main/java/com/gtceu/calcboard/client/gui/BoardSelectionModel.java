@@ -19,29 +19,47 @@ import java.util.Set;
  */
 public class BoardSelectionModel {
     private final Set<String> selectedNodeIds = new HashSet<>();
+    private final Set<String> selectedNoteIds = new HashSet<>();
 
     public Set<String> getSelectedNodeIds() {
         return selectedNodeIds;
     }
 
+    public Set<String> getSelectedNoteIds() {
+        return selectedNoteIds;
+    }
+
     public boolean isSelected(String id) {
-        return id != null && selectedNodeIds.contains(id);
+        return id != null && (selectedNodeIds.contains(id) || selectedNoteIds.contains(id));
+    }
+
+    public boolean isNoteSelected(String id) {
+        return id != null && selectedNoteIds.contains(id);
     }
 
     public boolean isEmpty() {
-        return selectedNodeIds.isEmpty();
+        return selectedNodeIds.isEmpty() && selectedNoteIds.isEmpty();
     }
 
     public int size() {
-        return selectedNodeIds.size();
+        return selectedNodeIds.size() + selectedNoteIds.size();
     }
 
     public void select(String id, boolean multi) {
         if (!multi) {
-            selectedNodeIds.clear();
+            clear();
         }
         if (id != null) {
             selectedNodeIds.add(id);
+        }
+    }
+
+    public void selectNote(String id, boolean multi) {
+        if (!multi) {
+            clear();
+        }
+        if (id != null) {
+            selectedNoteIds.add(id);
         }
     }
 
@@ -54,29 +72,43 @@ public class BoardSelectionModel {
         }
     }
 
+    public void toggleNote(String id) {
+        if (id == null) return;
+        if (selectedNoteIds.contains(id)) {
+            selectedNoteIds.remove(id);
+        } else {
+            selectedNoteIds.add(id);
+        }
+    }
+
     public void clear() {
         selectedNodeIds.clear();
+        selectedNoteIds.clear();
     }
 
     public void selectAll(BoardScreen screen) {
-        selectedNodeIds.clear();
+        clear();
         FlowGraph graph = screen.getGraph();
         if (graph != null) {
             for (RecipeNode n : graph.getNodes()) {
                 selectedNodeIds.add(n.getId());
+            }
+            for (com.gtceu.calcboard.api.CanvasStickyNote note : graph.getStickyNotes()) {
+                selectedNoteIds.add(note.getId());
             }
         }
         TutorialManager.getInstance().onSelectAll();
     }
 
     public void deleteSelection(BoardScreen screen) {
-        if (selectedNodeIds.isEmpty()) return;
+        if (isEmpty()) return;
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
 
-        int count = selectedNodeIds.size();
+        int count = size();
         List<RecipeNode> removedNodes = new ArrayList<>();
         List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
+        List<com.gtceu.calcboard.api.CanvasStickyNote> removedNotes = new ArrayList<>();
 
         for (RecipeNode n : graph.getNodes()) {
             if (selectedNodeIds.contains(n.getId())) {
@@ -88,12 +120,20 @@ public class BoardSelectionModel {
                 removedEdges.add(e);
             }
         }
+        for (com.gtceu.calcboard.api.CanvasStickyNote note : graph.getStickyNotes()) {
+            if (selectedNoteIds.contains(note.getId())) {
+                removedNotes.add(note);
+            }
+        }
 
         graph.getNodes().removeAll(removedNodes);
         graph.getConnections().removeAll(removedEdges);
+        graph.getStickyNotes().removeAll(removedNotes);
 
-        screen.recordCommand(new BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Delete " + count + " components"));
-        selectedNodeIds.clear();
+        if (!removedNodes.isEmpty() || !removedEdges.isEmpty()) {
+            screen.recordCommand(new BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Delete " + count + " components"));
+        }
+        clear();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
 
