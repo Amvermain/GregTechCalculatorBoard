@@ -166,6 +166,31 @@ public class FlowGraph {
         connections.remove(edge);
     }
 
+    public boolean cleanupInvalidConnections() {
+        return connections.removeIf(edge -> {
+            RecipeNode from = findNodeById(edge.fromNodeId());
+            RecipeNode to = findNodeById(edge.toNodeId());
+            if (from == null || to == null) return true;
+            if (edge.outputIndex() < 0 || edge.outputIndex() >= from.getOutputs().size()) return true;
+            if (edge.inputIndex() < 0 || edge.inputIndex() >= to.getInputs().size()) return true;
+
+            IngredientStack outStack = from.getOutputs().get(edge.outputIndex());
+            IngredientStack inStack = to.getInputs().get(edge.inputIndex());
+            if (outStack == null || inStack == null) return true;
+            if (outStack.getId() == null || inStack.getId() == null) return true;
+
+            // Fluid vs Item compatibility check
+            if (outStack.isFluid() != inStack.isFluid()) return true;
+
+            // Resource ID compatibility check
+            if (outStack.getId().equals(inStack.getId())) return false;
+            if (inStack.getAlternatives() != null && inStack.getAlternatives().contains(outStack.getId())) return false;
+            if (outStack.getAlternatives() != null && outStack.getAlternatives().contains(inStack.getId())) return false;
+
+            return true;
+        });
+    }
+
     public void copyFrom(FlowGraph other) {
         this.clear();
         if (other != null) {

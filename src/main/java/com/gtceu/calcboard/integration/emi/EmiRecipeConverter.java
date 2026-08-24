@@ -558,10 +558,10 @@ public class EmiRecipeConverter {
 
     public static class RecipeDetails {
         public double durationTicks = 20.0;
-        public double eut = 32.0;
-        public GTVoltageTier tier = GTVoltageTier.LV;
+        public double eut = 0.0;
+        public GTVoltageTier tier = GTVoltageTier.ULV;
         public boolean isGenerator = false;
-        public com.gtceu.calcboard.api.EnergyType energyType = com.gtceu.calcboard.api.EnergyType.ELECTRIC_EU;
+        public com.gtceu.calcboard.api.EnergyType energyType = com.gtceu.calcboard.api.EnergyType.NONE;
         public int backingRecipeTemp = 0;
         public List<IngredientStack> extraInputs = new ArrayList<>();
         public List<IngredientStack> extraOutputs = new ArrayList<>();
@@ -569,13 +569,13 @@ public class EmiRecipeConverter {
         public List<IngredientStack> customOutputs = new ArrayList<>();
     }
 
-    private static RecipeDetails extractRecipeDetails(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
+    public static RecipeDetails extractRecipeDetails(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
         RecipeDetails details = new RecipeDetails();
         try {
             var backing = recipe.getBackingRecipe();
             ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
 
-            if (preferredWorkstation != null && (preferredWorkstation.getNamespace().equals("systeams") || preferredWorkstation.getPath().contains("boiler"))) {
+            if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("systeams")) {
                 if (com.gtceu.calcboard.compat.systeams.SysteamsModAdapter.adaptBoilerRecipe(backing, details, catId)) {
                     return details;
                 }
@@ -594,6 +594,15 @@ public class EmiRecipeConverter {
                             handled = true;
                             break;
                         }
+                    }
+                    if (!handled) {
+                        try {
+                            Method getCookingTime = backing.getClass().getMethod("getCookingTime");
+                            Object timeObj = getCookingTime.invoke(backing);
+                            if (timeObj instanceof Number num) {
+                                details.durationTicks = num.doubleValue();
+                            }
+                        } catch (Throwable ignored) {}
                     }
                 }
             }
@@ -622,6 +631,7 @@ public class EmiRecipeConverter {
                     if (voltage > 0) {
                         details.eut = Math.max(1.0, voltage * Math.max(1L, amperage));
                         details.tier = GTVoltageTier.getTierForVoltage(voltage);
+                        details.energyType = com.gtceu.calcboard.api.EnergyType.ELECTRIC_EU;
                         details.isGenerator = true;
                     }
                 }
@@ -639,6 +649,7 @@ public class EmiRecipeConverter {
                         if (voltage > 0) {
                             details.eut = Math.max(1.0, voltage * Math.max(1L, amperage));
                             details.tier = GTVoltageTier.getTierForVoltage(voltage);
+                            details.energyType = com.gtceu.calcboard.api.EnergyType.ELECTRIC_EU;
                         }
                     }
                 } catch (Throwable ignored) {}

@@ -43,6 +43,12 @@ public class CategoryCapabilityMatrix {
         return baked || !capabilities.isEmpty();
     }
 
+    public synchronized void reset() {
+        capabilities.clear();
+        baked = false;
+        initTestDefaults();
+    }
+
     /**
      * Bakes the matrix by deductively analyzing GTCEu machine definitions, multiblock_info recipes, and Thermal tags.
      */
@@ -79,6 +85,24 @@ public class CategoryCapabilityMatrix {
                             boolean usesCoils = MultiblockDetector.isCoilMultiblock(mId);
                             boolean isTurbine = MultiblockDetector.isTurbineMachine(mId);
 
+                            boolean isSteam = false;
+                            boolean isHp = false;
+                            int tier = -1;
+                            try {
+                                Method mTier = def.getClass().getMethod("getTier");
+                                Object tObj = mTier.invoke(def);
+                                if (tObj instanceof Number num) tier = num.intValue();
+                                else if (tObj instanceof Enum<?> e) tier = e.ordinal();
+                            } catch (Throwable ignored) {}
+
+                            if (tier == 0 && !isMb) {
+                                isSteam = true;
+                                try {
+                                    Method mIsHp = def.getClass().getMethod("isHighPressure");
+                                    isHp = (boolean) mIsHp.invoke(def);
+                                } catch (Throwable ignored) {}
+                            }
+
                             GTVoltageTier turbineTier = isTurbine ? MultiblockDetector.getTurbineBaseTier(mId) : null;
                             double turbineBaseEnergy = isTurbine ? (MultiblockDetector.getTurbineBaseProduction(mId) != null ? MultiblockDetector.getTurbineBaseProduction(mId) : 4096.0) : 0.0;
 
@@ -88,12 +112,20 @@ public class CategoryCapabilityMatrix {
                             if (rTypes instanceof Object[] arr) {
                                 for (Object rt : arr) {
                                     if (rt != null) {
-                                        Method mGetIdRt = rt.getClass().getMethod("registryName");
-                                        Object rId = mGetIdRt.invoke(rt);
-                                        if (rId instanceof ResourceLocation catId) {
+                                        ResourceLocation catId = MultiblockDetector.extractRecipeTypeId(rt);
+                                        if (catId != null) {
                                             CategoryBuilder b = builders.computeIfAbsent(catId, CategoryBuilder::new);
                                             b.addWorkstation(mId, isMb);
                                             if (usesCoils) b.canUseCoils = true;
+                                            if (isSteam) {
+                                                if (isHp) {
+                                                    b.hasHighPressureSteamOption = true;
+                                                    b.highPressureWorkstation = mId;
+                                                } else {
+                                                    b.hasLowPressureSteamOption = true;
+                                                    b.lowPressureWorkstation = mId;
+                                                }
+                                            }
                                             if (isTurbine) {
                                                 b.isTurbine = true;
                                                 if (turbineTier != null) b.turbineBaseTier = turbineTier;
@@ -148,6 +180,37 @@ public class CategoryCapabilityMatrix {
                             if (MultiblockDetector.isTurbineMachine(ws)) {
                                 b.isTurbine = true;
                                 MultiblockDetector.registerTurbineCategory(catId);
+                            }
+                            if (!isMb && ws != null && ws.getNamespace().equals("gtceu")) {
+                                try {
+                                    if (ModCompatHelper.isGTLoaded()) {
+                                        Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                                        Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+                                        Method mGet = machinesRegistry.getClass().getMethod("get", ResourceLocation.class);
+                                        Object def = mGet.invoke(machinesRegistry, ws);
+                                        if (def != null) {
+                                            Method mTier = def.getClass().getMethod("getTier");
+                                            Object tObj = mTier.invoke(def);
+                                            int tier = -1;
+                                            if (tObj instanceof Number num) tier = num.intValue();
+                                            else if (tObj instanceof Enum<?> e) tier = e.ordinal();
+                                            if (tier == 0) {
+                                                boolean isHp = false;
+                                                try {
+                                                    Method mIsHp = def.getClass().getMethod("isHighPressure");
+                                                    isHp = (boolean) mIsHp.invoke(def);
+                                                } catch (Throwable ignored) {}
+                                                if (isHp) {
+                                                    b.hasHighPressureSteamOption = true;
+                                                    if (b.highPressureWorkstation == null) b.highPressureWorkstation = ws;
+                                                } else {
+                                                    b.hasLowPressureSteamOption = true;
+                                                    if (b.lowPressureWorkstation == null) b.lowPressureWorkstation = ws;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (Throwable ignored) {}
                             }
                         }
                     }
@@ -221,6 +284,10 @@ public class CategoryCapabilityMatrix {
                 isCoil,
                 isTurbine,
                 isThermal,
+                false,
+                false,
+                null,
+                null,
                 isTurbine ? MultiblockDetector.getTurbineBaseTier(categoryId) : null,
                 isTurbine && MultiblockDetector.getTurbineBaseProduction(categoryId) != null ? MultiblockDetector.getTurbineBaseProduction(categoryId) : 0.0,
                 Collections.unmodifiableSet(supported)
@@ -233,72 +300,105 @@ public class CategoryCapabilityMatrix {
                 ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
                 List.of(ResourceLocation.tryParse("gtceu:large_chemical_reactor"), ResourceLocation.tryParse("gtceu:extreme_chemical_reactor")),
                 ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
-                false, true, true, false, false, null, 0.0
+                false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:chemical_reactor"),
                 List.of(ResourceLocation.tryParse("gtceu:chemical_reactor"), ResourceLocation.tryParse("gtceu:large_chemical_reactor")),
                 ResourceLocation.tryParse("gtceu:chemical_reactor"),
-                true, true, true, false, false, null, 0.0
+                true, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:electric_blast_furnace"),
                 List.of(ResourceLocation.tryParse("gtceu:electric_blast_furnace")),
                 ResourceLocation.tryParse("gtceu:electric_blast_furnace"),
-                false, true, true, false, false, null, 0.0
+                false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:pyrolyse_oven"),
                 List.of(ResourceLocation.tryParse("gtceu:pyrolyse_oven")),
                 ResourceLocation.tryParse("gtceu:pyrolyse_oven"),
-                false, true, true, false, false, null, 0.0
+                false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:cracker"),
                 List.of(ResourceLocation.tryParse("gtceu:cracker")),
                 ResourceLocation.tryParse("gtceu:cracker"),
-                false, true, true, false, false, null, 0.0
+                false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:multi_smelter"),
                 List.of(ResourceLocation.tryParse("gtceu:multi_smelter")),
                 ResourceLocation.tryParse("gtceu:multi_smelter"),
-                false, true, true, false, false, null, 0.0
+                false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:steam_turbine"),
-                List.of(ResourceLocation.tryParse("gtceu:large_steam_turbine")),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:mv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:hv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:large_steam_turbine")
+                ),
                 ResourceLocation.tryParse("gtceu:large_steam_turbine"),
-                false, true, false, true, false, GTVoltageTier.HV, 1024.0
+                true, true, false, true, false, false, false, null, null, GTVoltageTier.HV, 1024.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:gas_turbine"),
-                List.of(ResourceLocation.tryParse("gtceu:large_gas_turbine")),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:mv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:hv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:large_gas_turbine")
+                ),
                 ResourceLocation.tryParse("gtceu:large_gas_turbine"),
-                false, true, false, true, false, GTVoltageTier.EV, 4096.0
+                true, true, false, true, false, false, false, null, null, GTVoltageTier.EV, 4096.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:plasma_turbine"),
-                List.of(ResourceLocation.tryParse("gtceu:large_plasma_turbine")),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
+                        ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"),
+                        ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine")
+                ),
                 ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
-                false, true, false, true, false, GTVoltageTier.IV, 16384.0
+                false, true, false, true, false, false, false, null, null, GTVoltageTier.IV, 16384.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("thermal:lapidary_fuel"),
                 List.of(ResourceLocation.tryParse("thermal:dynamo_lapidary")),
                 ResourceLocation.tryParse("thermal:dynamo_lapidary"),
-                true, false, false, false, true, null, 0.0
+                true, false, false, false, true, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:rock_filtrator"),
                 List.of(ResourceLocation.tryParse("gtceu:rock_filtrator")),
                 ResourceLocation.tryParse("gtceu:rock_filtrator"),
-                false, true, false, false, false, null, 0.0
+                false, true, false, false, false, false, false, null, null, null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:macerator"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), ResourceLocation.tryParse("gtceu:hp_steam_macerator"), ResourceLocation.tryParse("gtceu:lv_macerator")),
+                ResourceLocation.tryParse("gtceu:lv_macerator"),
+                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_macerator"), ResourceLocation.tryParse("gtceu:hp_steam_macerator"), null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:compressor"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_compressor"), ResourceLocation.tryParse("gtceu:hp_steam_compressor"), ResourceLocation.tryParse("gtceu:lv_compressor")),
+                ResourceLocation.tryParse("gtceu:lv_compressor"),
+                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_compressor"), ResourceLocation.tryParse("gtceu:hp_steam_compressor"), null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:alloy_smelter"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_alloy_smelter"), ResourceLocation.tryParse("gtceu:hp_steam_alloy_smelter"), ResourceLocation.tryParse("gtceu:lv_alloy_smelter"), ResourceLocation.tryParse("gtceu:combination_smelter")),
+                ResourceLocation.tryParse("gtceu:lv_alloy_smelter"),
+                true, true, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_alloy_smelter"), ResourceLocation.tryParse("gtceu:hp_steam_alloy_smelter"), null, 0.0
         );
     }
 
     private void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,
                                       boolean single, boolean multi, boolean coil, boolean turbine, boolean thermal,
+                                      boolean hasLp, boolean hasHp, ResourceLocation lpWs, ResourceLocation hpWs,
                                       GTVoltageTier tTier, double tProd) {
         Set<AddonCategory> supported = new HashSet<>();
         supported.add(AddonCategory.CUSTOM);
@@ -314,7 +414,7 @@ public class CategoryCapabilityMatrix {
             }
         }
         capabilities.put(catId, new CategoryCapability(
-                catId, ws, defWs, single, multi, coil, turbine, thermal, tTier, tProd, Collections.unmodifiableSet(supported)
+                catId, ws, defWs, single, multi, coil, turbine, thermal, hasLp, hasHp, lpWs, hpWs, tTier, tProd, Collections.unmodifiableSet(supported)
         ));
     }
 
@@ -327,6 +427,10 @@ public class CategoryCapabilityMatrix {
         boolean canUseCoils = false;
         boolean isTurbine = false;
         boolean isThermal = false;
+        boolean hasLowPressureSteamOption = false;
+        boolean hasHighPressureSteamOption = false;
+        ResourceLocation lowPressureWorkstation = null;
+        ResourceLocation highPressureWorkstation = null;
         GTVoltageTier turbineBaseTier = null;
         double turbineBaseProduction = 0.0;
 
@@ -380,6 +484,10 @@ public class CategoryCapabilityMatrix {
                     canUseCoils,
                     isTurbine,
                     isThermal,
+                    hasLowPressureSteamOption,
+                    hasHighPressureSteamOption,
+                    lowPressureWorkstation,
+                    highPressureWorkstation,
                     turbineBaseTier,
                     turbineBaseProduction,
                     Collections.unmodifiableSet(supported)

@@ -1,12 +1,14 @@
 package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -246,6 +248,21 @@ public class MachineAddonTest {
         Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.MULTIBLOCK_TRAIT));
         Assertions.assertFalse(centrifugeCats.contains(MachineAddon.Category.PARALLEL));
         Assertions.assertTrue(centrifugeCats.contains(MachineAddon.Category.CUSTOM));
+
+        // 4. Singleblock Gravitational Compression Chamber (GCC) compatibility
+        RecipeNode gcc = RecipeNode.create("Gravitational Compression Chamber [GCC]", 200.0, 1920.0, GTVoltageTier.EV);
+        gcc.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:compressor"));
+        gcc.setMachineIcon(ResourceLocation.tryParse("start_core:gravitational_compression_chamber"));
+        gcc.setMultiblock(false);
+
+        MachineAddon maint = new MachineAddon("gtceu:config_maintenance", "Configurable Maintenance Hatch", MachineAddon.Category.MAINTENANCE, "", null);
+        MachineAddon sptCool = new MachineAddon("gtceu:spt_coolant_boosting", "SPT Coolant Boosting", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        MachineAddon nptCool = new MachineAddon("gtceu:npt_coolant_boosting", "NPT Coolant Boosting", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+
+        // Singleblock GCC must NOT be compatible with maintenance or turbine traits
+        Assertions.assertFalse(maint.isCompatibleWith(gcc));
+        Assertions.assertFalse(sptCool.isCompatibleWith(gcc));
+        Assertions.assertFalse(nptCool.isCompatibleWith(gcc));
     }
 
     @Test
@@ -804,5 +821,34 @@ public class MachineAddonTest {
         MachineAddon loaded = MachineAddon.deserializeNBT(tag);
         Assertions.assertNotNull(loaded);
         Assertions.assertEquals("GTCEu ICoilType Block API [gtceu:cupronickel_coil]", loaded.getDiscoverySource());
+    }
+
+    @Test
+    public void testRotorAddonItemStackSerializationAndMaterialTagRestoration() {
+        GTRotorAddon rotor = new GTRotorAddon(
+                "gtceu:rotor_ancient_runicalium",
+                "Ancient Runicalium Turbine Rotor",
+                "Efficiency: 320%",
+                ResourceLocation.tryParse("gtceu:turbine_rotor"),
+                320,
+                6400,
+                16000.0
+        );
+
+        // Serialize and deserialize
+        CompoundTag tag = rotor.serializeNBT();
+        MachineAddon loaded = MachineAddon.deserializeNBT(tag);
+
+        Assertions.assertInstanceOf(GTRotorAddon.class, loaded);
+        GTRotorAddon loadedRotor = (GTRotorAddon) loaded;
+        Assertions.assertEquals(320, loadedRotor.getRotorEfficiency());
+        Assertions.assertEquals(6400, loadedRotor.getRotorPower());
+
+        // In test environment, getItemStackSample creates ItemStack and attaches GT.PartStats
+        ItemStack sample = loadedRotor.getItemStackSample();
+        if (sample != null && !sample.isEmpty() && sample.hasTag()) {
+            Assertions.assertTrue(sample.getTag().contains("GT.PartStats"));
+            Assertions.assertEquals("gtceu:ancient_runicalium", sample.getTag().getCompound("GT.PartStats").getString("Material"));
+        }
     }
 }

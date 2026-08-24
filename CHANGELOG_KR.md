@@ -8,6 +8,61 @@
 
 ---
 
+## [2.0.0-alpha.8] - 2026-08-25
+
+### 신규 기능 (Added)
+- **Star Technology 모드 및 스레딩 헬릭스(Threading Helix) 시스템 연동 (`StarTModAdapter`, `StarTAddonCrawler`, `StarTTurbineHelper`, `GTThreadingHelix`, `NodeThreadingConfig`, `MachineConfigDialog`, `NodeCardRenderer`)**:
+  - 스레딩을 지원하는 모든 그렉텍 멀티블록 기계에 대해 기계 설정 창(`MachineConfigDialog`) 전용 `[🧵 Threading]` 서브 탭 추가 (Generalis, Velocitas, Efficienta, Parallelismus, Filum 포인트 배분).
+  - 스레딩 빌더와 상단 `Active Addons` 슬롯 간 실시간 양방향 동기화 지원 (헬릭스 장착 시 종합 스탯 뱃지 및 `8x OpV Weaving Thread Helix`와 같이 수량 연동).
+  - 애드온 아이콘 슬롯 및 캔버스 카드 트레이에 수량 뱃지(예: `8`) 렌더링 지원.
+  - 플라즈마 터빈 모델 다변화 지원: 대형 플라즈마 터빈(LPT, $1\times$), 슈프림 플라즈마 터빈(SPT, $6\times$), 냥세인 플라즈마 터빈(NPT, $12\times$).
+  - Star Technology 멀티블록 부스팅 특성(Traits) 지원: 윤활유 부스팅(+25% / +50% EU/t, 이황화텅스텐 소모) 및 냉각제 부스팅(+75% / +150% EU/t, 초상태 헬륨-3 / 오가네손 안정화 BEC 소모).
+- **그렉텍 초기 증기 가공 기계(저압 청동 LP / 고압 강철 HP) 지원 및 증기 직결 소모 모드 (`SteamMode`, `RecipeNode`, `CategoryCapabilityMatrix`, `GTCEuGuiHandler`, `MachineConfigDialog`)**:
+  - 증기 시대 가공 기계(분쇄기, 압축기, 합금 제련기, 화로, 추출기, 암석 분쇄기 등)를 워크스테이션으로 갖는 모든 그렉텍 레시피에 대해 증기 직결 소모 모드(`LP Steam`, `HP Steam`) 추가.
+  - **그렉텍 증기 변환 공식 적용**: $1\text{ EU} = 2\text{ mB Steam}$ ($2\text{ L Steam}$).
+  - **저압 청동 증기 (LP Steam)**: 가공 시간 $2.0\times$ ($0.5\times$ 속도), 전력망 비연결($0\text{ EU/t}$), $\text{BaseEUt} \times 2\text{ mB/t}$ 증기(`gtceu:steam`) 유체 입력 슬롯 활성화.
+  - **고압 강철 증기 (HP Steam)**: 가공 시간 $1.0\times$ ($1.0\times$ 기본 LV 속도), 전력망 비연결($0\text{ EU/t}$), $\text{BaseEUt} \times 2\text{ mB/t}$ 증기(`gtceu:steam`) 유체 입력 슬롯 활성화.
+  - **노드 카드 및 기계 설정 UI 연동**: 노드 카드 티어 버튼 순환(`[LP Steam] ↔ [HP Steam] ↔ [LV] ↔ ...`) 및 기계 설정 모달창(`MachineConfigDialog`)에서 원클릭 프리셋 전환 지원.
+  - **보일러 직결 및 자동 비율 맞춤(Auto-Ratio)**: 증기 보일러(`gtceu:steam_boiler`) $\rightarrow$ 증기 가공 기계로 유체 와이어를 직접 연결하여 `Shift + Connect` 대수 자동 최적화 완벽 지원.
+- **즐겨찾기 상호작용 및 실시간 동기화 개선 (`RecipeSearchDialog`, `FavoritesDockWidget`)**:
+  - 레시피 검색창의 각 검색 결과 행에 즐겨찾기 별표(⭐) 토글 버튼 추가 및 행 우클릭 즐겨찾기 등록/해제 지원.
+  - 즐겨찾기 독(Favorites Dock)에서 항목 우클릭 시 즐겨찾기 즉시 제거 기능 추가.
+  - 기계(워크스테이션) 아이템을 즐겨찾기했을 때 해당 기계에서 가공 가능한 모든 레시피가 검색창의 `[⭐ 즐겨찾기]` 필터에 정상 연동되도록 개선.
+
+### 개선 및 변경 (Changed & Improved)
+- **GTCEu 코어 및 Star Technology 아키텍처 모듈 분리 (`StarTModAdapter`, `ModAdapterRegistry`, `IModAdapter`)**:
+  - Star Technology 고유의 기계 및 스레딩 로직을 `IModAdapter` SPI 구조 기반의 `StarTModAdapter`로 완전히 격리하여 모드 간 의존성 결합도 해소.
+- **4GB 저메모리 환경을 위한 대규모 힙 메모리(RAM) 및 GC 최적화 (`RecipeSearchEngine`, `DynamicAddonCrawler`, `ClientForgeEvents`, `CategoryCapabilityMatrix`)**:
+  - `SearchableRecipe` 구조를 플라이웨이트(Flyweight) 패턴으로 전면 리팩토링하고 `String.intern()` 풀링을 적용하여 8만 개 이상의 대규모 모드팩 레시피 인덱스 메모리 점유량을 **~320MB에서 ~14MB로 95% 이상 대폭 절감**.
+  - 동적 애드온 크롤러 스캔 시 중복 아이템(`Set<Item>`)을 즉시 필터링하여 수십만 개의 불필요한 `ItemStack` 객체 할당 98% 제거.
+  - 월드 퇴장(`ClientPlayerNetworkEvent.LoggingOut`) 시 레시피 검색 캐시, 기능 매트릭스, 애드온 카탈로그를 즉시 비우고 `System.gc()`를 호출하여 4GB 메모리 환경에서 월드 재로딩 시 발생하던 `OutOfMemoryError` 및 데이터팩 로드 실패 현상 원천 차단.
+  - `FavoritesDockWidget`의 매 프레임 리스트 복제 할당 제거 및 `findRecipesForFavorite` 캐싱을 통해 렌더링 루프의 불필요한 GC 오버헤드와 스터터링 현상 해소.
+- **가상 FE 아이템 슬롯 제거 및 전력 체계 정돈 (`CreateNewAgeRecipeHandler`, `CreateRecipeHandler`, `CreateNewAgeModAdapter`)**:
+  - 발전기 코일, 탄소 브러시, 모터 등에서 중복 표시되던 가상 `FE` 아이템 입출력 슬롯 제거.
+  - 슬롯에는 실제 물리 자원(회전력 SU, 재료, 유체)만 표시되고, 전력 수치는 노드 헤더 및 요약 오버레이에만 전력망 단위로 집계되도록 정돈.
+- **Create 모드 포장된 팬(Encased Fan) 가공 시간 고정 적용 (`CreateModAdapter`, `CreateGuiHandler`)**:
+  - Create 모드의 원작 고증에 따라 팬 블래스팅(Blasting), 팬 워싱(Splashing/Washing), 스모킹(Smoking), 헌팅(Haunting)의 가공 시간이 회전 속도(RPM)에 의해 단축되지 않고 고정 시간(기본 7.5초)으로 유지되도록 수정 (RPM은 바람 사거리 및 소비 SU에만 영향).
+  - 팬 가공의 생산 속도를 올리려면 팬의 회전 속도를 올리는 것이 아니라 **팬의 대수(`대수: N`)**를 늘려야 함을 툴팁으로 안내.
+- **그렉텍 증기 보일러 및 증기 생산 공정 완벽 연동 (`GTCEuRecipeHandler`, `GTCEuModAdapter`, `SysteamsModAdapter`)**:
+  - `SysteamsModAdapter`가 `gtceu:steam_boiler` 카테고리를 가로채던 라우팅 버그 수정.
+  - 그렉텍 증기 보일러(`gtceu:steam_boiler`) 레시피 등록 시 연료(용암 양동이, 석탄, 목탄 등) 및 물(`minecraft:water`) 소비와 증기(`gtceu:steam`) 생산량을 그렉텍 공식 비율(소형 청동 보일러 기준 $120\text{ L/s} = 6\text{ mB/t}$ 증기, $1\text{mB 물} \rightarrow 160\text{mB 증기}$)로 정확히 자동 산출.
+  - 용암 양동이 등 용기형 연료 사용 시 빈 양동이(`minecraft:bucket`) 부산물 자동 반환 지원.
+  - 고압 강철 보일러($3\times$), 대형 청동 보일러($8\times$), 대형 강철 보일러($15\times$), 대형 티타늄 보일러($26.6\times$), 대형 텅스텐강 보일러($40\times$) 등 워크스테이션 변경 시의 연소 속도 및 증기 배출량 비례 스케일링 지원.
+- **레시피 추가 단축키('A') 제거 (`ClientForgeEvents`, `KeyBindings`)**:
+  - EMI/JEI 북마크 및 키 바인딩 충돌을 방지하기 위해 화면 단축키로 레시피를 추가하던 기능 제거.
+
+### 버그 수정 (Fixed)
+- **GTCEu 터빈 로터 재질 NBT 영속화 및 틴트 복원 (`GTRotorAddon`, `MachineAddon`, `TurbineRotorHelper`)**:
+  - 월드 재접속 또는 메인 메뉴 이동 후 터빈 로터의 고유 재질 및 색상이 기본 뉴트로늄 텍스처로 초기화되던 버그 수정.
+  - `MachineAddon` 직렬화 시 `ItemStack`의 전체 NBT(`GT.PartStats: {Material: ...}`)를 보존하고, 누락 시 동적 복구 로직 구축.
+- **플라즈마 터빈 특성(Traits) 인식 및 유체 렌더링 수정 (`GTCEuAddonCrawler`, `StarTAddonCrawler`, `GTTurbineHelper`, `StarTTurbineHelper`, `IngredientRenderer`)**:
+  - `isTurbine` 에너지 타입 조건 완화 및 `isCompatibleStarTTrait` 모델 판정 개선으로 SPT/NPT 부스팅 특성이 `[📜 Traits]` 탭에 정상 표시되도록 수정.
+  - 부스팅 유체(`bec_og`, `superstate_helium_3`, `tungsten_disulfide`)의 네임스페이스 동적 조회를 통해 `AIR` 텍스처로 폴백되던 오류 수정.
+- **스레딩 빌더 서브 탭 텍스트 겹침 수정 (`MachineConfigDialog`)**:
+  - 서브 탭 버튼 레이블(`Sup`, `Spd`, `Par`, `Thrd`) 축약으로 텍스트 겹침 문제 해결.
+
+---
+
 ## [2.0.0-alpha.7] - 2026-08-23
 
 ### 신규 기능 (Added)

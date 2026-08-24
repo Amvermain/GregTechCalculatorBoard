@@ -77,6 +77,7 @@ public final class FlowGraphSolver {
      */
     public static void autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
         if (graph == null || anchor == null || graph.getNodes().isEmpty()) return;
+        graph.cleanupInvalidConnections();
 
         double targetAnchorCount = anchor.getMachineCount();
         if (integerCounts) {
@@ -328,6 +329,7 @@ public final class FlowGraphSolver {
     public static Map<String, Double> computeNodeEfficiencies(FlowGraph graph) {
         Map<String, Double> effMap = new HashMap<>();
         if (graph == null) return effMap;
+        graph.cleanupInvalidConnections();
 
         for (RecipeNode node : graph.getNodes()) {
             effMap.put(node.getId(), 1.0);
@@ -578,7 +580,7 @@ public final class FlowGraphSolver {
                 }
             }
 
-            if (node.getTargetTier().ordinal() > highestTier.ordinal()) {
+            if (node.getEnergyType() == EnergyType.ELECTRIC_EU && node.getTargetTier().ordinal() > highestTier.ordinal()) {
                 highestTier = node.getTargetTier();
             }
 

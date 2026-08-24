@@ -17,7 +17,10 @@ public enum EnergyType {
     HEAT_OR_SELF("Steam", 0xFF55FF88, false, false),
 
     /** Botania Mana machinery */
-    MANA("Mana/t", 0xFF55FFFF, false, false);
+    MANA("Mana/t", 0xFF55FFFF, false, false),
+
+    /** Passive / manual / unpowered recipe (Crafting table, stonecutter, campfire, stone barrel, etc.) */
+    NONE("-", 0xFF888888, false, false);
 
     private final String unitLabel;
     private final int accentColor;

@@ -216,6 +216,9 @@ public class NodeCardRenderer {
                     graphics.pose().translate(trayX - 1, ctrlY - 2, 0);
                     graphics.pose().scale(0.80f, 0.80f, 1.0f);
                     graphics.renderItem(sample, 1, 1);
+                    if (sample.getCount() > 1) {
+                        graphics.renderItemDecorations(font, sample, 1, 1);
+                    }
                     graphics.pose().popPose();
                 }
                 if (addon.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.REFLECTOR && !node.hasValidReflector()) {
@@ -256,7 +259,11 @@ public class NodeCardRenderer {
         int maxPowerW = Math.max(20, (cardW - 12) - rightW - 4);
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         String powerStr;
-        if (!isOperational) {
+        if (node.getEnergyType() == EnergyType.NONE) {
+            powerStr = Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
+        } else if (node.getEnergyType() == EnergyType.HEAT_OR_SELF) {
+            powerStr = "§6♨";
+        } else if (!isOperational) {
             GTVoltageTier tier = node.getTargetTier();
             String tierName = tier != null ? tier.getName() : "LV";
             powerStr = "§c0.0 EU/t §7(0A " + tierName + ")";

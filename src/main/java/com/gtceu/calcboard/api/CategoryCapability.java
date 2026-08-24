@@ -20,6 +20,10 @@ public record CategoryCapability(
         boolean canUseCoils,
         boolean isTurbine,
         boolean isThermal,
+        boolean hasLowPressureSteamOption,
+        boolean hasHighPressureSteamOption,
+        ResourceLocation lowPressureWorkstation,
+        ResourceLocation highPressureWorkstation,
         GTVoltageTier turbineBaseTier,
         double turbineBaseProduction,
         Set<AddonCategory> supportedAddonCategories
@@ -34,6 +38,10 @@ public record CategoryCapability(
             false,
             false,
             false,
+            false,
+            false,
+            null,
+            null,
             null,
             0.0,
             Set.of(AddonCategory.CUSTOM)
@@ -56,12 +64,16 @@ public record CategoryCapability(
         }
 
         if (isTurbine || node.isTurbine()) {
-            cats.add(AddonCategory.ROTOR);
             if (node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption) {
+                cats.add(AddonCategory.ROTOR);
                 cats.add(AddonCategory.MAINTENANCE);
+                if (com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                    cats.add(AddonCategory.MULTIBLOCK_TRAIT);
+                }
+                cats.add(AddonCategory.CUSTOM);
+                return cats;
             }
-            cats.add(AddonCategory.CUSTOM);
-            return cats;
+            return List.of(AddonCategory.CUSTOM);
         }
 
         boolean isMb = node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption;
@@ -81,10 +93,19 @@ public record CategoryCapability(
             }
             cats.add(AddonCategory.PARALLEL);
             cats.add(AddonCategory.MAINTENANCE);
+            if (node.hasThreading()) {
+                cats.add(AddonCategory.THREADING);
+            }
             cats.add(AddonCategory.MULTIBLOCK_TRAIT);
+        } else if (node.hasThreading()) {
+            cats.add(AddonCategory.THREADING);
         }
 
         cats.add(AddonCategory.CUSTOM);
         return cats;
+    }
+
+    public boolean supportsSteamMode() {
+        return hasLowPressureSteamOption || hasHighPressureSteamOption;
     }
 }

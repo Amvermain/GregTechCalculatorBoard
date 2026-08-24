@@ -199,4 +199,87 @@ public class CreateNewAgeGuiHandler {
         }
         return false;
     }
+
+    public static void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
+                                           int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
+                                           net.minecraft.client.gui.components.EditBox parallelBox,
+                                           com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        int totalStrength = 0;
+        int magnetCount = 0;
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
+                totalStrength += addon.getMagneticForce();
+                magnetCount++;
+            }
+        }
+
+        if (node.isGenerator()) {
+            String magnetHeader = String.format(Locale.ROOT, "§6🧲 %s: §e%d/12 §7- Total Force: §e%d",
+                    Component.translatable("gui.gtcalcboard.addon_cat.magnet").getString(), magnetCount, totalStrength);
+            graphics.drawString(font, magnetHeader, x + 10, y + 30, 0xFFFFFFFF, false);
+
+            int rpm = node.getRpm();
+            int[] rpmPresets = {16, 32, 64, 128, 256};
+            int btnX = x + 10;
+            for (int r : rpmPresets) {
+                boolean active = rpm == r;
+                boolean hov = mouseX >= btnX && mouseX <= btnX + 44 && mouseY >= y + 44 && mouseY <= y + 60;
+                graphics.fill(btnX, y + 44, btnX + 44, y + 60, active ? 0xFF5D3E1A : (hov ? 0xFF3D4558 : 0xFF282D3B));
+                graphics.renderOutline(btnX, y + 44, 44, 16, active ? 0xFFFFAA00 : 0xFF3F4658);
+                graphics.drawCenteredString(font, r + " RPM", btnX + 22, y + 48, active ? 0xFFFFD28C : 0xFFB0B8C8);
+                btnX += 48;
+            }
+
+            int clearBtnX = x + dialogW - 108;
+            boolean clearHov = mouseX >= clearBtnX && mouseX <= clearBtnX + 100 && mouseY >= y + 44 && mouseY <= y + 60;
+            graphics.fill(clearBtnX, y + 44, clearBtnX + 100, y + 60, clearHov ? 0xFF882222 : 0xFF442222);
+            graphics.renderOutline(clearBtnX, y + 44, 100, 16, clearHov ? 0xFFFF5555 : 0xFF552222);
+            graphics.drawCenteredString(font, "✕ Clear Magnets", clearBtnX + 50, y + 48, 0xFFFFFFFF);
+        } else {
+            graphics.drawString(font, "§6⚡ Motor Speed: §e" + node.getRpm() + " RPM", x + 10, y + 30, 0xFFFFFFFF, false);
+            int[] rpmPresets = {16, 32, 64, 128, 256};
+            int btnX = x + 10;
+            for (int r : rpmPresets) {
+                boolean active = node.getRpm() == r;
+                boolean hov = mouseX >= btnX && mouseX <= btnX + 44 && mouseY >= y + 44 && mouseY <= y + 60;
+                graphics.fill(btnX, y + 44, btnX + 44, y + 60, active ? 0xFF5D3E1A : (hov ? 0xFF3D4558 : 0xFF282D3B));
+                graphics.renderOutline(btnX, y + 44, 44, 16, active ? 0xFFFFAA00 : 0xFF3F4658);
+                graphics.drawCenteredString(font, r + " RPM", btnX + 22, y + 48, active ? 0xFFFFD28C : 0xFFB0B8C8);
+                btnX += 48;
+            }
+        }
+    }
+
+    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+                                                 RecipeNode node, int x, int y, int dialogW,
+                                                 double mouseX, double mouseY, int button,
+                                                 net.minecraft.client.gui.components.EditBox parallelBox,
+                                                 com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        int[] rpmPresets = {16, 32, 64, 128, 256};
+        int btnX = x + 10;
+        for (int r : rpmPresets) {
+            if (mouseX >= btnX && mouseX <= btnX + 44 && mouseY >= y + 44 && mouseY <= y + 60) {
+                node.setRpm(r);
+                if (parent != null) parent.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                );
+                return true;
+            }
+            btnX += 48;
+        }
+
+        if (node.isGenerator()) {
+            int clearBtnX = x + dialogW - 108;
+            if (mouseX >= clearBtnX && mouseX <= clearBtnX + 100 && mouseY >= y + 44 && mouseY <= y + 60) {
+                node.getAddons().removeIf(a -> a.getCategory().equals(AddonCategory.MAGNET) || a.getMagneticForce() > 0);
+                if (parent != null) parent.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                );
+                return true;
+            }
+        }
+        return false;
+    }
 }

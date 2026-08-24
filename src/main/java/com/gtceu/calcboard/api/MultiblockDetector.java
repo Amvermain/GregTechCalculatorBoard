@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Dynamically detects whether a machine block/workstation is a valid Multiblock
@@ -29,6 +30,7 @@ public class MultiblockDetector {
     private static final Set<ResourceLocation> TURBINE_RECIPE_CATEGORIES = new HashSet<>();
     private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
     private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new HashMap<>();
+    private static final Map<ResourceLocation, Integer> THREADING_MAX_HELIX_CAPACITY = new ConcurrentHashMap<>();
     private static boolean initialized = false;
 
     public static void initialize() {
@@ -116,6 +118,30 @@ public class MultiblockDetector {
                                         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [MultiblockDetector] Detected Coil Multiblock via multiblock_info: {}", controllerId);
                                     }
                                 }
+
+                                // Deduce whether this multiblock structure uses Threading Helixes and how many
+                                int helixCount = 0;
+                                for (var ei : recipe.getInputs()) {
+                                    for (var es : ei.getEmiStacks()) {
+                                        if (es != null) {
+                                            ItemStack stack = es.getItemStack();
+                                            if (stack != null && !stack.isEmpty()) {
+                                                ResourceLocation itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
+                                                if (itemId != null) {
+                                                    String p = itemId.getPath();
+                                                    if (GTThreadingHelix.fromId(itemId.toString()) != null || p.contains("thread_helix") || p.contains("threading_helix")) {
+                                                        helixCount = Math.max(helixCount, (int) es.getAmount());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (helixCount > 0 && controllerId != null) {
+                                    THREADING_MAX_HELIX_CAPACITY.put(controllerId, helixCount);
+                                    com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [MultiblockDetector] Detected Threading Multiblock with {} helix blocks via multiblock_info: {}", helixCount, controllerId);
+                                }
                             }
                         }
                     }
@@ -175,6 +201,7 @@ public class MultiblockDetector {
                                     || id.getPath().contains("large_steam_turbine")
                                     || id.getPath().contains("large_gas_turbine")
                                     || id.getPath().contains("large_plasma_turbine")
+                                    || id.getPath().contains("supreme_plasma_turbine")
                                     || id.getPath().contains("nyinsane_plasma_turbine"));
 
                             if (isCoilMb) {
@@ -325,6 +352,7 @@ public class MultiblockDetector {
         registerTestTurbine(ResourceLocation.tryParse("gtceu:large_steam_turbine"), GTVoltageTier.HV, 1024.0);
         registerTestTurbine(ResourceLocation.tryParse("gtceu:large_gas_turbine"), GTVoltageTier.EV, 4096.0);
         registerTestTurbine(ResourceLocation.tryParse("gtceu:large_plasma_turbine"), GTVoltageTier.IV, 16384.0);
+        registerTestTurbine(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"), GTVoltageTier.IV, 98304.0);
         registerTestTurbine(ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"), GTVoltageTier.IV, 196608.0);
 
         TURBINE_BASE_TIERS.put(ResourceLocation.tryParse("gtceu:steam_turbine"), GTVoltageTier.HV);
@@ -473,5 +501,39 @@ public class MultiblockDetector {
 
     public static Set<ResourceLocation> getAllMultiblockControllers() {
         return java.util.Collections.unmodifiableSet(MULTIBLOCK_RECIPE_CONTROLLERS);
+    }
+
+    public static int getMaxHelixCount(ResourceLocation id) {
+        if (id == null) return 0;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return THREADING_MAX_HELIX_CAPACITY.getOrDefault(id, 0);
+    }
+
+    public static int getMaxHelixCount(RecipeNode node) {
+        if (node == null) return 0;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        if (node.getMachineIcon() != null) {
+            int cnt = THREADING_MAX_HELIX_CAPACITY.getOrDefault(node.getMachineIcon(), 0);
+            if (cnt > 0) return cnt;
+        }
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null) {
+                int cnt = THREADING_MAX_HELIX_CAPACITY.getOrDefault(ws, 0);
+                if (cnt > 0) return cnt;
+            }
+        }
+        if (node.getRecipeCategoryId() != null) {
+            int cnt = THREADING_MAX_HELIX_CAPACITY.getOrDefault(node.getRecipeCategoryId(), 0);
+            if (cnt > 0) return cnt;
+        }
+        return 0;
+    }
+
+    public static boolean isThreadingMultiblock(ResourceLocation id) {
+        return getMaxHelixCount(id) > 0;
     }
 }

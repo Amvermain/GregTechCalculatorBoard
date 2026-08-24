@@ -1,17 +1,24 @@
 package com.gtceu.calcboard.client.gui;
 
+import com.gtceu.calcboard.api.GTThreadingHelix;
+import com.gtceu.calcboard.api.NodeThreadingConfig;
 import com.gtceu.calcboard.api.AddonCategory;
+import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.MachineAddon;
 import com.gtceu.calcboard.api.MachineAddonCatalog;
+import com.gtceu.calcboard.api.MultiblockDetector;
 import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.SteamMode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
@@ -34,6 +41,7 @@ public class MachineConfigDialog {
     // Filter: null = ALL, otherwise specific category
     private AddonCategory selectedCategory = null;
     private boolean isCustomBuilderActive = false;
+    private int selectedHelixTab = 0;
 
     // Search and Input boxes
     private EditBox parallelBox;
@@ -131,6 +139,12 @@ public class MachineConfigDialog {
         this.customDurationMult = 1.0;
         this.customEutMult = 1.0;
         this.customParallelMult = 1;
+
+        syncThreadingAddons(node);
+    }
+
+    public static void syncThreadingAddons(RecipeNode node) {
+        com.gtceu.calcboard.compat.start.StarTModAdapter.syncThreadingAddons(node);
     }
 
     public void close() {
@@ -211,70 +225,9 @@ public class MachineConfigDialog {
         graphics.fill(x + 6, y + 26, x + dialogW - 6, y + 66, 0xFF1E222D);
         graphics.renderOutline(x + 6, y + 26, dialogW - 12, 40, 0xFF353C4D);
 
-        if (MachineAddon.isTurbineMachine(node)) {
-            String rName = node.getRotorName();
-            if (rName == null || rName.isEmpty() || rName.startsWith("Standard")) {
-                rName = Component.translatable("gui.gtcalcboard.rotor.standard").getString();
-            }
-            int eff = node.getRotorEfficiency();
-            int pwr = node.getRotorPower();
-            String rotorHeader = "§6🌀 " + Component.translatable("gui.gtcalcboard.addon_cat.rotor").getString() + " §7- §f" + rName;
-            graphics.drawString(font, rotorHeader, x + 10, y + 30, 0xFFFFFFFF, false);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        adapter.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
 
-            String specStr = String.format("§b⏱ %s: §f%d%%   §e⚡ %s: §f%d%%",
-                    Component.translatable("gui.gtcalcboard.rotor.eff").getString(), eff,
-                    Component.translatable("gui.gtcalcboard.rotor.power").getString(), pwr);
-            if (node.isLargeTurbine()) {
-                int holderBonus = node.getTurbineHolderEfficiencyBonus();
-                if (holderBonus > 0) {
-                    specStr += String.format("   §a(+%d%% Holder)", holderBonus);
-                }
-            }
-            graphics.drawString(font, specStr, x + 10, y + 46, 0xFFD0D6E4, false);
-
-            // Reset Rotor Button [↺ Standard 100%]
-            int resetBtnX = x + dialogW - 118;
-            boolean resetHover = mouseX >= resetBtnX && mouseX <= resetBtnX + 110 && mouseY >= y + 38 && mouseY <= y + 54;
-            graphics.fill(resetBtnX, y + 38, resetBtnX + 110, y + 54, resetHover ? 0xFF3E485A : 0xFF242A35);
-            graphics.renderOutline(resetBtnX, y + 38, 110, 16, resetHover ? 0xFF58D3FF : 0xFF4A556B);
-            graphics.drawCenteredString(font, "↺ " + Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString(), resetBtnX + 55, y + 42, 0xFFFFFFFF);
-        } else if (!node.isMultiblock() && !com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node)) {
-            graphics.drawString(font, "§b" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_fixed").getString(), x + 10, y + 32, 0xFFFFFFFF, false);
-            graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_desc").getString(), x + 10, y + 48, 0xFF888888, false);
-        } else {
-            int curPar = node.getParallel();
-            String parLabel = "§b" + Component.translatable("gui.gtcalcboard.config.base_parallel", String.valueOf(curPar)).getString()
-                    + " §7(" + Component.translatable("gui.gtcalcboard.config.total_effective", String.valueOf(node.getTotalParallel())).getString() + "§7)";
-            graphics.drawString(font, parLabel, x + 10, y + 30, 0xFFFFFFFF, false);
-
-            // Render numerical editable Parallel Input Box
-            if (parallelBox != null) {
-                parallelBox.setX(x + 10);
-                parallelBox.setY(y + 44);
-                parallelBox.render(graphics, mouseX, mouseY, partialTicks);
-            }
-
-            // Quick Preset Buttons: 1x, 4x, 16x, 64x, 256x
-            int[] quickPars = {1, 4, 16, 64, 256};
-            int btnX = x + 64;
-            for (int p : quickPars) {
-                boolean active = curPar == p;
-                boolean h = mouseX >= btnX && mouseX <= btnX + 34 && mouseY >= y + 44 && mouseY <= y + 60;
-                graphics.fill(btnX, y + 44, btnX + 34, y + 60, active ? 0xFF2A5288 : (h ? 0xFF3D4558 : 0xFF282D3B));
-                graphics.renderOutline(btnX, y + 44, 34, 16, active ? 0xFF589CFF : 0xFF3F4658);
-                graphics.drawCenteredString(font, p + "x", btnX + 17, y + 48, active ? 0xFF58D3FF : 0xFFB0B8C8);
-                btnX += 38;
-            }
-
-            // Auto Max Parallel button for Turbines/Generators
-            if (node.isGenerator()) {
-                int autoBtnX = x + dialogW - 98;
-                boolean autoHover = mouseX >= autoBtnX && mouseX <= autoBtnX + 90 && mouseY >= y + 44 && mouseY <= y + 60;
-                graphics.fill(autoBtnX, y + 44, autoBtnX + 90, y + 60, autoHover ? 0xFF2A6840 : 0xFF1E4D2F);
-                graphics.renderOutline(autoBtnX, y + 44, 90, 16, 0xFF359050);
-                graphics.drawCenteredString(font, "⚡ " + Component.translatable("gui.gtcalcboard.config.auto_parallel", "Auto Max").getString(), autoBtnX + 45, y + 48, 0xFFFFFFFF);
-            }
-        }
 
         // ==========================================
         // SECTION 2: Active Addons Icon Tray (Middle Area: y+70 to y+124)
@@ -336,6 +289,9 @@ public class MachineConfigDialog {
                 ItemStack sample = addon.getRenderItemStack();
                 if (sample != null && !sample.isEmpty()) {
                     graphics.renderItem(sample, sx + 8, sy + 4);
+                    if (sample.getCount() > 1) {
+                        graphics.renderItemDecorations(font, sample, sx + 8, sy + 4);
+                    }
                 }
 
                 // Sub-stat badge below icon
@@ -355,7 +311,6 @@ public class MachineConfigDialog {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§f" + hoveredActiveAddon.getName()));
             addFormattedDescriptionLines(tooltip, hoveredActiveAddon.getDescription());
-            IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             adapter.buildAddonTooltip(node, hoveredActiveAddon, true, tooltip);
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             appendAdvancedTooltipDebugInfo(tooltip, hoveredActiveAddon);
@@ -374,6 +329,8 @@ public class MachineConfigDialog {
 
         if (isCustomBuilderActive) {
             renderCustomBuilder(graphics, font, x + 8, contentY + 4, dialogW - 16, contentH - 8, mouseX, mouseY);
+        } else if (selectedCategory == AddonCategory.THREADING) {
+            renderThreadingBuilder(graphics, font, x + 8, contentY + 4, dialogW - 16, contentH - 8, mouseX, mouseY);
         } else {
             renderCatalogGrid(graphics, font, x + 8, contentY + 4, dialogW - 16, contentH - 8, mouseX, mouseY);
         }
@@ -441,9 +398,6 @@ public class MachineConfigDialog {
         String customLabel = getCategoryLabel(AddonCategory.CUSTOM);
         int custW = font.width(customLabel) + 12;
         renderChip(graphics, font, customLabel, isCustomBuilderActive, cx, startY, custW, mouseX, mouseY);
-
-        // 4. 2-Track Multi-threaded Indexer Status Pill (Right-aligned)
-        renderIndexerStatusPill(graphics, font, dialogX + dialogW - 6, startY, mouseX, mouseY);
     }
 
     private void renderIndexerStatusPill(GuiGraphics graphics, net.minecraft.client.gui.Font font, int rightX, int y, int mouseX, int mouseY) {
@@ -460,14 +414,14 @@ public class MachineConfigDialog {
 
         int pillW = font.width(font.plainSubstrByWidth(pillText, 200)) + 12;
         int pillX = rightX - pillW;
-        boolean hover = mouseX >= pillX && mouseX <= rightX && mouseY >= y && mouseY <= y + 16;
+        boolean hover = mouseX >= pillX && mouseX <= rightX && mouseY >= y && mouseY <= y + 14;
 
         int bg = running ? (hover ? 0xFF2E2818 : 0xFF221E14) : (hover ? 0xFF182A1E : 0xFF142018);
         int border = running ? (hover ? 0xFFE0C040 : 0xFF8A7320) : (hover ? 0xFF45B074 : 0xFF2D6E49);
 
-        graphics.fill(pillX, y, rightX, y + 16, bg);
-        graphics.renderOutline(pillX, y, pillW, 16, border);
-        graphics.drawCenteredString(font, pillText, pillX + pillW / 2, y + 4, 0xFFFFFFFF);
+        graphics.fill(pillX, y, rightX, y + 14, bg);
+        graphics.renderOutline(pillX, y, pillW, 14, border);
+        graphics.drawCenteredString(font, pillText, pillX + pillW / 2, y + 3, 0xFFFFFFFF);
 
         if (hover) {
             List<Component> tooltip = new ArrayList<>();
@@ -515,26 +469,20 @@ public class MachineConfigDialog {
         }
 
         for (MachineAddon addon : list) {
-            if (!addon.isCompatibleWith(node)) {
-                continue;
-            }
-            if (selectedCategory != null && addon.getCategory() != selectedCategory) {
-                continue;
+            if (addon == null) continue;
+            if (!addon.isCompatibleWith(node)) continue;
+            if (selectedCategory != null && !addon.getCategory().equals(selectedCategory)) continue;
+            if (selectedCategory == null) {
+                List<AddonCategory> rel = MachineAddon.getRelevantCategories(node);
+                if (!rel.contains(addon.getCategory())) continue;
             }
             if (!q.isEmpty()) {
-                String name = addon.getName().toLowerCase();
-                String cleanName = com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.stripFormatting(name);
-                String desc = addon.getDescription() != null ? addon.getDescription().toLowerCase() : "";
-                String cleanDesc = com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.stripFormatting(desc);
-                String id = addon.getId().toLowerCase();
-                String qAlt = q.replace("셀", "셸").replace("셸", "셀");
-
-                boolean matches = name.contains(q) || cleanName.contains(q) || desc.contains(q) || cleanDesc.contains(q) || id.contains(q)
-                        || name.contains(qAlt) || cleanName.contains(qAlt) || desc.contains(qAlt) || cleanDesc.contains(qAlt) || id.contains(qAlt)
-                        || (!qClean.isEmpty() && (name.contains(qClean) || cleanName.contains(qClean) || desc.contains(qClean) || cleanDesc.contains(qClean) || id.contains(qClean)))
-                        || (!qUnder.isEmpty() && (name.contains(qUnder) || cleanName.contains(qUnder) || id.contains(qUnder)));
-
-                if (!matches) {
+                String n = addon.getName().toLowerCase();
+                String d = addon.getDescription() != null ? addon.getDescription().toLowerCase() : "";
+                String idStr = addon.getId() != null ? addon.getId().toString().toLowerCase() : "";
+                if (!n.contains(q) && !n.contains(qClean) && !n.contains(qUnder)
+                        && !d.contains(q) && !d.contains(qClean) && !d.contains(qUnder)
+                        && !idStr.contains(q) && !idStr.contains(qClean) && !idStr.contains(qUnder)) {
                     continue;
                 }
             }
@@ -558,22 +506,26 @@ public class MachineConfigDialog {
             return;
         }
 
-        // Search Bar (Y: startY)
+        // Search Bar (Y: startY) + Indexer Status Pill (Right-aligned)
+        int pillSpace = 120;
+        int searchW = width - pillSpace - 6;
         if (searchBox != null) {
             searchBox.setX(startX + 2);
             searchBox.setY(startY);
-            searchBox.setWidth(width - 4);
+            searchBox.setWidth(searchW);
             searchBox.render(graphics, mouseX, mouseY, 0);
 
             if (!searchBox.getValue().isEmpty()) {
-                int clearBtnX = startX + width - 18;
-                int clearBtnY = startY + 3;
+                int clearBtnX = startX + searchW - 14;
+                int clearBtnY = startY + 2;
                 boolean clearHover = mouseX >= clearBtnX && mouseX <= clearBtnX + 12 && mouseY >= clearBtnY && mouseY <= clearBtnY + 12;
                 graphics.fill(clearBtnX, clearBtnY, clearBtnX + 12, clearBtnY + 12, clearHover ? 0xFF772222 : 0xFF3D2020);
                 graphics.renderOutline(clearBtnX, clearBtnY, 12, 12, clearHover ? 0xFFA03333 : 0xFF553030);
                 graphics.drawCenteredString(font, "✕", clearBtnX + 6, clearBtnY + 2, 0xFFFFFFFF);
             }
         }
+
+        renderIndexerStatusPill(graphics, font, startX + width - 2, startY, mouseX, mouseY);
 
         List<MachineAddon> filtered = getFilteredCatalog();
         int totalCards = filtered.size();
@@ -821,6 +773,318 @@ public class MachineConfigDialog {
         graphics.drawCenteredString(font, Component.translatable("gui.gtcalcboard.config.create_install").getString(), createBtnX + 63, startY + 52, 0xFFFFFFFF);
     }
 
+    private void renderThreadingBuilder(GuiGraphics graphics, Font font, int startX, int startY, int width, int height, int mouseX, int mouseY) {
+        NodeThreadingConfig cfg = node.getThreadingConfig();
+        int maxHelix = MultiblockDetector.getMaxHelixCount(node);
+        if (maxHelix > 0) {
+            cfg.setMaxHelixCapacity(maxHelix);
+        }
+
+        // 1. Left Sub-panel: Helix Block Selector (X: startX, width: 184)
+        int leftW = 184;
+        graphics.fill(startX, startY, startX + leftW, startY + height, 0xFF14161E);
+        graphics.renderOutline(startX, startY, leftW, height, 0xFF2D3342);
+
+        // Category Sub-tabs: [💎 Sup] [🟢 Spd] [🔴 Par] [🔵 Thrd]
+        int tabW = leftW / 4;
+        String[] tabFullNames = {"Supreme", "Overdrive", "Co-Proc", "Weaving"};
+        String[] tabShortNames = {"Sup", "Spd", "Par", "Thrd"};
+        String[] tabIcons = {"💎", "🟢", "🔴", "🔵"};
+        for (int i = 0; i < 4; i++) {
+            int tx = startX + i * tabW;
+            boolean active = selectedHelixTab == i;
+            boolean h = mouseX >= tx && mouseX < tx + tabW && mouseY >= startY && mouseY <= startY + 14;
+            graphics.fill(tx, startY, tx + tabW, startY + 14, active ? 0xFF2A344A : (h ? 0xFF202636 : 0xFF181C26));
+            if (active) {
+                graphics.fill(tx, startY + 13, tx + tabW, startY + 14, 0xFF5890FF);
+            }
+            graphics.drawCenteredString(font, tabIcons[i] + " " + tabShortNames[i], tx + tabW / 2, startY + 3, active ? 0xFFFFFFFF : 0xFF888888);
+        }
+
+        // 3 Tiers for the selected category
+        GTThreadingHelix[] currentTiers;
+        if (selectedHelixTab == 0) {
+            currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UEV_SUPREME, GTThreadingHelix.UXV_SUPREME, GTThreadingHelix.MAX_SUPREME};
+        } else if (selectedHelixTab == 1) {
+            currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UHV_OVERDRIVE, GTThreadingHelix.UIV_OVERDRIVE, GTThreadingHelix.OPV_OVERDRIVE};
+        } else if (selectedHelixTab == 2) {
+            currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UHV_COPROCESSOR, GTThreadingHelix.UIV_COPROCESSOR, GTThreadingHelix.OPV_COPROCESSOR};
+        } else {
+            currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UHV_WEAVING, GTThreadingHelix.UIV_WEAVING, GTThreadingHelix.OPV_WEAVING};
+        }
+
+        int totalInstalled = cfg.getTotalHelixCount();
+        boolean atMax = maxHelix > 0 && totalInstalled >= maxHelix;
+
+        int rowY = startY + 18;
+        for (GTThreadingHelix helix : currentTiers) {
+            int count = cfg.getHelixCount(helix);
+            // Helix Tier & Name
+            String hLabel = "§e" + helix.getTier().name() + " §f" + helix.getEnglishName();
+            graphics.drawString(font, font.plainSubstrByWidth(hLabel, leftW - 75), startX + 4, rowY + 3, 0xFFFFFFFF, false);
+
+            // Stat badge
+            StringBuilder sb = new StringBuilder("§7");
+            if (helix.getGeneral() > 0) sb.append("+" + helix.getGeneral() + "Gen ");
+            if (helix.getSpeed() > 0) sb.append("+" + helix.getSpeed() + "Spd ");
+            if (helix.getEfficiency() > 0) sb.append("+" + helix.getEfficiency() + "Eff ");
+            if (helix.getParallels() > 0) sb.append("+" + helix.getParallels() + "Par ");
+            if (helix.getThreading() > 0) sb.append("+" + helix.getThreading() + "Thrd ");
+            graphics.drawString(font, sb.toString().trim(), startX + 4, rowY + 14, 0xFFAAAAAA, false);
+
+            // Counter buttons: [-] [ count ] [+] [+10]
+            int btnX = startX + leftW - 68;
+            renderMiniBtn(graphics, font, "-", btnX, rowY + 5, 14, mouseX, mouseY);
+            graphics.drawCenteredString(font, String.valueOf(count), btnX + 22, rowY + 8, count > 0 ? 0xFF55FF55 : 0xFF888888);
+            renderMiniBtn(graphics, font, "+", btnX + 30, rowY + 5, 14, atMax ? 0xFF333333 : mouseX, mouseY);
+            renderMiniBtn(graphics, font, "+10", btnX + 46, rowY + 5, 20, atMax ? 0xFF333333 : mouseX, mouseY);
+
+            rowY += 26;
+        }
+
+        // Total Helixes Installed & Max Helix Capacity
+        String helixCapStr = maxHelix > 0
+                ? String.format("§e🌀 Helixes: §a%d §7/ §e%d", totalInstalled, maxHelix)
+                : String.format("§e🌀 Helixes: §a%d", totalInstalled);
+        graphics.drawString(font, helixCapStr, startX + 4, startY + height - 22, 0xFFFFFFFF, false);
+
+        // Summary of base stats from Helixes at bottom of left panel
+        String baseStatsStr = String.format("§8Base: +%d Spd | +%d Eff | +%d Par | +%d Thrd",
+                cfg.getBaseSpeed(), cfg.getBaseEfficiency(), cfg.getBaseParallels(), cfg.getBaseThreading());
+        graphics.drawString(font, font.plainSubstrByWidth(baseStatsStr, leftW - 6), startX + 4, startY + height - 11, 0xFF888888, false);
+
+        // 2. Right Sub-panel: Generalis Allocation & Stats (X: startX + 190, width: width - 190)
+        int rightX = startX + 190;
+        int rightW = width - 190;
+        graphics.fill(rightX, startY, rightX + rightW, startY + height, 0xFF14161E);
+        graphics.renderOutline(rightX, startY, rightW, height, 0xFF2D3342);
+
+        // Top: Generalis Points Badge
+        int remGen = cfg.getRemainingGeneral();
+        int baseGen = cfg.getBaseGeneral();
+        String genBadge = String.format("§b💎 Generalis: §a%d §7/ §e%d pt §7(Avail/Total)", remGen, baseGen);
+        graphics.drawString(font, genBadge, rightX + 4, startY + 4, 0xFFFFFFFF, false);
+
+        // 4 Stat Allocation Rows:
+        // Row 1: Velocitas (Speed)
+        int statRowY = startY + 16;
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "🟢 Velocitas", cfg.getAssignedSpeed(), cfg.getTotalSpeed(),
+                String.format("§a⏱ %.2fx Dur (%.1fx Spd)", cfg.calculateDurationMultiplier(), 1.0 / Math.max(0.001, cfg.calculateDurationMultiplier())),
+                mouseX, mouseY);
+
+        // Row 2: Efficienta (Efficiency)
+        statRowY += 22;
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "🟣 Efficienta", cfg.getAssignedEfficiency(), cfg.getTotalEfficiency(),
+                String.format("§e⚡ %.2fx Power (%.0f%% Cost)", cfg.calculateEnergyMultiplier(), cfg.calculateEnergyMultiplier() * 100.0),
+                mouseX, mouseY);
+
+        // Row 3: Parallelismus (Parallels)
+        statRowY += 22;
+        int effPar = cfg.getEffectiveParallels();
+        double parPen = Math.sqrt(effPar);
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "🔴 Parallelismus", cfg.getAssignedParallels(), cfg.getTotalParallels(),
+                String.format("§c⚡ %dx Par (⏱ +%.0f%% Time)", effPar, (parPen - 1.0) * 100.0),
+                mouseX, mouseY);
+
+        // Row 4: Filum (Multi-threading)
+        statRowY += 22;
+        int effThrd = cfg.getEffectiveThreads();
+        renderStatAllocationRow(graphics, font, rightX, statRowY, rightW, "🔵 Filum", cfg.getAssignedThreading(), cfg.getTotalThreading(),
+                String.format("§9🧵 %d Threads", effThrd),
+                mouseX, mouseY);
+
+        // Bottom Action Buttons: [↺ Reset] [⚡ Max Spd] [🔋 Max Eff] [⚡ Max Par]
+        int actY = startY + height - 15;
+        renderMiniBtn(graphics, font, "↺ Reset", rightX + 4, actY, 40, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "⚡ Max Spd", rightX + 48, actY, 46, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "🔋 Max Eff", rightX + 98, actY, 46, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "⚡ Max Par", rightX + 148, actY, 42, mouseX, mouseY);
+    }
+
+    private void renderStatAllocationRow(GuiGraphics graphics, Font font, int rx, int ry, int rw, String label, int assigned, int total, String statEffect, int mouseX, int mouseY) {
+        graphics.drawString(font, label + " §8(+" + assigned + ")", rx + 4, ry + 1, 0xFFFFFFFF, false);
+        graphics.drawString(font, statEffect, rx + 4, ry + 10, 0xFFAAAAAA, false);
+
+        int btnX = rx + rw - 72;
+        renderMiniBtn(graphics, font, "-10", btnX, ry + 2, 16, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "-1", btnX + 18, ry + 2, 14, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "+1", btnX + 34, ry + 2, 14, mouseX, mouseY);
+        renderMiniBtn(graphics, font, "+10", btnX + 50, ry + 2, 20, mouseX, mouseY);
+    }
+
+    private boolean handleThreadingClick(int startX, int startY, int width, int height, double mouseX, double mouseY) {
+        NodeThreadingConfig cfg = node.getThreadingConfig();
+
+        // 1. Left Panel (Helix Tabs & Counters)
+        int leftW = 184;
+        if (mouseX >= startX && mouseX <= startX + leftW && mouseY >= startY && mouseY <= startY + height) {
+            // Sub-tabs: [Supreme] [Overdrive] [Co-Proc] [Weaving]
+            int tabW = leftW / 4;
+            if (mouseY >= startY && mouseY <= startY + 14) {
+                int clickedTab = (int) ((mouseX - startX) / tabW);
+                if (clickedTab >= 0 && clickedTab < 4) {
+                    selectedHelixTab = clickedTab;
+                    return true;
+                }
+            }
+
+            // 3 Tiers for current tab
+            GTThreadingHelix[] currentTiers;
+            if (selectedHelixTab == 0) {
+                currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UEV_SUPREME, GTThreadingHelix.UXV_SUPREME, GTThreadingHelix.MAX_SUPREME};
+            } else if (selectedHelixTab == 1) {
+                currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UHV_OVERDRIVE, GTThreadingHelix.UIV_OVERDRIVE, GTThreadingHelix.OPV_OVERDRIVE};
+            } else if (selectedHelixTab == 2) {
+                currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UHV_COPROCESSOR, GTThreadingHelix.UIV_COPROCESSOR, GTThreadingHelix.OPV_COPROCESSOR};
+            } else {
+                currentTiers = new GTThreadingHelix[]{GTThreadingHelix.UHV_WEAVING, GTThreadingHelix.UIV_WEAVING, GTThreadingHelix.OPV_WEAVING};
+            }
+
+            int rowY = startY + 18;
+            for (GTThreadingHelix helix : currentTiers) {
+                int btnX = startX + leftW - 68;
+                // [-]
+                if (mouseX >= btnX && mouseX <= btnX + 14 && mouseY >= rowY + 5 && mouseY <= rowY + 19) {
+                    cfg.addHelixCount(helix, -1);
+                    return true;
+                }
+                // [+]
+                if (mouseX >= btnX + 30 && mouseX <= btnX + 44 && mouseY >= rowY + 5 && mouseY <= rowY + 19) {
+                    cfg.addHelixCount(helix, 1);
+                    return true;
+                }
+                // [+10]
+                if (mouseX >= btnX + 46 && mouseX <= btnX + 66 && mouseY >= rowY + 5 && mouseY <= rowY + 19) {
+                    cfg.addHelixCount(helix, 10);
+                    return true;
+                }
+                rowY += 26;
+            }
+        }
+
+        // 2. Right Panel (Generalis Allocation & Quick Actions)
+        int rightX = startX + 190;
+        int rightW = width - 190;
+        if (mouseX >= rightX && mouseX <= rightX + rightW && mouseY >= startY && mouseY <= startY + height) {
+            int btnX = rightX + rightW - 72;
+
+            // Row 1: Velocitas (Speed)
+            int statRowY = startY + 16;
+            if (mouseY >= statRowY + 2 && mouseY <= statRowY + 16) {
+                if (mouseX >= btnX && mouseX <= btnX + 16) {
+                    cfg.setAssignedSpeed(Math.max(0, cfg.getAssignedSpeed() - 10));
+                    return true;
+                }
+                if (mouseX >= btnX + 18 && mouseX <= btnX + 32) {
+                    cfg.setAssignedSpeed(Math.max(0, cfg.getAssignedSpeed() - 1));
+                    return true;
+                }
+                if (mouseX >= btnX + 34 && mouseX <= btnX + 48) {
+                    int add = Math.min(1, cfg.getRemainingGeneral());
+                    cfg.setAssignedSpeed(cfg.getAssignedSpeed() + add);
+                    return true;
+                }
+                if (mouseX >= btnX + 50 && mouseX <= btnX + 70) {
+                    int add = Math.min(10, cfg.getRemainingGeneral());
+                    cfg.setAssignedSpeed(cfg.getAssignedSpeed() + add);
+                    return true;
+                }
+            }
+
+            // Row 2: Efficienta (Efficiency)
+            statRowY += 22;
+            if (mouseY >= statRowY + 2 && mouseY <= statRowY + 16) {
+                if (mouseX >= btnX && mouseX <= btnX + 16) {
+                    cfg.setAssignedEfficiency(Math.max(0, cfg.getAssignedEfficiency() - 10));
+                    return true;
+                }
+                if (mouseX >= btnX + 18 && mouseX <= btnX + 32) {
+                    cfg.setAssignedEfficiency(Math.max(0, cfg.getAssignedEfficiency() - 1));
+                    return true;
+                }
+                if (mouseX >= btnX + 34 && mouseX <= btnX + 48) {
+                    int add = Math.min(1, cfg.getRemainingGeneral());
+                    cfg.setAssignedEfficiency(cfg.getAssignedEfficiency() + add);
+                    return true;
+                }
+                if (mouseX >= btnX + 50 && mouseX <= btnX + 70) {
+                    int add = Math.min(10, cfg.getRemainingGeneral());
+                    cfg.setAssignedEfficiency(cfg.getAssignedEfficiency() + add);
+                    return true;
+                }
+            }
+
+            // Row 3: Parallelismus (Parallels)
+            statRowY += 22;
+            if (mouseY >= statRowY + 2 && mouseY <= statRowY + 16) {
+                if (mouseX >= btnX && mouseX <= btnX + 16) {
+                    cfg.setAssignedParallels(Math.max(0, cfg.getAssignedParallels() - 10));
+                    return true;
+                }
+                if (mouseX >= btnX + 18 && mouseX <= btnX + 32) {
+                    cfg.setAssignedParallels(Math.max(0, cfg.getAssignedParallels() - 1));
+                    return true;
+                }
+                if (mouseX >= btnX + 34 && mouseX <= btnX + 48) {
+                    int add = Math.min(1, cfg.getRemainingGeneral());
+                    cfg.setAssignedParallels(cfg.getAssignedParallels() + add);
+                    return true;
+                }
+                if (mouseX >= btnX + 50 && mouseX <= btnX + 70) {
+                    int add = Math.min(10, cfg.getRemainingGeneral());
+                    cfg.setAssignedParallels(cfg.getAssignedParallels() + add);
+                    return true;
+                }
+            }
+
+            // Row 4: Filum (Threading)
+            statRowY += 22;
+            if (mouseY >= statRowY + 2 && mouseY <= statRowY + 16) {
+                if (mouseX >= btnX && mouseX <= btnX + 16) {
+                    cfg.setAssignedThreading(Math.max(0, cfg.getAssignedThreading() - 5));
+                    return true;
+                }
+                if (mouseX >= btnX + 18 && mouseX <= btnX + 32) {
+                    cfg.setAssignedThreading(Math.max(0, cfg.getAssignedThreading() - 1));
+                    return true;
+                }
+                if (mouseX >= btnX + 34 && mouseX <= btnX + 48) {
+                    int add = Math.min(1, cfg.getRemainingGeneral());
+                    cfg.setAssignedThreading(cfg.getAssignedThreading() + add);
+                    return true;
+                }
+                if (mouseX >= btnX + 50 && mouseX <= btnX + 70) {
+                    int add = Math.min(5, cfg.getRemainingGeneral());
+                    cfg.setAssignedThreading(cfg.getAssignedThreading() + add);
+                    return true;
+                }
+            }
+
+            // Bottom Actions: [↺ Reset] [⚡ Max Spd] [🔋 Max Eff] [⚡ Max Par]
+            int actY = startY + height - 15;
+            if (mouseY >= actY && mouseY <= actY + 14) {
+                if (mouseX >= rightX + 4 && mouseX <= rightX + 44) {
+                    cfg.reset();
+                    return true;
+                }
+                if (mouseX >= rightX + 48 && mouseX <= rightX + 94) {
+                    cfg.setAssignedSpeed(cfg.getAssignedSpeed() + cfg.getRemainingGeneral());
+                    return true;
+                }
+                if (mouseX >= rightX + 98 && mouseX <= rightX + 144) {
+                    cfg.setAssignedEfficiency(cfg.getAssignedEfficiency() + cfg.getRemainingGeneral());
+                    return true;
+                }
+                if (mouseX >= rightX + 148 && mouseX <= rightX + 190) {
+                    cfg.setAssignedParallels(cfg.getAssignedParallels() + cfg.getRemainingGeneral());
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private void renderMiniBtn(GuiGraphics graphics, net.minecraft.client.gui.Font font, String label, int bx, int by, int bw, int mouseX, int mouseY) {
         boolean h = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + 14;
         graphics.fill(bx, by, bx + bw, by + 14, h ? 0xFF3F4658 : 0xFF2B313E);
@@ -899,9 +1163,14 @@ public class MachineConfigDialog {
                 if (newMb) {
                     var mbIcon = node.getMultiblockWorkstation();
                     if (mbIcon != null) node.setMachineIcon(mbIcon);
+                    com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
                 } else {
                     var sbIcon = node.getSingleblockWorkstation();
                     if (sbIcon != null) node.setMachineIcon(sbIcon);
+                    if (node.isTurbine() && node.getTargetTier().ordinal() > GTVoltageTier.HV.ordinal()) {
+                        node.setTargetTier(GTVoltageTier.HV);
+                    }
+                    com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
                     // Remove multiblock-only addons
                     node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL 
                             || a.getCategory() == MachineAddon.Category.MAINTENANCE 
@@ -924,67 +1193,35 @@ public class MachineConfigDialog {
             }
         }
 
-        if (MachineAddon.isTurbineMachine(node)) {
-            int resetBtnX = x + dialogW - 118;
-            if (button == 0 && mouseX >= resetBtnX && mouseX <= resetBtnX + 110 && mouseY >= y + 38 && mouseY <= y + 54) {
-                node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
-                node.setRotorEfficiency(100);
-                node.setRotorPower(100);
-                node.setRotorName("Standard (100%)");
-                node.setParallel(1);
-                if (parallelBox != null) parallelBox.setValue("1");
-                if (parent != null) parent.markSummaryDirty();
-                net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
-                );
-                return true;
-            }
-        } else if (node.isMultiblock() || com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node)) {
-            // Section 1: Parallel Input Box click
-            if (parallelBox != null) {
-                parallelBox.setX(x + 10);
-                parallelBox.setY(y + 44);
-                boolean clicked = parallelBox.mouseClicked(mouseX, mouseY, button);
-                parallelBox.setFocused(clicked);
-                if (clicked) return true;
-            }
-
-            // Section 1: Quick Presets (1x, 4x, 16x, 64x, 256x)
-            int[] quickPars = {1, 4, 16, 64, 256};
-            int btnX = x + 64;
-            for (int p : quickPars) {
-                if (mouseX >= btnX && mouseX <= btnX + 34 && mouseY >= y + 44 && mouseY <= y + 60) {
-                    int oldP = node.getParallel();
-                    if (oldP != p) {
-                        node.setParallel(p);
-                        if (parallelBox != null) parallelBox.setValue(String.valueOf(p));
-                        if (parent != null) {
-                            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.parallel(node.getId(), oldP, p));
-                            parent.markSummaryDirty();
-                        }
-                    }
-                    return true;
-                }
-                btnX += 38;
-            }
-
-            // Auto Max Parallel button click for Turbines/Generators
-            if (node.isGenerator()) {
-                int autoBtnX = x + dialogW - 98;
-                if (mouseX >= autoBtnX && mouseX <= autoBtnX + 90 && mouseY >= y + 44 && mouseY <= y + 60) {
-                    node.autoCalculateTurbineParallel();
-                    if (parallelBox != null) parallelBox.setValue(String.valueOf(node.getParallel()));
-                    if (parent != null) parent.markSummaryDirty();
-                    return true;
-                }
-            }
+        // Section 1: Parallel Input Box click
+        if (parallelBox != null && (node.isMultiblock() || ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node))) {
+            parallelBox.setX(x + 10);
+            parallelBox.setY(y + 44);
+            boolean clicked = parallelBox.mouseClicked(mouseX, mouseY, button);
+            parallelBox.setFocused(clicked);
+            if (clicked) return true;
         }
+
+        // Section 1: Adapter-specific header click (boilers, steam modes, rotors, quick presets, rpm, magnets, etc.)
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        if (adapter.handleDialogHeaderClick(this, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent)) {
+            return true;
+        }
+
 
         // Section 2: Clear All button
         List<MachineAddon> activeAddons = node.getAddons();
         if (!activeAddons.isEmpty()) {
             int clearAllX = x + dialogW - 80;
             if (mouseX >= clearAllX && mouseX <= clearAllX + 72 && mouseY >= y + 72 && mouseY <= y + 84) {
+                List<MachineAddon> toRemove = new ArrayList<>(node.getAddons());
+                for (MachineAddon a : toRemove) {
+                    adapter.handleUninstallAddon(node, a);
+                }
+                if (node.getThreadingConfig() != null) {
+                    node.getThreadingConfig().getHelixCounts().clear();
+                    node.getThreadingConfig().reset();
+                }
                 node.getAddons().clear();
                 node.setRotorEfficiency(100);
                 node.setRotorPower(100);
@@ -1022,7 +1259,7 @@ public class MachineConfigDialog {
             int sx = x + 10 + (i - activeAddonsScroll) * slotSpacing;
             if (mouseX >= sx && mouseX <= sx + slotSize && mouseY >= y + 86 && mouseY <= y + 118) {
                 MachineAddon addon = activeAddons.get(i);
-                node.getAddons().remove(i);
+                adapter.handleUninstallAddon(node, addon);
                 if (addon.getCategory() == MachineAddon.Category.ROTOR) {
                     node.setRotorEfficiency(100);
                     node.setRotorPower(100);
@@ -1087,9 +1324,11 @@ public class MachineConfigDialog {
         }
 
         int contentY = y + 146;
+        int contentH = (y + dialogH - 6) - contentY;
         int startX = x + 8;
         int startY = contentY + 4;
         int width = dialogW - 16;
+        int height = contentH - 8;
 
         if (isCustomBuilderActive) {
             // Custom builder inputs
@@ -1160,6 +1399,13 @@ public class MachineConfigDialog {
                 if (parent != null) parent.markSummaryDirty();
                 return true;
             }
+        } else if (selectedCategory == AddonCategory.THREADING) {
+            if (handleThreadingClick(startX, startY, width, height, mouseX, mouseY)) {
+                syncThreadingAddons(node);
+                invalidateFilteredCatalog();
+                if (parent != null) parent.markSummaryDirty();
+                return true;
+            }
         } else if (!node.isMultiblock() && !com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node)) {
             if (node.hasMultiblockOption()) {
                 int bannerY = startY + 12;
@@ -1215,7 +1461,6 @@ public class MachineConfigDialog {
 
                 if (mouseX >= bx && mouseX <= bx + cardW && mouseY >= by && mouseY <= by + cardH) {
                     MachineAddon addon = filtered.get(cardIndex);
-                    IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
                     if (button == 1) {
                         adapter.handleUninstallAddon(node, addon);
                     } else {

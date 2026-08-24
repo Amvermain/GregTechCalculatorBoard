@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.OverclockMode;
 import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.SteamMode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -323,12 +324,68 @@ public class NodeWidget {
 
     public boolean changeTier(int direction) {
         if (parent != null && !parent.ensureEditPermission()) return false;
+
+        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF) {
+            com.gtceu.calcboard.api.GTBoilerTier curTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
+            com.gtceu.calcboard.api.GTBoilerTier[] vals = com.gtceu.calcboard.api.GTBoilerTier.values();
+            int newIdx = (curTier.ordinal() + direction + vals.length) % vals.length;
+            com.gtceu.calcboard.api.GTBoilerTier nextTier = vals[newIdx];
+            node.setMachineIcon(nextTier.getDefaultIcon());
+            node.setMultiblock(nextTier.isMultiblock());
+            if (parent != null) parent.markSummaryDirty();
+            invalidateCache();
+            return true;
+        }
+
+        if (node.supportsSteamMode()) {
+            SteamMode curSteam = node.getSteamMode();
+            if (curSteam == SteamMode.LOW_PRESSURE) {
+                if (direction > 0) {
+                    node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                    if (parent != null) parent.markSummaryDirty();
+                    invalidateCache();
+                    return true;
+                }
+                return false;
+            } else if (curSteam == SteamMode.HIGH_PRESSURE) {
+                if (direction > 0) {
+                    node.setSteamMode(SteamMode.NONE);
+                    node.setTargetTier(GTVoltageTier.LV);
+                    if (parent != null) parent.markSummaryDirty();
+                    invalidateCache();
+                    return true;
+                } else if (direction < 0) {
+                    node.setSteamMode(SteamMode.LOW_PRESSURE);
+                    if (parent != null) parent.markSummaryDirty();
+                    invalidateCache();
+                    return true;
+                }
+            } else {
+                if (direction < 0 && node.getTargetTier() == GTVoltageTier.LV) {
+                    node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                    if (parent != null) parent.markSummaryDirty();
+                    invalidateCache();
+                    return true;
+                }
+            }
+        }
+
         int curIdx = node.getTargetTier().ordinal();
         int minIdx = node.getRecipeTier().ordinal();
         int maxIdx = GTVoltageTier.values().length - 1;
 
+        if (node.isTurbine() && !node.isMultiblock()) {
+            maxIdx = GTVoltageTier.HV.ordinal();
+        }
+
         int newIdx = curIdx + direction;
-        if (newIdx < minIdx || newIdx > maxIdx || newIdx == curIdx) {
+        if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
+            if (node.hasMultiblockOption()) {
+                node.setMultiblock(true);
+            } else {
+                return false;
+            }
+        } else if (newIdx < minIdx || newIdx > maxIdx || newIdx == curIdx) {
             return false;
         }
 
@@ -336,6 +393,7 @@ public class NodeWidget {
         GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
 
         node.setTargetTier(newTier);
+        com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
         if (parent != null) {
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
             parent.markSummaryDirty();

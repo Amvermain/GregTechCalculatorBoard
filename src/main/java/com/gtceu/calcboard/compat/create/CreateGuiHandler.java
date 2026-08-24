@@ -39,6 +39,9 @@ public class CreateGuiHandler {
         }
         tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
         tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        if (CreateModAdapter.isFanProcessingRecipe(node)) {
+            tooltipLines.add(Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint"));
+        }
         return tooltipLines;
     }
 
@@ -105,6 +108,54 @@ public class CreateGuiHandler {
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
             );
             return true;
+        }
+        return false;
+    }
+
+    public static void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
+                                           int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
+                                           net.minecraft.client.gui.components.EditBox parallelBox,
+                                           com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        if (CreateModAdapter.isFanProcessingRecipe(node)) {
+            graphics.drawString(font, "§6⚙ " + Component.translatable("gui.gtcalcboard.encased_fan").getString(), x + 10, y + 32, 0xFFFFFFFF, false);
+            graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint").getString(), x + 10, y + 48, 0xFF888888, false);
+        } else if (!node.isGenerator()) {
+            graphics.drawString(font, "§6⚙ " + Component.translatable("gui.gtcalcboard.rotation_speed_controller").getString() + ": §e" + node.getRpm() + " RPM", x + 10, y + 30, 0xFFFFFFFF, false);
+            int[] rpmPresets = {16, 32, 64, 128, 256};
+            int btnX = x + 10;
+            for (int r : rpmPresets) {
+                boolean active = node.getRpm() == r;
+                boolean hov = mouseX >= btnX && mouseX <= btnX + 44 && mouseY >= y + 44 && mouseY <= y + 60;
+                graphics.fill(btnX, y + 44, btnX + 44, y + 60, active ? 0xFF5D3E1A : (hov ? 0xFF3D4558 : 0xFF282D3B));
+                graphics.renderOutline(btnX, y + 44, 44, 16, active ? 0xFFFFAA00 : 0xFF3F4658);
+                graphics.drawCenteredString(font, r + " RPM", btnX + 22, y + 48, active ? 0xFFFFD28C : 0xFFB0B8C8);
+                btnX += 48;
+            }
+        } else {
+            graphics.drawString(font, "§a⚡ " + Component.translatable("gui.gtcalcboard.kinetic_generator").getString(), x + 10, y + 32, 0xFFFFFFFF, false);
+            graphics.drawString(font, "§8Fixed generation output (No speed modification)", x + 10, y + 48, 0xFF888888, false);
+        }
+    }
+
+    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+                                                 RecipeNode node, int x, int y, int dialogW,
+                                                 double mouseX, double mouseY, int button,
+                                                 net.minecraft.client.gui.components.EditBox parallelBox,
+                                                 com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        if (!CreateModAdapter.isFanProcessingRecipe(node) && !node.isGenerator()) {
+            int[] rpmPresets = {16, 32, 64, 128, 256};
+            int btnX = x + 10;
+            for (int r : rpmPresets) {
+                if (mouseX >= btnX && mouseX <= btnX + 44 && mouseY >= y + 44 && mouseY <= y + 60) {
+                    node.setRpm(r);
+                    if (parent != null) parent.markSummaryDirty();
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    );
+                    return true;
+                }
+                btnX += 48;
+            }
         }
         return false;
     }

@@ -22,7 +22,6 @@ public class ClientModBusEvents {
     @SubscribeEvent
     public static void onRegisterKeys(RegisterKeyMappingsEvent event) {
         event.register(KeyBindings.OPEN_BOARD);
-        event.register(KeyBindings.ADD_RECIPE);
     }
 
     @SubscribeEvent

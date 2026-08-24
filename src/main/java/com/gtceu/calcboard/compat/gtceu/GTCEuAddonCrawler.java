@@ -82,7 +82,7 @@ public class GTCEuAddonCrawler {
                 ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
                 if (id == null) continue;
                 String ns = id.getNamespace();
-                if (!ns.equals("gtceu") && !ns.equals("start_core") && !ns.equals("kubejs")) continue;
+                if (!ns.equals("gtceu") && !ns.equals("kubejs")) continue;
 
                 if (DynamicAddonCrawler.isItemDisabledOrHidden(item, activeRecipeItems)) {
                     continue;
@@ -166,6 +166,9 @@ public class GTCEuAddonCrawler {
         cmhEco.setEutMultiplier(1.0);
         cmhEco.setDiscoverySource("GTCEu Configurable Maintenance Hatch (Eco Mode)");
         if (!containsAddonId(list, cmhEco.getId())) list.add(cmhEco);
+
+        // Include Star Technology turbine boosting traits in catalog
+        com.gtceu.calcboard.compat.start.StarTAddonCrawler.addBuiltinStarTTraits(list);
     }
 
     public static boolean isMaintenanceHatchItem(Item item, ResourceLocation id) {

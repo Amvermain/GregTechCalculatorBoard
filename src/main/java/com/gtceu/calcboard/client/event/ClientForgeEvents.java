@@ -46,14 +46,25 @@ public class ClientForgeEvents {
         com.gtceu.calcboard.api.BoardManager.getInstance().resetToDefault();
         ClientWorkspaceState.getInstance().clear();
         MachineAddonCatalog.getInstance().reset();
+        RecipeSearchDialog.clearGlobalCache();
+        com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().reset();
+        System.gc();
     }
 
     @SubscribeEvent
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] RecipesUpdatedEvent received. Refreshing addon catalog and recipe search index...");
         MachineAddonCatalog.getInstance().markDirty();
+        RecipeSearchDialog.clearGlobalCache();
         MachineAddonCatalog.getInstance().preloadAsync();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+    }
+
+    @SubscribeEvent
+    public static void onScreenOpening(ScreenEvent.Opening event) {
+        if (event.getNewScreen() instanceof BoardScreen) {
+            RecipeSearchDialog.notifyFavoritesChanged();
+        }
     }
 
     @SubscribeEvent
@@ -70,67 +81,6 @@ public class ClientForgeEvents {
                     mc.setScreen(new BoardScreen());
                 }
             }
-        }
-    }
-
-    @SubscribeEvent
-    public static void onScreenKeyPressed(ScreenEvent.KeyPressed.Pre event) {
-        Screen screen = event.getScreen();
-        if (screen == null) return;
-
-        // 1. Never capture keys in system, options, keybinds, controls, pause, or chat screens
-        if (screen instanceof OptionsScreen
-                || screen instanceof KeyBindsScreen
-                || screen instanceof ControlsScreen
-                || screen instanceof ChatScreen
-                || screen instanceof PauseScreen
-                || screen instanceof TitleScreen
-                || screen instanceof DeathScreen) {
-            return;
-        }
-
-        String screenClass = screen.getClass().getName();
-        if (screenClass.contains("KeyBinds") || screenClass.contains("Controls") || screenClass.contains("options")) {
-            return;
-        }
-
-        // 2. Never capture keys if any EditBox or text input is currently focused
-        var focused = screen.getFocused();
-        if (focused instanceof EditBox) {
-            return;
-        }
-        if (focused != null) {
-            String focusedClass = focused.getClass().getName();
-            if (focusedClass.contains("EditBox") || focusedClass.contains("TextField") || focusedClass.contains("Search")) {
-                return;
-            }
-        }
-
-        // 3. Process ADD_RECIPE only when bound and hovering over a recipe in recipe/inventory screens
-        if (!KeyBindings.ADD_RECIPE.isUnbound() && KeyBindings.ADD_RECIPE.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))) {
-            try {
-                // If cursor is hovering over an EMI stack / recipe context
-                var interaction = EmiApi.getHoveredStack(true);
-                EmiRecipe targetRecipe = null;
-
-                if (interaction != null && !interaction.isEmpty()) {
-                    targetRecipe = interaction.getRecipeContext();
-                    if (targetRecipe == null && interaction.getStack() != null) {
-                        targetRecipe = EmiApi.getRecipeContext(interaction.getStack());
-                        if (targetRecipe == null) {
-                            var recipes = EmiApi.getRecipeManager().getRecipesByOutput(interaction.getStack().getEmiStacks().get(0));
-                            if (recipes != null && !recipes.isEmpty()) {
-                                targetRecipe = recipes.get(0);
-                            }
-                        }
-                    }
-                }
-
-                if (targetRecipe != null) {
-                    CalcBoardEmiPlugin.addRecipeToBoard(targetRecipe, true);
-                    event.setCanceled(true);
-                }
-            } catch (Throwable ignored) {}
         }
     }
 }

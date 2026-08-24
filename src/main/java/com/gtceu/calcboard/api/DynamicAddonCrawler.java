@@ -63,52 +63,64 @@ public class DynamicAddonCrawler {
 
     public static List<ItemStack> collectAllActiveItemStacks() {
         List<ItemStack> stacks = new ArrayList<>();
+        Set<Item> seenItemsWithoutTag = new HashSet<>();
+        Set<String> seenItemsWithTag = new HashSet<>();
 
-        // 1. If EMI is loaded, EMI recipe manager already aggregates Vanilla, KubeJS, GTCEu, and Thermal recipes in unified form
+        java.util.function.Consumer<ItemStack> collector = is -> {
+            if (is == null || is.isEmpty()) return;
+            if (is.hasTag()) {
+                String key = ForgeRegistries.ITEMS.getKey(is.getItem()) + "#" + is.getTag().toString();
+                if (seenItemsWithTag.add(key)) {
+                    stacks.add(is);
+                }
+            } else {
+                if (seenItemsWithoutTag.add(is.getItem())) {
+                    stacks.add(is);
+                }
+            }
+        };
+
+        // 1. If EMI is loaded, scan EMI recipe outputs
         try {
             var emiRecipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
             if (emiRecipeManager != null && emiRecipeManager.getRecipes() != null && !emiRecipeManager.getRecipes().isEmpty()) {
                 for (dev.emi.emi.api.recipe.EmiRecipe emiRecipe : emiRecipeManager.getRecipes()) {
-                    if (emiRecipe != null) {
-                        extractRecipeOutputs(emiRecipe, stacks);
+                    if (emiRecipe != null && emiRecipe.getOutputs() != null) {
+                        for (dev.emi.emi.api.stack.EmiStack es : emiRecipe.getOutputs()) {
+                            if (es != null && !es.isEmpty()) {
+                                ItemStack is = es.getItemStack();
+                                if (is != null && !is.isEmpty()) {
+                                    if (!is.hasTag() && es.getNbt() != null) {
+                                        is = is.copy();
+                                        is.setTag(es.getNbt().copy());
+                                    }
+                                    collector.accept(is);
+                                }
+                            }
+                        }
                     }
                 }
                 return stacks;
             }
         } catch (Throwable ignored) {}
 
-        // 2. Fallback: Minecraft Level RecipeManager (Vanilla + KubeJS crafting table + Furnace/Smoking/Blasting/Stonecutting)
+        // 2. Fallback: Minecraft Level RecipeManager
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.level != null) {
             try {
                 var recipeManager = mc.level.getRecipeManager();
                 if (recipeManager != null) {
                     for (Recipe<?> r : recipeManager.getRecipes()) {
-                        extractRecipeOutputs(r, stacks);
+                        try {
+                            ItemStack res = r.getResultItem(mc.level.registryAccess());
+                            if (res != null && !res.isEmpty()) {
+                                collector.accept(res);
+                            }
+                        } catch (Throwable ignored) {}
                     }
                 }
             } catch (Throwable ignored) {}
         }
-
-        // 3. Fallback: GTCEu GTRegistries.RECIPE_TYPES
-        try {
-            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-            Field recipeTypesField = gtRegistriesCls.getField("RECIPE_TYPES");
-            Object recipeTypesRegistry = recipeTypesField.get(null);
-            if (recipeTypesRegistry instanceof Iterable<?> registryIterable) {
-                for (Object recipeType : registryIterable) {
-                    try {
-                        Method getRecipesMethod = recipeType.getClass().getMethod("getRecipes");
-                        Object recipesObj = getRecipesMethod.invoke(recipeType);
-                        if (recipesObj instanceof Collection<?> recipesColl) {
-                            for (Object gtRecipe : recipesColl) {
-                                extractRecipeOutputs(gtRecipe, stacks);
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
 
         return stacks;
     }

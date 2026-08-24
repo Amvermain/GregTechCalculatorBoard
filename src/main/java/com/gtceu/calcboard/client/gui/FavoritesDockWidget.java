@@ -18,8 +18,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Collapsible Favorites Dock Widget located at the Top-Left of BoardScreen.
@@ -110,21 +109,33 @@ public class FavoritesDockWidget {
         return false;
     }
 
+    private static final Map<EmiFavorite, List<EmiRecipe>> FAVORITE_RECIPES_CACHE = new WeakHashMap<>();
+
+    public static void clearCache() {
+        FAVORITE_RECIPES_CACHE.clear();
+    }
+
     public List<EmiFavorite> getFavorites() {
         try {
+            if (EmiFavorites.favoriteSidebar != null && !EmiFavorites.favoriteSidebar.isEmpty()) {
+                return EmiFavorites.favoriteSidebar;
+            }
             if (EmiFavorites.favorites != null) {
-                return new ArrayList<>(EmiFavorites.favorites);
+                return EmiFavorites.favorites;
             }
         } catch (Throwable ignored) {}
         return List.of();
     }
 
     public List<EmiRecipe> findRecipesForFavorite(EmiFavorite fav) {
-        List<EmiRecipe> list = new ArrayList<>();
-        if (fav == null) return list;
+        if (fav == null) return List.of();
+        List<EmiRecipe> cached = FAVORITE_RECIPES_CACHE.get(fav);
+        if (cached != null) return cached;
 
+        List<EmiRecipe> list = new ArrayList<>();
         if (fav.getRecipe() != null) {
             list.add(fav.getRecipe());
+            FAVORITE_RECIPES_CACHE.put(fav, list);
             return list;
         }
 
@@ -201,6 +212,7 @@ public class FavoritesDockWidget {
                 }
             }
         }
+        FAVORITE_RECIPES_CACHE.put(fav, list);
         return list;
     }
 
@@ -210,6 +222,10 @@ public class FavoritesDockWidget {
         List<EmiFavorite> favorites = getFavorites();
         int count = favorites.size();
         hoveredFavorite = null;
+
+        if (activeFlyoutFavorite != null && !favorites.contains(activeFlyoutFavorite)) {
+            closeFlyout();
+        }
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 500);
@@ -508,6 +524,7 @@ public class FavoritesDockWidget {
                 tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.recipes_count", recipes.size()).getString()));
                 tooltip.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.favorites_dock.hover_flyout_hint").getString()));
                 tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.favorites_dock.click_hint").getString()));
+                tooltip.add(Component.literal("§c" + Component.translatable("gui.gtcalcboard.favorites_dock.remove_hint").getString()));
                 graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
             }
         }
@@ -635,10 +652,7 @@ public class FavoritesDockWidget {
                     return true;
                 }
             }
-            boolean isAddKey = (!com.gtceu.calcboard.client.key.KeyBindings.ADD_RECIPE.isUnbound()
-                    && com.gtceu.calcboard.client.key.KeyBindings.ADD_RECIPE.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(keyCode, scanCode)));
-
-            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_SPACE || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || isAddKey) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_SPACE || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER) {
                 double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
                 spawnRecipeNode(activeEmi, pos[0], pos[1]);
                 return true;
@@ -702,6 +716,31 @@ public class FavoritesDockWidget {
                     }
                 }
             }
+        }
+
+        if (button == 1) {
+            // Right-click on Main Dock item -> Remove Favorite
+            int listY = dockY + HEADER_HEIGHT + 2;
+            int listH = maxH - HEADER_HEIGHT - 4;
+            if (mouseX >= DOCK_X && mouseX <= DOCK_X + EXPANDED_WIDTH && mouseY >= listY && mouseY <= listY + listH) {
+                List<EmiFavorite> favorites = getFavorites();
+                int curY = listY - (int) scrollY;
+                for (EmiFavorite fav : favorites) {
+                    if (mouseY >= curY && mouseY <= curY + ROW_HEIGHT - 2) {
+                        try {
+                            EmiFavorites.removeFavorite(fav);
+                            RecipeSearchDialog.notifyFavoritesChanged();
+                        } catch (Throwable ignored) {}
+                        closeFlyout();
+                        Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F)
+                        );
+                        return true;
+                    }
+                    curY += ROW_HEIGHT;
+                }
+            }
+            return false;
         }
 
         if (button != 0) return false;

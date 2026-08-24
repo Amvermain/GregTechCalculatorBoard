@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
+import com.gtceu.calcboard.compat.start.StarTModAdapter;
 import com.gtceu.calcboard.compat.systeams.SysteamsModAdapter;
 import com.gtceu.calcboard.compat.thermal.ThermalModAdapter;
 import com.gtceu.calcboard.compat.vanilla.VanillaModAdapter;
@@ -32,10 +33,11 @@ public class ModAdapterRegistry {
         initialized = true;
 
         // Register built-in adapters
-        register(new SysteamsModAdapter());      // Priority 110 (higher than Thermal to intercept Systeams boilers)
+        register(new SysteamsModAdapter());      // Priority 110 (intercepts Systeams boilers & steam dynamos)
+        register(new StarTModAdapter());         // Priority 105 (intercepts Star Technology GCC, SPT/NPT, Threading)
+        register(new CreateNewAgeModAdapter());  // Priority 105 (intercepts Create: New Age motors & generator coils)
         register(new ThermalModAdapter());       // Priority 100
         register(new GTCEuModAdapter());         // Priority 100
-        register(new CreateNewAgeModAdapter());  // Priority 95 (higher than Create to intercept Create: New Age items)
         register(new CreateModAdapter());        // Priority 90
         register(FALLBACK_ADAPTER);               // Priority 0
     }

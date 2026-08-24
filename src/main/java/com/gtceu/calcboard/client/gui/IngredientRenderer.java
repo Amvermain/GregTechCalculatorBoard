@@ -25,7 +25,18 @@ public final class IngredientRenderer {
         ResourceLocation id = ingredient.getId();
         if (ingredient.isFluid()) {
             var fluid = ForgeRegistries.FLUIDS.getValue(id);
-            if (fluid != null) {
+            if (fluid == null || fluid == net.minecraft.world.level.material.Fluids.EMPTY) {
+                // Try namespace fallbacks
+                String path = id.getPath();
+                for (String ns : new String[]{"gtceu", "start_core", "gtceu_start"}) {
+                    var alt = ForgeRegistries.FLUIDS.getValue(new ResourceLocation(ns, path));
+                    if (alt != null && alt != net.minecraft.world.level.material.Fluids.EMPTY) {
+                        fluid = alt;
+                        break;
+                    }
+                }
+            }
+            if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
                 return EmiStack.of(fluid, Math.max(1, (long) ingredient.getAmount()));
             }
         } else {

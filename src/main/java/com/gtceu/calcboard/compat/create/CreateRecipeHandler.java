@@ -206,26 +206,17 @@ public class CreateRecipeHandler {
                     if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
                 }
 
-                String outputSearchIndex = String.join(" ", outputNames) + " " + String.join(" ", outputIds);
-                String inputSearchIndex = String.join(" ", inputNames) + " " + String.join(" ", inputIds);
-                String fullSearchIndex = (displayName + " " + modId + " " + catId + " " + catName + " " + outputSearchIndex + " " + inputSearchIndex + " kinetic stress units generator create su").toLowerCase(Locale.ROOT);
+                String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
+                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " kinetic stress units generator create su").trim();
 
                 list.add(new RecipeSearchEngine.SearchableRecipe(
                         node,
                         displayName,
-                        modId,
-                        catId,
-                        catName,
-                        outputNames,
-                        inputNames,
-                        outputIds,
-                        inputIds,
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        outputSearchIndex,
+                        modId.intern(),
+                        catId.intern(),
+                        catName.intern(),
                         inputSearchIndex,
-                        fullSearchIndex
+                        outputSearchIndex
                 ));
             }
         }

@@ -16,13 +16,25 @@ import java.lang.reflect.Method;
 public class ThermalRecipeHandler {
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
-        long energyRF = extractEnergyRF(backing);
-        if (energyRF <= 0) return false;
-
         ResourceLocation catId = null;
         if (emiRecipeObj instanceof EmiRecipe recipe && recipe.getCategory() != null) {
             catId = recipe.getCategory().getId();
         }
+
+        if (catId != null) {
+            String ns = catId.getNamespace().toLowerCase();
+            if (!ns.equals("thermal") && !ns.equals("thermal_expansion") && !ns.equals("cofh_core") && !ns.equals("systeams")) {
+                return false;
+            }
+        } else if (backing != null) {
+            String clsName = backing.getClass().getName().toLowerCase();
+            if (!clsName.contains("thermal") && !clsName.contains("cofh") && !clsName.contains("systeams")) {
+                return false;
+            }
+        }
+
+        long energyRF = extractEnergyRF(backing);
+        if (energyRF <= 0) return false;
 
         // Deductive classification via Recipe class hierarchy and official TagKey
         boolean isDynamo = ThermalAugmentHelper.isDynamoRecipe(backing);

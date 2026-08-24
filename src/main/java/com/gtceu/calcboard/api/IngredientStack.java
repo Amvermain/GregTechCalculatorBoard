@@ -131,13 +131,19 @@ public class IngredientStack {
             try {
                 if (type == Type.FLUID) {
                     var fluid = ForgeRegistries.FLUIDS.getValue(id);
-                    if (fluid != null) {
-                        return fluid.getFluidType().getDescription().getString();
+                    if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
+                        String name = fluid.getFluidType().getDescription().getString();
+                        if (name != null && !name.isEmpty() && !name.equalsIgnoreCase("air") && !name.equalsIgnoreCase("empty")) {
+                            return name;
+                        }
                     }
                 } else {
                     var item = ForgeRegistries.ITEMS.getValue(id);
                     if (item != null && item != Items.AIR) {
-                        return item.getDescription().getString();
+                        String name = item.getDescription().getString();
+                        if (name != null && !name.isEmpty() && !name.equalsIgnoreCase("air")) {
+                            return name;
+                        }
                     }
                 }
             } catch (Throwable ignored) {}

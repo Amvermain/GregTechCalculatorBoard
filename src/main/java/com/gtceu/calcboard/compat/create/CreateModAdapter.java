@@ -15,6 +15,7 @@ import net.minecraftforge.fml.loading.FMLLoader;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Mod Adapter facade for Create kinetic generators and processing machinery.
@@ -99,17 +100,49 @@ public class CreateModAdapter implements IModAdapter {
     public void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
     }
 
+    public static boolean isFanProcessingRecipe(RecipeNode node) {
+        if (node == null) return false;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            String path = catId.getPath().toLowerCase(Locale.ROOT);
+            if (path.contains("splashing") || path.contains("washing") || path.contains("haunting") || path.contains("smoking") || path.contains("blasting")) {
+                return true;
+            }
+        }
+        ResourceLocation icon = node.getMachineIcon();
+        if (icon != null) {
+            String path = icon.getPath().toLowerCase(Locale.ROOT);
+            if (path.contains("encased_fan") || path.contains("fan")) {
+                return true;
+            }
+        }
+        String name = node.getName().toLowerCase(Locale.ROOT);
+        return name.contains("fan blasting") || name.contains("fan washing") || name.contains("fan splashing") || name.contains("fan smoking") || name.contains("fan haunting");
+    }
+
     @Override
     public OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
         int rpm = node.getRpm();
         double baseDuration = node.getBaseDurationTicks();
         double basePower = node.getBaseEUt();
 
+        boolean isFanProcessing = isFanProcessingRecipe(node);
+
         // 32 RPM is the baseline standard speed (1.0x)
         double speedFactor = Math.max(0.01, rpm / 32.0);
-        double rawDuration = baseDuration / speedFactor;
-        double durationTicks = Math.max(1.0, rawDuration);
-        double batchesPerTick = (rawDuration < 1.0 && rawDuration > 0.0) ? (1.0 / rawDuration) : 1.0;
+
+        double durationTicks;
+        double batchesPerTick;
+        if (isFanProcessing) {
+            // In Create mod, Fan processing (blasting/washing/smoking/haunting) duration is fixed in-world.
+            // RPM only affects airflow distance/range, NOT processing speed!
+            durationTicks = Math.max(1.0, baseDuration);
+            batchesPerTick = 1.0;
+        } else {
+            double rawDuration = baseDuration / speedFactor;
+            durationTicks = Math.max(1.0, rawDuration);
+            batchesPerTick = (rawDuration < 1.0 && rawDuration > 0.0) ? (1.0 / rawDuration) : 1.0;
+        }
 
         double effectivePower;
         if (isGenerator) {
@@ -156,6 +189,16 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
         return CreateGuiHandler.handleControlScroll(widget, node, mouseX, mouseY, delta);
+    }
+
+    @Override
+    public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        CreateGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    @Override
+    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        return CreateGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {

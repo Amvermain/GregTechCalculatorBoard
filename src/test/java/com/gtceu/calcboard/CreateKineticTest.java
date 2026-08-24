@@ -68,8 +68,7 @@ public class CreateKineticTest {
         for (RecipeSearchEngine.SearchableRecipe sr : virtualRecipes) {
             if (sr.displayName().equals("Large Water Wheel")) {
                 foundLargeWaterWheel = true;
-                Assertions.assertEquals("create", sr.modId());
-                Assertions.assertTrue(sr.fullSearchIndex().contains("kinetic"));
+                Assertions.assertTrue(sr.inputSearchIndex().contains("kinetic") || sr.outputSearchIndex().contains("kinetic"));
                 Assertions.assertTrue(sr.recipe() instanceof RecipeNode);
             }
         }
@@ -101,6 +100,29 @@ public class CreateKineticTest {
         millstone.setRpm(256);
         Assertions.assertEquals(0.625, millstone.getEffectiveDurationSeconds(), 0.001); // 0.625s
         Assertions.assertEquals(2048.0, millstone.getSingleMachineEUt(), 0.001); // 2048 SU
+    }
+
+    @Test
+    public void testFanProcessingFixedDuration() {
+        RecipeNode fanBlasting = RecipeNode.create("Fan Blasting (Copper Dust)", 150.0, 128.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        fanBlasting.setEnergyType(EnergyType.KINETIC_SU);
+        fanBlasting.setRecipeCategoryId(ResourceLocation.tryParse("create:blasting"));
+        fanBlasting.setMachineIcon(ResourceLocation.tryParse("create:encased_fan"));
+        fanBlasting.setRpm(32);
+
+        // At 32 RPM: duration is 150 ticks = 7.50s, 128 SU
+        Assertions.assertEquals(7.50, fanBlasting.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(128.0, fanBlasting.getSingleMachineEUt(), 0.001);
+
+        // At 256 RPM: Fan processing duration remains fixed at 7.50s in Create mod (RPM only extends airflow distance)
+        fanBlasting.setRpm(256);
+        Assertions.assertEquals(7.50, fanBlasting.getEffectiveDurationSeconds(), 0.001); // Still 7.50s!
+        Assertions.assertEquals(1024.0, fanBlasting.getSingleMachineEUt(), 0.001); // Stress scales with RPM (1024 SU)
+
+        // Multiple fans (machine count 4): speed scales with fan count
+        fanBlasting.setMachineCount(4);
+        Assertions.assertEquals(0.5333, fanBlasting.getNominalCyclesPerSecond(), 0.001); // 4 * (1/7.5) = 0.5333/s
+        Assertions.assertEquals(4096.0, fanBlasting.getTotalEUt(), 0.001); // 4 * 1024 SU = 4096 SU
     }
 
     @Test

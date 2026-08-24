@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
+import com.gtceu.calcboard.compat.start.StarTModAdapter;
 import com.gtceu.calcboard.compat.systeams.SysteamsModAdapter;
 import com.gtceu.calcboard.compat.thermal.ThermalModAdapter;
 import com.gtceu.calcboard.compat.vanilla.VanillaModAdapter;
@@ -66,6 +67,8 @@ public class ModAdapterRegistryTest {
         gtNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
         IModAdapter gtAdapter = ModAdapterRegistry.getAdapterForNode(gtNode);
         Assertions.assertInstanceOf(GTCEuModAdapter.class, gtAdapter);
+        Assertions.assertEquals("gtceu", gtAdapter.getModId());
+        Assertions.assertFalse(gtAdapter instanceof StarTModAdapter);
 
         // 2. Thermal Dynamo Node
         RecipeNode dynNode = RecipeNode.create("Lapidary Dynamo", 1500.0, 50.0, GTVoltageTier.LV);
@@ -81,5 +84,36 @@ public class ModAdapterRegistryTest {
         boilerNode.setMachineIcon(ResourceLocation.tryParse("systeams:lapidary_boiler"));
         IModAdapter sysAdapter = ModAdapterRegistry.getAdapterForNode(boilerNode);
         Assertions.assertInstanceOf(SysteamsModAdapter.class, sysAdapter);
+
+        // 4. Star Technology Gravitational Compression Chamber (GCC) - routes to StarTModAdapter
+        RecipeNode gccNode = RecipeNode.create("Gravitational Compression Chamber [GCC]", 200.0, 1920.0, GTVoltageTier.EV);
+        gccNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:compressor"));
+        gccNode.setMachineIcon(ResourceLocation.tryParse("start_core:gravitational_compression_chamber"));
+        IModAdapter gccAdapter = ModAdapterRegistry.getAdapterForNode(gccNode);
+        Assertions.assertInstanceOf(StarTModAdapter.class, gccAdapter);
+        Assertions.assertEquals("start_core", gccAdapter.getModId());
+        Assertions.assertFalse(com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(gccNode));
+
+        // 5. Plasma Turbines (LPT, SPT, NPT)
+        RecipeNode nptNode = RecipeNode.create("Nyinsane Plasma Turbine", 10.0, 196608.0, GTVoltageTier.MAX);
+        nptNode.setGenerator(true);
+        nptNode.setMultiblock(true);
+        nptNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_turbine"));
+        nptNode.setMachineIcon(ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"));
+
+        IModAdapter nptAdapter = ModAdapterRegistry.getAdapterForNode(nptNode);
+        Assertions.assertInstanceOf(StarTModAdapter.class, nptAdapter);
+        Assertions.assertTrue(nptAdapter.getApplicableAddonCategories(nptNode).contains(com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT));
+
+        com.gtceu.calcboard.api.MachineAddon nptCoolant = new com.gtceu.calcboard.api.MachineAddon(
+                "gtceu:npt_coolant_boosting", "NPT Coolant", com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT, "+150% EU/t", null
+        );
+        com.gtceu.calcboard.api.MachineAddon sptCoolant = new com.gtceu.calcboard.api.MachineAddon(
+                "gtceu:spt_coolant_boosting", "SPT Coolant", com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT, "+75% EU/t", null
+        );
+
+        // NPT node must accept NPT coolant, reject SPT coolant
+        Assertions.assertTrue(nptAdapter.isAddonCompatible(nptNode, nptCoolant));
+        Assertions.assertFalse(nptAdapter.isAddonCompatible(nptNode, sptCoolant));
     }
 }

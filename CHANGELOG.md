@@ -8,6 +8,61 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.8] - 2026-08-25
+
+### Added
+- **Star Technology & Threading Helix System (`StarTModAdapter`, `StarTAddonCrawler`, `StarTTurbineHelper`, `GTThreadingHelix`, `NodeThreadingConfig`, `MachineConfigDialog`, `NodeCardRenderer`)**:
+  - Added dedicated `[🧵 Threading]` sub-tab in `MachineConfigDialog` for all GTCEu multiblock machines supporting Threading (Generalis, Velocitas, Efficienta, Parallelismus, Filum).
+  - Live two-way synchronization between the Threading Builder and the top `Active Addons` tray with combined stats badges and quantity indicators (e.g. `8x OpV Weaving Thread Helix`).
+  - Added item decoration quantity badges on addon slot icons and node card trays (e.g. `8`).
+  - Multi-model Plasma Turbine support: Large Plasma Turbine (LPT, $1\times$), Supreme Plasma Turbine (SPT, $6\times$), and Nyinsane Plasma Turbine (NPT, $12\times$).
+  - Star Technology Multiblock Traits: Lubricant Boosting (+25% / +50% EU/t with Tungsten Disulfide) and Coolant Boosting (+75% / +150% EU/t with Superstate Helium 3 / Oganesson Stabilized BEC).
+- **GregTech Steam-Era Processing Machinery (LP Bronze / HP Steel) & Direct Steam Consumption Mode (`SteamMode`, `RecipeNode`, `CategoryCapabilityMatrix`, `GTCEuGuiHandler`, `MachineConfigDialog`)**:
+  - Added direct steam processing modes (`LP Steam`, `HP Steam`) for all GregTech recipes that support steam processing machinery (Macerators, Compressors, Alloy Smelters, Furnaces, Extractors, Rock Breakers, etc.).
+  - **GregTech Steam Physics Ratio**: $1\text{ EU} = 2\text{ mB Steam}$ ($2\text{ L Steam}$).
+  - **Low Pressure Steam (LP Bronze)**: $2.0\times$ duration ($0.5\times$ speed), disconnected from electric EU grid ($0\text{ EU/t}$), activates a $\text{BaseEUt} \times 2\text{ mB/t}$ Steam (`gtceu:steam`) fluid input slot.
+  - **High Pressure Steam (HP Steel)**: $1.0\times$ duration ($1.0\times$ standard LV speed), disconnected from electric EU grid ($0\text{ EU/t}$), activates a $\text{BaseEUt} \times 2\text{ mB/t}$ Steam (`gtceu:steam`) fluid input slot.
+  - **Node Card Controls & Dialog Presets**: Interactive tier button cycling (`[LP Steam] ↔ [HP Steam] ↔ [LV] ↔ ...`) and 1-click preset buttons in `MachineConfigDialog`.
+  - **Direct Boiler Wiring & Auto-Ratio**: Seamlessly drag steam wires from Steam Boilers (`gtceu:steam_boiler`) directly to steam machines, fully supporting `Shift + Connect` Auto-Ratio machine scaling.
+- **Favorites Interactions & Live Synchronization (`RecipeSearchDialog`, `FavoritesDockWidget`)**:
+  - Added favorite star (⭐) toggle button to each recipe search result row and right-click to toggle favorite status.
+  - Added right-click on items in the Favorites Dock to instantly remove them from favorites.
+  - Enhanced workstation (machine item) favorites to correctly display all processable recipes in the search dialog's `[⭐ Favorites]` filter.
+
+### Changed & Improved
+- **GTCEu Modern / Star Technology Architecture Decoupling (`StarTModAdapter`, `ModAdapterRegistry`, `IModAdapter`)**:
+  - Cleanly isolated Star Technology and Threading mechanics into `StarTModAdapter` via the `IModAdapter` SPI pattern without hardcoding mod-specific logic into GTCEu core.
+- **Massive RAM & GC Optimization for 4GB Low-Memory Environments (`RecipeSearchEngine`, `DynamicAddonCrawler`, `ClientForgeEvents`, `CategoryCapabilityMatrix`)**:
+  - Completely refactored `SearchableRecipe` with the Flyweight pattern and `String.intern()`, reducing total recipe search heap allocation from **~320MB down to ~14MB (>95% reduction)** across 80,000+ recipes.
+  - Deduplicated item outputs by `Item` and NBT keys (`Set<Item>`) during dynamic addon crawler passes, slashing temporary heap allocations by >98%.
+  - Added automatic cache eviction (`clearGlobalCache`, `reset`) and explicit `System.gc()` call on world logout (`ClientPlayerNetworkEvent.LoggingOut`) to prevent `OutOfMemoryError` and data pack reload failures when reloading worlds on 4GB RAM.
+  - Eliminated per-frame list copying in `FavoritesDockWidget` and cached `findRecipesForFavorite` lookups to prevent periodic GC stuttering during rendering.
+- **Virtual FE Item Cleanup & Grid Energy Refinement (`CreateNewAgeRecipeHandler`, `CreateRecipeHandler`, `CreateNewAgeModAdapter`)**:
+  - Removed duplicate virtual `FE` item input/output slots from Generator Coils, Carbon Brushes, and Motors.
+  - Recipe item slots now only contain physical resources (Stress Units, items, fluids), while electricity is cleanly aggregated at the grid level on card headers and the summary overlay.
+- **Create Encased Fan Fixed Processing Duration (`CreateModAdapter`, `CreateGuiHandler`)**:
+  - Aligned Encased Fan bulk processing (Blasting, Splashing/Washing, Smoking, Haunting) with vanilla Create mechanics: processing time remains fixed (default 7.5s) regardless of RPM, as RPM only extends airflow reach/distance and increases SU impact.
+  - Added tooltip guidance noting that throughput is increased by placing multiple fans (`Machine Count: N`), not by speeding up RPM.
+- **Full GregTech Steam Boiler & Steam Production Support (`GTCEuRecipeHandler`, `GTCEuModAdapter`, `SysteamsModAdapter`)**:
+  - Fixed category routing collision where `SysteamsModAdapter` hijacked `gtceu:steam_boiler` recipes.
+  - Automatically calculates fuel burn, water consumption (`minecraft:water`), and steam production (`gtceu:steam`) based on official GTCEu ratios (Small Bronze Boiler baseline: $120\text{ L/s} = 6\text{ mB/t}$ Steam, $1\text{mB Water} \rightarrow 160\text{mB Steam}$).
+  - Automatically generates empty container outputs (e.g. `minecraft:bucket` from Lava Buckets).
+  - Supported speed & throughput scaling across all boiler tiers: High Pressure Steel Boiler ($3\times$), Large Bronze Boiler ($8\times$), Large Steel Boiler ($15\times$), Large Titanium Boiler ($26.6\times$), and Large Tungstensteel Boiler ($40\times$).
+- **Removed Recipe Shortcut Key ('A') (`ClientForgeEvents`, `KeyBindings`)**:
+  - Removed screen shortcut key recipe addition to eliminate keybinding conflicts with EMI/JEI bookmarks.
+
+### Fixed
+- **GTCEu Turbine Rotor Material NBT Persistence & Texture Tint Restoration (`GTRotorAddon`, `MachineAddon`, `TurbineRotorHelper`)**:
+  - Fixed turbine rotor material loss and color tint reverting to default Neutronium texture after returning from the Main Menu or reloading worlds.
+  - Serialized full `ItemStack` NBT (`GT.PartStats: {Material: ...}`) into `MachineAddon` save tags and added dynamic fallback material reconstruction in `GTRotorAddon.getItemStackSample()`.
+- **Plasma Turbine Trait Retrieval & Fluid Name Resolution (`GTCEuAddonCrawler`, `StarTAddonCrawler`, `GTTurbineHelper`, `StarTTurbineHelper`, `IngredientRenderer`)**:
+  - Fixed energy type condition in `isTurbine` and relaxed model matching in `isCompatibleStarTTrait`, allowing SPT/NPT boosting traits to properly display in `[📜 Traits]` and `[All]` tabs.
+  - Added dynamic namespace resolution (`gtceu`, `start_core`, `gtceu_start`) for boosting fluids, preventing `Fluids.EMPTY` from falling back to `AIR` text and icon.
+- **Threading Sub-Tab Label Overlap (`MachineConfigDialog`)**:
+  - Shortened sub-tab button labels (`Sup`, `Spd`, `Par`, `Thrd`) to eliminate text clipping and overlap.
+
+---
+
 ## [2.0.0-alpha.7] - 2026-08-23
 
 ### Added

@@ -95,6 +95,9 @@ public class MachineAddon {
             try {
                 String stackName = itemStackSample.getHoverName().getString();
                 if (stackName != null && !stackName.isEmpty() && !stackName.contains("%s")) {
+                    if (itemStackSample.getCount() > 1 && !stackName.startsWith(itemStackSample.getCount() + "x") && !stackName.startsWith(itemStackSample.getCount() + " ")) {
+                        return itemStackSample.getCount() + "x " + stackName;
+                    }
                     return stackName;
                 }
             } catch (Throwable ignored) {}
@@ -139,12 +142,32 @@ public class MachineAddon {
     }
 
     public String getDescription() {
-        if (description != null && (description.startsWith("gui.gtcalcboard.") || description.contains("."))) {
+        if (description != null && !description.trim().isEmpty()) {
+            if (description.startsWith("gui.gtcalcboard.") || description.startsWith("item.") || description.startsWith("block.")) {
+                try {
+                    return Component.translatable(description).getString();
+                } catch (Throwable ignored) {}
+            }
+            return description;
+        }
+        if (itemStackSample != null && !itemStackSample.isEmpty()) {
             try {
-                return Component.translatable(description).getString();
+                var player = Minecraft.getInstance().player;
+                var lines = itemStackSample.getTooltipLines(player, TooltipFlag.Default.NORMAL);
+                if (lines != null && lines.size() > 1) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 1; i < lines.size(); i++) {
+                        String t = lines.get(i).getString().trim();
+                        if (!t.isEmpty()) {
+                            if (sb.length() > 0) sb.append(" | ");
+                            sb.append(t);
+                        }
+                    }
+                    if (sb.length() > 0) return sb.toString();
+                }
             } catch (Throwable ignored) {}
         }
-        if (itemIcon != null) {
+        if (itemIcon != null && !itemIcon.getPath().contains("rotor")) {
             try {
                 var item = ForgeRegistries.ITEMS.getValue(itemIcon);
                 if (item != null && item != Items.AIR) {
@@ -165,7 +188,7 @@ public class MachineAddon {
                 }
             } catch (Throwable ignored) {}
         }
-        return description != null ? description : "";
+        return "";
     }
 
     public String getRawDescription() {
@@ -438,11 +461,19 @@ public class MachineAddon {
         if (discoverySource != null) {
             tag.putString("discoverySource", discoverySource);
         }
+        if (itemStackSample != null && !itemStackSample.isEmpty()) {
+            tag.put("itemStackSample", itemStackSample.serializeNBT());
+        }
         return tag;
     }
 
     public void deserializeAdditionalNBT(CompoundTag tag) {
         if (tag.contains("modId")) setModId(tag.getString("modId"));
+        if (tag.contains("itemStackSample")) {
+            try {
+                setItemStackSample(ItemStack.of(tag.getCompound("itemStackSample")));
+            } catch (Throwable ignored) {}
+        }
         if (tag.contains("durationMultiplier")) setDurationMultiplier(tag.getDouble("durationMultiplier"));
         if (tag.contains("eutMultiplier")) setEutMultiplier(tag.getDouble("eutMultiplier"));
         if (tag.contains("parallelMultiplier")) setParallelMultiplier(tag.getInt("parallelMultiplier"));

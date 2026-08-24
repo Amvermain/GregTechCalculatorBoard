@@ -5,6 +5,9 @@ import dev.emi.emi.api.recipe.EmiRecipeCategory;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,17 +34,65 @@ public class RecipeSearchEngine {
             String modId,
             String categoryId,
             String categoryName,
-            List<String> outputNames,
-            List<String> inputNames,
-            List<String> outputIds,
-            List<String> inputIds,
-            List<String> outputFluidIds,
-            List<String> inputFluidIds,
-            List<String> tags,
-            String outputSearchIndex,
-            String inputSearchIndex,
-            String fullSearchIndex
-    ) {}
+            String inputIndex,
+            String outputIndex,
+            Set<ResourceLocation> inputIds,
+            Set<ResourceLocation> outputIds,
+            Set<String> inputPaths,
+            Set<String> outputPaths,
+            Set<String> inputNames,
+            Set<String> outputNames
+    ) {
+        public SearchableRecipe(
+                Object recipe,
+                String displayName,
+                String modId,
+                String categoryId,
+                String categoryName,
+                String inputIndex,
+                String outputIndex
+        ) {
+            this(recipe, displayName, modId, categoryId, categoryName, inputIndex, outputIndex,
+                    Collections.emptySet(), Collections.emptySet(), Collections.emptySet(), Collections.emptySet(), Collections.emptySet(), Collections.emptySet());
+        }
+
+        public boolean hasExactInput(ResourceLocation id) {
+            return id != null && inputIds != null && inputIds.contains(id);
+        }
+
+        public boolean hasExactOutput(ResourceLocation id) {
+            return id != null && outputIds != null && outputIds.contains(id);
+        }
+
+        public boolean hasInputPath(String path) {
+            return path != null && inputPaths != null && inputPaths.contains(path.toLowerCase(Locale.ROOT));
+        }
+
+        public boolean hasOutputPath(String path) {
+            return path != null && outputPaths != null && outputPaths.contains(path.toLowerCase(Locale.ROOT));
+        }
+
+        public boolean hasExactInputName(String name) {
+            return name != null && inputNames != null && inputNames.contains(name.toLowerCase(Locale.ROOT));
+        }
+
+        public boolean hasExactOutputName(String name) {
+            return name != null && outputNames != null && outputNames.contains(name.toLowerCase(Locale.ROOT));
+        }
+
+        public boolean hasInput(String token) {
+            if (token == null || token.isEmpty()) return false;
+            return inputIndex != null && inputIndex.contains(token.toLowerCase(Locale.ROOT));
+        }
+
+        public boolean hasOutput(String token) {
+            if (token == null || token.isEmpty()) return false;
+            return outputIndex != null && outputIndex.contains(token.toLowerCase(Locale.ROOT));
+        }
+
+        public String inputSearchIndex() { return inputIndex != null ? inputIndex : ""; }
+        public String outputSearchIndex() { return outputIndex != null ? outputIndex : ""; }
+    }
 
     public static Map<String, CategoryInfo> discoverCategories(List<SearchableRecipe> allRecipes) {
         Map<String, CategoryInfo> map = new LinkedHashMap<>();
@@ -105,49 +156,46 @@ public class RecipeSearchEngine {
         String categoryName = "";
 
         if (recipe.getId() != null) {
-            modId = recipe.getId().getNamespace().toLowerCase(Locale.ROOT);
+            modId = recipe.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
         }
 
         EmiRecipeCategory cat = recipe.getCategory();
         if (cat != null) {
             if (cat.getId() != null) {
-                categoryId = cat.getId().getPath().toLowerCase(Locale.ROOT);
+                categoryId = cat.getId().getPath().toLowerCase(Locale.ROOT).intern();
                 if (modId.isEmpty()) {
-                    modId = cat.getId().getNamespace().toLowerCase(Locale.ROOT);
+                    modId = cat.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
                 }
             }
             try {
                 if (cat.getName() != null) {
-                    categoryName = cat.getName().getString().toLowerCase(Locale.ROOT);
+                    categoryName = cat.getName().getString().toLowerCase(Locale.ROOT).intern();
                 }
             } catch (Throwable ignored) {}
         }
 
-        List<String> outputNames = new ArrayList<>();
-        List<String> outputIds = new ArrayList<>();
-        List<String> outputFluidIds = new ArrayList<>();
+        Set<ResourceLocation> outputIds = new HashSet<>();
+        Set<String> outputPaths = new HashSet<>();
+        Set<String> outputNames = new HashSet<>();
         StringBuilder outSb = new StringBuilder();
-
         if (recipe.getOutputs() != null) {
             for (EmiStack out : recipe.getOutputs()) {
                 if (out != null) {
-                    indexStack(out, outputNames, outputIds, outputFluidIds, outSb);
+                    indexStackCompact(out, outSb, outputIds, outputPaths, outputNames);
                 }
             }
         }
 
-        List<String> inputNames = new ArrayList<>();
-        List<String> inputIds = new ArrayList<>();
-        List<String> inputFluidIds = new ArrayList<>();
-        List<String> tags = new ArrayList<>();
+        Set<ResourceLocation> inputIds = new HashSet<>();
+        Set<String> inputPaths = new HashSet<>();
+        Set<String> inputNames = new HashSet<>();
         StringBuilder inSb = new StringBuilder();
-
         if (recipe.getInputs() != null) {
             for (EmiIngredient in : recipe.getInputs()) {
                 if (in != null && in.getEmiStacks() != null) {
                     for (EmiStack stack : in.getEmiStacks()) {
                         if (stack != null) {
-                            indexStack(stack, inputNames, inputIds, inputFluidIds, inSb);
+                            indexStackCompact(stack, inSb, inputIds, inputPaths, inputNames);
                         }
                     }
                 }
@@ -156,19 +204,46 @@ public class RecipeSearchEngine {
 
         // Index virtual kinetic input for Create machine recipes
         if (cat != null && cat.getId() != null && ("create".equals(cat.getId().getNamespace()) || "createaddition".equals(cat.getId().getNamespace()))) {
-            inputIds.add("create:stress_units");
-            inputIds.add("stress_units");
+            inSb.append(" create:stress_units stress_units stress units");
+            inputPaths.add("stress_units");
             inputNames.add("stress units");
-            inSb.append("create:stress_units stress_units stress units ");
         }
 
-        StringBuilder fullSb = new StringBuilder();
-        fullSb.append(displayName.toLowerCase(Locale.ROOT)).append(" ");
-        if (!modId.isEmpty()) fullSb.append(modId).append(" ");
-        if (!categoryId.isEmpty()) fullSb.append(categoryId).append(" ");
-        if (!categoryName.isEmpty()) fullSb.append(categoryName).append(" ");
-        if (recipe.getId() != null) fullSb.append(recipe.getId().toString().toLowerCase(Locale.ROOT)).append(" ");
-        fullSb.append(outSb).append(" ").append(inSb);
+        // Index custom adapter recipe outputs/inputs (e.g. gtceu:steam_boiler -> steam output, water input)
+        try {
+            com.gtceu.calcboard.integration.emi.EmiRecipeConverter.RecipeDetails details =
+                    com.gtceu.calcboard.integration.emi.EmiRecipeConverter.extractRecipeDetails(recipe, null);
+            if (details != null) {
+                if (details.overrideOutputs && !details.customOutputs.isEmpty()) {
+                    for (com.gtceu.calcboard.api.IngredientStack cos : details.customOutputs) {
+                        if (cos != null && cos.getId() != null) {
+                            outputIds.add(cos.getId());
+                            outputPaths.add(cos.getId().getPath().toLowerCase(Locale.ROOT));
+                            if (cos.getDisplayName() != null) {
+                                outputNames.add(cos.getDisplayName().toLowerCase(Locale.ROOT));
+                                outSb.append(' ').append(cos.getDisplayName().toLowerCase(Locale.ROOT));
+                            }
+                            outSb.append(' ').append(cos.getId().toString().toLowerCase(Locale.ROOT));
+                            outSb.append(' ').append(cos.getId().getPath().toLowerCase(Locale.ROOT));
+                        }
+                    }
+                }
+                if (!details.extraInputs.isEmpty()) {
+                    for (com.gtceu.calcboard.api.IngredientStack ein : details.extraInputs) {
+                        if (ein != null && ein.getId() != null) {
+                            inputIds.add(ein.getId());
+                            inputPaths.add(ein.getId().getPath().toLowerCase(Locale.ROOT));
+                            if (ein.getDisplayName() != null) {
+                                inputNames.add(ein.getDisplayName().toLowerCase(Locale.ROOT));
+                                inSb.append(' ').append(ein.getDisplayName().toLowerCase(Locale.ROOT));
+                            }
+                            inSb.append(' ').append(ein.getId().toString().toLowerCase(Locale.ROOT));
+                            inSb.append(' ').append(ein.getId().getPath().toLowerCase(Locale.ROOT));
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
 
         // Index category workstations (e.g. Lapidary Boiler, Electric Blast Furnace, Large Chemical Reactor)
         if (cat != null) {
@@ -182,12 +257,12 @@ public class RecipeSearchEngine {
                                 for (EmiStack wsStack : wsIng.getEmiStacks()) {
                                     if (wsStack != null) {
                                         if (wsStack.getId() != null) {
-                                            fullSb.append(" ").append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
-                                            fullSb.append(" ").append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
+                                            inSb.append(' ').append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
+                                            inSb.append(' ').append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
                                         }
                                         try {
                                             if (wsStack.getName() != null) {
-                                                fullSb.append(" ").append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
+                                                inSb.append(' ').append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
                                             }
                                         } catch (Throwable ignored) {}
                                     }
@@ -205,17 +280,36 @@ public class RecipeSearchEngine {
                 modId,
                 categoryId,
                 categoryName,
-                outputNames,
-                inputNames,
-                outputIds,
+                inSb.toString().trim(),
+                outSb.toString().trim(),
                 inputIds,
-                outputFluidIds,
-                inputFluidIds,
-                tags,
-                outSb.toString(),
-                inSb.toString(),
-                fullSb.toString()
+                outputIds,
+                inputPaths,
+                outputPaths,
+                inputNames,
+                outputNames
         );
+    }
+
+    private static void indexStackCompact(EmiStack stack, StringBuilder sb, Set<ResourceLocation> ids, Set<String> paths, Set<String> names) {
+        if (stack == null) return;
+        ResourceLocation id = stack.getId();
+        if (id != null) {
+            ids.add(id);
+            paths.add(id.getPath().toLowerCase(Locale.ROOT));
+            sb.append(' ').append(id.toString().toLowerCase(Locale.ROOT));
+            sb.append(' ').append(id.getPath().toLowerCase(Locale.ROOT));
+        }
+        try {
+            Component name = stack.getName();
+            if (name != null) {
+                String n = name.getString().toLowerCase(Locale.ROOT);
+                if (!n.isEmpty()) {
+                    names.add(n);
+                    sb.append(' ').append(n);
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     private static void indexStack(EmiStack stack, List<String> names, List<String> ids, List<String> fluidIds, StringBuilder sb) {
@@ -444,87 +538,62 @@ public class RecipeSearchEngine {
 
     private static boolean matchesTerm(SearchableRecipe recipe, QueryTerm term) {
         String text = term.text();
-        String textSpaced = text.replace('_', ' ');
-        String textUnder = text.replace(' ', '_');
+        String textSpaced = text.replace('_', ' ').trim();
+        String textUnder = text.replace(' ', '_').trim();
+        String textClean = text.replaceAll("_+$", "").trim();
 
         return switch (term.scope()) {
-            case INPUT -> matchesInput(recipe, term.type(), text, textSpaced, textUnder);
-            case OUTPUT -> matchesOutput(recipe, term.type(), text, textSpaced, textUnder);
-            case ALL -> matchesAll(recipe, term.type(), text, textSpaced, textUnder);
+            case INPUT -> matchesInput(recipe, term.type(), text, textSpaced, textUnder, textClean);
+            case OUTPUT -> matchesOutput(recipe, term.type(), text, textSpaced, textUnder, textClean);
+            case ALL -> matchesAll(recipe, term.type(), text, textSpaced, textUnder, textClean);
         };
     }
 
-    private static boolean matchesInput(SearchableRecipe recipe, MatchType type, String text, String textSpaced, String textUnder) {
+    private static boolean matchesInput(SearchableRecipe recipe, MatchType type, String text, String textSpaced, String textUnder, String textClean) {
         return switch (type) {
-            case MOD_ID -> {
-                for (String id : recipe.inputIds()) {
-                    if (id.startsWith(text + ":") || id.contains(text)) yield true;
-                }
-                yield false;
-            }
-            case TAG -> {
-                for (String id : recipe.inputIds()) {
-                    if (id.contains(text) || id.contains(textUnder)) yield true;
-                }
-                for (String t : recipe.tags()) {
-                    if (t.contains(text) || t.contains(textUnder)) yield true;
-                }
-                yield false;
-            }
+            case MOD_ID -> recipe.inputSearchIndex().startsWith(text + ":") || recipe.inputSearchIndex().contains(" " + text + ":") || recipe.inputSearchIndex().contains(text);
+            case TAG -> recipe.inputSearchIndex().contains(text) || recipe.inputSearchIndex().contains(textUnder);
             case CATEGORY -> false;
             case GENERAL -> recipe.inputSearchIndex().contains(text)
-                    || (!textSpaced.equals(text) && recipe.inputSearchIndex().contains(textSpaced))
-                    || (!textUnder.equals(text) && recipe.inputSearchIndex().contains(textUnder));
+                    || (!textSpaced.isEmpty() && recipe.inputSearchIndex().contains(textSpaced))
+                    || (!textUnder.isEmpty() && recipe.inputSearchIndex().contains(textUnder))
+                    || (!textClean.isEmpty() && recipe.inputSearchIndex().contains(textClean));
         };
     }
 
-    private static boolean matchesOutput(SearchableRecipe recipe, MatchType type, String text, String textSpaced, String textUnder) {
+    private static boolean matchesOutput(SearchableRecipe recipe, MatchType type, String text, String textSpaced, String textUnder, String textClean) {
         return switch (type) {
-            case MOD_ID -> {
-                for (String id : recipe.outputIds()) {
-                    if (id.startsWith(text + ":") || id.contains(text)) yield true;
-                }
-                yield false;
-            }
-            case TAG -> {
-                for (String id : recipe.outputIds()) {
-                    if (id.contains(text) || id.contains(textUnder)) yield true;
-                }
-                for (String t : recipe.tags()) {
-                    if (t.contains(text) || t.contains(textUnder)) yield true;
-                }
-                yield false;
-            }
+            case MOD_ID -> recipe.outputSearchIndex().startsWith(text + ":") || recipe.outputSearchIndex().contains(" " + text + ":") || recipe.outputSearchIndex().contains(text);
+            case TAG -> recipe.outputSearchIndex().contains(text) || recipe.outputSearchIndex().contains(textUnder);
             case CATEGORY -> false;
             case GENERAL -> recipe.outputSearchIndex().contains(text)
                     || recipe.displayName().toLowerCase(Locale.ROOT).contains(text)
-                    || (!textSpaced.equals(text) && (recipe.outputSearchIndex().contains(textSpaced) || recipe.displayName().toLowerCase(Locale.ROOT).contains(textSpaced)))
-                    || (!textUnder.equals(text) && (recipe.outputSearchIndex().contains(textUnder) || recipe.displayName().toLowerCase(Locale.ROOT).contains(textUnder)));
+                    || (!textSpaced.isEmpty() && (recipe.outputSearchIndex().contains(textSpaced) || recipe.displayName().toLowerCase(Locale.ROOT).contains(textSpaced)))
+                    || (!textUnder.isEmpty() && (recipe.outputSearchIndex().contains(textUnder) || recipe.displayName().toLowerCase(Locale.ROOT).contains(textUnder)))
+                    || (!textClean.isEmpty() && (recipe.outputSearchIndex().contains(textClean) || recipe.displayName().toLowerCase(Locale.ROOT).contains(textClean)));
         };
     }
 
-    private static boolean matchesAll(SearchableRecipe recipe, MatchType type, String text, String textSpaced, String textUnder) {
+    private static boolean matchesAll(SearchableRecipe recipe, MatchType type, String text, String textSpaced, String textUnder, String textClean) {
         return switch (type) {
-            case MOD_ID -> recipe.modId().contains(text);
-            case TAG -> {
-                for (String t : recipe.tags()) {
-                    if (t.contains(text) || t.contains(textUnder)) yield true;
-                }
-                for (String id : recipe.inputIds()) {
-                    if (id.contains(text) || id.contains(textUnder)) yield true;
-                }
-                for (String id : recipe.outputIds()) {
-                    if (id.contains(text) || id.contains(textUnder)) yield true;
-                }
-                yield false;
-            }
+            case MOD_ID -> recipe.modId().contains(text) || recipe.inputSearchIndex().contains(text) || recipe.outputSearchIndex().contains(text);
+            case TAG -> recipe.inputSearchIndex().contains(text) || recipe.inputSearchIndex().contains(textUnder) || recipe.outputSearchIndex().contains(text) || recipe.outputSearchIndex().contains(textUnder);
             case CATEGORY -> recipe.categoryId().contains(text)
                     || recipe.categoryId().contains(textUnder)
                     || recipe.categoryName().contains(text)
                     || recipe.categoryName().contains(textSpaced);
-            case GENERAL -> recipe.fullSearchIndex().contains(text)
-                    || (!textSpaced.equals(text) && recipe.fullSearchIndex().contains(textSpaced))
-                    || (!textUnder.equals(text) && recipe.fullSearchIndex().contains(textUnder));
+            case GENERAL -> {
+                String dNameLower = recipe.displayName().toLowerCase(Locale.ROOT);
+                yield dNameLower.contains(text)
+                        || recipe.outputSearchIndex().contains(text)
+                        || recipe.inputSearchIndex().contains(text)
+                        || recipe.categoryName().contains(text)
+                        || recipe.categoryId().contains(text)
+                        || recipe.modId().contains(text)
+                        || (!textSpaced.isEmpty() && (dNameLower.contains(textSpaced) || recipe.outputSearchIndex().contains(textSpaced) || recipe.inputSearchIndex().contains(textSpaced) || recipe.categoryName().contains(textSpaced)))
+                        || (!textUnder.isEmpty() && (dNameLower.contains(textUnder) || recipe.outputSearchIndex().contains(textUnder) || recipe.inputSearchIndex().contains(textUnder) || recipe.categoryId().contains(textUnder)))
+                        || (!textClean.isEmpty() && (dNameLower.contains(textClean) || recipe.outputSearchIndex().contains(textClean) || recipe.inputSearchIndex().contains(textClean) || recipe.categoryName().contains(textClean)));
+            }
         };
     }
 
@@ -545,13 +614,16 @@ public class RecipeSearchEngine {
             for (QueryTerm term : group.terms()) {
                 if (term.negated()) continue;
                 String t = term.text();
+                String tSpaced = t.replace('_', ' ').trim();
+                String tUnder = t.replace(' ', '_').trim();
+                String tClean = t.replaceAll("_+$", "").trim();
                 if (term.scope() == Scope.OUTPUT) {
-                    if (!matchesOutput(recipe, term.type(), t, t.replace('_', ' '), t.replace(' ', '_'))) {
+                    if (!matchesOutput(recipe, term.type(), t, tSpaced, tUnder, tClean)) {
                         allInOutputs = false;
                     }
                     allInInputsOrCat = false;
                 } else if (term.scope() == Scope.INPUT) {
-                    if (!matchesInput(recipe, term.type(), t, t.replace('_', ' '), t.replace(' ', '_'))) {
+                    if (!matchesInput(recipe, term.type(), t, tSpaced, tUnder, tClean)) {
                         allInInputsOrCat = false;
                     }
                     allInOutputs = false;
@@ -632,13 +704,9 @@ public class RecipeSearchEngine {
                     }
                 } else if (term.type() == MatchType.MOD_ID) {
                     if (term.scope() == Scope.INPUT) {
-                        for (String id : recipe.inputIds()) {
-                            if (id.startsWith(t + ":")) { score += 10000; break; }
-                        }
+                        if (recipe.inputSearchIndex().startsWith(t + ":") || recipe.inputSearchIndex().contains(" " + t + ":")) score += 10000;
                     } else if (term.scope() == Scope.OUTPUT) {
-                        for (String id : recipe.outputIds()) {
-                            if (id.startsWith(t + ":")) { score += 10000; break; }
-                        }
+                        if (recipe.outputSearchIndex().startsWith(t + ":") || recipe.outputSearchIndex().contains(" " + t + ":")) score += 10000;
                     } else {
                         if (recipe.modId().equals(t)) {
                             score += 10000;
@@ -647,14 +715,9 @@ public class RecipeSearchEngine {
                         }
                     }
                 } else if (term.type() == MatchType.TAG) {
-                    for (String tag : recipe.tags()) {
-                        if (tag.equals(t) || tag.equals(tUnder)) {
-                            score += 8000;
-                            break;
-                        } else if (tag.contains(t) || tag.contains(tUnder)) {
-                            score += 4000;
-                            break;
-                        }
+                    if (recipe.inputSearchIndex().contains(t) || recipe.inputSearchIndex().contains(tUnder)
+                            || recipe.outputSearchIndex().contains(t) || recipe.outputSearchIndex().contains(tUnder)) {
+                        score += 8000;
                     }
                 } else {
                     if (term.scope() == Scope.OUTPUT) {
@@ -691,8 +754,6 @@ public class RecipeSearchEngine {
                             score += 1500;
                         } else if (recipe.inputSearchIndex().contains(t)) {
                             score += 800;
-                        } else if (recipe.fullSearchIndex().contains(t)) {
-                            score += 100;
                         }
                     }
                 }

@@ -24,14 +24,7 @@ public class RecipeSearchEngineTest {
         outputNames.forEach(o -> outSb.append(o.toLowerCase()).append(" "));
         StringBuilder inSb = new StringBuilder();
         inputNames.forEach(i -> inSb.append(i.toLowerCase()).append(" "));
-
-        StringBuilder fullSb = new StringBuilder();
-        fullSb.append(displayName.toLowerCase()).append(" ");
-        fullSb.append(modId.toLowerCase()).append(" ");
-        fullSb.append(categoryId.toLowerCase()).append(" ");
-        fullSb.append(categoryName.toLowerCase()).append(" ");
-        tags.forEach(t -> fullSb.append(t.toLowerCase()).append(" "));
-        fullSb.append(outSb).append(" ").append(inSb);
+        tags.forEach(t -> outSb.append(t.toLowerCase()).append(" "));
 
         return new SearchableRecipe(
                 null,
@@ -39,16 +32,8 @@ public class RecipeSearchEngineTest {
                 modId.toLowerCase(),
                 categoryId.toLowerCase(),
                 categoryName.toLowerCase(),
-                outputNames,
-                inputNames,
-                outputNames,
-                inputNames,
-                List.of(),
-                List.of(),
-                tags,
-                outSb.toString(),
-                inSb.toString(),
-                fullSb.toString()
+                inSb.toString().trim(),
+                outSb.toString().trim()
         );
     }
 
@@ -305,8 +290,8 @@ public class RecipeSearchEngineTest {
         );
 
         // When looking for producers of Tetrafluoroethylene, ashes recipe does not have it in outputs
-        assertTrue(tetrafluoroethyleneRecipe.outputNames().contains("Tetrafluoroethylene"));
-        assertFalse(ashesRecipe.outputNames().contains("Tetrafluoroethylene"));
+        assertTrue(tetrafluoroethyleneRecipe.hasOutput("Tetrafluoroethylene"));
+        assertFalse(ashesRecipe.hasOutput("Tetrafluoroethylene"));
 
         // When searching "[chemical reactor]", both match category
         ParsedQuery qCategory = RecipeSearchEngine.parseQuery("[chemical reactor]");
@@ -378,5 +363,79 @@ public class RecipeSearchEngineTest {
         ParsedQuery qQuotedOut = RecipeSearchEngine.parseQuery("out:\"Heavy Fuel\"");
         assertTrue(RecipeSearchEngine.matches(chemicalRecipe, qQuotedOut));
         assertFalse(RecipeSearchEngine.matches(steelRecipe, qQuotedOut));
+    }
+
+    @Test
+    public void testSteamProducerExactMatching() {
+        net.minecraft.resources.ResourceLocation steamId = net.minecraft.resources.ResourceLocation.tryParse("gtceu:steam");
+        net.minecraft.resources.ResourceLocation lavaId = net.minecraft.resources.ResourceLocation.tryParse("minecraft:lava");
+        net.minecraft.resources.ResourceLocation steamPipeId = net.minecraft.resources.ResourceLocation.tryParse("gtceu:small_steam_pipe");
+        net.minecraft.resources.ResourceLocation boilerBlockId = net.minecraft.resources.ResourceLocation.tryParse("gtceu:hp_steam_liquid_boiler");
+
+        // 1. Steam Boiler (Lava) recipe: produces Steam fluid
+        SearchableRecipe steamBoilerRecipe = new SearchableRecipe(
+                null,
+                "Steam Boiler (Lava)",
+                "gtceu",
+                "steam_boiler",
+                "Steam Boiler",
+                "minecraft:lava lava gtceu:steam_boiler steam_boiler",
+                "gtceu:steam steam",
+                java.util.Set.of(lavaId),
+                java.util.Set.of(steamId),
+                java.util.Set.of("lava"),
+                java.util.Set.of("steam"),
+                java.util.Set.of("lava"),
+                java.util.Set.of("steam")
+        );
+
+        // 2. Steam Pipe crafting recipe: produces Steam Pipe item (NOT steam fluid)
+        SearchableRecipe steamPipeCrafting = new SearchableRecipe(
+                null,
+                "Steam Pipe",
+                "gtceu",
+                "crafting",
+                "Crafting",
+                "gtceu:bronze_ingot bronze_ingot",
+                "gtceu:small_steam_pipe small_steam_pipe steam pipe",
+                java.util.Collections.emptySet(),
+                java.util.Set.of(steamPipeId),
+                java.util.Collections.emptySet(),
+                java.util.Set.of("small_steam_pipe"),
+                java.util.Collections.emptySet(),
+                java.util.Set.of("steam pipe")
+        );
+
+        // 3. High Pressure Steam Liquid Boiler crafting recipe: produces Boiler block (NOT steam fluid)
+        SearchableRecipe boilerBlockCrafting = new SearchableRecipe(
+                null,
+                "High Pressure Steam Liquid Boiler",
+                "gtceu",
+                "crafting",
+                "Crafting",
+                "gtceu:steel_plate steel_plate",
+                "gtceu:hp_steam_liquid_boiler hp_steam_liquid_boiler high pressure steam liquid boiler",
+                java.util.Collections.emptySet(),
+                java.util.Set.of(boilerBlockId),
+                java.util.Collections.emptySet(),
+                java.util.Set.of("hp_steam_liquid_boiler"),
+                java.util.Collections.emptySet(),
+                java.util.Set.of("high pressure steam liquid boiler")
+        );
+
+        // Exact match verification for Producer search of Steam (gtceu:steam)
+        assertTrue(steamBoilerRecipe.hasExactOutput(steamId));
+        assertFalse(steamPipeCrafting.hasExactOutput(steamId));
+        assertFalse(boilerBlockCrafting.hasExactOutput(steamId));
+
+        // Exact path verification
+        assertTrue(steamBoilerRecipe.hasOutputPath("steam"));
+        assertFalse(steamPipeCrafting.hasOutputPath("steam"));
+        assertFalse(boilerBlockCrafting.hasOutputPath("steam"));
+
+        // Exact display name verification
+        assertTrue(steamBoilerRecipe.hasExactOutputName("steam"));
+        assertFalse(steamPipeCrafting.hasExactOutputName("steam"));
+        assertFalse(boilerBlockCrafting.hasExactOutputName("steam"));
     }
 }

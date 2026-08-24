@@ -15,12 +15,4 @@ public class KeyBindings {
         GLFW.GLFW_KEY_B,
         CATEGORY
     );
-
-    public static final KeyMapping ADD_RECIPE = new KeyMapping(
-        "key.gtcalcboard.add_recipe",
-        KeyConflictContext.GUI,
-        InputConstants.Type.KEYSYM,
-        GLFW.GLFW_KEY_A,
-        CATEGORY
-    );
 }

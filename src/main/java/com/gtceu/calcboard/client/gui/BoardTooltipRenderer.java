@@ -226,7 +226,23 @@ public final class BoardTooltipRenderer {
                     tooltipLines.add(Component.literal(modeStr));
 
                     if (n.isTurbine()) {
-                        tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.rotor.tooltip_eff", String.valueOf(n.getRotorEfficiency())).getString()));
+                        String rName = n.getRotorName();
+                        if (rName == null || rName.isEmpty() || rName.startsWith("Standard")) {
+                            rName = Component.translatable("gui.gtcalcboard.rotor.standard").getString();
+                        }
+                        tooltipLines.add(Component.literal("§6🌀 " + Component.translatable("gui.gtcalcboard.addon_cat.rotor").getString() + ": §f" + rName));
+                        int eff = n.getRotorEfficiency();
+                        int pwr = n.getRotorPower();
+                        int holderBonus = n.getTurbineHolderEfficiencyBonus();
+                        String effStr = "§b⏱ " + Component.translatable("gui.gtcalcboard.rotor.eff").getString() + ": §f" + eff + "%";
+                        if (holderBonus > 0) {
+                            effStr += " §a(+" + holderBonus + "% Holder)";
+                        }
+                        tooltipLines.add(Component.literal(effStr));
+                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.rotor.power").getString() + ": §f" + pwr + "%"));
+                        if (n.getTotalParallel() > 1) {
+                            tooltipLines.add(Component.literal("§b⚙ " + Component.translatable("gui.gtcalcboard.config.total_effective", String.valueOf(n.getTotalParallel())).getString()));
+                        }
                     } else if (n.isCreateMachine()) {
                         tooltipLines.add(Component.literal("§6⚙ " + n.getRpm() + " RPM"));
                     } else {

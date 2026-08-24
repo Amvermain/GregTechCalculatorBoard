@@ -62,7 +62,7 @@ public final class GlobalBalanceAggregator {
                 } else {
                     totalConsumedEUt += nodeEffectiveEUt;
                 }
-                if (node.getTargetTier() != null && node.getTargetTier().ordinal() > highestTier.ordinal()) {
+                if (node.getEnergyType() == EnergyType.ELECTRIC_EU && node.getTargetTier() != null && node.getTargetTier().ordinal() > highestTier.ordinal()) {
                     highestTier = node.getTargetTier();
                 }
             }

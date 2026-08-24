@@ -74,6 +74,39 @@ public class GTRotorAddon extends MachineAddon {
     }
 
     @Override
+    public net.minecraft.world.item.ItemStack getItemStackSample() {
+        net.minecraft.world.item.ItemStack sample = super.getItemStackSample();
+        if (sample != null && !sample.isEmpty() && sample.hasTag() && sample.getTag().contains("GT.PartStats")) {
+            return sample;
+        }
+
+        // Dynamically rebuild GTCEu rotor ItemStack with GT.PartStats material tag
+        try {
+            String matName = getId();
+            if (matName != null && matName.startsWith("gtceu:rotor_")) {
+                matName = matName.substring("gtceu:rotor_".length());
+            }
+            if (matName != null && !matName.isEmpty()) {
+                net.minecraft.world.item.Item rotorItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(
+                        ResourceLocation.tryParse("gtceu:turbine_rotor")
+                );
+                if (rotorItem != null) {
+                    net.minecraft.world.item.ItemStack stack = new net.minecraft.world.item.ItemStack(rotorItem);
+                    CompoundTag tag = stack.getOrCreateTag();
+                    CompoundTag partStats = new CompoundTag();
+                    partStats.putString("Material", matName.contains(":") ? matName : "gtceu:" + matName);
+                    tag.put("GT.PartStats", partStats);
+                    stack.setTag(tag);
+                    setItemStackSample(stack);
+                    return stack;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return sample;
+    }
+
+    @Override
     public void deserializeAdditionalNBT(CompoundTag tag) {
         super.deserializeAdditionalNBT(tag);
         if (tag.contains("rotorEfficiency")) rotorEfficiency = tag.getInt("rotorEfficiency");

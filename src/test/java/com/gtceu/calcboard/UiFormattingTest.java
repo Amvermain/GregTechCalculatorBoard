@@ -255,15 +255,15 @@ public class UiFormattingTest {
 
         RecipeSearchEngine.SearchableRecipe r1 = new RecipeSearchEngine.SearchableRecipe(
                 new Object(), "Reaction 1", "gtceu", "chemical_reactor", "Chemical Reactor",
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), "", "", ""
+                "", ""
         );
         RecipeSearchEngine.SearchableRecipe r2 = new RecipeSearchEngine.SearchableRecipe(
                 new Object(), "Reaction 2", "gtceu", "chemical_reactor", "Chemical Reactor",
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), "", "", ""
+                "", ""
         );
         RecipeSearchEngine.SearchableRecipe r3 = new RecipeSearchEngine.SearchableRecipe(
                 new Object(), "Distillation 1", "gtceu", "distillation_tower", "Distillation Tower",
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), "", "", ""
+                "", ""
         );
 
         var discovered = RecipeSearchEngine.discoverCategories(List.of(r1, r2, r3));

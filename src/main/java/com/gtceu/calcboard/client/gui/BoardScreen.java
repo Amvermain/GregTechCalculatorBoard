@@ -476,6 +476,7 @@ public class BoardScreen extends Screen {
 
         // 0. Update graph calculations and efficiencies if dirty
         if (summaryDirty || cachedSummary == null) {
+            getGraph().cleanupInvalidConnections();
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
             summaryDirty = false;
         }

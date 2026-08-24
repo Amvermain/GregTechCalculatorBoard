@@ -28,19 +28,11 @@ public class ThermalModAdapter implements IModAdapter {
 
     @Override
     public int getPriority() {
-        return 100;
+        return 101;
     }
 
     @Override
     public boolean isLoaded() {
-        try {
-            Class<?> mlClass = Class.forName("net.minecraftforge.fml.ModList");
-            Object ml = mlClass.getMethod("get").invoke(null);
-            if (ml != null) {
-                var isLoadedMethod = mlClass.getMethod("isLoaded", String.class);
-                return (boolean) isLoadedMethod.invoke(ml, "thermal") || (boolean) isLoadedMethod.invoke(ml, "thermal_expansion") || (boolean) isLoadedMethod.invoke(ml, "cofh_core");
-            }
-        } catch (Throwable ignored) {}
         return true;
     }
 
@@ -237,6 +229,11 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
+    public int computeEffectiveParallel(RecipeNode node) {
+        return Math.max(1, node.getParallel());
+    }
+
+    @Override
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
         return ThermalGuiHandler.formatEnergyStats(node, displayMode);
     }
@@ -266,5 +263,15 @@ public class ThermalModAdapter implements IModAdapter {
     @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         return ThermalGuiHandler.handleControlClick(widget, node, mouseX, mouseY, button);
+    }
+
+    @Override
+    public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        ThermalGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    @Override
+    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        return ThermalGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 }

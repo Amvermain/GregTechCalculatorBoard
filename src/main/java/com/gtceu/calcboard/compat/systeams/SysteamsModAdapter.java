@@ -47,7 +47,8 @@ public class SysteamsModAdapter implements IModAdapter {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace().toLowerCase();
         if (ns.equals("systeams")) return true;
-        return ThermalAugmentHelper.isBoilerItem(categoryId);
+        if (ns.equals("thermal") && ThermalAugmentHelper.isBoilerItem(categoryId)) return true;
+        return false;
     }
 
     @Override
@@ -57,14 +58,13 @@ public class SysteamsModAdapter implements IModAdapter {
             return true;
         }
         if (node.getMachineIcon() != null) {
-            if (node.getMachineIcon().getNamespace().equals("systeams")) return true;
-            if (ThermalAugmentHelper.isBoilerItem(node.getMachineIcon())) {
+            String ns = node.getMachineIcon().getNamespace().toLowerCase();
+            if (ns.equals("systeams")) return true;
+            if (ns.equals("thermal") && ThermalAugmentHelper.isBoilerItem(node.getMachineIcon())) {
                 return true;
             }
         }
-        boolean hasSteamOut = node.getOutputs().stream().anyMatch(o -> o.getId() != null && o.getId().getPath().contains("steam"));
-        boolean hasWaterIn = node.getInputs().stream().anyMatch(i -> i.getId() != null && i.getId().getPath().contains("water"));
-        return hasSteamOut && hasWaterIn;
+        return false;
     }
 
     @Override
@@ -151,6 +151,11 @@ public class SysteamsModAdapter implements IModAdapter {
             double batchesPerTick = (rawDuration < 1.0 && rawDuration > 0.0) ? (1.0 / rawDuration) : 1.0;
             return new OverclockMode.OverclockResult(finalDuration, 0.0, batchesPerTick, 0);
         }
+    }
+
+    @Override
+    public int computeEffectiveParallel(RecipeNode node) {
+        return Math.max(1, node.getParallel());
     }
 
     @Override

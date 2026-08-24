@@ -55,7 +55,7 @@ public class CreateNewAgeTest {
         IModAdapter adapter = ModAdapterRegistry.getAdapterForCategory(ResourceLocation.tryParse("create_new_age:energising"));
         Assertions.assertNotNull(adapter, "CreateNewAgeModAdapter must be registered in ModAdapterRegistry");
         Assertions.assertTrue(adapter instanceof CreateNewAgeModAdapter);
-        Assertions.assertEquals(95, adapter.getPriority());
+        Assertions.assertEquals(105, adapter.getPriority());
 
         // Check category routing
         Assertions.assertTrue(adapter.handlesCategory(ResourceLocation.tryParse("create_new_age:energising")));

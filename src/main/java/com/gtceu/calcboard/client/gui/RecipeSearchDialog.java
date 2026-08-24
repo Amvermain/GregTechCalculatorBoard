@@ -83,6 +83,27 @@ public class RecipeSearchDialog {
     private EmiRecipe currentContextualDefaultRecipe = null;
     private long lastObservedGlobalVersion = -1;
 
+    private static final List<Runnable> FAVORITES_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public static void registerFavoritesListener(Runnable listener) {
+        if (listener != null) {
+            FAVORITES_LISTENERS.add(listener);
+        }
+    }
+
+    public static void unregisterFavoritesListener(Runnable listener) {
+        FAVORITES_LISTENERS.remove(listener);
+    }
+
+    public static void notifyFavoritesChanged() {
+        FavoritesDockWidget.clearCache();
+        for (Runnable r : FAVORITES_LISTENERS) {
+            try {
+                r.run();
+            } catch (Throwable ignored) {}
+        }
+    }
+
     private static final int DIALOG_WIDTH = 360;
     private static final int DIALOG_HEIGHT = 280;
     private static final int ROW_HEIGHT = 32;
@@ -114,29 +135,109 @@ public class RecipeSearchDialog {
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
 
         this.filterDialog.setOnFilterChanged(() -> updateSearchResults(searchBox.getValue()));
+        registerFavoritesListener(() -> {
+            if (this.visible) {
+                updateSearchResults(searchBox.getValue());
+            }
+        });
     }
 
     public static Set<ResourceLocation> getFavoriteRecipeIds() {
         Set<ResourceLocation> ids = new HashSet<>();
         try {
-            for (var fav : dev.emi.emi.runtime.EmiFavorites.favorites) {
-                if (fav.getRecipe() != null && fav.getRecipe().getId() != null) {
-                    ids.add(fav.getRecipe().getId());
-                } else if (!fav.getEmiStacks().isEmpty()) {
-                    var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-                    if (rm != null) {
+            List<dev.emi.emi.runtime.EmiFavorite> favs = new ArrayList<>();
+            if (dev.emi.emi.runtime.EmiFavorites.favorites != null) {
+                favs.addAll(dev.emi.emi.runtime.EmiFavorites.favorites);
+            }
+            if (dev.emi.emi.runtime.EmiFavorites.favoriteSidebar != null) {
+                for (var sf : dev.emi.emi.runtime.EmiFavorites.favoriteSidebar) {
+                    if (sf != null && !favs.contains(sf)) {
+                        favs.add(sf);
+                    }
+                }
+            }
+
+            if (!favs.isEmpty()) {
+                var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+                for (var fav : favs) {
+                    if (fav.getRecipe() != null && fav.getRecipe().getId() != null) {
+                        ids.add(fav.getRecipe().getId());
+                    } else if (!fav.getEmiStacks().isEmpty() && rm != null) {
                         for (var stack : fav.getEmiStacks()) {
-                            for (var r : rm.getRecipesByOutput(stack)) {
-                                if (r != null && r.getId() != null) {
-                                    ids.add(r.getId());
+                            var outRecipes = rm.getRecipesByOutput(stack);
+                            if (outRecipes != null) {
+                                for (var r : outRecipes) {
+                                    if (r != null && r.getId() != null) {
+                                        ids.add(r.getId());
+                                    }
                                 }
                             }
+                            try {
+                                for (var cat : rm.getCategories()) {
+                                    if (cat == null) continue;
+                                    var workstations = rm.getWorkstations(cat);
+                                    if (workstations != null) {
+                                        boolean isWs = false;
+                                        for (var wsIng : workstations) {
+                                            if (wsIng != null && wsIng.getEmiStacks() != null) {
+                                                for (var wsStack : wsIng.getEmiStacks()) {
+                                                    if (wsStack != null && wsStack.isEqual(stack)) {
+                                                        isWs = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            if (isWs) break;
+                                        }
+                                        if (isWs) {
+                                            var catRecipes = rm.getRecipes(cat);
+                                            if (catRecipes != null) {
+                                                for (var cr : catRecipes) {
+                                                    if (cr != null && cr.getId() != null) {
+                                                        ids.add(cr.getId());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (Throwable ignored) {}
                         }
                     }
                 }
             }
         } catch (Throwable ignored) {}
         return ids;
+    }
+
+    public static boolean isRecipeFavorite(EmiRecipe recipe) {
+        if (recipe == null || recipe.getId() == null) return false;
+        return getFavoriteRecipeIds().contains(recipe.getId());
+    }
+
+    public static void toggleFavoriteRecipe(EmiRecipe recipe) {
+        if (recipe == null) return;
+        try {
+            var outputs = recipe.getOutputs();
+            dev.emi.emi.api.stack.EmiIngredient stack = !outputs.isEmpty() ? outputs.get(0) : null;
+            if (stack == null) return;
+
+            if (dev.emi.emi.runtime.EmiFavorites.favorites != null) {
+                dev.emi.emi.runtime.EmiFavorite existing = null;
+                for (var fav : dev.emi.emi.runtime.EmiFavorites.favorites) {
+                    if (fav.getRecipe() != null && recipe.getId() != null && recipe.getId().equals(fav.getRecipe().getId())) {
+                        existing = fav;
+                        break;
+                    }
+                }
+                if (existing != null) {
+                    dev.emi.emi.runtime.EmiFavorites.removeFavorite(existing);
+                } else {
+                    dev.emi.emi.runtime.EmiFavorites.addFavorite(stack, recipe);
+                }
+                notifyFavoritesChanged();
+            }
+        } catch (Throwable ignored) {}
     }
 
     public static void clearGlobalCache() {
@@ -369,12 +470,12 @@ public class RecipeSearchDialog {
             String categoryId,
             String categoryName
     ) {
-        List<String> outputNames = new ArrayList<>();
-        List<String> inputNames = new ArrayList<>();
-        List<String> outputIds = new ArrayList<>();
-        List<String> inputIds = new ArrayList<>();
-        List<String> outputFluidIds = new ArrayList<>();
-        List<String> inputFluidIds = new ArrayList<>();
+        Set<String> outputNames = new HashSet<>();
+        Set<String> inputNames = new HashSet<>();
+        Set<ResourceLocation> outputIds = new HashSet<>();
+        Set<ResourceLocation> inputIds = new HashSet<>();
+        Set<String> outputPaths = new HashSet<>();
+        Set<String> inputPaths = new HashSet<>();
         StringBuilder outSb = new StringBuilder();
         StringBuilder inSb = new StringBuilder();
 
@@ -385,15 +486,11 @@ public class RecipeSearchDialog {
                 inSb.append(n).append(" ");
             }
             if (in.getId() != null) {
+                inputIds.add(in.getId());
                 String fullId = in.getId().toString().toLowerCase(Locale.ROOT);
                 String path = in.getId().getPath().toLowerCase(Locale.ROOT);
-                inputIds.add(fullId);
-                inputIds.add(path);
+                inputPaths.add(path);
                 inSb.append(fullId).append(" ").append(path).append(" ");
-                if (in.isFluid()) {
-                    inputFluidIds.add(fullId);
-                    inputFluidIds.add(path);
-                }
             }
         }
 
@@ -404,41 +501,28 @@ public class RecipeSearchDialog {
                 outSb.append(n).append(" ");
             }
             if (out.getId() != null) {
+                outputIds.add(out.getId());
                 String fullId = out.getId().toString().toLowerCase(Locale.ROOT);
                 String path = out.getId().getPath().toLowerCase(Locale.ROOT);
-                outputIds.add(fullId);
-                outputIds.add(path);
+                outputPaths.add(path);
                 outSb.append(fullId).append(" ").append(path).append(" ");
-                if (out.isFluid()) {
-                    outputFluidIds.add(fullId);
-                    outputFluidIds.add(path);
-                }
             }
         }
-
-        StringBuilder fullSb = new StringBuilder();
-        fullSb.append(template.getName().toLowerCase(Locale.ROOT)).append(" ");
-        fullSb.append(modId.toLowerCase(Locale.ROOT)).append(" ");
-        fullSb.append(categoryId.toLowerCase(Locale.ROOT)).append(" ");
-        fullSb.append(categoryName.toLowerCase(Locale.ROOT)).append(" ");
-        fullSb.append(outSb).append(" ").append(inSb);
 
         return new SearchableRecipe(
                 template,
                 template.getName(),
-                modId,
-                categoryId,
-                categoryName,
-                outputNames,
-                inputNames,
-                outputIds,
+                modId.intern(),
+                categoryId.intern(),
+                categoryName.intern(),
+                inSb.toString().trim(),
+                outSb.toString().trim(),
                 inputIds,
-                outputFluidIds,
-                inputFluidIds,
-                List.of(),
-                outSb.toString(),
-                inSb.toString(),
-                fullSb.toString()
+                outputIds,
+                inputPaths,
+                outputPaths,
+                inputNames,
+                outputNames
         );
     }
 
@@ -528,39 +612,24 @@ public class RecipeSearchDialog {
                 .map(sr -> {
                     int contextualScore = 0;
                     if (hasContext) {
+                        ResourceLocation targetId = contextualWireTarget.sourceStack.getId();
                         if (!contextualWireTarget.sourceIsInput) {
                             // Looking for CONSUMERS (recipes with matching input)
-                            if (targetIsFluid) {
-                                if ((targetFullId != null && sr.inputFluidIds().contains(targetFullId))
-                                        || (targetIdPath != null && sr.inputFluidIds().contains(targetIdPath))) {
-                                    contextualScore = 10000;
-                                } else if (targetName != null && sr.inputNames().contains(targetName)) {
-                                    contextualScore = 5000;
-                                }
-                            } else {
-                                if ((targetFullId != null && !sr.inputFluidIds().contains(targetFullId) && sr.inputIds().contains(targetFullId))
-                                        || (targetIdPath != null && !sr.inputFluidIds().contains(targetIdPath) && sr.inputIds().contains(targetIdPath))) {
-                                    contextualScore = 10000;
-                                } else if (targetName != null && sr.inputNames().contains(targetName)) {
-                                    contextualScore = 5000;
-                                }
+                            if (targetId != null && sr.hasExactInput(targetId)) {
+                                contextualScore = 100000;
+                            } else if (targetIdPath != null && sr.hasInputPath(targetIdPath)) {
+                                contextualScore = 80000;
+                            } else if (targetName != null && sr.hasExactInputName(targetName)) {
+                                contextualScore = 50000;
                             }
                         } else {
                             // Looking for PRODUCERS (recipes with matching output)
-                            if (targetIsFluid) {
-                                if ((targetFullId != null && sr.outputFluidIds().contains(targetFullId))
-                                        || (targetIdPath != null && sr.outputFluidIds().contains(targetIdPath))) {
-                                    contextualScore = 10000;
-                                } else if (targetName != null && sr.outputNames().contains(targetName)) {
-                                    contextualScore = 5000;
-                                }
-                            } else {
-                                if ((targetFullId != null && !sr.outputFluidIds().contains(targetFullId) && sr.outputIds().contains(targetFullId))
-                                        || (targetIdPath != null && !sr.outputFluidIds().contains(targetIdPath) && sr.outputIds().contains(targetIdPath))) {
-                                    contextualScore = 10000;
-                                } else if (targetName != null && sr.outputNames().contains(targetName)) {
-                                    contextualScore = 5000;
-                                }
+                            if (targetId != null && sr.hasExactOutput(targetId)) {
+                                contextualScore = 100000;
+                            } else if (targetIdPath != null && sr.hasOutputPath(targetIdPath)) {
+                                contextualScore = 80000;
+                            } else if (targetName != null && sr.hasExactOutputName(targetName)) {
+                                contextualScore = 50000;
                             }
                         }
                     }
@@ -666,7 +735,7 @@ public class RecipeSearchDialog {
 
         // Auto-refresh when background indexing completes or global recipe cache is updated
         long currentGlobalVer = GLOBAL_VERSION;
-        if (currentGlobalVer != lastObservedGlobalVersion || (GLOBAL_CACHED && filteredRecipes.isEmpty() && !GLOBAL_RECIPES.isEmpty())) {
+        if (currentGlobalVer != lastObservedGlobalVersion) {
             lastObservedGlobalVersion = currentGlobalVer;
             updateSearchResults(searchBox.getValue());
         }
@@ -926,8 +995,20 @@ public class RecipeSearchDialog {
                 String catText = !sr.categoryName().isEmpty() ? "§7[" + sr.categoryName() + "§7] " : (!sr.categoryId().isEmpty() ? "§7[" + sr.categoryId() + "§7] " : "");
                 String star = isDefault ? "§6★ " : "";
                 String fullRowText = star + catText + (isDefault ? "§b" : "§f") + rName;
-                int maxTextW = listW - 110;
+                int maxTextW = listW - 130;
                 graphics.drawString(font, font.plainSubstrByWidth(fullRowText, maxTextW), listX + 64, rowY + 12, isDefault ? 0xFF38BDF8 : 0xFFFFFFFF, false);
+
+                // Star favorite indicator / toggle next to Add button
+                boolean isFav = (sr.recipe() instanceof EmiRecipe er) && isRecipeFavorite(er);
+                int favStarX = btnX - 20;
+                int favStarY = rowY + 7;
+                int favStarW = 16;
+                int favStarH = 18;
+                boolean favStarHover = mouseX >= favStarX && mouseX <= favStarX + favStarW && mouseY >= favStarY && mouseY <= favStarY + favStarH;
+
+                if (isFav || favStarHover || isRowSelectedOrHovered) {
+                    graphics.drawString(font, isFav ? "⭐" : "☆", favStarX + 4, favStarY + 5, isFav ? 0xFFFFD700 : (favStarHover ? 0xFFFDE047 : 0xFF64748B), false);
+                }
 
                 graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, btnHover ? 0xFF2A6840 : 0xFF1E4D2F);
                 graphics.renderOutline(btnX, btnY, btnW, btnH, 0xFF359050);
@@ -1163,8 +1244,31 @@ public class RecipeSearchDialog {
             int rowY = listY + i * ROW_HEIGHT;
             if (mouseX >= listX && mouseX <= listX + listW && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT) {
                 SearchableRecipe sr = filteredRecipes.get(index);
-                addRecipeAt(sr, screenWidth, screenHeight);
-                return true;
+                int rowBtnW = 44;
+                int btnX = listX + listW - rowBtnW - 6;
+                int favStarX = btnX - 20;
+                int favStarW = 16;
+                int favStarY = rowY + 7;
+                int favStarH = 18;
+
+                // 1. Star button click or Right Click -> Toggle Favorite
+                boolean isStarClicked = (button == 0 && mouseX >= favStarX && mouseX <= favStarX + favStarW && mouseY >= favStarY && mouseY <= favStarY + favStarH);
+                if (isStarClicked || button == 1) {
+                    if (sr.recipe() instanceof EmiRecipe er) {
+                        toggleFavoriteRecipe(er);
+                        updateSearchResultsSynchronously(searchBox.getValue());
+                        Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                        );
+                        return true;
+                    }
+                }
+
+                // 2. Left click -> Add recipe to board
+                if (button == 0) {
+                    addRecipeAt(sr, screenWidth, screenHeight);
+                    return true;
+                }
             }
         }
 

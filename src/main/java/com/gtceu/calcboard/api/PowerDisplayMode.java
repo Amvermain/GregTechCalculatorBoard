@@ -47,6 +47,12 @@ public enum PowerDisplayMode {
      */
     public String formatNodePower(RecipeNode node) {
         if (node == null) return "0 EU/t";
+        if (node.getEnergyType() == EnergyType.NONE) {
+            return Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
+        }
+        if (node.getEnergyType() == EnergyType.HEAT_OR_SELF) {
+            return "§6♨";
+        }
         double totalEUt = node.getEffectiveTotalEUt();
         GTVoltageTier tier = node.getTargetTier();
         if (tier == null) tier = GTVoltageTier.LV;

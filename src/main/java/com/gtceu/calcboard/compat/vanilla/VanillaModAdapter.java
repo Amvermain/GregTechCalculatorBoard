@@ -1,12 +1,19 @@
 package com.gtceu.calcboard.compat.vanilla;
 
 import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.client.gui.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Generic fallback compatibility adapter for Vanilla Minecraft and non-specialized mods.
@@ -69,5 +76,47 @@ public class VanillaModAdapter implements IModAdapter {
             return new OverclockMode.OverclockResult(node.getBaseDurationTicks(), node.getBaseEUt(), 1.0, 0);
         }
         return node.getOverclockMode().calculate(node.getBaseDurationTicks(), node.getBaseEUt(), node.getTierDelta());
+    }
+
+    @Override
+    public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
+        return Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
+    }
+
+    @Override
+    public List<Component> buildEnergyTooltip(RecipeNode node) {
+        List<Component> tooltipLines = new ArrayList<>();
+        tooltipLines.add(Component.literal("§a🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_stat").getString()));
+        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.2fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        return tooltipLines;
+    }
+
+    @Override
+    public void renderCardControls(GuiGraphics graphics, Font font,
+                                   RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
+                                   boolean isGlowing) {
+        String bannerText = "🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
+        int bannerW = cardW - 12;
+        NodeCardRenderer.drawBtn(graphics, font, bannerText, x + 6, row2Y, bannerW, 14, mouseX, mouseY, 0xFF88D49E, false, false);
+    }
+
+    @Override
+    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
+        return false;
+    }
+
+    @Override
+    public boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
+        return false;
+    }
+
+    @Override
+    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
+        return false;
+    }
+
+    @Override
+    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+        return false;
     }
 }

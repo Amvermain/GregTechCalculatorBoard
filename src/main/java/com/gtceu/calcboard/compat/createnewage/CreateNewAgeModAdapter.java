@@ -32,7 +32,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
 
     @Override
     public int getPriority() {
-        return 95;
+        return 105;
     }
 
     @Override
@@ -327,5 +327,15 @@ public class CreateNewAgeModAdapter implements IModAdapter {
 
     public static List<RecipeSearchEngine.SearchableRecipe> getVirtualSearchRecipes() {
         return CreateNewAgeRecipeHandler.getVirtualSearchRecipes();
+    }
+
+    @Override
+    public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        CreateNewAgeGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    @Override
+    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+        return CreateNewAgeGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 }

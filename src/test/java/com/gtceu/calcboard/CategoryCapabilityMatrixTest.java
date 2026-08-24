@@ -72,6 +72,7 @@ public class CategoryCapabilityMatrixTest {
         RecipeNode turbineNode = RecipeNode.create("Large Steam Turbine", 20.0, 1024.0, GTVoltageTier.HV);
         turbineNode.setRecipeCategoryId(turbineCat);
         turbineNode.setGenerator(true);
+        turbineNode.setMultiblock(true);
 
         List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(turbineNode);
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.ROTOR));
@@ -119,6 +120,7 @@ public class CategoryCapabilityMatrixTest {
         RecipeNode turbineNode = RecipeNode.create("Gas Turbine (Nitrobenzene)", 20.0, 32.0, GTVoltageTier.LV);
         turbineNode.setRecipeCategoryId(gasTurbineCat);
         turbineNode.setGenerator(true);
+        turbineNode.setMultiblock(true);
 
         List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(turbineNode);
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.ROTOR));

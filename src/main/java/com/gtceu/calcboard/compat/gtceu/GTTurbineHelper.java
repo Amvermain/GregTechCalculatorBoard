@@ -16,8 +16,8 @@ public final class GTTurbineHelper {
      * Checks whether the given node represents a GregTech Turbine (Singleblock or Multiblock).
      */
     public static boolean isTurbine(RecipeNode node) {
-        if (node == null) return false;
-        if (node.isCreateMachine() || node.getEnergyType() != EnergyType.ELECTRIC_EU) return false;
+        if (node == null || node.isCreateMachine()) return false;
+        if (node.getEnergyType() != null && node.getEnergyType() != EnergyType.ELECTRIC_EU && node.getEnergyType() != EnergyType.NONE) return false;
         if (node.hasRotorAddon()) return true;
 
         ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
@@ -48,7 +48,10 @@ public final class GTTurbineHelper {
      * Checks whether the given node represents a GTCEu Large Multiblock Turbine.
      */
     public static boolean isLargeTurbine(RecipeNode node) {
-        if (node == null || !node.isGenerator() || node.isCreateMachine() || node.getEnergyType() != EnergyType.ELECTRIC_EU) {
+        if (node == null || node.isCreateMachine()) {
+            return false;
+        }
+        if (node.getEnergyType() != null && node.getEnergyType() != EnergyType.ELECTRIC_EU && node.getEnergyType() != EnergyType.NONE) {
             return false;
         }
         if (hasRotorAddon(node)) return true;
@@ -76,10 +79,39 @@ public final class GTTurbineHelper {
     }
 
     /**
+     * Deductively identifies the base voltage tier for this turbine type from GTCEu Machine Definitions or Recipe Category.
+     */
+    public static GTVoltageTier getTurbineBaseTier(RecipeNode node) {
+        if (node == null) return GTVoltageTier.EV;
+        ResourceLocation machineIcon = node.getMachineIcon();
+        if (machineIcon != null) {
+            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(machineIcon);
+            if (tier != null) return tier;
+        }
+        ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
+        if (recipeCategoryId != null) {
+            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(recipeCategoryId);
+            if (tier != null) return tier;
+        }
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null) {
+                GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(ws);
+                if (tier != null) return tier;
+            }
+        }
+        return GTVoltageTier.EV;
+    }
+
+    /**
      * Base production for a turbine machine (in EU/t).
      */
     public static double getTurbineBaseProduction(RecipeNode node) {
         if (node == null) return 4096.0;
+        ResourceLocation machineIcon = node.getMachineIcon();
+        if (machineIcon != null) {
+            Double prod = MultiblockDetector.getTurbineBaseProduction(machineIcon);
+            if (prod != null) return prod;
+        }
         ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
         if (recipeCategoryId != null) {
             Double prod = MultiblockDetector.getTurbineBaseProduction(recipeCategoryId);
@@ -91,7 +123,7 @@ public final class GTTurbineHelper {
                 if (prod != null) return prod;
             }
         }
-        GTVoltageTier baseTier = node.getTurbineBaseTier();
+        GTVoltageTier baseTier = getTurbineBaseTier(node);
         return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 4096.0;
     }
 
@@ -158,6 +190,79 @@ public final class GTTurbineHelper {
 
     public static double getRotorMaterialMaxEUt(String rotorName) {
         return TurbineRotorHelper.getRotorStats(rotorName).durability();
+    }
+
+    /**
+     * Calculates the maximum generator EU/t capacity based on the equipped rotor holder / material.
+     */
+    public static double getGeneratorMaxEUt(RecipeNode node) {
+        if (node == null || !node.isGenerator()) return Double.MAX_VALUE;
+        if (!isLargeTurbine(node)) return Double.MAX_VALUE;
+
+        String rName = node.getRotorName();
+        int rPower = node.getRotorPower();
+        boolean hasRotor = node.getAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
+                || (rName != null && !rName.isEmpty() && !rName.startsWith("Standard"));
+        if (!hasRotor) return Double.MAX_VALUE;
+
+        int activePower = rPower > 0 && rPower != 100 ? rPower : TurbineRotorHelper.getRotorStats(rName).power();
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon.getCategory() == MachineAddon.Category.ROTOR) {
+                if (addon.getRotorPower() > 0) {
+                    activePower = addon.getRotorPower();
+                }
+                break;
+            }
+        }
+        if (activePower <= 0) activePower = 100;
+
+        return getNodeRotorHolderMaxEUt(node, node.getTargetTier(), activePower);
+    }
+
+    /**
+     * Calculates effective turbine parallel count based on rotor holder capacity cap.
+     */
+    public static int getEffectiveTurbineParallel(RecipeNode node) {
+        if (node == null || !isLargeTurbine(node)) return Math.max(1, node != null ? node.getParallel() : 1);
+        if (node.getParallel() > 1) return node.getParallel();
+        if (!hasRotorAddon(node)) return node.getParallel();
+        double cap = getGeneratorMaxEUt(node);
+        double recipeEUt = Math.abs(node.getBaseEUt());
+        if (recipeEUt <= 0 || cap >= Double.MAX_VALUE) return Math.max(1, node.getParallel());
+        return (int) Math.max(1, Math.floor(cap / recipeEUt));
+    }
+
+    /**
+     * Automatically calculates and tunes optimal turbine parallel count.
+     */
+    public static void autoCalculateTurbineParallel(RecipeNode node) {
+        if (node == null || !node.isGenerator() || !isLargeTurbine(node)) {
+            if (node != null) node.setParallel(1);
+            return;
+        }
+        if (node.getBaseEUt() <= 0) return;
+
+        String rName = node.getRotorName();
+        int rEff = node.getRotorEfficiency();
+        int rPow = node.getRotorPower();
+        boolean hasRotor = node.getAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
+                || (rName != null && !rName.isEmpty() && !rName.startsWith("Standard"));
+        if (!hasRotor && rEff <= 100 && (rPow <= 100 || rPow == 0)) {
+            return;
+        }
+
+        int activePower = rPow > 0 && rPow != 100 ? rPow : TurbineRotorHelper.getRotorStats(rName).power();
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon.getCategory() == MachineAddon.Category.ROTOR) {
+                if (addon.getRotorPower() > 0) {
+                    activePower = addon.getRotorPower();
+                }
+                break;
+            }
+        }
+
+        double holderMax = getNodeRotorHolderMaxEUt(node, node.getTargetTier(), activePower);
+        node.setParallel((int) Math.max(1, Math.ceil(holderMax / node.getBaseEUt())));
     }
 
     /**

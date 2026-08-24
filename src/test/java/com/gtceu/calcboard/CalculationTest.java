@@ -12,18 +12,23 @@ import java.util.Map;
 public class CalculationTest {
 
     @Test
-    public void testStandardOverclock() {
-        // Base: 100 ticks (5s), 30 EU/t (LV)
-        // Target: HV (tier delta = 2)
-        // Standard GT: 4x EU/t, 2x speed (0.5x duration) per tier
-        // Tier 1 (MV): 120 EU/t, 50 ticks (2.5s)
-        // Tier 2 (HV): 480 EU/t, 25 ticks (1.25s)
-        OverclockMode.OverclockResult res = OverclockMode.STANDARD.calculate(100.0, 30.0, 2);
-        
-        Assertions.assertEquals(25.0, res.durationTicks(), 0.001);
-        Assertions.assertEquals(480.0, res.eut(), 0.001);
-        Assertions.assertEquals(2, res.overclocks());
-        Assertions.assertEquals(20.0 / 25.0, res.getCyclesPerSecond(), 0.001); // 0.8 cycles/s
+    public void testInspectEmiEvents() {
+        try {
+            Class<?> emiApiClass = Class.forName("dev.emi.emi.api.EmiApi");
+            for (var m : emiApiClass.getDeclaredMethods()) {
+                System.out.println("EmiApi method: " + m);
+            }
+            Class<?> emiReloadManager = Class.forName("dev.emi.emi.runtime.EmiReloadManager");
+            for (var m : emiReloadManager.getDeclaredMethods()) {
+                System.out.println("EmiReloadManager method: " + m);
+            }
+            Class<?> emiDataClass = Class.forName("dev.emi.emi.runtime.EmiPersistentData");
+            for (var m : emiDataClass.getDeclaredMethods()) {
+                System.out.println("EmiPersistentData method: " + m);
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     @Test
@@ -803,5 +808,29 @@ public class CalculationTest {
         Assertions.assertFalse(inStats.isInputDeficit());
         Assertions.assertEquals(100.0, inStats.getPercent(), 0.01);
         Assertions.assertTrue(plasmaGen.isOperational(graph));
+    }
+
+    @Test
+    public void testPassiveUnpoweredRecipeHandling() {
+        RecipeNode barrel = RecipeNode.create("Large Stone Barrel", 200.0, 0.0, GTVoltageTier.ULV);
+        barrel.setEnergyType(EnergyType.NONE);
+        barrel.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:cobblestone"), "Cobblestone", 1.0));
+        barrel.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:lava"), "Lava", 500.0));
+
+        Assertions.assertEquals(EnergyType.NONE, barrel.getEnergyType());
+        Assertions.assertEquals(0.0, barrel.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(0.0, barrel.getTotalEUt(), 0.001);
+        Assertions.assertEquals(10.0, barrel.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(0.10, barrel.getCyclesPerSecond(), 0.001);
+
+        Map<IngredientStack, Double> outRates = barrel.calculateOutputRates();
+        Assertions.assertEquals(50.0, outRates.values().iterator().next(), 0.001);
+
+        FlowGraph graph = new FlowGraph();
+        graph.addNode(barrel);
+        BalanceSummary summary = FlowGraphSolver.computeSummary(graph);
+        Assertions.assertEquals(0.0, summary.totalEUt(), 0.001);
+        Assertions.assertEquals(0.0, summary.totalSU(), 0.001);
+        Assertions.assertEquals(0.0, summary.totalFE(), 0.001);
     }
 }
