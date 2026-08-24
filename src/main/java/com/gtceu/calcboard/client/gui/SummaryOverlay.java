@@ -24,6 +24,7 @@ public class SummaryOverlay {
     private boolean hoveredMachines = false;
     private boolean hoveredPower = false;
     private boolean hoveredStress = false;
+    private boolean hoveredFusion = false;
     private BalanceSummary lastSummary = null;
 
     public boolean isCollapsed() {
@@ -113,6 +114,18 @@ public class SummaryOverlay {
             curHeaderY += 13;
         }
 
+        // Fusion Startup Ignition Energy Line
+        int fusionY = curHeaderY;
+        boolean showFusion = summary.totalFusionStartupEU() > 0;
+        if (showFusion) {
+            String fLabel = "§d⚛ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer").getString();
+            String fValStr = "§f" + FormatUtil.formatCompactNumber(summary.totalFusionStartupEU()) + " EU";
+            int fLabelW = font.width(fLabel) + 6;
+            graphics.drawString(font, fLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
+            graphics.drawString(font, fValStr, x + 8 + fLabelW, curHeaderY, 0xFFFFFFFF, false);
+            curHeaderY += 13;
+        }
+
         int machinesY = curHeaderY;
         String mLabel = "§6" + Component.translatable("gui.gtcalcboard.total_machines").getString();
         String mCountStr = String.format("§f%d%s §7(%s)", summary.totalMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString(), Component.translatable("gui.gtcalcboard.hover_details").getString());
@@ -123,6 +136,7 @@ public class SummaryOverlay {
         hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
         hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12;
         hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
+        hoveredFusion = showFusion && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= fusionY - 2 && mouseY <= fusionY + 12;
 
         // Top separator below power & machines
         int headerBottom = machinesY + 14;
@@ -240,6 +254,26 @@ public class SummaryOverlay {
                 tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Stress Deficit: §c-%,.0f SU", -totSU)));
                 tooltip.add(Component.literal("§4⚠ " + Component.translatable("gui.gtcalcboard.tooltip.overstressed").getString()));
             }
+            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            return;
+        }
+
+        if (hoveredFusion && lastSummary != null && lastSummary.totalFusionStartupEU() > 0) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("§d⚛ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()));
+            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Required Startup Energy: §e%,d EU", lastSummary.totalFusionStartupEU())));
+            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Formatted: §f%s EU", FormatUtil.formatCompactNumber(lastSummary.totalFusionStartupEU()))));
+            tooltip.add(Component.literal("§8§m------------------------"));
+            tooltip.add(Component.literal("§b" + Component.translatable("gui.gtcalcboard.fusion_breakdown_title").getString()));
+            for (Map.Entry<Integer, Integer> entry : lastSummary.fusionTierCounts().entrySet()) {
+                int fTier = entry.getKey();
+                int count = entry.getValue();
+                long tierStartEU = lastSummary.fusionTierStartupEU().getOrDefault(fTier, 0L);
+                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7• Fusion Mk%d: §f%d%s §7(%s EU)",
+                        fTier, count, Component.translatable("gui.gtcalcboard.machine_unit").getString(), FormatUtil.formatCompactNumber(tierStartEU))));
+            }
+            tooltip.add(Component.literal("§8§m------------------------"));
+            tooltip.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.fusion_start_buffer_desc").getString()));
             graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
             return;
         }

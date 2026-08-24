@@ -29,20 +29,40 @@ public class CreateRecipeHandler {
                 if (catId.getPath().contains("liquid_burning")) return false; // Liquid burner produces FE from fuel
                 details.energyType = EnergyType.KINETIC_SU;
                 details.tier = GTVoltageTier.ULV;
+
+                int duration = 0;
                 if (backingRecipe != null) {
                     try {
-                        var getProcessingTimeMethod = backingRecipe.getClass().getMethod("getProcessingTime");
-                        int time = (int) getProcessingTimeMethod.invoke(backingRecipe);
-                        if (time > 0) details.durationTicks = time;
-                    } catch (Throwable ignored) {}
+                        var getProcessingDurationMethod = backingRecipe.getClass().getMethod("getProcessingDuration");
+                        duration = (int) getProcessingDurationMethod.invoke(backingRecipe);
+                    } catch (Throwable ignored) {
+                        try {
+                            var getProcessingTimeMethod = backingRecipe.getClass().getMethod("getProcessingTime");
+                            duration = (int) getProcessingTimeMethod.invoke(backingRecipe);
+                        } catch (Throwable ignored2) {}
+                    }
                 }
+
                 String path = catId.getPath().toLowerCase(Locale.ROOT);
+                if (duration <= 0) {
+                    if (path.contains("splashing") || path.contains("washing") || path.contains("haunting") || path.contains("smoking") || path.contains("blasting")) {
+                        duration = 150; // Create FanProcessing standard default is 150 ticks (7.5s)
+                    } else if (path.contains("pressing") || path.contains("compacting")) {
+                        duration = 200; // Create Press default is 200 ticks (10.0s)
+                    } else if (path.contains("crushing") || path.contains("milling")) {
+                        duration = 100; // Create Crushing/Milling default is 100 ticks (5.0s)
+                    } else {
+                        duration = 100;
+                    }
+                }
+                details.durationTicks = duration;
+
                 if (path.contains("crushing") || path.contains("pressing") || path.contains("compacting") || path.contains("rolling")) {
                     details.eut = 256.0; // 8x RPM at 32 RPM
                 } else if (path.contains("polishing")) {
                     details.eut = 64.0;  // 2x RPM at 32 RPM
                 } else {
-                    details.eut = 128.0; // 4x RPM at 32 RPM (milling, mixing, cutting, etc.)
+                    details.eut = 128.0; // 4x RPM at 32 RPM (milling, mixing, cutting, fan washing, etc.)
                 }
                 double durationSec = details.durationTicks / 20.0;
                 double suPerBatch = details.eut * durationSec;
@@ -119,20 +139,18 @@ public class CreateRecipeHandler {
         } else if (namespace.equals("createaddition")) {
             if (path.equals("alternator")) {
                 RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Alternator", 20.0, 256.0, GTVoltageTier.ULV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(false);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(true);
                 node.setMachineIcon(itemId);
                 node.setRecipeCategoryId(ResourceLocation.tryParse("createaddition:alternator"));
                 node.addInput(IngredientStack.stressUnit(256.0));
-                node.addOutput(IngredientStack.item(ResourceLocation.tryParse("thermal:energy_fe"), "FE", 256.0, 1.0));
                 return node;
             } else if (path.equals("electric_motor")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Electric Motor", 20.0, 1024.0, GTVoltageTier.ULV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Electric Motor", 20.0, 512.0, GTVoltageTier.ULV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(false);
                 node.setMachineIcon(itemId);
                 node.setRecipeCategoryId(ResourceLocation.tryParse("createaddition:electric_motor"));
-                node.addInput(IngredientStack.item(ResourceLocation.tryParse("thermal:energy_fe"), "FE", 512.0, 1.0));
                 node.addOutput(IngredientStack.stressUnit(1024.0));
                 return node;
             }

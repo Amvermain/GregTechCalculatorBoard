@@ -3,6 +3,7 @@ package com.gtceu.calcboard.compat.systeams;
 import com.gtceu.calcboard.api.*;
 import com.gtceu.calcboard.client.gui.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,8 +15,8 @@ import net.minecraftforge.fml.ModList;
 import java.util.List;
 
 /**
- * Compatibility adapter facade for Thermal Systeams (Boilers, Boiling, Steam Dynamos).
- * Delegates to SysteamsGuiHandler and SysteamsRecipeHandler.
+ * Mod Adapter facade for Thermal Systeams (boilers, steam generation, steam dynamos).
+ * Manages boiler recipe parsing, water-to-steam scaling, and steam dynamo conversions.
  */
 public class SysteamsModAdapter implements IModAdapter {
 
@@ -26,14 +27,16 @@ public class SysteamsModAdapter implements IModAdapter {
 
     @Override
     public int getPriority() {
-        return 110; // Evaluated ahead of standard Thermal adapter to intercept boiler & steam dynamo variants
+        return 110;
     }
 
     @Override
     public boolean isLoaded() {
         try {
-            if (ModList.get() != null) {
-                return ModList.get().isLoaded("systeams");
+            Class<?> mlClass = Class.forName("net.minecraftforge.fml.ModList");
+            Object ml = mlClass.getMethod("get").invoke(null);
+            if (ml != null) {
+                return (boolean) mlClass.getMethod("isLoaded", String.class).invoke(ml, "systeams");
             }
         } catch (Throwable ignored) {}
         return true;
@@ -44,7 +47,7 @@ public class SysteamsModAdapter implements IModAdapter {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace().toLowerCase();
         if (ns.equals("systeams")) return true;
-        return ThermalAugmentHelper.isBoilerItem(categoryId) || ThermalAugmentHelper.isDynamoItem(categoryId);
+        return ThermalAugmentHelper.isBoilerItem(categoryId);
     }
 
     @Override
@@ -55,7 +58,7 @@ public class SysteamsModAdapter implements IModAdapter {
         }
         if (node.getMachineIcon() != null) {
             if (node.getMachineIcon().getNamespace().equals("systeams")) return true;
-            if (ThermalAugmentHelper.isBoilerItem(node.getMachineIcon()) || ThermalAugmentHelper.isDynamoItem(node.getMachineIcon())) {
+            if (ThermalAugmentHelper.isBoilerItem(node.getMachineIcon())) {
                 return true;
             }
         }
@@ -70,15 +73,15 @@ public class SysteamsModAdapter implements IModAdapter {
     }
 
     @Override
-    public List<MachineAddon.Category> getApplicableAddonCategories(RecipeNode node) {
-        return List.of(MachineAddon.Category.THERMAL_AUGMENT, MachineAddon.Category.CUSTOM);
+    public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
+        return List.of(AddonCategory.THERMAL_AUGMENT, AddonCategory.CUSTOM);
     }
 
     @Override
     public boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
-        if (addon.getCategory() == MachineAddon.Category.CUSTOM) return true;
-        return addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT;
+        if (addon.getCategory().equals(AddonCategory.CUSTOM)) return true;
+        return addon.getCategory().equals(AddonCategory.THERMAL_AUGMENT);
     }
 
     @Override

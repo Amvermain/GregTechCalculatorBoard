@@ -1,5 +1,8 @@
 package com.gtceu.calcboard.api;
 
+import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -198,11 +201,11 @@ public class DynamicAddonCrawler {
         // 1. Check if item has any active crafting recipes
         if (activeRecipeItems != null && !activeRecipeItems.isEmpty()) {
             if (!activeRecipeItems.contains(item)) {
-                return true; // No recipe producing this item
+                return true; // No active recipe producing this item
             }
         }
 
-        // 2. Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers)
+        // 2. Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers, etc.)
         try {
             var itemReg = net.minecraft.core.registries.Registries.ITEM;
             var holder = ForgeRegistries.ITEMS.getHolder(item);
@@ -210,7 +213,11 @@ public class DynamicAddonCrawler {
                 var h = holder.get();
                 var hiddenTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("c:hidden_from_recipe_viewers"));
                 var hiddenTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewers"));
-                if (h.containsTag(hiddenTag1) || h.containsTag(hiddenTag2)) {
+                var hiddenTag3 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("c:hidden_from_recipe_viewer"));
+                var hiddenTag4 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewer"));
+                var hiddenTag5 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("emi:hidden_from_recipe_viewers"));
+                var hiddenTag6 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("emi:hidden_from_recipe_viewer"));
+                if (h.containsTag(hiddenTag1) || h.containsTag(hiddenTag2) || h.containsTag(hiddenTag3) || h.containsTag(hiddenTag4) || h.containsTag(hiddenTag5) || h.containsTag(hiddenTag6)) {
                     return true;
                 }
             }
@@ -223,16 +230,20 @@ public class DynamicAddonCrawler {
         long startNanos = System.nanoTime();
         List<MachineAddon> extraAddons = Collections.synchronizedList(new ArrayList<>());
         try {
+            if (progressCallback != null) progressCallback.accept(0.1);
             List<ItemStack> activeStacks = collectAllActiveItemStacks();
+            if (progressCallback != null) progressCallback.accept(0.5);
             for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
                 try {
                     adapter.discoverAddons(extraAddons, activeStacks);
                 } catch (Throwable ignored) {}
             }
+        } catch (Throwable ignored) {
+        } finally {
             if (progressCallback != null) {
                 progressCallback.accept(1.0);
             }
-        } catch (Throwable ignored) {}
+        }
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(

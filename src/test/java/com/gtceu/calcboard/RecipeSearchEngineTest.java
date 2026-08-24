@@ -313,4 +313,70 @@ public class RecipeSearchEngineTest {
         assertTrue(RecipeSearchEngine.matches(tetrafluoroethyleneRecipe, qCategory));
         assertTrue(RecipeSearchEngine.matches(ashesRecipe, qCategory));
     }
+
+    @Test
+    public void testInputAndOutputPrefixes() {
+        SearchableRecipe steelRecipe = createMockRecipe(
+                "Steel Ingot", "gtceu", "electric_blast_furnace", "Electric Blast Furnace",
+                List.of("Steel Ingot", "Slag"), List.of("Iron Ingot", "Oxygen"), List.of("forge:ingots/steel")
+        );
+
+        SearchableRecipe ironRecipe = createMockRecipe(
+                "Iron Ingot", "minecraft", "smelting", "Smelting",
+                List.of("Iron Ingot"), List.of("Hematite Chunk"), List.of("forge:ingots/iron")
+        );
+
+        SearchableRecipe chemicalRecipe = createMockRecipe(
+                "Heavy Fuel", "gtceu", "chemical_reactor", "Chemical Reactor",
+                List.of("Heavy Fuel"), List.of("Heavy Oil", "Hydrogen"), List.of()
+        );
+
+        // 1. in: prefix
+        ParsedQuery qIn = RecipeSearchEngine.parseQuery("in:iron");
+        assertTrue(RecipeSearchEngine.matches(steelRecipe, qIn), "steelRecipe has Iron Ingot in inputs");
+        assertFalse(RecipeSearchEngine.matches(ironRecipe, qIn), "ironRecipe has Iron Ingot in outputs, not inputs");
+
+        // 2. input: prefix
+        ParsedQuery qInput = RecipeSearchEngine.parseQuery("input:iron");
+        assertTrue(RecipeSearchEngine.matches(steelRecipe, qInput));
+        assertFalse(RecipeSearchEngine.matches(ironRecipe, qInput));
+
+        // 3. > prefix (shortcut for input)
+        ParsedQuery qArrowIn = RecipeSearchEngine.parseQuery(">iron");
+        assertTrue(RecipeSearchEngine.matches(steelRecipe, qArrowIn));
+        assertFalse(RecipeSearchEngine.matches(ironRecipe, qArrowIn));
+
+        // 4. out: prefix
+        ParsedQuery qOut = RecipeSearchEngine.parseQuery("out:steel");
+        assertTrue(RecipeSearchEngine.matches(steelRecipe, qOut));
+        assertFalse(RecipeSearchEngine.matches(ironRecipe, qOut));
+
+        // 5. output: prefix
+        ParsedQuery qOutput = RecipeSearchEngine.parseQuery("output:iron");
+        assertTrue(RecipeSearchEngine.matches(ironRecipe, qOutput));
+        assertFalse(RecipeSearchEngine.matches(steelRecipe, qOutput));
+
+        // 6. < prefix (shortcut for output)
+        ParsedQuery qArrowOut = RecipeSearchEngine.parseQuery("<iron");
+        assertTrue(RecipeSearchEngine.matches(ironRecipe, qArrowOut));
+        assertFalse(RecipeSearchEngine.matches(steelRecipe, qArrowOut));
+
+        // 7. Combined in: and out:
+        ParsedQuery qBoth = RecipeSearchEngine.parseQuery("in:iron out:steel");
+        assertTrue(RecipeSearchEngine.matches(steelRecipe, qBoth));
+        assertFalse(RecipeSearchEngine.matches(ironRecipe, qBoth));
+
+        // 8. Negated in / out
+        ParsedQuery qNegOut = RecipeSearchEngine.parseQuery("in:iron !out:slag");
+        assertFalse(RecipeSearchEngine.matches(steelRecipe, qNegOut), "steelRecipe outputs slag, so should be excluded");
+
+        // 9. Quoted phrases in input / output
+        ParsedQuery qQuotedIn = RecipeSearchEngine.parseQuery("in:\"Heavy Oil\"");
+        assertTrue(RecipeSearchEngine.matches(chemicalRecipe, qQuotedIn));
+        assertFalse(RecipeSearchEngine.matches(steelRecipe, qQuotedIn));
+
+        ParsedQuery qQuotedOut = RecipeSearchEngine.parseQuery("out:\"Heavy Fuel\"");
+        assertTrue(RecipeSearchEngine.matches(chemicalRecipe, qQuotedOut));
+        assertFalse(RecipeSearchEngine.matches(steelRecipe, qQuotedOut));
+    }
 }

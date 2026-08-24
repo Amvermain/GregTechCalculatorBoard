@@ -1,9 +1,11 @@
 package com.gtceu.calcboard.compat.gtceu;
 
-import com.gtceu.calcboard.api.CoilHelper;
+import com.gtceu.calcboard.api.DynamicAddonCrawler;
 import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.ParallelHelper;
-import com.gtceu.calcboard.api.TurbineRotorHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
@@ -20,7 +22,7 @@ import java.util.Map;
 
 /**
  * Handles dynamic discovery of GregTech CEu Modern coils, turbine rotors,
- * parallel hatches, maintenance hatches, and multiblock traits.
+ * parallel hatches, maintenance hatches, fusion reflectors, and multiblock traits.
  */
 public class GTCEuAddonCrawler {
 
@@ -28,10 +30,11 @@ public class GTCEuAddonCrawler {
         // 1. Built-in GT Multiblock Traits & Configurable Maintenance Hatch modes
         addBuiltinTraits(collector);
 
-        // 2. Discover standard GT coils & rotors via helpers
+        // 2. Discover standard GT coils, rotors, and fusion reflectors via helpers
         try {
             TurbineRotorHelper.discoverGTCEuRotors(collector);
             CoilHelper.discoverGTCEuCoils(collector);
+            ReflectorHelper.discoverGTCEuReflectors(collector);
         } catch (Throwable ignored) {}
 
         // 3. Scan active recipe stacks (e.g. custom material rotors, parts with NBT)
@@ -53,23 +56,37 @@ public class GTCEuAddonCrawler {
                 if (parallel != null && !containsAddonId(collector, parallel.getId())) {
                     collector.add(parallel);
                 }
+                MachineAddon reflector = ReflectorHelper.parseReflectorItem(s, id);
+                if (reflector != null && !containsAddonId(collector, reflector.getId())) {
+                    collector.add(reflector);
+                }
             }
         }
 
-        // 4. Registry crawl for GT hatches & coils
+        // 4. Registry crawl for GT & Addon hatches, coils, reflectors, rotors
         if (ForgeRegistries.ITEMS != null) {
             Map<Item, ItemStack> nbtItemSamples = new HashMap<>();
+            java.util.Set<Item> activeRecipeItems = new java.util.HashSet<>();
             if (recipeOutputStacks != null) {
                 for (ItemStack s : recipeOutputStacks) {
-                    if (s != null && s.hasTag()) {
-                        nbtItemSamples.put(s.getItem(), s);
+                    if (s != null && !s.isEmpty()) {
+                        activeRecipeItems.add(s.getItem());
+                        if (s.hasTag()) {
+                            nbtItemSamples.put(s.getItem(), s);
+                        }
                     }
                 }
             }
 
             for (Item item : ForgeRegistries.ITEMS) {
                 ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
-                if (id == null || !id.getNamespace().equals("gtceu")) continue;
+                if (id == null) continue;
+                String ns = id.getNamespace();
+                if (!ns.equals("gtceu") && !ns.equals("start_core") && !ns.equals("kubejs")) continue;
+
+                if (DynamicAddonCrawler.isItemDisabledOrHidden(item, activeRecipeItems)) {
+                    continue;
+                }
 
                 ItemStack stack = nbtItemSamples.getOrDefault(item, new ItemStack(item));
 
@@ -88,6 +105,12 @@ public class GTCEuAddonCrawler {
                 MachineAddon rotor = TurbineRotorHelper.parseTurbineRotor(stack, id);
                 if (rotor != null && !containsAddonId(collector, rotor.getId())) {
                     collector.add(rotor);
+                    continue;
+                }
+
+                MachineAddon reflector = ReflectorHelper.parseReflectorItem(stack, id);
+                if (reflector != null && !containsAddonId(collector, reflector.getId())) {
+                    collector.add(reflector);
                     continue;
                 }
 

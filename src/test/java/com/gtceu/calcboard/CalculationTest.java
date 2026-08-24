@@ -5,6 +5,8 @@ import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class CalculationTest {
@@ -644,5 +646,162 @@ public class CalculationTest {
             .filter(e -> e.getKey().getDisplayName().contains("Fire Infused Shard"))
             .mapToDouble(Map.Entry::getValue).sum();
         Assertions.assertTrue(fireShardProduced > 0.05, "Fire Infused Shard must be in net outputs!");
+    }
+
+    @Test
+    public void testReflectorFusionAddonsAndCompatibility() {
+        RecipeNode fusionNode = RecipeNode.create("Reflector Fusion Reactor", 100.0, 16384.0, GTVoltageTier.LuV);
+        fusionNode.setRequiredReflectorTier(2);
+
+        com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter adapter = new com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter();
+        List<com.gtceu.calcboard.api.AddonCategory> cats = adapter.getApplicableAddonCategories(fusionNode);
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.REFLECTOR), "Fusion node must support REFLECTOR category");
+
+        com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon t1 = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_1", "T1 Reflector", "", null, 1);
+        com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon t2 = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_2", "T2 Reflector", "", null, 2);
+
+        Assertions.assertTrue(adapter.isAddonCompatible(fusionNode, t1));
+        Assertions.assertTrue(adapter.isAddonCompatible(fusionNode, t2));
+
+        List<net.minecraft.network.chat.Component> warnings = new ArrayList<>();
+        // No reflector installed -> validation fails & outputs are 0
+        boolean valid0 = adapter.validateNode(fusionNode, warnings);
+        Assertions.assertFalse(valid0);
+        Assertions.assertFalse(warnings.isEmpty());
+        Assertions.assertFalse(fusionNode.isOperational());
+        Assertions.assertEquals(0.0, fusionNode.getCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.0, fusionNode.getTotalEUt(), 0.001);
+
+        // Install T1 reflector -> required is T2 -> validation fails & outputs are 0
+        adapter.onAddonInstalled(fusionNode, t1);
+        warnings.clear();
+        boolean valid1 = adapter.validateNode(fusionNode, warnings);
+        Assertions.assertFalse(valid1);
+        Assertions.assertFalse(fusionNode.isOperational());
+        Assertions.assertEquals(0.0, fusionNode.getCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.0, fusionNode.getTotalEUt(), 0.001);
+
+        // Install T2 reflector -> required is T2 -> validation passes & outputs become active
+        adapter.onAddonInstalled(fusionNode, t2);
+        warnings.clear();
+        boolean valid2 = adapter.validateNode(fusionNode, warnings);
+        Assertions.assertTrue(valid2);
+        Assertions.assertTrue(warnings.isEmpty());
+        Assertions.assertTrue(fusionNode.isOperational());
+        Assertions.assertTrue(fusionNode.getCyclesPerSecond() > 0.0);
+        Assertions.assertTrue(fusionNode.getTotalEUt() > 0.0);
+    }
+
+    @Test
+    public void testTurbineFlowDeficitValidation() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Steam Producer (Boiler producing 500 mB/s steam)
+        RecipeNode boiler = RecipeNode.create("Large Boiler", 20.0, 32.0, GTVoltageTier.LV);
+        boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
+        boiler.setMachineCount(1.0);
+        graph.addNode(boiler);
+
+        // 2. Large Steam Turbine (Requires 1,000 mB/s steam)
+        RecipeNode turbine = RecipeNode.create("Large Steam Turbine", 20.0, -4096.0, GTVoltageTier.EV);
+        turbine.setGenerator(true);
+        turbine.setMultiblock(true);
+        turbine.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:steam_turbine"));
+        turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 1000.0, 1.0));
+        turbine.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:distilled_water"), "Distilled Water", 10.0, 1.0));
+        turbine.setMachineCount(1.0);
+        graph.addNode(turbine);
+
+        com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter adapter = new com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter();
+        Assertions.assertTrue(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(turbine));
+
+        // Unconnected: operational by default
+        Assertions.assertTrue(turbine.isOperational(graph));
+        Assertions.assertFalse(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.hasTurbineFlowDeficit(turbine, graph));
+
+        // Connect 500 mB/s supplier to 1000 mB/s turbine (50% flow deficit)
+        graph.addConnection(boiler.getId(), 0, turbine.getId(), 0);
+        graph.computeSummary();
+
+        FlowGraphSolver.PortFlowStats inStats = graph.getInputPortStats(turbine, 0);
+        Assertions.assertTrue(inStats.isConnected());
+        Assertions.assertTrue(inStats.isInputDeficit());
+        Assertions.assertTrue(inStats.getPercent() < 100.0);
+
+        // Flow deficit active -> validation fails & inoperational
+        List<net.minecraft.network.chat.Component> warnings = new ArrayList<>();
+        boolean valid = adapter.validateNode(turbine, graph, warnings);
+        Assertions.assertFalse(valid);
+        Assertions.assertFalse(warnings.isEmpty());
+        Assertions.assertTrue(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.hasTurbineFlowDeficit(turbine, graph));
+        Assertions.assertFalse(turbine.isOperational(graph));
+
+        // Scale boiler machine count to 2.0 -> produces 1,000 mB/s steam (100% flow satisfied)
+        boiler.setMachineCount(2.0);
+        graph.computeSummary();
+
+        FlowGraphSolver.PortFlowStats inStatsBalanced = graph.getInputPortStats(turbine, 0);
+        Assertions.assertTrue(inStatsBalanced.isConnected());
+        Assertions.assertFalse(inStatsBalanced.isInputDeficit());
+        Assertions.assertTrue(inStatsBalanced.getPercent() >= 100.0);
+
+        warnings.clear();
+        boolean validBalanced = adapter.validateNode(turbine, graph, warnings);
+        Assertions.assertTrue(validBalanced);
+        Assertions.assertTrue(warnings.isEmpty());
+        Assertions.assertFalse(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.hasTurbineFlowDeficit(turbine, graph));
+        Assertions.assertTrue(turbine.isOperational(graph));
+    }
+
+    @Test
+    public void testAutoRatioExcludesInoperativeProducers() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. Inoperative Top Fusion Reactor (Requires T2 reflector, but none installed -> 0 output)
+        RecipeNode topReactor = RecipeNode.create("Reflector Fusion Reactor", 100.0, 16384.0, GTVoltageTier.ZPM);
+        topReactor.setRequiredReflectorTier(2);
+        topReactor.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:argon_plasma"), "Argon Plasma", 1000.0, 1.0));
+        topReactor.setMachineCount(1.0);
+        graph.addNode(topReactor);
+
+        // 2. Operative Bottom Fusion Reactor (Requires T2 reflector, T2 installed -> produces Argon Plasma)
+        RecipeNode bottomReactor = RecipeNode.create("Reflector Fusion Reactor (Live)", 100.0, 16384.0, GTVoltageTier.ZPM);
+        bottomReactor.setRequiredReflectorTier(2);
+        com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter adapter = new com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter();
+        adapter.onAddonInstalled(bottomReactor, new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_2", "T2 Reflector", "", null, 2));
+        bottomReactor.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:argon_plasma"), "Argon Plasma", 1000.0, 1.0));
+        bottomReactor.setMachineCount(1.0);
+        graph.addNode(bottomReactor);
+
+        // 3. Plasma Generator (Consumes Argon Plasma, requires 100% flow)
+        RecipeNode plasmaGen = RecipeNode.create("Plasma Generator", 20.0, -4096.0, GTVoltageTier.EV);
+        plasmaGen.setGenerator(true);
+        plasmaGen.setMultiblock(true);
+        plasmaGen.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_turbine"));
+        plasmaGen.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:argon_plasma"), "Argon Plasma", 100.0, 1.0));
+        plasmaGen.setMachineCount(1.0);
+        graph.addNode(plasmaGen);
+
+        // Connect both top (broken) and bottom (live) reactors to plasmaGen input
+        graph.addConnection(topReactor.getId(), 0, plasmaGen.getId(), 0);
+        graph.addConnection(bottomReactor.getId(), 0, plasmaGen.getId(), 0);
+
+        Assertions.assertFalse(topReactor.isOperational());
+        Assertions.assertTrue(bottomReactor.isOperational());
+
+        // Run Auto Ratio with bottomReactor as anchor
+        FlowGraphSolver.autoRatioFromAnchor(graph, bottomReactor, false);
+        graph.computeSummary();
+
+        // Operative bottom reactor produces 200 mB/s (1000 mB / 5s).
+        // Each plasma generator consumes 100 mB/s.
+        // Total plasma generators should be 2.0 (scaled to the LIVE bottom reactor only, NOT 4.0 from the dead top reactor).
+        Assertions.assertEquals(2.0, plasmaGen.getMachineCount(), 0.01);
+
+        FlowGraphSolver.PortFlowStats inStats = graph.getInputPortStats(plasmaGen, 0);
+        Assertions.assertTrue(inStats.isConnected());
+        Assertions.assertFalse(inStats.isInputDeficit());
+        Assertions.assertEquals(100.0, inStats.getPercent(), 0.01);
+        Assertions.assertTrue(plasmaGen.isOperational(graph));
     }
 }

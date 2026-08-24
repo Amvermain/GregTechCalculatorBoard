@@ -75,11 +75,39 @@ public class EmiRecipeConverter {
         node.setGenerator(details.isGenerator);
         node.setEnergyType(details.energyType);
         node.setMachineIcon(preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe));
-        if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-            node.setRecipeCategoryId(recipe.getCategory().getId());
+        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+        if (catId != null) {
+            node.setRecipeCategoryId(catId);
         }
+
+        // Run Extensible Recipe Property Extractor Pipeline (RFC-002)
+        CompoundTag recipeDataTag = null;
+        Object backing = recipe.getBackingRecipe();
+        if (backing != null) {
+            try {
+                Field dataField = backing.getClass().getField("data");
+                Object dataObj = dataField.get(backing);
+                if (dataObj instanceof CompoundTag tag) recipeDataTag = tag;
+            } catch (Throwable ignored) {
+                try {
+                    Method dataMethod = backing.getClass().getMethod("data");
+                    Object dataObj = dataMethod.invoke(backing);
+                    if (dataObj instanceof CompoundTag tag) recipeDataTag = tag;
+                } catch (Throwable ignored2) {}
+            }
+        }
+        com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.extractAll(backing, recipeDataTag, catId, node.getProperties());
+
         if (details.backingRecipeTemp > 0) {
             node.setRecipeTemperature(details.backingRecipeTemp);
+        }
+
+        if (node.isFusion()) {
+            GTVoltageTier minTier = node.getMinFusionVoltageTier();
+            if (node.getTargetTier().ordinal() < minTier.ordinal()) {
+                node.setRecipeTier(minTier);
+                node.setTargetTier(minTier);
+            }
         }
 
         // Convert Inputs
@@ -113,6 +141,7 @@ public class EmiRecipeConverter {
             }
         }
 
+        Map<ResourceLocation, Double> baseChances = extractOutputChances(recipe);
         Map<ResourceLocation, Double> tierBoosts = extractTierChanceBoosts(recipe);
         boolean isGT = ModCompatHelper.isGTLoaded() && (recipe.getBackingRecipe() != null && recipe.getBackingRecipe().getClass().getName().contains("GTRecipe"));
 
@@ -121,7 +150,13 @@ public class EmiRecipeConverter {
             if (outStack == null || outStack.isEmpty()) continue;
             if (isDummyConditionMarker(outStack.getId())) continue;
 
-            IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), outStack.getChance());
+            float chance = outStack.getChance();
+            ResourceLocation outId = outStack.getId();
+            if (chance >= 1.0f && outId != null && baseChances.containsKey(outId)) {
+                chance = baseChances.get(outId).floatValue();
+            }
+
+            IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), chance);
             if (os != null && !isDummyConditionMarker(os.getId())) {
                 if (os.getChance() < 1.0) {
                     if (tierBoosts.containsKey(os.getId())) {
@@ -149,7 +184,6 @@ public class EmiRecipeConverter {
             node.addOutput(eout.copy());
         }
 
-        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
         if (catId != null) {
             node.setRecipeCategoryId(catId);
             com.gtceu.calcboard.api.CategoryCapability cap = com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().getCapability(catId);
@@ -332,6 +366,87 @@ public class EmiRecipeConverter {
         } else {
             return IngredientStack.item(id, displayName, amount, chance);
         }
+    }
+
+    private static Map<ResourceLocation, Double> extractOutputChances(EmiRecipe recipe) {
+        Map<ResourceLocation, Double> map = new HashMap<>();
+        if (recipe == null) return map;
+        try {
+            Object backing = recipe.getBackingRecipe();
+            if (backing == null) return map;
+
+            // 1. Create ProcessingRecipe (e.g. Fan Washing, Crushing, Milling, Cutting, etc.)
+            try {
+                Method m = backing.getClass().getMethod("getRollableResults");
+                Object res = m.invoke(backing);
+                if (res instanceof List<?> list) {
+                    for (Object po : list) {
+                        if (po == null) continue;
+                        Method getStackM = po.getClass().getMethod("getStack");
+                        Method getChanceM = po.getClass().getMethod("getChance");
+                        Object stackObj = getStackM.invoke(po);
+                        Object chanceObj = getChanceM.invoke(po);
+                        if (stackObj instanceof net.minecraft.world.item.ItemStack is && chanceObj instanceof Number n) {
+                            ResourceLocation id = ForgeRegistries.ITEMS.getKey(is.getItem());
+                            if (id != null) {
+                                map.put(id, n.doubleValue());
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            // 2. GTCEu GTRecipe output chances
+            if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
+                Field outputsField = null;
+                try {
+                    outputsField = backing.getClass().getField("outputs");
+                } catch (Throwable ignored) {
+                    try {
+                        outputsField = backing.getClass().getDeclaredField("outputs");
+                        outputsField.setAccessible(true);
+                    } catch (Throwable ignored2) {}
+                }
+                if (outputsField != null) {
+                    Object outputsObj = outputsField.get(backing);
+                    if (outputsObj instanceof Map<?, ?> outMap) {
+                        for (Object listObj : outMap.values()) {
+                            if (listObj instanceof List<?> list) {
+                                for (Object contentObj : list) {
+                                    if (contentObj == null) continue;
+                                    double chance = 1.0;
+                                    try {
+                                        Field f = contentObj.getClass().getField("chance");
+                                        Object v = f.get(contentObj);
+                                        if (v instanceof Number n) chance = n.doubleValue();
+                                    } catch (Throwable ignored) {
+                                        try {
+                                            Method m = contentObj.getClass().getMethod("chance");
+                                            Object v = m.invoke(contentObj);
+                                            if (v instanceof Number n) chance = n.doubleValue();
+                                        } catch (Throwable ignored2) {
+                                            try {
+                                                Method m = contentObj.getClass().getMethod("getChance");
+                                                Object v = m.invoke(contentObj);
+                                                if (v instanceof Number n) chance = n.doubleValue();
+                                            } catch (Throwable ignored3) {}
+                                        }
+                                    }
+                                    if (chance > 1.0) {
+                                        chance = chance / 10000.0; // GTCEu uses 10000 = 100%
+                                    }
+                                    ResourceLocation resId = extractContentResourceId(contentObj);
+                                    if (resId != null) {
+                                        map.put(resId, Math.max(0.0, Math.min(1.0, chance)));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return map;
     }
 
     private static Map<ResourceLocation, Double> extractTierChanceBoosts(EmiRecipe recipe) {
@@ -587,13 +702,13 @@ public class EmiRecipeConverter {
 
             if (isDynamo) {
                 details.isGenerator = true;
-                double basePowerRF = com.gtceu.calcboard.api.ThermalAugmentHelper.getThermalDynamoBasePowerRF(catId);
+                double basePowerRF = com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.getThermalDynamoBasePowerRF(catId);
                 details.eut = basePowerRF / 4.0; // Standard 200 RF/t -> 50 EU/t
                 details.durationTicks = Math.max(1.0, (double) energyRF / basePowerRF);
                 details.tier = GTVoltageTier.LV;
             } else {
                 details.isGenerator = false;
-                double baseMachPowerRF = com.gtceu.calcboard.api.ThermalAugmentHelper.getThermalMachineBasePowerRF(catId);
+                double baseMachPowerRF = com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.getThermalMachineBasePowerRF(catId);
                 details.eut = baseMachPowerRF / 4.0; // Standard 20 RF/t -> 5 EU/t
                 details.durationTicks = Math.max(1.0, (double) energyRF / baseMachPowerRF);
                 details.tier = GTVoltageTier.LV;

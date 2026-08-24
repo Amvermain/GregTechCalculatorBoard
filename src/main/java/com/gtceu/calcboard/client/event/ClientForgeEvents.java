@@ -59,6 +59,11 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
+            // Background pre-cache trigger once EMI and registries are ready
+            if (!RecipeSearchDialog.isGlobalCached() && !RecipeSearchDialog.isCaching()) {
+                RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+            }
+
             while (KeyBindings.OPEN_BOARD.consumeClick()) {
                 Minecraft mc = Minecraft.getInstance();
                 if (mc.screen == null) {

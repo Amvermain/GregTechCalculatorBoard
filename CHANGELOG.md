@@ -8,6 +8,41 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ---
 
+## [2.0.0-alpha.7] - 2026-08-23
+
+### Added
+- **Create: New Age Integration (`CreateNewAgeModAdapter`, `CreateNewAgeGuiHandler`, `CreateNewAgeRecipeHandler`, `CreateNewAgeAddonCrawler`, `CreateMagnetAddon`)**:
+  - **Generator Coil & Carbon Brushes Calculations**:
+    - Supported equipping up to 12 magnet items with Shift-click batch install.
+    - Calculated Generator Coil base stress (`24.0 SU/RPM`) and total stress load ($(24.0 + \text{Strength}) \times \text{RPM}$).
+    - Dynamically retrieved mod config (`suToEnergy`) via runtime reflection for power output ($\text{FE/t} = \text{Strength} \times \text{RPM} \times \text{suToEnergy}$).
+    - Rendered Goggle-style UI header with energy stats (Base Stress, Total Stress, Efficiency, FE/t).
+  - **Motors & Motor Extensions Calculations**: Calculated SU output and FE power consumption for motors and extension multipliers.
+  - **Kinetic Overstressed Handling (`FlowGraphSolver`)**: Halts nodes (`0.0 efficiency`, `0 FE/t`, `0 SU/s`) when Stress Unit supply is deficient.
+- **GTCEu Fusion Reactor Simulation & Start Buffer Aggregation (`RecipeNode`, `FlowGraphSolver`, `SummaryOverlay`, `NodeBadgeRegistry`)**:
+  - Extracted recipe `eu_to_start` (ignition requirement) and preserved in NBT.
+  - Automatically determined Fusion Tier (Mk1 $\le 160\text{M}$, Mk2 $\le 320\text{M}$, Mk3 $> 320\text{M EU}$) and minimum voltage tier (LuV/ZPM/UV) with target tier clamping.
+  - Supported Fusion Reflector addons (T1-T3) and spec integration.
+  - Displayed Fusion Start Buffer badge on node card headers.
+  - Aggregated per-tier reactor counts and total startup EU (`⚛ Fusion Start Buffer`) in the Summary Overlay with detailed tooltips.
+- **Parametric Search Input/Output Prefixes & Prefix Guide Dock (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - `in:`, `input:`, `>` : Input material filter.
+  - `out:`, `output:`, `<`, `^` : Output product filter.
+  - **Always-Visible Prefix Guide Dock**:
+    - Added a docked side panel on the left of the search dialog displaying 8 core prefixes (`@`, `#`, `[`, `>`, `<`, `!`, `|`, `"`).
+    - Added Quick Insert feature: Clicking any prefix chip auto-appends it into the search box.
+    - Applied responsive auto-centering layout.
+
+### Changed & Improved
+- **Addon Deductive Analysis Structure**:
+  - Replaced heuristic string parsing with official Java interfaces, deterministic NBT (`AugmentData`), and runtime config lookups.
+  - Refactored `DynamicAddonCrawler` and `MachineConfigDialog` polymorphic architecture.
+  - Supported equipping up to 12 slots for Thermal Augments.
+- **Code Quality & Javadoc Standardization**:
+  - Standardized all Javadoc comments to English and cleaned up redundant comments.
+
+---
+
 ## [2.0.0-alpha.6] - 2026-08-23
 
 ### Added
@@ -54,6 +89,8 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 - **Dynamo & Boiler Tooltips (`BoardTooltipRenderer`)**:
   - Corrected dynamo hover tooltip from consumption to generation (`Total Power Generation: +400.00 RF/t`).
   - Added steam production rate (`Total Steam: +30,000.00 mB/s`) to boiler hover tooltips.
+- **Compound Module Power Stats Display (`NodeCardRenderer`)**:
+  - Fixed rendering condition causing net power generation/consumption stats (`+320.00 EU/t (Gen)`, etc.) to be omitted from row 2 of compound module cards.
 
 ---
 

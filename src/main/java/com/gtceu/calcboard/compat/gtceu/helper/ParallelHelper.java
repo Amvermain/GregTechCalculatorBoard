@@ -1,5 +1,7 @@
-package com.gtceu.calcboard.api;
+package com.gtceu.calcboard.compat.gtceu.helper;
 
+import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
@@ -14,8 +16,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Dynamically queries GTCEu Modern's MachineDefinition, MetaMachine, and IParallelHatch API
- * to extract exact parallel processing capacities directly from running code without any name or tooltip parsing.
+ * Helper class for GTCEu Modern parallel control hatches.
+ * Dynamically queries MachineDefinition, MetaMachine, and IParallelHatch APIs to extract exact parallel capacity.
  */
 public class ParallelHelper {
 
@@ -34,7 +36,6 @@ public class ParallelHelper {
             return null;
         }
 
-        // 1. Direct NBT property check
         if (stack.hasTag()) {
             net.minecraft.nbt.CompoundTag tag = stack.getTag();
             if (tag != null) {
@@ -68,7 +69,6 @@ public class ParallelHelper {
             return null;
         }
 
-        // Try extracting MachineDefinition directly from MetaMachineBlock
         try {
             for (Method m : block.getClass().getMethods()) {
                 if ((m.getName().equalsIgnoreCase("getMachineDefinition") || m.getName().equalsIgnoreCase("getDefinition")) && m.getParameterCount() == 0) {
@@ -114,7 +114,6 @@ public class ParallelHelper {
     private static ParallelStats computeParallelStats(String identifier) {
         ResourceLocation id = ResourceLocation.tryParse(identifier.contains(":") ? identifier : "gtceu:" + identifier);
 
-        // 1. Direct GTCEu GTRegistries.MACHINES & MachineDefinition code inspection
         if (id != null) {
             try {
                 Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
@@ -137,15 +136,10 @@ public class ParallelHelper {
         return null;
     }
 
-    /**
-     * Extracts exact parallel stats from a GTCEu MachineDefinition by creating a proxy MetaMachine
-     * and calling its native getCurrentParallel() / getMaxParallel() methods.
-     */
     public static ParallelStats extractStatsFromMachineDef(Object machineDef) {
         if (machineDef == null) return null;
 
         try {
-            // 1. Primary: Instantiate MetaMachine via dummy holder proxy and invoke getCurrentParallel()
             Object dummyHolder = getOrCreateDummyHolderProxy();
             if (dummyHolder != null) {
                 for (Method m : machineDef.getClass().getMethods()) {
@@ -163,7 +157,6 @@ public class ParallelHelper {
                 }
             }
 
-            // 2. Secondary: Direct getter on MachineDefinition if present
             int maxPar = extractInt(machineDef, "getCurrentParallel", "getMaxParallel", "getParallel", "getMaxParallelAmount");
             boolean isAbsolute = extractBoolean(machineDef, "isAbsolute", "isExact", "isFixedEnergy", "isPowerConstant");
             if (maxPar > 0) {
@@ -174,19 +167,12 @@ public class ParallelHelper {
         return null;
     }
 
-    /**
-     * Calls native instance methods (getCurrentParallel, getMaxParallel, isAbsolute) on a MetaMachine object.
-     */
     public static ParallelStats extractStatsFromMachineInstance(Object machine) {
         if (machine == null) return null;
 
-        // 1. Parallel capacity getter: getCurrentParallel(), getMaxParallel()
         int maxPar = extractInt(machine, "getCurrentParallel", "getMaxParallel", "getParallel", "getMaxParallelAmount");
-
-        // 2. Direct boolean queries on MetaMachine methods
         boolean isAbsolute = extractBoolean(machine, "isAbsolute", "isExact", "isFixedEnergy", "isPowerConstant", "isEnergyFree", "hasFixedEnergy");
 
-        // 3. Inspect declared fields for maxParallel, currentParallel, isAbsolute
         Class<?> curr = machine.getClass();
         while (curr != null && curr != Object.class) {
             for (Field f : curr.getDeclaredFields()) {
@@ -210,9 +196,6 @@ public class ParallelHelper {
             curr = curr.getSuperclass();
         }
 
-        // 4. Pure Bytecode / RecipeModifier method inspection:
-        // In vanilla GTCEu, ParallelHatchPartMachine implements standard recipe EUt scaling.
-        // Specialized hatches (such as Absolute Mastery Hatches) override modifyRecipe to disable energy consumption.
         if (!isAbsolute) {
             try {
                 Class<?> baseHatchCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.ParallelHatchPartMachine");
@@ -233,8 +216,6 @@ public class ParallelHelper {
 
         return null;
     }
-
-
 
     private static Object getOrCreateDummyHolderProxy() {
         if (DUMMY_HOLDER_PROXY != null) {
@@ -295,7 +276,7 @@ public class ParallelHelper {
         return false;
     }
 
-    public static MachineAddon parseParallelHatch(ItemStack stack, ResourceLocation id) {
+    public static GTParallelHatchAddon parseParallelHatch(ItemStack stack, ResourceLocation id) {
         ParallelStats stats = getParallelStats(stack);
         if (stats == null || stats.maxParallel() <= 1) {
             return null;
@@ -309,11 +290,7 @@ public class ParallelHelper {
                 ? net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.absolute_parallel_hatch_desc", String.valueOf(parallel)).getString()
                 : net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.parallel_hatch_desc", String.valueOf(parallel)).getString();
 
-        MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.getPath() : name, MachineAddon.Category.PARALLEL, desc, id);
-        addon.setParallelMultiplier(parallel);
-        addon.setPowerConstant(isAbsolute);
-        addon.setDurationMultiplier(1.0);
-        addon.setEutMultiplier(isAbsolute ? 1.0 : parallel);
+        GTParallelHatchAddon addon = new GTParallelHatchAddon(id.toString(), name.isEmpty() ? id.getPath() : name, desc, id, parallel, isAbsolute);
         addon.setItemStackSample(stack);
         addon.setDiscoverySource("GTCEu MetaMachine Parallel Hatch API [" + id + "]");
         return addon;

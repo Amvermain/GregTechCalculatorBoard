@@ -82,6 +82,12 @@ public class MachineAddonCatalog {
         }
     }
 
+    private volatile long catalogVersion = 0;
+
+    public long getVersion() {
+        return catalogVersion;
+    }
+
     /**
      * Fast Track 1: Synchronously or asynchronously loads 100% of registry-backed addons in ~5ms.
      */
@@ -97,6 +103,7 @@ public class MachineAddonCatalog {
             allAddons.addAll(customAddons);
             isFastLoaded = true;
             isDirty = false;
+            catalogVersion++;
         }
 
         // Automatically trigger Track 2 in the background
@@ -125,16 +132,16 @@ public class MachineAddonCatalog {
         .thenAccept(extraList -> {
             if (extraList != null && !extraList.isEmpty()) {
                 synchronized (allAddons) {
-                    for (MachineAddon a : extraList) {
-                        if (allAddons.stream().noneMatch(x -> x.getId().equals(a.getId()))) {
-                            allAddons.add(a);
-                        }
-                    }
+                    allAddons.clear();
+                    allAddons.addAll(extraList);
+                    allAddons.addAll(customAddons);
+                    catalogVersion++;
                 }
             }
             this.isExhaustiveScanRunning = false;
             this.isExhaustiveScanComplete = true;
             this.exhaustiveProgress = 1.0;
+            catalogVersion++;
             com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
                     "[GTCalcBoard] [Catalog] 2-Track indexing complete. Total Addons: {}", allAddons.size()
             );
@@ -202,9 +209,10 @@ public class MachineAddonCatalog {
         }
     }
 
-    public List<MachineAddon> getAddonsByCategory(MachineAddon.Category category) {
+    public List<MachineAddon> getAddonsByCategory(AddonCategory category) {
+        if (category == null) return getAllAddons();
         return getAllAddons().stream()
-                .filter(a -> a.getCategory() == category)
+                .filter(a -> a.getCategory().equals(category))
                 .collect(Collectors.toList());
     }
 

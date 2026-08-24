@@ -13,15 +13,16 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Mod adapter facade for Create kinetic generators and machines.
- * Delegates to CreateGuiHandler and CreateRecipeHandler.
+ * Mod Adapter facade for Create kinetic generators and processing machinery.
  */
 public class CreateModAdapter implements IModAdapter {
 
     public static final String MOD_ID = "create";
+    public static final String MOD_ID_ADDITION = "createaddition";
 
     @Override
     public String getModId() {
@@ -38,7 +39,7 @@ public class CreateModAdapter implements IModAdapter {
         try {
             if (ModList.get() != null) {
                 return ModList.get().isLoaded(MOD_ID)
-                        || ModList.get().isLoaded("createaddition")
+                        || ModList.get().isLoaded(MOD_ID_ADDITION)
                         || !FMLLoader.isProduction();
             }
         } catch (Throwable t) {
@@ -50,15 +51,23 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
-        return categoryId.getNamespace().equals(MOD_ID) || categoryId.getNamespace().equals("createaddition");
+        String ns = categoryId.getNamespace();
+        return ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION);
     }
 
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
         if (node.getEnergyType() == EnergyType.KINETIC_SU) return true;
-        if (node.getMachineIcon() != null && (node.getMachineIcon().getNamespace().equals(MOD_ID) || node.getMachineIcon().getNamespace().equals("createaddition"))) return true;
-        return node.getRecipeCategoryId() != null && (node.getRecipeCategoryId().getNamespace().equals(MOD_ID) || node.getRecipeCategoryId().getNamespace().equals("createaddition"));
+        if (node.getMachineIcon() != null) {
+            String ns = node.getMachineIcon().getNamespace();
+            if (ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION)) return true;
+        }
+        if (node.getRecipeCategoryId() != null) {
+            String ns = node.getRecipeCategoryId().getNamespace();
+            return ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION);
+        }
+        return false;
     }
 
     @Override
@@ -67,7 +76,7 @@ public class CreateModAdapter implements IModAdapter {
     }
 
     @Override
-    public List<MachineAddon.Category> getApplicableAddonCategories(RecipeNode node) {
+    public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
         return List.of();
     }
 
@@ -150,14 +159,20 @@ public class CreateModAdapter implements IModAdapter {
     }
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
-        return CreateRecipeHandler.createKineticGeneratorNode(stack);
+        RecipeNode node = CreateRecipeHandler.createKineticGeneratorNode(stack);
+        if (node != null) return node;
+        return com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(stack);
     }
 
     public static RecipeNode createKineticGeneratorNode(ResourceLocation itemId, String displayName) {
-        return CreateRecipeHandler.createKineticGeneratorNode(itemId, displayName);
+        RecipeNode node = CreateRecipeHandler.createKineticGeneratorNode(itemId, displayName);
+        if (node != null) return node;
+        return com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(itemId, displayName);
     }
 
     public static List<RecipeSearchEngine.SearchableRecipe> getVirtualKineticSearchRecipes() {
-        return CreateRecipeHandler.getVirtualKineticSearchRecipes();
+        List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>(CreateRecipeHandler.getVirtualKineticSearchRecipes());
+        list.addAll(com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.getVirtualSearchRecipes());
+        return list;
     }
 }

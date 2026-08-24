@@ -2,7 +2,7 @@ package com.gtceu.calcboard.compat.thermal;
 
 import com.gtceu.calcboard.api.EnergyType;
 import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.ThermalAugmentHelper;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import net.minecraft.resources.ResourceLocation;

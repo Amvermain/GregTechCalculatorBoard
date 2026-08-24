@@ -8,6 +8,41 @@
 
 ---
 
+## [2.0.0-alpha.7] - 2026-08-23
+
+### 신규 기능 (Added)
+- **Create: New Age 모드 연동 (`CreateNewAgeModAdapter`, `CreateNewAgeGuiHandler`, `CreateNewAgeRecipeHandler`, `CreateNewAgeAddonCrawler`, `CreateMagnetAddon`)**:
+  - **발전기 코일 및 탄소 브러시 계산**:
+    - 발전기 코일 링에 최대 12개의 자석 아이템 장착 및 Shift-클릭 일괄 장착 지원.
+    - 발전기 코일 기본 부하(`24.0 SU/RPM`) 및 자석 강도에 따른 회전 부하($(24.0 + \text{Strength}) \times \text{RPM}$) 계산.
+    - 모드 설정(`suToEnergy`)을 런타임에 조회하여 실제 발전량($\text{FE/t} = \text{Strength} \times \text{RPM} \times \text{suToEnergy}$) 계산.
+    - 고글 스타일 GUI 헤더 및 에너지 통계(Base Stress, Total Stress, Efficiency, FE/t) 렌더링.
+  - **모터 및 모터 확장기 계산**: 기본, 고급, 강화 모터의 SU 출력 및 FE 소비량 연산과 확장기 배율 지원.
+  - **키네틱 과부하(Overstressed) 처리 (`FlowGraphSolver`)**: 회전력 결핍 시 즉시 정지(`0.0 efficiency`, `0 FE/t`, `0 SU/s`)하도록 계산 처리.
+- **GTCEu 핵융합로(Fusion Reactor) 시뮬레이션 및 점화 에너지 집계 (`RecipeNode`, `FlowGraphSolver`, `SummaryOverlay`, `NodeBadgeRegistry`)**:
+  - 레시피의 `eu_to_start` (점화 필요 EU) 데이터 추출 및 NBT 저장.
+  - 점화 에너지에 따른 핵융합 티어(Mk1 $\le 160\text{M}$, Mk2 $\le 320\text{M}$, Mk3 $> 320\text{M EU}$) 및 최소 전압 티어(LuV/ZPM/UV) 자동 결정 및 전압 하한 클램핑.
+  - 핵융합 반사판(`GTReflectorAddon`, T1~T3) 애드온 장착 및 스펙 연동.
+  - 노드 카드 상단에 점화 버퍼 뱃지 표시.
+  - 우측 요약 오버레이(`SummaryOverlay`)에 플로우차트 내 모든 핵융합로의 티어별 대수 및 총 점화 버퍼 합산(`⚛ Fusion Start Buffer`) 집계 및 툴팁 렌더링.
+- **레시피 검색창 입출력 전용 접두사 및 가이드 패널 (`RecipeSearchEngine`, `RecipeSearchDialog`)**:
+  - `in:`, `input:`, `>` : 투입 재료 한정 검색.
+  - `out:`, `output:`, `<`, `^` : 생산 결과물 한정 검색.
+  - **검색창 좌측 프리픽스 가이드 독(Prefix Guide Dock)**:
+    - 8개 핵심 접두사(`@`, `#`, `[`, `>`, `<`, `!`, `|`, `"`)를 표시하는 좌측 패널 추가.
+    - 접두사 버튼 클릭 시 검색창에 자동 입력되는 빠른 삽입(Quick Insert) 지원.
+    - 화면 해상도에 따른 반응형 중앙 정렬 레이아웃 적용.
+
+### 개선 및 리팩토링 (Changed & Improved)
+- **애드온 연역적 분석 구조 개선**:
+  - 문자열 파싱 방식을 제거하고 공식 Java 인터페이스, 결정론적 NBT(`AugmentData`), 런타임 설정 조회를 사용하도록 변경.
+  - `DynamicAddonCrawler` 및 `MachineConfigDialog` 다형성 구조 리팩토링.
+  - Thermal Augment 최대 12슬롯 장착 지원.
+- **코드 품질 및 Javadoc 표준화**:
+  - 소스 코드 Javadoc 영문 표준화 및 주석 정리.
+
+---
+
 ## [2.0.0-alpha.6] - 2026-08-23
 
 ### 신규 기능 (Added)
@@ -54,6 +89,8 @@
 - **다이나모 및 보일러 툴팁 수정 (`BoardTooltipRenderer`)**:
   - 다이나모 호버 시 소비량으로 표기되던 툴팁을 발전량(`Total Power Generation: +400.00 RF/t`)으로 수정.
   - 보일러 호버 시 증기 생산량(`Total Steam: +30,000.00 mB/s`) 툴팁 추가.
+- **복합 모듈 노드 카드 전력 표기 수정 (`NodeCardRenderer`)**:
+  - 복합 모듈 카드 2행에서 순 발전/소비 전력 수치(`+320.00 EU/t (Gen)` 등)가 누락되던 렌더링 조건문 수정.
 
 ---
 

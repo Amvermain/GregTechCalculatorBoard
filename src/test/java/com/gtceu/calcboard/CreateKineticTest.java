@@ -176,4 +176,94 @@ public class CreateKineticTest {
         Assertions.assertEquals(1.0, waterWheel.getMachineCount(), 0.001);
         Assertions.assertEquals(2.0, press.getMachineCount(), 0.001); // 2 presses needed to absorb 512 SU
     }
+
+    @Test
+    public void testFanWashingChanceOutput() {
+        // Fan Washing: Crushed Iron Ore (150 ticks = 7.5s at 32 RPM standard Create default)
+        // Output 1: Crushed Iron Ore (100% chance, 1.0) -> 1.0 * (20/150) = 0.1333/s
+        // Output 2: Nickel Dust (7% chance, 1.0) -> 0.07 * (20/150) = 0.00933/s
+        RecipeNode washing = RecipeNode.create("Fan Washing (Crushed Iron Ore)", 150.0, 128.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        washing.setEnergyType(EnergyType.KINETIC_SU);
+        washing.setRpm(32);
+        washing.addInput(com.gtceu.calcboard.api.IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1.0));
+        washing.addInput(com.gtceu.calcboard.api.IngredientStack.stressUnit(960.0));
+        washing.addOutput(com.gtceu.calcboard.api.IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1.0, 1.0));
+        washing.addOutput(com.gtceu.calcboard.api.IngredientStack.item(ResourceLocation.tryParse("gtceu:nickel_dust"), "Nickel Dust", 1.0, 0.07));
+
+        Assertions.assertEquals(0.1333, washing.getEffectiveCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.1333, washing.getOutputSlotRate(0, true), 0.001); // 0.1333/s Crushed Iron Ore
+        Assertions.assertEquals(0.00933, washing.getOutputSlotRate(1, true), 0.001); // 0.00933/s Nickel Dust (7% of 0.1333)
+
+        // Verify formatted string
+        String nickelRateStr = com.gtceu.calcboard.client.gui.FormatUtil.formatRate(washing.getOutputSlotRate(1, true), false);
+        Assertions.assertEquals("0.0093/s", nickelRateStr);
+    }
+
+    @Test
+    public void testCreateNewAgeGeneratorsAndMotors() {
+        // 1. Generator Coil (Converts SU to FE)
+        RecipeNode coil = CreateModAdapter.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:generator_coil"),
+                "Generator Coil"
+        );
+        Assertions.assertNotNull(coil);
+        Assertions.assertEquals("Generator Coil", coil.getName());
+        Assertions.assertEquals(EnergyType.ELECTRIC_FE, coil.getEnergyType());
+        Assertions.assertTrue(coil.isGenerator());
+        Assertions.assertEquals(512.0, coil.getBaseEUt(), 0.001);
+        Assertions.assertTrue(coil.getInputs().get(0).isStressUnit());
+        Assertions.assertTrue(coil.getOutputs().isEmpty());
+
+        // 2. Carbon Brushes
+        RecipeNode brushes = CreateModAdapter.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:carbon_brushes"),
+                "Carbon Brushes"
+        );
+        Assertions.assertNotNull(brushes);
+        Assertions.assertEquals(EnergyType.ELECTRIC_FE, brushes.getEnergyType());
+        Assertions.assertTrue(brushes.isGenerator());
+
+        // 3. Basic & Advanced & Reinforced Motors (Converts FE to SU)
+        RecipeNode basicMotor = CreateModAdapter.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:basic_motor"),
+                "Basic Motor"
+        );
+        Assertions.assertNotNull(basicMotor);
+        Assertions.assertEquals(EnergyType.ELECTRIC_FE, basicMotor.getEnergyType());
+        Assertions.assertFalse(basicMotor.isGenerator());
+        Assertions.assertEquals(256.0, basicMotor.getBaseEUt(), 0.001);
+        Assertions.assertTrue(basicMotor.getInputs().isEmpty());
+        Assertions.assertTrue(basicMotor.getOutputs().get(0).isStressUnit());
+
+        RecipeNode advMotor = CreateModAdapter.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:advanced_motor"),
+                "Advanced Motor"
+        );
+        Assertions.assertEquals(1024.0, advMotor.getBaseEUt(), 0.001);
+
+        RecipeNode reinfMotor = CreateModAdapter.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:reinforced_motor"),
+                "Reinforced Motor"
+        );
+        Assertions.assertEquals(4096.0, reinfMotor.getBaseEUt(), 0.001);
+
+        // 4. Stirling Engine
+        RecipeNode stirling = CreateModAdapter.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:stirling_engine"),
+                "Stirling Engine"
+        );
+        Assertions.assertNotNull(stirling);
+        Assertions.assertEquals(EnergyType.KINETIC_SU, stirling.getEnergyType());
+        Assertions.assertEquals(1024.0, stirling.getBaseEUt(), 0.001);
+
+        // 5. Virtual Search includes Create New Age items
+        List<RecipeSearchEngine.SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
+        boolean foundCoil = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Generator Coil"));
+        boolean foundBrushes = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Carbon Brushes"));
+        boolean foundMotor = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Basic Motor"));
+
+        Assertions.assertTrue(foundCoil);
+        Assertions.assertTrue(foundBrushes);
+        Assertions.assertTrue(foundMotor);
+    }
 }

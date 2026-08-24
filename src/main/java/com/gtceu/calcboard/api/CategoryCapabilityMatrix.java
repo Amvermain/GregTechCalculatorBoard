@@ -200,16 +200,16 @@ public class CategoryCapabilityMatrix {
         boolean isCoil = MultiblockDetector.isCoilRecipeCategory(categoryId);
         boolean isTurbine = MultiblockDetector.isTurbineRecipeCategory(categoryId);
 
-        Set<MachineAddon.Category> supported = new HashSet<>();
-        supported.add(MachineAddon.Category.CUSTOM);
+        Set<AddonCategory> supported = new HashSet<>();
+        supported.add(AddonCategory.CUSTOM);
         if (isThermal) {
-            supported.add(MachineAddon.Category.THERMAL_AUGMENT);
+            supported.add(AddonCategory.THERMAL_AUGMENT);
         } else {
-            if (isTurbine) supported.add(MachineAddon.Category.ROTOR);
-            if (isCoil) supported.add(MachineAddon.Category.COIL);
-            supported.add(MachineAddon.Category.PARALLEL);
-            supported.add(MachineAddon.Category.MAINTENANCE);
-            supported.add(MachineAddon.Category.MULTIBLOCK_TRAIT);
+            if (isTurbine) supported.add(AddonCategory.ROTOR);
+            if (isCoil) supported.add(AddonCategory.COIL);
+            supported.add(AddonCategory.PARALLEL);
+            supported.add(AddonCategory.MAINTENANCE);
+            supported.add(AddonCategory.MULTIBLOCK_TRAIT);
         }
 
         return new CategoryCapability(
@@ -300,17 +300,17 @@ public class CategoryCapabilityMatrix {
     private void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,
                                       boolean single, boolean multi, boolean coil, boolean turbine, boolean thermal,
                                       GTVoltageTier tTier, double tProd) {
-        Set<MachineAddon.Category> supported = new HashSet<>();
-        supported.add(MachineAddon.Category.CUSTOM);
+        Set<AddonCategory> supported = new HashSet<>();
+        supported.add(AddonCategory.CUSTOM);
         if (thermal) {
-            supported.add(MachineAddon.Category.THERMAL_AUGMENT);
+            supported.add(AddonCategory.THERMAL_AUGMENT);
         } else {
-            if (turbine) supported.add(MachineAddon.Category.ROTOR);
-            if (coil) supported.add(MachineAddon.Category.COIL);
+            if (turbine) supported.add(AddonCategory.ROTOR);
+            if (coil) supported.add(AddonCategory.COIL);
             if (multi) {
-                supported.add(MachineAddon.Category.PARALLEL);
-                supported.add(MachineAddon.Category.MAINTENANCE);
-                supported.add(MachineAddon.Category.MULTIBLOCK_TRAIT);
+                supported.add(AddonCategory.PARALLEL);
+                supported.add(AddonCategory.MAINTENANCE);
+                supported.add(AddonCategory.MULTIBLOCK_TRAIT);
             }
         }
         capabilities.put(catId, new CategoryCapability(
@@ -352,22 +352,22 @@ public class CategoryCapabilityMatrix {
         }
 
         CategoryCapability build() {
-            Set<MachineAddon.Category> supported = new HashSet<>();
-            supported.add(MachineAddon.Category.CUSTOM);
+            Set<AddonCategory> supported = new HashSet<>();
+            supported.add(AddonCategory.CUSTOM);
 
             if (isThermal) {
-                supported.add(MachineAddon.Category.THERMAL_AUGMENT);
+                supported.add(AddonCategory.THERMAL_AUGMENT);
             } else {
                 if (isTurbine) {
-                    supported.add(MachineAddon.Category.ROTOR);
+                    supported.add(AddonCategory.ROTOR);
                 }
                 if (canUseCoils) {
-                    supported.add(MachineAddon.Category.COIL);
+                    supported.add(AddonCategory.COIL);
                 }
                 if (hasMultiblockOption) {
-                    supported.add(MachineAddon.Category.PARALLEL);
-                    supported.add(MachineAddon.Category.MAINTENANCE);
-                    supported.add(MachineAddon.Category.MULTIBLOCK_TRAIT);
+                    supported.add(AddonCategory.PARALLEL);
+                    supported.add(AddonCategory.MAINTENANCE);
+                    supported.add(AddonCategory.MULTIBLOCK_TRAIT);
                 }
             }
 

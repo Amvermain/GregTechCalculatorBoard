@@ -3,6 +3,8 @@ package com.gtceu.calcboard.compat.thermal;
 import com.gtceu.calcboard.api.*;
 import com.gtceu.calcboard.client.gui.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,8 +16,8 @@ import net.minecraftforge.fml.ModList;
 import java.util.List;
 
 /**
- * Compatibility adapter facade for Thermal Series (Thermal Expansion, Foundation, Innovation).
- * Delegates to ThermalAddonCrawler, ThermalGuiHandler, and ThermalRecipeHandler.
+ * Mod Adapter facade for Thermal Series (Thermal Expansion, Foundation, Innovation).
+ * Manages Thermal augments, upgrade kit discovery, slot validation, and recipe scaling.
  */
 public class ThermalModAdapter implements IModAdapter {
 
@@ -32,8 +34,11 @@ public class ThermalModAdapter implements IModAdapter {
     @Override
     public boolean isLoaded() {
         try {
-            if (ModList.get() != null) {
-                return ModList.get().isLoaded("thermal") || ModList.get().isLoaded("thermal_expansion") || ModList.get().isLoaded("cofh_core");
+            Class<?> mlClass = Class.forName("net.minecraftforge.fml.ModList");
+            Object ml = mlClass.getMethod("get").invoke(null);
+            if (ml != null) {
+                var isLoadedMethod = mlClass.getMethod("isLoaded", String.class);
+                return (boolean) isLoadedMethod.invoke(ml, "thermal") || (boolean) isLoadedMethod.invoke(ml, "thermal_expansion") || (boolean) isLoadedMethod.invoke(ml, "cofh_core");
             }
         } catch (Throwable ignored) {}
         return true;
@@ -57,15 +62,137 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
-    public List<MachineAddon.Category> getApplicableAddonCategories(RecipeNode node) {
-        return List.of(MachineAddon.Category.THERMAL_AUGMENT, MachineAddon.Category.CUSTOM);
+    public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
+        return List.of(AddonCategory.THERMAL_AUGMENT, AddonCategory.CUSTOM);
     }
 
     @Override
     public boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
-        if (addon.getCategory() == MachineAddon.Category.CUSTOM) return true;
-        return addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT;
+        if (addon.getCategory().equals(AddonCategory.CUSTOM)) return true;
+        return addon.getCategory().equals(AddonCategory.THERMAL_AUGMENT);
+    }
+
+    @Override
+    public boolean canInstallAddon(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return false;
+        if (!isAddonCompatible(node, addon)) return false;
+        if (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) {
+            return true; // Replaces existing kit
+        }
+        if (addon.getParallelMultiplier() > 1) {
+            return true; // Kit scale replacement
+        }
+        // General augments limited to 3 slots
+        long nonKitCount = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
+        return nonKitCount < 3;
+    }
+
+    @Override
+    public void onAddonInstalled(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return;
+        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            node.getAddons().removeIf(a -> (a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || a.getParallelMultiplier() > 1);
+        }
+        node.getAddons().add(addon);
+    }
+
+    @Override
+    public void handleInstallAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
+        if (node == null || addon == null) return;
+        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            node.getAddons().removeIf(a -> (a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || a.getParallelMultiplier() > 1);
+            node.addAddon(addon.copy());
+        } else {
+            long nonKitCount = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
+            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+            if (shiftClick) {
+                int toAdd = (int) (3 - nonKitCount);
+                for (int k = 0; k < toAdd; k++) {
+                    node.addAddon(addon.copy());
+                }
+            } else {
+                if (nonKitCount < 3) {
+                    node.addAddon(addon.copy());
+                } else if (targetCount > 0) {
+                    node.removeSingleAddon(addon.getId());
+                }
+            }
+        }
+    }
+
+    @Override
+    public void handleUninstallAddon(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return;
+        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            node.removeAddon(addon.getId());
+        } else {
+            node.removeSingleAddon(addon.getId());
+        }
+    }
+
+    @Override
+    public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
+        if (addon == null || tooltip == null) return;
+        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.addon.thermal.upgrade_desc", addon.getParallelMultiplier())));
+            if (isActiveAddon) {
+                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
+            } else {
+                boolean isInst = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+                if (isInst) {
+                    tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
+                } else {
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install_kit")));
+                }
+            }
+        } else {
+            long totalRegAugs = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
+            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
+            if (targetCount > 0) {
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
+                if (totalRegAugs < 3) {
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
+                }
+                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
+            } else {
+                if (totalRegAugs < 3) {
+                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install")));
+                } else {
+                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onAddonRemoved(RecipeNode node, MachineAddon addon) {
+        // Lifecycle hook
+    }
+
+    @Override
+    public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            return String.format("§d⚡ %dx Scale", addon.getParallelMultiplier());
+        }
+        if (addon.getDurationMultiplier() != 1.0 && addon.getEutMultiplier() != 1.0) {
+            return String.format("§e⚡ %.1fx ⏱ %.1fx", addon.getEutMultiplier(), addon.getDurationMultiplier());
+        }
+        if (addon.getEutMultiplier() != 1.0) {
+            return String.format("§e⚡ %.2fx", addon.getEutMultiplier());
+        }
+        if (addon.getDurationMultiplier() != 1.0) {
+            return String.format("§a⏱ %.2fx", addon.getDurationMultiplier());
+        }
+        return "";
     }
 
     @Override

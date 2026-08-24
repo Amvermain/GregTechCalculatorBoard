@@ -90,7 +90,6 @@ public class DeletePageConfirmDialog {
             graphics.drawString(font, allLines.get(i), modalX + 12, modalY + 28 + i * 11, 0xFFDDDDDD, false);
         }
 
-        // Action Buttons: [취소 (Cancel)] vs [영구 삭제 (Delete)]
         int btnW = (modalW - 32) / 2;
         int btnH = 20;
         int cancelBtnX = modalX + 12;

@@ -63,7 +63,6 @@ public class WelcomeTutorialDialog {
             graphics.drawString(font, lines.get(i), modalX + 12, curY + i * 11, 0xFFDDDDDD, false);
         }
 
-        // Action Buttons: [🎓 튜토리얼 시작] vs [직접 둘러보기]
         int btnW = (modalW - 32) / 2;
         int btnH = 22;
         int startBtnX = modalX + modalW - btnW - 12;

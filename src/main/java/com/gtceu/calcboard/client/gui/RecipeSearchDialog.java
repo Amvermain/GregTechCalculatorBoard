@@ -55,8 +55,10 @@ public class RecipeSearchDialog {
 
     // Static global cache shared across the entire game session (loaded only once in background)
     private static final List<SearchableRecipe> GLOBAL_RECIPES = Collections.synchronizedList(new ArrayList<>());
+    private static final List<Runnable> ON_COMPLETE_CALLBACKS = Collections.synchronizedList(new ArrayList<>());
     private static volatile boolean GLOBAL_CACHED = false;
     private static volatile boolean IS_CACHING = false;
+    private static volatile long GLOBAL_VERSION = 0;
     private static final java.util.concurrent.ScheduledExecutorService SEARCH_SCHEDULER = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "GTCalcBoard-SearchScheduler");
         t.setDaemon(true);
@@ -79,10 +81,30 @@ public class RecipeSearchDialog {
     private int lastMouseX = 0;
     private int lastMouseY = 0;
     private EmiRecipe currentContextualDefaultRecipe = null;
+    private long lastObservedGlobalVersion = -1;
 
     private static final int DIALOG_WIDTH = 360;
     private static final int DIALOG_HEIGHT = 280;
     private static final int ROW_HEIGHT = 32;
+
+    public record PrefixGuideItem(
+            String prefix,
+            String labelKey,
+            String descKey,
+            int color,
+            int hoverBg
+    ) {}
+
+    public static final List<PrefixGuideItem> PREFIX_ITEMS = List.of(
+            new PrefixGuideItem("@", "gui.gtcalcboard.search.prefix.mod", "gui.gtcalcboard.search.prefix.mod.desc", 0xFF38BDF8, 0xFF1C2C44),
+            new PrefixGuideItem("#", "gui.gtcalcboard.search.prefix.tag", "gui.gtcalcboard.search.prefix.tag.desc", 0xFFFBBF24, 0xFF3D351C),
+            new PrefixGuideItem("[", "gui.gtcalcboard.search.prefix.category", "gui.gtcalcboard.search.prefix.category.desc", 0xFF4ADE80, 0xFF1B3D26),
+            new PrefixGuideItem(">", "gui.gtcalcboard.search.prefix.input", "gui.gtcalcboard.search.prefix.input.desc", 0xFFFB923C, 0xFF3D2C1C),
+            new PrefixGuideItem("<", "gui.gtcalcboard.search.prefix.output", "gui.gtcalcboard.search.prefix.output.desc", 0xFFF472B6, 0xFF3D1C34),
+            new PrefixGuideItem("!", "gui.gtcalcboard.search.prefix.exclude", "gui.gtcalcboard.search.prefix.exclude.desc", 0xFFF87171, 0xFF3D1C1C),
+            new PrefixGuideItem("|", "gui.gtcalcboard.search.prefix.or", "gui.gtcalcboard.search.prefix.or.desc", 0xFFA78BFA, 0xFF2A1C44),
+            new PrefixGuideItem("\"", "gui.gtcalcboard.search.prefix.exact", "gui.gtcalcboard.search.prefix.exact.desc", 0xFFE2E8F0, 0xFF282E3B)
+    );
 
     public RecipeSearchDialog(BoardScreen parent) {
         this.parent = parent;
@@ -119,8 +141,10 @@ public class RecipeSearchDialog {
 
     public static void clearGlobalCache() {
         GLOBAL_RECIPES.clear();
+        ON_COMPLETE_CALLBACKS.clear();
         GLOBAL_CACHED = false;
         IS_CACHING = false;
+        GLOBAL_VERSION++;
     }
 
     public static void invalidateCache() {
@@ -129,6 +153,10 @@ public class RecipeSearchDialog {
 
     public static boolean isGlobalCached() {
         return GLOBAL_CACHED;
+    }
+
+    public static long getGlobalVersion() {
+        return GLOBAL_VERSION;
     }
 
     public static int getCachedRecipeCount() {
@@ -150,6 +178,9 @@ public class RecipeSearchDialog {
         if (GLOBAL_CACHED) {
             if (onComplete != null) onComplete.run();
             return;
+        }
+        if (onComplete != null) {
+            ON_COMPLETE_CALLBACKS.add(onComplete);
         }
         if (IS_CACHING) return;
 
@@ -184,6 +215,7 @@ public class RecipeSearchDialog {
                     GLOBAL_RECIPES.clear();
                     GLOBAL_RECIPES.addAll(tempList);
                     GLOBAL_CACHED = true;
+                    GLOBAL_VERSION++;
                 }
 
                 CACHING_PROGRESS = new RecipeLoadingProgress(3, 3, "gui.gtcalcboard.loading_recipe_phase.3", "Baking Machine Capabilities Matrix");
@@ -196,8 +228,13 @@ public class RecipeSearchDialog {
                         tempList.size(), elapsedMs, Runtime.getRuntime().availableProcessors()
                 );
 
-                if (onComplete != null) {
-                    Minecraft.getInstance().execute(onComplete);
+                List<Runnable> callbacks;
+                synchronized (ON_COMPLETE_CALLBACKS) {
+                    callbacks = new ArrayList<>(ON_COMPLETE_CALLBACKS);
+                    ON_COMPLETE_CALLBACKS.clear();
+                }
+                for (Runnable cb : callbacks) {
+                    Minecraft.getInstance().execute(cb);
                 }
             } catch (Throwable t) {
                 IS_CACHING = false;
@@ -247,6 +284,7 @@ public class RecipeSearchDialog {
             this.targetSpawnCanvasX = canvasX;
             this.targetSpawnCanvasY = canvasY;
             this.stickyHoverRecipe = null;
+            this.lastObservedGlobalVersion = GLOBAL_VERSION;
             searchBox.setValue("");
             searchBox.setFocused(true);
             ensureGlobalRecipesCachedAsync(() -> {
@@ -617,6 +655,22 @@ public class RecipeSearchDialog {
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         if (!visible) return;
 
+        // Auto-retry trigger if EMI was not yet ready when opened
+        if (!GLOBAL_CACHED && !IS_CACHING) {
+            ensureGlobalRecipesCachedAsync(() -> {
+                if (this.visible) {
+                    updateSearchResults(searchBox.getValue());
+                }
+            });
+        }
+
+        // Auto-refresh when background indexing completes or global recipe cache is updated
+        long currentGlobalVer = GLOBAL_VERSION;
+        if (currentGlobalVer != lastObservedGlobalVersion || (GLOBAL_CACHED && filteredRecipes.isEmpty() && !GLOBAL_RECIPES.isEmpty())) {
+            lastObservedGlobalVersion = currentGlobalVer;
+            updateSearchResults(searchBox.getValue());
+        }
+
         this.lastMouseX = mouseX;
         this.lastMouseY = mouseY;
 
@@ -626,11 +680,23 @@ public class RecipeSearchDialog {
         Font font = Minecraft.getInstance().font;
         int dialogW = Math.min(380, screenWidth - 24);
         int dialogH = Math.min(280, screenHeight - 24);
-        int x = (screenWidth - dialogW) / 2;
+        int sideW = 104;
+        int gap = 6;
+        boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
+        int totalW = hasSideSpace ? (dialogW + sideW + gap) : dialogW;
+        int startX = (screenWidth - totalW) / 2;
+        int sideX = hasSideSpace ? startX : -1000;
+        int x = hasSideSpace ? (startX + sideW + gap) : startX;
         int y = (screenHeight - dialogH) / 2;
 
         // Solid Dark Backdrop
         graphics.fill(0, 0, screenWidth, screenHeight, 0xCC000000);
+
+        // Render Left Prefix Guide Side Panel
+        if (hasSideSpace) {
+            renderPrefixSidePanel(graphics, font, sideX, y, sideW, dialogH, mouseX, mouseY);
+        }
+
         graphics.fill(x, y, x + dialogW, y + dialogH, 0xFF1E222B);
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4A90E2);
 
@@ -655,17 +721,36 @@ public class RecipeSearchDialog {
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 12 && mouseY >= closeY && mouseY <= closeY + 12;
         graphics.drawString(font, "✕", closeX, closeY, closeHover ? 0xFFFF5555 : 0xFFAAAAAA, false);
 
-        // Search Input Box, Favorites Toggle & Filter Button
+        // Search Input Box, Favorites Toggle, Help & Filter Buttons
         int topBtnW = 20;
         int topBtnH = 16;
         int filterBtnX = x + dialogW - 12 - topBtnW;
         int favBtnX = filterBtnX - topBtnW - 3;
-        int searchBoxW = dialogW - 24 - (topBtnW * 2) - 6;
+        int helpBtnX = favBtnX - topBtnW - 3;
+        int searchBoxW = dialogW - 24 - (topBtnW * 3) - 9;
 
         searchBox.setX(x + 12);
         searchBox.setY(y + 30);
         searchBox.setWidth(searchBoxW);
         searchBox.render(graphics, mouseX, mouseY, 0);
+
+        // Help / Search Syntax Guide Button [?]
+        boolean helpHover = mouseX >= helpBtnX && mouseX <= helpBtnX + topBtnW && mouseY >= y + 30 && mouseY <= y + 30 + topBtnH;
+        graphics.fill(helpBtnX, y + 30, helpBtnX + topBtnW, y + 30 + topBtnH, helpHover ? 0xFF334155 : 0xFF1E293B);
+        graphics.renderOutline(helpBtnX, y + 30, topBtnW, topBtnH, helpHover ? 0xFFF59E0B : 0xFF475569);
+        graphics.drawCenteredString(font, "?", helpBtnX + topBtnW / 2, y + 34, helpHover ? 0xFFFBBF24 : 0xFF94A3B8);
+
+        if (helpHover && !filterDialog.isVisible()) {
+            String raw = Component.translatable("gui.gtcalcboard.search.help_tooltip").getString();
+            if (raw.contains("\n")) {
+                List<Component> lines = java.util.Arrays.stream(raw.split("\n"))
+                        .<Component>map(Component::literal)
+                        .toList();
+                graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+            } else {
+                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.search.help_tooltip"), mouseX, mouseY);
+            }
+        }
 
         // Favorites Button [⭐]
         boolean favHover = mouseX >= favBtnX && mouseX <= favBtnX + topBtnW && mouseY >= y + 30 && mouseY <= y + 30 + topBtnH;
@@ -897,6 +982,59 @@ public class RecipeSearchDialog {
         }
     }
 
+    private void renderPrefixSidePanel(GuiGraphics graphics, Font font, int sideX, int y, int sideW, int dialogH, int mouseX, int mouseY) {
+        graphics.fill(sideX, y, sideX + sideW, y + dialogH, 0xFF1E222B);
+        graphics.renderOutline(sideX, y, sideW, dialogH, 0xFF4A90E2);
+
+        // Header
+        graphics.fill(sideX, y, sideX + sideW, y + 24, 0xFF282E3B);
+        String headerTitle = "§e⌨ " + Component.translatable("gui.gtcalcboard.search.prefix_guide.title").getString();
+        graphics.drawString(font, font.plainSubstrByWidth(headerTitle, sideW - 10), sideX + 6, y + 8, 0xFFFFFFFF, false);
+
+        int itemW = sideW - 12;
+        int itemH = 24;
+        int itemSpacing = 28;
+        PrefixGuideItem hoveredItem = null;
+
+        for (int i = 0; i < PREFIX_ITEMS.size(); i++) {
+            PrefixGuideItem item = PREFIX_ITEMS.get(i);
+            int itemX = sideX + 6;
+            int itemY = y + 28 + i * itemSpacing;
+
+            boolean hover = mouseX >= itemX && mouseX <= itemX + itemW && mouseY >= itemY && mouseY <= itemY + itemH;
+            if (hover) {
+                hoveredItem = item;
+            }
+
+            int bg = hover ? item.hoverBg() : 0xFF151922;
+            int border = hover ? item.color() : 0xFF334155;
+
+            graphics.fill(itemX, itemY, itemX + itemW, itemY + itemH, bg);
+            graphics.renderOutline(itemX, itemY, itemW, itemH, border);
+
+            // Colored Prefix Badge
+            graphics.fill(itemX + 2, itemY + 2, itemX + 18, itemY + itemH - 2, 0xFF0F172A);
+            graphics.drawCenteredString(font, item.prefix(), itemX + 10, itemY + 8, item.color());
+
+            // Label text
+            String label = Component.translatable(item.labelKey()).getString();
+            if (label.startsWith(item.prefix())) {
+                label = label.substring(item.prefix().length()).trim();
+            }
+            graphics.drawString(font, font.plainSubstrByWidth(label, itemW - 22), itemX + 22, itemY + 8, hover ? 0xFFFFFFFF : 0xFFCCCCCC, false);
+        }
+
+        // Render Tooltip for hovered item
+        if (hoveredItem != null && !filterDialog.isVisible()) {
+            List<Component> tooltipLines = new ArrayList<>();
+            tooltipLines.add(Component.literal("§6§l" + Component.translatable(hoveredItem.labelKey()).getString()));
+            tooltipLines.add(Component.literal("§7" + Component.translatable(hoveredItem.descKey()).getString()));
+            tooltipLines.add(Component.literal("§8----------------------"));
+            tooltipLines.add(Component.literal("§e💡 " + Component.translatable("gui.gtcalcboard.search.prefix.click_hint").getString()));
+            graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+        }
+    }
+
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible) return false;
 
@@ -906,8 +1044,39 @@ public class RecipeSearchDialog {
 
         int dialogW = Math.min(380, screenWidth - 24);
         int dialogH = Math.min(280, screenHeight - 24);
-        int x = (screenWidth - dialogW) / 2;
+        int sideW = 104;
+        int gap = 6;
+        boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
+        int totalW = hasSideSpace ? (dialogW + sideW + gap) : dialogW;
+        int startX = (screenWidth - totalW) / 2;
+        int sideX = hasSideSpace ? startX : -1000;
+        int x = hasSideSpace ? (startX + sideW + gap) : startX;
         int y = (screenHeight - dialogH) / 2;
+
+        // Side panel click handling
+        if (hasSideSpace && mouseX >= sideX && mouseX <= sideX + sideW && mouseY >= y && mouseY <= y + dialogH) {
+            int itemW = sideW - 12;
+            int itemH = 24;
+            int itemSpacing = 28;
+            for (int i = 0; i < PREFIX_ITEMS.size(); i++) {
+                int itemY = y + 28 + i * itemSpacing;
+                if (mouseX >= sideX + 6 && mouseX <= sideX + 6 + itemW && mouseY >= itemY && mouseY <= itemY + itemH) {
+                    PrefixGuideItem item = PREFIX_ITEMS.get(i);
+                    String current = searchBox.getValue();
+                    if (!current.isEmpty() && !current.endsWith(" ")) {
+                        current += " ";
+                    }
+                    searchBox.setValue(current + item.prefix());
+                    searchBox.setFocused(true);
+                    searchBox.setCursorPosition(searchBox.getValue().length());
+                    Minecraft.getInstance().getSoundManager().play(
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                    );
+                    return true;
+                }
+            }
+            return true;
+        }
 
         // If mouse is inside the sticky preview card on the right
         if (stickyHoverRecipe != null) {
@@ -938,13 +1107,27 @@ public class RecipeSearchDialog {
             return true;
         }
 
-        // Favorites toggle button [⭐]
+        // Top action buttons
         int btnW = 20;
         int btnH = 16;
         int filterBtnX = x + dialogW - 12 - btnW;
         int favBtnX = filterBtnX - btnW - 3;
+        int helpBtnX = favBtnX - btnW - 3;
         int btnY = y + 30;
 
+        // Help button [?] -> Open Chapter 2 of Guidebook
+        if (mouseX >= helpBtnX && mouseX <= helpBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
+            Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+            );
+            setVisible(false);
+            if (parent != null && parent.getGuideDialog() != null) {
+                parent.getGuideDialog().openCategory(GuideDialog.GuideCategory.SEARCH);
+            }
+            return true;
+        }
+
+        // Favorites toggle button [⭐]
         if (mouseX >= favBtnX && mouseX <= favBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
             showFavoritesOnly = !showFavoritesOnly;
             updateSearchResultsSynchronously(searchBox.getValue());

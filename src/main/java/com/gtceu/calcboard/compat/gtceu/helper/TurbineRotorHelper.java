@@ -1,5 +1,8 @@
-package com.gtceu.calcboard.api;
+package com.gtceu.calcboard.compat.gtceu.helper;
 
+import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.MultiblockDetector;
+import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -11,8 +14,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Dynamically queries GTCEu Modern's TurbineRotorBehaviour and Material RotorProperty
- * to obtain exact turbine rotor efficiency, power, durability, and max EU/t without hardcoded tables.
+ * Helper class for GTCEu Modern turbine rotors.
+ * Dynamically queries TurbineRotorBehaviour and RotorProperty to extract efficiency, power, durability, and max EU/t.
  */
 public class TurbineRotorHelper {
 
@@ -24,9 +27,6 @@ public class TurbineRotorHelper {
 
     /**
      * Obtains exact rotor stats directly from GTCEu's TurbineRotorBehaviour or RotorProperty.
-     *
-     * @param rotorIdentifier Material name (e.g. "shellite", "damascus_steel"), resource location string, or rotor item name
-     * @return Dynamically extracted RotorStats
      */
     public static RotorStats getRotorStats(String rotorIdentifier) {
         if (rotorIdentifier == null || rotorIdentifier.isEmpty()) {
@@ -198,13 +198,11 @@ public class TurbineRotorHelper {
         return null;
     }
 
-    public static MachineAddon parseTurbineRotor(ItemStack stack, ResourceLocation id) {
+    public static GTRotorAddon parseTurbineRotor(ItemStack stack, ResourceLocation id) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
 
-        // Strictly match the assembled turbine rotor item (gtceu:turbine_rotor)
-        // Explicitly exclude raw craft parts (*_blade, *_rotor) and machine blocks (*_turbine, basic_*, etc.)
         String matId = null;
         if (stack.hasTag() && stack.getTag().contains("GT.PartStats")) {
             matId = stack.getTag().getCompound("GT.PartStats").getString("Material");
@@ -231,11 +229,7 @@ public class TurbineRotorHelper {
         }
 
         String desc = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
-        MachineAddon addon = new MachineAddon(addonId, name.isEmpty() ? id.toString() : name, MachineAddon.Category.ROTOR, desc, id);
-        addon.setDurationMultiplier(Math.max(1.0, eff / 100.0));
-        addon.setEutMultiplier(1.0);
-        addon.setRotorPower(power);
-        addon.setRotorMaxEUt(dynamicMaxEUt);
+        GTRotorAddon addon = new GTRotorAddon(addonId, name.isEmpty() ? id.toString() : name, desc, id, eff, power, dynamicMaxEUt);
         addon.setItemStackSample(stack);
         addon.setDiscoverySource("GTCEu TurbineRotorBehaviour API [" + id + "]");
         return addon;
@@ -269,9 +263,6 @@ public class TurbineRotorHelper {
                 rotorPattern = "%s " + rotorPattern;
             }
 
-            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [RotorHelper] discoverGTCEuRotors running. allMaterials count: {}", allMaterials.size());
-
-            // 1. Process all materials discovered from GTRegistries
             for (Object mat : allMaterials) {
                 try {
                     Method getNameMethod = mat.getClass().getMethod("getName");
@@ -383,11 +374,7 @@ public class TurbineRotorHelper {
 
                         String displayName = String.format(rotorPattern, matDisplayName);
                         String desc = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.turbine_efficiency_desc", String.valueOf(eff)).getString();
-                        MachineAddon rAddon = new MachineAddon("gtceu:rotor_" + cleanMatName, displayName, MachineAddon.Category.ROTOR, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"));
-                        rAddon.setDurationMultiplier(eff / 100.0);
-                        rAddon.setEutMultiplier(1.0);
-                        rAddon.setRotorPower(power);
-                        rAddon.setRotorMaxEUt(durability > 0 ? durability : 1600.0);
+                        GTRotorAddon rAddon = new GTRotorAddon("gtceu:rotor_" + cleanMatName, displayName, desc, ResourceLocation.tryParse("gtceu:turbine_rotor"), eff, power, durability > 0 ? durability : 1600.0);
                         if (!stack.isEmpty()) {
                             rAddon.setItemStackSample(stack);
                         }
@@ -395,15 +382,12 @@ public class TurbineRotorHelper {
 
                         if (list.stream().noneMatch(a -> a.getId().equals(rAddon.getId()) || a.getName().equalsIgnoreCase(rAddon.getName()))) {
                             list.add(rAddon);
-                            if (cleanMatName.contains("ender")) {
-                                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [RotorHelper] Successfully added Ender rotor: id={}, name={}", rAddon.getId(), rAddon.getName());
-                            }
                         }
                     }
                 } catch (Throwable ignored) {}
             }
 
-            // 2. Discover turbine rotors from Creative Mode Tabs (where KubeJS & GTCEu register all active rotor item variants)
+            // 2. Creative Tab search
             try {
                 for (net.minecraft.world.item.CreativeModeTab tab : net.minecraft.core.registries.BuiltInRegistries.CREATIVE_MODE_TAB) {
                     try {
@@ -413,11 +397,9 @@ public class TurbineRotorHelper {
                                 if (s != null && !s.isEmpty()) {
                                     ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
                                     if (id != null && id.getPath().equals("turbine_rotor")) {
-                                        MachineAddon rotor = parseTurbineRotor(s, id);
+                                        GTRotorAddon rotor = parseTurbineRotor(s, id);
                                         if (rotor != null && list.stream().noneMatch(a -> a.getId().equals(rotor.getId()))) {
                                             list.add(rotor);
-                                            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [RotorHelper] Discovered rotor from CreativeTab: id={}, name={}, eff={}, pwr={}",
-                                                    rotor.getId(), rotor.getName(), rotor.getDurationMultiplier(), rotor.getRotorPower());
                                         }
                                     }
                                 }
@@ -443,85 +425,6 @@ public class TurbineRotorHelper {
                             allMaterials.add(mat);
                         }
                     }
-                }
-
-                for (Method m : materialsRegistry.getClass().getMethods()) {
-                    if (m.getParameterCount() == 0) {
-                        try {
-                            Object res = m.invoke(materialsRegistry);
-                            if (res instanceof Iterable<?> it) {
-                                for (Object mat : it) {
-                                    if (mat != null && materialCls.isInstance(mat) && !allMaterials.contains(mat)) {
-                                        allMaterials.add(mat);
-                                    }
-                                }
-                            } else if (res instanceof Map<?, ?> map) {
-                                for (Object mat : map.values()) {
-                                    if (mat != null && materialCls.isInstance(mat) && !allMaterials.contains(mat)) {
-                                        allMaterials.add(mat);
-                                    }
-                                }
-                            } else if (res instanceof java.util.stream.Stream<?> stream) {
-                                stream.forEach(mat -> {
-                                    if (mat != null && materialCls.isInstance(mat) && !allMaterials.contains(mat)) {
-                                        allMaterials.add(mat);
-                                    }
-                                });
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
-
-                Class<?> cur = materialsRegistry.getClass();
-                while (cur != null && cur != Object.class) {
-                    for (java.lang.reflect.Field f : cur.getDeclaredFields()) {
-                        try {
-                            f.setAccessible(true);
-                            Object val = f.get(materialsRegistry);
-                            if (val instanceof Iterable<?> it) {
-                                for (Object mat : it) {
-                                    if (mat != null && materialCls.isInstance(mat) && !allMaterials.contains(mat)) {
-                                        allMaterials.add(mat);
-                                    }
-                                }
-                            } else if (val instanceof Map<?, ?> map) {
-                                for (Object mat : map.values()) {
-                                    if (mat != null && materialCls.isInstance(mat) && !allMaterials.contains(mat)) {
-                                        allMaterials.add(mat);
-                                    }
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                    cur = cur.getSuperclass();
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        try {
-            Class<?> gtMaterialsCls = Class.forName("com.gregtechceu.gtceu.common.data.GTMaterials");
-            for (java.lang.reflect.Field f : gtMaterialsCls.getFields()) {
-                if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) && materialCls.isAssignableFrom(f.getType())) {
-                    try {
-                        Object mat = f.get(null);
-                        if (mat != null && !allMaterials.contains(mat)) {
-                            allMaterials.add(mat);
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        try {
-            Class<?> gcymMaterialsCls = Class.forName("com.gregtechceu.gtceu.common.data.GCYMMaterials");
-            for (java.lang.reflect.Field f : gcymMaterialsCls.getFields()) {
-                if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) && materialCls.isAssignableFrom(f.getType())) {
-                    try {
-                        Object mat = f.get(null);
-                        if (mat != null && !allMaterials.contains(mat)) {
-                            allMaterials.add(mat);
-                        }
-                    } catch (Throwable ignored) {}
                 }
             }
         } catch (Throwable ignored) {}

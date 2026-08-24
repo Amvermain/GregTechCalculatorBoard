@@ -120,7 +120,6 @@ public class ToolbarWidget {
             boolean hasLock = state.doesHoldLock(activePageId);
 
             if (hasLock) {
-                // [✕ 편집 종료]
                 String cancelTxt = "§c✕ " + Component.translatable("gui.gtcalcboard.btn_cancel_edit").getString();
                 list.add(new ToolbarButtonDef("cancel_edit", cancelTxt, 0xFFFF6B6B, 0xFF3D1C1C, 0xFF5A2A2A, 0xFF773B3B, font.width(cancelTxt) + 12, btn -> {
                     state.autoCommitAndRelease(screen, activePageId);
@@ -129,7 +128,6 @@ public class ToolbarWidget {
                 }));
             }
 
-            // [📋 내 보드로 복사]
             String copyTxt = "§b📋 " + Component.translatable("gui.gtcalcboard.btn_copy_to_personal").getString();
             list.add(new ToolbarButtonDef("copy_to_personal", copyTxt, 0xFF66DDFF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(copyTxt) + 12, btn -> {
                 BoardManager bm = BoardManager.getInstance();
@@ -152,7 +150,6 @@ public class ToolbarWidget {
                 BoardToast.show("gui.gtcalcboard.toast.copied_to_personal", pageTitle);
             }));
 
-            // [📜 저장 기록]
             String historyTxt = "§f📜 " + Component.translatable("gui.gtcalcboard.btn_recent_saves").getString();
             list.add(new ToolbarButtonDef("recent_saves", historyTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(historyTxt) + 12, btn -> {
                 if (screen.getRecentSavesDialog() != null) {
@@ -160,7 +157,6 @@ public class ToolbarWidget {
                 }
             }));
         } else if (state.isCollaborationEnabled()) {
-            // [📤 팀 보드로 내보내기]
             String exportTeamTxt = "§a📤 " + Component.translatable("gui.gtcalcboard.btn_export_to_team").getString();
             list.add(new ToolbarButtonDef("export_to_team", exportTeamTxt, 0xFF55FF88, 0xFF1C3D26, 0xFF2A5A38, 0xFF3B774E, font.width(exportTeamTxt) + 12, btn -> {
                 if (screen.getExportToTeamDialog() != null) {

@@ -46,7 +46,6 @@ public class TutorialOverlay {
             graphics.drawString(font, lines.get(l), bannerX + 10, bannerY + 22 + l * 11, 0xFFCCCCCC, false);
         }
 
-        // Action Buttons: [건너뛰기] / [다음] / [닫기]
         int btnW = 60;
         int btnH = 18;
         int nextBtnX = bannerX + bannerW - btnW - 10;

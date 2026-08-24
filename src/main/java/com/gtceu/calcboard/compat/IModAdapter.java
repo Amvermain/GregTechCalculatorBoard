@@ -8,8 +8,8 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 /**
- * Service Provider Interface (SPI) contract for external mod compatibilities.
- * Encapsulates mod-specific recipe parsing, hardware addons, capabilities, overclocking, and composite recipes.
+ * Service Provider Interface (SPI) for external mod integration.
+ * Encapsulates recipe parsing, hardware addons, capability matrices, overclocking, and compound recipe handling.
  */
 public interface IModAdapter {
 
@@ -19,66 +19,211 @@ public interface IModAdapter {
     String getModId();
 
     /**
-     * Priority of this adapter (higher runs earlier, default 100).
+     * Adapter priority (higher values evaluated first, default 100).
      */
     default int getPriority() {
         return 100;
     }
 
     /**
-     * Returns true if the backing mod is present and active in the runtime.
+     * Checks if the target mod is currently loaded and active in the runtime environment.
      */
     boolean isLoaded();
 
     /**
-     * Returns true if this adapter handles the given recipe category.
+     * Checks if this adapter handles the specified recipe category.
      */
     boolean handlesCategory(ResourceLocation categoryId);
 
     /**
-     * Returns true if this adapter handles the given RecipeNode.
+     * Checks if this adapter handles the specified recipe node.
      */
     boolean handlesNode(RecipeNode node);
 
     /**
-     * Discovers all hardware addons, coils, rotors, augment items provided by this mod.
+     * Discovers and registers hardware addons (coils, rotors, reflectors, augments) provided by the mod.
      */
     void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks);
 
     /**
-     * Injects mod-specific capability definitions into the capability matrix.
+     * Injects mod-specific capability matrix definitions.
      */
     void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager);
 
     /**
-     * Adapts or transforms recipe details (e.g. composite recipes, water+fuel -> steam, custom power/duration).
-     * Returns true if this adapter processed and customized the details.
+     * Adapts compound recipes (e.g. water+fuel -> steam) or mod-specific energy/duration rules.
+     * Returns true if custom handling was applied.
      */
     default boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
         return false;
     }
 
     /**
-     * Returns whether the given machine node supports installing hardware addons.
+     * Checks if the specified machine node supports installing hardware addons.
      */
     default boolean supportsAddons(RecipeNode node) {
         return !getApplicableAddonCategories(node).isEmpty();
     }
 
     /**
-     * Returns the list of applicable addon categories for the given machine node.
+     * Returns the list of applicable addon categories for the specified node.
      */
-    default List<MachineAddon.Category> getApplicableAddonCategories(RecipeNode node) {
+    default List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
         return List.of();
     }
 
     /**
-     * Validates whether a specific addon can be installed on the given machine node.
+     * Checks if a specific addon is compatible with the target machine node.
      */
     default boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
-        if (addon.getCategory() == MachineAddon.Category.CUSTOM) return true;
+        if (addon.getCategory().equals(AddonCategory.CUSTOM)) return true;
         return getApplicableAddonCategories(node).contains(addon.getCategory());
+    }
+
+    /**
+     * Checks if the addon can be installed considering slot limits and duplicate rules.
+     */
+    default boolean canInstallAddon(RecipeNode node, MachineAddon addon) {
+        return isAddonCompatible(node, addon);
+    }
+
+    /**
+     * Lifecycle hook when an addon is installed onto a node (e.g. replacing existing coil/rotor/reflector).
+     */
+    default void onAddonInstalled(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return;
+        if (addon.getCategory() == MachineAddon.Category.COIL ||
+            addon.getCategory() == MachineAddon.Category.ROTOR ||
+            addon.getCategory() == MachineAddon.Category.REFLECTOR) {
+            node.getAddons().removeIf(a -> a.getCategory() == addon.getCategory());
+        }
+        node.getAddons().add(addon);
+    }
+
+    /**
+     * Lifecycle hook when an addon is removed from a node.
+     */
+    default void onAddonRemoved(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return;
+    }
+
+    /**
+     * Returns special reset/default cards in the machine config dialog for the node (e.g. standard 100% rotor).
+     */
+    default List<MachineAddon> getResetAddonCards(RecipeNode node) {
+        return List.of();
+    }
+
+    /**
+     * Installs an addon onto the machine node (handles slots, replacement, shift-click filling).
+     */
+    default void handleInstallAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
+        if (node == null || addon == null) return;
+        if (!node.isMultiblock() && node.hasMultiblockOption() && addon.getCategory() != AddonCategory.CUSTOM && addon.getCategory() != AddonCategory.THERMAL_AUGMENT) {
+            node.setMultiblock(true);
+            ResourceLocation mbWs = node.getMultiblockWorkstation();
+            if (mbWs != null) {
+                node.setMachineIcon(mbWs);
+            }
+        }
+        onAddonInstalled(node, addon.copy());
+    }
+
+    /**
+     * Uninstalls an addon or removes a copy from the machine node.
+     */
+    default void handleUninstallAddon(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return;
+        onAddonRemoved(node, addon);
+        node.removeAddon(addon.getId());
+    }
+
+    /**
+     * Checks if the addon is considered installed on the node.
+     */
+    default boolean isAddonInstalled(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return false;
+        return node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+    }
+
+    /**
+     * Gets the installed count of this addon on the node.
+     */
+    default int getAddonInstalledCount(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return 0;
+        return (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+    }
+
+    /**
+     * Formats the subtitle text for an addon in the catalog grid (e.g. "Magnetic Force: 24x", "Parallel: 4x").
+     */
+    default String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        if (addon.getCategory().equals(AddonCategory.MAGNET)) {
+            return String.format("Magnetic Force: %dx", addon.getMagneticForce());
+        }
+        if (addon.getCategory().equals(AddonCategory.PARALLEL)) {
+            return String.format("Parallel: %dx", addon.getParallelMultiplier());
+        }
+        if (addon.getCategory().equals(AddonCategory.COIL)) {
+            return String.format("Coil: %d K", addon.getCoilTemperature());
+        }
+        if (addon.getCategory().equals(AddonCategory.ROTOR)) {
+            return String.format("Power: %d%%", addon.getRotorPower());
+        }
+        return addon.getName();
+    }
+
+    /**
+     * Builds the hover tooltip lines for an addon in the MachineConfigDialog (both active and catalog views).
+     */
+    default void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<net.minecraft.network.chat.Component> tooltip) {
+        if (addon == null || tooltip == null) return;
+        if (addon.getParallelMultiplier() > 1) {
+            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.parallel", addon.getParallelMultiplier()).getString())));
+        }
+        if (addon.getDurationMultiplier() != 1.0) {
+            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§a⏳ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.speed_boost", String.format(java.util.Locale.ROOT, "%.2fx", 1.0 / addon.getDurationMultiplier())).getString())));
+        }
+        if (addon.getEutMultiplier() != 1.0 && !addon.getCategory().equals(AddonCategory.MAGNET)) {
+            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.eut_multiplier", String.format(java.util.Locale.ROOT, "%.2fx", addon.getEutMultiplier())).getString())));
+        }
+    }
+
+    /**
+     * Formats the badge text displayed on the top/bottom corner of an addon card in the catalog grid.
+     */
+    default String formatAddonBadge(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        if (addon.getCategory() == MachineAddon.Category.REFLECTOR) {
+            return String.format("§b🪞 Tier %d", addon.getReflectorTier());
+        }
+        if (addon.getCategory() == MachineAddon.Category.COIL) {
+            return String.format("§6♨ %d K", addon.getCoilTemperature());
+        }
+        if (addon.getCategory() == MachineAddon.Category.ROTOR) {
+            return String.format("§a⚙ %d%%", addon.getRotorEfficiency());
+        }
+        if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
+            return String.format("§b%dx Par", addon.getParallelMultiplier());
+        }
+        return "";
+    }
+
+    /**
+     * Validates node operating conditions (reflector tier, coil temperature, etc.) and fills warning list.
+     * Returns true if all prerequisites are met.
+     */
+    default boolean validateNode(RecipeNode node, List<net.minecraft.network.chat.Component> warnings) {
+        return true;
+    }
+
+    /**
+     * Validates node operating conditions including graph flow state.
+     */
+    default boolean validateNode(RecipeNode node, FlowGraph graph, List<net.minecraft.network.chat.Component> warnings) {
+        return validateNode(node, warnings);
     }
 
     /**

@@ -1,6 +1,10 @@
 package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -520,6 +524,47 @@ public class MachineAddonTest {
     }
 
     @Test
+    void testThermalMachineAugmentsAndNumericTags() {
+        // 1. Test Thermal Machine Speed Augment (MachinePower +100%, MachineSpeed +100% -> 2x power, 0.5x duration)
+        CompoundTag speedAug = new CompoundTag();
+        speedAug.putString("Type", "Machine");
+        speedAug.putFloat("MachinePower", 1.0f);
+        speedAug.putFloat("MachineSpeed", 1.0f);
+        CompoundTag speedRoot = new CompoundTag();
+        speedRoot.put("AugmentData", speedAug);
+
+        MachineAddon speedAddon = ThermalAugmentHelper.parseThermalAugmentTag(speedRoot, "Flux Linkage Amplifier", ResourceLocation.tryParse("thermal:machine_speed_augment"));
+        Assertions.assertNotNull(speedAddon);
+        Assertions.assertEquals(2.0, speedAddon.getEutMultiplier(), 0.001);
+        Assertions.assertEquals(0.5, speedAddon.getDurationMultiplier(), 0.001);
+
+        // 2. Test Thermal Extra / KubeJS 48x Tier Upgrade with DoubleTag BaseMod
+        CompoundTag tier48Aug = new CompoundTag();
+        tier48Aug.putString("Type", "Upgrade");
+        tier48Aug.putDouble("BaseMod", 48.0);
+        tier48Aug.putDouble("Scale", 48.0);
+        CompoundTag tier48Root = new CompoundTag();
+        tier48Root.put("AugmentData", tier48Aug);
+
+        MachineAddon tier48Addon = ThermalAugmentHelper.parseThermalAugmentTag(tier48Root, "Abyssal Upgrade Kit", ResourceLocation.tryParse("thermal_extra:abyssal_upgrade_kit"));
+        Assertions.assertNotNull(tier48Addon);
+        Assertions.assertEquals(48, tier48Addon.getParallelMultiplier());
+        Assertions.assertTrue(RecipeNode.isThermalUpgradeKit(tier48Addon));
+
+        // 3. Test Multi-Cycle Injector with 1.60x Fuel Energy (DoubleTag DynEnergy)
+        CompoundTag mci160Aug = new CompoundTag();
+        mci160Aug.putString("Type", "Dynamo");
+        mci160Aug.putDouble("DynEnergy", 1.60);
+        CompoundTag mci160Root = new CompoundTag();
+        mci160Root.put("AugmentData", mci160Aug);
+
+        MachineAddon mci160Addon = ThermalAugmentHelper.parseThermalAugmentTag(mci160Root, "Abyssal Multi-Cycle Injector", ResourceLocation.tryParse("thermal_extra:abyssal_multi_cycle_injector"));
+        Assertions.assertNotNull(mci160Addon);
+        Assertions.assertEquals(1.60, mci160Addon.getDurationMultiplier(), 0.001);
+        Assertions.assertEquals(1.0, mci160Addon.getEutMultiplier(), 0.001);
+    }
+
+    @Test
     void testTurbineRotorHelperReflectionAndStrictRejection() {
         Object mockRotorProperty = new Object() {
             public double getEfficiency() { return 1.4; }
@@ -616,12 +661,12 @@ public class MachineAddonTest {
 
         // Install LV Upgrade Kit (6x)
         dynamo.addAddon(lvKit.copy());
-        Assertions.assertEquals(6, dynamo.getTotalParallel());
+        Assertions.assertEquals(6, dynamo.getCombinedParallelMultiplier());
         Assertions.assertEquals(1, dynamo.getAddons().size());
 
         // Install EV Upgrade Kit (48x) -> replaces LV Upgrade Kit!
         dynamo.addAddon(evKit.copy());
-        Assertions.assertEquals(48, dynamo.getTotalParallel());
+        Assertions.assertEquals(48, dynamo.getCombinedParallelMultiplier());
         Assertions.assertEquals(1, dynamo.getAddons().size());
         Assertions.assertTrue(dynamo.getAddons().get(0).getId().startsWith("kubejs:ev_upgrade_kit"));
 

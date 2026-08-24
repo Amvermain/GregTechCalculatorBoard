@@ -353,7 +353,7 @@ public final class FlowGraphSolver {
                     hasConnectedInput = true;
 
                     IngredientStack inStack = consumer.getInputs().get(inIdx);
-                    double nominalInRate = inStack.getAmount() * consumer.getCyclesPerSecond();
+                    double nominalInRate = consumer.getInputSlotRate(inIdx, false);
                     if (nominalInRate <= 0.00001) continue;
 
                     double totalIncomingSupply = 0.0;
@@ -384,6 +384,10 @@ public final class FlowGraphSolver {
                     }
 
                     double portRatio = totalIncomingSupply / nominalInRate;
+                    if (inStack.isStressUnit() && portRatio < 0.9999) {
+                        // Create Kinetics: Overstressed network halts completely (0% efficiency, 0 output)
+                        portRatio = 0.0;
+                    }
                     minRatio = Math.min(minRatio, portRatio);
                 }
 
@@ -498,6 +502,10 @@ public final class FlowGraphSolver {
         int totalMachineCount = 0;
         Map<String, Integer> machineBreakdown = new LinkedHashMap<>();
 
+        long totalFusionStartupEU = 0L;
+        Map<Integer, Integer> fusionTierCounts = new LinkedHashMap<>();
+        Map<Integer, Long> fusionTierStartupEU = new LinkedHashMap<>();
+
         Map<IngredientStack, Double> totalProduction = new HashMap<>();
         Map<IngredientStack, Double> totalConsumption = new HashMap<>();
 
@@ -516,6 +524,17 @@ public final class FlowGraphSolver {
                     totalGeneratedSU += subSummary.totalSU() > 0 ? subSummary.totalSU() * moduleCount : 0;
                     totalConsumedFE += subSummary.totalFE() < 0 ? -subSummary.totalFE() * moduleCount : 0;
                     totalGeneratedFE += subSummary.totalFE() > 0 ? subSummary.totalFE() * moduleCount : 0;
+
+                    if (subSummary.totalFusionStartupEU() > 0) {
+                        long subFusionEU = subSummary.totalFusionStartupEU() * moduleCount;
+                        totalFusionStartupEU += subFusionEU;
+                        for (Map.Entry<Integer, Integer> entry : subSummary.fusionTierCounts().entrySet()) {
+                            fusionTierCounts.put(entry.getKey(), fusionTierCounts.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
+                        }
+                        for (Map.Entry<Integer, Long> entry : subSummary.fusionTierStartupEU().entrySet()) {
+                            fusionTierStartupEU.put(entry.getKey(), fusionTierStartupEU.getOrDefault(entry.getKey(), 0L) + entry.getValue() * moduleCount);
+                        }
+                    }
                 } else {
                     int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
                     totalMachineCount += subMachines;
@@ -525,6 +544,15 @@ public final class FlowGraphSolver {
                 int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
                 totalMachineCount += nodeMachines;
                 machineBreakdown.put(node.getName(), machineBreakdown.getOrDefault(node.getName(), 0) + nodeMachines);
+
+                if (node.isFusion() && node.getEuToStart() > 0) {
+                    int fTier = node.getFusionTier();
+                    long startEU = node.getEuToStart();
+                    long totalNodeStartEU = startEU * nodeMachines;
+                    totalFusionStartupEU += totalNodeStartEU;
+                    fusionTierCounts.put(fTier, fusionTierCounts.getOrDefault(fTier, 0) + nodeMachines);
+                    fusionTierStartupEU.put(fTier, fusionTierStartupEU.getOrDefault(fTier, 0L) + totalNodeStartEU);
+                }
             }
 
             double rawPower = node.getEffectiveTotalEUt();
@@ -590,7 +618,7 @@ public final class FlowGraphSolver {
         double netEUt = totalConsumedEUt - totalGeneratedEUt;
         double netSU = totalGeneratedSU - totalConsumedSU;
         double netFE = totalGeneratedFE - totalConsumedFE;
-        return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption);
+        return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU);
     }
 
     private static void collectUniqueStacks(Set<IngredientStack> source, List<IngredientStack> destination) {

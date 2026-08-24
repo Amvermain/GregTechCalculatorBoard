@@ -1,11 +1,16 @@
-package com.gtceu.calcboard.api;
+package com.gtceu.calcboard.compat.thermal.helper;
 
+import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
+import java.lang.reflect.Method;
+
 /**
- * Deductively parses and extracts performance modifiers from Thermal / KubeJS Augments.
+ * Helper class for parsing Thermal Series and KubeJS augments via deterministic NBT data and runtime reflection.
  */
 public class ThermalAugmentHelper {
 
@@ -24,19 +29,19 @@ public class ThermalAugmentHelper {
         }
 
         if (augTag == null) {
-            // Deductive Reflection: Query IAugmentItem API from CoFH / Thermal
             try {
                 for (java.lang.reflect.Method m : stack.getItem().getClass().getMethods()) {
-                    if (m.getName().equalsIgnoreCase("getAugmentData") || m.getName().equalsIgnoreCase("getAugmentTag")) {
+                    String mn = m.getName().toLowerCase();
+                    if (mn.contains("augmentdata") || mn.contains("augmenttag") || mn.contains("augment") || mn.contains("data")) {
                         if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(ItemStack.class)) {
                             Object res = m.invoke(stack.getItem(), stack);
-                            if (res instanceof CompoundTag ct) {
+                            if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) {
                                 augTag = ct;
                                 break;
                             }
                         } else if (m.getParameterCount() == 0) {
                             Object res = m.invoke(stack.getItem());
-                            if (res instanceof CompoundTag ct) {
+                            if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) {
                                 augTag = ct;
                                 break;
                             }
@@ -82,9 +87,14 @@ public class ThermalAugmentHelper {
     }
 
     private static boolean hasAnyAugmentKey(CompoundTag tag) {
-        return tag.contains("Scale") || tag.contains("BaseMod") || tag.contains("DynScale") || tag.contains("DynamoScale") || tag.contains("Parallel") || tag.contains("Factor") || tag.contains("Tier")
-                || tag.contains("DynamoPower") || tag.contains("DynPower") || tag.contains("PowerMod") || tag.contains("EnergyMod") || tag.contains("ProcessPower") || tag.contains("MachinePower") || tag.contains("SteamMod")
-                || tag.contains("DynamoEnergy") || tag.contains("DynEnergy") || tag.contains("SpeedMod") || tag.contains("FuelMod") || tag.contains("EfficiencyMod") || tag.contains("ProcessEnergy") || tag.contains("MachineSpeed") || tag.contains("MachineEnergy");
+        if (tag == null || tag.isEmpty()) return false;
+        return tag.contains("Scale") || tag.contains("BaseMod") || tag.contains("DynScale") || tag.contains("DynamoScale")
+                || tag.contains("Parallel") || tag.contains("Factor") || tag.contains("Tier") || tag.contains("Level")
+                || tag.contains("DynamoPower") || tag.contains("DynPower") || tag.contains("PowerMod") || tag.contains("EnergyMod")
+                || tag.contains("ProcessPower") || tag.contains("MachinePower") || tag.contains("SteamMod")
+                || tag.contains("DynamoEnergy") || tag.contains("DynEnergy") || tag.contains("SpeedMod") || tag.contains("FuelMod")
+                || tag.contains("EfficiencyMod") || tag.contains("ProcessEnergy") || tag.contains("MachineEnergy")
+                || tag.contains("ProcessSpeed") || tag.contains("Type") || tag.contains("AugmentData");
     }
 
     public static MachineAddon parseThermalAugmentTag(CompoundTag augTag, String name, ResourceLocation id) {
@@ -96,28 +106,43 @@ public class ThermalAugmentHelper {
             augTag = augTag.getCompound("AugmentData");
         }
 
-        int parallel = extractTagInt(augTag, 1, "Scale", "BaseMod", "DynScale", "DynamoScale");
+        int parallel = extractTagInt(augTag, 1, "Scale", "BaseMod", "Factor", "Tier", "Level", "DynScale", "DynamoScale", "MachineScale", "Parallel");
 
         double eutMult = 1.0;
         if (augTag.contains("DynamoPower") || augTag.contains("DynPower")) {
             double dynPower = extractTagRawNumber(augTag, "DynamoPower", "DynPower");
             eutMult = 1.0 + dynPower;
-        } else if (augTag.contains("PowerMod") || augTag.contains("EnergyMod") || augTag.contains("ProcessPower")) {
-            eutMult = extractTagNumber(augTag, "PowerMod", "EnergyMod", "ProcessPower");
+        } else if (augTag.contains("MachinePower") || augTag.contains("ProcessPower")) {
+            double machPower = extractTagRawNumber(augTag, "MachinePower", "ProcessPower");
+            eutMult = 1.0 + machPower;
+        } else if (augTag.contains("PowerMod") || augTag.contains("EnergyMod")) {
+            eutMult = extractTagNumber(augTag, "PowerMod", "EnergyMod");
         }
 
         double durMult = 1.0;
-        if (augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy") || augTag.contains("SpeedMod") || augTag.contains("FuelMod") || augTag.contains("EfficiencyMod") || augTag.contains("ProcessEnergy")) {
-            durMult = extractTagNumber(augTag, "DynamoEnergy", "DynEnergy", "SpeedMod", "FuelMod", "EfficiencyMod", "ProcessEnergy");
+        if (augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy")) {
+            durMult = extractTagNumber(augTag, "DynamoEnergy", "DynEnergy");
+        } else if (augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed")) {
+            double spd = extractTagRawNumber(augTag, "MachineSpeed", "ProcessSpeed");
+            if (spd > 0) {
+                durMult = 1.0 / (1.0 + spd);
+            }
+        } else if (augTag.contains("SpeedMod")) {
+            double spdMod = extractTagNumber(augTag, "SpeedMod");
+            if (spdMod > 0) {
+                durMult = 1.0 / spdMod;
+            }
+        } else if (augTag.contains("FuelMod") || augTag.contains("EfficiencyMod") || augTag.contains("ProcessEnergy") || augTag.contains("MachineEnergy")) {
+            durMult = extractTagNumber(augTag, "FuelMod", "EfficiencyMod", "ProcessEnergy", "MachineEnergy");
         }
 
-        // Exclude passive storage / RF / fluid augments that have no rate/power effects
         if (parallel <= 1 && eutMult == 1.0 && durMult == 1.0) {
             return null;
         }
 
         String desc = "";
-        if (parallel > 1) {
+        boolean isKit = parallel > 1;
+        if (isKit) {
             desc = String.format("⚡ %dx Scale Factor", parallel);
         } else if (eutMult != 1.0 && durMult != 1.0) {
             desc = String.format("⚡ Max Output: +%d%% (%.2fx) | ⏱ Fuel: %.2fx", (int) Math.round((eutMult - 1.0) * 100), eutMult, durMult);
@@ -127,71 +152,39 @@ public class ThermalAugmentHelper {
             desc = String.format("⚡ Max Output: +%d%% (%.2fx)", (int) Math.round((eutMult - 1.0) * 100), eutMult);
         }
 
-        String addonId = id.toString() + "#" + augTag.toString().hashCode();
+        String addonId = id.toString() + (parallel > 1 ? "_scale_" + parallel : "");
 
-        MachineAddon addon = new MachineAddon(addonId, name == null || name.isEmpty() ? id.getPath() : name, MachineAddon.Category.THERMAL_AUGMENT, desc, id);
-        addon.setParallelMultiplier(parallel);
-        addon.setEutMultiplier(eutMult);
-        addon.setDurationMultiplier(durMult);
+        ThermalAugmentAddon addon = new ThermalAugmentAddon(addonId, name == null || name.isEmpty() ? id.getPath() : name, desc, id, parallel, durMult, eutMult, isKit);
         addon.setDiscoverySource("AugmentData NBT Tag [" + id + "]");
         return addon;
     }
 
     public static double extractTagRawNumber(CompoundTag tag, String... keys) {
+        if (tag == null) return 0.0;
         for (String k : keys) {
-            if (tag.contains(k)) {
-                try {
-                    double val = tag.getDouble(k);
-                    if (val != 0) return val;
-                } catch (Throwable ignored) {}
-                try {
-                    float val = tag.getFloat(k);
-                    if (val != 0) return val;
-                } catch (Throwable ignored) {}
-                try {
-                    int val = tag.getInt(k);
-                    if (val != 0) return val;
-                } catch (Throwable ignored) {}
+            if (tag.contains(k) && tag.get(k) instanceof net.minecraft.nbt.NumericTag num) {
+                return num.getAsDouble();
             }
         }
         return 0.0;
     }
 
     public static double extractTagNumber(CompoundTag tag, String... keys) {
+        if (tag == null) return 1.0;
         for (String k : keys) {
-            if (tag.contains(k)) {
-                try {
-                    double val = tag.getDouble(k);
-                    if (val != 0) return val;
-                } catch (Throwable ignored) {}
-                try {
-                    float val = tag.getFloat(k);
-                    if (val != 0) return val;
-                } catch (Throwable ignored) {}
-                try {
-                    int val = tag.getInt(k);
-                    if (val != 0) return val;
-                } catch (Throwable ignored) {}
+            if (tag.contains(k) && tag.get(k) instanceof net.minecraft.nbt.NumericTag num) {
+                return num.getAsDouble();
             }
         }
         return 1.0;
     }
 
     public static int extractTagInt(CompoundTag tag, int def, String... keys) {
+        if (tag == null) return def;
         for (String k : keys) {
-            if (tag.contains(k)) {
-                try {
-                    float val = tag.getFloat(k);
-                    if (val > 0) return Math.round(val);
-                } catch (Throwable ignored) {}
-                try {
-                    int val = tag.getInt(k);
-                    if (val > 0) return val;
-                } catch (Throwable ignored) {}
-                try {
-                    double val = tag.getDouble(k);
-                    if (val > 0) return (int) Math.round(val);
-                } catch (Throwable ignored) {}
+            if (tag.contains(k) && tag.get(k) instanceof net.minecraft.nbt.NumericTag num) {
+                int val = (int) Math.round(num.getAsDouble());
+                if (val > 0) return val;
             }
         }
         return def;
@@ -200,7 +193,6 @@ public class ThermalAugmentHelper {
     public static boolean isThermalMachine(RecipeNode node) {
         if (node == null) return false;
 
-        // 0. Recipe Category ID namespace check
         if (node.getRecipeCategoryId() != null) {
             String ns = node.getRecipeCategoryId().getNamespace().toLowerCase();
             if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams")) {
@@ -208,7 +200,6 @@ public class ThermalAugmentHelper {
             }
         }
 
-        // 1. Tag-based detection on machine icon & available workstations
         if (node.getMachineIcon() != null && isThermalTaggedItem(node.getMachineIcon())) {
             return true;
         }
@@ -218,7 +209,6 @@ public class ThermalAugmentHelper {
             }
         }
 
-        // 2. Namespace fallback
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace().toLowerCase();
             if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams")) {
@@ -234,67 +224,85 @@ public class ThermalAugmentHelper {
             }
         }
 
+        if (node.getName() != null) {
+            String nameLower = node.getName().toLowerCase();
+            if (nameLower.contains("dynamo") || nameLower.contains("thermal") || nameLower.contains("lapidary") || nameLower.contains("compression") || nameLower.contains("magmatic") || nameLower.contains("numismatic") || nameLower.contains("gourmand") || nameLower.contains("disenchantment") || nameLower.contains("pulverizer") || nameLower.contains("induction smelter")) {
+                return true;
+            }
+        }
+
+        if (node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || (a.getModId() != null && a.getModId().equals("thermal")))) {
+            return true;
+        }
+
         return false;
     }
 
     public static boolean isThermalTaggedItem(ResourceLocation id) {
         if (id == null) return false;
-        try {
-            if (net.minecraftforge.registries.ForgeRegistries.ITEMS == null) return false;
-            net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                var holder = net.minecraftforge.registries.ForgeRegistries.ITEMS.getHolder(item);
-                if (holder.isPresent()) {
-                    var h = holder.get();
-                    var itemReg = net.minecraft.core.registries.Registries.ITEM;
-                    var dynTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("thermal:dynamos"));
-                    var dynTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:dynamos"));
-                    var machTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("thermal:machines"));
-                    var machTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:machines"));
-                    var boilTag = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:boilers"));
-                    if (h.containsTag(dynTag1) || h.containsTag(dynTag2) || h.containsTag(machTag1) || h.containsTag(machTag2) || h.containsTag(boilTag)) {
-                        return true;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return false;
+        String ns = id.getNamespace().toLowerCase();
+        if (ns.equals("thermal") || ns.equals("systeams") || ns.equals("thermal_expansion") || ns.equals("cofh_core")) {
+            return true;
+        }
+        return hasItemTag(id, "thermal:dynamos", "systeams:dynamos", "thermal:machines", "systeams:machines", "systeams:boilers");
     }
 
     public static boolean isDynamoItem(ResourceLocation id) {
         if (id == null) return false;
+        if (hasItemTag(id, "thermal:dynamos", "systeams:dynamos", "forge:dynamos")) return true;
+        if (checkItemClassHierarchy(id, "Dynamo")) return true;
+        return id.getPath().contains("dynamo");
+    }
+
+    public static boolean isBoilerItem(ResourceLocation id) {
+        if (id == null) return false;
+        if (hasItemTag(id, "systeams:boilers", "thermal:boilers", "forge:boilers")) return true;
+        if (checkItemClassHierarchy(id, "Boiler")) return true;
+        return id.getPath().contains("boiler");
+    }
+
+    private static boolean checkItemClassHierarchy(ResourceLocation id, String searchName) {
+        if (id == null) return false;
         try {
-            if (net.minecraftforge.registries.ForgeRegistries.ITEMS == null) return false;
-            net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                var holder = net.minecraftforge.registries.ForgeRegistries.ITEMS.getHolder(item);
-                if (holder.isPresent()) {
-                    var h = holder.get();
-                    var itemReg = net.minecraft.core.registries.Registries.ITEM;
-                    var dynTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("thermal:dynamos"));
-                    var dynTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:dynamos"));
-                    if (h.containsTag(dynTag1) || h.containsTag(dynTag2)) {
-                        return true;
+            Class<?> frClass = Class.forName("net.minecraftforge.registries.ForgeRegistries");
+            Object itemsReg = frClass.getField("ITEMS").get(null);
+            if (itemsReg == null) return false;
+            Method getValue = itemsReg.getClass().getMethod("getValue", ResourceLocation.class);
+            Object item = getValue.invoke(itemsReg, id);
+            if (item != null) {
+                Class<?> cur = item.getClass();
+                while (cur != null && cur != Object.class) {
+                    if (cur.getSimpleName().contains(searchName) || cur.getName().contains(searchName)) return true;
+                    for (Class<?> iface : cur.getInterfaces()) {
+                        if (iface.getSimpleName().contains(searchName) || iface.getName().contains(searchName)) return true;
                     }
+                    cur = cur.getSuperclass();
                 }
             }
         } catch (Throwable ignored) {}
         return false;
     }
 
-    public static boolean isBoilerItem(ResourceLocation id) {
+    private static boolean hasItemTag(ResourceLocation id, String... tagIds) {
         if (id == null) return false;
         try {
-            if (net.minecraftforge.registries.ForgeRegistries.ITEMS == null) return false;
-            net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                var holder = net.minecraftforge.registries.ForgeRegistries.ITEMS.getHolder(item);
-                if (holder.isPresent()) {
-                    var h = holder.get();
+            Class<?> frClass = Class.forName("net.minecraftforge.registries.ForgeRegistries");
+            Object itemsReg = frClass.getField("ITEMS").get(null);
+            if (itemsReg == null) return false;
+            Method getValue = itemsReg.getClass().getMethod("getValue", ResourceLocation.class);
+            Object item = getValue.invoke(itemsReg, id);
+            if (item != null) {
+                Method getHolder = itemsReg.getClass().getMethod("getHolder", Object.class);
+                java.util.Optional<?> holderOpt = (java.util.Optional<?>) getHolder.invoke(itemsReg, item);
+                if (holderOpt.isPresent()) {
+                    Object holder = holderOpt.get();
+                    Method containsTag = holder.getClass().getMethod("containsTag", net.minecraft.tags.TagKey.class);
                     var itemReg = net.minecraft.core.registries.Registries.ITEM;
-                    var boilTag = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("systeams:boilers"));
-                    if (h.containsTag(boilTag)) {
-                        return true;
+                    for (String t : tagIds) {
+                        var tagKey = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse(t));
+                        if ((boolean) containsTag.invoke(holder, tagKey)) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -339,7 +347,6 @@ public class ThermalAugmentHelper {
     }
 
     public static double getThermalDynamoBasePowerRF(ResourceLocation dynamoId) {
-        // 1. Functional Deduction via Reflection on Thermal Dynamo Block Entity / Config
         try {
             Class<?> dynEntityClass = Class.forName("cofh.thermal.expansion.block.entity.dynamo.DynamoBlockEntity");
             for (java.lang.reflect.Field f : dynEntityClass.getDeclaredFields()) {
@@ -366,12 +373,10 @@ public class ThermalAugmentHelper {
             }
         } catch (Throwable ignored) {}
 
-        // Fallback default for Thermal Expansion 1.20.1 Dynamos (200 RF/t)
         return 200.0;
     }
 
     public static double getThermalMachineBasePowerRF(ResourceLocation machineId) {
-        // 1. Functional Deduction via Reflection on Thermal Machine Block Entity / Config
         try {
             Class<?> machEntityClass = Class.forName("cofh.thermal.expansion.block.entity.machine.MachineBlockEntity");
             for (java.lang.reflect.Field f : machEntityClass.getDeclaredFields()) {
@@ -385,7 +390,6 @@ public class ThermalAugmentHelper {
             }
         } catch (Throwable ignored) {}
 
-        // Fallback default for Thermal Expansion 1.20.1 Machines (20 RF/t)
         return 20.0;
     }
 }

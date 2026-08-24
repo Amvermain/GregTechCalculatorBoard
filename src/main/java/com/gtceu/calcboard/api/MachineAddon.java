@@ -1,5 +1,10 @@
 package com.gtceu.calcboard.api;
 
+import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
+import com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon;
+import com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon;
+import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
+import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -11,44 +16,40 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
- * Represents a hardware addon, trait, upgrade kit, hatch, or custom multiplier attached to a RecipeNode.
+ * Hardware addon, trait, upgrade kit, hatch, or custom multiplier entity attached to a RecipeNode.
+ * Common mod-agnostic base class encapsulating polymorphic hardware components across mods.
  */
 public class MachineAddon {
 
-    public enum Category {
-        PARALLEL("Parallel Hatches", "gui.gtcalcboard.addon_cat.parallel"),
-        MAINTENANCE("Maintenance & Hatches", "gui.gtcalcboard.addon_cat.maintenance"),
-        COIL("Heating Coils", "gui.gtcalcboard.addon_cat.coil"),
-        ROTOR("Turbine Rotors", "gui.gtcalcboard.addon_cat.rotor"),
-        MULTIBLOCK_TRAIT("Multiblock Traits", "gui.gtcalcboard.addon_cat.trait"),
-        THERMAL_AUGMENT("Thermal Augments & Kits", "gui.gtcalcboard.addon_cat.thermal"),
-        CUSTOM("Custom Modifiers", "gui.gtcalcboard.addon_cat.custom");
+    public static final class Category {
+        public static final AddonCategory PARALLEL = AddonCategory.PARALLEL;
+        public static final AddonCategory MAINTENANCE = AddonCategory.MAINTENANCE;
+        public static final AddonCategory COIL = AddonCategory.COIL;
+        public static final AddonCategory ROTOR = AddonCategory.ROTOR;
+        public static final AddonCategory REFLECTOR = AddonCategory.REFLECTOR;
+        public static final AddonCategory MULTIBLOCK_TRAIT = AddonCategory.MULTIBLOCK_TRAIT;
+        public static final AddonCategory THERMAL_AUGMENT = AddonCategory.THERMAL_AUGMENT;
+        public static final AddonCategory MAGNET = AddonCategory.MAGNET;
+        public static final AddonCategory CUSTOM = AddonCategory.CUSTOM;
 
-        private final String englishName;
-        private final String translatableKey;
-
-        Category(String englishName, String translatableKey) {
-            this.englishName = englishName;
-            this.translatableKey = translatableKey;
+        public static Collection<AddonCategory> values() {
+            return AddonCategory.values();
         }
 
-        public String getEnglishName() {
-            return englishName;
-        }
-
-        public String getTranslatableKey() {
-            return translatableKey;
+        public static AddonCategory valueOf(String name) {
+            return AddonCategory.get(name);
         }
     }
 
     private final String id;
     private String name;
-    private Category category;
+    private String modId = "";
+    private AddonCategory category;
     private String description;
     private ResourceLocation itemIcon;
     private ItemStack itemStackSample;
@@ -56,31 +57,21 @@ public class MachineAddon {
     private double durationMultiplier = 1.0;
     private double eutMultiplier = 1.0;
     private int parallelMultiplier = 1;
-    private boolean powerConstant = false; // If true, parallel execution does not scale EU/t (e.g. Absolute Parallel Hatch)
-    private String discoverySource; // Debug provenance metadata (e.g. Recipe Output NBT, Registry, Behavior reflection)
+    private boolean powerConstant = false;
+    private int magneticForce = 0;
+    private String discoverySource;
 
-    // Machine-specific coil bonus metrics
-    private int coilTemperature = 1800;
-    private int pyrolyseSpeedPercent = 100;
-    private int crackingEnergyPercent = 100;
-    private int chemicalSpeedPercent = 100;
-    private int chemicalEnergyPercent = 100;
-    private int smelterParallel = 1;
-
-    // Turbine rotor specific capacity
-    private double rotorMaxEUt = 0.0;
-
-    public MachineAddon(String id, String name, Category category, String description, ResourceLocation itemIcon) {
+    public MachineAddon(String id, String name, AddonCategory category, String description, ResourceLocation itemIcon) {
         this.id = id;
         this.name = name;
-        this.category = category != null ? category : Category.CUSTOM;
+        this.category = category != null ? category : AddonCategory.CUSTOM;
         this.description = description != null ? description : "";
         this.itemIcon = itemIcon;
         this.itemStackSample = null;
     }
 
     public static MachineAddon custom(String name, double durationMult, double eutMult, int parallelMult) {
-        MachineAddon addon = new MachineAddon("custom:" + System.currentTimeMillis(), name, Category.CUSTOM, "gui.gtcalcboard.addon.custom_modifier_desc", null);
+        MachineAddon addon = new MachineAddon("custom:" + System.currentTimeMillis(), name, AddonCategory.CUSTOM, "gui.gtcalcboard.addon.custom_modifier_desc", null);
         addon.setDurationMultiplier(durationMult);
         addon.setEutMultiplier(eutMult);
         addon.setParallelMultiplier(parallelMult);
@@ -89,6 +80,14 @@ public class MachineAddon {
 
     public String getId() {
         return id;
+    }
+
+    public String getModId() {
+        return modId != null && !modId.isEmpty() ? modId : (id.contains(":") ? id.substring(0, id.indexOf(":")) : "");
+    }
+
+    public void setModId(String modId) {
+        this.modId = modId;
     }
 
     public String getName() {
@@ -131,12 +130,12 @@ public class MachineAddon {
         this.name = name;
     }
 
-    public Category getCategory() {
-        return category;
+    public AddonCategory getCategory() {
+        return category != null ? category : AddonCategory.CUSTOM;
     }
 
-    public void setCategory(Category category) {
-        this.category = category;
+    public void setCategory(AddonCategory category) {
+        this.category = category != null ? category : AddonCategory.CUSTOM;
     }
 
     public String getDescription() {
@@ -186,9 +185,7 @@ public class MachineAddon {
     }
 
     public ItemStack getItemStackSample() {
-        if (itemStackSample != null && !itemStackSample.isEmpty()) {
-            return itemStackSample;
-        }
+        if (itemStackSample != null) return itemStackSample;
         if (itemIcon != null) {
             try {
                 Item item = ForgeRegistries.ITEMS.getValue(itemIcon);
@@ -197,7 +194,16 @@ public class MachineAddon {
                 }
             } catch (Throwable ignored) {}
         }
-        return ItemStack.EMPTY;
+        try {
+            return ItemStack.EMPTY;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public ItemStack getRenderItemStack() {
+        ItemStack sample = getItemStackSample();
+        return (sample != null && !sample.isEmpty()) ? sample : ItemStack.EMPTY;
     }
 
     public void setItemStackSample(ItemStack itemStackSample) {
@@ -235,6 +241,38 @@ public class MachineAddon {
     public void setPowerConstant(boolean powerConstant) {
         this.powerConstant = powerConstant;
     }
+
+    public String getDiscoverySource() {
+        return discoverySource;
+    }
+
+    public void setDiscoverySource(String discoverySource) {
+        this.discoverySource = discoverySource;
+    }
+
+    public static boolean isTurbineMachine(RecipeNode node) {
+        return node != null && node.isTurbine();
+    }
+
+    public static boolean isThermalMachine(RecipeNode node) {
+        return com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node);
+    }
+
+    // Machine-specific coil bonus metrics
+    private int coilTemperature = 1800;
+    private int pyrolyseSpeedPercent = 100;
+    private int crackingEnergyPercent = 100;
+    private int chemicalSpeedPercent = 100;
+    private int chemicalEnergyPercent = 100;
+    private int smelterParallel = 16;
+
+    // Turbine rotor specific capacity
+    private int rotorEfficiency = 100;
+    private int rotorPower = 100;
+    private double rotorMaxEUt = 1600.0;
+
+    // Fusion reflector tier
+    private int reflectorTier = 0;
 
     public int getCoilTemperature() {
         return coilTemperature;
@@ -284,14 +322,12 @@ public class MachineAddon {
         this.smelterParallel = smelterParallel;
     }
 
-    private int rotorPower = 100;
-
-    public double getRotorMaxEUt() {
-        return rotorMaxEUt;
+    public int getRotorEfficiency() {
+        return rotorEfficiency;
     }
 
-    public void setRotorMaxEUt(double rotorMaxEUt) {
-        this.rotorMaxEUt = Math.max(0.0, rotorMaxEUt);
+    public void setRotorEfficiency(int rotorEfficiency) {
+        this.rotorEfficiency = rotorEfficiency;
     }
 
     public int getRotorPower() {
@@ -299,80 +335,77 @@ public class MachineAddon {
     }
 
     public void setRotorPower(int rotorPower) {
-        this.rotorPower = Math.max(10, Math.min(5000, rotorPower));
+        this.rotorPower = rotorPower;
     }
 
-    /**
-     * Tailors coil bonus multipliers specifically for the target machine.
-     * Pyrolyse: Speed % -> Duration (100 / Speed)
-     * Cracking: Energy % -> EU/t (Energy / 100)
-     * Chemical Reactor / LCR: Speed % -> Duration (100 / Speed), Energy % -> EU/t (Energy / 100)
-     * Multi Smelter: Max Parallel -> Parallel
-     * EBF: 5% EU discount per 900K excess temperature above the recipe's required temperature
-     */
+    public double getRotorMaxEUt() {
+        return rotorMaxEUt;
+    }
+
+    public void setRotorMaxEUt(double rotorMaxEUt) {
+        this.rotorMaxEUt = rotorMaxEUt;
+    }
+
+    public int getReflectorTier() {
+        return reflectorTier;
+    }
+
+    public void setReflectorTier(int reflectorTier) {
+        this.reflectorTier = reflectorTier;
+    }
+
     public MachineAddon forMachine(RecipeNode node) {
         if (node == null) return this;
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         return adapter.tailorAddon(this, node);
     }
 
+    public int getMagneticForce() {
+        return magneticForce;
+    }
+
+    public void setMagneticForce(int magneticForce) {
+        this.magneticForce = magneticForce;
+    }
+
     public MachineAddon forMachine(String machineName) {
         return forMachine(RecipeNode.create(machineName, 20.0, 32.0, GTVoltageTier.LV));
     }
 
-    /**
-     * Checks if this addon is compatible with the given RecipeNode's machine type.
-     */
     public boolean isCompatibleWith(RecipeNode node) {
         if (node == null) return true;
-        if (category == Category.CUSTOM) return true;
+        if (category == null || category.equals(Category.CUSTOM)) return true;
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         return adapter.isAddonCompatible(node, this);
     }
 
-    public static boolean isThermalMachine(RecipeNode node) {
-        return ThermalAugmentHelper.isThermalMachine(node);
-    }
-
-    public static boolean isTurbineMachine(RecipeNode node) {
-        if (node == null) return false;
-        return node.isTurbine();
-    }
-
-    /**
-     * Returns the list of applicable addon categories for the given RecipeNode machine.
-     */
-    public static List<Category> getRelevantCategories(RecipeNode node) {
+    public static List<AddonCategory> getRelevantCategories(RecipeNode node) {
         if (node == null) {
-            return List.of(Category.values());
+            return new ArrayList<>(AddonCategory.values());
         }
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         return adapter.getApplicableAddonCategories(node);
     }
 
-    public String getDiscoverySource() {
-        return discoverySource;
-    }
-
-    public void setDiscoverySource(String discoverySource) {
-        this.discoverySource = discoverySource;
-    }
-
     public MachineAddon copy() {
         MachineAddon cp = new MachineAddon(this.id, this.name, this.category, this.description, this.itemIcon);
+        cp.setModId(this.modId);
         cp.setItemStackSample(this.itemStackSample != null ? this.itemStackSample.copy() : null);
         cp.setDurationMultiplier(this.durationMultiplier);
         cp.setEutMultiplier(this.eutMultiplier);
         cp.setParallelMultiplier(this.parallelMultiplier);
         cp.setPowerConstant(this.powerConstant);
+        cp.setMagneticForce(this.magneticForce);
         cp.setCoilTemperature(this.coilTemperature);
         cp.setPyrolyseSpeedPercent(this.pyrolyseSpeedPercent);
         cp.setCrackingEnergyPercent(this.crackingEnergyPercent);
         cp.setChemicalSpeedPercent(this.chemicalSpeedPercent);
         cp.setChemicalEnergyPercent(this.chemicalEnergyPercent);
         cp.setSmelterParallel(this.smelterParallel);
-        cp.setRotorMaxEUt(this.rotorMaxEUt);
+        cp.setRotorEfficiency(this.rotorEfficiency);
         cp.setRotorPower(this.rotorPower);
+        cp.setRotorMaxEUt(this.rotorMaxEUt);
+        cp.setReflectorTier(this.reflectorTier);
         cp.setDiscoverySource(this.discoverySource);
         return cp;
     }
@@ -381,7 +414,8 @@ public class MachineAddon {
         CompoundTag tag = new CompoundTag();
         tag.putString("id", id);
         tag.putString("name", name != null ? name : "");
-        tag.putString("category", category.name());
+        tag.putString("modId", getModId());
+        tag.putString("category", category != null ? category.getId() : "custom");
         tag.putString("description", description != null ? description : "");
         if (itemIcon != null) {
             tag.putString("icon", itemIcon.toString());
@@ -390,48 +424,74 @@ public class MachineAddon {
         tag.putDouble("eutMultiplier", eutMultiplier);
         tag.putInt("parallelMultiplier", parallelMultiplier);
         tag.putBoolean("powerConstant", powerConstant);
-        tag.putInt("coilTemp", coilTemperature);
-        tag.putInt("pyroSpeed", pyrolyseSpeedPercent);
-        tag.putInt("crackEnergy", crackingEnergyPercent);
-        tag.putInt("chemSpeed", chemicalSpeedPercent);
-        tag.putInt("chemEnergy", chemicalEnergyPercent);
-        tag.putInt("smelterPar", smelterParallel);
-        tag.putDouble("rotorMaxEUt", rotorMaxEUt);
+        tag.putInt("magneticForce", magneticForce);
+        tag.putInt("coilTemperature", coilTemperature);
+        tag.putInt("pyrolyseSpeedPercent", pyrolyseSpeedPercent);
+        tag.putInt("crackingEnergyPercent", crackingEnergyPercent);
+        tag.putInt("chemicalSpeedPercent", chemicalSpeedPercent);
+        tag.putInt("chemicalEnergyPercent", chemicalEnergyPercent);
+        tag.putInt("smelterParallel", smelterParallel);
+        tag.putInt("rotorEfficiency", rotorEfficiency);
         tag.putInt("rotorPower", rotorPower);
+        tag.putDouble("rotorMaxEUt", rotorMaxEUt);
+        tag.putInt("reflectorTier", reflectorTier);
         if (discoverySource != null) {
             tag.putString("discoverySource", discoverySource);
         }
         return tag;
     }
 
+    public void deserializeAdditionalNBT(CompoundTag tag) {
+        if (tag.contains("modId")) setModId(tag.getString("modId"));
+        if (tag.contains("durationMultiplier")) setDurationMultiplier(tag.getDouble("durationMultiplier"));
+        if (tag.contains("eutMultiplier")) setEutMultiplier(tag.getDouble("eutMultiplier"));
+        if (tag.contains("parallelMultiplier")) setParallelMultiplier(tag.getInt("parallelMultiplier"));
+        if (tag.contains("powerConstant")) setPowerConstant(tag.getBoolean("powerConstant"));
+        if (tag.contains("magneticForce")) setMagneticForce(tag.getInt("magneticForce"));
+        if (tag.contains("coilTemperature")) setCoilTemperature(tag.getInt("coilTemperature"));
+        if (tag.contains("pyrolyseSpeedPercent")) setPyrolyseSpeedPercent(tag.getInt("pyrolyseSpeedPercent"));
+        if (tag.contains("crackingEnergyPercent")) setCrackingEnergyPercent(tag.getInt("crackingEnergyPercent"));
+        if (tag.contains("chemicalSpeedPercent")) setChemicalSpeedPercent(tag.getInt("chemicalSpeedPercent"));
+        if (tag.contains("chemicalEnergyPercent")) setChemicalEnergyPercent(tag.getInt("chemicalEnergyPercent"));
+        if (tag.contains("smelterParallel")) setSmelterParallel(tag.getInt("smelterParallel"));
+        if (tag.contains("rotorEfficiency")) setRotorEfficiency(tag.getInt("rotorEfficiency"));
+        if (tag.contains("rotorPower")) setRotorPower(tag.getInt("rotorPower"));
+        if (tag.contains("rotorMaxEUt")) setRotorMaxEUt(tag.getDouble("rotorMaxEUt"));
+        if (tag.contains("reflectorTier")) setReflectorTier(tag.getInt("reflectorTier"));
+        if (tag.contains("discoverySource")) setDiscoverySource(tag.getString("discoverySource"));
+    }
+
     public static MachineAddon deserializeNBT(CompoundTag tag) {
         if (tag == null || !tag.contains("id")) return null;
         String id = tag.getString("id");
         String name = tag.getString("name");
-        Category cat = Category.CUSTOM;
+        AddonCategory cat = AddonCategory.CUSTOM;
         if (tag.contains("category")) {
             try {
-                cat = Category.valueOf(tag.getString("category"));
+                cat = AddonCategory.get(tag.getString("category"));
             } catch (Exception ignored) {}
         }
         String desc = tag.getString("description");
         ResourceLocation icon = tag.contains("icon") ? ResourceLocation.tryParse(tag.getString("icon")) : null;
 
-        MachineAddon addon = new MachineAddon(id, name, cat, desc, icon);
-        if (tag.contains("durationMultiplier")) addon.setDurationMultiplier(tag.getDouble("durationMultiplier"));
-        if (tag.contains("eutMultiplier")) addon.setEutMultiplier(tag.getDouble("eutMultiplier"));
-        if (tag.contains("parallelMultiplier")) addon.setParallelMultiplier(tag.getInt("parallelMultiplier"));
-        if (tag.contains("powerConstant")) addon.setPowerConstant(tag.getBoolean("powerConstant"));
-        if (tag.contains("coilTemp")) addon.setCoilTemperature(tag.getInt("coilTemp"));
-        if (tag.contains("pyroSpeed")) addon.setPyrolyseSpeedPercent(tag.getInt("pyroSpeed"));
-        if (tag.contains("crackEnergy")) addon.setCrackingEnergyPercent(tag.getInt("crackEnergy"));
-        if (tag.contains("chemSpeed")) addon.setChemicalSpeedPercent(tag.getInt("chemSpeed"));
-        if (tag.contains("chemEnergy")) addon.setChemicalEnergyPercent(tag.getInt("chemEnergy"));
-        if (tag.contains("smelterPar")) addon.setSmelterParallel(tag.getInt("smelterPar"));
-        if (tag.contains("rotorMaxEUt")) addon.setRotorMaxEUt(tag.getDouble("rotorMaxEUt"));
-        if (tag.contains("rotorPower")) addon.setRotorPower(tag.getInt("rotorPower"));
-        if (tag.contains("discoverySource")) addon.setDiscoverySource(tag.getString("discoverySource"));
+        MachineAddon addon;
+        if (cat.equals(AddonCategory.COIL)) {
+            addon = new GTCoilAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.ROTOR)) {
+            addon = new GTRotorAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.REFLECTOR)) {
+            addon = new GTReflectorAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.PARALLEL)) {
+            addon = new GTParallelHatchAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.THERMAL_AUGMENT)) {
+            addon = new ThermalAugmentAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.MAGNET)) {
+            addon = new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0);
+        } else {
+            addon = new MachineAddon(id, name, cat, desc, icon);
+        }
 
+        addon.deserializeAdditionalNBT(tag);
         return addon;
     }
 

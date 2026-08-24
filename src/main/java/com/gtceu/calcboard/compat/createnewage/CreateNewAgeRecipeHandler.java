@@ -1,0 +1,225 @@
+package com.gtceu.calcboard.compat.createnewage;
+
+import com.gtceu.calcboard.api.EnergyType;
+import com.gtceu.calcboard.api.GTVoltageTier;
+import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Handles Create: New Age recipe parsing, energising processing, and generator/motor node creation.
+ */
+public class CreateNewAgeRecipeHandler {
+
+    public static final String MOD_ID = "create_new_age";
+
+    public static boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+        if (emiRecipe instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
+            ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+            if (catId != null && catId.getNamespace().equals(MOD_ID)) {
+                String path = catId.getPath().toLowerCase(Locale.ROOT);
+
+                if (path.contains("energising") || path.contains("energizing")) {
+                    details.energyType = EnergyType.ELECTRIC_FE;
+                    int duration = 100;
+                    double energy = 5000.0;
+                    if (backingRecipe != null) {
+                        try {
+                            var getEnergyMethod = backingRecipe.getClass().getMethod("getEnergy");
+                            energy = ((Number) getEnergyMethod.invoke(backingRecipe)).doubleValue();
+                        } catch (Throwable ignored) {
+                            try {
+                                var energyField = backingRecipe.getClass().getField("energy");
+                                energy = ((Number) energyField.get(backingRecipe)).doubleValue();
+                            } catch (Throwable ignored2) {}
+                        }
+                        try {
+                            var getDurationMethod = backingRecipe.getClass().getMethod("getDuration");
+                            duration = (int) getDurationMethod.invoke(backingRecipe);
+                        } catch (Throwable ignored) {
+                            try {
+                                var durationField = backingRecipe.getClass().getField("duration");
+                                duration = (int) durationField.get(backingRecipe);
+                            } catch (Throwable ignored2) {}
+                        }
+                    }
+                    details.durationTicks = duration > 0 ? duration : 100;
+                    details.eut = energy / (double) details.durationTicks;
+                    details.tier = GTVoltageTier.getTierForVoltage((long) (details.eut / 4.0));
+                    return true;
+                }
+
+                details.energyType = EnergyType.KINETIC_SU;
+                details.tier = GTVoltageTier.ULV;
+                details.durationTicks = 100;
+                details.eut = 128.0;
+                details.extraInputs.add(IngredientStack.stressUnit(128.0 * (100.0 / 20.0)));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if (itemId == null) return null;
+        return createKineticGeneratorNode(itemId, stack.getHoverName().getString());
+    }
+
+    public static RecipeNode createKineticGeneratorNode(ResourceLocation itemId, String displayName) {
+        if (itemId == null) return null;
+        String path = itemId.getPath();
+        String namespace = itemId.getNamespace();
+
+        if (namespace.equals(MOD_ID)) {
+            if (path.contains("generator_coil")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Generator Coil", 20.0, 512.0, GTVoltageTier.ULV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(true);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:generator"));
+                node.addInput(IngredientStack.stressUnit(768.0)); // 24.0 base stress * 32 RPM
+                return node;
+            } else if (path.contains("carbon_brushes")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Carbon Brushes", 20.0, 256.0, GTVoltageTier.ULV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(true);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:generator"));
+                node.addInput(IngredientStack.stressUnit(768.0));
+                return node;
+            } else if (path.equals("basic_motor")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Basic Motor", 20.0, 256.0, GTVoltageTier.ULV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(false);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:motor"));
+                node.addOutput(IngredientStack.stressUnit(512.0));
+                return node;
+            } else if (path.equals("advanced_motor")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Advanced Motor", 20.0, 1024.0, GTVoltageTier.LV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(false);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:motor"));
+                node.addOutput(IngredientStack.stressUnit(2048.0));
+                return node;
+            } else if (path.equals("reinforced_motor")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Reinforced Motor", 20.0, 4096.0, GTVoltageTier.MV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setGenerator(false);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:motor"));
+                node.addOutput(IngredientStack.stressUnit(8192.0));
+                return node;
+            } else if (path.equals("stirling_engine")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Stirling Engine", 20.0, 1024.0, GTVoltageTier.LV);
+                node.setEnergyType(EnergyType.KINETIC_SU);
+                node.setGenerator(true);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:stirling_engine"));
+                node.addOutput(IngredientStack.stressUnit(1024.0));
+                return node;
+            } else if (path.contains("solar_heating_plate")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Solar Heating Plate", 20.0, 256.0, GTVoltageTier.ULV);
+                node.setEnergyType(EnergyType.KINETIC_SU);
+                node.setGenerator(true);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:solar_heat"));
+                node.addOutput(IngredientStack.stressUnit(256.0));
+                return node;
+            } else if (path.contains("energiser")) {
+                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Energiser", 20.0, 256.0, GTVoltageTier.ULV);
+                node.setEnergyType(EnergyType.ELECTRIC_FE);
+                node.setMachineIcon(itemId);
+                node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:energising"));
+                return node;
+            }
+        }
+        return null;
+    }
+
+    public static List<RecipeSearchEngine.SearchableRecipe> getVirtualSearchRecipes() {
+        List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
+        String catId = "create_new_age:generation";
+        String catName = "Create: New Age";
+
+        ResourceLocation[] items = {
+                ResourceLocation.tryParse("create_new_age:generator_coil"),
+                ResourceLocation.tryParse("create_new_age:carbon_brushes"),
+                ResourceLocation.tryParse("create_new_age:basic_motor"),
+                ResourceLocation.tryParse("create_new_age:advanced_motor"),
+                ResourceLocation.tryParse("create_new_age:reinforced_motor"),
+                ResourceLocation.tryParse("create_new_age:stirling_engine"),
+                ResourceLocation.tryParse("create_new_age:solar_heating_plate"),
+                ResourceLocation.tryParse("create_new_age:energiser_t1")
+        };
+
+        String[] names = {
+                "Generator Coil",
+                "Carbon Brushes",
+                "Basic Motor",
+                "Advanced Motor",
+                "Reinforced Motor",
+                "Stirling Engine",
+                "Solar Heating Plate",
+                "Energiser T1"
+        };
+
+        for (int i = 0; i < items.length; i++) {
+            if (items[i] == null) continue;
+            RecipeNode node = createKineticGeneratorNode(items[i], names[i]);
+            if (node != null) {
+                String displayName = node.getName();
+                String modId = items[i].getNamespace();
+
+                List<String> outputNames = new ArrayList<>();
+                List<String> outputIds = new ArrayList<>();
+                for (IngredientStack out : node.getOutputs()) {
+                    outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
+                    if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
+                }
+
+                List<String> inputNames = new ArrayList<>();
+                List<String> inputIds = new ArrayList<>();
+                for (IngredientStack in : node.getInputs()) {
+                    inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
+                    if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
+                }
+
+                String outputSearchIndex = String.join(" ", outputNames) + " " + String.join(" ", outputIds);
+                String inputSearchIndex = String.join(" ", inputNames) + " " + String.join(" ", inputIds);
+                String fullSearchIndex = (displayName + " " + modId + " " + catId + " " + catName + " " + outputSearchIndex + " " + inputSearchIndex + " kinetic stress units generator create su fe electricity new age magnet coil").toLowerCase(Locale.ROOT);
+
+                list.add(new RecipeSearchEngine.SearchableRecipe(
+                        node,
+                        displayName,
+                        modId,
+                        catId,
+                        catName,
+                        outputNames,
+                        inputNames,
+                        outputIds,
+                        inputIds,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        outputSearchIndex,
+                        inputSearchIndex,
+                        fullSearchIndex
+                ));
+            }
+        }
+        return list;
+    }
+}

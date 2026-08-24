@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api;
 
+import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;

@@ -3,8 +3,8 @@ package com.gtceu.calcboard.compat.systeams;
 import com.gtceu.calcboard.api.EnergyType;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.ThermalAugmentHelper;
 import com.gtceu.calcboard.compat.thermal.ThermalModAdapter;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import net.minecraft.resources.ResourceLocation;
@@ -184,6 +184,9 @@ public class SysteamsRecipeHandler {
         // Boiler baseSteamPerTick = baseEnergyPerTick * STEAM_RATIO_* (0.5) = 150 mB/t
         double baseProcessTick = 20.0;
         double speedMult = getSpeedMultiplier(catId);
+        if (speedMult > 50.0) {
+            speedMult = speedMult / 10.0; // SysteamsConfig SPEED_LAPIDARY is stored as 150.0 (normalized to 15.0x for 150 mB/t base steam)
+        }
         double steamRatio = getSteamRatio(catId);
         return Math.max(1.0, baseProcessTick * speedMult * steamRatio);
     }

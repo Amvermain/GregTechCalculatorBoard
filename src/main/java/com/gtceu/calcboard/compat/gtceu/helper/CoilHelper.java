@@ -1,5 +1,8 @@
-package com.gtceu.calcboard.api;
+package com.gtceu.calcboard.compat.gtceu.helper;
 
+import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
@@ -14,9 +17,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Pure Type-driven Coil Helper.
- * Interacts exclusively with GTCEu Modern's CoilBlock and ICoilType API.
- * No keyword-based or string substring matching.
+ * Helper class for GTCEu Modern heating coils.
+ * Deductively extracts coil stats and temperature via direct CoilBlock and ICoilType API interaction.
  */
 public class CoilHelper {
 
@@ -224,7 +226,7 @@ public class CoilHelper {
         return 0;
     }
 
-    public static MachineAddon parseCoilBlock(ItemStack stack, ResourceLocation id) {
+    public static GTCoilAddon parseCoilBlock(ItemStack stack, ResourceLocation id) {
         if (stack == null || stack.isEmpty()) return null;
 
         CoilStats stats = getCoilStats(stack);
@@ -236,14 +238,8 @@ public class CoilHelper {
         String desc = String.format("♨ Heat: %d K\n• Smelter: %dx Par\n• Pyrolyse: %d%% Spd\n• Cracking: %d%% Energy\n• Chemical Reactor: %d%% Spd, %d%% Energy",
                 stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
 
-        MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.toString() : name, MachineAddon.Category.COIL, desc, id);
+        GTCoilAddon addon = new GTCoilAddon(id.toString(), name.isEmpty() ? id.toString() : name, desc, id, stats);
         addon.setItemStackSample(stack);
-        addon.setCoilTemperature(stats.temperature());
-        addon.setPyrolyseSpeedPercent(stats.pyrolyseSpeedPercent());
-        addon.setCrackingEnergyPercent(stats.crackingEnergyPercent());
-        addon.setChemicalSpeedPercent(stats.chemicalSpeedPercent());
-        addon.setChemicalEnergyPercent(stats.chemicalEnergyPercent());
-        addon.setSmelterParallel(stats.smelterParallel());
         addon.setDiscoverySource("GTCEu ICoilType Block API [" + id + "]");
         return addon;
     }
@@ -262,16 +258,10 @@ public class CoilHelper {
                     String desc = String.format("♨ Heat: %d K\n• Smelter: %dx Par\n• Pyrolyse: %d%% Spd\n• Cracking: %d%% Energy\n• Chemical Reactor: %d%% Spd, %d%% Energy",
                             stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
 
-                    MachineAddon addon = new MachineAddon(id.toString(), displayName, MachineAddon.Category.COIL, desc, id);
+                    GTCoilAddon addon = new GTCoilAddon(id.toString(), displayName, desc, id, stats);
                     if (!stack.isEmpty()) {
                         addon.setItemStackSample(stack);
                     }
-                    addon.setCoilTemperature(stats.temperature());
-                    addon.setPyrolyseSpeedPercent(stats.pyrolyseSpeedPercent());
-                    addon.setCrackingEnergyPercent(stats.crackingEnergyPercent());
-                    addon.setChemicalSpeedPercent(stats.chemicalSpeedPercent());
-                    addon.setChemicalEnergyPercent(stats.chemicalEnergyPercent());
-                    addon.setSmelterParallel(stats.smelterParallel());
                     addon.setDiscoverySource("GTCEu ICoilType Block API [" + id + "]");
 
                     if (list.stream().noneMatch(a -> a.getId().equals(addon.getId()))) {
@@ -295,13 +285,20 @@ public class CoilHelper {
         ResourceLocation icon = node.getMachineIcon();
         String mName = node.getName() != null ? node.getName().toLowerCase(java.util.Locale.ROOT) : "";
 
+        int pyroSpeed = source.getPyrolyseSpeedPercent();
+        int crackEnergy = source.getCrackingEnergyPercent();
+        int chemSpeed = source.getChemicalSpeedPercent();
+        int chemEnergy = source.getChemicalEnergyPercent();
+        int smelterPar = source.getSmelterParallel();
+        int coilTemp = source.getCoilTemperature();
+
         // 1. Cracking Unit: Energy % -> EU/t (Energy / 100)
         if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:cracker")) || catId.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
                 || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:cracker")) || icon.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
                 || wsList.contains(ResourceLocation.tryParse("gtceu:cracker")) || wsList.contains(ResourceLocation.tryParse("gtceu:cracking_unit"))
                 || mName.contains("cracker") || mName.contains("cracking")) {
             cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(source.getCrackingEnergyPercent() / 100.0);
+            cp.setEutMultiplier(crackEnergy / 100.0);
             cp.setParallelMultiplier(1);
             return cp;
         }
@@ -311,7 +308,7 @@ public class CoilHelper {
                 || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
                 || wsList.contains(ResourceLocation.tryParse("gtceu:pyrolyse_oven"))
                 || mName.contains("pyrolyse")) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, source.getPyrolyseSpeedPercent()));
+            cp.setDurationMultiplier(100.0 / Math.max(1, pyroSpeed));
             cp.setEutMultiplier(1.0);
             cp.setParallelMultiplier(1);
             return cp;
@@ -322,8 +319,8 @@ public class CoilHelper {
                 || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || icon.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
                 || wsList.contains(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || wsList.contains(ResourceLocation.tryParse("gtceu:chemical_reactor"))
                 || mName.contains("chemical")) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, source.getChemicalSpeedPercent()));
-            cp.setEutMultiplier(source.getChemicalEnergyPercent() / 100.0);
+            cp.setDurationMultiplier(100.0 / Math.max(1, chemSpeed));
+            cp.setEutMultiplier(chemEnergy / 100.0);
             cp.setParallelMultiplier(1);
             return cp;
         }
@@ -333,7 +330,7 @@ public class CoilHelper {
                 || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || icon.equals(ResourceLocation.tryParse("gtceu:alloy_smelter"))))
                 || wsList.contains(ResourceLocation.tryParse("gtceu:multi_smelter")) || wsList.contains(ResourceLocation.tryParse("gtceu:alloy_smelter"))
                 || mName.contains("multi_smelter") || mName.contains("smelter")) {
-            cp.setParallelMultiplier(Math.max(1, source.getSmelterParallel()));
+            cp.setParallelMultiplier(Math.max(1, smelterPar));
             cp.setDurationMultiplier(1.0);
             cp.setEutMultiplier(1.0);
             return cp;
@@ -344,8 +341,8 @@ public class CoilHelper {
                 || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:electric_blast_furnace")))
                 || wsList.contains(ResourceLocation.tryParse("gtceu:electric_blast_furnace"))
                 || mName.contains("blast")) {
-            if (reqTemp > 0 && source.getCoilTemperature() > reqTemp) {
-                int excessTemp = source.getCoilTemperature() - reqTemp;
+            if (reqTemp > 0 && coilTemp > reqTemp) {
+                int excessTemp = coilTemp - reqTemp;
                 int tiersAbove = excessTemp / 900;
                 cp.setEutMultiplier(Math.pow(0.95, tiersAbove));
             } else {

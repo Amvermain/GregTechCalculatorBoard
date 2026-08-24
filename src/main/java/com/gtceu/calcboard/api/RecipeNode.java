@@ -1,5 +1,9 @@
 package com.gtceu.calcboard.api;
 
+import com.gtceu.calcboard.api.property.NodeProperties;
+import com.gtceu.calcboard.api.property.NodePropertyKey;
+import com.gtceu.calcboard.api.property.NodePropertyStore;
+import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -32,10 +36,7 @@ public class RecipeNode {
     // Master base node for Auto Ratio
     private boolean isBaseNode = false;
     private boolean isGenerator = false;
-    private int recipeTemperature = 0; // EBF requirement in Kelvin (e.g. 1800K, 3600K)
-    private int rotorEfficiency = 100; // Default 100%
-    private int rotorPower = 100;      // Default 100%
-    private String rotorName = "Standard (100%)";
+    private final NodePropertyStore properties = new NodePropertyStore();
 
     // Canvas position & Dimensions
     private double posX;
@@ -98,10 +99,6 @@ public class RecipeNode {
         this.parallel = 1;
         this.overclockMode = OverclockMode.STANDARD;
         this.isGenerator = false;
-        this.recipeTemperature = 0;
-        this.rotorEfficiency = 100;
-        this.rotorPower = 100;
-        this.rotorName = "Standard (100%)";
         this.efficiency = 1.0;
         this.isMultiblock = false;
     }
@@ -220,10 +217,17 @@ public class RecipeNode {
     }
 
     public void setTargetTier(GTVoltageTier targetTier) {
-        if (targetTier.ordinal() >= recipeTier.ordinal()) {
+        GTVoltageTier minTier = recipeTier;
+        if (isFusion()) {
+            GTVoltageTier minFusionTier = getMinFusionVoltageTier();
+            if (minFusionTier.ordinal() > minTier.ordinal()) {
+                minTier = minFusionTier;
+            }
+        }
+        if (targetTier.ordinal() >= minTier.ordinal()) {
             this.targetTier = targetTier;
         } else {
-            this.targetTier = recipeTier;
+            this.targetTier = minTier;
         }
     }
 
@@ -263,17 +267,105 @@ public class RecipeNode {
         this.recipeCategoryId = recipeCategoryId;
     }
 
+    public NodePropertyStore getProperties() {
+        return properties;
+    }
+
+    public int getRecipeTemperature() {
+        return properties.get(NodeProperties.EBF_TEMPERATURE);
+    }
+
+    public void setRecipeTemperature(int recipeTemperature) {
+        properties.set(NodeProperties.EBF_TEMPERATURE, Math.max(0, recipeTemperature));
+    }
+
+    public long getEuToStart() {
+        return properties.get(NodeProperties.FUSION_START_EU);
+    }
+
+    public void setEuToStart(long euToStart) {
+        properties.set(NodeProperties.FUSION_START_EU, Math.max(0L, euToStart));
+        if (isFusion()) {
+            GTVoltageTier minFusionTier = getMinFusionVoltageTier();
+            if (targetTier.ordinal() < minFusionTier.ordinal()) {
+                targetTier = minFusionTier;
+            }
+        }
+    }
+
+    public boolean isFusion() {
+        return getEuToStart() > 0 || getRequiredReflectorTier() > 0
+                || (recipeCategoryId != null && recipeCategoryId.getPath().contains("fusion"))
+                || (machineIcon != null && machineIcon.getPath().contains("fusion"))
+                || (name != null && name.toLowerCase().contains("fusion"));
+    }
+
+    public int getFusionTier() {
+        long startEU = getEuToStart();
+        if (startEU <= 160_000_000L) return 1;
+        if (startEU <= 320_000_000L) return 2;
+        return 3;
+    }
+
+    public GTVoltageTier getMinFusionVoltageTier() {
+        int fTier = getFusionTier();
+        return fTier == 1 ? GTVoltageTier.LuV : (fTier == 2 ? GTVoltageTier.ZPM : GTVoltageTier.UV);
+    }
+
+    public int getRequiredReflectorTier() {
+        return properties.get(NodeProperties.REQUIRED_REFLECTOR_TIER);
+    }
+
+    public void setRequiredReflectorTier(int tier) {
+        properties.set(NodeProperties.REQUIRED_REFLECTOR_TIER, Math.max(0, tier));
+    }
+
+    public int getInstalledReflectorTier() {
+        for (MachineAddon a : addons) {
+            if (a.getCategory() == MachineAddon.Category.REFLECTOR) {
+                return a.getReflectorTier();
+            }
+        }
+        return 0;
+    }
+
+    public boolean hasValidReflector() {
+        int req = getRequiredReflectorTier();
+        if (req <= 0) return true;
+        return getInstalledReflectorTier() >= req;
+    }
+
+    /**
+     * Checks if the machine node satisfies hardware prerequisites (reflector tier, coil temp, etc.) to operate.
+     */
+    public boolean isOperational() {
+        return isOperational(null);
+    }
+
+    /**
+     * Checks if the machine node satisfies operating requirements including graph flow conditions.
+     */
+    public boolean isOperational(FlowGraph graph) {
+        if (isReroute) return true;
+        if (!hasValidReflector()) return false;
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            return adapter.validateNode(this, graph, null);
+        }
+        return true;
+    }
+
     private boolean isMultiblock = false;
-    private int rpm = 32;
 
     public static final int[] STANDARD_RPMS = {4, 8, 16, 32, 64, 128, 256};
 
     public int getRpm() {
-        return rpm > 0 ? rpm : 32;
+        int cur = properties.get(NodeProperties.KINETIC_RPM);
+        return cur > 0 ? cur : 32;
     }
 
     public void setRpm(int rpm) {
-        this.rpm = Math.max(1, Math.min(256, rpm));
+        properties.set(NodeProperties.KINETIC_RPM, Math.max(1, Math.min(256, rpm)));
     }
 
     public void cycleRpm(int direction) {
@@ -351,7 +443,7 @@ public class RecipeNode {
     }
 
     public boolean canUseCoils() {
-        if (recipeTemperature > 0) {
+        if (getRecipeTemperature() > 0) {
             return true;
         }
         if (recipeCategoryId != null && CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId).canUseCoils()) {
@@ -513,19 +605,27 @@ public class RecipeNode {
     }
 
     public int getRotorEfficiency() {
-        return rotorEfficiency;
+        return properties.get(NodeProperties.TURBINE_ROTOR_EFFICIENCY);
     }
 
     public void setRotorEfficiency(int rotorEfficiency) {
-        this.rotorEfficiency = Math.max(10, Math.min(500, rotorEfficiency));
+        properties.set(NodeProperties.TURBINE_ROTOR_EFFICIENCY, Math.max(10, Math.min(500, rotorEfficiency)));
     }
 
     public int getRotorPower() {
-        return rotorPower;
+        return properties.get(NodeProperties.TURBINE_ROTOR_POWER);
     }
 
     public void setRotorPower(int rotorPower) {
-        this.rotorPower = Math.max(10, Math.min(5000, rotorPower));
+        properties.set(NodeProperties.TURBINE_ROTOR_POWER, Math.max(10, Math.min(5000, rotorPower)));
+    }
+
+    public String getRotorName() {
+        return properties.get(NodeProperties.TURBINE_ROTOR_NAME);
+    }
+
+    public void setRotorName(String rotorName) {
+        properties.set(NodeProperties.TURBINE_ROTOR_NAME, rotorName != null ? rotorName : "Standard (100%)");
     }
 
     /**
@@ -546,100 +646,52 @@ public class RecipeNode {
     }
 
     public int getTurbineHolderEfficiencyBonus() {
-        if (!isLargeTurbine()) return 0;
-        GTVoltageTier baseTier = getTurbineBaseTier();
-        if (baseTier == null || targetTier == null) return 0;
-        int delta = targetTier.ordinal() - baseTier.ordinal();
-        return Math.max(0, delta * 10);
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineHolderEfficiencyBonus(this);
     }
 
     public double getTurbineBaseProduction() {
-        if (recipeCategoryId != null) {
-            Double prod = MultiblockDetector.getTurbineBaseProduction(recipeCategoryId);
-            if (prod != null) return prod;
-        }
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null) {
-                Double prod = MultiblockDetector.getTurbineBaseProduction(ws);
-                if (prod != null) return prod;
-            }
-        }
-        GTVoltageTier baseTier = getTurbineBaseTier();
-        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 4096.0;
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineBaseProduction(this);
     }
 
     public boolean hasRotorAddon() {
-        if (isCreateMachine() || energyType != EnergyType.ELECTRIC_EU) return false;
-        return addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
-                || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"))
-                || rotorEfficiency != 100
-                || (rotorPower > 0 && rotorPower != 100);
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.hasRotorAddon(this);
     }
 
     public boolean isLargeTurbine() {
-        if (!isGenerator || isCreateMachine() || energyType != EnergyType.ELECTRIC_EU) return false;
-        if (hasRotorAddon()) return true;
-        if (isMultiblock()) return isTurbine();
-        if (name != null) {
-            String sanitized = name.toLowerCase().trim().replace(" ", "_");
-            if (sanitized.contains("large") && sanitized.contains("turbine")) return true;
-            if (MultiblockDetector.isTurbineMachine(ResourceLocation.tryParse("gtceu:" + sanitized))) return true;
-        }
-        return false;
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isLargeTurbine(this);
     }
 
     public double getNodeRotorHolderBaseCapacity(GTVoltageTier tier) {
-        if (tier == null) return getTurbineBaseProduction();
-        int tierIndex = tier.ordinal();
-        GTVoltageTier baseTier = getTurbineBaseTier();
-        int delta = tierIndex - baseTier.ordinal();
-        double baseProd = getTurbineBaseProduction();
-        if (delta >= 0) {
-            return baseProd * (1L << delta);
-        } else {
-            return Math.max(baseProd / 8.0, baseProd / (1L << (-delta)));
-        }
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getNodeRotorHolderBaseCapacity(this, tier);
     }
 
     /**
      * Fallback static rotor holder base capacity (EV = 4,096 EU/t base).
      */
     public static double getRotorHolderBaseCapacity(GTVoltageTier tier) {
-        if (tier == null) return 4096.0;
-        int tierIndex = tier.ordinal();
-        int delta = tierIndex - GTVoltageTier.EV.ordinal();
-        if (delta >= 0) {
-            return 4096.0 * (1L << delta);
-        } else {
-            return Math.max(512.0, 4096.0 / (1L << (-delta)));
-        }
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderBaseCapacity(tier);
     }
 
     /**
      * GTCEu Rotor Holder max throughput based on its voltage tier and rotor power %.
-     * In GTCEu: floor(baseCapacity * (rotorPower / 100.0))
      */
     public double getNodeRotorHolderMaxEUt(GTVoltageTier tier, int rotorPower) {
-        double baseCap = getNodeRotorHolderBaseCapacity(tier);
-        double powerMultiplier = (rotorPower > 0 ? rotorPower : 100) / 100.0;
-        return Math.floor(baseCap * powerMultiplier);
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getNodeRotorHolderMaxEUt(this, tier, rotorPower);
     }
 
     public static double getRotorHolderMaxEUt(GTVoltageTier tier, int rotorPower) {
-        double baseCap = getRotorHolderBaseCapacity(tier);
-        double powerMultiplier = (rotorPower > 0 ? rotorPower : 100) / 100.0;
-        return Math.floor(baseCap * powerMultiplier);
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderMaxEUt(tier, rotorPower);
     }
 
     public static double getRotorHolderMaxEUt(GTVoltageTier tier) {
-        return getRotorHolderMaxEUt(tier, 130);
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderMaxEUt(tier);
     }
 
     /**
      * Dynamically queries GTCEu for material rotor maximum EU/t capacity / durability.
      */
     public static double getRotorMaterialMaxEUt(String rotorName) {
-        return TurbineRotorHelper.getRotorStats(rotorName).durability();
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorMaterialMaxEUt(rotorName);
     }
 
     /**
@@ -682,13 +734,16 @@ public class RecipeNode {
         }
         if (baseEUt <= 0) return;
 
+        String rName = getRotorName();
+        int rEff = getRotorEfficiency();
+        int rPow = getRotorPower();
         boolean hasRotor = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
-                || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"));
-        if (!hasRotor && rotorEfficiency <= 100 && (rotorPower <= 100 || rotorPower == 0)) {
+                || (rName != null && !rName.isEmpty() && !rName.startsWith("Standard"));
+        if (!hasRotor && rEff <= 100 && (rPow <= 100 || rPow == 0)) {
             return;
         }
 
-        int activePower = rotorPower > 0 && rotorPower != 100 ? rotorPower : getRotorMaterialPower(rotorName);
+        int activePower = rPow > 0 && rPow != 100 ? rPow : getRotorMaterialPower(rName);
         for (MachineAddon addon : addons) {
             if (addon.getCategory() == MachineAddon.Category.ROTOR) {
                 if (addon.getRotorPower() > 0) {
@@ -700,22 +755,6 @@ public class RecipeNode {
 
         double holderMax = getNodeRotorHolderMaxEUt(targetTier, activePower);
         this.parallel = (int) Math.max(1, Math.ceil(holderMax / baseEUt));
-    }
-
-    public String getRotorName() {
-        return rotorName;
-    }
-
-    public void setRotorName(String rotorName) {
-        this.rotorName = rotorName;
-    }
-
-    public int getRecipeTemperature() {
-        return recipeTemperature;
-    }
-
-    public void setRecipeTemperature(int recipeTemperature) {
-        this.recipeTemperature = Math.max(0, recipeTemperature);
     }
 
     // Addon Management & Calculations
@@ -731,46 +770,13 @@ public class RecipeNode {
 
     public void addAddon(MachineAddon addon) {
         if (addon == null) return;
-
-        // Thermal Upgrade Kit: exactly 1 kit max (replaces existing)
-        if (isThermalUpgradeKit(addon)) {
-            addons.removeIf(RecipeNode::isThermalUpgradeKit);
-            addons.add(addon);
-            return;
-        }
-
-        // Thermal Regular Augments: stackable up to 3 slots max
-        if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
-            long regCount = addons.stream().filter(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && !isThermalUpgradeKit(a)).count();
-            if (regCount < 3) {
-                addons.add(addon);
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            if (!adapter.canInstallAddon(this, addon)) {
+                return;
             }
-            return;
-        }
-
-        // Rotor (Single)
-        if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-            addons.removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
-            addons.add(addon);
-            return;
-        }
-
-        // Coil (Single)
-        if (addon.getCategory() == MachineAddon.Category.COIL) {
-            addons.removeIf(a -> a.getCategory() == MachineAddon.Category.COIL);
-            addons.add(addon);
-            return;
-        }
-
-        // Maintenance Hatch (Single)
-        if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
-            addons.removeIf(a -> a.getCategory() == MachineAddon.Category.MAINTENANCE);
-            addons.add(addon);
-            return;
-        }
-
-        // General Multiblock Trait / Hatch / Custom
-        if (!addons.contains(addon)) {
+            adapter.onAddonInstalled(this, addon);
+        } else {
             addons.add(addon);
         }
     }
@@ -779,7 +785,11 @@ public class RecipeNode {
         if (addonId == null) return;
         for (int i = 0; i < addons.size(); i++) {
             if (addons.get(i).getId().equals(addonId)) {
-                addons.remove(i);
+                MachineAddon removed = addons.remove(i);
+                com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this);
+                if (adapter != null) {
+                    adapter.onAddonRemoved(this, removed);
+                }
                 break;
             }
         }
@@ -872,7 +882,14 @@ public class RecipeNode {
 
     // Calculation logic
     public int getTierDelta() {
-        return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
+        GTVoltageTier base = recipeTier;
+        if (isFusion()) {
+            GTVoltageTier minFusionTier = getMinFusionVoltageTier();
+            if (minFusionTier.ordinal() > base.ordinal()) {
+                base = minFusionTier;
+            }
+        }
+        return Math.max(0, targetTier.ordinal() - base.ordinal());
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
@@ -881,36 +898,7 @@ public class RecipeNode {
     }
 
     public boolean isTurbine() {
-        if (!isGenerator || isCreateMachine() || energyType != EnergyType.ELECTRIC_EU) return false;
-        if (MachineAddon.isThermalMachine(this)) return false;
-
-        if (rotorEfficiency != 100 || rotorPower != 100 || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"))) {
-            return true;
-        }
-
-        if (recipeCategoryId != null) {
-            if (MultiblockDetector.isTurbineRecipeCategory(recipeCategoryId)) {
-                return true;
-            }
-            if (recipeCategoryId.getNamespace().equals("gtceu")) {
-                String p = recipeCategoryId.getPath();
-                if (p.equals("gas_turbine") || p.equals("steam_turbine") || p.equals("plasma_turbine")) {
-                    return true;
-                }
-            }
-        }
-
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && MultiblockDetector.isTurbineMachine(ws)) {
-                return true;
-            }
-        }
-
-        if (machineIcon != null && MultiblockDetector.isTurbineMachine(machineIcon)) {
-            return true;
-        }
-
-        return addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+        return com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(this);
     }
 
     /**
@@ -922,11 +910,13 @@ public class RecipeNode {
 
     public double getGeneratorMaxEUt() {
         if (!isGenerator) return Double.MAX_VALUE;
+        String rName = getRotorName();
+        int rPower = getRotorPower();
         boolean hasRotor = addons.stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
-                || (rotorName != null && !rotorName.isEmpty() && !rotorName.startsWith("Standard"));
+                || (rName != null && !rName.isEmpty() && !rName.startsWith("Standard"));
         if (!hasRotor) return Double.MAX_VALUE;
 
-        int activePower = rotorPower > 0 && rotorPower != 100 ? rotorPower : getRotorMaterialPower(rotorName);
+        int activePower = rPower > 0 && rPower != 100 ? rPower : getRotorMaterialPower(rName);
         for (MachineAddon addon : addons) {
             if (addon.getCategory() == MachineAddon.Category.ROTOR) {
                 if (addon.getRotorPower() > 0) {
@@ -943,6 +933,7 @@ public class RecipeNode {
      * Single machine EU/t consumption while running.
      */
     public double getSingleMachineEUt() {
+        if (!isOperational()) return 0.0;
         if (isGenerator) {
             if (isLargeTurbine()) {
                 if (parallel == 1) {
@@ -974,15 +965,21 @@ public class RecipeNode {
      * Total EU/t consumption across all machines in this node.
      */
     public double getTotalEUt() {
+        if (!isOperational()) return 0.0;
         return getSingleMachineEUt() * machineCount;
     }
 
     /**
      * Recipe executions per second across all machines and parallel factor.
      */
-    public double getCyclesPerSecond() {
+    public double getNominalCyclesPerSecond() {
         double singleMachineCyclesPerSec = getOverclockResult().getCyclesPerSecond();
         return singleMachineCyclesPerSec * machineCount * getTotalParallel();
+    }
+
+    public double getCyclesPerSecond() {
+        if (!isOperational()) return 0.0;
+        return getNominalCyclesPerSecond();
     }
 
     /**
@@ -1020,7 +1017,7 @@ public class RecipeNode {
         if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
             amount *= Math.max(0.01, getCombinedDurationMultiplier());
         }
-        double cps = effective ? getEffectiveCyclesPerSecond() : getCyclesPerSecond();
+        double cps = effective ? getEffectiveCyclesPerSecond() : getNominalCyclesPerSecond();
         return amount * cps;
     }
 
@@ -1152,7 +1149,7 @@ public class RecipeNode {
      * Calculates single machine production rate for a specific output ingredient.
      */
     public double calculateSingleMachineOutputRate(IngredientStack out) {
-        if (out == null) return 0.0;
+        if (out == null || !isOperational()) return 0.0;
         double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
         int tierDelta = getTierDelta();
         return out.getExpectedAmount(tierDelta) * singleCps;
@@ -1199,10 +1196,7 @@ public class RecipeNode {
         tag.putString("overclockMode", overclockMode.name());
         tag.putBoolean("isBaseNode", isBaseNode);
         tag.putBoolean("isGenerator", isGenerator);
-        tag.putInt("recipeTemperature", recipeTemperature);
-        tag.putInt("rotorEfficiency", rotorEfficiency);
-        tag.putInt("rotorPower", rotorPower);
-        tag.putString("rotorName", rotorName);
+        tag.put("properties", properties.serializeNBT());
         tag.putDouble("posX", posX);
         tag.putDouble("posY", posY);
         tag.putInt("cardWidth", cardWidth);
@@ -1249,7 +1243,6 @@ public class RecipeNode {
             tag.putString("energyType", energyType.name());
         }
 
-        tag.putInt("rpm", getRpm());
         tag.putBoolean("isMultiblock", isMultiblock);
         tag.putBoolean("isReroute", isReroute);
 
@@ -1288,6 +1281,32 @@ public class RecipeNode {
         GTVoltageTier recipeTier = GTVoltageTier.valueOf(tag.getString("recipeTier"));
 
         RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+        if (tag.contains("properties", Tag.TAG_COMPOUND)) {
+            node.properties.deserializeNBT(tag.getCompound("properties"));
+        }
+
+        // Backward compatibility for legacy saves and blueprints
+        if (tag.contains("recipeTemperature") && !node.properties.has(NodeProperties.EBF_TEMPERATURE)) {
+            node.setRecipeTemperature(tag.getInt("recipeTemperature"));
+        }
+        if (tag.contains("rpm") && !node.properties.has(NodeProperties.KINETIC_RPM)) {
+            node.setRpm(tag.getInt("rpm"));
+        }
+        if (tag.contains("rotorEfficiency") && !node.properties.has(NodeProperties.TURBINE_ROTOR_EFFICIENCY)) {
+            node.setRotorEfficiency(tag.getInt("rotorEfficiency"));
+        }
+        if (tag.contains("rotorPower") && !node.properties.has(NodeProperties.TURBINE_ROTOR_POWER)) {
+            node.setRotorPower(tag.getInt("rotorPower"));
+        }
+        if (tag.contains("rotorName") && !node.properties.has(NodeProperties.TURBINE_ROTOR_NAME)) {
+            node.setRotorName(tag.getString("rotorName"));
+        }
+        if (tag.contains("fusionStartEU") && !node.properties.has(NodeProperties.FUSION_START_EU)) {
+            node.setEuToStart(tag.getLong("fusionStartEU"));
+        } else if (tag.contains("euToStart") && !node.properties.has(NodeProperties.FUSION_START_EU)) {
+            node.setEuToStart(tag.getLong("euToStart"));
+        }
+
         if (tag.contains("recipeCategoryId")) {
             node.recipeCategoryId = ResourceLocation.tryParse(tag.getString("recipeCategoryId"));
         }
@@ -1296,9 +1315,6 @@ public class RecipeNode {
         }
         if (tag.contains("icon")) {
             node.machineIcon = ResourceLocation.tryParse(tag.getString("icon"));
-        }
-        if (tag.contains("rpm")) {
-            node.rpm = tag.getInt("rpm");
         }
         if (tag.contains("targetTier")) {
             node.targetTier = GTVoltageTier.valueOf(tag.getString("targetTier"));
@@ -1333,18 +1349,6 @@ public class RecipeNode {
         }
         if (tag.contains("isGenerator")) {
             node.isGenerator = tag.getBoolean("isGenerator");
-        }
-        if (tag.contains("recipeTemperature")) {
-            node.recipeTemperature = tag.getInt("recipeTemperature");
-        }
-        if (tag.contains("rotorEfficiency")) {
-            node.rotorEfficiency = tag.getInt("rotorEfficiency");
-        }
-        if (tag.contains("rotorPower")) {
-            node.rotorPower = tag.getInt("rotorPower");
-        }
-        if (tag.contains("rotorName")) {
-            node.rotorName = tag.getString("rotorName");
         }
         if (tag.contains("cardWidth")) {
             node.cardWidth = tag.getInt("cardWidth");

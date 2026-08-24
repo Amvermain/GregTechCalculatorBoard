@@ -75,6 +75,14 @@ public class GuideDialog {
         setVisible(true);
     }
 
+    public void openCategory(GuideCategory category) {
+        if (category != null) {
+            this.activeCategoryIndex = category.ordinal();
+        }
+        this.scrollOffset = 0;
+        this.visible = true;
+    }
+
     public void close() {
         setVisible(false);
     }
