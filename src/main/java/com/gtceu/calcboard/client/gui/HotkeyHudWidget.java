@@ -12,7 +12,7 @@ public class HotkeyHudWidget {
     private boolean expanded;
 
     private static final int EXPANDED_WIDTH = 195;
-    private static final int EXPANDED_HEIGHT = 160;
+    private static final int EXPANDED_HEIGHT = 172;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
 
@@ -98,6 +98,8 @@ public class HotkeyHudWidget {
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + Z / Y", "gui.gtcalcboard.hotkey_hud.undo_redo");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + C / V / X", "gui.gtcalcboard.hotkey_hud.clipboard");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "F", "gui.gtcalcboard.hotkey_hud.flip");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Right-Click Wire", "gui.gtcalcboard.hotkey_hud.sever");
         curY += 12;

@@ -503,5 +503,11 @@
   "gui.gtcalcboard.turbine_flow_deficit_warning": "Turbine requires 100%% %s flow (Current: %d%%)",
   "gui.gtcalcboard.node_badge.turbine_deficit": "⚠ Deficit",
   "gui.gtcalcboard.turbine_deficit_title": "Turbine Input Flow Deficit",
-  "gui.gtcalcboard.turbine_deficit_desc": "Turbine cannot maintain rotor speed without 100% fuel/steam supply. Output set to 0."
+  "gui.gtcalcboard.turbine_deficit_desc": "Turbine cannot maintain rotor speed without 100% fuel/steam supply. Output set to 0.",
+  "gui.gtcalcboard.flip_direction.left_to_right": "Flow: Left to Right (Click to Flip)",
+  "gui.gtcalcboard.flip_direction.right_to_left": "Flow: Right to Left (Click to Flip)",
+  "gui.gtcalcboard.hotkey_hud.flip": "Flip Horizontal",
+  "message.gtcalcboard.flipped_nodes": "Flipped %s node(s) horizontally.",
+  "gui.gtcalcboard.config.default_parallel_btn": "Default %sx",
+  "gui.gtcalcboard.tooltip.steam_parallel_innate": "Innate Steam Parallels: %sx"
 }

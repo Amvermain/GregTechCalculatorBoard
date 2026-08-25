@@ -55,6 +55,9 @@ public class RecipeNode {
     // Reroute / Junction Node Abstraction (RFC-001)
     private boolean isReroute = false;
 
+    // Horizontal Flip / Directionality (Left-to-Right vs Right-to-Left)
+    private boolean isFlipped = false;
+
     // Module N:N Port Mapping Origins (RFC-002)
     public record PortOrigin(String internalNodeId, int internalPortIndex) {
         public CompoundTag serializeNBT() {
@@ -174,6 +177,12 @@ public class RecipeNode {
 
     public void setMachineIcon(ResourceLocation machineIcon) {
         this.machineIcon = machineIcon;
+        if (this.parallel <= 1) {
+            int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
+            if (defPar > 1) {
+                this.parallel = defPar;
+            }
+        }
     }
 
     public double getBaseDurationTicks() {
@@ -338,6 +347,18 @@ public class RecipeNode {
             this.cardWidth = 32;
             this.cardHeight = 32;
         }
+    }
+
+    public boolean isFlipped() {
+        return isFlipped;
+    }
+
+    public void setFlipped(boolean flipped) {
+        this.isFlipped = flipped;
+    }
+
+    public void toggleFlipped() {
+        this.isFlipped = !this.isFlipped;
     }
 
     public void bindRerouteIngredient(IngredientStack stack) {
@@ -635,6 +656,12 @@ public class RecipeNode {
 
     public void setMultiblock(boolean multiblock) {
         this.isMultiblock = multiblock;
+        if (multiblock && this.parallel <= 1) {
+            int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
+            if (defPar > 1) {
+                this.parallel = defPar;
+            }
+        }
     }
 
     public boolean hasMultiblockOption() {

@@ -212,6 +212,7 @@ public class EmiRecipeConverter {
         if (hasAnyMulti && !hasAnySingle) {
             node.setMultiblock(true);
         }
+        node.autoCalculateTurbineParallel();
         return node;
     }
 

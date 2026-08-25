@@ -569,9 +569,20 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
+    public int getDefaultParallel(RecipeNode node) {
+        if (node == null) return 1;
+        return MultiblockDetector.getDefaultParallel(node);
+    }
+
+    @Override
     public void autoTuneParallel(RecipeNode node) {
         if (node.isGenerator() && GTTurbineHelper.isLargeTurbine(node)) {
             GTTurbineHelper.autoCalculateTurbineParallel(node);
+        } else if (node.getParallel() <= 1) {
+            int defPar = getDefaultParallel(node);
+            if (defPar > 1) {
+                node.setParallel(defPar);
+            }
         }
     }
 

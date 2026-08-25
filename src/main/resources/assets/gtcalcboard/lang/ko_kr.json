@@ -540,5 +540,11 @@
   "gui.gtcalcboard.turbine_flow_deficit_warning": "터빈은 100%%의 %s 공급이 필요합니다 (현재: %d%%)",
   "gui.gtcalcboard.node_badge.turbine_deficit": "⚠ 유량 부족",
   "gui.gtcalcboard.turbine_deficit_title": "터빈 입력 유량 부족 (Deficit)",
-  "gui.gtcalcboard.turbine_deficit_desc": "터빈은 100%의 연료/증기가 공급되지 않으면 로터 회전수를 유지할 수 없어 발전이 중단됩니다. 출력이 0으로 설정됩니다."
+  "gui.gtcalcboard.turbine_deficit_desc": "터빈은 100%의 연료/증기가 공급되지 않으면 로터 회전수를 유지할 수 없어 발전이 중단됩니다. 출력이 0으로 설정됩니다.",
+  "gui.gtcalcboard.flip_direction.left_to_right": "흐름: 좌 → 우 (클릭하여 좌우 반전)",
+  "gui.gtcalcboard.flip_direction.right_to_left": "흐름: 우 → 좌 (클릭하여 좌우 반전)",
+  "gui.gtcalcboard.hotkey_hud.flip": "좌우 반전",
+  "message.gtcalcboard.flipped_nodes": "%s개 노드를 좌우 반전했습니다.",
+  "gui.gtcalcboard.config.default_parallel_btn": "기본 %sx",
+  "gui.gtcalcboard.tooltip.steam_parallel_innate": "기본 증기 병렬: %sx"
 }

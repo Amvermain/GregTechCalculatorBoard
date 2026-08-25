@@ -26,8 +26,10 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -156,6 +158,45 @@ public class BoardScreen extends Screen {
 
     public void duplicateSelection() {
         selectionModel.duplicateSelection(this, lastMouseX, lastMouseY);
+    }
+
+    public void flipSelectedNodes() {
+        if (!ensureEditPermission()) return;
+        List<String> nodeIds = new ArrayList<>(selectionModel.getSelectedNodeIds());
+        if (nodeIds.isEmpty()) {
+            double canvasX = toCanvasX(lastMouseX);
+            double canvasY = toCanvasY(lastMouseY);
+            for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
+                NodeWidget w = nodeWidgets.get(i);
+                if (w.isPointInside(canvasX, canvasY)) {
+                    nodeIds.add(w.getNode().getId());
+                    break;
+                }
+            }
+        }
+        if (nodeIds.isEmpty()) return;
+
+        Map<String, Boolean> prevStates = new HashMap<>();
+        Map<String, Boolean> newStates = new HashMap<>();
+        for (String id : nodeIds) {
+            RecipeNode n = getGraph().findNodeById(id);
+            if (n != null) {
+                prevStates.put(id, n.isFlipped());
+                newStates.put(id, !n.isFlipped());
+                n.setFlipped(!n.isFlipped());
+            }
+        }
+        if (!newStates.isEmpty()) {
+            recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.FlipNodesCommand(prevStates, newStates));
+            markSummaryDirty();
+            for (NodeWidget w : nodeWidgets) {
+                if (newStates.containsKey(w.getNode().getId())) {
+                    w.invalidateCache();
+                }
+            }
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F));
+            BoardToast.show(Component.literal("§b⇄ ").append(Component.translatable("message.gtcalcboard.flipped_nodes", newStates.size())));
+        }
     }
 
     public void recordCommand(BoardCommand cmd) {
@@ -526,12 +567,15 @@ public class BoardScreen extends Screen {
                         continue;
                     }
 
-                    boolean isHovered = ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, canvasMouseX, canvasMouseY, 6.0);
+                    float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
+                    float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
+
+                    boolean isHovered = ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, fromDirX, toDirX, canvasMouseX, canvasMouseY, 6.0);
                     boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
                     int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : 0xFF00E5FF);
                     float wireThick = isWireGlowing ? 3.5f : 2.0f;
-                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, lineColor, wireThick);
-                    visibleWires.add(new float[]{x1, y1, x2, y2});
+                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
+                    visibleWires.add(new float[]{x1, y1, x2, y2, fromDirX, toDirX});
                 }
             }
         }
@@ -544,11 +588,13 @@ public class BoardScreen extends Screen {
             if (canvasHandler.isWireStartInput()) {
                 x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-                ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, dragWireColor, 3.0f);
+                float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
+                ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
             } else {
                 x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-                ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, dragWireColor, 3.0f);
+                float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
+                ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
             }
         }
         ConnectionRenderer.endBatch();

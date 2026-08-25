@@ -32,6 +32,10 @@ public class NodeWidget {
     private Map<IngredientStack, Double> cachedInputRates = null;
     private Map<IngredientStack, Double> cachedOutputRates = null;
 
+    public NodeWidget(RecipeNode node) {
+        this(node, null);
+    }
+
     public NodeWidget(RecipeNode node, BoardScreen parent) {
         this.node = node;
         this.parent = parent;
@@ -108,14 +112,14 @@ public class NodeWidget {
 
     public float getOutputPortX(int index) {
         if (node.isReroute()) {
-            return (float) (node.getPosX() + 16);
+            return (float) (node.getPosX() + (node.isFlipped() ? 0 : 32));
         }
-        return (float) (node.getPosX() + getWidth() - 6);
+        return (float) (node.getPosX() + (node.isFlipped() ? 6 : getWidth() - 6));
     }
 
     public float getOutputPortY(int index) {
         if (node.isReroute()) {
-            return (float) (node.getPosY() + 32);
+            return (float) (node.getPosY() + 16);
         }
         int contentY = getContentStartY();
         return contentY + index * 18 + 8;
@@ -123,14 +127,14 @@ public class NodeWidget {
 
     public float getInputPortX(int index) {
         if (node.isReroute()) {
-            return (float) (node.getPosX() + 16);
+            return (float) (node.getPosX() + (node.isFlipped() ? 32 : 0));
         }
-        return (float) (node.getPosX() + 6);
+        return (float) (node.getPosX() + (node.isFlipped() ? getWidth() - 6 : 6));
     }
 
     public float getInputPortY(int index) {
         if (node.isReroute()) {
-            return (float) (node.getPosY());
+            return (float) (node.getPosY() + 16);
         }
         int contentY = getContentStartY();
         return contentY + index * 18 + 8;
@@ -144,15 +148,24 @@ public class NodeWidget {
         }
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
-        return canvasMouseX >= x && canvasMouseX <= x + getWidth() - 40 && canvasMouseY >= y && canvasMouseY <= y + HEADER_HEIGHT;
+        int headerBtnWidth = node.isModule() ? 74 : 56;
+        return canvasMouseX >= x && canvasMouseX <= x + getWidth() - headerBtnWidth && canvasMouseY >= y && canvasMouseY <= y + HEADER_HEIGHT;
     }
 
     public boolean isExpandButtonHovered(double canvasMouseX, double canvasMouseY) {
         if (!node.isModule() || node.isReroute()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
-        int expandX = x + getWidth() - 54;
+        int expandX = x + getWidth() - 72;
         return canvasMouseX >= expandX && canvasMouseX <= expandX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+    }
+
+    public boolean isFlipButtonHovered(double canvasMouseX, double canvasMouseY) {
+        if (node.isReroute()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int flipX = x + getWidth() - 54;
+        return canvasMouseX >= flipX && canvasMouseX <= flipX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
     }
 
     public boolean isTargetButtonHovered(double canvasMouseX, double canvasMouseY) {
@@ -188,17 +201,22 @@ public class NodeWidget {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         if (node.isReroute()) {
-            // Port dot at (x + 14..18, y..4). Hit zone is top-center 16x12 box
-            if (canvasMouseX >= x + 8 && canvasMouseX <= x + 24 && canvasMouseY >= y - 6 && canvasMouseY <= y + 8) {
+            boolean isFlipped = node.isFlipped();
+            int minX = isFlipped ? (x + 22) : (x - 4);
+            int maxX = isFlipped ? (x + 36) : (x + 10);
+            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= y + 6 && canvasMouseY <= y + 26) {
                 return 0;
             }
             return -1;
         }
         int contentY = getContentStartY();
+        boolean isFlipped = node.isFlipped();
 
         for (int i = 0; i < node.getInputs().size(); i++) {
             int rowY = contentY + i * 18;
-            if (canvasMouseX >= x && canvasMouseX <= x + 40 && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
+            int minX = isFlipped ? (x + getWidth() - 40) : x;
+            int maxX = isFlipped ? (x + getWidth() + 4) : (x + 40);
+            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
                 return i;
             }
         }
@@ -209,18 +227,22 @@ public class NodeWidget {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         if (node.isReroute()) {
-            // Port dot at (x + 14..18, y + 28..32). Hit zone is bottom-center 16x12 box
-            if (canvasMouseX >= x + 8 && canvasMouseX <= x + 24 && canvasMouseY >= y + 24 && canvasMouseY <= y + 38) {
+            boolean isFlipped = node.isFlipped();
+            int minX = isFlipped ? (x - 4) : (x + 22);
+            int maxX = isFlipped ? (x + 10) : (x + 36);
+            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= y + 6 && canvasMouseY <= y + 26) {
                 return 0;
             }
             return -1;
         }
         int contentY = getContentStartY();
+        boolean isFlipped = node.isFlipped();
 
         for (int i = 0; i < node.getOutputs().size(); i++) {
             int rowY = contentY + i * 18;
-            int outPortX = x + getWidth() - 36;
-            if (canvasMouseX >= outPortX && canvasMouseX <= x + getWidth() + 4 && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
+            int minX = isFlipped ? x : (x + getWidth() - 40);
+            int maxX = isFlipped ? (x + 40) : (x + getWidth() + 4);
+            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
                 return i;
             }
         }
@@ -471,6 +493,21 @@ public class NodeWidget {
         // Close Button [X]
         if (isCloseButtonHovered(mouseX, mouseY)) {
             parent.removeNode(this);
+            return true;
+        }
+
+        // Direction / Flip Button [➔] or [⬅]
+        if (isFlipButtonHovered(mouseX, mouseY)) {
+            boolean oldFlipped = node.isFlipped();
+            boolean newFlipped = !oldFlipped;
+            node.setFlipped(newFlipped);
+            if (parent != null) {
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.FlipNodesCommand(node, oldFlipped, newFlipped));
+                parent.markSummaryDirty();
+            }
+            invalidateCache();
+            Minecraft mc = Minecraft.getInstance();
+            mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F));
             return true;
         }
 

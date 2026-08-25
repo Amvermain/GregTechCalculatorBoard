@@ -37,6 +37,19 @@ public final class BoardTooltipRenderer {
                     graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.tooltip.remove_node")), mouseX, mouseY);
                     return;
                 }
+                if (widget.isTargetButtonHovered(canvasMouseX, canvasMouseY)) {
+                    graphics.renderTooltip(font, Component.literal("§6🎯 ").append(Component.translatable("gui.gtcalcboard.tooltip.target_base")), mouseX, mouseY);
+                    return;
+                }
+                if (widget.isFlipButtonHovered(canvasMouseX, canvasMouseY)) {
+                    String flipKey = widget.getNode().isFlipped() ? "gui.gtcalcboard.flip_direction.right_to_left" : "gui.gtcalcboard.flip_direction.left_to_right";
+                    graphics.renderTooltip(font, Component.literal("§b⇄ ").append(Component.translatable(flipKey)), mouseX, mouseY);
+                    return;
+                }
+                if (widget.isExpandButtonHovered(canvasMouseX, canvasMouseY)) {
+                    graphics.renderTooltip(font, Component.literal("§d⤢ ").append(Component.translatable("gui.gtcalcboard.tooltip.expand_module")), mouseX, mouseY);
+                    return;
+                }
 
                 int inIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
                 int outIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);

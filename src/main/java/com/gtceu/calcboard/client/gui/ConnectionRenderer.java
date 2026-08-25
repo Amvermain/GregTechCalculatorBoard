@@ -29,14 +29,18 @@ public class ConnectionRenderer {
     }
 
     public static void addBezierToBatch(float x1, float y1, float x2, float y2, int color, float thickness) {
+        addBezierToBatch(x1, y1, x2, y2, 1.0f, -1.0f, color, thickness);
+    }
+
+    public static void addBezierToBatch(float x1, float y1, float x2, float y2, float dir1X, float dir2X, int color, float thickness) {
         if (ACTIVE_BATCH_BUFFER == null || ACTIVE_BATCH_POSE == null) return;
 
         float dx = Math.abs(x2 - x1) * 0.5f;
         dx = Math.max(dx, 40f);
 
-        float cx1 = x1 + dx;
+        float cx1 = x1 + dx * dir1X;
         float cy1 = y1;
-        float cx2 = x2 - dx;
+        float cx2 = x2 + dx * dir2X;
         float cy2 = y2;
 
         float chord = (float) Math.hypot(x2 - x1, y2 - y1);
@@ -113,10 +117,12 @@ public class ConnectionRenderer {
         for (int w = 0; w < count; w++) {
             float[] wire = wires.get(w);
             float x1 = wire[0], y1 = wire[1], x2 = wire[2], y2 = wire[3];
+            float dir1X = wire.length >= 6 ? wire[4] : 1.0f;
+            float dir2X = wire.length >= 6 ? wire[5] : -1.0f;
             float dx = Math.max(Math.abs(x2 - x1) * 0.5f, 40f);
-            float cx1 = x1 + dx;
+            float cx1 = x1 + dx * dir1X;
             float cy1 = y1;
-            float cx2 = x2 - dx;
+            float cx2 = x2 + dx * dir2X;
             float cy2 = y2;
 
             float dotX = it * it * it * x1 + 3 * it * it * pulseTime * cx1 + 3 * it * pulseTime * pulseTime * cx2 + pulseTime * pulseTime * pulseTime * x2;
@@ -141,6 +147,10 @@ public class ConnectionRenderer {
     }
 
     public static boolean isPointNearBezier(float x1, float y1, float x2, float y2, double px, double py, double maxDist) {
+        return isPointNearBezier(x1, y1, x2, y2, 1.0f, -1.0f, px, py, maxDist);
+    }
+
+    public static boolean isPointNearBezier(float x1, float y1, float x2, float y2, float dir1X, float dir2X, double px, double py, double maxDist) {
         float minX = Math.min(x1, x2) - (float) maxDist - 40f;
         float maxX = Math.max(x1, x2) + (float) maxDist + 40f;
         float minY = Math.min(y1, y2) - (float) maxDist - 20f;
@@ -152,9 +162,9 @@ public class ConnectionRenderer {
 
         float dx = Math.abs(x2 - x1) * 0.5f;
         dx = Math.max(dx, 40f);
-        float cx1 = x1 + dx;
+        float cx1 = x1 + dx * dir1X;
         float cy1 = y1;
-        float cx2 = x2 - dx;
+        float cx2 = x2 + dx * dir2X;
         float cy2 = y2;
 
         float chord = (float) Math.hypot(x2 - x1, y2 - y1);

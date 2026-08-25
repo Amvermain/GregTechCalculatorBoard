@@ -268,6 +268,13 @@ public interface IModAdapter {
     }
 
     /**
+     * Gets the innate or recommended default parallel execution count for this machine node.
+     */
+    default int getDefaultParallel(RecipeNode node) {
+        return 1;
+    }
+
+    /**
      * Automatically calculates and tunes optimal parallel count (e.g. for turbines/generators).
      */
     default void autoTuneParallel(RecipeNode node) {

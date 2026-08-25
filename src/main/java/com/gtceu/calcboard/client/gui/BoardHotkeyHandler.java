@@ -213,6 +213,12 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
+        // 11. Flip Selected Nodes Horizontally: F
+        if (keyCode == GLFW.GLFW_KEY_F && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+            screen.flipSelectedNodes();
+            return true;
+        }
+
         return false;
     }
 }

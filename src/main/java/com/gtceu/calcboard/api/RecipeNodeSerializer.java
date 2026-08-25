@@ -88,6 +88,7 @@ public final class RecipeNodeSerializer {
 
         tag.putBoolean("isMultiblock", node.isMultiblock());
         tag.putBoolean("isReroute", node.isReroute());
+        tag.putBoolean("isFlipped", node.isFlipped());
 
         if (!node.getModuleInputOrigins().isEmpty()) {
             ListTag inOriginsTag = new ListTag();
@@ -246,6 +247,9 @@ public final class RecipeNodeSerializer {
 
         if (tag.contains("isReroute")) {
             node.setReroute(tag.getBoolean("isReroute"));
+        }
+        if (tag.contains("isFlipped")) {
+            node.setFlipped(tag.getBoolean("isFlipped"));
         }
         if (tag.contains("moduleInputOrigins", Tag.TAG_LIST)) {
             ListTag inOriginsTag = tag.getList("moduleInputOrigins", Tag.TAG_LIST);

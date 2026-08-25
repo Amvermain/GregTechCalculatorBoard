@@ -327,6 +327,7 @@ public class GTCEuGuiHandler {
             }
         } else {
             int curPar = node.getParallel();
+            int defPar = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
             String parLabel = "§b" + Component.translatable("gui.gtcalcboard.config.base_parallel", String.valueOf(curPar)).getString()
                     + " §7(" + Component.translatable("gui.gtcalcboard.config.total_effective", String.valueOf(node.getTotalParallel())).getString() + "§7)";
             graphics.drawString(font, parLabel, x + 10, y + 30, 0xFFFFFFFF, false);
@@ -337,15 +338,20 @@ public class GTCEuGuiHandler {
                 parallelBox.render(graphics, mouseX, mouseY, partialTicks);
             }
 
-            int[] quickPars = {1, 4, 16, 64, 256};
-            int btnX = x + 64;
+            int[] quickPars = {1, 4, 8, 16, 64, 256};
+            int btnX = x + 60;
             for (int qp : quickPars) {
                 boolean active = curPar == qp;
-                boolean hov = mouseX >= btnX && mouseX <= btnX + 34 && mouseY >= y + 44 && mouseY <= y + 60;
-                graphics.fill(btnX, y + 44, btnX + 34, y + 60, active ? 0xFF285078 : (hov ? 0xFF3D4558 : 0xFF282D3B));
-                graphics.renderOutline(btnX, y + 44, 34, 16, active ? 0xFF589CFF : 0xFF3F4658);
-                graphics.drawCenteredString(font, qp + "x", btnX + 17, y + 48, active ? 0xFF58D3FF : 0xFFB0B8C8);
-                btnX += 38;
+                boolean isDefault = qp == defPar && defPar > 1;
+                boolean hov = mouseX >= btnX && mouseX <= btnX + 30 && mouseY >= y + 44 && mouseY <= y + 60;
+                int bgColor = active ? 0xFF285078 : (hov ? 0xFF3D4558 : (isDefault ? 0xFF353020 : 0xFF282D3B));
+                int outlineColor = active ? 0xFF589CFF : (isDefault ? 0xFFFFAA00 : 0xFF3F4658);
+                int textColor = active ? 0xFF58D3FF : (isDefault ? 0xFFFFD700 : 0xFFB0B8C8);
+
+                graphics.fill(btnX, y + 44, btnX + 30, y + 60, bgColor);
+                graphics.renderOutline(btnX, y + 44, 30, 16, outlineColor);
+                graphics.drawCenteredString(font, qp + "x", btnX + 15, y + 48, textColor);
+                btnX += 34;
             }
 
             if (node.isGenerator()) {
@@ -354,6 +360,14 @@ public class GTCEuGuiHandler {
                 graphics.fill(autoBtnX, y + 44, autoBtnX + 90, y + 60, autoHov ? 0xFF285078 : 0xFF282D3B);
                 graphics.renderOutline(autoBtnX, y + 44, 90, 16, autoHov ? 0xFF589CFF : 0xFF3F4658);
                 graphics.drawCenteredString(font, "⚡ " + Component.translatable("gui.gtcalcboard.config.auto_parallel").getString(), autoBtnX + 45, y + 48, 0xFF58D3FF);
+            } else if (defPar > 1) {
+                int defBtnX = x + dialogW - 98;
+                boolean defHov = mouseX >= defBtnX && mouseX <= defBtnX + 90 && mouseY >= y + 44 && mouseY <= y + 60;
+                boolean isAlreadyDef = curPar == defPar;
+                graphics.fill(defBtnX, y + 44, defBtnX + 90, y + 60, isAlreadyDef ? 0xFF4A3E1A : (defHov ? 0xFF3D4558 : 0xFF282D3B));
+                graphics.renderOutline(defBtnX, y + 44, 90, 16, isAlreadyDef ? 0xFFFFD700 : (defHov ? 0xFFFFAA00 : 0xFF3F4658));
+                String defBtnText = "✔ " + Component.translatable("gui.gtcalcboard.config.default_parallel_btn", String.valueOf(defPar)).getString();
+                graphics.drawCenteredString(font, defBtnText, defBtnX + 45, y + 48, isAlreadyDef ? 0xFFFFD700 : 0xFFE0E6ED);
             }
         }
     }
@@ -489,10 +503,11 @@ public class GTCEuGuiHandler {
                 }
             }
         } else {
-            int[] quickPars = {1, 4, 16, 64, 256};
-            int btnX = x + 64;
+            int defPar = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
+            int[] quickPars = {1, 4, 8, 16, 64, 256};
+            int btnX = x + 60;
             for (int qp : quickPars) {
-                if (mouseX >= btnX && mouseX <= btnX + 34 && mouseY >= y + 44 && mouseY <= y + 60) {
+                if (mouseX >= btnX && mouseX <= btnX + 30 && mouseY >= y + 44 && mouseY <= y + 60) {
                     node.setParallel(qp);
                     if (parallelBox != null) parallelBox.setValue(String.valueOf(qp));
                     if (parent != null) parent.markSummaryDirty();
@@ -501,7 +516,7 @@ public class GTCEuGuiHandler {
                     );
                     return true;
                 }
-                btnX += 38;
+                btnX += 34;
             }
 
             if (node.isGenerator()) {
@@ -509,6 +524,17 @@ public class GTCEuGuiHandler {
                 if (mouseX >= autoBtnX && mouseX <= autoBtnX + 90 && mouseY >= y + 44 && mouseY <= y + 60) {
                     node.autoCalculateTurbineParallel();
                     if (parallelBox != null) parallelBox.setValue(String.valueOf(node.getParallel()));
+                    if (parent != null) parent.markSummaryDirty();
+                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    );
+                    return true;
+                }
+            } else if (defPar > 1) {
+                int defBtnX = x + dialogW - 98;
+                if (mouseX >= defBtnX && mouseX <= defBtnX + 90 && mouseY >= y + 44 && mouseY <= y + 60) {
+                    node.setParallel(defPar);
+                    if (parallelBox != null) parallelBox.setValue(String.valueOf(defPar));
                     if (parent != null) parent.markSummaryDirty();
                     net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)

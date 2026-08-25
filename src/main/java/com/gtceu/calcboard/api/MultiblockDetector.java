@@ -31,6 +31,7 @@ public class MultiblockDetector {
     private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
     private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new HashMap<>();
     private static final Map<ResourceLocation, Integer> THREADING_MAX_HELIX_CAPACITY = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, Integer> DEFAULT_MULTIBLOCK_PARALLELS = new ConcurrentHashMap<>();
     private static boolean initialized = false;
 
     public static void initialize() {
@@ -252,6 +253,23 @@ public class MultiblockDetector {
                                 TURBINE_BASE_PRODUCTIONS.put(id, baseEnergy);
                             }
 
+                            // Detect innate default parallel (e.g. Steam Multiblocks, specialized parallel controllers)
+                            int innatePar = 1;
+                            for (String mName : new String[]{"getParallelAmount", "getSteamParallel", "getBaseParallel", "getParallels", "getParallelCount", "getDefaultParallel"}) {
+                                try {
+                                    Method m = def.getClass().getMethod(mName);
+                                    Object pVal = m.invoke(def);
+                                    if (pVal instanceof Number num && num.intValue() > 1) {
+                                        innatePar = num.intValue();
+                                        break;
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                            if (innatePar > 1) {
+                                DEFAULT_MULTIBLOCK_PARALLELS.put(id, innatePar);
+                                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [MultiblockDetector] Detected Innate Multiblock Parallel: {} = {}x", id, innatePar);
+                            }
+
                             // Inspect recipe types of multiblock definition
                             try {
                                 Method mGetRecipeType = def.getClass().getMethod("getRecipeTypes");
@@ -371,6 +389,24 @@ public class MultiblockDetector {
         COIL_MULTIBLOCK_CONTROLLERS.add(lcr);
         MULTIBLOCK_RECIPE_CONTROLLERS.add(lcr);
         COIL_RECIPE_CATEGORIES.add(cr);
+
+        // Register default steam multiblock innate parallels
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_grinder"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_oven"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_compressor"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_ore_factory"), 4);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_hammer"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_alloy_smelter"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_purifier"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_centrifuge"), 8);
+        registerDefaultParallel(ResourceLocation.tryParse("gtceu:steam_rock_breaker"), 8);
+    }
+
+    public static void registerDefaultParallel(ResourceLocation loc, int parallel) {
+        if (loc != null && parallel > 1) {
+            DEFAULT_MULTIBLOCK_PARALLELS.put(loc, parallel);
+            MULTIBLOCK_RECIPE_CONTROLLERS.add(loc);
+        }
     }
 
     private static void registerTestTurbine(ResourceLocation loc, GTVoltageTier tier, double baseProd) {
@@ -394,7 +430,29 @@ public class MultiblockDetector {
         TURBINE_RECIPE_CATEGORIES.clear();
         TURBINE_BASE_TIERS.clear();
         TURBINE_BASE_PRODUCTIONS.clear();
+        DEFAULT_MULTIBLOCK_PARALLELS.clear();
         initialize(rmObj);
+    }
+
+    public static int getDefaultParallel(ResourceLocation id) {
+        if (id == null) return 1;
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+        return DEFAULT_MULTIBLOCK_PARALLELS.getOrDefault(id, 1);
+    }
+
+    public static int getDefaultParallel(RecipeNode node) {
+        if (node == null) return 1;
+        if (node.getMachineIcon() != null) {
+            int p = getDefaultParallel(node.getMachineIcon());
+            if (p > 1) return p;
+        }
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            int p = getDefaultParallel(ws);
+            if (p > 1) return p;
+        }
+        return 1;
     }
 
     public static GTVoltageTier getTurbineBaseTier(ResourceLocation id) {
