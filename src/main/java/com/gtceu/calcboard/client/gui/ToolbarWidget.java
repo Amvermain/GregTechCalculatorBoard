@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.*;
@@ -86,6 +87,14 @@ public class ToolbarWidget {
         list.add(new ToolbarButtonDef("global_balance", balanceTxt, 0xFF66E5FF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(balanceTxt) + 12, btn -> {
             if (screen.getGlobalBalanceDialog() != null) {
                 screen.getGlobalBalanceDialog().open();
+            }
+        }));
+
+        // 3.55 Multiblock Construction BOM
+        String bomTxt = "§6📋 " + Component.translatable("gui.gtcalcboard.bom").getString();
+        list.add(new ToolbarButtonDef("multiblock_bom", bomTxt, 0xFFFFCC66, 0xFF352B1C, 0xFF4D3D28, 0xFF665035, font.width(bomTxt) + 12, btn -> {
+            if (screen.getMultiblockBOMDialog() != null) {
+                screen.getMultiblockBOMDialog().open();
             }
         }));
 
@@ -195,13 +204,13 @@ public class ToolbarWidget {
         Font font = Minecraft.getInstance().font;
         int width = screen.width;
 
-        int tbX = 8;
+        int tbX = screen.getDynamicLeftMargin();
         int tbY = screen.getToolbarY();
         int tbH = 18;
-        int tbW = width - 16;
+        int tbW = width - tbX - 8;
 
         String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
-        int titleRight = 14 + font.width(titleStr) + 8;
+        int titleRight = tbX + 6 + font.width(titleStr) + 8;
 
         List<ToolbarButtonDef> buttons = buildButtons(font);
         int totalBtnW = 0;
@@ -221,7 +230,7 @@ public class ToolbarWidget {
         graphics.renderOutline(tbX, tbY, actualToolbarW, tbH, 0xFF3D4455);
 
         // Fixed title on the left
-        graphics.drawString(font, titleStr, 14, tbY + 5, 0xFFFFFFFF, false);
+        graphics.drawString(font, titleStr, tbX + 6, tbY + 5, 0xFFFFFFFF, false);
 
         graphics.enableScissor(scrollAreaX, tbY + 1, tbX + tbW - 2, tbY + tbH - 1);
 
@@ -290,7 +299,7 @@ public class ToolbarWidget {
 
         Font font = Minecraft.getInstance().font;
         String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
-        int titleRight = 14 + font.width(titleStr) + 8;
+        int titleRight = screen.getDynamicLeftMargin() + 6 + font.width(titleStr) + 8;
         List<ToolbarButtonDef> buttons = buildButtons(font);
         int totalBtnW = 0;
         for (ToolbarButtonDef btn : buttons) {
@@ -323,7 +332,7 @@ public class ToolbarWidget {
         if (!hasDragged && button == pressedButton) {
             Font font = Minecraft.getInstance().font;
             String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
-            int titleRight = 14 + font.width(titleStr) + 8;
+            int titleRight = screen.getDynamicLeftMargin() + 6 + font.width(titleStr) + 8;
             int curX = titleRight - (int) scrollX;
             int tbY = screen.getToolbarY();
 
@@ -367,21 +376,78 @@ public class ToolbarWidget {
     public void performAutoConnect() {
         if (!screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
+        List<com.gtceu.calcboard.api.history.BoardCommand> subCommands = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> addedEdges = autoConnect(graph, subCommands);
+
+        if (!addedEdges.isEmpty()) {
+            subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(
+                Collections.emptyList(), addedEdges, "Auto Connect " + addedEdges.size() + " wires"
+            ));
+        }
+        if (!subCommands.isEmpty()) {
+            if (subCommands.size() == 1) {
+                screen.recordCommand(subCommands.get(0));
+            } else {
+                screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(
+                    subCommands, "Auto Connect " + addedEdges.size() + " wires"
+                ));
+            }
+        }
+        screen.markSummaryDirty();
+    }
+
+    public static List<FlowGraph.ConnectionEdge> autoConnect(FlowGraph graph, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands) {
         List<FlowGraph.ConnectionEdge> addedEdges = new ArrayList<>();
+        if (graph == null) return addedEdges;
+
         for (RecipeNode from : graph.getNodes()) {
             for (int outIdx = 0; outIdx < from.getOutputs().size(); outIdx++) {
                 var out = from.getOutputs().get(outIdx);
+                boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
+
                 for (RecipeNode to : graph.getNodes()) {
                     if (from == to) continue;
                     for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
                         var in = to.getInputs().get(inIdx);
                         if (out.equals(in) || in.matchesOrAlternative(out)) {
-                            if (!out.equals(in)) {
-                                in.selectAlternative(out.getId());
+                            // Check if a path already exists (directly or via intermediate reroute junctions)
+                            if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+                                continue;
                             }
-                            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, to.getId(), inIdx);
+
+                            // If this output is already routed to a junction hub, do not create direct bypass wires to normal nodes
+                            if (fromFeedsReroute && !to.isReroute()) {
+                                continue;
+                            }
+
+                            // If target input is already fed by a reroute junction, route into that junction instead of bypassing it
+                            RecipeNode targetNode = to;
+                            int targetInIdx = inIdx;
+                            if (!from.isReroute() && !to.isReroute()) {
+                                RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+                                if (feedingReroute != null) {
+                                    targetNode = feedingReroute;
+                                    targetInIdx = 0;
+                                    if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            if (!out.equals(in) && in.hasAlternatives() && subCommands != null) {
+                                ResourceLocation oldAlt = in.getId();
+                                in.selectAlternative(out.getId());
+                                ResourceLocation newAlt = in.getId();
+                                if (!Objects.equals(oldAlt, newAlt)) {
+                                    subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
+                                        to.getId(), inIdx, true, oldAlt, newAlt
+                                    ));
+                                }
+                            }
+
+                            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
                             if (!graph.getConnections().contains(edge)) {
-                                graph.addConnection(from.getId(), outIdx, to.getId(), inIdx);
+                                graph.addConnection(from.getId(), outIdx, targetNode.getId(), targetInIdx);
                                 addedEdges.add(edge);
                             }
                         }
@@ -389,10 +455,69 @@ public class ToolbarWidget {
                 }
             }
         }
-        if (!addedEdges.isEmpty()) {
-            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(Collections.emptyList(), addedEdges, "Auto Connect " + addedEdges.size() + " wires"));
+        return addedEdges;
+    }
+
+    private static boolean isPortConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+        if (fromNodeId.equals(toNodeId)) return true;
+        Set<String> visited = new HashSet<>();
+        Queue<String> queue = new ArrayDeque<>();
+
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx) {
+                if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                    return true;
+                }
+                RecipeNode target = graph.getNode(edge.toNodeId());
+                if (target != null && target.isReroute()) {
+                    if (visited.add(target.getId())) {
+                        queue.add(target.getId());
+                    }
+                }
+            }
         }
-        screen.markSummaryDirty();
+
+        while (!queue.isEmpty()) {
+            String currRerouteId = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (edge.fromNodeId().equals(currRerouteId)) {
+                    if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                        return true;
+                    }
+                    RecipeNode target = graph.getNode(edge.toNodeId());
+                    if (target != null && target.isReroute()) {
+                        if (visited.add(target.getId())) {
+                            queue.add(target.getId());
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isOutputFeedingReroute(FlowGraph graph, String fromNodeId, int outIdx) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx) {
+                RecipeNode target = graph.getNode(edge.toNodeId());
+                if (target != null && target.isReroute()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static RecipeNode findFeedingRerouteNode(FlowGraph graph, String toNodeId, int inIdx) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                RecipeNode src = graph.getNode(edge.fromNodeId());
+                if (src != null && src.isReroute()) {
+                    return src;
+                }
+            }
+        }
+        return null;
     }
 
     public void performAutoRatio() {

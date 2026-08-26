@@ -83,13 +83,31 @@ graph LR
 
 | Sub-Package | Core Components | Assigned Responsibilities |
 | :--- | :--- | :--- |
-| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT multiblock traits, heating coils, turbine rotors, parallel/maintenance hatches discovery<br/>• Voltage tier badges and EU/t tooltip rendering<br/>• GTRecipe reflection and generator/consumer conversion |
+| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT multiblock traits, heating coils, turbine rotors, parallel/maintenance hatches discovery<br/>• Voltage tier badges and EU/t tooltip rendering<br/>• GTRecipe reflection and generator/consumer conversion<br/>• Steam mode (LP/HP) and steam multiblock auto-configuration and validation |
 | `compat.create` | `CreateModAdapter`<br/>`CreateGuiHandler`<br/>`CreateRecipeHandler` | • Virtual kinetic generator recipes (Large Water Wheel, Windmill, Steam Engine, etc.)<br/>• RPM control buttons and Stress Unit (SU) tooltip rendering<br/>• Create processing recipe duration and stress load adaptation |
+| `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeGuiHandler`<br/>`CreateNewAgeRecipeHandler` | • Electric motor (FE ➔ SU) and generator (SU ➔ FE) virtual recipes<br/>• Torque/power conversion efficiency and voltage step regulation |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAddonCrawler`<br/>`ThermalGuiHandler`<br/>`ThermalRecipeHandler` | • Thermal augments and KubeJS custom kits (`AugmentData` NBT) crawling<br/>• Dynamo generation (RF/t) tooltip rendering<br/>• Thermal dynamo and machine recipe detail extraction |
 | `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsGuiHandler`<br/>`SysteamsRecipeHandler` | • Steam boiler (Steam mB/s) and Steam Dynamo tooltip rendering<br/>• SysteamsConfig reflection for boiling heat efficiency and steam production |
+| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper`<br/>`StarTAddonCrawler` | • Star Technology custom plasma turbines (SPT/NPT) and multi-helix multiblock support<br/>• SPT/NPT trait addon compatibility and structure constraints validation |
 | `compat.vanilla` | `VanillaModAdapter` | • Universal singleblock fallback for standard Minecraft recipes |
 
-### 2.2 Dynamic Crawler Orchestration & Dead Item Pruning (`DynamicAddonCrawler`)
+### 2.2 `IModAdapter` Lifecycle & Core Responsibilities
+
+* `onMachineIconChanged(node, oldIcon, newIcon)`: Automatically adjusts multiblock flag, steam mode, default parallel (8x etc.), and slot synchronization upon icon change.
+* `getEnergyType(node)`: Resolves the node's physical energy model (`ELECTRIC_EU`, `KINETIC_SU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `NONE`).
+* `computeOverclock(node, targetTier, isGenerator)`: Calculates voltage overclocking, sub-tick batches, rotor efficiency, coil temperature discounts, and augment multipliers.
+* `validateNode(node, graph, warnings)`: Deterministically validates reflector requirements, turbine flow deficits, and hatch/bus slot constraints.
+* `buildMultiblockBOM(node, warnings)`: Solves multiblock structure bill of materials from controller pattern recipes with hybrid hatch overrides.
+
+### 2.3 Addon & Spec Deductive Analysis Policy (Rule 5)
+
+* **Strict Anti-Heuristic Rule**: String matching on tooltips, item display names, or raw item paths (`id.getPath().contains(...)`) to deduce machine specs or addon properties is strictly forbidden.
+* **Deterministic Deduction**:
+  1. Official mod APIs and runtime Java reflection (`Functional Deduction`).
+  2. In-game object / simulation state execution.
+  3. Pure NBT numeric tags (e.g. `AugmentData` float/int compound tags) and official Forge `TagKey` registries.
+
+### 2.4 Dynamic Crawler Orchestration & Dead Item Pruning (`DynamicAddonCrawler`)
 * **Active Stack Harvesting**: Gathers all live `ItemStack` instances with NBT directly from EMI index (`EmiApi.getIndexStacks()`) and game level recipes (`mc.level.getRecipeManager()`).
 * **Adapter Delegation**: Dispatches active stacks to `adapter.discoverAddons(collector, activeStacks)` without hardcoding mod-specific logic in the central crawler.
 * **Dead Item Pruning**: Automatically filters out disabled items (items hidden from EMI and with no recipes) to ensure a clean addon configuration catalog.

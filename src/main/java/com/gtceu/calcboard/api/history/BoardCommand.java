@@ -1,7 +1,11 @@
 package com.gtceu.calcboard.api.history;
 
+import com.gtceu.calcboard.api.CanvasGroupFrame;
+import com.gtceu.calcboard.api.CanvasStickyNote;
 import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RecipeNode;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
 
@@ -74,6 +78,9 @@ public interface BoardCommand {
 
         @Override
         public void undo(FlowGraph graph) {
+            for (FlowGraph.ConnectionEdge e : edges) {
+                graph.getConnections().remove(e);
+            }
             for (RecipeNode n : nodes) {
                 graph.removeNode(n);
             }
@@ -129,6 +136,9 @@ public interface BoardCommand {
 
         @Override
         public void redo(FlowGraph graph) {
+            for (FlowGraph.ConnectionEdge e : edges) {
+                graph.getConnections().remove(e);
+            }
             for (RecipeNode n : nodes) {
                 graph.removeNode(n);
             }
@@ -522,6 +532,204 @@ public interface BoardCommand {
         @Override
         public String getDescription() {
             return "Flip " + newStates.size() + " nodes horizontally";
+        }
+    }
+
+    /**
+     * Toggling or selecting an alternative ingredient on an input/output slot.
+     */
+    class SelectAlternativeCommand implements BoardCommand {
+        private final String nodeId;
+        private final int slotIndex;
+        private final boolean isInput;
+        private final ResourceLocation oldAlternativeId;
+        private final ResourceLocation newAlternativeId;
+
+        public SelectAlternativeCommand(String nodeId, int slotIndex, boolean isInput, ResourceLocation oldAlternativeId, ResourceLocation newAlternativeId) {
+            this.nodeId = nodeId;
+            this.slotIndex = slotIndex;
+            this.isInput = isInput;
+            this.oldAlternativeId = oldAlternativeId;
+            this.newAlternativeId = newAlternativeId;
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node != null) {
+                List<IngredientStack> list = isInput ? node.getInputs() : node.getOutputs();
+                if (slotIndex >= 0 && slotIndex < list.size()) {
+                    list.get(slotIndex).selectAlternative(oldAlternativeId);
+                }
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node != null) {
+                List<IngredientStack> list = isInput ? node.getInputs() : node.getOutputs();
+                if (slotIndex >= 0 && slotIndex < list.size()) {
+                    list.get(slotIndex).selectAlternative(newAlternativeId);
+                }
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return "Select alternative ingredient";
+        }
+    }
+
+    /**
+     * Addition of one or more sticky notes.
+     */
+    class AddStickyNotesCommand implements BoardCommand {
+        private final List<CanvasStickyNote> notes;
+        private final String description;
+
+        public AddStickyNotesCommand(List<CanvasStickyNote> notes, String description) {
+            this.notes = new ArrayList<>(notes);
+            this.description = description;
+        }
+
+        public AddStickyNotesCommand(CanvasStickyNote note, String description) {
+            this(List.of(note), description);
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            for (CanvasStickyNote note : notes) {
+                graph.removeStickyNote(note);
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            for (CanvasStickyNote note : notes) {
+                if (!graph.getStickyNotes().contains(note)) {
+                    graph.addStickyNote(note);
+                }
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return description != null ? description : "Add " + notes.size() + " sticky notes";
+        }
+    }
+
+    /**
+     * Removal of one or more sticky notes.
+     */
+    class RemoveStickyNotesCommand implements BoardCommand {
+        private final List<CanvasStickyNote> notes;
+        private final String description;
+
+        public RemoveStickyNotesCommand(List<CanvasStickyNote> notes, String description) {
+            this.notes = new ArrayList<>(notes);
+            this.description = description;
+        }
+
+        public RemoveStickyNotesCommand(CanvasStickyNote note, String description) {
+            this(List.of(note), description);
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            for (CanvasStickyNote note : notes) {
+                if (!graph.getStickyNotes().contains(note)) {
+                    graph.addStickyNote(note);
+                }
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            for (CanvasStickyNote note : notes) {
+                graph.removeStickyNote(note);
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return description != null ? description : "Remove " + notes.size() + " sticky notes";
+        }
+    }
+
+    /**
+     * Addition of one or more group frames.
+     */
+    class AddFramesCommand implements BoardCommand {
+        private final List<CanvasGroupFrame> frames;
+        private final String description;
+
+        public AddFramesCommand(List<CanvasGroupFrame> frames, String description) {
+            this.frames = new ArrayList<>(frames);
+            this.description = description;
+        }
+
+        public AddFramesCommand(CanvasGroupFrame frame, String description) {
+            this(List.of(frame), description);
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            for (CanvasGroupFrame frame : frames) {
+                graph.removeFrame(frame);
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            for (CanvasGroupFrame frame : frames) {
+                if (!graph.getFrames().contains(frame)) {
+                    graph.addFrame(frame);
+                }
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return description != null ? description : "Add " + frames.size() + " frames";
+        }
+    }
+
+    /**
+     * Removal of one or more group frames.
+     */
+    class RemoveFramesCommand implements BoardCommand {
+        private final List<CanvasGroupFrame> frames;
+        private final String description;
+
+        public RemoveFramesCommand(List<CanvasGroupFrame> frames, String description) {
+            this.frames = new ArrayList<>(frames);
+            this.description = description;
+        }
+
+        public RemoveFramesCommand(CanvasGroupFrame frame, String description) {
+            this(List.of(frame), description);
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            for (CanvasGroupFrame frame : frames) {
+                if (!graph.getFrames().contains(frame)) {
+                    graph.addFrame(frame);
+                }
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            for (CanvasGroupFrame frame : frames) {
+                graph.removeFrame(frame);
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return description != null ? description : "Remove " + frames.size() + " frames";
         }
     }
 }

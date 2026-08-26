@@ -6,6 +6,68 @@
 
 **그렉텍 계산기 보드 (GregTech Calculator Board)**의 모든 주요 변경 사항이 이 문서에 기록됩니다.
 
+## [2.0.0-alpha.9] - 2026-08-26
+
+### 신규 기능 (Added)
+- **EMI 네이티브 레시피 추가(`[+]`) 버튼 및 드래그 앤 드롭 연동 (`BoardEmiRecipeHandler`, `BoardEmiDragDropHandler`, `CalcBoardEmiPlugin`)**:
+  - 계산기 보드가 열린 상태에서 EMI 레시피 뷰어를 볼 때 레시피 우하단의 네이티브 `[+]` 버튼을 클릭하여 해당 레시피를 보드 캔버스에 즉시 노드로 추가 지원.
+  - EMI 레시피를 보드 화면으로 직접 드래그 앤 드롭하여 마우스 위치에 노드를 생성하는 인터랙션 지원.
+- **멀티블록 구조체 자동 분석 및 자재 명세서 (BOM, Bill of Materials) 시스템 (`RFC-003`, `MultiblockBOMCalculator`, `MultiblockStructureCatalog`, `MultiblockBOMDialog`, `MultiblockBOMEmiRecipe`, `MultiblockBOMTest`)**:
+  - 단축키 `B` 및 툴바 `[📦 BOM]` 버튼으로 전체/선택 페이지의 모든 멀티블록 및 단일 기계 자재 명세서 일괄 산출 다이얼로그 추가.
+  - 케이싱, 코일, 해치/버스, 컨트롤러 분류 및 스택+잔여량(예: `3 stacks + 48 (240)`) 표기.
+  - `[★ Register in EMI]` 버튼을 통해 EMI 가상 레시피 트리에 BOM 결과물을 원클릭 등록하여 EMI 제작 트리 역추적 지원.
+  - `[📋 Copy List]` 텍스트 클립보드 내보내기 지원.
+  - 듀얼 하위 티어 에너지 해치(`⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches`) 실시간 토글 지원.
+- **에너지 해치(Energy Hatch) 및 하이브리드 해치 오버라이드 시스템 (`RFC-004`, `GTEnergyHatchAddon`, `GTHatchAddon`, `EnergyHatchHelper`, `GTHatchHelper`)**:
+  - 멀티블록 전압 티어 및 암페어(1A, 2A, 4A, 16A 등)를 결정하는 에너지 해치 애드온 장착 및 티어 오버클록 상한 자동 결정.
+  - 입력/출력 아이템 버스 및 유체 해치(1x, 4x, 9x, 16x) 수용량 기반 동적 I/O 해치 계산 및 증류탑(Distillation Tower) 다중 유체 해치 제약 검증.
+- **노드 수평 반전 (Horizontal Node Flip) 기능 (`RecipeNode`, `NodeCardRenderer`, `BoardHotkeyHandler`, `NodeFlipTest`)**:
+  - 단축키 `Alt + F` 또는 노드 상단 반전 버튼(`[⇄]`)으로 노드의 입력(좌)/출력(우) 슬롯 방향을 수평 반전하여 복잡한 플로우차트의 와이어 교차 최소화.
+- **생명주기 이벤트 버스(Lifecycle Event Bus) 및 애드온 훅 시스템 (`RFC-001`, `RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`, `LifecycleEventBusTest`)**:
+  - 캔버스 노드 생성, 수정, 삭제, 계산 전/후, 카탈로그 빌드 시점을 통지하는 Forge 이벤트 버스 연동.
+- **그렉텍 대형 증기 보일러(Large Multiblock Boilers) 지원 및 쓰로틀(Throttle) 제어 (`GTBoilerTier`, `GTCEuRecipeHandler`, `GTCEuModAdapter`, `MachineConfigDialog`)**:
+  - 대형 청동/강철/티타늄/텅스텐스틸 보일러 레시피(`gtceu:large_boiler`)를 정상 인식하고 대형 청동 보일러 기준 증기 생산량($800\text{ mB/t} = 16,000\text{ mB/s}$) 및 물 소비량($5\text{ mB/t} = 100\text{ mB/s}$, 1:160 비율) 자동 산출.
+  - 대형 보일러 티어별 속도 배수 지원: L-Bronze $1.0\times$ ($800\text{ mB/t}$), L-Steel $2.25\times$ ($1,800\text{ mB/t}$), L-Titanium $4.0\times$ ($3,200\text{ mB/t}$), L-Tungstensteel $8.0\times$ ($6,400\text{ mB/t}$).
+  - 기계 설정 창(`MachineConfigDialog`) 및 노드 카드에 25% ~ 100% 쓰로틀 슬라이더 및 프리셋 버튼 연동 (쓰로틀 비율에 따른 소요 시간, 연료 소비율, 증기 생산율 비례 스케일링).
+- **그룹 프레임(CanvasGroupFrame) 선택 모델, 클립보드 및 실행 취소/다시 실행 완전 통합 (`BoardSelectionModel`, `CanvasGroupFrameRenderer`, `CanvasInteractionHandler`, `NodeClipboard`, `BoardCommand`, `CanvasGroupFrameTest`)**:
+  - 마우스 드래그 영역 선택(Marquee Box Selection) 시 프레임 자동 포함 및 헤더 클릭 Shift/Ctrl 다중 선택 지원.
+  - 프레임 단독 및 내부 노드 포함 클립보드 단축키(`Ctrl + C`, `Ctrl + V`, `Ctrl + X`, `Ctrl + D`, `Delete`) 지원 (복사/붙여넣기 시 내부 상대 좌표 유지).
+  - 프레임 생성, 삭제, 이동, 크기 변경에 대한 실행 취소/다시 실행(`Undo / Redo`) 지원.
+  - 다중 선택 상태에서 프레임 헤더 드래그 시 델타 중복 적용(Double-Delta) 방지.
+- **Create: New Age 카본 브러시(Carbon Brushes) 발전기 코일 및 자석 BOM 자동 집계 (`MultiblockBOMCalculator`, `CreateNewAgeModAdapter`, `IModAdapter`, `CreateNewAgeTest`)**:
+  - `IModAdapter.populateExtraBOMParts` SPI를 통해 카본 브러시 1대당 필수 컴패니언 블록인 `Generator Coil` (`create_new_age:generator_coil`) 1개를 BOM의 `COIL` 카테고리에 자동 산출.
+  - 단일블록 및 키네틱 노드에 장착된 모든 애드온(자석 최대 12개, 서멀 증강 키트, 스레딩 등)을 기계 대수와 곱하여 BOM에 자동 집계.
+  - 자석(`MAGNET`) 아이템을 `COIL` 카테고리로 분류하여 BOM 내 Coils 탭 및 All 탭에 정상 표시.
+- **머플러 해치(Muffler Hatch) 및 유지보수 해치 카탈로그/BOM 지원 (`MultiblockStructureCatalog`, `MultiblockBOMCalculator`, `GTCEuModAdapter`)**:
+  - 머플러 해치(LV~MAX) 및 유지보수/자동 유지보수 해치 카탈로그 등록 및 멀티블록 자동설계/BOM 연동.
+- **Star Technology 멸균 정화 유지보수 해치 지원 (`StarTAddonCrawler`, `StarTModAdapter`, `MachineAddonTest`)**:
+  - `start_core:sterile_cleaning_maintenance_hatch` (멸균 정화 유지보수 해치) 유지보수 애드온 지원 및 다국어 툴팁/명칭 추가.
+
+### 개선 및 변경 (Changed & Improved)
+- **백그라운드 데이터 인덱싱 및 메모리 점유율 개선**:
+  - 대규모 레시피 및 멀티블록 구조체 색인 중 발생하던 일시적인 화면 끊김 및 메모리 사용량 최적화.
+- **플로우 그래프 직렬화 페이로드 경량화 (`FlowGraphSerializer`)**:
+  - 기본값 필드 생략을 통해 청사진 및 NBT 저장 데이터 크기 최적화.
+- **UI 레이아웃 및 툴바 정렬 개선 (`BoardScreen`, `ToolbarWidget`)**:
+  - 좌상단 툴바 여백 및 즐겨찾기 독(Favorites Dock) 배치 조정.
+- **자석(Magnet) 및 다중 스택 애드온 클릭 상호작용 개선 (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
+  - 카탈로그 카드 좌클릭 시 빈 슬롯이 남아있으면 1개씩 순차 장착(+1), Shift+좌클릭 시 12개 슬롯 일괄 채우기(+12) 및 일괄 교체 지원.
+  - 우클릭 시 해당 애드온 1개 제거(-1) 및 상단 `Clear Magnets` 버튼으로 전체 초기화 지원.
+- **기계 설정창 애드온 툴팁 지연 렌더링 적용 (`MachineConfigDialog`)**:
+  - 애드온 카드의 긴 설명 텍스트가 다이얼로그 경계 밖에서 잘리던 UI 레이어링 버그를 지연 렌더링 방식으로 수정.
+
+### 버그 수정 (Fixed)
+- **자동 연결(Auto Connect) 시 리라우트 정션 우회 중복 연결 방지 (`ToolbarWidget`)**:
+  - 리라우트 정션 허브를 통해 연결된 기계 간에 자동 연결 실행 시 불필요한 직결 와이어가 중복 생성되던 현상 수정.
+- **대형 보일러 레시피 소요 시간 이중 가속 버그 수정 (`GTCEuRecipeHandler`, `GTCEuModAdapter`)**:
+  - 소형 보일러 승격 가속 배수가 대형 보일러 전용 레시피에 중복 적용되어 사이클 시간이 0.05초(1틱)로 왜곡되고 용암 소모량이 폭증하던 연산 오류 해결.
+- **HP Steam 모드에서 ULV/LV 전환 시 단일블록 기계 아이콘 복원 버그 수정 (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
+  - HP Steam 모드 해제 시 멀티블록 워크스테이션으로 강제 전환되던 현상을 수정하여 원래의 티어별 단일블록 기계 아이콘 복원.
+- **검색창 및 모달 다이얼로그 텍스트 입력 중 'E' 키/단축키 간섭 버그 수정 (`RecipeSearchDialog`, `BoardScreen`, `MultiblockBOMDialog`, `GlobalBalanceDashboardDialog`)**:
+  - 검색창 및 다이얼로그 텍스트 상자에 문자(E, B, T, F, J 등) 입력 시 인벤토리 닫기 키가 작동하여 화면이 닫히거나 전역 캔버스 단축키가 실행되던 키 이벤트 라우팅 오류 해결.
+- **키네틱 발전기/모터 EMI 레시피 정식 등록 및 스트레스 유닛(SU) 검색 색인 강화 (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
+  - 즐겨찾기(Favorites)에 Large Water Wheel 등의 키네틱 기계를 등록해도 가상 레시피가 연동되지 않던 문제를 EMI 정식 레시피 등록을 통해 해결하고, 검색창에서 `<su`, `<stress`, `large water wheel` 등 출력 및 기계명으로 즉시 검색되도록 색인 지원.
+
 ---
 
 ## [2.0.0-alpha.8] - 2026-08-25

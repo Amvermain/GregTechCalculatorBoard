@@ -82,13 +82,31 @@ graph LR
 
 | 서브패키지 | 주요 컴포넌트 | 전담 역할 및 기능 |
 | :--- | :--- | :--- |
-| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT 다중블록 특성 및 가열 코일/터빈 로터/병렬·유지보수 해치 크롤링<br/>• 전압 티어 및 EU/t 툴팁/미리보기 렌더링<br/>• GTRecipe 리플렉션 및 발전기/소비기 스펙 변환 |
+| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT 다중블록 특성 및 가열 코일/터빈 로터/병렬·유지보수 해치 크롤링<br/>• 전압 티어 및 EU/t 툴팁/미리보기 렌더링<br/>• GTRecipe 리플렉션 및 발전기/소비기 스펙 변환<br/>• 스팀 모드(LP/HP) 및 스팀 멀티블록 자동 구성 및 검증 |
 | `compat.create` | `CreateModAdapter`<br/>`CreateGuiHandler`<br/>`CreateRecipeHandler` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• RPM 속도 제어 버튼 및 Stress Unit (SU) 툴팁 렌더링<br/>• Create 가공 레시피 소요 시간 및 부하 변환 |
+| `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeGuiHandler`<br/>`CreateNewAgeRecipeHandler` | • 전기 모터(FE ➔ SU) 및 발전기(SU ➔ FE) 가상 레시피 생성<br/>• 회전력과 전력 간 변환 효율 및 전압 단계 제어 |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAddonCrawler`<br/>`ThermalGuiHandler`<br/>`ThermalRecipeHandler` | • 서멀 증강 및 KubeJS 커스텀 키트(`AugmentData` NBT) 크롤링<br/>• 다이내모 발전량(RF/t) 툴팁 렌더링<br/>• 서멀 다이내모 및 기계 레시피 변환 |
 | `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsGuiHandler`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁 렌더링<br/>• SysteamsConfig 리플렉션 기반 증기 열효율 및 생산량 변환 |
+| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper`<br/>`StarTAddonCrawler` | • Star Technology 특수 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 다중 블록 제약 검증 |
 | `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 타 모드 기본 폴백 처리 |
 
-### 2.2 크롤러 오케스트레이션 및 비활성 아이템 자동 정리 (`DynamicAddonCrawler`)
+### 2.2 `IModAdapter` 생명주기 및 핵심 책임 명세
+
+* `onMachineIconChanged(node, oldIcon, newIcon)`: 머신 아이콘 전환 시 멀티블록 플래그, 스팀 모드, 기본 병렬 수치(8x 등) 자동 조정 및 슬롯 동기화.
+* `getEnergyType(node)`: 노드의 에너지 형태(`ELECTRIC_EU`, `KINETIC_SU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `NONE`) 결정.
+* `computeOverclock(node, targetTier, isGenerator)`: 전압 오버클럭, 서브틱 CPS, 로터 효율, 코일 온도 할인, 증강 장치 배수 연산.
+* `validateNode(node, graph, warnings)`: 반사판 요구 티어, 터빈 유량 결손, 해치/버스 슬롯 및 용량 제약 연역 검증.
+* `buildMultiblockBOM(node, warnings)`: 멀티블록 청사진 기반 필요 블록 수량 및 오버라이드 해치 BOM 산출.
+
+### 2.3 연역적 분석 원칙 (Rule 5: Deductive Analysis Policy)
+
+* **휴리스틱 금지**: 아이템 이름, 툴팁 텍스트, 아이템 ID 경로 문자열 매칭(`id.getPath().contains(...)`)을 통한 스펙 추론을 엄격히 배제.
+* **결정론적 데이터 획득**:
+  1. 공식 모드 API 및 런타임 Java 리플렉션을 통한 기능적 연역.
+  2. 모드 내부 시뮬레이션 및 동작 파라미터 직접 추출.
+  3. 결정론적 NBT 수치 데이터 구조(예: `AugmentData` 내 순수 Float/Int 태그) 및 공식 `TagKey` 직접 검사.
+
+### 2.4 크롤러 오케스트레이션 및 비활성 아이템 자동 정리 (`DynamicAddonCrawler`)
 * **활성 스택 일괄 수집**: EMI 인덱스(`EmiApi.getIndexStacks()`) 및 인게임 레시피 매니저(`mc.level.getRecipeManager()`)를 순회하여 현재 게임 내에 실제로 활성화된 모든 `ItemStack`과 커스텀 NBT를 수집.
 * **어댑터 위임**: 수집된 활성 스택을 각 모드 어댑터의 `discoverAddons(collector, activeStacks)`로 전달하여 모듈별로 크롤링.
 * **비활성 아이템 자동 제거 (Pruning)**: 모드팩에서 레시피를 삭제하거나 EMI에서 숨긴 아이템(예: 기본 서멀 업그레이드 키트 등)은 카탈로그에서 자동으로 제외되어 깨끗한 설정창을 보장.

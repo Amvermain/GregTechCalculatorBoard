@@ -47,15 +47,14 @@ public class IngredientStack {
 ---
 
 ### 1.3 `RecipeNode` (노드 도메인 모델)
-캔버스에 배치되는 기계 카드, 발전기, 또는 복합 모듈의 전체 상태를 보유합니다.
+캔버스에 배치되는 기계 카드, 발전기, 또는 복합 모듈의 전체 상태를 보유하며, 모드 특화 규칙은 `IModAdapter`로 위임합니다.
 
 ```mermaid
 classDiagram
     class RecipeNode {
         +String id
-        +double x, y
-        +String title
-        +String machineName
+        +double posX, posY
+        +String name
         +List~IngredientStack~ inputs
         +List~IngredientStack~ outputs
         +double baseDurationTicks
@@ -64,26 +63,77 @@ classDiagram
         +GTVoltageTier targetTier
         +OverclockMode overclockMode
         +double machineCount
-        +int parallelMultiplier
+        +int parallel
         +boolean isMultiblock
         +boolean isGenerator
-        +List~MachineAddon~ installedAddons
-        +ResourceLocation selectedWorkstation
+        +SteamMode steamMode
+        +List~MachineAddon~ addons
+        +ResourceLocation machineIcon
+        +ResourceLocation recipeCategoryId
         +List~ResourceLocation~ availableWorkstations
+        +NodePropertyStore properties
         +double efficiency
-        +calculateSingleMachineOutputRate(stack) double
-        +getEffectiveTotalEUt() double
-        +getEffectiveDurationTicks() double
+        +setMachineIcon(icon) void
+        +getEnergyType() EnergyType
+        +getOverclockResult() OverclockResult
+        +getSingleMachineEUt() double
+        +getTotalEUt() double
         +getCyclesPerSecond() double
     }
 ```
 
+* **클린 아키텍처 및 SPI 위임**:
+  - `RecipeNode`는 순수 계산 도메인 엔티티로서, 특정 모드(GTCEu, Create, Thermal 등)의 내부 코드를 직접 참조하지 않습니다.
+  - 머신 아이콘 변경 이벤트(`setMachineIcon`), 에너지 타입 해소(`getEnergyType`), 단일 기계 전력량 계산(`getSingleMachineEUt`), 노드 운영 유효성 검증(`isOperational`)은 모두 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`)에 의해 상류 원자재 공급 제약 하에서 계산된 기계의 실제 가동률.
-* **`calculateSingleMachineOutputRate(stack)`**: 1대 기계 기준 1초당 아이템/유체 생산 유량을 계산 (오버클럭, 서브틱, 병렬, 애드온 승수, 확률 부스트 포함).
+* **`calculateOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
 
 ---
 
-### 1.4 `FlowGraph` 및 `ConnectionEdge`
+### 1.4 `NodePropertyStore` 및 `NodeProperties` (타입 세이프 확장 속성)
+기존 클래스 필드를 비대화하지 않고, 모드별/기능별 특화 속성을 동적이고 안전하게 관리하는 속성 저장소입니다.
+
+```java
+public class NodePropertyStore {
+    private final Map<NodeProperty<?>, Object> properties = new HashMap<>();
+
+    public <T> T get(NodeProperty<T> prop) {
+        return (T) properties.getOrDefault(prop, prop.defaultValue());
+    }
+
+    public <T> void set(NodeProperty<T> prop, T value) {
+        properties.put(prop, value);
+    }
+}
+```
+
+* **표준 속성 레지스트리 (`NodeProperties`)**:
+  - `REQUIRED_REFLECTOR_TIER` (`Integer`, 기본값 `0`): 핵융합 반응기 반사판 요구 티어
+  - `TURBINE_ROTOR_EFFICIENCY` (`Integer`, 기본값 `100`): 대형 터빈 로터 효율 (%)
+  - `TURBINE_ROTOR_POWER` (`Integer`, 기본값 `100`): 대형 터빈 로터 파워 (%)
+  - `TURBINE_ROTOR_NAME` (`String`, 기본값 `""`): 장착된 터빈 로터 이름
+  - `TURBINE_HOLDER_BONUS` (`Integer`, 기본값 `0`): 로터 홀더 추가 효율 보너스 (%)
+  - `CLEANROOM_TIER` (`Integer`, 기본값 `0`): 클린룸 요구 레벨
+
+---
+
+### 1.5 `EnergyType` 및 `SteamMode` (다중 에너지 & 물리 모델)
+다양한 기술 모드의 동력 및 에너지 시스템을 통합 관리합니다.
+
+* **`EnergyType`**:
+  - `ELECTRIC_EU`: GregTech 전력 (EU/t)
+  - `KINETIC_SU`: Create 회전 운동 에너지 (SU, RPM)
+  - `ELECTRIC_FE`: Thermal / Create New Age 전력 (RF/t, FE/t)
+  - `HEAT_OR_SELF`: 스팀 보일러 및 연소기 (mB/s Steam 생성)
+  - `NONE`: 무동력 / 패시브 레시피 (0 Power)
+* **`SteamMode`**:
+  - `NONE`: 일반 전기 모드
+  - `LOW_PRESSURE`: 저압 스팀 가공 ($2.0\times$ 소요 시간, 1 EU = 2 mB Steam)
+  - `HIGH_PRESSURE`: 고압 스팀 가공 ($1.0\times$ 소요 시간, 1 EU = 2 mB Steam)
+
+---
+
+### 1.6 `FlowGraph` 및 `ConnectionEdge`
 * **`ConnectionEdge`**: 노드 간의 유향 연결선 불변 레코드
   ```java
   public record ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex)

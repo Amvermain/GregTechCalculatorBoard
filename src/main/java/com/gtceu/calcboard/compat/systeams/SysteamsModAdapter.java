@@ -54,15 +54,16 @@ public class SysteamsModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getRecipeCategoryId() != null && handlesCategory(node.getRecipeCategoryId())) {
-            return true;
-        }
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace().toLowerCase();
+            if (ns.equals("gtceu")) return false;
             if (ns.equals("systeams")) return true;
             if (ns.equals("thermal") && ThermalAugmentHelper.isBoilerItem(node.getMachineIcon())) {
                 return true;
             }
+        }
+        if (node.getRecipeCategoryId() != null && handlesCategory(node.getRecipeCategoryId())) {
+            return true;
         }
         return false;
     }
@@ -188,5 +189,31 @@ public class SysteamsModAdapter implements IModAdapter {
     @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         return SysteamsGuiHandler.handleControlClick(widget, node, mouseX, mouseY, button);
+    }
+
+    @Override
+    public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node == null || stack == null) return defaultRate;
+        double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
+        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        return defaultRate;
+    }
+
+    @Override
+    public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node == null || stack == null) return defaultRate;
+        double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
+        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        return defaultRate;
     }
 }

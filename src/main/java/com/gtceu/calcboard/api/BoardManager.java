@@ -58,6 +58,9 @@ public class BoardManager {
     }
 
     public void saveForCurrentContext() {
+        if (!autoLoaded) {
+            return;
+        }
         try {
             File saveFile = getDefaultSaveFile();
             if (saveFile != null) {

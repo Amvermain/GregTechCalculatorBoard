@@ -28,15 +28,14 @@ public class CategoryCapabilityMatrix {
 
     /**
      * Retrieves the pre-baked CategoryCapability for the given category ID.
+     * Returns fallback immediately if matrix is not yet baked to prevent freezing caller thread.
      */
     public CategoryCapability getCapability(ResourceLocation categoryId) {
         if (categoryId == null) {
             return CategoryCapability.DEFAULT;
         }
-        if (!baked && capabilities.isEmpty()) {
-            bake(null);
-        }
-        return capabilities.getOrDefault(categoryId, buildFallback(categoryId));
+        CategoryCapability cap = capabilities.get(categoryId);
+        return cap != null ? cap : buildFallback(categoryId);
     }
 
     public boolean isBaked() {
@@ -49,172 +48,70 @@ public class CategoryCapabilityMatrix {
         initTestDefaults();
     }
 
+    private Map<ResourceLocation, CategoryBuilder> currentBuilders = null;
+
+    public CategoryBuilder getOrCreateBuilder(ResourceLocation categoryId) {
+        if (currentBuilders != null && categoryId != null) {
+            return currentBuilders.computeIfAbsent(categoryId, CategoryBuilder::new);
+        }
+        return new CategoryBuilder(categoryId);
+    }
+
     /**
-     * Bakes the matrix by deductively analyzing GTCEu machine definitions, multiblock_info recipes, and Thermal tags.
+     * Bakes the matrix by querying EMI multiblock_info recipes and delegating to loaded IModAdapters.
      */
     public synchronized void bake(Object emiRecipeManager) {
         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [CategoryCapabilityMatrix] Starting pre-baking capability matrix...");
 
-        // 1. Ensure MultiblockDetector has scanned EMI multiblock_info recipes
+        // 1. Ensure MultiblockDetector has scanned EMI multiblock_info recipes and mod multiblocks
         MultiblockDetector.reinitialize(emiRecipeManager);
 
         Map<ResourceLocation, CategoryBuilder> builders = new HashMap<>();
+        this.currentBuilders = builders;
 
-        // 2. Scan GTCEu Machine Definitions
+        // 2. Query EMI Category workstations directly (O(Categories) ~ 100 iterations instead of 30,000+ recipes)
         try {
-            if (ModCompatHelper.isGTLoaded()) {
-                Class<?> multiblockDefCls = null;
-                try {
-                    multiblockDefCls = Class.forName("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
-                } catch (Throwable ignored) {}
-
-                Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-                Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
-                Iterable<?> iterable = MultiblockDetector.getRegistryIterable(machinesRegistry);
-
-                if (iterable != null) {
-                    for (Object def : iterable) {
-                        if (def == null) continue;
-                        try {
-                            Method mGetId = def.getClass().getMethod("getId");
-                            ResourceLocation mId = (ResourceLocation) mGetId.invoke(def);
-                            if (mId == null) continue;
-
-                            boolean isMb = (multiblockDefCls != null && multiblockDefCls.isInstance(def))
-                                    || MultiblockDetector.isMultiblock(mId);
-                            boolean usesCoils = MultiblockDetector.isCoilMultiblock(mId);
-                            boolean isTurbine = MultiblockDetector.isTurbineMachine(mId);
-
-                            boolean isSteam = false;
-                            boolean isHp = false;
-                            int tier = -1;
-                            try {
-                                Method mTier = def.getClass().getMethod("getTier");
-                                Object tObj = mTier.invoke(def);
-                                if (tObj instanceof Number num) tier = num.intValue();
-                                else if (tObj instanceof Enum<?> e) tier = e.ordinal();
-                            } catch (Throwable ignored) {}
-
-                            if (tier == 0 && !isMb) {
-                                isSteam = true;
-                                try {
-                                    Method mIsHp = def.getClass().getMethod("isHighPressure");
-                                    isHp = (boolean) mIsHp.invoke(def);
-                                } catch (Throwable ignored) {}
-                            }
-
-                            GTVoltageTier turbineTier = isTurbine ? MultiblockDetector.getTurbineBaseTier(mId) : null;
-                            double turbineBaseEnergy = isTurbine ? (MultiblockDetector.getTurbineBaseProduction(mId) != null ? MultiblockDetector.getTurbineBaseProduction(mId) : 4096.0) : 0.0;
-
-                            // Query Recipe Types of this MachineDefinition
-                            Method mGetRecipeType = def.getClass().getMethod("getRecipeTypes");
-                            Object rTypes = mGetRecipeType.invoke(def);
-                            if (rTypes instanceof Object[] arr) {
-                                for (Object rt : arr) {
-                                    if (rt != null) {
-                                        ResourceLocation catId = MultiblockDetector.extractRecipeTypeId(rt);
-                                        if (catId != null) {
-                                            CategoryBuilder b = builders.computeIfAbsent(catId, CategoryBuilder::new);
-                                            b.addWorkstation(mId, isMb);
-                                            if (usesCoils) b.canUseCoils = true;
-                                            if (isSteam) {
-                                                if (isHp) {
-                                                    b.hasHighPressureSteamOption = true;
-                                                    b.highPressureWorkstation = mId;
-                                                } else {
-                                                    b.hasLowPressureSteamOption = true;
-                                                    b.lowPressureWorkstation = mId;
-                                                }
-                                            }
-                                            if (isTurbine) {
-                                                b.isTurbine = true;
-                                                if (turbineTier != null) b.turbineBaseTier = turbineTier;
-                                                if (turbineBaseEnergy > 0) b.turbineBaseProduction = turbineBaseEnergy;
-                                            }
+            var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+            if (rm != null && rm.getCategories() != null) {
+                for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : rm.getCategories()) {
+                    if (cat == null || cat.getId() == null) continue;
+                    ResourceLocation catId = cat.getId();
+                    CategoryBuilder b = builders.computeIfAbsent(catId, CategoryBuilder::new);
+                    List<dev.emi.emi.api.stack.EmiIngredient> workstations = rm.getWorkstations(cat);
+                    if (workstations != null) {
+                        for (dev.emi.emi.api.stack.EmiIngredient ei : workstations) {
+                            if (ei != null && ei.getEmiStacks() != null) {
+                                for (dev.emi.emi.api.stack.EmiStack es : ei.getEmiStacks()) {
+                                    if (es != null && !es.isEmpty() && es.getId() != null) {
+                                        ResourceLocation ws = es.getId();
+                                        boolean isMb = MultiblockDetector.isMultiblock(ws);
+                                        b.addWorkstation(ws, isMb);
+                                        if (MultiblockDetector.isCoilMultiblock(ws)) {
+                                            b.canUseCoils = true;
+                                            MultiblockDetector.registerCoilCategory(catId);
+                                        }
+                                        if (MultiblockDetector.isTurbineMachine(ws)) {
+                                            b.isTurbine = true;
+                                            MultiblockDetector.registerTurbineCategory(catId);
                                         }
                                     }
                                 }
                             }
-                        } catch (Throwable ignored) {}
-                    }
-                }
-            }
-        } catch (Throwable t) {
-            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] [CategoryCapabilityMatrix] Error inspecting GTRegistries: {}", t.getMessage());
-        }
-
-        // 3. Scan all EMI recipes to map category -> workstations and detect capabilities directly from recipe definitions
-        Iterable<?> recipes = null;
-        if (emiRecipeManager != null) {
-            if (emiRecipeManager instanceof Iterable<?> it) {
-                recipes = it;
-            } else {
-                try {
-                    Method mGetRecipes = emiRecipeManager.getClass().getMethod("getRecipes");
-                    Object res = mGetRecipes.invoke(emiRecipeManager);
-                    if (res instanceof Iterable<?> it) recipes = it;
-                } catch (Throwable ignored) {}
-            }
-        }
-        if (recipes == null) {
-            try {
-                var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-                if (rm != null) recipes = rm.getRecipes();
-            } catch (Throwable ignored) {}
-        }
-
-        if (recipes != null) {
-            for (Object rObj : recipes) {
-                if (rObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
-                    if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-                        ResourceLocation catId = recipe.getCategory().getId();
-                        CategoryBuilder b = builders.computeIfAbsent(catId, CategoryBuilder::new);
-
-                        for (ResourceLocation ws : com.gtceu.calcboard.integration.emi.EmiRecipeConverter.findAllWorkstations(recipe)) {
-                            boolean isMb = MultiblockDetector.isMultiblock(ws);
-                            b.addWorkstation(ws, isMb);
-                            if (MultiblockDetector.isCoilMultiblock(ws)) {
-                                b.canUseCoils = true;
-                                MultiblockDetector.registerCoilCategory(catId);
-                            }
-                            if (MultiblockDetector.isTurbineMachine(ws)) {
-                                b.isTurbine = true;
-                                MultiblockDetector.registerTurbineCategory(catId);
-                            }
-                            if (!isMb && ws != null && ws.getNamespace().equals("gtceu")) {
-                                try {
-                                    if (ModCompatHelper.isGTLoaded()) {
-                                        Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-                                        Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
-                                        Method mGet = machinesRegistry.getClass().getMethod("get", ResourceLocation.class);
-                                        Object def = mGet.invoke(machinesRegistry, ws);
-                                        if (def != null) {
-                                            Method mTier = def.getClass().getMethod("getTier");
-                                            Object tObj = mTier.invoke(def);
-                                            int tier = -1;
-                                            if (tObj instanceof Number num) tier = num.intValue();
-                                            else if (tObj instanceof Enum<?> e) tier = e.ordinal();
-                                            if (tier == 0) {
-                                                boolean isHp = false;
-                                                try {
-                                                    Method mIsHp = def.getClass().getMethod("isHighPressure");
-                                                    isHp = (boolean) mIsHp.invoke(def);
-                                                } catch (Throwable ignored) {}
-                                                if (isHp) {
-                                                    b.hasHighPressureSteamOption = true;
-                                                    if (b.highPressureWorkstation == null) b.highPressureWorkstation = ws;
-                                                } else {
-                                                    b.hasLowPressureSteamOption = true;
-                                                    if (b.lowPressureWorkstation == null) b.lowPressureWorkstation = ws;
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch (Throwable ignored) {}
-                            }
                         }
                     }
                 }
+            }
+        } catch (Throwable ignored) {}
+
+        // 3. Delegate to each loaded IModAdapter to enrich capabilities
+        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+            try {
+                adapter.enrichCapabilities(this, emiRecipeManager);
+            } catch (Throwable t) {
+                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn(
+                        "[GTCalcBoard] [CategoryCapabilityMatrix] Adapter '{}' enrichCapabilities failed: {}",
+                        adapter.getModId(), t.getMessage()
+                );
             }
         }
 
@@ -242,6 +139,8 @@ public class CategoryCapabilityMatrix {
             newMap.put(entry.getKey(), entry.getValue().build());
         }
 
+        this.currentBuilders = null;
+
         if (!newMap.isEmpty()) {
             capabilities.clear();
             capabilities.putAll(newMap);
@@ -258,7 +157,8 @@ public class CategoryCapabilityMatrix {
     }
 
     private CategoryCapability buildFallback(ResourceLocation categoryId) {
-        String ns = categoryId.getNamespace().toLowerCase();
+        if (categoryId == null) return null;
+        String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
         boolean isThermal = ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("systeams") || ns.equals("cofh_core");
         boolean isCoil = MultiblockDetector.isCoilRecipeCategory(categoryId);
         boolean isTurbine = MultiblockDetector.isTurbineRecipeCategory(categoryId);
@@ -418,31 +318,35 @@ public class CategoryCapabilityMatrix {
         ));
     }
 
-    private static class CategoryBuilder {
-        final ResourceLocation categoryId;
-        final List<ResourceLocation> workstations = new ArrayList<>();
-        ResourceLocation defaultWorkstation = null;
-        boolean hasSingleblockOption = false;
-        boolean hasMultiblockOption = false;
-        boolean canUseCoils = false;
-        boolean isTurbine = false;
-        boolean isThermal = false;
-        boolean hasLowPressureSteamOption = false;
-        boolean hasHighPressureSteamOption = false;
-        ResourceLocation lowPressureWorkstation = null;
-        ResourceLocation highPressureWorkstation = null;
-        GTVoltageTier turbineBaseTier = null;
-        double turbineBaseProduction = 0.0;
+    public static class CategoryBuilder {
+        public final ResourceLocation categoryId;
+        public final List<ResourceLocation> workstations = new ArrayList<>();
+        public ResourceLocation defaultWorkstation = null;
+        public boolean hasSingleblockOption = false;
+        public boolean hasMultiblockOption = false;
+        public boolean canUseCoils = false;
+        public boolean isTurbine = false;
+        public boolean isThermal = false;
+        public boolean hasLowPressureSteamOption = false;
+        public boolean hasHighPressureSteamOption = false;
+        public ResourceLocation lowPressureWorkstation = null;
+        public ResourceLocation highPressureWorkstation = null;
+        public GTVoltageTier turbineBaseTier = null;
+        public double turbineBaseProduction = 0.0;
 
-        CategoryBuilder(ResourceLocation categoryId) {
+        public CategoryBuilder(ResourceLocation categoryId) {
             this.categoryId = categoryId;
-            String ns = categoryId.getNamespace().toLowerCase();
+            String ns = categoryId != null ? categoryId.getNamespace().toLowerCase(Locale.ROOT) : "";
             this.isThermal = ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("systeams") || ns.equals("cofh_core");
         }
 
-        void addWorkstation(ResourceLocation ws, boolean isMb) {
+        public void addWorkstation(ResourceLocation ws, boolean isMb) {
             if (ws == null) return;
-            if (!workstations.contains(ws)) {
+            if (ws.getPath().equalsIgnoreCase(categoryId.getPath())) {
+                workstations.remove(ws);
+                workstations.add(0, ws);
+                defaultWorkstation = ws;
+            } else if (!workstations.contains(ws)) {
                 workstations.add(ws);
             }
             if (isMb) {
@@ -456,6 +360,46 @@ public class CategoryCapabilityMatrix {
         }
 
         CategoryCapability build() {
+            // Sort workstations: exact categoryId match first, base multiblocks, then large/mega multiblocks, then singleblocks
+            workstations.sort((a, b) -> {
+                boolean aExact = a.getPath().equalsIgnoreCase(categoryId.getPath());
+                boolean bExact = b.getPath().equalsIgnoreCase(categoryId.getPath());
+                if (aExact != bExact) return aExact ? -1 : 1;
+
+                boolean aMb = MultiblockDetector.isMultiblock(a);
+                boolean bMb = MultiblockDetector.isMultiblock(b);
+                if (aMb != bMb) return aMb ? -1 : 1;
+
+                if (aMb && bMb) {
+                    String aPath = a.getPath().toLowerCase(Locale.ROOT);
+                    String bPath = b.getPath().toLowerCase(Locale.ROOT);
+                    boolean aAdvanced = aPath.startsWith("large_") || aPath.startsWith("mega_") || aPath.startsWith("advanced_") || aPath.startsWith("yielding_");
+                    boolean bAdvanced = bPath.startsWith("large_") || bPath.startsWith("mega_") || bPath.startsWith("advanced_") || bPath.startsWith("yielding_");
+                    if (aAdvanced != bAdvanced) return aAdvanced ? 1 : -1;
+                }
+
+                return a.toString().compareTo(b.toString());
+            });
+
+            if (!workstations.isEmpty()) {
+                ResourceLocation bestDefault = null;
+                for (ResourceLocation ws : workstations) {
+                    if (!MultiblockDetector.isMultiblock(ws)) {
+                        if (ws.getPath().equalsIgnoreCase(categoryId.getPath())) {
+                            bestDefault = ws;
+                            break;
+                        }
+                        if (bestDefault == null) {
+                            bestDefault = ws;
+                        }
+                    }
+                }
+                if (bestDefault == null) {
+                    bestDefault = workstations.get(0);
+                }
+                defaultWorkstation = bestDefault;
+            }
+
             Set<AddonCategory> supported = new HashSet<>();
             supported.add(AddonCategory.CUSTOM);
 

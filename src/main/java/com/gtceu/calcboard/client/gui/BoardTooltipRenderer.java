@@ -140,9 +140,18 @@ public final class BoardTooltipRenderer {
 
                     if (out.getChance() < 1.0) {
                         RecipeNode node = widget.getNode();
-                        int tierDelta = node != null ? node.getTierDelta() : 0;
-                        double effChance = out.getEffectiveChance(tierDelta);
-                        if (out.getTierChanceBoost() > 0.0) {
+                        double effChance = node != null ? node.getEffectiveOutputChance(outIdx) : out.getChance();
+                        if (effChance <= 0.0) {
+                            if (node != null && node.getSteamMode().isSteam()) {
+                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Steam Mode: No Byproducts)"));
+                            } else if (node != null && node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
+                                String reqTierName = outIdx == 1 ? "HV" : (outIdx == 2 ? "EV" : "IV");
+                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Requires " + reqTierName + "+)"));
+                            } else {
+                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0%"));
+                            }
+                        } else if (out.getTierChanceBoost() > 0.0) {
+                            int tierDelta = node != null ? node.getTierDelta() : 0;
                             if (tierDelta > 0 && effChance > out.getChance()) {
                                 tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(+%.1f%%/Tier §a→ %.1f%%§7)",
                                         Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim(),
@@ -156,7 +165,7 @@ public final class BoardTooltipRenderer {
                                         out.getTierChanceBoost() * 100.0)));
                             }
                         } else {
-                            tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", out.getChance() * 100.0))));
+                            tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", effChance * 100.0))));
                         }
                     }
 
@@ -199,6 +208,37 @@ public final class BoardTooltipRenderer {
                         if (n.getMachineIcon() != null) {
                             tooltipLines.add(Component.literal("§7[F3+H Debug] §8Machine Icon: §6" + n.getMachineIcon()));
                         }
+                    }
+                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    return;
+                }
+
+                // Machine Icon Hover Tooltip
+                if (widget.isMachineIconHovered(canvasMouseX, canvasMouseY)) {
+                    RecipeNode n = widget.getNode();
+                    List<Component> tooltipLines = new ArrayList<>();
+                    String mName = n.getMachineDisplayName();
+                    tooltipLines.add(Component.literal((n.isMultiblock() ? "§e🏛 " : "§b⚡ ") + mName));
+                    if (n.hasMultiblockOption()) {
+                        tooltipLines.add(Component.literal("§7[Click]: §f" + Component.translatable(n.isMultiblock() ? "gui.gtcalcboard.tooltip.switch_to_singleblock" : "gui.gtcalcboard.tooltip.switch_to_multiblock").getString()));
+                    }
+                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    return;
+                }
+
+                // Voltage Tier / Energy Hatch Button Hover Tooltip
+                if (widget.isTierButtonHovered(canvasMouseX, canvasMouseY)) {
+                    RecipeNode n = widget.getNode();
+                    List<Component> tooltipLines = new ArrayList<>();
+                    if (n.isMultiblock() && !n.isGenerator() && !n.isTurbine()) {
+                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.addon_cat.energy_hatch").getString() + " §7(" + n.getTargetTier().getName() + ")"));
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.multiblock_energy_hatch_hint").getString()));
+                    } else if (n.supportsSteamMode() && n.getSteamMode() != com.gtceu.calcboard.api.SteamMode.NONE) {
+                        tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_tier").getString() + " §7(" + n.getSteamMode().name() + ")"));
+                        tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_steam_tier").getString()));
+                    } else {
+                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + n.getTargetTier().getName() + ")"));
+                        tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
                     }
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;

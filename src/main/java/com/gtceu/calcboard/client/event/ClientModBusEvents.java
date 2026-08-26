@@ -28,6 +28,7 @@ public class ClientModBusEvents {
     public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((ResourceManagerReloadListener) resourceManager -> {
             MachineAddonCatalog.getInstance().markDirty();
+            com.gtceu.calcboard.client.gui.RecipeSearchDialog.clearGlobalCache();
         });
     }
 }

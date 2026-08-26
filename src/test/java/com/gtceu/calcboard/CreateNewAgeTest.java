@@ -186,7 +186,20 @@ public class CreateNewAgeTest {
         CreateMagnetAddon magnet = new CreateMagnetAddon("create_new_age:fluxuated_magnetite", "Fluxuated Magnetite", "", null, 8);
         Assertions.assertTrue(adapter.isAddonCompatible(brushes, magnet));
 
-        // Fill all 12 slots with Fluxuated Magnetite (Force 8 each)
+        // 1. Single click increments (+1)
+        brushes.getAddons().clear();
+        adapter.handleInstallAddon(brushes, magnet, false);
+        Assertions.assertEquals(1, brushes.getAddons().size());
+        adapter.handleInstallAddon(brushes, magnet, false);
+        Assertions.assertEquals(2, brushes.getAddons().size());
+        adapter.handleInstallAddon(brushes, magnet, false);
+        Assertions.assertEquals(3, brushes.getAddons().size());
+
+        // 2. Right click removes (-1)
+        adapter.handleUninstallAddon(brushes, magnet);
+        Assertions.assertEquals(2, brushes.getAddons().size());
+
+        // 3. Shift-click fills remaining (10 added -> total 12)
         adapter.handleInstallAddon(brushes, magnet, true);
         Assertions.assertEquals(12, brushes.getAddons().size());
 
@@ -242,5 +255,35 @@ public class CreateNewAgeTest {
         Assertions.assertEquals(1.0, brushes.getEfficiency(), 0.001);
         Assertions.assertEquals(1.0, brushes.getEffectiveCyclesPerSecond(), 0.001);
         Assertions.assertEquals(90.0, brushes.getEffectiveTotalEUt(), 0.001);
+    }
+
+    @Test
+    public void testCarbonBrushesBOMCalculation() {
+        RecipeNode brushes = CreateNewAgeRecipeHandler.createKineticGeneratorNode(
+                ResourceLocation.tryParse("create_new_age:carbon_brushes"), "Carbon Brushes"
+        );
+        brushes.setMachineCount(4.0);
+
+        CreateMagnetAddon magnet = new CreateMagnetAddon("create_new_age:fluxuated_magnetite", "Fluxuated Magnetite", "", ResourceLocation.tryParse("create_new_age:fluxuated_magnetite"), 8);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(brushes);
+        adapter.handleInstallAddon(brushes, magnet, true); // 12 magnets
+
+        var bom = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(brushes), false);
+        Assertions.assertNotNull(bom);
+        Assertions.assertEquals(4, bom.totalMultiblockCount());
+
+        var items = bom.aggregatedItems();
+        var brushEntry = items.stream().filter(i -> i.itemId().getPath().contains("carbon_brushes")).findFirst().orElse(null);
+        var coilEntry = items.stream().filter(i -> i.itemId().getPath().contains("generator_coil")).findFirst().orElse(null);
+        var magnetEntry = items.stream().filter(i -> i.itemId().getPath().contains("fluxuated_magnetite")).findFirst().orElse(null);
+
+        Assertions.assertNotNull(brushEntry, "BOM must include Carbon Brushes");
+        Assertions.assertEquals(4, brushEntry.totalAmount());
+
+        Assertions.assertNotNull(coilEntry, "BOM must include Generator Coil for Carbon Brushes");
+        Assertions.assertEquals(4, coilEntry.totalAmount());
+
+        Assertions.assertNotNull(magnetEntry, "BOM must include installed Fluxuated Magnetite");
+        Assertions.assertEquals(48, magnetEntry.totalAmount());
     }
 }

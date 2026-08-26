@@ -28,6 +28,31 @@ $$\text{CPS (Cycles Per Second)} = \frac{20.0}{\text{Effective Duration}} \times
 $$\text{Temp Discount} = 0.95^{\lfloor (\text{CoilTemp} - \text{RecipeTemp}) / 900 \rfloor}$$
 $$\text{EU/t}_{\text{final}} = \text{BaseEU/t} \times \text{PowerMultiplier} \times \text{Temp Discount}$$
 
+### 1.4 Steam Boilers & Throttle ($\theta \in [0.25, 1.0]$)
+
+#### Small Singleblock Boilers
+* **LP Bronze Boiler**: Base multiplier $1.0\times$ ($120\text{ L/s} = 6\text{ mB/t}$ Steam)
+* **HP Steel Boiler**: $3.0\times$ acceleration ($360\text{ L/s} = 18\text{ mB/t}$ Steam)
+
+#### Large Multiblock Boilers
+* **Large Bronze Boiler**: Base multiplier $1.0\times$ ($16,000\text{ mB/s} = 800\text{ mB/t}$ Steam)
+* **Large Steel Boiler**: $2.25\times$ ($36,000\text{ mB/s} = 1,800\text{ mB/t}$ Steam)
+* **Large Titanium Boiler**: $4.0\times$ ($64,000\text{ mB/s} = 3,200\text{ mB/t}$ Steam)
+* **Large Tungstensteel Boiler**: $8.0\times$ ($128,000\text{ mB/s} = 6,400\text{ mB/t}$ Steam)
+
+$$\text{Effective Speed Multiplier} = \text{TierSpeedMultiplier} \times \theta$$
+$$\text{Steam Rate (mB/t)} = \text{BaseSteamRate} \times \text{Effective Speed Multiplier}$$
+$$\text{Water Rate (mB/t)} = \frac{\text{Steam Rate (mB/t)}}{160.0} \quad (1\text{mB Water} \rightarrow 160\text{mB Steam})$$
+$$\text{Effective Duration (ticks)} = \frac{\text{BaseDurationTicks}}{\text{Effective Speed Multiplier}}$$
+
+### 1.5 Create: New Age Kinetic Generator Coils
+
+For Carbon Brushes (`create_new_age:carbon_brushes`) and Generator Coil (`create_new_age:generator_coil`) with $N$ installed magnets:
+
+$$\text{Total Strength} = \sum_{m \in \text{InstalledMagnets}} m.\text{getMagneticForce}()$$
+$$\text{Total Kinetic Stress (SU)} = (24.0 + \text{Total Strength}) \times \text{RPM} \times \text{MachineCount}$$
+$$\text{Generated FE/t} = \text{Total Strength} \times \text{RPM} \times \text{suToEnergy} \times \text{Efficiency} \times \text{MachineCount}$$
+
 ---
 
 ## 2. 5 Core Graph Algorithms (`FlowGraphSolver`)

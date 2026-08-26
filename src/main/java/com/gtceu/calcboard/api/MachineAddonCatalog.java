@@ -105,9 +105,6 @@ public class MachineAddonCatalog {
             isDirty = false;
             catalogVersion++;
         }
-
-        // Automatically trigger Track 2 in the background
-        startExhaustiveScanAsync();
     }
 
     /**
@@ -145,6 +142,11 @@ public class MachineAddonCatalog {
             com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
                     "[GTCalcBoard] [Catalog] 2-Track indexing complete. Total Addons: {}", allAddons.size()
             );
+            try {
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                    new com.gtceu.calcboard.api.event.CatalogLifecycleEvent.AddonsReady(allAddons.size())
+                );
+            } catch (Throwable ignored) {}
         }).exceptionally(ex -> {
             this.isExhaustiveScanRunning = false;
             return null;
@@ -157,7 +159,19 @@ public class MachineAddonCatalog {
      * Triggers asynchronous background preloading of both Track 1 (Fast) and Track 2 (Exhaustive).
      */
     public synchronized CompletableFuture<Void> preloadAsync() {
+        try {
+            boolean recipeReady = DynamicAddonCrawler.isRecipeBakingComplete();
+            if (recipeReady && !wasRecipeReady) {
+                wasRecipeReady = true;
+                isDirty = true;
+                isExhaustiveScanComplete = false;
+            }
+        } catch (Throwable ignored) {}
+
         ensureFastLoaded();
+        if (!isExhaustiveScanComplete && !isExhaustiveScanRunning) {
+            startExhaustiveScanAsync();
+        }
         return exhaustiveFuture != null ? exhaustiveFuture : CompletableFuture.completedFuture(null);
     }
 
@@ -165,8 +179,6 @@ public class MachineAddonCatalog {
         isDirty = true;
         ensureFastLoaded();
     }
-
-    private int lastLevelHash = 0;
     private boolean wasRecipeReady = false;
 
     public List<MachineAddon> getAllAddons() {
@@ -178,21 +190,6 @@ public class MachineAddonCatalog {
                     lastLanguageCode = currentLang;
                     isDirty = true;
                 }
-            }
-            if (mc != null && mc.level != null) {
-                int currentLevelHash = System.identityHashCode(mc.level);
-                if (currentLevelHash != lastLevelHash) {
-                    lastLevelHash = currentLevelHash;
-                    isDirty = true;
-                    isExhaustiveScanComplete = false;
-                    wasRecipeReady = false;
-                }
-            }
-            boolean recipeReady = DynamicAddonCrawler.isRecipeBakingComplete();
-            if (recipeReady && !wasRecipeReady) {
-                wasRecipeReady = true;
-                isDirty = true;
-                isExhaustiveScanComplete = false;
             }
         } catch (Throwable ignored) {}
 
@@ -232,27 +229,12 @@ public class MachineAddonCatalog {
         List<MachineAddon> rec = new ArrayList<>();
         if (node == null) return rec;
 
-        boolean isThermal = MachineAddon.isThermalMachine(node);
-        boolean isTurbine = MachineAddon.isTurbineMachine(node);
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         List<MachineAddon> all = getAllAddons();
 
-        if (isThermal) {
-            for (MachineAddon addon : all) {
-                if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
-                    rec.add(addon);
-                }
-            }
-        } else if (isTurbine) {
-            for (MachineAddon addon : all) {
-                if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-                    rec.add(addon);
-                }
-            }
-        } else {
-            for (MachineAddon addon : all) {
-                if (addon.isCompatibleWith(node)) {
-                    rec.add(addon);
-                }
+        for (MachineAddon addon : all) {
+            if (adapter.isAddonCompatible(node, addon)) {
+                rec.add(addon);
             }
         }
 

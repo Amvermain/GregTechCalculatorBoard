@@ -28,7 +28,25 @@ public class GTCEuRecipeHandler {
             catId = emiRecipe.getCategory().getId();
         }
 
-        if (catId != null && catId.getPath().contains("steam_boiler")) {
+        boolean isGTBoiler = false;
+        if (catId != null && (catId.getPath().contains("boiler") || catId.getPath().contains("steam_boiler"))) {
+            isGTBoiler = true;
+        }
+        if (!isGTBoiler && emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
+            if (er.getId() != null && er.getId().getPath().contains("boiler")) {
+                isGTBoiler = true;
+            }
+            if (!isGTBoiler && er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("boiler")) {
+                isGTBoiler = true;
+            }
+        }
+        if (!isGTBoiler && backing != null && backing.getClass().getName().contains("GTRecipe")) {
+            if (catId != null && catId.getPath().contains("boiler")) {
+                isGTBoiler = true;
+            }
+        }
+
+        if (isGTBoiler) {
             extractGTRecipeDetails(backing, details);
             details.energyType = EnergyType.HEAT_OR_SELF;
             details.isGenerator = false;
@@ -99,7 +117,35 @@ public class GTCEuRecipeHandler {
                 }
             }
 
-            double baseSteamPerTick = isLiquidFuel ? 15.0 : 6.0;
+            boolean isLargeBoiler = false;
+            if (catId != null && catId.getPath().contains("large_boiler")) {
+                isLargeBoiler = true;
+            }
+            if (!isLargeBoiler && emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
+                if (er.getId() != null && er.getId().getPath().contains("large_boiler")) {
+                    isLargeBoiler = true;
+                }
+                if (!isLargeBoiler && er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("large_boiler")) {
+                    isLargeBoiler = true;
+                }
+            }
+            if (!isLargeBoiler && backing != null && backing.getClass().getName().contains("GTRecipe")) {
+                try {
+                    Field recipeTypeField = backing.getClass().getField("recipeType");
+                    Object rt = recipeTypeField.get(backing);
+                    if (rt != null && rt.toString().toLowerCase(Locale.ROOT).contains("large_boiler")) {
+                        isLargeBoiler = true;
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            double baseSteamPerTick;
+            if (isLargeBoiler) {
+                baseSteamPerTick = 800.0;
+            } else {
+                baseSteamPerTick = isLiquidFuel ? 15.0 : 6.0;
+            }
+
             double durationTicks = Math.max(1.0, details.durationTicks);
             double totalSteam = baseSteamPerTick * durationTicks;
             double totalWater = totalSteam / 160.0; // 1 mB Water = 160 mB Steam

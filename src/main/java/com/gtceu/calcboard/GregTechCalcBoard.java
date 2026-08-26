@@ -26,6 +26,7 @@ public class GregTechCalcBoard {
         );
 
         var modBus = context.getModEventBus();
+        com.gtceu.calcboard.integration.emi.ModMenus.MENUS.register(modBus);
         modBus.addListener(this::commonSetup);
 
         MinecraftForge.EVENT_BUS.register(this);

@@ -7,8 +7,10 @@ import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,14 +78,30 @@ public class CreateNewAgeRecipeHandler {
         return createKineticGeneratorNode(itemId, stack.getHoverName().getString());
     }
 
+    public static String getItemDisplayName(ResourceLocation itemId, String fallback) {
+        if (itemId != null) {
+            try {
+                var item = ForgeRegistries.ITEMS.getValue(itemId);
+                if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                    String name = new ItemStack(item).getHoverName().getString();
+                    if (name != null && !name.isEmpty()) {
+                        return name;
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+        return fallback != null ? fallback : (itemId != null ? itemId.getPath() : "");
+    }
+
     public static RecipeNode createKineticGeneratorNode(ResourceLocation itemId, String displayName) {
         if (itemId == null) return null;
         String path = itemId.getPath();
         String namespace = itemId.getNamespace();
+        String name = getItemDisplayName(itemId, displayName);
 
         if (namespace.equals(MOD_ID)) {
             if (path.contains("generator_coil")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Generator Coil", 20.0, 512.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Generator Coil", 20.0, 512.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -91,7 +109,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addInput(IngredientStack.stressUnit(768.0)); // 24.0 base stress * 32 RPM
                 return node;
             } else if (path.contains("carbon_brushes")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Carbon Brushes", 20.0, 256.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Carbon Brushes", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -99,7 +117,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addInput(IngredientStack.stressUnit(768.0));
                 return node;
             } else if (path.equals("basic_motor")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Basic Motor", 20.0, 256.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Basic Motor", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(false);
                 node.setMachineIcon(itemId);
@@ -107,7 +125,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(512.0));
                 return node;
             } else if (path.equals("advanced_motor")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Advanced Motor", 20.0, 1024.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Advanced Motor", 20.0, 1024.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(false);
                 node.setMachineIcon(itemId);
@@ -115,7 +133,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(2048.0));
                 return node;
             } else if (path.equals("reinforced_motor")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Reinforced Motor", 20.0, 4096.0, GTVoltageTier.MV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Reinforced Motor", 20.0, 4096.0, GTVoltageTier.MV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(false);
                 node.setMachineIcon(itemId);
@@ -123,7 +141,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(8192.0));
                 return node;
             } else if (path.equals("stirling_engine")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Stirling Engine", 20.0, 1024.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Stirling Engine", 20.0, 1024.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -131,7 +149,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(1024.0));
                 return node;
             } else if (path.contains("solar_heating_plate")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Solar Heating Plate", 20.0, 256.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Solar Heating Plate", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -139,7 +157,7 @@ public class CreateNewAgeRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(256.0));
                 return node;
             } else if (path.contains("energiser")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Energiser", 20.0, 256.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Energiser", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setMachineIcon(itemId);
                 node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:energising"));
@@ -152,7 +170,10 @@ public class CreateNewAgeRecipeHandler {
     public static List<RecipeSearchEngine.SearchableRecipe> getVirtualSearchRecipes() {
         List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
         String catId = "create_new_age:generation";
-        String catName = "Create: New Age";
+        String catName = Component.translatable("category.gtcalcboard.create_new_age").getString();
+        if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
+            catName = "Create: New Age";
+        }
 
         ResourceLocation[] items = {
                 ResourceLocation.tryParse("create_new_age:generator_coil"),
@@ -165,7 +186,7 @@ public class CreateNewAgeRecipeHandler {
                 ResourceLocation.tryParse("create_new_age:energiser_t1")
         };
 
-        String[] names = {
+        String[] fallbackNames = {
                 "Generator Coil",
                 "Carbon Brushes",
                 "Basic Motor",
@@ -178,7 +199,7 @@ public class CreateNewAgeRecipeHandler {
 
         for (int i = 0; i < items.length; i++) {
             if (items[i] == null) continue;
-            RecipeNode node = createKineticGeneratorNode(items[i], names[i]);
+            RecipeNode node = createKineticGeneratorNode(items[i], fallbackNames[i]);
             if (node != null) {
                 String displayName = node.getName();
                 String modId = items[i].getNamespace();
@@ -188,6 +209,21 @@ public class CreateNewAgeRecipeHandler {
                 for (IngredientStack out : node.getOutputs()) {
                     outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
                     if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
+                    if (out.isStressUnit()) {
+                        outputNames.add("stress");
+                        outputNames.add("unit");
+                        outputNames.add("units");
+                        outputNames.add("su");
+                        outputNames.add("su/s");
+                        outputNames.add("kinetic");
+                        outputNames.add("스트레스");
+                    }
+                }
+                outputNames.add(displayName.toLowerCase(Locale.ROOT));
+                outputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
+                if (items[i] != null) {
+                    outputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
+                    outputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
                 }
 
                 List<String> inputNames = new ArrayList<>();
@@ -195,10 +231,25 @@ public class CreateNewAgeRecipeHandler {
                 for (IngredientStack in : node.getInputs()) {
                     inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
                     if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
+                    if (in.isStressUnit()) {
+                        inputNames.add("stress");
+                        inputNames.add("unit");
+                        inputNames.add("units");
+                        inputNames.add("su");
+                        inputNames.add("su/s");
+                        inputNames.add("kinetic");
+                        inputNames.add("스트레스");
+                    }
+                }
+                inputNames.add(displayName.toLowerCase(Locale.ROOT));
+                inputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
+                if (items[i] != null) {
+                    inputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
+                    inputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
                 }
 
                 String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
-                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " kinetic stress units generator create su fe electricity new age magnet coil").trim();
+                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + fallbackNames[i].toLowerCase(Locale.ROOT) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create su fe electricity new age magnet coil").trim();
 
                 list.add(new RecipeSearchEngine.SearchableRecipe(
                         node,

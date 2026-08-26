@@ -353,6 +353,124 @@ public class GTCEuSteamProcessingTest {
         plasma.setParallel(12);
         Assertions.assertEquals(196608.0, plasma.getSingleMachineEUt(), 0.001);
     }
+
+    @Test
+    void testUlvToSteamTierTransition() {
+        RecipeNode node = RecipeNode.create("Tin Dust", 72.2 * 20.0, 2.0, GTVoltageTier.ULV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        node.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:huge_restrictive_tin_item_pipe"), "Pipe", 1.0));
+        node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:tin_dust"), "Tin Dust", 1.0));
+
+        com.gtceu.calcboard.client.gui.NodeWidget widget = new com.gtceu.calcboard.client.gui.NodeWidget(node);
+
+        assertEquals(GTVoltageTier.ULV, node.getTargetTier());
+        assertEquals(SteamMode.NONE, node.getSteamMode());
+
+        // 1. Changing tier down (-1) from ULV should transition to HP Steam
+        boolean changed = widget.changeTier(-1);
+        assertTrue(changed, "Tier change down from ULV should succeed");
+        assertEquals(SteamMode.HIGH_PRESSURE, node.getSteamMode());
+
+        // 2. Changing tier down (-1) from HP Steam should transition to LP Steam
+        changed = widget.changeTier(-1);
+        assertTrue(changed, "Tier change down from HP Steam should succeed");
+        assertEquals(SteamMode.LOW_PRESSURE, node.getSteamMode());
+
+        // 3. Changing tier up (+1) from LP Steam should transition to HP Steam
+        changed = widget.changeTier(1);
+        assertTrue(changed, "Tier change up from LP Steam should succeed");
+        assertEquals(SteamMode.HIGH_PRESSURE, node.getSteamMode());
+
+        // 4. Changing tier up (+1) from HP Steam should transition to ULV (since recipe tier is ULV)
+        changed = widget.changeTier(1);
+        assertTrue(changed, "Tier change up from HP Steam should succeed");
+        assertEquals(SteamMode.NONE, node.getSteamMode());
+        assertEquals(GTVoltageTier.ULV, node.getTargetTier());
+
+        // 5. Changing tier up (+1) from ULV should transition to LV
+        changed = widget.changeTier(1);
+        assertTrue(changed, "Tier change up from ULV should succeed");
+        assertEquals(SteamMode.NONE, node.getSteamMode());
+        assertEquals(GTVoltageTier.LV, node.getTargetTier());
+    }
+
+    @Test
+    void testSteamDefinitionDetection() {
+        assertTrue(com.gtceu.calcboard.compat.gtceu.helper.GTCEuCapabilityScanner.isSteamDefinition(null, ResourceLocation.tryParse("gtceu:steam_grinder")));
+        assertTrue(com.gtceu.calcboard.compat.gtceu.helper.GTCEuCapabilityScanner.isHighPressureDefinition(null, ResourceLocation.tryParse("gtceu:steam_grinder")));
+        assertTrue(MultiblockDetector.isSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_grinder")));
+
+        RecipeNode grinderNode = RecipeNode.create("Steam Grinder", 200.0, 2.0, GTVoltageTier.ULV);
+        grinderNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        grinderNode.setMachineIcon(ResourceLocation.tryParse("gtceu:steam_grinder"));
+
+        assertTrue(grinderNode.isMultiblock());
+        assertEquals(SteamMode.HIGH_PRESSURE, grinderNode.getSteamMode());
+        assertEquals(8, grinderNode.getParallel());
+    }
+
+    @Test
+    void testMaceratorByproductTierGating() {
+        RecipeNode macerator = RecipeNode.create("Pure Gold Dust", 400.0, 2.0, GTVoltageTier.ULV);
+        macerator.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        macerator.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:purified_gold_ore"), "Purified Gold Ore", 1.0));
+
+        IngredientStack pureGold = IngredientStack.item(ResourceLocation.tryParse("gtceu:pure_gold_dust"), "Pure Gold Dust", 1.0, 1.0);
+        IngredientStack stoneDust = IngredientStack.item(ResourceLocation.tryParse("gtceu:stone_dust"), "Stone Dust", 1.0, 0.14);
+        stoneDust.setTierChanceBoost(0.085);
+
+        macerator.getOutputs().add(pureGold);
+        macerator.getOutputs().add(stoneDust);
+
+        // At ULV / LV / MV (below HV): primary output is 100%, Stone Dust byproduct chance is 0%
+        macerator.setTargetTier(GTVoltageTier.ULV);
+        assertEquals(1.0, macerator.getEffectiveOutputChance(0), 0.001);
+        assertEquals(0.0, macerator.getEffectiveOutputChance(1), 0.001);
+        assertEquals(0.0, macerator.getOutputSlotRate(1, false), 0.001);
+
+        macerator.setTargetTier(GTVoltageTier.LV);
+        assertEquals(0.0, macerator.getEffectiveOutputChance(1), 0.001);
+
+        macerator.setTargetTier(GTVoltageTier.MV);
+        assertEquals(0.0, macerator.getEffectiveOutputChance(1), 0.001);
+
+        // At HV: 1st byproduct is unlocked at base 14%
+        macerator.setTargetTier(GTVoltageTier.HV);
+        assertEquals(0.14, macerator.getEffectiveOutputChance(1), 0.001);
+        assertTrue(macerator.getOutputSlotRate(1, false) > 0.0);
+
+        // At EV: extra tier boost +8.5% -> 22.5%
+        macerator.setTargetTier(GTVoltageTier.EV);
+        assertEquals(0.225, macerator.getEffectiveOutputChance(1), 0.001);
+
+        // In Steam Mode: byproducts are always 0%
+        macerator.setSteamMode(SteamMode.HIGH_PRESSURE);
+        assertEquals(0.0, macerator.getEffectiveOutputChance(1), 0.001);
+        assertEquals(0.0, macerator.getOutputSlotRate(1, false), 0.001);
+    }
+
+    @Test
+    void testSteamToElectricTransitionDoesNotSwitchToMultiblock() {
+        RecipeNode macerator = RecipeNode.create("Macerator", 100.0, 30.0, GTVoltageTier.ULV);
+        macerator.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        macerator.setAvailableWorkstations(List.of(
+            ResourceLocation.tryParse("gtceu:large_macerator"),
+            ResourceLocation.tryParse("gtceu:lv_macerator"),
+            ResourceLocation.tryParse("gtceu:mv_macerator")
+        ));
+
+        // 1. Enter HP Steam
+        macerator.setSteamMode(SteamMode.HIGH_PRESSURE);
+        assertFalse(macerator.isMultiblock());
+
+        // 2. Transition from HP Steam to ULV
+        macerator.setSteamMode(SteamMode.NONE);
+        macerator.setTargetTier(GTVoltageTier.ULV);
+
+        // 3. Must stay Singleblock
+        assertFalse(macerator.isMultiblock(), "Node must not automatically switch to multiblock when transitioning from Steam to ULV");
+        assertNotEquals(ResourceLocation.tryParse("gtceu:large_macerator"), macerator.getMachineIcon());
+    }
 }
 
 

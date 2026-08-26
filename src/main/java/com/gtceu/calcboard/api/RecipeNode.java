@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api;
 
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.compat.IModAdapter;
@@ -50,7 +51,7 @@ public class RecipeNode {
     private FlowGraph subGraph = null;
     private int containedMachineCount = 0;
     private double efficiency = 1.0;
-    private EnergyType energyType = EnergyType.ELECTRIC_EU;
+    private EnergyType energyType = null;
 
     // Reroute / Junction Node Abstraction (RFC-001)
     private boolean isReroute = false;
@@ -112,6 +113,9 @@ public class RecipeNode {
                 node.getAvailableWorkstations().add(loc);
             }
         }
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.Created(node));
+        } catch (Throwable ignored) {}
         return node;
     }
 
@@ -176,13 +180,47 @@ public class RecipeNode {
     }
 
     public void setMachineIcon(ResourceLocation machineIcon) {
+        if (java.util.Objects.equals(this.machineIcon, machineIcon)) return;
+        ResourceLocation oldIcon = this.machineIcon;
         this.machineIcon = machineIcon;
-        if (this.parallel <= 1) {
-            int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
-            if (defPar > 1) {
-                this.parallel = defPar;
-            }
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            adapter.onMachineIconChanged(this, oldIcon, machineIcon);
         }
+    }
+
+    public String getMachineDisplayName() {
+        if (isModule) {
+            return name != null && !name.isBlank() ? name : "Module";
+        }
+        if (isReroute) {
+            return "Junction";
+        }
+
+        ResourceLocation icon = getMachineIcon();
+        if (icon == null && !availableWorkstations.isEmpty()) {
+            icon = availableWorkstations.get(0);
+        }
+
+        if (icon != null) {
+            try {
+                var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(icon);
+                if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                    return item.getDescription().getString();
+                }
+                var block = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(icon);
+                if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
+                    return block.getName().getString();
+                }
+            } catch (Throwable ignored) {}
+            return MultiblockStructureCatalog.formatMachineName(icon.getPath());
+        }
+
+        if (recipeCategoryId != null) {
+            return MultiblockStructureCatalog.formatMachineName(recipeCategoryId.getPath());
+        }
+
+        return name != null && !name.isBlank() ? name : "Machine";
     }
 
     public double getBaseDurationTicks() {
@@ -222,6 +260,31 @@ public class RecipeNode {
             }
         }
         this.targetTier = (targetTier.ordinal() >= minTier.ordinal()) ? targetTier : minTier;
+        if (!isMultiblock() && (steamMode == null || !steamMode.isSteam())) {
+            ResourceLocation tierWs = getWorkstationForTier(this.targetTier);
+            if (tierWs != null) {
+                setMachineIcon(tierWs);
+            }
+        }
+    }
+
+    public ResourceLocation getWorkstationForTier(GTVoltageTier tier) {
+        if (tier == null) return null;
+        String prefix = tier.name().toLowerCase(java.util.Locale.ROOT) + "_";
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null) {
+                String path = ws.getPath().toLowerCase(java.util.Locale.ROOT);
+                if (path.startsWith(prefix) || path.contains("_" + prefix)) {
+                    return ws;
+                }
+            }
+        }
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
+                return ws;
+            }
+        }
+        return null;
     }
 
     public double getMachineCount() {
@@ -272,10 +335,12 @@ public class RecipeNode {
         if (energyType != null) {
             return energyType;
         }
-        if (baseEUt <= 0.0 && !isGenerator) {
-            return isLiquidBoilerRecipe() || (steamMode != null && steamMode.isSteam()) ? EnergyType.HEAT_OR_SELF : EnergyType.NONE;
-        }
-        return EnergyType.ELECTRIC_EU;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        return adapter != null ? adapter.getEnergyType(this) : EnergyType.ELECTRIC_EU;
+    }
+
+    public EnergyType getEnergyTypeOverride() {
+        return energyType;
     }
 
     public void setEnergyType(EnergyType energyType) {
@@ -498,6 +563,17 @@ public class RecipeNode {
         addons.removeIf(a -> a.getId().equals(addonId));
     }
 
+    public boolean removeOneAddon(String addonId) {
+        if (addonId == null) return false;
+        for (int i = 0; i < addons.size(); i++) {
+            if (addons.get(i).getId().equals(addonId)) {
+                addons.remove(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void clearAddons() {
         addons.clear();
     }
@@ -567,6 +643,15 @@ public class RecipeNode {
         properties.set(NodeProperties.EBF_TEMPERATURE, Math.max(0, recipeTemperature));
     }
 
+    public int getBoilerThrottle() {
+        int t = properties.get(NodeProperties.BOILER_THROTTLE);
+        return Math.max(25, Math.min(100, t));
+    }
+
+    public void setBoilerThrottle(int throttle) {
+        properties.set(NodeProperties.BOILER_THROTTLE, Math.max(25, Math.min(100, throttle)));
+    }
+
     public long getEuToStart() {
         return properties.get(NodeProperties.FUSION_START_EU);
     }
@@ -611,9 +696,49 @@ public class RecipeNode {
         this.threadingConfig = threadingConfig;
     }
 
-    public boolean hasThreading() {
-        if (threadingConfig != null && threadingConfig.isActive()) return true;
+    public boolean isThreadingAvailable() {
         return MultiblockDetector.getMaxHelixCount(this) > 0;
+    }
+
+    public boolean isExplicitThreadingMachine() {
+        if (machineIcon != null) {
+            return MultiblockDetector.isThreadingMultiblock(machineIcon);
+        }
+        return false;
+    }
+
+    public boolean hasThreading() {
+        if (isExplicitThreadingMachine()) return true;
+        if (threadingConfig != null && threadingConfig.isActive()) return true;
+        return false;
+    }
+
+    public boolean isThreadingActive() {
+        return hasThreading();
+    }
+
+    public void setThreadingActive(boolean active) {
+        if (active) {
+            getThreadingConfig().setActive(true);
+            for (ResourceLocation ws : getAvailableWorkstations()) {
+                if (ws != null && MultiblockDetector.isThreadingMultiblock(ws)) {
+                    setMachineIcon(ws);
+                    break;
+                }
+            }
+        } else {
+            if (threadingConfig != null) {
+                threadingConfig.reset();
+                threadingConfig.setActive(false);
+            }
+            addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING || a.getId().startsWith("start_core:helix_") || a.getId().contains("helix"));
+            if (machineIcon == null || MultiblockDetector.isThreadingMultiblock(machineIcon)) {
+                ResourceLocation mbWs = getMultiblockWorkstation();
+                if (mbWs != null) {
+                    setMachineIcon(mbWs);
+                }
+            }
+        }
     }
 
     public int getRequiredReflectorTier() {
@@ -655,12 +780,36 @@ public class RecipeNode {
     }
 
     public void setMultiblock(boolean multiblock) {
+        if (this.isMultiblock == multiblock) return;
         this.isMultiblock = multiblock;
-        if (multiblock && this.parallel <= 1) {
-            int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
-            if (defPar > 1) {
-                this.parallel = defPar;
+        if (multiblock) {
+            if (this.parallel <= 1) {
+                int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
+                if (defPar > 1) {
+                    this.parallel = defPar;
+                }
             }
+            if (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon)) {
+                ResourceLocation mbWs = getMultiblockWorkstation();
+                if (mbWs != null) {
+                    setMachineIcon(mbWs);
+                }
+            }
+        } else {
+            if (machineIcon == null || MultiblockDetector.isMultiblock(machineIcon)) {
+                ResourceLocation sbWs = getWorkstationForTier(targetTier);
+                if (sbWs == null) {
+                    sbWs = getSingleblockWorkstation();
+                }
+                if (sbWs != null) {
+                    setMachineIcon(sbWs);
+                }
+            }
+            this.parallel = 1;
+            this.addons.removeIf(a -> a.getCategory() == MachineAddon.Category.COIL 
+                    || a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT
+                    || a.getCategory() == MachineAddon.Category.THREADING
+                    || a.getCategory() == MachineAddon.Category.PARALLEL);
         }
     }
 
@@ -679,9 +828,54 @@ public class RecipeNode {
     }
 
     public ResourceLocation getMultiblockWorkstation() {
+        // 1. Exact match with recipeCategoryId in availableWorkstations
+        if (recipeCategoryId != null) {
+            for (ResourceLocation ws : availableWorkstations) {
+                if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(recipeCategoryId.getPath())) {
+                    return ws;
+                }
+            }
+        }
+
+        // 2. Base/standard multiblocks before large_/mega_/advanced_
+        for (ResourceLocation ws : availableWorkstations) {
+            if (MultiblockDetector.isMultiblock(ws)) {
+                String path = ws.getPath().toLowerCase(Locale.ROOT);
+                if (!path.startsWith("large_") && !path.startsWith("mega_") && !path.startsWith("advanced_") && !path.startsWith("yielding_")) {
+                    return ws;
+                }
+            }
+        }
+
+        // 3. Any multiblock in availableWorkstations
         for (ResourceLocation ws : availableWorkstations) {
             if (MultiblockDetector.isMultiblock(ws)) {
                 return ws;
+            }
+        }
+
+        // 4. Fallback to CategoryCapabilityMatrix
+        if (recipeCategoryId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
+            if (cap != null && cap.availableWorkstations() != null) {
+                for (ResourceLocation ws : cap.availableWorkstations()) {
+                    if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(recipeCategoryId.getPath())) {
+                        return ws;
+                    }
+                }
+                for (ResourceLocation ws : cap.availableWorkstations()) {
+                    if (MultiblockDetector.isMultiblock(ws)) {
+                        String path = ws.getPath().toLowerCase(Locale.ROOT);
+                        if (!path.startsWith("large_") && !path.startsWith("mega_") && !path.startsWith("advanced_") && !path.startsWith("yielding_")) {
+                            return ws;
+                        }
+                    }
+                }
+                for (ResourceLocation ws : cap.availableWorkstations()) {
+                    if (MultiblockDetector.isMultiblock(ws)) {
+                        return ws;
+                    }
+                }
             }
         }
         return null;
@@ -689,11 +883,18 @@ public class RecipeNode {
 
     public ResourceLocation getSingleblockWorkstation() {
         for (ResourceLocation ws : availableWorkstations) {
-            if (!MultiblockDetector.isMultiblock(ws)) {
+            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
                 return ws;
             }
         }
-        return machineIcon;
+        if (recipeCategoryId != null && !MultiblockDetector.isMultiblock(recipeCategoryId)) {
+            return recipeCategoryId;
+        }
+        CategoryCapability cap = recipeCategoryId != null ? CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId) : null;
+        if (cap != null && cap.defaultWorkstation() != null && !MultiblockDetector.isMultiblock(cap.defaultWorkstation())) {
+            return cap.defaultWorkstation();
+        }
+        return (machineIcon != null && !MultiblockDetector.isMultiblock(machineIcon)) ? machineIcon : null;
     }
 
     public boolean canUseCoils() {
@@ -843,6 +1044,9 @@ public class RecipeNode {
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PreCalculation(this));
+        } catch (Throwable ignored) {}
         return ModAdapterRegistry.getAdapterForNode(this).computeOverclock(this, targetTier, isGenerator);
     }
 
@@ -887,17 +1091,14 @@ public class RecipeNode {
     public Map<IngredientStack, Double> calculateInputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
-        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack in : inputs) {
             double r;
             if (in.isStressUnit()) {
                 r = isGenerator() ? (in.getAmount() * cps) : getTotalEUt();
             } else {
                 double amount = in.getAmount();
-                if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
-                    amount *= fuelEnergyMult;
-                }
                 r = amount * cps;
+                r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, in, true, r);
             }
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
@@ -911,6 +1112,9 @@ public class RecipeNode {
                 rates.put(in, r);
             }
         }
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, rates, Collections.emptyMap()));
+        } catch (Throwable ignored) {}
         return rates;
     }
 
@@ -921,40 +1125,74 @@ public class RecipeNode {
             return isGenerator() ? (in.getAmount() * (effective ? getEffectiveCyclesPerSecond() : getNominalCyclesPerSecond())) : (getTotalEUt() * (effective ? getEfficiency() : 1.0));
         }
         double amount = in.getAmount();
-        if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
-            amount *= Math.max(0.01, getCombinedDurationMultiplier());
-        }
         double cps = effective ? getEffectiveCyclesPerSecond() : getNominalCyclesPerSecond();
-        return amount * cps;
+        double r = amount * cps;
+        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, in, true, r);
+    }
+
+    public double getEffectiveOutputChance(int outputIndex) {
+        if (outputIndex < 0 || outputIndex >= outputs.size()) return 0.0;
+        IngredientStack out = outputs.get(outputIndex);
+        if (out.getChance() >= 1.0) return 1.0;
+
+        // 1. Steam Ore Factory multiblock produces full outputs and byproducts
+        if (isMultiblock() && machineIcon != null && machineIcon.getPath().contains("steam_ore_factory")) {
+            return out.getEffectiveChance(getTierDelta());
+        }
+
+        // 2. Standard Steam machines in GTCEu cannot produce byproducts
+        if (getSteamMode() != null && getSteamMode().isSteam()) {
+            return 0.0;
+        }
+
+        // 2. GTCEu Macerator ore byproduct tier gating (for byproducts with base chance > 0):
+        //    Output 1: 1st Byproduct requires HV (Tier 3)
+        //    Output 2: 2nd Byproduct requires EV (Tier 4)
+        //    Output 3: 3rd Byproduct requires IV (Tier 5)
+        if (outputIndex >= 1 && out.getChance() > 0.0 && recipeCategoryId != null && recipeCategoryId.getPath().contains("macerator")) {
+            GTVoltageTier curTier = getTargetTier();
+            if (curTier == null) curTier = GTVoltageTier.LV;
+            int curTierIdx = curTier.ordinal();
+
+            GTVoltageTier reqTier;
+            if (outputIndex == 1) reqTier = GTVoltageTier.HV;
+            else if (outputIndex == 2) reqTier = GTVoltageTier.EV;
+            else reqTier = GTVoltageTier.IV;
+
+            if (curTierIdx < reqTier.ordinal()) {
+                return 0.0;
+            }
+
+            int extraTiers = curTierIdx - reqTier.ordinal();
+            double boost = out.getTierChanceBoost();
+            return Math.min(1.0, Math.max(0.0, out.getChance() + extraTiers * boost));
+        }
+
+        return out.getEffectiveChance(getTierDelta());
     }
 
     public double getOutputSlotRate(int index, boolean effective) {
         if (index < 0 || index >= outputs.size()) return 0.0;
         IngredientStack out = outputs.get(index);
-        double amount = out.getExpectedAmount(getTierDelta());
-        if (out.isFluid() && MachineAddon.isThermalMachine(this) && out.getId() != null && out.getId().getPath().contains("steam")) {
-            amount *= Math.max(0.01, getCombinedDurationMultiplier());
-        }
+        double amount = out.getAmount() * getEffectiveOutputChance(index);
         double cps = effective ? getEffectiveCyclesPerSecond() : getCyclesPerSecond();
-        return amount * cps;
+        double r = amount * cps;
+        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, out, false, r);
     }
 
     public double getSingleOutputExpectedAmount(int index) {
         if (index < 0 || index >= outputs.size()) return 0.0;
-        return outputs.get(index).getExpectedAmount(getTierDelta());
+        return outputs.get(index).getAmount() * getEffectiveOutputChance(index);
     }
 
     public Map<IngredientStack, Double> calculateOutputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getCyclesPerSecond();
-        int tierDelta = getTierDelta();
-        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
-        for (IngredientStack out : outputs) {
-            double amount = out.getExpectedAmount(tierDelta);
-            if (out.isFluid() && MachineAddon.isThermalMachine(this) && out.getId() != null && out.getId().getPath().contains("steam")) {
-                amount *= fuelEnergyMult;
-            }
+        for (int i = 0; i < outputs.size(); i++) {
+            IngredientStack out = outputs.get(i);
+            double amount = out.getAmount() * getEffectiveOutputChance(i);
             double r = amount * cps;
+            r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, out, false, r);
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(out)) {
@@ -967,19 +1205,19 @@ public class RecipeNode {
                 rates.put(out, r);
             }
         }
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, java.util.Collections.emptyMap(), rates));
+        } catch (Throwable ignored) {}
         return rates;
     }
 
     public Map<IngredientStack, Double> calculateEffectiveInputRates() {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
-        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack in : inputs) {
             double amount = in.getAmount();
-            if (in.isFluid() && MachineAddon.isThermalMachine(this) && in.getId() != null && in.getId().getPath().contains("water")) {
-                amount *= fuelEnergyMult;
-            }
             double r = amount * cps;
+            r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, in, true, r);
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(in)) {
@@ -992,6 +1230,9 @@ public class RecipeNode {
                 rates.put(in, r);
             }
         }
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, rates, java.util.Collections.emptyMap()));
+        } catch (Throwable ignored) {}
         return rates;
     }
 
@@ -999,13 +1240,10 @@ public class RecipeNode {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         double cps = getEffectiveCyclesPerSecond();
         int tierDelta = getTierDelta();
-        double fuelEnergyMult = MachineAddon.isThermalMachine(this) ? Math.max(0.01, getCombinedDurationMultiplier()) : 1.0;
         for (IngredientStack out : outputs) {
             double amount = out.getExpectedAmount(tierDelta);
-            if (out.isFluid() && MachineAddon.isThermalMachine(this) && out.getId() != null && out.getId().getPath().contains("steam")) {
-                amount *= fuelEnergyMult;
-            }
             double r = amount * cps;
+            r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, out, false, r);
             boolean merged = false;
             for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
                 if (entry.getKey().equals(out)) {
@@ -1018,13 +1256,17 @@ public class RecipeNode {
                 rates.put(out, r);
             }
         }
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, java.util.Collections.emptyMap(), rates));
+        } catch (Throwable ignored) {}
         return rates;
     }
 
     public double calculateSingleMachineOutputRate(IngredientStack out) {
         if (out == null || !isOperational()) return 0.0;
         double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
-        return out.getExpectedAmount(getTierDelta()) * singleCps;
+        double baseRate = out.getExpectedAmount(getTierDelta()) * singleCps;
+        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeSingleMachineIngredientRate(this, out, false, baseRate);
     }
 
     public double calculateSingleMachineInputRate(IngredientStack in) {
@@ -1033,7 +1275,8 @@ public class RecipeNode {
             return isGenerator() ? in.getAmount() : getSingleMachineEUt();
         }
         double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
-        return in.getAmount() * singleCps;
+        double baseRate = in.getAmount() * singleCps;
+        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeSingleMachineIngredientRate(this, in, true, baseRate);
     }
 
     // =========================================================================

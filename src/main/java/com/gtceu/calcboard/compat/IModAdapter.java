@@ -5,7 +5,7 @@ import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * Service Provider Interface (SPI) for external mod integration.
@@ -49,6 +49,27 @@ public interface IModAdapter {
      * Injects mod-specific capability matrix definitions.
      */
     void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager);
+
+    /**
+     * Scans and registers mod-specific multiblock machines and their capabilities.
+     */
+    default void scanMultiblocks(Object emiRecipeManager) {
+        // Default no-op
+    }
+
+    /**
+     * Scans and registers mod-specific multiblock 3D BOM structures and component requirements.
+     */
+    default void scanMultiblockStructures() {
+        // Default no-op
+    }
+
+    /**
+     * Scans and returns a single multiblock 3D BOM structure on demand if not yet cached.
+     */
+    default com.gtceu.calcboard.api.bom.MultiblockStructureDef scanMultiblockStructure(ResourceLocation machineId) {
+        return null;
+    }
 
     /**
      * Adapts compound recipes (e.g. water+fuel -> steam) or mod-specific energy/duration rules.
@@ -95,8 +116,15 @@ public interface IModAdapter {
         if (node == null || addon == null) return;
         if (addon.getCategory() == MachineAddon.Category.COIL ||
             addon.getCategory() == MachineAddon.Category.ROTOR ||
-            addon.getCategory() == MachineAddon.Category.REFLECTOR) {
-            node.getAddons().removeIf(a -> a.getCategory() == addon.getCategory());
+            addon.getCategory() == MachineAddon.Category.REFLECTOR ||
+            addon.getCategory() == MachineAddon.Category.PARALLEL ||
+            addon.getCategory() == MachineAddon.Category.MAINTENANCE ||
+            addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
+            node.getAddons().removeIf(a -> a.getCategory() == addon.getCategory() || a.getId().equals(addon.getId()));
+        } else if (addon.getCategory() != MachineAddon.Category.ENERGY_HATCH &&
+                   addon.getCategory() != MachineAddon.Category.THERMAL_AUGMENT &&
+                   !addon.getCategory().equals(AddonCategory.MAGNET)) {
+            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
         }
         node.getAddons().add(addon);
     }
@@ -113,6 +141,60 @@ public interface IModAdapter {
      */
     default List<MachineAddon> getResetAddonCards(RecipeNode node) {
         return List.of();
+    }
+
+    /**
+     * Supplies extra structure parts or companion hardware required for this machine in the BOM
+     * (e.g. Generator Coil for Create: New Age Carbon Brushes, or equipped machine addons).
+     */
+    default void populateExtraBOMParts(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts) {
+    }
+
+    /**
+     * Resolves the list of structural parts (controllers, casings, coils, hatches, buses, companion blocks, addons)
+     * required to construct 1 unit of the machine represented by this node.
+     */
+    default List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> resolveStructureParts(RecipeNode node, boolean dualLowerTierEnergyHatches) {
+        List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> list = new ArrayList<>();
+        if (node == null) return list;
+
+        ResourceLocation machineId = node.getMachineIcon();
+        if (machineId == null && !node.getAvailableWorkstations().isEmpty()) {
+            machineId = node.getAvailableWorkstations().get(0);
+        }
+
+        if (machineId != null && !machineId.getPath().equals("air")) {
+            String displayName = node.getName() != null && !node.getName().isBlank()
+                    ? node.getName()
+                    : com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(machineId.getPath());
+            list.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(
+                    machineId,
+                    displayName,
+                    1,
+                    com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER
+            ));
+        }
+
+        // Aggregate equipped addons
+        Map<ResourceLocation, Integer> addonCounts = new LinkedHashMap<>();
+        Map<ResourceLocation, String> addonNames = new LinkedHashMap<>();
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon != null && addon.getItemIcon() != null) {
+                ResourceLocation icon = addon.getItemIcon();
+                addonCounts.merge(icon, 1, Integer::sum);
+                addonNames.put(icon, addon.getName());
+            }
+        }
+        for (var entry : addonCounts.entrySet()) {
+            ResourceLocation icon = entry.getKey();
+            int count = entry.getValue();
+            String partName = addonNames.getOrDefault(icon, icon.getPath());
+            com.gtceu.calcboard.api.bom.PartCategory pCat = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.classifyPart(icon);
+            list.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(icon, partName, count, pCat));
+        }
+
+        populateExtraBOMParts(node, list);
+        return list;
     }
 
     /**
@@ -141,8 +223,8 @@ public interface IModAdapter {
                 node.getThreadingConfig().setHelixCount(helix, 0);
             }
         }
+        node.removeOneAddon(addon.getId());
         onAddonRemoved(node, addon);
-        node.removeAddon(addon.getId());
     }
 
     /**
@@ -172,11 +254,27 @@ public interface IModAdapter {
         if (addon.getCategory().equals(AddonCategory.PARALLEL)) {
             return String.format("Parallel: %dx", addon.getParallelMultiplier());
         }
+        if (addon.getCategory().equals(AddonCategory.ENERGY_HATCH)) {
+            if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
+                return String.format("Tier: %s (%,dA)", eh.getTier().getName(), eh.getAmperage());
+            }
+            return "Energy Hatch";
+        }
+        if (addon.getCategory().equals(AddonCategory.HATCH_BUS)) {
+            if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon h) {
+                if (h.isME()) return "§d📡 ME Automation";
+                if (h.getHatchType().isFluid()) {
+                    return String.format("§b%,d mB/slot", h.getTankCapacityMB() / Math.max(1, h.getSlotCapacity()));
+                }
+                return String.format("§7%d Item Slots", h.getSlotCapacity());
+            }
+            return "Hatch / Bus";
+        }
         if (addon.getCategory().equals(AddonCategory.COIL)) {
             return String.format("Coil: %d K", addon.getCoilTemperature());
         }
         if (addon.getCategory().equals(AddonCategory.ROTOR)) {
-            return String.format("Power: %d%%", addon.getRotorPower());
+            return String.format("§e⚡ %d%%", addon.getRotorPower());
         }
         return addon.getName();
     }
@@ -186,14 +284,32 @@ public interface IModAdapter {
      */
     default void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<net.minecraft.network.chat.Component> tooltip) {
         if (addon == null || tooltip == null) return;
+        if (addon.getCategory().equals(AddonCategory.ENERGY_HATCH) && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
+            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ Max Voltage: %s (%,d EU/t, %,dA)", eh.getTier().getName(), eh.getTier().getVoltage(), eh.getAmperage())));
+            if (eh.isLaser()) tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§d📡 High-density Laser Target Input (%,dA)", eh.getAmperage())));
+            if (eh.isSubstation()) tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b🏢 Substation High-amperage Input (%,dA)", eh.getAmperage())));
+        }
+        if (addon.getCategory().equals(AddonCategory.HATCH_BUS) && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon h) {
+            if (h.isME()) {
+                tooltip.add(net.minecraft.network.chat.Component.literal("§d📡 ME Network Automation Integration"));
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7Provides %d integrated virtual recipe slots", h.getSlotCapacity())));
+            } else if (h.getHatchType().isFluid()) {
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b📦 Fluid Slots: %d", h.getSlotCapacity())));
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7Tank Capacity: %,d mB (%,d mB / slot)", h.getTankCapacityMB(), h.getTankCapacityMB() / Math.max(1, h.getSlotCapacity()))));
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ Voltage Tier: %s", h.getTier().getName())));
+            } else {
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7📦 Item Inventory Slots: %d", h.getSlotCapacity())));
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ Voltage Tier: %s", h.getTier().getName())));
+            }
+        }
         if (addon.getParallelMultiplier() > 1) {
-            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.parallel", addon.getParallelMultiplier()).getString())));
+            tooltip.add(net.minecraft.network.chat.Component.literal("§b").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.stat.parallel", addon.getParallelMultiplier())));
         }
         if (addon.getDurationMultiplier() != 1.0) {
-            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§a⏳ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.speed_boost", String.format(java.util.Locale.ROOT, "%.2fx", 1.0 / addon.getDurationMultiplier())).getString())));
+            tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.stat.speed_mult", String.format(java.util.Locale.ROOT, "%.2fx", 1.0 / addon.getDurationMultiplier()))));
         }
         if (addon.getEutMultiplier() != 1.0 && !addon.getCategory().equals(AddonCategory.MAGNET)) {
-            tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.eut_multiplier", String.format(java.util.Locale.ROOT, "%.2fx", addon.getEutMultiplier())).getString())));
+            tooltip.add(net.minecraft.network.chat.Component.literal("§e").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.stat.eut_mult", String.format(java.util.Locale.ROOT, "%.2fx", addon.getEutMultiplier()))));
         }
     }
 
@@ -204,6 +320,22 @@ public interface IModAdapter {
         if (addon == null) return "";
         if (addon.getCategory() == MachineAddon.Category.REFLECTOR) {
             return String.format("§b🪞 Tier %d", addon.getReflectorTier());
+        }
+        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
+            return eh.getAmperage() > 2
+                    ? String.format("§e⚡ %s (%,dA)", eh.getTier().getName(), eh.getAmperage())
+                    : String.format("§e⚡ %s", eh.getTier().getName());
+        }
+        if (addon.getCategory() == MachineAddon.Category.HATCH_BUS && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon h) {
+            if (h.isME()) {
+                return "§d📡 ME";
+            }
+            if (h.getHatchType().isFluid()) {
+                return h.getSlotCapacity() > 1
+                        ? String.format("§b📦 %dx Fluid", h.getSlotCapacity())
+                        : String.format("§b📦 %s Fluid", h.getTier().getName());
+            }
+            return String.format("§7📦 %s (%d)", h.getTier().getName(), h.getSlotCapacity());
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
             return String.format("§6♨ %d K", addon.getCoilTemperature());
@@ -296,6 +428,20 @@ public interface IModAdapter {
     }
 
     /**
+     * Computes the effective ingredient flow rate (units/sec) for the given node and stack.
+     */
+    default double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        return defaultRate;
+    }
+
+    /**
+     * Computes the single machine ingredient flow rate (units/sec) for the given node and stack.
+     */
+    default double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        return defaultRate;
+    }
+
+    /**
      * Checks if this recipe node represents a boiler recipe.
      */
     default boolean isBoilerRecipe(RecipeNode node) {
@@ -307,6 +453,19 @@ public interface IModAdapter {
      */
     default boolean isLiquidBoilerRecipe(RecipeNode node) {
         return false;
+    }
+    /**
+     * Handles machine icon lifecycle changes (e.g. configuring multiblock state, steam mode, default parallels).
+     */
+    default void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
+        // Default no-op
+    }
+
+    /**
+     * Resolves the energy type for this node (EU, FE, SU, Steam/Heat, Passive/None).
+     */
+    default EnergyType getEnergyType(RecipeNode node) {
+        return EnergyType.ELECTRIC_EU;
     }
 
     /**
@@ -406,11 +565,12 @@ public interface IModAdapter {
         int ctrlY = y + 20 + 6;
         int row2Y = ctrlY + 18;
         int btnW = 32;
-        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF) {
+        if (node.isLiquidBoilerRecipe() || isBoilerRecipe(node)) {
             com.gtceu.calcboard.api.GTBoilerTier bTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
             btnW = Math.max(54, net.minecraft.client.Minecraft.getInstance().font.width(bTier.getDisplayName()) + 8);
         } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            btnW = Math.max(48, net.minecraft.client.Minecraft.getInstance().font.width(node.getSteamMode().getDisplayName()) + 8);
+            String steamText = node.isMultiblock() ? ("🏛 " + node.getSteamMode().getShortName()) : node.getSteamMode().getDisplayName();
+            btnW = Math.max(48, net.minecraft.client.Minecraft.getInstance().font.width(steamText) + 8);
         }
         return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
@@ -459,6 +619,12 @@ public interface IModAdapter {
     default boolean handleControlClick(com.gtceu.calcboard.client.gui.NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
+            if (node.isMultiblock() && !node.isGenerator() && !node.isTurbine() && supportsAddons(node)) {
+                if (widget.getParent() != null) {
+                    widget.getParent().openMachineConfigDialog(node, com.gtceu.calcboard.api.AddonCategory.ENERGY_HATCH);
+                }
+                return true;
+            }
             int direction = (button == 1) ? -1 : 1;
             return widget.changeTier(direction);
         }
@@ -580,6 +746,15 @@ public interface IModAdapter {
                 return true;
             }
         }
+        return false;
+    }
+
+    /**
+     * Handles mouse wheel scroll on Section 1 header inside MachineConfigDialog.
+     */
+    default boolean handleDialogHeaderScroll(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+                                             RecipeNode node, int x, int y, int dialogW,
+                                             double mouseX, double mouseY, double delta) {
         return false;
     }
 }

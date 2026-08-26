@@ -140,12 +140,20 @@ public class NodeWidget {
         return contentY + index * 18 + 8;
     }
 
+    public boolean isMachineIconHovered(double canvasMouseX, double canvasMouseY) {
+        if (node.isReroute() || node.isModule()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        return canvasMouseX >= x + 2 && canvasMouseX <= x + 20 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+    }
+
     public boolean isHeaderHovered(double canvasMouseX, double canvasMouseY) {
         if (node.isReroute()) {
             return isPointInside(canvasMouseX, canvasMouseY)
                     && getHoveredInputPortIndex(canvasMouseX, canvasMouseY) < 0
                     && getHoveredOutputPortIndex(canvasMouseX, canvasMouseY) < 0;
         }
+        if (isMachineIconHovered(canvasMouseX, canvasMouseY)) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int headerBtnWidth = node.isModule() ? 74 : 56;
@@ -347,7 +355,8 @@ public class NodeWidget {
     public boolean changeTier(int direction) {
         if (parent != null && !parent.ensureEditPermission()) return false;
 
-        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF) {
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        if (adapter != null && adapter.isBoilerRecipe(node)) {
             com.gtceu.calcboard.api.GTBoilerTier curTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
             com.gtceu.calcboard.api.GTBoilerTier[] vals = com.gtceu.calcboard.api.GTBoilerTier.values();
             int newIdx = (curTier.ordinal() + direction + vals.length) % vals.length;
@@ -359,6 +368,12 @@ public class NodeWidget {
             return true;
         }
 
+        int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
+        int maxIdx = GTVoltageTier.values().length - 1;
+        if (node.isTurbine() && !node.isMultiblock()) {
+            maxIdx = GTVoltageTier.HV.ordinal();
+        }
+
         if (node.supportsSteamMode()) {
             SteamMode curSteam = node.getSteamMode();
             if (curSteam == SteamMode.LOW_PRESSURE) {
@@ -367,12 +382,14 @@ public class NodeWidget {
                     if (parent != null) parent.markSummaryDirty();
                     invalidateCache();
                     return true;
+                } else if (direction < 0) {
+                    return false;
                 }
-                return false;
             } else if (curSteam == SteamMode.HIGH_PRESSURE) {
                 if (direction > 0) {
                     node.setSteamMode(SteamMode.NONE);
-                    node.setTargetTier(GTVoltageTier.LV);
+                    GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal()) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+                    node.setTargetTier(lowestElectric);
                     if (parent != null) parent.markSummaryDirty();
                     invalidateCache();
                     return true;
@@ -383,27 +400,28 @@ public class NodeWidget {
                     return true;
                 }
             } else {
-                if (direction < 0 && node.getTargetTier() == GTVoltageTier.LV) {
-                    node.setSteamMode(SteamMode.HIGH_PRESSURE);
-                    if (parent != null) parent.markSummaryDirty();
-                    invalidateCache();
-                    return true;
+                int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
+                int lowestAllowedElectric = (minIdx == GTVoltageTier.ULV.ordinal()) ? GTVoltageTier.ULV.ordinal() : GTVoltageTier.LV.ordinal();
+                if (direction < 0) {
+                    if (curIdx <= lowestAllowedElectric) {
+                        node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                        if (parent != null) parent.markSummaryDirty();
+                        invalidateCache();
+                        return true;
+                    }
                 }
             }
         }
 
-        int curIdx = node.getTargetTier().ordinal();
-        int minIdx = node.getRecipeTier().ordinal();
-        int maxIdx = GTVoltageTier.values().length - 1;
-
-        if (node.isTurbine() && !node.isMultiblock()) {
-            maxIdx = GTVoltageTier.HV.ordinal();
-        }
-
+        int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
         int newIdx = curIdx + direction;
+
         if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
             if (node.hasMultiblockOption()) {
                 node.setMultiblock(true);
+                if (parent != null) parent.markSummaryDirty();
+                invalidateCache();
+                return true;
             } else {
                 return false;
             }
@@ -464,6 +482,20 @@ public class NodeWidget {
 
         if (parent != null && !parent.ensureEditPermission()) {
             return true;
+        }
+
+        // Machine Icon Click -> Toggle Multiblock / Singleblock mode
+        if (button == 0 && isMachineIconHovered(mouseX, mouseY)) {
+            if (node.hasMultiblockOption()) {
+                boolean newMb = !node.isMultiblock();
+                node.setMultiblock(newMb);
+                if (parent != null) parent.markSummaryDirty();
+                invalidateCache();
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+                );
+                return true;
+            }
         }
 
         // Module Expand Button [⤢]

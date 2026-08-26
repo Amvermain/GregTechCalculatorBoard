@@ -197,4 +197,132 @@ public class CanvasGroupFrameTest {
         Assertions.assertEquals("inner", module.getSubGraph().getFrames().get(0).getId());
         Assertions.assertEquals("Inner Frame", module.getSubGraph().getFrames().get(0).getTitle());
     }
+
+    @Test
+    public void testMultiEdgeResizeGeometry() {
+        CanvasGroupFrame frame = new CanvasGroupFrame("f1", "Resize Test", CanvasGroupFrame.COLOR_BLUE, 100, 100, 300, 200);
+
+        // 1. Expand West (Left): drag deltaX = -50 (moves left to posX = 50, width = 350)
+        double origX = frame.getPosX();
+        double origW = frame.getWidth();
+        double deltaX = -50;
+        double clampedDeltaX = Math.min(deltaX, origW - CanvasGroupFrame.MIN_WIDTH);
+        frame.setPosX(origX + clampedDeltaX);
+        frame.setWidth(origW - clampedDeltaX);
+
+        Assertions.assertEquals(50, frame.getPosX(), 0.001);
+        Assertions.assertEquals(350, frame.getWidth(), 0.001);
+
+        // 2. Expand North (Top): drag deltaY = -40 (moves up to posY = 60, height = 240)
+        double origY = frame.getPosY();
+        double origH = frame.getHeight();
+        double deltaY = -40;
+        double clampedDeltaY = Math.min(deltaY, origH - CanvasGroupFrame.MIN_HEIGHT);
+        frame.setPosY(origY + clampedDeltaY);
+        frame.setHeight(origH - clampedDeltaY);
+
+        Assertions.assertEquals(60, frame.getPosY(), 0.001);
+        Assertions.assertEquals(240, frame.getHeight(), 0.001);
+
+        // 3. Shrink West with clamp: trying to shrink deltaX = +300 (width would be 50 < MIN_WIDTH 120)
+        origX = frame.getPosX();
+        origW = frame.getWidth();
+        deltaX = 300;
+        clampedDeltaX = Math.min(deltaX, origW - CanvasGroupFrame.MIN_WIDTH); // 350 - 120 = 230
+        frame.setPosX(origX + clampedDeltaX);
+        frame.setWidth(origW - clampedDeltaX);
+
+        Assertions.assertEquals(50 + 230, frame.getPosX(), 0.001);
+        Assertions.assertEquals(CanvasGroupFrame.MIN_WIDTH, frame.getWidth(), 0.001);
+    }
+
+    @Test
+    public void testFrameSelectionModel() {
+        com.gtceu.calcboard.client.gui.BoardSelectionModel model = new com.gtceu.calcboard.client.gui.BoardSelectionModel();
+        Assertions.assertTrue(model.isEmpty());
+
+        model.selectFrame("f1", false);
+        Assertions.assertEquals(1, model.size());
+        Assertions.assertTrue(model.isFrameSelected("f1"));
+        Assertions.assertTrue(model.isSelected("f1"));
+        Assertions.assertFalse(model.isNodeSelected("f1"));
+        Assertions.assertFalse(model.isNoteSelected("f1"));
+
+        // Multi-select note and node
+        model.select("n1", true);
+        model.selectNote("note1", true);
+        Assertions.assertEquals(3, model.size());
+        Assertions.assertTrue(model.isFrameSelected("f1"));
+        Assertions.assertTrue(model.isSelected("n1"));
+        Assertions.assertTrue(model.isNoteSelected("note1"));
+
+        // Toggle frame
+        model.toggleFrame("f1");
+        Assertions.assertFalse(model.isFrameSelected("f1"));
+        Assertions.assertEquals(2, model.size());
+
+        model.clear();
+        Assertions.assertTrue(model.isEmpty());
+    }
+
+    @Test
+    public void testFrameClipboardCopyPaste() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode n1 = RecipeNode.create("Centrifuge", 100, 30, GTVoltageTier.LV);
+        n1.setPos(50, 50);
+        graph.addNode(n1);
+
+        CanvasStickyNote note = new CanvasStickyNote("note1", "Title", "Memo", CanvasStickyNote.COLOR_AMBER, 50, 200, 160, 100);
+        graph.addStickyNote(note);
+
+        CanvasGroupFrame frame = new CanvasGroupFrame("f1", "Frame 1", CanvasGroupFrame.COLOR_PURPLE, 40, 40, 300, 280);
+        graph.addFrame(frame);
+
+        // Copy all
+        NodeClipboard.getInstance().copy(graph, Set.of(n1.getId()), Set.of(note.getId()), Set.of(frame.getId()));
+        Assertions.assertTrue(NodeClipboard.getInstance().hasContent());
+
+        // Paste into new graph at offset target
+        FlowGraph targetGraph = new FlowGraph();
+        NodeClipboard.PasteResult res = NodeClipboard.getInstance().paste(targetGraph, 200, 200);
+
+        Assertions.assertEquals(1, res.nodes().size());
+        Assertions.assertEquals(1, res.notes().size());
+        Assertions.assertEquals(1, res.frames().size());
+
+        CanvasGroupFrame pastedFrame = res.frames().get(0);
+        Assertions.assertNotEquals("f1", pastedFrame.getId());
+        Assertions.assertEquals("Frame 1", pastedFrame.getTitle());
+        Assertions.assertEquals(CanvasGroupFrame.COLOR_PURPLE, pastedFrame.getColor());
+        Assertions.assertEquals(1, targetGraph.getFrames().size());
+        Assertions.assertEquals(1, targetGraph.getNodes().size());
+        Assertions.assertEquals(1, targetGraph.getStickyNotes().size());
+    }
+
+    @Test
+    public void testFrameCommandsUndoRedo() {
+        FlowGraph graph = new FlowGraph();
+        CanvasGroupFrame frame = new CanvasGroupFrame("f1", "Frame 1", CanvasGroupFrame.COLOR_ROSE, 10, 10, 200, 150);
+        graph.addFrame(frame);
+
+        // 1. Remove command
+        com.gtceu.calcboard.api.history.BoardCommand.RemoveFramesCommand removeCmd =
+                new com.gtceu.calcboard.api.history.BoardCommand.RemoveFramesCommand(frame, "Delete frame");
+        removeCmd.redo(graph);
+        Assertions.assertEquals(0, graph.getFrames().size());
+
+        removeCmd.undo(graph);
+        Assertions.assertEquals(1, graph.getFrames().size());
+        Assertions.assertEquals("f1", graph.getFrames().get(0).getId());
+
+        // 2. Add command
+        CanvasGroupFrame frame2 = new CanvasGroupFrame("f2", "Frame 2", CanvasGroupFrame.COLOR_AMBER, 20, 20, 200, 150);
+        com.gtceu.calcboard.api.history.BoardCommand.AddFramesCommand addCmd =
+                new com.gtceu.calcboard.api.history.BoardCommand.AddFramesCommand(frame2, "Add frame");
+        addCmd.redo(graph);
+        Assertions.assertEquals(2, graph.getFrames().size());
+
+        addCmd.undo(graph);
+        Assertions.assertEquals(1, graph.getFrames().size());
+    }
 }

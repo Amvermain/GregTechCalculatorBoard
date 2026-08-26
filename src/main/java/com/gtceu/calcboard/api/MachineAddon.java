@@ -28,10 +28,13 @@ public class MachineAddon {
 
     public static final class Category {
         public static final AddonCategory PARALLEL = AddonCategory.PARALLEL;
+        public static final AddonCategory ENERGY_HATCH = AddonCategory.ENERGY_HATCH;
+        public static final AddonCategory HATCH_BUS = AddonCategory.HATCH_BUS;
         public static final AddonCategory MAINTENANCE = AddonCategory.MAINTENANCE;
         public static final AddonCategory COIL = AddonCategory.COIL;
         public static final AddonCategory ROTOR = AddonCategory.ROTOR;
         public static final AddonCategory REFLECTOR = AddonCategory.REFLECTOR;
+        public static final AddonCategory THREADING = AddonCategory.THREADING;
         public static final AddonCategory MULTIBLOCK_TRAIT = AddonCategory.MULTIBLOCK_TRAIT;
         public static final AddonCategory THERMAL_AUGMENT = AddonCategory.THERMAL_AUGMENT;
         public static final AddonCategory MAGNET = AddonCategory.MAGNET;
@@ -91,6 +94,17 @@ public class MachineAddon {
     }
 
     public String getName() {
+        if ("gtceu:rotor_standard".equals(id) || "gtceu:reflector_none".equals(id)) {
+            if (name != null && !name.isEmpty()) {
+                if (name.startsWith("gui.gtcalcboard.") || name.contains(".")) {
+                    try {
+                        String trans = Component.translatable(name).getString();
+                        if (!trans.contains("%s")) return trans;
+                    } catch (Throwable ignored) {}
+                }
+                return name;
+            }
+        }
         if (itemStackSample != null && !itemStackSample.isEmpty()) {
             try {
                 String stackName = itemStackSample.getHoverName().getString();
@@ -436,29 +450,67 @@ public class MachineAddon {
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("id", id);
-        tag.putString("name", name != null ? name : "");
-        tag.putString("modId", getModId());
-        tag.putString("category", category != null ? category.getId() : "custom");
-        tag.putString("description", description != null ? description : "");
+        if (name != null && !name.isEmpty()) {
+            tag.putString("name", name);
+        }
+        if (!getModId().isEmpty()) {
+            tag.putString("modId", getModId());
+        }
+        if (category != null && category != AddonCategory.CUSTOM) {
+            tag.putString("category", category.getId());
+        }
+        if (description != null && !description.isEmpty()) {
+            tag.putString("description", description);
+        }
         if (itemIcon != null) {
             tag.putString("icon", itemIcon.toString());
         }
-        tag.putDouble("durationMultiplier", durationMultiplier);
-        tag.putDouble("eutMultiplier", eutMultiplier);
-        tag.putInt("parallelMultiplier", parallelMultiplier);
-        tag.putBoolean("powerConstant", powerConstant);
-        tag.putInt("magneticForce", magneticForce);
-        tag.putInt("coilTemperature", coilTemperature);
-        tag.putInt("pyrolyseSpeedPercent", pyrolyseSpeedPercent);
-        tag.putInt("crackingEnergyPercent", crackingEnergyPercent);
-        tag.putInt("chemicalSpeedPercent", chemicalSpeedPercent);
-        tag.putInt("chemicalEnergyPercent", chemicalEnergyPercent);
-        tag.putInt("smelterParallel", smelterParallel);
-        tag.putInt("rotorEfficiency", rotorEfficiency);
-        tag.putInt("rotorPower", rotorPower);
-        tag.putDouble("rotorMaxEUt", rotorMaxEUt);
-        tag.putInt("reflectorTier", reflectorTier);
-        if (discoverySource != null) {
+        if (Math.abs(durationMultiplier - 1.0) > 0.0001) {
+            tag.putDouble("durationMultiplier", durationMultiplier);
+        }
+        if (Math.abs(eutMultiplier - 1.0) > 0.0001) {
+            tag.putDouble("eutMultiplier", eutMultiplier);
+        }
+        if (parallelMultiplier != 0) {
+            tag.putInt("parallelMultiplier", parallelMultiplier);
+        }
+        if (powerConstant) {
+            tag.putBoolean("powerConstant", true);
+        }
+        if (magneticForce != 0) {
+            tag.putInt("magneticForce", magneticForce);
+        }
+        if (coilTemperature != 0) {
+            tag.putInt("coilTemperature", coilTemperature);
+        }
+        if (pyrolyseSpeedPercent != 0) {
+            tag.putInt("pyrolyseSpeedPercent", pyrolyseSpeedPercent);
+        }
+        if (crackingEnergyPercent != 0) {
+            tag.putInt("crackingEnergyPercent", crackingEnergyPercent);
+        }
+        if (chemicalSpeedPercent != 0) {
+            tag.putInt("chemicalSpeedPercent", chemicalSpeedPercent);
+        }
+        if (chemicalEnergyPercent != 0) {
+            tag.putInt("chemicalEnergyPercent", chemicalEnergyPercent);
+        }
+        if (smelterParallel != 0) {
+            tag.putInt("smelterParallel", smelterParallel);
+        }
+        if (rotorEfficiency != 0) {
+            tag.putInt("rotorEfficiency", rotorEfficiency);
+        }
+        if (rotorPower != 0) {
+            tag.putInt("rotorPower", rotorPower);
+        }
+        if (rotorMaxEUt != 0.0) {
+            tag.putDouble("rotorMaxEUt", rotorMaxEUt);
+        }
+        if (reflectorTier != 0) {
+            tag.putInt("reflectorTier", reflectorTier);
+        }
+        if (discoverySource != null && !discoverySource.isEmpty()) {
             tag.putString("discoverySource", discoverySource);
         }
         if (itemStackSample != null && !itemStackSample.isEmpty()) {
@@ -514,6 +566,10 @@ public class MachineAddon {
             addon = new GTReflectorAddon(id, name, desc, icon);
         } else if (cat.equals(AddonCategory.PARALLEL)) {
             addon = new GTParallelHatchAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.ENERGY_HATCH)) {
+            addon = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(id, name, desc, icon);
+        } else if (cat.equals(AddonCategory.HATCH_BUS)) {
+            addon = new com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon(id, name, desc, icon);
         } else if (cat.equals(AddonCategory.THERMAL_AUGMENT)) {
             addon = new ThermalAugmentAddon(id, name, desc, icon);
         } else if (cat.equals(AddonCategory.MAGNET)) {

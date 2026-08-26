@@ -275,6 +275,19 @@ public class RecipeSearchDialog {
         return IS_CACHING;
     }
 
+    private static final java.util.concurrent.ForkJoinPool BACKGROUND_INDEX_POOL = new java.util.concurrent.ForkJoinPool(
+            Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() - 1)),
+            pool -> {
+                var worker = java.util.concurrent.ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+                worker.setName("GTCalcBoard-RecipeIndexer-" + worker.getPoolIndex());
+                worker.setDaemon(true);
+                worker.setPriority(Thread.MIN_PRIORITY);
+                return worker;
+            },
+            null,
+            false
+    );
+
     public static void ensureGlobalRecipesCachedAsync(Runnable onComplete) {
         if (GLOBAL_CACHED) {
             if (onComplete != null) onComplete.run();
@@ -285,8 +298,19 @@ public class RecipeSearchDialog {
         }
         if (IS_CACHING) return;
 
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.level == null) {
+            return;
+        }
+
+        // Strictly ensure all recipe indexing occurs post-EMI baking
+        if (!com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) {
+            com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> ensureGlobalRecipesCachedAsync(null));
+            return;
+        }
+
         var emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-        if (emiManager == null || emiManager.getRecipes().isEmpty() || !dev.emi.emi.runtime.EmiReloadManager.isLoaded()) {
+        if (emiManager == null || emiManager.getRecipes().isEmpty()) {
             return;
         }
 
@@ -301,14 +325,29 @@ public class RecipeSearchDialog {
                     return;
                 }
 
-                CACHING_PROGRESS = new RecipeLoadingProgress(2, 3, "gui.gtcalcboard.loading_recipe_phase.2", recipes.size() + " Recipes (" + Runtime.getRuntime().availableProcessors() + " CPU Cores)");
+                CACHING_PROGRESS = new RecipeLoadingProgress(2, 3, "gui.gtcalcboard.loading_recipe_phase.2", recipes.size() + " Recipes");
                 long startNanos = System.nanoTime();
-                // Fast parallel indexing across all CPU cores (reduces 120s+ to < 1s)
-                List<SearchableRecipe> tempList = new ArrayList<>(recipes.parallelStream()
-                        .map(RecipeSearchEngine::buildIndex)
-                        .filter(Objects::nonNull)
-                        .toList());
+                
+                // Smooth low-priority chunked batch indexing with CPU yielding to prevent frame drops
+                List<SearchableRecipe> rawList = BACKGROUND_INDEX_POOL.submit(() -> {
+                    int total = recipes.size();
+                    List<SearchableRecipe> list = new ArrayList<>(total);
+                    int batchSize = 500;
+                    for (int i = 0; i < total; i += batchSize) {
+                        int end = Math.min(i + batchSize, total);
+                        for (int j = i; j < end; j++) {
+                            try {
+                                SearchableRecipe sr = RecipeSearchEngine.buildIndex(recipes.get(j));
+                                if (sr != null) list.add(sr);
+                            } catch (Throwable ignored) {}
+                        }
+                        // Yield CPU between batches to give render thread 100% frame-rate priority
+                        Thread.yield();
+                    }
+                    return list;
+                }).get();
 
+                List<SearchableRecipe> tempList = new ArrayList<>(rawList);
                 // Index Create & passive kinetic generators
                 tempList.addAll(com.gtceu.calcboard.compat.create.CreateModAdapter.getVirtualKineticSearchRecipes());
 
@@ -325,9 +364,15 @@ public class RecipeSearchDialog {
 
                 long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
                 com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
-                        "[GTCalcBoard] [RecipeSearch] Indexed {} EMI recipes in {}ms across {} CPU cores.",
-                        tempList.size(), elapsedMs, Runtime.getRuntime().availableProcessors()
+                        "[GTCalcBoard] [RecipeSearch] Indexed {} EMI recipes in {}ms smoothly in background.",
+                        tempList.size(), elapsedMs
                 );
+
+                try {
+                    net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                        new com.gtceu.calcboard.api.event.CatalogLifecycleEvent.RecipesReady(tempList.size(), elapsedMs)
+                    );
+                } catch (Throwable ignored) {}
 
                 List<Runnable> callbacks;
                 synchronized (ON_COMPLETE_CALLBACKS) {
@@ -470,44 +515,41 @@ public class RecipeSearchDialog {
             String categoryId,
             String categoryName
     ) {
-        Set<String> outputNames = new HashSet<>();
-        Set<String> inputNames = new HashSet<>();
-        Set<ResourceLocation> outputIds = new HashSet<>();
-        Set<ResourceLocation> inputIds = new HashSet<>();
-        Set<String> outputPaths = new HashSet<>();
-        Set<String> inputPaths = new HashSet<>();
+        List<ResourceLocation> outputIds = new ArrayList<>();
+        List<String> outputNames = new ArrayList<>();
+        List<ResourceLocation> inputIds = new ArrayList<>();
+        List<String> inputNames = new ArrayList<>();
         StringBuilder outSb = new StringBuilder();
         StringBuilder inSb = new StringBuilder();
 
         for (IngredientStack in : template.getInputs()) {
             if (in.getDisplayName() != null) {
-                String n = in.getDisplayName().toLowerCase(Locale.ROOT);
-                inputNames.add(n);
-                inSb.append(n).append(" ");
+                inputNames.add(in.getDisplayName());
+                inSb.append(in.getDisplayName().toLowerCase(Locale.ROOT)).append(" ");
             }
             if (in.getId() != null) {
                 inputIds.add(in.getId());
-                String fullId = in.getId().toString().toLowerCase(Locale.ROOT);
-                String path = in.getId().getPath().toLowerCase(Locale.ROOT);
-                inputPaths.add(path);
-                inSb.append(fullId).append(" ").append(path).append(" ");
+                inSb.append(in.getId().toString().toLowerCase(Locale.ROOT)).append(" ")
+                    .append(in.getId().getPath().toLowerCase(Locale.ROOT)).append(" ");
             }
         }
 
         for (IngredientStack out : template.getOutputs()) {
             if (out.getDisplayName() != null) {
-                String n = out.getDisplayName().toLowerCase(Locale.ROOT);
-                outputNames.add(n);
-                outSb.append(n).append(" ");
+                outputNames.add(out.getDisplayName());
+                outSb.append(out.getDisplayName().toLowerCase(Locale.ROOT)).append(" ");
             }
             if (out.getId() != null) {
                 outputIds.add(out.getId());
-                String fullId = out.getId().toString().toLowerCase(Locale.ROOT);
-                String path = out.getId().getPath().toLowerCase(Locale.ROOT);
-                outputPaths.add(path);
-                outSb.append(fullId).append(" ").append(path).append(" ");
+                outSb.append(out.getId().toString().toLowerCase(Locale.ROOT)).append(" ")
+                    .append(out.getId().getPath().toLowerCase(Locale.ROOT)).append(" ");
             }
         }
+
+        ResourceLocation[] inArr = inputIds.isEmpty() ? null : inputIds.toArray(new ResourceLocation[0]);
+        ResourceLocation[] outArr = outputIds.isEmpty() ? null : outputIds.toArray(new ResourceLocation[0]);
+        String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
+        String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
 
         return new SearchableRecipe(
                 template,
@@ -517,12 +559,10 @@ public class RecipeSearchDialog {
                 categoryName.intern(),
                 inSb.toString().trim(),
                 outSb.toString().trim(),
-                inputIds,
-                outputIds,
-                inputPaths,
-                outputPaths,
-                inputNames,
-                outputNames
+                inArr,
+                outArr,
+                inNamesArr,
+                outNamesArr
         );
     }
 
@@ -1449,7 +1489,10 @@ public class RecipeSearchDialog {
                 return true;
             }
         }
-        return searchBox.keyPressed(keyCode, scanCode, modifiers);
+        if (searchBox != null) {
+            searchBox.keyPressed(keyCode, scanCode, modifiers);
+        }
+        return true;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {

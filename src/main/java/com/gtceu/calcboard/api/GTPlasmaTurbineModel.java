@@ -50,34 +50,62 @@ public enum GTPlasmaTurbineModel {
         return machineIcon;
     }
 
+    public ResourceLocation getMachineIcon(RecipeNode node) {
+        if (node != null) {
+            for (ResourceLocation ws : node.getAvailableWorkstations()) {
+                if (ws != null) {
+                    String path = ws.getPath().toLowerCase(java.util.Locale.ROOT);
+                    if (this == NPT && (path.contains("nyinsane") || path.contains("npt"))) return ws;
+                    if (this == SPT && (path.contains("supreme") || path.contains("spt") || path.contains("boosted"))) return ws;
+                    if (this == LPT && (path.contains("large") || path.contains("lpt") || path.contains("plasma_large"))) return ws;
+                }
+            }
+        }
+        if (this == LPT) {
+            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(this.machineIcon);
+            if (item == null || item == net.minecraft.world.item.Items.AIR) {
+                var alt = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
+                if (net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(alt)) {
+                    return alt;
+                }
+            }
+        }
+        return machineIcon;
+    }
+
     public static GTPlasmaTurbineModel getModel(RecipeNode node) {
         if (node == null) return LPT;
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
             String path = icon.getPath().toLowerCase(java.util.Locale.ROOT);
-            if (path.contains("nyinsane")) return NPT;
-            if (path.contains("supreme") || path.contains("boosted")) return SPT;
-            if (path.contains("large_plasma")) return LPT;
-        }
-        if (node.getName() != null) {
-            String name = node.getName().toLowerCase(java.util.Locale.ROOT);
-            if (name.contains("nyinsane") || name.contains("npt")) return NPT;
-            if (name.contains("supreme") || name.contains("spt")) return SPT;
+            if (icon.equals(NPT.machineIcon) || path.contains("nyinsane") || path.contains("npt")) return NPT;
+            if (icon.equals(SPT.machineIcon) || path.contains("supreme") || path.contains("spt") || path.contains("boosted")) return SPT;
+            if (icon.equals(LPT.machineIcon) || path.contains("large") || path.contains("plasma_generator")) return LPT;
         }
         return LPT;
     }
 
     public static boolean isPlasmaTurbine(RecipeNode node) {
-        if (node == null || !node.isTurbine()) return false;
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("plasma_turbine")) {
-            return true;
+        if (node == null) return false;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            if (catId.equals(ResourceLocation.tryParse("gtceu:plasma_generator"))
+                    || catId.equals(ResourceLocation.tryParse("gtceu:plasma_turbine"))
+                    || catId.getPath().contains("plasma")) {
+                return true;
+            }
         }
         ResourceLocation icon = node.getMachineIcon();
-        if (icon != null && icon.getPath().contains("plasma_turbine")) {
-            return true;
+        if (icon != null) {
+            if (icon.equals(LPT.machineIcon) || icon.equals(SPT.machineIcon) || icon.equals(NPT.machineIcon)
+                    || icon.getPath().contains("plasma")) {
+                return true;
+            }
         }
-        if (node.getName() != null && node.getName().toLowerCase(java.util.Locale.ROOT).contains("plasma turbine")) {
-            return true;
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && (ws.equals(LPT.machineIcon) || ws.equals(SPT.machineIcon) || ws.equals(NPT.machineIcon) || ws.getPath().contains("plasma"))) {
+                return true;
+            }
         }
         return false;
     }

@@ -24,6 +24,9 @@ public final class NodeProperties {
     public static final NodePropertyKey<String> CLEANROOM_TYPE = register(
             NodePropertyKey.ofString("cleanroom_type", "")
     );
+    public static final NodePropertyKey<Integer> BOILER_THROTTLE = register(
+            NodePropertyKey.ofInt("boiler_throttle", 100)
+    );
 
     // Large Turbine & Rotor Properties
     public static final NodePropertyKey<Integer> TURBINE_ROTOR_EFFICIENCY = register(

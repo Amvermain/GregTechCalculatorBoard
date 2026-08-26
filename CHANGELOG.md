@@ -6,6 +6,69 @@
 
 All notable changes to **GregTech Calculator Board** will be documented in this file.
 
+## [2.0.0-alpha.9] - 2026-08-26
+
+### Added
+- **Native EMI Recipe Transfer (`[+]`) Button & Drag-and-Drop Integration (`BoardEmiRecipeHandler`, `BoardEmiDragDropHandler`, `CalcBoardEmiPlugin`)**:
+  - Clicking EMI's native `[+]` button while viewing recipes with the Calculator Board open now directly instantiates and adds the recipe as an active node onto the canvas.
+  - Supports dragging recipes directly from EMI onto the board canvas to place new nodes.
+- **Multiblock Construction Bill of Materials (BOM) System (`RFC-003`, `MultiblockBOMCalculator`, `MultiblockStructureCatalog`, `MultiblockBOMDialog`, `MultiblockBOMEmiRecipe`, `MultiblockBOMTest`)**:
+  - Added dedicated global/per-page BOM calculation dialog opened via hotkey `B` or the `[📦 BOM]` toolbar button.
+  - Categorizes structure parts into Casings, Coils, Hatches/Buses, and Controllers with precise stack and remainder formatting (e.g. `3 stacks + 48 (240)`).
+  - One-click `[★ Register in EMI]` button to register the aggregated construction parts as a virtual root recipe in EMI's crafting tree for effortless ingredient tracing.
+  - Added `[📋 Copy List]` clipboard text export functionality.
+  - Real-time dual lower-tier energy hatch toggle (`⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches`).
+- **Energy Hatch & Dynamic Hybrid Hatch Override System (`RFC-004`, `GTEnergyHatchAddon`, `GTHatchAddon`, `EnergyHatchHelper`, `GTHatchHelper`)**:
+  - Determines multiblock voltage tier and amperage (1A, 2A, 4A, 16A, etc.) through equipped energy hatch addons with automatic tier overclock ceiling clamping.
+  - Dynamically calculates needed I/O bus and hatch counts based on slot capacities (1x, 4x, 9x, 16x) and enforces Distillation Tower single-fluid hatch constraints.
+- **Horizontal Node Flip (`RecipeNode`, `NodeCardRenderer`, `BoardHotkeyHandler`, `NodeFlipTest`)**:
+  - Hotkey `Alt + F` or card flip button (`[⇄]`) horizontally mirrors input (left) and output (right) slot layout to minimize wire crossings in dense process layouts.
+- **Lifecycle Event Bus & Addon Hooks System (`RFC-001`, `RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`, `LifecycleEventBusTest`)**:
+  - Standardized Forge event bus hooks notifying external listeners on node lifecycle stages (create, modify, delete, pre/post calculation, and catalog build).
+- **GregTech Large Multiblock Steam Boilers & Throttle Control (`GTBoilerTier`, `GTCEuRecipeHandler`, `GTCEuModAdapter`, `MachineConfigDialog`)**:
+  - Accurately parses Large Boiler recipes (`gtceu:large_boiler`), calculating baseline steam production ($800\text{ mB/t} = 16,000\text{ mB/s}$) and water consumption ($5\text{ mB/t} = 100\text{ mB/s}$, 1:160 ratio) for the Large Bronze Boiler.
+  - Multi-tier speed scaling for large boilers: L-Bronze $1.0\times$ ($800\text{ mB/t}$), L-Steel $2.25\times$ ($1,800\text{ mB/t}$), L-Titanium $4.0\times$ ($3,200\text{ mB/t}$), and L-Tungstensteel $8.0\times$ ($6,400\text{ mB/t}$).
+  - Integrated 25% ~ 100% Throttle slider and preset buttons in `MachineConfigDialog` and node cards, dynamically scaling duration, fuel burn rate, and steam output.
+- **Canvas Group Frame Selection Model, Clipboard & Undo/Redo Integration (`BoardSelectionModel`, `CanvasGroupFrameRenderer`, `CanvasInteractionHandler`, `NodeClipboard`, `BoardCommand`, `CanvasGroupFrameTest`)**:
+  - Full marquee box selection and Shift/Ctrl multi-selection support for group frames.
+  - Comprehensive clipboard support (`Ctrl + C`, `Ctrl + V`, `Ctrl + X`, `Ctrl + D`, `Delete`) for frames and contained nodes, preserving relative layout coordinates upon paste.
+  - Complete history tracking (`Undo / Redo`) for frame creation, deletion, movement, and resizing.
+  - Prevented duplicate delta application (Double-Delta) when dragging multiple selected frames and nodes.
+- **Create: New Age Carbon Brushes Generator Coil & Magnet BOM Aggregation (`MultiblockBOMCalculator`, `CreateNewAgeModAdapter`, `IModAdapter`, `CreateNewAgeTest`)**:
+  - Extended `IModAdapter.populateExtraBOMParts` SPI to automatically include 1x `Generator Coil` (`create_new_age:generator_coil`) per Carbon Brushes machine under the `COIL` category in the BOM.
+  - Automatically aggregates all installed singleblock and kinetic addons (up to 12 magnets per generator, thermal augments, threading helixes) into the BOM multiplied by machine count.
+  - Classified `MAGNET` items under the `COIL` category, properly displaying them in the Coils and All BOM tabs.
+- **Muffler & Maintenance Hatch Catalog and BOM Support (`MultiblockStructureCatalog`, `MultiblockBOMCalculator`, `GTCEuModAdapter`)**:
+  - Added Muffler Hatches (LV~MAX) and Maintenance / Auto-Maintenance Hatches to the catalog and BOM construction blueprints.
+- **Star Technology Sterile Cleaning Maintenance Hatch Support (`StarTAddonCrawler`, `StarTModAdapter`, `MachineAddonTest`)**:
+  - Added `start_core:sterile_cleaning_maintenance_hatch` to the maintenance addons catalog with full localization support.
+
+### Changed & Improved
+- **Background Data Indexing & Memory Footprint Optimization**:
+  - Optimized recipe search token caching and indexing throughput, eliminating frame drops and reducing memory allocation during startup and recipe search.
+- **Flow Graph JSON Serialization Payload Optimization (`FlowGraphSerializer`)**:
+  - Omitted default field values during graph serialization to significantly minimize blueprint and NBT data size.
+- **UI Layout and Toolbar Margin Polish (`BoardScreen`, `ToolbarWidget`)**:
+  - Refined toolbar button boundaries and padding, improving Favorites Dock placement and responsiveness.
+- **Magnet & Multi-Stackable Addon Click Interaction (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
+  - Left-clicking catalog cards now stacks addons (+1) up to 12 slots, while Shift + Left-Click fills remaining slots (+12) or batch-replaces them.
+  - Right-clicking uninstalls 1 copy (-1), and the top `Clear Magnets` button resets all installed magnets.
+- **Deferred Addon Tooltip Rendering (`MachineConfigDialog`)**:
+  - Resolved UI layering bug where lengthy addon descriptions were clipped by dialog boundaries.
+
+### Fixed
+- **Auto Connect Duplicate Bypass Wire Prevention (`ToolbarWidget`)**:
+  - Prevented redundant direct bypass wires from being created between producers and consumers that are already routed through a reroute junction hub.
+- **Large Boiler Recipe Double-Acceleration Duration Bug (`GTCEuRecipeHandler`, `GTCEuModAdapter`)**:
+  - Fixed an issue where singleblock boiler speed multipliers were redundantly applied to large boiler recipes, distorting cycle duration down to 0.05s (1 tick) and vastly overconsuming fuel.
+- **HP Steam to Electric Singleblock Machine Icon Recovery Bug (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
+  - Fixed an issue where disabling HP Steam mode unexpectedly promoted singleblock machines to multiblock icons instead of restoring the original tier-specific singleblock workstation.
+- **Dialog & Search Text Input 'E' Key / Canvas Hotkey Conflict Bug (`RecipeSearchDialog`, `BoardScreen`, `MultiblockBOMDialog`, `GlobalBalanceDashboardDialog`)**:
+  - Fixed a key routing bug where typing letters (such as 'E', 'B', 'T', 'F', 'J') into search boxes or modal input fields triggered Minecraft's inventory close key (E) or board canvas shortcuts instead of typing cleanly into the input box.
+- **Kinetic Generator & Motor EMI Recipe Integration & SU Search Indexing (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
+  - Fixed an issue where pinning kinetic generators (such as Large Water Wheel) to EMI favorites did not link to their generation recipes by registering them as native EMI synthetic recipes with workstations and outputs.
+  - Enriched search indices so querying `<su`, `<stress`, or machine names immediately matches stress unit generation recipes.
+
 ---
 
 ## [2.0.0-alpha.8] - 2026-08-25

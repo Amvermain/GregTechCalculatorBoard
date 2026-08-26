@@ -215,13 +215,11 @@ public class ThermalAugmentHelper {
             }
         }
 
-        // 3. Fallback for mock nodes without category/icon in tests
-        if (catId == null && icon == null && node.getAvailableWorkstations().isEmpty()) {
-            if (node.getName() != null) {
-                String nl = node.getName().toLowerCase(java.util.Locale.ROOT);
-                if (nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic") || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment") || (nl.contains("thermal") && !nl.contains("thermal_cloth"))) {
-                    return true;
-                }
+        // 3. Name keywords for mock/dynamos
+        if (node.getName() != null) {
+            String nl = node.getName().toLowerCase(java.util.Locale.ROOT);
+            if (nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic") || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment") || (nl.contains("thermal") && !nl.contains("thermal_cloth"))) {
+                return true;
             }
         }
 

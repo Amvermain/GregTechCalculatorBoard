@@ -33,7 +33,7 @@ public class WorkspaceTabBarWidget {
         Font font = mc.font;
 
         int barY = 2;
-        int curX = 6;
+        int curX = screen.getDynamicLeftMargin();
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 350.0f);
@@ -172,7 +172,7 @@ public class WorkspaceTabBarWidget {
         Font font = mc.font;
 
         int barY = 2;
-        int curX = 6;
+        int curX = screen.getDynamicLeftMargin();
 
         // 1. [👤 Personal Board] Tab Click
         String personalTxt = "👤 " + Component.translatable("gui.gtcalcboard.workspace.personal").getString();

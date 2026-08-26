@@ -325,6 +325,6 @@ public class GuideDialog {
             return true;
         }
 
-        return false;
+        return true;
     }
 }

@@ -288,4 +288,30 @@ public class CreateKineticTest {
         Assertions.assertTrue(foundBrushes);
         Assertions.assertTrue(foundMotor);
     }
+
+    @Test
+    public void testKineticRecipeSearchAndFavoriteMatching() {
+        List<RecipeSearchEngine.SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
+
+        // 1. Search by "<su"
+        RecipeSearchEngine.ParsedQuery querySu = RecipeSearchEngine.parseQuery("<su");
+        List<RecipeSearchEngine.SearchableRecipe> matchesSu = virtualRecipes.stream()
+                .filter(sr -> RecipeSearchEngine.matches(sr, querySu))
+                .toList();
+        Assertions.assertTrue(matchesSu.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
+
+        // 2. Search by "<stress"
+        RecipeSearchEngine.ParsedQuery queryStress = RecipeSearchEngine.parseQuery("<stress");
+        List<RecipeSearchEngine.SearchableRecipe> matchesStress = virtualRecipes.stream()
+                .filter(sr -> RecipeSearchEngine.matches(sr, queryStress))
+                .toList();
+        Assertions.assertTrue(matchesStress.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
+
+        // 3. Search by "large water wheel"
+        RecipeSearchEngine.ParsedQuery queryLww = RecipeSearchEngine.parseQuery("large water wheel");
+        List<RecipeSearchEngine.SearchableRecipe> matchesLww = virtualRecipes.stream()
+                .filter(sr -> RecipeSearchEngine.matches(sr, queryLww))
+                .toList();
+        Assertions.assertTrue(matchesLww.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
+    }
 }

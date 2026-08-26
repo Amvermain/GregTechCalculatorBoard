@@ -41,6 +41,15 @@ public class DynamicAddonCrawler {
                 adapter.discoverAddons(list, Collections.emptyList());
             } catch (Throwable ignored) {}
         }
+        try {
+            com.gtceu.calcboard.api.event.MachineAddonRegisterEvent event = new com.gtceu.calcboard.api.event.MachineAddonRegisterEvent();
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
+            for (MachineAddon custom : event.getRegisteredAddons()) {
+                if (custom != null) {
+                    list.add(custom);
+                }
+            }
+        } catch (Throwable ignored) {}
         return list;
     }
 
@@ -63,44 +72,48 @@ public class DynamicAddonCrawler {
 
     public static List<ItemStack> collectAllActiveItemStacks() {
         List<ItemStack> stacks = new ArrayList<>();
-        Set<Item> seenItemsWithoutTag = new HashSet<>();
-        Set<String> seenItemsWithTag = new HashSet<>();
-
+        Set<Item> seenItems = new HashSet<>();
         java.util.function.Consumer<ItemStack> collector = is -> {
             if (is == null || is.isEmpty()) return;
-            if (is.hasTag()) {
-                String key = ForgeRegistries.ITEMS.getKey(is.getItem()) + "#" + is.getTag().toString();
-                if (seenItemsWithTag.add(key)) {
-                    stacks.add(is);
-                }
-            } else {
-                if (seenItemsWithoutTag.add(is.getItem())) {
-                    stacks.add(is);
-                }
+            Item item = is.getItem();
+            ResourceLocation key = ForgeRegistries.ITEMS.getKey(item);
+            if (key == null) return;
+            String ns = key.getNamespace();
+            String path = key.getPath();
+            // Fast filter: only inspect items from relevant namespaces or addon keywords
+            if (!ns.equals("gtceu") && !ns.equals("thermal") && !ns.equals("thermal_expansion")
+                    && !ns.equals("systeams") && !path.contains("rotor") && !path.contains("augment")
+                    && !path.contains("hatch") && !path.contains("coil")) {
+                return;
+            }
+            if (seenItems.add(item)) {
+                stacks.add(is);
             }
         };
 
-        // 1. If EMI is loaded, scan EMI recipe outputs
+        // 1. If EMI is loaded & baked, scan EMI recipe outputs
         try {
-            var emiRecipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (emiRecipeManager != null && emiRecipeManager.getRecipes() != null && !emiRecipeManager.getRecipes().isEmpty()) {
-                for (dev.emi.emi.api.recipe.EmiRecipe emiRecipe : emiRecipeManager.getRecipes()) {
-                    if (emiRecipe != null && emiRecipe.getOutputs() != null) {
-                        for (dev.emi.emi.api.stack.EmiStack es : emiRecipe.getOutputs()) {
-                            if (es != null && !es.isEmpty()) {
-                                ItemStack is = es.getItemStack();
-                                if (is != null && !is.isEmpty()) {
-                                    if (!is.hasTag() && es.getNbt() != null) {
-                                        is = is.copy();
-                                        is.setTag(es.getNbt().copy());
+            if (com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) {
+                var emiRecipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
+                if (emiRecipeManager != null && emiRecipeManager.getRecipes() != null && !emiRecipeManager.getRecipes().isEmpty()) {
+                    for (dev.emi.emi.api.recipe.EmiRecipe emiRecipe : emiRecipeManager.getRecipes()) {
+                        if (emiRecipe != null && emiRecipe.getOutputs() != null) {
+                            for (dev.emi.emi.api.stack.EmiStack es : emiRecipe.getOutputs()) {
+                                if (es != null && !es.isEmpty()) {
+                                    ItemStack is = es.getItemStack();
+                                    if (is != null && !is.isEmpty()) {
+                                        if (!is.hasTag() && es.getNbt() != null) {
+                                            is = is.copy();
+                                            is.setTag(es.getNbt().copy());
+                                        }
+                                        collector.accept(is);
                                     }
-                                    collector.accept(is);
                                 }
                             }
                         }
                     }
+                    return stacks;
                 }
-                return stacks;
             }
         } catch (Throwable ignored) {}
 

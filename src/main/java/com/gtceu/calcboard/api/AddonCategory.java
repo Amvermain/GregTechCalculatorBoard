@@ -12,6 +12,8 @@ public final class AddonCategory {
     private static final Map<String, AddonCategory> REGISTRY = new ConcurrentHashMap<>();
 
     public static final AddonCategory PARALLEL = register("parallel", "Parallel Hatches", "gui.gtcalcboard.addon_cat.parallel", 100);
+    public static final AddonCategory ENERGY_HATCH = register("energy_hatch", "Energy Hatches", "gui.gtcalcboard.addon_cat.energy_hatch", 98);
+    public static final AddonCategory HATCH_BUS = register("hatch_bus", "Hatches & Buses", "gui.gtcalcboard.addon_cat.hatch_bus", 96);
     public static final AddonCategory MAINTENANCE = register("maintenance", "Maintenance & Hatches", "gui.gtcalcboard.addon_cat.maintenance", 95);
     public static final AddonCategory COIL = register("coil", "Heating Coils", "gui.gtcalcboard.addon_cat.coil", 90);
     public static final AddonCategory ROTOR = register("rotor", "Turbine Rotors", "gui.gtcalcboard.addon_cat.rotor", 80);

@@ -7,8 +7,10 @@ import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -80,14 +82,30 @@ public class CreateRecipeHandler {
         return createKineticGeneratorNode(itemId, stack.getHoverName().getString());
     }
 
+    public static String getItemDisplayName(ResourceLocation itemId, String fallback) {
+        if (itemId != null) {
+            try {
+                var item = ForgeRegistries.ITEMS.getValue(itemId);
+                if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                    String name = new ItemStack(item).getHoverName().getString();
+                    if (name != null && !name.isEmpty()) {
+                        return name;
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+        return fallback != null ? fallback : (itemId != null ? itemId.getPath() : "");
+    }
+
     public static RecipeNode createKineticGeneratorNode(ResourceLocation itemId, String displayName) {
         if (itemId == null) return null;
         String path = itemId.getPath();
         String namespace = itemId.getNamespace();
+        String name = getItemDisplayName(itemId, displayName);
 
         if (namespace.equals("create")) {
             if (path.equals("large_water_wheel")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Large Water Wheel", 20.0, 512.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Large Water Wheel", 20.0, 512.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -95,7 +113,7 @@ public class CreateRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(512.0));
                 return node;
             } else if (path.equals("water_wheel")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Water Wheel", 20.0, 256.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Water Wheel", 20.0, 256.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -103,7 +121,7 @@ public class CreateRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(256.0));
                 return node;
             } else if (path.equals("windmill_bearing")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Windmill Bearing", 20.0, 512.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Windmill Bearing", 20.0, 512.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -111,7 +129,7 @@ public class CreateRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(512.0));
                 return node;
             } else if (path.equals("steam_engine")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Steam Engine", 20.0, 2048.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Steam Engine", 20.0, 2048.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -120,7 +138,7 @@ public class CreateRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(2048.0));
                 return node;
             } else if (path.equals("hand_crank")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Hand Crank", 20.0, 256.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Hand Crank", 20.0, 256.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -128,7 +146,7 @@ public class CreateRecipeHandler {
                 node.addOutput(IngredientStack.stressUnit(256.0));
                 return node;
             } else if (path.equals("creative_motor")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Creative Motor", 20.0, 16384.0, GTVoltageTier.LV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Creative Motor", 20.0, 16384.0, GTVoltageTier.LV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -138,7 +156,7 @@ public class CreateRecipeHandler {
             }
         } else if (namespace.equals("createaddition")) {
             if (path.equals("alternator")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Alternator", 20.0, 256.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Alternator", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(true);
                 node.setMachineIcon(itemId);
@@ -146,7 +164,7 @@ public class CreateRecipeHandler {
                 node.addInput(IngredientStack.stressUnit(256.0));
                 return node;
             } else if (path.equals("electric_motor")) {
-                RecipeNode node = RecipeNode.create(displayName != null ? displayName : "Electric Motor", 20.0, 512.0, GTVoltageTier.ULV);
+                RecipeNode node = RecipeNode.create(name != null ? name : "Electric Motor", 20.0, 512.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(false);
                 node.setMachineIcon(itemId);
@@ -161,7 +179,10 @@ public class CreateRecipeHandler {
     public static List<RecipeSearchEngine.SearchableRecipe> getVirtualKineticSearchRecipes() {
         List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
         String catId = "create:kinetic_generation";
-        String catName = "Create Kinetic";
+        String catName = Component.translatable("category.gtcalcboard.create_kinetic").getString();
+        if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
+            catName = "Create Kinetic";
+        }
 
         ResourceLocation[] items = {
                 ResourceLocation.tryParse("create:large_water_wheel"),
@@ -174,7 +195,7 @@ public class CreateRecipeHandler {
                 ResourceLocation.tryParse("createaddition:electric_motor")
         };
 
-        String[] names = {
+        String[] fallbackNames = {
                 "Large Water Wheel",
                 "Water Wheel",
                 "Windmill Bearing",
@@ -187,7 +208,7 @@ public class CreateRecipeHandler {
 
         for (int i = 0; i < items.length; i++) {
             if (items[i] == null) continue;
-            RecipeNode node = createKineticGeneratorNode(items[i], names[i]);
+            RecipeNode node = createKineticGeneratorNode(items[i], fallbackNames[i]);
             if (node != null) {
                 String displayName = node.getName();
                 String modId = items[i].getNamespace();
@@ -197,6 +218,21 @@ public class CreateRecipeHandler {
                 for (IngredientStack out : node.getOutputs()) {
                     outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
                     if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
+                    if (out.isStressUnit()) {
+                        outputNames.add("stress");
+                        outputNames.add("unit");
+                        outputNames.add("units");
+                        outputNames.add("su");
+                        outputNames.add("su/s");
+                        outputNames.add("kinetic");
+                        outputNames.add("스트레스");
+                    }
+                }
+                outputNames.add(displayName.toLowerCase(Locale.ROOT));
+                outputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
+                if (items[i] != null) {
+                    outputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
+                    outputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
                 }
 
                 List<String> inputNames = new ArrayList<>();
@@ -204,10 +240,25 @@ public class CreateRecipeHandler {
                 for (IngredientStack in : node.getInputs()) {
                     inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
                     if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
+                    if (in.isStressUnit()) {
+                        inputNames.add("stress");
+                        inputNames.add("unit");
+                        inputNames.add("units");
+                        inputNames.add("su");
+                        inputNames.add("su/s");
+                        inputNames.add("kinetic");
+                        inputNames.add("스트레스");
+                    }
+                }
+                inputNames.add(displayName.toLowerCase(Locale.ROOT));
+                inputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
+                if (items[i] != null) {
+                    inputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
+                    inputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
                 }
 
                 String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
-                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " kinetic stress units generator create su").trim();
+                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + fallbackNames[i].toLowerCase(Locale.ROOT) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create su").trim();
 
                 list.add(new RecipeSearchEngine.SearchableRecipe(
                         node,

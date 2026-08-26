@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.compat.gtceu;
 
 import com.gtceu.calcboard.api.DynamicAddonCrawler;
+import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
@@ -18,6 +19,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -30,11 +32,14 @@ public class GTCEuAddonCrawler {
         // 1. Built-in GT Multiblock Traits & Configurable Maintenance Hatch modes
         addBuiltinTraits(collector);
 
-        // 2. Discover standard GT coils, rotors, and fusion reflectors via helpers
+        // 2. Discover standard GT coils, rotors, energy hatches, hatches & buses, parallel hatches, and fusion reflectors via helpers
         try {
             TurbineRotorHelper.discoverGTCEuRotors(collector);
             CoilHelper.discoverGTCEuCoils(collector);
             ReflectorHelper.discoverGTCEuReflectors(collector);
+            com.gtceu.calcboard.compat.gtceu.helper.EnergyHatchHelper.discoverGTCEuEnergyHatches(collector);
+            com.gtceu.calcboard.compat.gtceu.helper.GTHatchHelper.discoverGTCEuHatches(collector);
+            ParallelHelper.discoverGTCEuParallelHatches(collector);
         } catch (Throwable ignored) {}
 
         // 3. Scan active recipe stacks (e.g. custom material rotors, parts with NBT)
@@ -55,6 +60,10 @@ public class GTCEuAddonCrawler {
                 MachineAddon parallel = ParallelHelper.parseParallelHatch(s, id);
                 if (parallel != null && !containsAddonId(collector, parallel.getId())) {
                     collector.add(parallel);
+                }
+                MachineAddon energyHatch = com.gtceu.calcboard.compat.gtceu.helper.EnergyHatchHelper.parseEnergyHatch(s, id);
+                if (energyHatch != null && !containsAddonId(collector, energyHatch.getId())) {
+                    collector.add(energyHatch);
                 }
                 MachineAddon reflector = ReflectorHelper.parseReflectorItem(s, id);
                 if (reflector != null && !containsAddonId(collector, reflector.getId())) {
@@ -99,6 +108,12 @@ public class GTCEuAddonCrawler {
                 MachineAddon parallel = ParallelHelper.parseParallelHatch(stack, id);
                 if (parallel != null && !containsAddonId(collector, parallel.getId())) {
                     collector.add(parallel);
+                    continue;
+                }
+
+                MachineAddon energyHatch = com.gtceu.calcboard.compat.gtceu.helper.EnergyHatchHelper.parseEnergyHatch(stack, id);
+                if (energyHatch != null && !containsAddonId(collector, energyHatch.getId())) {
+                    collector.add(energyHatch);
                     continue;
                 }
 
@@ -155,6 +170,24 @@ public class GTCEuAddonCrawler {
         overpressure.setDiscoverySource("GTCEu Multiblock Trait Specification [gtceu:autoclave]");
         if (!containsAddonId(list, overpressure.getId())) list.add(overpressure);
 
+        MachineAddon maint = new MachineAddon("gtceu:maintenance_hatch", "gui.gtcalcboard.addon.maintenance_hatch", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.maintenance_hatch.desc", ResourceLocation.tryParse("gtceu:maintenance_hatch"));
+        maint.setDurationMultiplier(1.0);
+        maint.setEutMultiplier(1.0);
+        maint.setDiscoverySource("GTCEu Maintenance Hatch Specification");
+        if (!containsAddonId(list, maint.getId())) list.add(maint);
+
+        MachineAddon autoMaint = new MachineAddon("gtceu:auto_maintenance_hatch", "gui.gtcalcboard.addon.auto_maintenance_hatch", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.auto_maintenance_hatch.desc", ResourceLocation.tryParse("gtceu:auto_maintenance_hatch"));
+        autoMaint.setDurationMultiplier(1.0);
+        autoMaint.setEutMultiplier(1.0);
+        autoMaint.setDiscoverySource("GTCEu Auto Maintenance Hatch Specification");
+        if (!containsAddonId(list, autoMaint.getId())) list.add(autoMaint);
+
+        MachineAddon cleanMaint = new MachineAddon("gtceu:cleaning_maintenance_hatch", "gui.gtcalcboard.addon.cleaning_maintenance_hatch", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.cleaning_maintenance_hatch.desc", ResourceLocation.tryParse("gtceu:cleaning_maintenance_hatch"));
+        cleanMaint.setDurationMultiplier(1.0);
+        cleanMaint.setEutMultiplier(1.0);
+        cleanMaint.setDiscoverySource("GTCEu Cleaning Maintenance Hatch Specification");
+        if (!containsAddonId(list, cleanMaint.getId())) list.add(cleanMaint);
+
         MachineAddon cmhFast = new MachineAddon("gtceu:configurable_maintenance_hatch_fast", "gui.gtcalcboard.addon.configurable_maintenance_hatch_fast", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.configurable_maintenance_hatch_fast.desc", ResourceLocation.tryParse("gtceu:configurable_maintenance_hatch"));
         cmhFast.setDurationMultiplier(0.9);
         cmhFast.setEutMultiplier(1.0);
@@ -167,11 +200,35 @@ public class GTCEuAddonCrawler {
         cmhEco.setDiscoverySource("GTCEu Configurable Maintenance Hatch (Eco Mode)");
         if (!containsAddonId(list, cmhEco.getId())) list.add(cmhEco);
 
+        // Register Muffler Hatches (LV ~ MAX)
+        for (GTVoltageTier tier : GTVoltageTier.values()) {
+            if (tier.ordinal() < GTVoltageTier.LV.ordinal()) continue;
+            String prefix = tier.getName().toLowerCase(Locale.ROOT);
+            ResourceLocation mId = ResourceLocation.tryParse("gtceu:" + prefix + "_muffler_hatch");
+            if (mId != null) {
+                String mName = tier.getName() + " Muffler Hatch";
+                MachineAddon muffler = new MachineAddon(
+                    mId.toString(),
+                    mName,
+                    MachineAddon.Category.MAINTENANCE,
+                    "gui.gtcalcboard.addon.muffler_hatch_desc",
+                    mId
+                );
+                muffler.setDurationMultiplier(1.0);
+                muffler.setEutMultiplier(1.0);
+                muffler.setDiscoverySource("GTCEu Muffler Hatch Specification [" + tier.getName() + "]");
+                if (!containsAddonId(list, muffler.getId())) list.add(muffler);
+            }
+        }
+
         // Include Star Technology turbine boosting traits in catalog
         com.gtceu.calcboard.compat.start.StarTAddonCrawler.addBuiltinStarTTraits(list);
     }
 
     public static boolean isMaintenanceHatchItem(Item item, ResourceLocation id) {
+        if (id != null && id.getPath().contains("muffler_hatch")) {
+            return true;
+        }
         if (item instanceof BlockItem bi) {
             Block b = bi.getBlock();
             try {
@@ -234,6 +291,15 @@ public class GTCEuAddonCrawler {
             eco.setItemStackSample(stack);
             eco.setDiscoverySource("GTCEu Configurable Maintenance Hatch Definition (Eco Mode) [" + id + "]");
             list.add(eco);
+        } else if (id.getPath().contains("muffler")) {
+            String name = stack.getHoverName().getString();
+            String desc = Component.translatable("gui.gtcalcboard.addon.muffler_hatch_desc").getString();
+            MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.toString() : name, MachineAddon.Category.MAINTENANCE, desc, id);
+            addon.setDurationMultiplier(1.0);
+            addon.setEutMultiplier(1.0);
+            addon.setItemStackSample(stack);
+            addon.setDiscoverySource("GTCEu Muffler Hatch Definition [" + id + "]");
+            list.add(addon);
         } else {
             String name = stack.getHoverName().getString();
             String desc = Component.translatable("gui.gtcalcboard.addon.maintenance_hatch_desc").getString();

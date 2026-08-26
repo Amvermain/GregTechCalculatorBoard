@@ -683,10 +683,11 @@ public class GlobalBalanceDashboardDialog {
         }
 
         if (searchBox != null && searchBox.isFocused()) {
-            return searchBox.keyPressed(keyCode, scanCode, modifiers);
+            searchBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
         }
 
-        return false;
+        return true;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {

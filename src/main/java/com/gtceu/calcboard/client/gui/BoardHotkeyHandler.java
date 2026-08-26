@@ -51,6 +51,14 @@ public final class BoardHotkeyHandler {
             return screen.getGlobalBalanceDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
+        if (screen.getMultiblockBOMDialog() != null && screen.getMultiblockBOMDialog().isVisible()) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                screen.getMultiblockBOMDialog().close();
+                return true;
+            }
+            return screen.getMultiblockBOMDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+
         if (screen.getGuideDialog() != null && screen.getGuideDialog().isVisible()) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 screen.getGuideDialog().close();
@@ -186,8 +194,20 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
+        // 8.5 Toggle Multiblock BOM Dialog: Shift + B or M
+        if (((keyCode == GLFW.GLFW_KEY_B && (modifiers & GLFW.GLFW_MOD_SHIFT) != 0) || (keyCode == GLFW.GLFW_KEY_M && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0))) {
+            if (screen.getMultiblockBOMDialog() != null) {
+                if (screen.getMultiblockBOMDialog().isVisible()) {
+                    screen.getMultiblockBOMDialog().close();
+                } else {
+                    screen.getMultiblockBOMDialog().open();
+                }
+                return true;
+            }
+        }
+
         // 9. Toggle Global Balance Dashboard: B
-        if (keyCode == GLFW.GLFW_KEY_B && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+        if (keyCode == GLFW.GLFW_KEY_B && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0 && (modifiers & GLFW.GLFW_MOD_SHIFT) == 0) {
             if (screen.getGlobalBalanceDialog() != null) {
                 if (screen.getGlobalBalanceDialog().isVisible()) {
                     screen.getGlobalBalanceDialog().close();

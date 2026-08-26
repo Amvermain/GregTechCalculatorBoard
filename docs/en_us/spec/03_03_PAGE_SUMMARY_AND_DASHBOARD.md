@@ -210,4 +210,16 @@ Decomposes the selected item's sources and sinks across pages in $O(N)$ complexi
 
 ---
 
+## 4. Multiblock Construction Bill of Materials Dialog (`MultiblockBOMDialog`)
+
+Opened via hotkey `M` or `Shift + B` (and the `[📦 BOM]` toolbar button), this dialog aggregates required construction casings, coils, hatches, buses, and controllers across the current or all workspace pages.
+
+* **Category Tab Filtering**: `All`, `Casings`, `Coils`, `Hatches & Buses`, `Controllers`.
+* **Stack Unit Formatting**: Automatically displays quantities in standard inventory stack notation (e.g. `3 stacks + 48 (240 items)`).
+* **Dual Energy Hatch Toggle**: `⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches` for real-time parts substitution.
+* **One-Click EMI Integration (`[★ Register in EMI]`)**: Registers the full bill of materials as a virtual recipe root in EMI for seamless recipe ingredient tracking.
+* **Clipboard Export (`[📋 Copy List]`)**: Copies the formatted bill of materials list to the system clipboard.
+
+---
+
 > ➡️ **Next Chapter**: [[03-04] Recipe Search, Filters, Hotkey HUD, Guide & Toast UI](03_04_RECIPE_SEARCH_AND_TOOLS.md)

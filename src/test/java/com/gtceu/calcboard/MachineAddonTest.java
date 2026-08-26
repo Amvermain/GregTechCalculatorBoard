@@ -1,16 +1,22 @@
 package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
+import com.gtceu.calcboard.compat.start.StarTAddonCrawler;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Unit tests for Machine Addons, Turbine Rotors, Heating Coils, Parallel Hatches, and Thermal Augments.
@@ -232,9 +238,31 @@ public class MachineAddonTest {
         pyrolyse.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:pyrolyse_oven"));
         var pyrolyseCats = MachineAddon.getRelevantCategories(pyrolyse);
         Assertions.assertTrue(pyrolyseCats.contains(MachineAddon.Category.COIL));
-        Assertions.assertTrue(pyrolyseCats.contains(MachineAddon.Category.PARALLEL));
+        Assertions.assertFalse(pyrolyseCats.contains(MachineAddon.Category.PARALLEL));
         Assertions.assertTrue(pyrolyseCats.contains(MachineAddon.Category.MAINTENANCE));
         Assertions.assertFalse(pyrolyseCats.contains(MachineAddon.Category.ROTOR));
+
+        // 2b. Large Chemical Reactor & LFD (Parallel Multiblock)
+        RecipeNode lcr = RecipeNode.create("Large Chemical Reactor", 20.0, 64.0, GTVoltageTier.HV);
+        lcr.setMultiblock(true);
+        lcr.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
+        var lcrCats = MachineAddon.getRelevantCategories(lcr);
+        Assertions.assertTrue(lcrCats.contains(MachineAddon.Category.PARALLEL));
+
+        RecipeNode dt = RecipeNode.create("Distillation Tower", 20.0, 64.0, GTVoltageTier.EV);
+        dt.setMultiblock(true);
+        dt.setMachineIcon(ResourceLocation.tryParse("gtceu:distillation_tower"));
+        var dtCats = MachineAddon.getRelevantCategories(dt);
+        Assertions.assertFalse(dtCats.contains(MachineAddon.Category.PARALLEL));
+
+        // 2c. Singleblock Turbine vs Multiblock Turbine
+        RecipeNode singleTurbine = RecipeNode.create("Steam Turbine (Steam)", 20.0, 32.0, GTVoltageTier.LV);
+        singleTurbine.setMultiblock(false);
+        singleTurbine.setGenerator(true);
+        singleTurbine.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:steam_turbine"));
+        var singleTurbineCats = MachineAddon.getRelevantCategories(singleTurbine);
+        Assertions.assertFalse(singleTurbineCats.contains(MachineAddon.Category.ROTOR));
+        Assertions.assertFalse(rotor.isCompatibleWith(singleTurbine));
 
         Assertions.assertTrue(coil.isCompatibleWith(pyrolyse));
         Assertions.assertFalse(rotor.isCompatibleWith(pyrolyse));
@@ -850,5 +878,64 @@ public class MachineAddonTest {
             Assertions.assertTrue(sample.getTag().contains("GT.PartStats"));
             Assertions.assertEquals("gtceu:ancient_runicalium", sample.getTag().getCompound("GT.PartStats").getString("Material"));
         }
+    }
+
+    @Test
+    public void testMultiblockTraitSingletonBehavior() {
+        RecipeNode lcrNode = RecipeNode.create("Large Chemical Reactor", 20.0, 120.0, GTVoltageTier.HV);
+        lcrNode.setMultiblock(true);
+        lcrNode.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(lcrNode);
+
+        MachineAddon batch = new MachineAddon("gtceu:batch_processing", "Batch Mode", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        batch.setParallelMultiplier(16);
+
+        // LCR supports batch mode
+        Assertions.assertTrue(adapter.isAddonCompatible(lcrNode, batch));
+
+        // LFD does NOT support batch mode
+        RecipeNode lfdNode = RecipeNode.create("Large Distillation Tower", 20.0, 120.0, GTVoltageTier.HV);
+        lfdNode.setMultiblock(true);
+        lfdNode.setMachineIcon(ResourceLocation.tryParse("gtceu:large_distillery"));
+        Assertions.assertFalse(adapter.isAddonCompatible(lfdNode, batch));
+
+        // Install 1st time on LCR
+        adapter.handleInstallAddon(lcrNode, batch, false);
+        Assertions.assertEquals(1, lcrNode.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT).count());
+        Assertions.assertEquals(16, lcrNode.getTotalParallel());
+
+        // Attempting to install again overwrites/replaces rather than duplicating
+        adapter.handleInstallAddon(lcrNode, batch, false);
+        Assertions.assertEquals(1, lcrNode.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT).count());
+        Assertions.assertEquals(16, lcrNode.getTotalParallel());
+
+        // Uninstall
+        adapter.handleUninstallAddon(lcrNode, batch);
+        Assertions.assertEquals(0, lcrNode.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT).count());
+        Assertions.assertEquals(1, lcrNode.getTotalParallel());
+    }
+
+    @Test
+    public void testStarTSterileCleaningMaintenanceHatchDiscoveryAndCompatibility() {
+        List<MachineAddon> addons = new ArrayList<>();
+        StarTAddonCrawler.discoverAddons(addons, List.of());
+
+        MachineAddon sterileHatch = addons.stream()
+                .filter(a -> "start_core:sterile_cleaning_maintenance_hatch".equals(a.getId()))
+                .findFirst()
+                .orElse(null);
+
+        Assertions.assertNotNull(sterileHatch, "Sterile Cleaning Maintenance Hatch must be discovered by StarTAddonCrawler");
+        Assertions.assertEquals(MachineAddon.Category.MAINTENANCE, sterileHatch.getCategory());
+        Assertions.assertEquals(1.0, sterileHatch.getDurationMultiplier());
+        Assertions.assertEquals(1.0, sterileHatch.getEutMultiplier());
+
+        // Test compatibility with multiblock
+        RecipeNode lcrNode = RecipeNode.create("Large Chemical Reactor", 20.0, 120.0, GTVoltageTier.HV);
+        lcrNode.setMultiblock(true);
+        lcrNode.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(lcrNode);
+
+        Assertions.assertTrue(adapter.isAddonCompatible(lcrNode, sterileHatch), "Sterile Cleaning Maintenance Hatch must be compatible with multiblock");
     }
 }

@@ -381,12 +381,10 @@ public class RecipeSearchEngineTest {
                 "Steam Boiler",
                 "minecraft:lava lava gtceu:steam_boiler steam_boiler",
                 "gtceu:steam steam",
-                java.util.Set.of(lavaId),
-                java.util.Set.of(steamId),
-                java.util.Set.of("lava"),
-                java.util.Set.of("steam"),
-                java.util.Set.of("lava"),
-                java.util.Set.of("steam")
+                new net.minecraft.resources.ResourceLocation[]{lavaId},
+                new net.minecraft.resources.ResourceLocation[]{steamId},
+                new String[]{"Lava"},
+                new String[]{"Steam"}
         );
 
         // 2. Steam Pipe crafting recipe: produces Steam Pipe item (NOT steam fluid)
@@ -398,12 +396,10 @@ public class RecipeSearchEngineTest {
                 "Crafting",
                 "gtceu:bronze_ingot bronze_ingot",
                 "gtceu:small_steam_pipe small_steam_pipe steam pipe",
-                java.util.Collections.emptySet(),
-                java.util.Set.of(steamPipeId),
-                java.util.Collections.emptySet(),
-                java.util.Set.of("small_steam_pipe"),
-                java.util.Collections.emptySet(),
-                java.util.Set.of("steam pipe")
+                null,
+                new net.minecraft.resources.ResourceLocation[]{steamPipeId},
+                null,
+                new String[]{"Small Steam Pipe"}
         );
 
         // 3. High Pressure Steam Liquid Boiler crafting recipe: produces Boiler block (NOT steam fluid)
@@ -415,12 +411,10 @@ public class RecipeSearchEngineTest {
                 "Crafting",
                 "gtceu:steel_plate steel_plate",
                 "gtceu:hp_steam_liquid_boiler hp_steam_liquid_boiler high pressure steam liquid boiler",
-                java.util.Collections.emptySet(),
-                java.util.Set.of(boilerBlockId),
-                java.util.Collections.emptySet(),
-                java.util.Set.of("hp_steam_liquid_boiler"),
-                java.util.Collections.emptySet(),
-                java.util.Set.of("high pressure steam liquid boiler")
+                null,
+                new net.minecraft.resources.ResourceLocation[]{boilerBlockId},
+                null,
+                new String[]{"High Pressure Steam Liquid Boiler"}
         );
 
         // Exact match verification for Producer search of Steam (gtceu:steam)

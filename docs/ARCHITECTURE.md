@@ -1,151 +1,118 @@
 # GregTech Calculator Board - Architecture & Developer Guide
 
+<p align="center">
+  <b>English</b> | <a href="ARCHITECTURE_KR.md">한국어</a>
+</p>
+
 > 📘 **Detailed Code Specifications**:
-> * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](file:///e:/Dev/modding/minecraft/GregTechCalculatorBoard/docs/ko_kr/CODE_SPECIFICATION.md)
-> * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](file:///e:/Dev/modding/minecraft/GregTechCalculatorBoard/docs/en_us/CODE_SPECIFICATION.md)
+> * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/docs/ko_kr/CODE_SPECIFICATION.md)
+> * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/docs/en_us/CODE_SPECIFICATION.md)
 > Full v2.0.0 architecture specs, 5 graph algorithms, `CategoryCapabilityMatrix`, and multiplayer concurrency lock protocols are available above.
 
-This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and 1.7.10 backporting targets for GregTech Calculator Board.
+This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer for GregTech Calculator Board.
 
 ---
 
 ## 1. System Overview
 
-The codebase is organized into three decoupled layers:
+The codebase is organized into four strictly decoupled architectural layers following Clean Architecture and SPI (Service Provider Interface) principles:
 
 ```mermaid
 graph TD
-    subgraph UI["Presentation & UI Layer (com.gtceu.calcboard.client.gui)"]
-        BS["BoardScreen (Viewport, 2D Camera, Pan & Zoom)"]
-        CIH["CanvasInteractionHandler (Mouse Input, Selection, Dragging)"]
-        Widgets["NodeWidget & NodeCardRenderer (Cards, Icons, Port Sockets)"]
-        CR["ConnectionRenderer (Cubic Bezier Splines & Hit Testing)"]
-        Dialogs["MachineConfigDialog (Addon Rack, Category Filters, Tuner)"]
-        Overlays["SummaryOverlay & GuideDialog"]
+    subgraph UI["1. Presentation & UI Layer (com.gtceu.calcboard.client.gui)"]
+        BS["BoardScreen (Viewport, 2D Camera, Pan & Zoom, Screen Matrix)"]
+        CIH["CanvasInteractionHandler (Mouse Drag, Marquee Selection, Port Wiring)"]
+        Widgets["NodeWidget & NodeCardRenderer (Card Layouts, Badges, Port Sockets)"]
+        CR["ConnectionRenderer (Cubic Bezier Splines & Curve Hit-Testing)"]
+        Dialogs["MachineConfigDialog & AddonCatalogPanel (Addon Rack, Search Engine)"]
+        Overlays["SummaryOverlay, GuideDialog, MultiblockBOMDialog"]
     end
 
-    subgraph Core["Core Math & Graph Engine (com.gtceu.calcboard.api)"]
-        BM["BoardManager (Multi-Page Documents & Local Storage)"]
-        FG["FlowGraph (Topology, Nodes, Connections, Subgraphs)"]
-        RN["RecipeNode (Machine Parameters, Voltage, Parallels, Addons)"]
+    subgraph Core["2. Core Math & Graph Engine (com.gtceu.calcboard.api)"]
+        BM["BoardManager & BoardPage (Multi-Page Documents & Local Storage)"]
+        FG["FlowGraph & ConnectionEdge (Topology, Nodes, Directed Wires, Subgraphs)"]
+        RN["RecipeNode (Pure Domain Model, Inputs/Outputs, Rate & CPS Storage)"]
+        NPS["NodePropertyStore & NodeProperties (Type-Safe Dynamic Property Registry)"]
         OC["OverclockMode (Standard, Perfect, Lossless & Sub-tick Batches)"]
         FGS["FlowGraphSolver (Fixed-Point Relaxation, BFS AutoRatio, Port Stats)"]
         FGMH["FlowGraphModuleHandler (Compound Module Grouping & Expansion)"]
         HM["HistoryManager (Undo/Redo Command Delta Stack)"]
-        BC["BlueprintCodec (NBT & Base64 GZIP Blueprint Codec)"]
+        BC["BlueprintCodec (NBT & Base64 GZIP Compressed Codec)"]
     end
 
-    subgraph Compat["Mod Compatibility Layer (com.gtceu.calcboard.compat)"]
-        MAR["ModAdapterRegistry & IModAdapter (Priority Routing SPI)"]
-        subgraph Adapters["Sub-package Adapters (Facade, AddonCrawler, GuiHandler, RecipeHandler)"]
-            GT["gtceu (Coils, Rotors, Hatches, Traits, EU/t)"]
-            CR_MOD["create (RPM/SU, Stress, Kinetic Generators)"]
-            TH["thermal (AugmentData, Dynamos, RF/t)"]
+    subgraph Compat["3. Mod Compatibility SPI Layer (com.gtceu.calcboard.compat)"]
+        MAR["ModAdapterRegistry (Priority Routing SPI)"]
+        IMA["IModAdapter (Lifecycle, Overclocking, Energy, BOM & Validation Interface)"]
+        subgraph Adapters["Domain Mod Adapters"]
+            GT["gtceu (Voltage Tiers, Coils, Rotors, Hatches, Steam Modes, EU/t)"]
+            CR_MOD["create (RPM/SU, Stress Capacity, Kinetic Generators)"]
+            CNA["createnewage (Motors, Generators, Heat/FE/SU Conversion)"]
+            TH["thermal (AugmentData, Tier Kits, Dynamos, RF/t)"]
             SY["systeams (Boilers, Steam mB/s, Steam Dynamos)"]
-            VN["vanilla (Universal Fallback)"]
+            ST["start (Plasma Turbines, Multi-Helix Structures, SPT/NPT Traits)"]
+            VN["vanilla (Passive Unpowered Fallback)"]
         end
-        MAR --> Adapters
+        MAR --> IMA
+        IMA --> Adapters
     end
 
-    subgraph Integration["Integration Layer (com.gtceu.calcboard.integration)"]
-        ERC["Recipe Ingestion (1.20: EMI / 1.7.10: NEI GT_Recipe_Map)"]
-        MD["MultiblockDetector (Structure Recipe Scanner)"]
+    subgraph Integration["4. Integration & Pre-baking Layer (com.gtceu.calcboard.integration)"]
+        ERC["EmiRecipeConverter (Deep Recursive Ingredient & Chance Extraction)"]
+        CCM["CategoryCapabilityMatrix (Pre-baked O(1) Machine & Workstation Cache)"]
+        MD["MultiblockDetector (Deterministic Structure & Part Recipe Scanner)"]
         DAC["DynamicAddonCrawler (Harvests active stacks & orchestrates adapters)"]
     end
 
     UI -->|Dispatches user actions & UI rendering| Core
-    UI -->|Delegates custom controls| Compat
+    UI -->|Delegates custom controls & tooltips| Compat
     Integration -->|Ingests recipe and machine data| Core
-    Integration -->|Discovers addons| Compat
-    Core -->|Routes machine rules & calculations| Compat
+    Integration -->|Discovers addons & bakes capabilities| Compat
+    Core -->|Routes machine rules, lifecycle & calculations| Compat
 ```
 
-The core math engine (`com.gtceu.calcboard.api`) has zero dependencies on Minecraft client GUI or rendering classes, allowing it to run in headless environments and pass JUnit tests independently.
+The core math engine (`com.gtceu.calcboard.api`) has zero dependencies on Minecraft client GUI or rendering classes, allowing it to execute in headless server environments and pass JUnit tests independently.
 
 ---
 
-## 2. Core Domain & Math Engine
+## 2. Core Architectural Principles
 
-### 2.1 Data Models
+### 2.1 Clean Domain Model (`RecipeNode`)
+`RecipeNode` is an engine-level generic calculation entity representing any processing workstation, power generator, or compound module on the canvas:
+* **Zero Direct Mod Coupling**: `RecipeNode` contains no hardcoded GregTech, Create, or Thermal specific mechanics.
+* **Lifecycle & Event Delegation**: Machine icon changes (`setMachineIcon`), energy type queries (`getEnergyType`), default parallels (`getDefaultParallel`), single machine power (`getSingleMachineEUt`), and node operating validation (`isOperational`) are dynamically dispatched to the active `IModAdapter` via `ModAdapterRegistry.getAdapterForNode(node)`.
+* **Type-Safe Dynamic Properties**: Additional mod-specific or feature-specific metadata is stored cleanly in `NodePropertyStore` using type-safe `NodeProperty<T>` keys without bloating the core node class fields.
 
-- **`BoardManager` & `BoardPage`**: Root workspace manager. Handles multi-tab pages, active page state, camera viewport coordinates, and client-side persistence (`<gamedir>/gtcalcboard/calcboard_save.nbt`).
-- **`FlowGraph`**: Graph container storing nodes (`RecipeNode`) and directed connection edges (`ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx)`). Supports nested subgraphs.
-- **`RecipeNode`**: Represents a processing machine, power generator, or compound module on the canvas:
-  - Inputs and outputs (`List<IngredientStack>`).
-  - Base recipe parameters: base duration ticks, base EU/t, recipe voltage tier.
-  - Runtime configuration: target voltage tier, overclock mode (`STANDARD`, `PERFECT`, `LOSSLESS`), machine count, parallel multiplier, multiblock flag, generator flag, and installed hardware addons (`List<MachineAddon>`).
-  - Operating efficiency: settled rate ($\eta \in [0.0, 1.0]$) computed by the graph solver under supply constraints.
-- **`IngredientStack`**: Stores item/fluid ID, display name, amount, base chance ($0.0 \dots 1.0$), and `tierChanceBoost`.
-
----
-
-### 2.2 Overclocking Mathematics
-
-Overclocking is evaluated dynamically based on the voltage tier difference:
-
-$$\Delta\text{Tier} = \max(0, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal})$$
-
-If $\Delta\text{Tier} > 0$:
-
-$$\text{Energy Multiplier} = (\text{energyFactor})^{\Delta\text{Tier}} \quad (\text{Default: } 4.0^{\Delta\text{Tier}})$$
-$$\text{Duration} = \frac{\text{baseDurationTicks}}{(\text{speedFactor})^{\Delta\text{Tier}}} \quad (\text{Standard: } 2.0^{\Delta\text{Tier}}, \text{ Perfect: } 4.0^{\Delta\text{Tier}})$$
-
-#### Sub-tick Processing ($< 1.0\text{ Tick}$)
-When overclocking reduces a recipe's duration below $1.0\text{ tick}$ ($0.05\text{ s}$):
-
-$$\text{batchesPerTick} = \frac{1.0}{\text{calculatedDurationTicks}}, \quad \text{effectiveDurationTicks} = 1.0$$
-$$\text{Cycles Per Second (CPS)} = 20.0 \times \text{batchesPerTick} \times \text{parallel} \times \text{machineCount}$$
-
-#### Hardware Addons Compounding
-$$\text{Total Duration} = \text{Duration} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()$$
-$$\text{Total EU/t} = \text{EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
-
-#### Probabilistic Byproduct Scaling (Tier Chance Boost)
-For recipes with chanced outputs (e.g. Macerator, Centrifuge), higher voltage tiers boost output probability:
-
-$$\text{Effective Chance} = \min(1.0, \text{BaseChance} + \Delta\text{Tier} \times \text{TierChanceBoost})$$
-$$\text{Expected Output Amount} = \text{Amount} \times \text{Effective Chance}$$
-
-Standard GregTech recipes use $+5.0\%$ per voltage tier ($\text{TierChanceBoost} = 0.05$).
+### 2.2 Addon & Spec Deductive Analysis Policy (Rule 5)
+* **Strict Anti-Heuristic Rule**: String matching on tooltips, item display names, or raw item paths (`id.getPath().contains(...)`) to guess machine tiers or addon values is strictly forbidden.
+* **Deterministic Deduction**:
+  1. Official mod APIs and runtime Java reflection (`Functional Deduction`).
+  2. In-game object / simulation state execution.
+  3. Pure NBT numeric tags (e.g. `AugmentData` float/int compound tags) and official Forge `TagKey` registries.
 
 ---
 
-### 2.3 Compound Modules (`FlowGraphModuleHandler`)
+## 3. Multi-Mod Energy & Physical Models
 
-Compound Modules package a group of selected nodes into a single composite card (`Ctrl+G`):
-
-```mermaid
-flowchart LR
-    subgraph Expanded["Sub-Graph Nodes"]
-        M1["Machine A"] --> M2["Machine B"]
-        M2 --> M3["Machine C"]
-        M3 -->|Recycle| M1
-    end
-    
-    subgraph Collapsed["Compound Module Card"]
-        CM["[Module] PGM Line\nNet EU/t: 1,240 (IV)\n18 Machines\nInputs: 4 | Outputs: 6"]
-    end
-    
-    Expanded -- "Group (Ctrl+G)" --> Collapsed
-    Collapsed -- "Expand (Ctrl+G)" --> Expanded
-```
-
-- **I/O Extraction**: `FlowGraphSolver.computeSummary(subGraph)` derives net external raw inputs and products. Internal intermediate connections are encapsulated.
-- **Wire Remapping**: External incoming/outgoing wires are reconnected to the composite card's boundary ports.
-- **Scaling**: Adjusting the module's machine count scales all internal machine counts and flow rates proportionally.
+| Energy Type (`EnergyType`) | Domain Mod | Operating Metric | Overclock / Speed Mechanism | Primary Adapter |
+| :--- | :--- | :--- | :--- | :--- |
+| **`ELECTRIC_EU`** | GregTech CEu | $\text{EU/t}$, Voltage Tier | Standard 4x/2x, Perfect 4x/4x, Sub-tick batches | [`GTCEuModAdapter`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/compat/gtceu/GTCEuModAdapter.java) |
+| **`KINETIC_SU`** | Create | $\text{SU}$ (Stress Units), $\text{RPM}$ | Speed scaling: $\text{Duration} \propto \frac{1}{\text{RPM}}$ (Fan recipes fixed) | [`CreateModAdapter`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/compat/create/CreateModAdapter.java) |
+| **`ELECTRIC_FE`** | Thermal / New Age | $\text{RF/t}$ / $\text{FE/t}$ | Augments & Tier Kits (Base Power + Auxiliary multipliers) | [`ThermalModAdapter`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/compat/thermal/ThermalModAdapter.java) |
+| **`HEAT_OR_SELF`** | Boilers / Dynamos | $\text{mB/s Steam}$ generated | Small Boilers ($\text{LP}=1\times, \text{HP}=3\times$), Large Multiblock Boilers ($\text{Bronze}=1\times$, $\text{Steel}=2.25\times$, $\text{Titanium}=4\times$, $\text{Tungstensteel}=8\times$), Throttle ($25\% \sim 100\%$) | [`GTCEuModAdapter`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/compat/gtceu/GTCEuModAdapter.java), [`SysteamsModAdapter`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/compat/systeams/SysteamsModAdapter.java) |
+| **`NONE`** | Vanilla / Passive | 0 Power | Fixed duration / duration multipliers | [`VanillaModAdapter`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/compat/vanilla/VanillaModAdapter.java) |
 
 ---
 
-### 2.4 Solver Algorithms (`FlowGraphSolver`)
+## 4. Mathematical Solver Engine (`FlowGraphSolver`)
 
 ```mermaid
 flowchart TD
     A["1. Auto-Ratio BFS (Anchor Node Propagation)"] --> B["2. Fixed-Point Bottleneck Iteration (10-Pass Relaxation)"]
     B --> C["3. Port Statistics (Proportional Wire Distribution)"]
-    C --> D["4. Process Summary (Net EU/t, Raw Inputs, Net Products)"]
+    C --> D["4. Process Summary (Net Power, Raw Inputs, Net Products, BOM)"]
 ```
 
-#### Algorithm 1: Fixed-Point Bottleneck Relaxation
+### 4.1 Algorithm 1: Fixed-Point Bottleneck Relaxation
 Computes the operating efficiency of every node under upstream shortages or recycled feedback loops:
 
 1. Initialize all node efficiencies: $\eta_v^{(0)} = 1.0$.
@@ -163,186 +130,61 @@ $$\rho_i = \frac{\text{IncomingSupply}_i}{\text{NominalDemand}_{C, i}}$$
    - Update node efficiency: $\eta_C^{(k)} = \min_i (\rho_i, 1.0)$.
 3. If $\max_v |\eta_v^{(k)} - \eta_v^{(k-1)}| < 10^{-4}$, stop early (converged).
 
-#### Algorithm 2: Port Flow Statistics
+### 4.2 Algorithm 2: Port Flow Statistics
 - **Input Ports (`getInputPortStats`)**: Compares nominal demand with total incoming supply. Flags deficit (`shortage`), balanced (`100%`), or surplus.
 - **Output Ports (`getOutputPortStats`)**: Compares actual production with downstream consumer demand. Flags surplus (`safe overproduction`), balanced, or deficit.
 
-#### Algorithm 3: Dual-Pass BFS Auto-Ratio
+### 4.3 Algorithm 3: Dual-Pass BFS Auto-Ratio
 Sizes the machine network from a designated anchor node:
 1. **Upstream Pass**: Traverses backward from consumer inputs to producers, setting producer machine counts so $\text{Supply} \ge \text{Demand}$.
 2. **Downstream Pass**: Traverses forward from producer outputs to byproduct consumers, sizing consumers to absorb waste streams.
 3. **Cycle Guard**: Limits total iterations to $\max(50, |V| \times 5)$ and per-node visits to $\le 3$, preventing infinite loops on cyclic graphs. Anchor count is preserved.
 
-#### Algorithm 4: Process Summary
-Aggregates total power consumption/generation (Net EU/t), maximum active voltage tier, recursive machine breakdown, and net material balance ($\Delta = \text{Production} - \text{Consumption}$).
+### 4.4 Algorithm 4: Overclocking & Sub-tick Mathematics
+When voltage tier difference $\Delta\text{Tier} > 0$:
 
-#### Algorithm 5: Shift-Drag 1:1 Rate Match
-When holding `Shift` while dropping a wire between ports, automatically calculates the required machine count:
+$$\text{Energy Multiplier} = (4.0)^{\Delta\text{Tier}}, \quad \text{Duration} = \frac{\text{baseDurationTicks}}{(2.0)^{\Delta\text{Tier}}}$$
 
-$$\text{Target Machine Count} = \frac{\text{Source Port Flow Rate}}{\text{Target Single Machine Port Rate}}$$
+For Sub-tick processing ($< 1.0\text{ Tick}$):
 
----
-
-### 2.5 Hardware Addons (`MachineAddon` & `DynamicAddonCrawler`)
-
-- Categories: `COIL`, `PARALLEL`, `MAINTENANCE`, `ROTOR`, `MULTIBLOCK_TRAIT`, `THERMAL_AUGMENT`, `CUSTOM`.
-- Machine-tailored modifiers (`addon.forMachine(node)`):
-  - **EBF**: 5% EU discount per 900K excess temperature: $\text{EUt Mult} = 0.95^{\lfloor (T_{\text{coil}} - T_{\text{recipe}}) / 900 \rfloor}$.
-  - **LCR**: Speed bonus (e.g. RTM: $150\%$ speed $\to 0.67\times$ duration, $85\%$ energy $\to 0.85\times$ EU/t).
-  - **Pyrolyse**: Speed bonus (e.g. Nichrome: $200\%$ speed $\to 0.50\times$ duration).
-  - **Cracking**: Energy bonus (e.g. HSS-G: $60\%$ energy $\to 0.60\times$ EU/t).
-  - **Multi Smelter**: Parallel scaling (e.g. RTM: $128\times$ parallel).
-- `DynamicAddonCrawler`: Discovers addon blocks across loaded mods using JVM reflection and multiline tooltip section parsing (`Pattern.DOTALL`), with built-in fallbacks for standard GregTech materials.
+$$\text{batchesPerTick} = \frac{1.0}{\text{calculatedDurationTicks}}, \quad \text{effectiveDurationTicks} = 1.0$$
+$$\text{Cycles Per Second (CPS)} = 20.0 \times \text{batchesPerTick} \times \text{parallel} \times \text{machineCount}$$
 
 ---
 
-### 2.6 Undo / Redo (`HistoryManager`)
+## 5. Multiblock Structure & BOM Engine (RFC-003, RFC-004)
 
-Command pattern tracking vector state deltas (`BoardCommand`):
-- `MoveNodesCommand`, `AddConnectionCommand`, `RemoveConnectionCommand`, `AddNodesCommand`, `RemoveNodesCommand`, `ModifyPropertyCommand`, `GroupModuleCommand`, `ExpandModuleCommand`.
-- Memory footprint is under 2 MB for 1,000 history steps.
+The Calculator Board features a structural bill-of-materials (BOM) solver:
+* **Deductive Blueprint Scanner**: Extracts exact required block counts, dynamic heating coils, and allowed hatch/bus positions from controller pattern recipes.
+* **Hybrid Hatch Override**: Enables players to override default hatch configurations with higher tier, multi-fluid, or dual lower-tier hatches.
+* **Dynamic Casing Reduction**: Automatically subtracts structural casing blocks when extra utility hatches (parallel, maintenance, optical, computing) are installed into the multiblock frame.
 
 ---
 
-## 3. UI & Canvas Rendering
-
-### 3.1 Viewport Transformation (`BoardScreen`)
-
-Virtual canvas coordinate conversion:
-
-$$\text{CanvasX} = \frac{\text{ScreenX} - \text{PanX}}{\text{Zoom}}, \quad \text{CanvasY} = \frac{\text{ScreenY} - \text{PanY}}{\text{Zoom}}$$
-$$\text{ScreenX} = \text{CanvasX} \times \text{Zoom} + \text{PanX}, \quad \text{ScreenY} = \text{CanvasY} \times \text{Zoom} + \text{PanY}$$
+## 6. UI & Canvas Rendering Pipeline
 
 ```mermaid
 flowchart TD
     G1["1. Background Dot Grid (Grid Step = 20 * Zoom)"] --> G2["2. Canvas Matrix Push: translate(panX, panY), scale(zoom)"]
-    subgraph CanvasSpace["Canvas Space"]
+    subgraph CanvasSpace["Canvas Space (Virtual Coordinates)"]
         C1["2.1 Bezier Connection Wires (ConnectionRenderer)"]
         C2["2.2 Active Dragged Wire"]
         C3["2.3 Machine Node Cards (Frustum Culled)"]
-        C4["2.4 Quick-Add Marker [+]"]
-        C5["2.5 Marquee Selection Box"]
-        C1 --> C2 --> C3 --> C4 --> C5
+        C4["2.4 Group Frames (CanvasGroupFrame)"]
+        C5["2.5 Quick-Add Marker [+]"]
+        C6["2.6 Marquee Selection Box"]
+        C1 --> C2 --> C3 --> C4 --> C5 --> C6
     end
     G2 --> CanvasSpace
     CanvasSpace --> G3["3. Canvas Matrix Pop"]
     G3 --> G4["4. Screen HUD (Tabs, Toolbar, Hotkeys, Process Summary)"]
     G4 --> G5["5. Tooltips (Port Flow, Items, Addons)"]
-    G5 --> G6["6. Modal Dialogs (MachineConfigDialog, Search, Guide)"]
+    G5 --> G6["6. Modal Dialogs (MachineConfigDialog, BOM, Search, Guide)"]
 ```
 
 ---
 
-### 3.2 Spline Routing (`ConnectionRenderer`)
-
-- Cubic Bezier splines between output socket $(x_1, y_1)$ and input socket $(x_2, y_2)$:
-
-$$dx = \max(40.0, |x_2 - x_1| \times 0.5)$$
-
-$$P_0 = (x_1, y_1), \quad P_1 = (x_1 + dx, y_1), \quad P_2 = (x_2 - dx, y_2), \quad P_3 = (x_2, y_2)$$
-
-- Distance hit testing: Evaluates Euclidean distance from cursor to curve across 30 parametric samples for right-click wire severing.
-
----
-
-## 4. Serialization & Blueprints
-
-- **File Save**: `<gamedir>/gtcalcboard/calcboard_save.nbt` via compressed NBT (`NbtIo.writeCompressed`).
-- **Blueprint Strings**: `FlowGraph` $\to$ NBT $\to$ GZIP $\to$ URL-safe Base64 with `GTBOARD:` prefix for clipboard import/export.
-
----
-
-## 5. GTNH 1.7.10 Porting Guide
-
-This section outlines replacement targets for backporting to **Minecraft 1.7.10 / GT5u / TecTech / NEI**.
-
-### 5.1 Recipe Ingestion (NEI $\to$ `RecipeNode`)
-
-Replace `EmiRecipeConverter` with a `GT_Recipe_Map` adapter:
-
-```java
-package com.gtceu.calcboard.integration.nei;
-
-import gregtech.api.util.GT_Recipe;
-import net.minecraft.item.ItemStack;
-import net.minecraftforge.fluids.FluidStack;
-
-public class NeiRecipeConverter {
-
-    public static RecipeNode fromGtRecipe(GT_Recipe recipe, GT_Recipe.GT_Recipe_Map recipeMap) {
-        String name = recipeMap.mNEIName != null ? recipeMap.mNEIName : recipeMap.mUnlocalizedName;
-        double durationTicks = (double) recipe.mDuration;
-        double baseEUt = (double) recipe.mEUt;
-        GTVoltageTier tier = GTVoltageTier.fromEUt(baseEUt);
-
-        RecipeNode node = RecipeNode.create(name, durationTicks, baseEUt, tier);
-
-        if (recipe.mInputs != null) {
-            for (ItemStack is : recipe.mInputs) {
-                if (is != null) {
-                    node.addInput(IngredientStack.item(is.getItem().getUnlocalizedName(), is.getDisplayName(), is.stackSize, 1.0));
-                }
-            }
-        }
-        if (recipe.mFluidInputs != null) {
-            for (FluidStack fs : recipe.mFluidInputs) {
-                if (fs != null) {
-                    node.addInput(IngredientStack.fluid(fs.getFluid().getName(), fs.getLocalizedName(), fs.amount, 1.0));
-                }
-            }
-        }
-        if (recipe.mOutputs != null) {
-            for (int i = 0; i < recipe.mOutputs.length; i++) {
-                ItemStack is = recipe.mOutputs[i];
-                if (is != null) {
-                    double chance = (recipe.mChances != null && i < recipe.mChances.length && recipe.mChances[i] > 0)
-                            ? (double) recipe.mChances[i] / 10000.0 : 1.0;
-                    node.addOutput(IngredientStack.item(is.getItem().getUnlocalizedName(), is.getDisplayName(), is.stackSize, chance));
-                }
-            }
-        }
-        if (recipe.mFluidOutputs != null) {
-            for (FluidStack fs : recipe.mFluidOutputs) {
-                if (fs != null) {
-                    node.addOutput(IngredientStack.fluid(fs.getFluid().getName(), fs.getLocalizedName(), fs.amount, 1.0));
-                }
-            }
-        }
-        if (recipe.mSpecialValue > 0) {
-            node.setRequiredTemperature(recipe.mSpecialValue);
-        }
-        return node;
-    }
-}
-```
-
----
-
-### 5.2 Graphics Pipeline (1.20 `GuiGraphics` $\to$ 1.7.10 `GL11`)
-
-| 1.20.1 Implementation | 1.7.10 Replacement |
-| :--- | :--- |
-| `graphics.fill(x1, y1, x2, y2, color)` | `Gui.drawRect(x1, y1, x2, y2, color)` |
-| `graphics.pose().pushPose()` | `GL11.glPushMatrix()` |
-| `graphics.pose().translate(x, y, z)` | `GL11.glTranslatef((float)x, (float)y, (float)z)` |
-| `graphics.pose().scale(sx, sy, sz)` | `GL11.glScalef((float)sx, (float)sy, (float)sz)` |
-| `graphics.pose().popPose()` | `GL11.glPopMatrix()` |
-| `graphics.renderItem(stack, x, y)` | `RenderItem.getInstance().renderItemAndEffectIntoGUI(...)` |
-| `graphics.renderTooltip(...)` | `drawHoveringText(lines, x, y, fontRenderer)` |
-| `graphics.enableScissor(...)` | `GL11.glEnable(GL11.GL_SCISSOR_TEST); GL11.glScissor(...)` |
-
----
-
-### 5.3 Machine Hierarchy & Voltage Tiers
-
-- **Voltage Tiers**: Map `GTVoltageTier` ordinal to GT5u `GT_Values.VN` ($0 = \text{ULV} \dots 14 = \text{MAX}$).
-- **Multiblock Controller Detection**: Check if `metaTileEntity instanceof GT_MetaTileEntity_MultiblockBase_EM` (TecTech) or `instanceof GT_MetaTileEntity_TooltipMultiBlockBase` (GT5u).
-- **Heating Coils**: Map to GT5u `mCoilTier` or `HeatingCoilLevel`.
-- **Large Turbines**: Calculate output EU/t using `mEfficiency` and `mOptimalFlow`.
-
----
-
-## 6. Repository & Licensing
+## 7. Repository & Licensing
 
 - **Repository**: [Amvermain/GregTechCalculatorBoard](https://github.com/Amvermain/GregTechCalculatorBoard)
 - **License**: MIT License

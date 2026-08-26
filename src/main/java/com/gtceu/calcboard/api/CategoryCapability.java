@@ -81,6 +81,8 @@ public record CategoryCapability(
 
         if (isFusion) {
             cats.add(AddonCategory.REFLECTOR);
+            cats.add(AddonCategory.ENERGY_HATCH);
+            cats.add(AddonCategory.HATCH_BUS);
             cats.add(AddonCategory.PARALLEL);
             cats.add(AddonCategory.MAINTENANCE);
             cats.add(AddonCategory.CUSTOM);
@@ -88,16 +90,22 @@ public record CategoryCapability(
         }
 
         if (isMb) {
+            if (!node.isGenerator() && !MultiblockDetector.isSteamMultiblock(node.getMachineIcon()) && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
+                cats.add(AddonCategory.ENERGY_HATCH);
+            }
+            cats.add(AddonCategory.HATCH_BUS);
             if (canUseCoils || node.canUseCoils()) {
                 cats.add(AddonCategory.COIL);
             }
-            cats.add(AddonCategory.PARALLEL);
+            if (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations(), node.getRecipeCategoryId())) {
+                cats.add(AddonCategory.PARALLEL);
+            }
             cats.add(AddonCategory.MAINTENANCE);
-            if (node.hasThreading()) {
+            if (node.hasThreading() && (node.isThreadingActive() || MultiblockDetector.isThreadingMultiblock(node.getMachineIcon()))) {
                 cats.add(AddonCategory.THREADING);
             }
             cats.add(AddonCategory.MULTIBLOCK_TRAIT);
-        } else if (node.hasThreading()) {
+        } else if (node.hasThreading() && (node.isThreadingActive() || MultiblockDetector.isThreadingMultiblock(node.getMachineIcon()))) {
             cats.add(AddonCategory.THREADING);
         }
 

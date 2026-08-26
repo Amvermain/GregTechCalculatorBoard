@@ -40,6 +40,21 @@ public class ModAdapterRegistry {
         register(new GTCEuModAdapter());         // Priority 100
         register(new CreateModAdapter());        // Priority 90
         register(FALLBACK_ADAPTER);               // Priority 0
+
+        // Fire extension event for third-party adapters & KubeJS
+        try {
+            var event = new com.gtceu.calcboard.api.event.ModAdapterRegisterEvent();
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
+            for (IModAdapter customAdapter : event.getRegisteredAdapters()) {
+                register(customAdapter);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    public static synchronized void reset() {
+        ADAPTERS.clear();
+        ADAPTER_MAP.clear();
+        initialized = false;
     }
 
     public static synchronized void register(IModAdapter adapter) {

@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.integration.emi;
 
+import com.gtceu.calcboard.api.EnergyType;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.ModCompatHelper;
@@ -27,6 +28,9 @@ public class EmiRecipeConverter {
     }
 
     public static RecipeNode convert(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
+        if (recipe instanceof KineticGenerationEmiRecipe kg) {
+            return kg.toRecipeNode();
+        }
         String catName = null;
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             String catPath = recipe.getCategory().getId().getPath();
@@ -73,11 +77,29 @@ public class EmiRecipeConverter {
 
         RecipeNode node = RecipeNode.create(name, details.durationTicks, details.eut, details.tier);
         node.setGenerator(details.isGenerator);
-        node.setEnergyType(details.energyType);
-        node.setMachineIcon(preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe));
+        if (details.energyType != null && details.energyType != EnergyType.ELECTRIC_EU) {
+            node.setEnergyType(details.energyType);
+        }
         ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
         if (catId != null) {
             node.setRecipeCategoryId(catId);
+        }
+
+        List<ResourceLocation> allWs = findAllWorkstations(recipe);
+        node.getAvailableWorkstations().clear();
+        for (ResourceLocation ws : allWs) {
+            if (ws != null && !isDummyConditionMarker(ws)) {
+                node.getAvailableWorkstations().add(ws);
+            }
+        }
+        ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe);
+        if (icon != null) {
+            node.setMachineIcon(icon);
+            if (!node.getAvailableWorkstations().contains(icon)) {
+                node.getAvailableWorkstations().add(0, icon);
+            }
+        } else if (!node.getAvailableWorkstations().isEmpty()) {
+            node.setMachineIcon(node.getAvailableWorkstations().get(0));
         }
 
         // Run Extensible Recipe Property Extractor Pipeline (RFC-002)
@@ -152,7 +174,7 @@ public class EmiRecipeConverter {
 
             float chance = outStack.getChance();
             ResourceLocation outId = outStack.getId();
-            if (chance >= 1.0f && outId != null && baseChances.containsKey(outId)) {
+            if (outId != null && baseChances.containsKey(outId)) {
                 chance = baseChances.get(outId).floatValue();
             }
 
@@ -291,22 +313,13 @@ public class EmiRecipeConverter {
     private static ResourceLocation findMachineIcon(EmiRecipe recipe) {
         if (recipe == null) return null;
 
-        // 1. Try getWorkstations
-        try {
-            Method m = recipe.getClass().getMethod("getWorkstations");
-            Object res = m.invoke(recipe);
-            if (res instanceof List<?> workstations && !workstations.isEmpty()) {
-                for (Object ws : workstations) {
-                    if (ws instanceof EmiIngredient ei) {
-                        for (EmiStack es : ei.getEmiStacks()) {
-                            if (es != null && !es.isEmpty() && es.getId() != null) {
-                                return es.getId();
-                            }
-                        }
-                    }
-                }
+        // 1. Try all workstations from recipe and category
+        List<ResourceLocation> allWs = findAllWorkstations(recipe);
+        for (ResourceLocation ws : allWs) {
+            if (ws != null && !isDummyConditionMarker(ws)) {
+                return ws;
             }
-        } catch (Throwable ignored) {}
+        }
 
         // 2. Try Category ID matching in ForgeRegistries.ITEMS
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
@@ -510,36 +523,64 @@ public class EmiRecipeConverter {
     private static ResourceLocation extractContentResourceId(Object contentObj) {
         if (contentObj == null) return null;
         try {
-            Field f = null;
-            try { f = contentObj.getClass().getField("content"); } catch (Throwable ignored) {
-                try { f = contentObj.getClass().getDeclaredField("content"); f.setAccessible(true); } catch (Throwable ignored2) {}
-            }
-            Object inner = f != null ? f.get(contentObj) : null;
-            if (inner == null) {
-                try {
-                    Method m = contentObj.getClass().getMethod("getContent");
-                    inner = m.invoke(contentObj);
-                } catch (Throwable ignored) {}
-            }
-            if (inner instanceof net.minecraft.world.item.ItemStack is) {
-                return ForgeRegistries.ITEMS.getKey(is.getItem());
-            } else if (inner instanceof net.minecraft.world.item.Item it) {
-                return ForgeRegistries.ITEMS.getKey(it);
-            } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
-                net.minecraft.world.item.ItemStack[] items = ing.getItems();
-                if (items.length > 0 && !items[0].isEmpty()) {
-                    return ForgeRegistries.ITEMS.getKey(items[0].getItem());
-                }
-            } else if (inner instanceof Fluid fl) {
-                return ForgeRegistries.FLUIDS.getKey(fl);
-            } else if (inner != null && inner.getClass().getName().contains("FluidStack")) {
-                try {
-                    Method gm = inner.getClass().getMethod("getFluid");
-                    Object flObj = gm.invoke(inner);
-                    if (flObj instanceof Fluid fl) {
-                        return ForgeRegistries.FLUIDS.getKey(fl);
+            Object inner = contentObj;
+            for (int depth = 0; depth < 5 && inner != null; depth++) {
+                if (inner instanceof net.minecraft.world.item.ItemStack is) {
+                    return is.isEmpty() ? null : ForgeRegistries.ITEMS.getKey(is.getItem());
+                } else if (inner instanceof net.minecraft.world.item.Item it) {
+                    return ForgeRegistries.ITEMS.getKey(it);
+                } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
+                    net.minecraft.world.item.ItemStack[] items = ing.getItems();
+                    if (items != null && items.length > 0 && !items[0].isEmpty()) {
+                        return ForgeRegistries.ITEMS.getKey(items[0].getItem());
                     }
-                } catch (Throwable ignored) {}
+                } else if (inner instanceof Fluid fl) {
+                    return ForgeRegistries.FLUIDS.getKey(fl);
+                } else if (inner instanceof net.minecraft.world.item.ItemStack[] arr) {
+                    if (arr.length > 0 && !arr[0].isEmpty()) {
+                        return ForgeRegistries.ITEMS.getKey(arr[0].getItem());
+                    }
+                } else if (inner instanceof List<?> list && !list.isEmpty()) {
+                    inner = list.get(0);
+                    continue;
+                }
+
+                Object next = null;
+                String clName = inner.getClass().getName();
+                if (clName.contains("FluidStack")) {
+                    try {
+                        Method gm = inner.getClass().getMethod("getFluid");
+                        Object flObj = gm.invoke(inner);
+                        if (flObj instanceof Fluid fl) {
+                            return ForgeRegistries.FLUIDS.getKey(fl);
+                        }
+                    } catch (Throwable ignored) {}
+                }
+
+                for (String mName : new String[]{"getContent", "getInner", "getStack", "getItems", "getMatchingStacks", "getItemStack", "getFluid", "getRawFluid", "getIngredient"}) {
+                    try {
+                        Method m = inner.getClass().getMethod(mName);
+                        next = m.invoke(inner);
+                        if (next != null && next != inner) break;
+                    } catch (Throwable ignored) {}
+                }
+                if (next == null) {
+                    for (String fName : new String[]{"content", "inner", "stack", "itemStack", "ingredient", "fluid"}) {
+                        try {
+                            Field f = null;
+                            try { f = inner.getClass().getField(fName); } catch (Throwable ignored) {
+                                f = inner.getClass().getDeclaredField(fName);
+                                f.setAccessible(true);
+                            }
+                            if (f != null) {
+                                next = f.get(inner);
+                                if (next != null && next != inner) break;
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+                if (next == null || next == inner) break;
+                inner = next;
             }
         } catch (Throwable ignored) {}
         return null;
@@ -576,7 +617,12 @@ public class EmiRecipeConverter {
             var backing = recipe.getBackingRecipe();
             ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
 
-            if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("systeams")) {
+            if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("gtceu")) {
+                com.gtceu.calcboard.compat.IModAdapter gtAdapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForModId("gtceu");
+                if (gtAdapter != null && gtAdapter.adaptRecipeDetails(recipe, backing, details)) {
+                    return details;
+                }
+            } else if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("systeams")) {
                 if (com.gtceu.calcboard.compat.systeams.SysteamsModAdapter.adaptBoilerRecipe(backing, details, catId)) {
                     return details;
                 }
@@ -597,13 +643,9 @@ public class EmiRecipeConverter {
                         }
                     }
                     if (!handled) {
-                        try {
-                            Method getCookingTime = backing.getClass().getMethod("getCookingTime");
-                            Object timeObj = getCookingTime.invoke(backing);
-                            if (timeObj instanceof Number num) {
-                                details.durationTicks = num.doubleValue();
-                            }
-                        } catch (Throwable ignored) {}
+                        if (backing instanceof net.minecraft.world.item.crafting.AbstractCookingRecipe acr) {
+                            details.durationTicks = acr.getCookingTime();
+                        }
                     }
                 }
             }

@@ -22,41 +22,76 @@ public final class RecipeNodeSerializer {
 
         CompoundTag tag = new CompoundTag();
         tag.putString("id", node.getId());
-        tag.putString("name", node.getName());
+        if (node.getName() != null && !node.getName().isEmpty()) {
+            tag.putString("name", node.getName());
+        }
         if (node.getMachineIcon() != null) {
             tag.putString("icon", node.getMachineIcon().toString());
         }
-        tag.putDouble("baseDuration", node.getBaseDurationTicks());
-        tag.putDouble("baseEUt", node.getBaseEUt());
-        tag.putString("recipeTier", node.getRecipeTier().name());
-        tag.putString("targetTier", node.getTargetTier().name());
-        tag.putDouble("machineCount", node.getMachineCount());
-        tag.putInt("parallel", node.getParallel());
-        tag.putString("overclockMode", node.getOverclockMode().name());
-        tag.putBoolean("isBaseNode", node.isBaseNode());
-        tag.putBoolean("isGenerator", node.isGenerator());
-        tag.put("properties", node.getProperties().serializeNBT());
+        if (node.getBaseDurationTicks() != 0.0) {
+            tag.putDouble("baseDuration", node.getBaseDurationTicks());
+        }
+        if (node.getBaseEUt() != 0.0) {
+            tag.putDouble("baseEUt", node.getBaseEUt());
+        }
+        if (node.getRecipeTier() != null) {
+            tag.putString("recipeTier", node.getRecipeTier().name());
+            if (node.getTargetTier() != null && node.getTargetTier() != node.getRecipeTier()) {
+                tag.putString("targetTier", node.getTargetTier().name());
+            }
+        }
+        if (Math.abs(node.getMachineCount() - 1.0) > 0.0001) {
+            tag.putDouble("machineCount", node.getMachineCount());
+        }
+        if (node.getParallel() > 1) {
+            tag.putInt("parallel", node.getParallel());
+        }
+        if (node.getOverclockMode() != OverclockMode.STANDARD) {
+            tag.putString("overclockMode", node.getOverclockMode().name());
+        }
+        if (node.isBaseNode()) {
+            tag.putBoolean("isBaseNode", true);
+        }
+        if (node.isGenerator()) {
+            tag.putBoolean("isGenerator", true);
+        }
+        CompoundTag propTag = node.getProperties().serializeNBT();
+        if (!propTag.isEmpty()) {
+            tag.put("properties", propTag);
+        }
         tag.putDouble("posX", node.getPosX());
         tag.putDouble("posY", node.getPosY());
-        tag.putInt("cardWidth", node.getCardWidth());
-        tag.putInt("cardHeight", node.getCardHeight());
-        tag.putBoolean("isModule", node.isModule());
-        tag.putInt("containedMachineCount", node.getContainedMachineCount());
-        if (node.getSubGraph() != null) {
-            tag.put("subGraph", node.getSubGraph().serializeNBT(0, 0, 1.0));
+        if (node.getCardWidth() != 245) {
+            tag.putInt("cardWidth", node.getCardWidth());
+        }
+        if (node.getCardHeight() > 0) {
+            tag.putInt("cardHeight", node.getCardHeight());
+        }
+        if (node.isModule()) {
+            tag.putBoolean("isModule", true);
+            if (node.getContainedMachineCount() > 0) {
+                tag.putInt("containedMachineCount", node.getContainedMachineCount());
+            }
+            if (node.getSubGraph() != null) {
+                tag.put("subGraph", node.getSubGraph().serializeNBT(0, 0, 1.0));
+            }
         }
 
-        ListTag inList = new ListTag();
-        for (IngredientStack in : node.getInputs()) {
-            inList.add(in.serializeNBT());
+        if (!node.getInputs().isEmpty()) {
+            ListTag inList = new ListTag();
+            for (IngredientStack in : node.getInputs()) {
+                inList.add(in.serializeNBT());
+            }
+            tag.put("inputs", inList);
         }
-        tag.put("inputs", inList);
 
-        ListTag outList = new ListTag();
-        for (IngredientStack out : node.getOutputs()) {
-            outList.add(out.serializeNBT());
+        if (!node.getOutputs().isEmpty()) {
+            ListTag outList = new ListTag();
+            for (IngredientStack out : node.getOutputs()) {
+                outList.add(out.serializeNBT());
+            }
+            tag.put("outputs", outList);
         }
-        tag.put("outputs", outList);
 
         if (!node.getAddons().isEmpty()) {
             ListTag addonList = new ListTag();
@@ -66,16 +101,22 @@ public final class RecipeNodeSerializer {
             tag.put("addons", addonList);
         }
 
-        if (!node.getAvailableWorkstations().isEmpty()) {
-            ListTag wsList = new ListTag();
-            for (ResourceLocation ws : node.getAvailableWorkstations()) {
-                wsList.add(net.minecraft.nbt.StringTag.valueOf(ws.toString()));
-            }
-            tag.put("workstations", wsList);
-        }
-
         if (node.getRecipeCategoryId() != null) {
             tag.putString("recipeCategoryId", node.getRecipeCategoryId().toString());
+        }
+
+        if (!node.getAvailableWorkstations().isEmpty()) {
+            CategoryCapability cap = node.getRecipeCategoryId() != null 
+                    ? CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId()) 
+                    : null;
+            List<ResourceLocation> capWs = (cap != null && cap.availableWorkstations() != null) ? cap.availableWorkstations() : List.of();
+            if (!node.getAvailableWorkstations().equals(capWs)) {
+                ListTag wsList = new ListTag();
+                for (ResourceLocation ws : node.getAvailableWorkstations()) {
+                    wsList.add(net.minecraft.nbt.StringTag.valueOf(ws.toString()));
+                }
+                tag.put("workstations", wsList);
+            }
         }
 
         if (node.getEnergyType() != null) {
@@ -86,9 +127,15 @@ public final class RecipeNodeSerializer {
             tag.putString("steamMode", node.getSteamMode().name());
         }
 
-        tag.putBoolean("isMultiblock", node.isMultiblock());
-        tag.putBoolean("isReroute", node.isReroute());
-        tag.putBoolean("isFlipped", node.isFlipped());
+        if (node.isMultiblock()) {
+            tag.putBoolean("isMultiblock", true);
+        }
+        if (node.isReroute()) {
+            tag.putBoolean("isReroute", true);
+        }
+        if (node.isFlipped()) {
+            tag.putBoolean("isFlipped", true);
+        }
 
         if (!node.getModuleInputOrigins().isEmpty()) {
             ListTag inOriginsTag = new ListTag();
@@ -160,11 +207,25 @@ public final class RecipeNodeSerializer {
         if (tag.contains("recipeCategoryId")) {
             node.setRecipeCategoryId(ResourceLocation.tryParse(tag.getString("recipeCategoryId")));
         }
-        if (tag.contains("isMultiblock")) {
-            node.setMultiblock(tag.getBoolean("isMultiblock"));
+        if (tag.contains("workstations")) {
+            ListTag wsList = tag.getList("workstations", 8);
+            List<ResourceLocation> wsColl = new ArrayList<>();
+            for (int i = 0; i < wsList.size(); i++) {
+                ResourceLocation ws = ResourceLocation.tryParse(wsList.getString(i));
+                if (ws != null) wsColl.add(ws);
+            }
+            node.setAvailableWorkstations(wsColl);
+        } else if (node.getRecipeCategoryId() != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
+            if (cap != null && cap.availableWorkstations() != null && !cap.availableWorkstations().isEmpty()) {
+                node.setAvailableWorkstations(cap.availableWorkstations());
+            }
         }
         if (tag.contains("icon")) {
             node.setMachineIcon(ResourceLocation.tryParse(tag.getString("icon")));
+        }
+        if (tag.contains("isMultiblock")) {
+            node.setMultiblock(tag.getBoolean("isMultiblock"));
         }
         if (tag.contains("targetTier")) {
             node.setTargetTier(GTVoltageTier.valueOf(tag.getString("targetTier")));
@@ -174,15 +235,6 @@ public final class RecipeNodeSerializer {
         }
         if (tag.contains("parallel")) {
             node.setParallel(tag.getInt("parallel"));
-        }
-        if (tag.contains("workstations")) {
-            ListTag wsList = tag.getList("workstations", 8);
-            List<ResourceLocation> wsColl = new ArrayList<>();
-            for (int i = 0; i < wsList.size(); i++) {
-                ResourceLocation ws = ResourceLocation.tryParse(wsList.getString(i));
-                if (ws != null) wsColl.add(ws);
-            }
-            node.setAvailableWorkstations(wsColl);
         }
         if (tag.contains("addons")) {
             ListTag addonList = tag.getList("addons", 10);

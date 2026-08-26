@@ -283,6 +283,9 @@ public class TurbineRotorHelper {
                     if (cleanMatName.contains(":")) {
                         cleanMatName = cleanMatName.substring(cleanMatName.indexOf(":") + 1);
                     }
+                    if (cleanMatName.equalsIgnoreCase("standard") || cleanMatName.equalsIgnoreCase("none") || cleanMatName.equalsIgnoreCase("dummy")) {
+                        continue;
+                    }
 
                     ItemStack stack = rotorItem != null ? new ItemStack(rotorItem) : ItemStack.EMPTY;
                     Object behaviour = null;

@@ -86,7 +86,8 @@ public class PageTabBarWidget {
         int addW = 18;
         totalWidth += addW + 6;
 
-        this.maxScrollX = Math.max(0, totalWidth - screen.width);
+        int leftMargin = screen.getDynamicLeftMargin();
+        this.maxScrollX = Math.max(0, totalWidth - (screen.width - leftMargin));
         this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX));
 
         graphics.pose().pushPose();
@@ -95,13 +96,13 @@ public class PageTabBarWidget {
 
         int tabY = screen.getPageTabY();
 
-        // Enable horizontal scissor so tabs don't overflow outside screen
-        graphics.enableScissor(0, tabY - 2, screen.width, tabY + TAB_HEIGHT + 4);
+        // Enable horizontal scissor so tabs don't overflow outside screen or left margin
+        graphics.enableScissor(leftMargin - 2, tabY - 2, screen.width, tabY + TAB_HEIGHT + 4);
 
         graphics.pose().pushPose();
         graphics.pose().translate((float) -scrollX, 0, 0);
 
-        int curX = 6;
+        int curX = leftMargin;
 
         for (int i = 0; i < pageTitles.size(); i++) {
             String pageName = pageTitles.get(i);
@@ -203,7 +204,7 @@ public class PageTabBarWidget {
         }
 
         double virtualMouseX = mouseX + scrollX;
-        int curX = 6;
+        int curX = screen.getDynamicLeftMargin();
 
         for (int i = 0; i < pageTitles.size(); i++) {
             String pageName = pageTitles.get(i);

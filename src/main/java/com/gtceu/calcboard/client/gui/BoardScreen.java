@@ -17,6 +17,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
@@ -37,10 +38,22 @@ import java.util.UUID;
  * Main GUI Screen for GregTech Calculator Board.
  * Acts as the master orchestrator coordinating canvas rendering, node widgets, and sub-components.
  */
-public class BoardScreen extends Screen {
+public class BoardScreen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<com.gtceu.calcboard.integration.emi.BoardMenu> {
+    public static final int LEFT_MARGIN = 48;
     public static double lastPanX = 40.0;
     public static double lastPanY = 40.0;
     public static double lastZoom = 1.0;
+    private static long lastBoardScreenActiveTime = 0;
+
+    public static boolean isBoardContext() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.screen == null) return false;
+        if (mc.screen instanceof BoardScreen) return true;
+        if (mc.screen.getClass().getName().contains("RecipeScreen") || mc.screen.getClass().getName().contains("Emi")) {
+            return (System.currentTimeMillis() - lastBoardScreenActiveTime) < 30000;
+        }
+        return false;
+    }
 
     private final List<NodeWidget> nodeWidgets = new ArrayList<>();
 
@@ -59,6 +72,7 @@ public class BoardScreen extends Screen {
     private GuideDialog guideDialog;
     private DeletePageConfirmDialog deletePageDialog;
     private GlobalBalanceDashboardDialog globalBalanceDialog;
+    private MultiblockBOMDialog multiblockBOMDialog;
     private SaveToTeamDialog saveToTeamDialog;
     private ExportToTeamDialog exportToTeamDialog;
     private RecentSavesDialog recentSavesDialog;
@@ -78,7 +92,13 @@ public class BoardScreen extends Screen {
     private double lastMouseX, lastMouseY;
 
     public BoardScreen() {
-        super(Component.translatable("gui.gtcalcboard.title"));
+        this(new com.gtceu.calcboard.integration.emi.BoardMenu(0, Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
+    }
+
+    public BoardScreen(com.gtceu.calcboard.integration.emi.BoardMenu menu) {
+        super(menu, Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : new net.minecraft.world.entity.player.Inventory(null), Component.translatable("gui.gtcalcboard.title"));
+        this.imageWidth = 0;
+        this.imageHeight = 0;
         var activePage = BoardManager.getInstance().getActivePage();
         this.panX = activePage.getPanX();
         this.panY = activePage.getPanY();
@@ -86,6 +106,14 @@ public class BoardScreen extends Screen {
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;
+    }
+
+    @Override
+    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+    }
+
+    @Override
+    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
     }
 
     public FlowGraph getGraph() {
@@ -108,12 +136,20 @@ public class BoardScreen extends Screen {
         return selectionModel.getSelectedNoteIds();
     }
 
+    public Set<String> getSelectedFrameIds() {
+        return selectionModel.getSelectedFrameIds();
+    }
+
     public boolean isNodeSelected(String id) {
         return selectionModel.isSelected(id);
     }
 
     public boolean isNoteSelected(String id) {
         return selectionModel.isNoteSelected(id);
+    }
+
+    public boolean isFrameSelected(String id) {
+        return selectionModel.isFrameSelected(id);
     }
 
     public void selectNode(String id, boolean multi) {
@@ -124,12 +160,20 @@ public class BoardScreen extends Screen {
         selectionModel.selectNote(id, multi);
     }
 
+    public void selectFrame(String id, boolean multi) {
+        selectionModel.selectFrame(id, multi);
+    }
+
     public void toggleSelectNode(String id) {
         selectionModel.toggle(id);
     }
 
     public void toggleSelectNote(String id) {
         selectionModel.toggleNote(id);
+    }
+
+    public void toggleSelectFrame(String id) {
+        selectionModel.toggleFrame(id);
     }
 
     public void clearSelection() {
@@ -250,12 +294,12 @@ public class BoardScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        MachineAddonCatalog.getInstance().preloadAsync();
         this.searchDialog = new RecipeSearchDialog(this);
         this.machineConfigDialog = new MachineConfigDialog(this);
         this.guideDialog = new GuideDialog(this);
         this.deletePageDialog = new DeletePageConfirmDialog(this);
         this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
+        this.multiblockBOMDialog = new MultiblockBOMDialog(this);
         this.saveToTeamDialog = new SaveToTeamDialog(this);
         this.exportToTeamDialog = new ExportToTeamDialog(this);
         this.recentSavesDialog = new RecentSavesDialog(this);
@@ -330,6 +374,10 @@ public class BoardScreen extends Screen {
         return globalBalanceDialog;
     }
 
+    public MultiblockBOMDialog getMultiblockBOMDialog() {
+        return multiblockBOMDialog;
+    }
+
     public GuideDialog getGuideDialog() {
         return guideDialog;
     }
@@ -362,6 +410,25 @@ public class BoardScreen extends Screen {
         markSummaryDirty();
     }
 
+    public int getDynamicLeftMargin() {
+        int maxRight = 8;
+        try {
+            for (var child : this.children()) {
+                if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
+                    if (widget instanceof net.minecraft.client.gui.components.EditBox) continue;
+                    if (widget.visible && widget.getY() < 60 && widget.getX() >= 0 && widget.getX() < this.width / 3) {
+                        int right = widget.getX() + widget.getWidth();
+                        if (right > maxRight) {
+                            maxRight = right;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return maxRight > 8 ? (maxRight + 6) : 8;
+    }
+
     public int getPageTabY() {
         return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 22 : 2;
     }
@@ -372,6 +439,24 @@ public class BoardScreen extends Screen {
 
     public int getHeaderBottomY() {
         return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 64 : 44;
+    }
+
+    public int getFavoritesDockY() {
+        int maxBottom = getHeaderBottomY() + 6;
+        try {
+            for (var child : this.children()) {
+                if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
+                    if (widget instanceof net.minecraft.client.gui.components.EditBox) continue;
+                    if (widget.visible && widget.getX() < 160 && widget.getY() < 120) {
+                        int bottom = widget.getY() + widget.getHeight();
+                        if (bottom > maxBottom) {
+                            maxBottom = bottom;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return maxBottom;
     }
 
     private long lastEditTimestamp = 0;
@@ -410,7 +495,6 @@ public class BoardScreen extends Screen {
             );
             return false;
         }
-
         // Auto-acquire lock seamlessly upon editing
         UUID teamId = state.getCurrentTeamId();
         com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket(teamId, activePageId));
@@ -419,8 +503,8 @@ public class BoardScreen extends Screen {
     }
 
     @Override
-    public void tick() {
-        super.tick();
+    public void containerTick() {
+        super.containerTick();
         com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
         if (state.isCollaborationEnabled() && state.isTeamMode()) {
             presencePingTicks++;
@@ -508,10 +592,14 @@ public class BoardScreen extends Screen {
         if (globalBalanceDialog != null) {
             globalBalanceDialog.markDirty();
         }
+        if (multiblockBOMDialog != null) {
+            multiblockBOMDialog.markDirty();
+        }
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        lastBoardScreenActiveTime = System.currentTimeMillis();
         this.lastMouseX = mouseX;
         this.lastMouseY = mouseY;
 
@@ -535,7 +623,7 @@ public class BoardScreen extends Screen {
         double canvasMouseY = toCanvasY(mouseY);
 
         // 2.5 Render Visual Canvas Group Frames & Sticky Notes (Layer below wires and nodes)
-        CanvasGroupFrameRenderer.renderFrames(graphics, getGraph(), canvasMouseX, canvasMouseY, null);
+        CanvasGroupFrameRenderer.renderFrames(graphics, getGraph(), canvasMouseX, canvasMouseY, null, getSelectedFrameIds());
         CanvasStickyNoteRenderer.renderNotes(graphics, getGraph(), canvasMouseX, canvasMouseY, getSelectedNoteIds());
 
         // 5. Render Node Widgets with Viewport Culling
@@ -634,7 +722,7 @@ public class BoardScreen extends Screen {
             graphics.flush();
         }
 
-        // 4.5 Render Quick Action Marker ([🔍] Search, [🔀] Junction, [🖼] Frame, [📝] Note) if active
+        // 4.5 Render Quick Action Marker
         canvasHandler.checkMarkerCursorDistance(canvasMouseX, canvasMouseY);
         if (canvasHandler.hasQuickAddMarker()) {
             double qx = canvasHandler.getQuickAddMarkerCanvasX();
@@ -704,16 +792,11 @@ public class BoardScreen extends Screen {
         }
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
 
+        // 6.5 Render bottom-center background loading status HUD (disappears when 100% complete)
+        renderCentralLoadingCard(graphics, font, width, height);
+
         // 7. Render Tooltips only if no modal dialog is open
-        if ((welcomeDialog == null || !welcomeDialog.isVisible())
-            && (globalBalanceDialog == null || !globalBalanceDialog.isVisible())
-            && (guideDialog == null || !guideDialog.isVisible())
-            && (searchDialog == null || !searchDialog.isVisible())
-            && (machineConfigDialog == null || !machineConfigDialog.isVisible())
-            && (deletePageDialog == null || !deletePageDialog.isVisible())
-            && (saveToTeamDialog == null || !saveToTeamDialog.isVisible())
-            && (exportToTeamDialog == null || !exportToTeamDialog.isVisible())
-            && (recentSavesDialog == null || !recentSavesDialog.isVisible())) {
+        if (!isAnyModalOpen()) {
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
             favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
             workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
@@ -722,23 +805,22 @@ public class BoardScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTicks);
 
         // 8. Top-level Modal Dialogs (Highest Layer)
-        graphics.flush();
-        Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
-        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-        RenderSystem.disableDepthTest();
-
-        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
+        if (welcomeDialog != null && welcomeDialog.isVisible()) {
+            welcomeDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
+            globalBalanceDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
+            multiblockBOMDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (guideDialog != null && guideDialog.isVisible()) {
+            guideDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (deletePageDialog != null && deletePageDialog.isVisible()) {
+            deletePageDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
             saveToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
             exportToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
             recentSavesDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (deletePageDialog != null && deletePageDialog.isVisible()) {
-            deletePageDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
-            globalBalanceDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (guideDialog != null && guideDialog.isVisible()) {
-            guideDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (searchDialog != null && searchDialog.isVisible()) {
             searchDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
@@ -749,14 +831,138 @@ public class BoardScreen extends Screen {
             noteEditDialog.render(graphics, width, height, mouseX, mouseY);
         }
 
-        // 9. Interactive Tutorial Overlay and Welcome Dialog
+        // 9. Interactive Tutorial Overlay
         TutorialOverlay.render(graphics, font, this, width, height, mouseX, mouseY);
-        if (welcomeDialog != null && welcomeDialog.isVisible()) {
-            welcomeDialog.render(graphics, width, height, mouseX, mouseY);
-        }
 
         // 10. Global Toast Notifications (Top layer)
         BoardToast.render(graphics, font, width, height);
+    }
+
+    private boolean isAnyModalOpen() {
+        return (welcomeDialog != null && welcomeDialog.isVisible())
+            || (globalBalanceDialog != null && globalBalanceDialog.isVisible())
+            || (multiblockBOMDialog != null && multiblockBOMDialog.isVisible())
+            || (guideDialog != null && guideDialog.isVisible())
+            || (searchDialog != null && searchDialog.isVisible())
+            || (machineConfigDialog != null && machineConfigDialog.isVisible())
+            || (deletePageDialog != null && deletePageDialog.isVisible())
+            || (saveToTeamDialog != null && saveToTeamDialog.isVisible())
+            || (exportToTeamDialog != null && exportToTeamDialog.isVisible())
+            || (recentSavesDialog != null && recentSavesDialog.isVisible())
+            || (frameEditDialog != null && frameEditDialog.isVisible())
+            || (noteEditDialog != null && noteEditDialog.isVisible());
+    }
+
+    public record BackgroundLoadingTask(String title, int percent, boolean indeterminate, String statusText, String subtitle) {}
+
+    private void renderCentralLoadingCard(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        if (isAnyModalOpen()) return;
+
+        List<BackgroundLoadingTask> tasks = new ArrayList<>();
+
+        if (RecipeSearchDialog.isCaching()) {
+            var prog = RecipeSearchDialog.getCachingProgress();
+            int pct = (prog != null && prog.totalPhases() > 0) ? (int) (prog.currentPhase() * 100.0 / prog.totalPhases()) : 0;
+            String sub = (prog != null && prog.phaseKey() != null) ? Component.translatable(prog.phaseKey()).getString() : "";
+            tasks.add(new BackgroundLoadingTask(
+                Component.translatable("gui.gtcalcboard.status.task_recipes").getString(),
+                pct,
+                false,
+                pct + "%",
+                sub
+            ));
+        } else if (favoritesDockWidget != null && favoritesDockWidget.isEmiLoading()) {
+            tasks.add(new BackgroundLoadingTask(
+                Component.translatable("gui.gtcalcboard.status.task_recipes").getString(),
+                30,
+                true,
+                Component.translatable("gui.gtcalcboard.status.in_progress").getString(),
+                Component.translatable("gui.gtcalcboard.favorites_dock.loading_emi").getString()
+            ));
+        }
+
+        if (MachineAddonCatalog.getInstance().isExhaustiveScanRunning()) {
+            double prog = MachineAddonCatalog.getInstance().getExhaustiveProgress();
+            int pct = (int) Math.round(prog * 100.0);
+            tasks.add(new BackgroundLoadingTask(
+                Component.translatable("gui.gtcalcboard.status.task_addons").getString(),
+                pct,
+                false,
+                pct + "%",
+                Component.translatable("gui.gtcalcboard.status.indexing_addons", pct).getString()
+            ));
+        }
+
+        if (!com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.isInitialized()) {
+            tasks.add(new BackgroundLoadingTask(
+                Component.translatable("gui.gtcalcboard.status.task_multiblocks").getString(),
+                50,
+                true,
+                Component.translatable("gui.gtcalcboard.status.in_progress").getString(),
+                Component.translatable("gui.gtcalcboard.status.indexing_multiblocks").getString()
+            ));
+        }
+
+        if (tasks.isEmpty()) return;
+
+        int cardW = 340;
+        int rowH = 34;
+        int cardH = 26 + (tasks.size() * rowH) + 4;
+        int cardX = (screenWidth - cardW) / 2;
+        int cardY = screenHeight - cardH - 24;
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 450);
+
+        // Container Background & Border
+        graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0xF0101520);
+        graphics.renderOutline(cardX, cardY, cardW, cardH, 0xFF35445E);
+
+        // Title Header
+        graphics.fill(cardX, cardY, cardX + cardW, cardY + 20, 0xEE182232);
+        graphics.fill(cardX, cardY + 19, cardX + cardW, cardY + 20, 0xFF2A364D);
+        String headerTitle = "§e⏳ " + Component.translatable("gui.gtcalcboard.status.loading_header").getString();
+        graphics.drawString(font, headerTitle, cardX + 8, cardY + 6, 0xFFFFFFFF, false);
+
+        int curY = cardY + 24;
+        for (BackgroundLoadingTask task : tasks) {
+            // Line 1: Title (Left) & Status (Right)
+            graphics.drawString(font, "§f" + task.title, cardX + 10, curY, 0xFFE0E0E0, false);
+            String status = "§7" + task.statusText;
+            int statusW = font.width(status);
+            graphics.drawString(font, status, cardX + cardW - 10 - statusW, curY, 0xFFAAAAAA, false);
+
+            // Line 2: Subtitle
+            if (task.subtitle != null && !task.subtitle.isEmpty()) {
+                String sub = font.plainSubstrByWidth("§8" + task.subtitle, cardW - 20);
+                graphics.drawString(font, sub, cardX + 10, curY + 10, 0xFF888888, false);
+            }
+
+            // Line 3: Progress Bar
+            int barX = cardX + 10;
+            int barY = curY + 22;
+            int barW = cardW - 20;
+            int barH = 3;
+
+            graphics.fill(barX, barY, barX + barW, barY + barH, 0xFF222733);
+            graphics.renderOutline(barX, barY, barW, barH, 0xFF3D4659);
+
+            if (task.indeterminate) {
+                long time = System.currentTimeMillis() % 1500;
+                float pos = (time / 1500.0f);
+                int segW = 45;
+                int segX = barX + (int) (pos * (barW - segW));
+                graphics.fill(segX, barY, segX + segW, barY + barH, 0xFF4A90E2);
+            } else {
+                float fillRatio = Math.max(0.05f, Math.min(1.0f, task.percent / 100.0f));
+                int fillW = (int) (barW * fillRatio);
+                graphics.fill(barX, barY, barX + fillW, barY + barH, 0xFF4A90E2);
+            }
+
+            curY += rowH;
+        }
+
+        graphics.pose().popPose();
     }
 
     private void renderGridBackground(GuiGraphics graphics) {
@@ -824,6 +1030,9 @@ public class BoardScreen extends Screen {
         }
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
+            return multiblockBOMDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseClicked(mouseX, mouseY, button);
@@ -906,6 +1115,9 @@ public class BoardScreen extends Screen {
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.mouseScrolled(mouseX, mouseY, delta);
         }
+        if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
+            return multiblockBOMDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             return machineConfigDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -949,6 +1161,9 @@ public class BoardScreen extends Screen {
         }
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.charTyped(codePoint, modifiers);
+        }
+        if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
+            return multiblockBOMDialog.charTyped(codePoint, modifiers);
         }
         if (pageTabBar.charTyped(codePoint, modifiers)) {
             return true;
@@ -994,6 +1209,9 @@ public class BoardScreen extends Screen {
         if (BoardHotkeyHandler.handleKeyPressed(this, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
             return true;
         }
+        if (this.minecraft != null && this.minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            return false;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
@@ -1011,11 +1229,15 @@ public class BoardScreen extends Screen {
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
 
     public void openMachineConfigDialog(RecipeNode node) {
+        openMachineConfigDialog(node, null);
+    }
+
+    public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.AddonCategory initialCategory) {
         if (machineConfigDialog == null) {
             machineConfigDialog = new MachineConfigDialog(this);
         }
         TutorialManager.getInstance().onMachineConfigOpened();
-        machineConfigDialog.open(node);
+        machineConfigDialog.open(node, initialCategory);
     }
 
     public void openFrameEditDialog(com.gtceu.calcboard.api.CanvasGroupFrame frame) {
@@ -1227,6 +1449,7 @@ public class BoardScreen extends Screen {
         BoardManager.getInstance().setHotkeyHudExpanded(this.hotkeyHudWidget.isExpanded());
         BoardManager.getInstance().setFavoritesDockExpanded(this.favoritesDockWidget.isExpanded());
         BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), this.panX, this.panY, this.zoom);
+        lastBoardScreenActiveTime = 0;
         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
         super.onClose();
     }

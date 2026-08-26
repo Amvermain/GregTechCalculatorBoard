@@ -140,13 +140,30 @@ public class CreateNewAgeModAdapter implements IModAdapter {
 
             if (shiftClick) {
                 int toAdd = (int) (12 - totalMagnets);
-                for (int k = 0; k < toAdd; k++) {
-                    node.addAddon(addon.copy());
+                if (toAdd > 0) {
+                    for (int k = 0; k < toAdd; k++) {
+                        node.addAddon(addon.copy());
+                    }
+                } else if (targetCount < 12) {
+                    node.getAddons().removeIf(a -> a.getCategory().equals(AddonCategory.MAGNET) || a.getMagneticForce() > 0);
+                    for (int k = 0; k < 12; k++) {
+                        node.addAddon(addon.copy());
+                    }
+                } else {
+                    node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
                 }
             } else {
                 if (totalMagnets < 12) {
                     node.addAddon(addon.copy());
-                } else if (targetCount > 0) {
+                } else if (targetCount < 12) {
+                    for (MachineAddon existing : new java.util.ArrayList<>(node.getAddons())) {
+                        if ((existing.getCategory().equals(AddonCategory.MAGNET) || existing.getMagneticForce() > 0) && !existing.getId().equals(addon.getId())) {
+                            node.removeSingleAddon(existing.getId());
+                            node.addAddon(addon.copy());
+                            break;
+                        }
+                    }
+                } else {
                     node.removeSingleAddon(addon.getId());
                 }
             }
@@ -208,6 +225,18 @@ public class CreateNewAgeModAdapter implements IModAdapter {
             }
             if (targetCount > 0) {
                 tooltip.add(Component.literal("§c[Right-Click] Remove 1 Magnet (-1)"));
+            }
+        }
+    }
+
+    @Override
+    public void populateExtraBOMParts(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts) {
+        if (node == null || parts == null) return;
+        ResourceLocation icon = node.getMachineIcon();
+        if (icon != null && icon.getPath().contains("carbon_brushes")) {
+            ResourceLocation coilId = ResourceLocation.tryParse("create_new_age:generator_coil");
+            if (coilId != null) {
+                parts.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(coilId, "Generator Coil", 1, com.gtceu.calcboard.api.bom.PartCategory.COIL));
             }
         }
     }

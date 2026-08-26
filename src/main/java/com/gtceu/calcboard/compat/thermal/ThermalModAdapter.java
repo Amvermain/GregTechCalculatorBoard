@@ -45,6 +45,10 @@ public class ThermalModAdapter implements IModAdapter {
 
     @Override
     public boolean handlesNode(RecipeNode node) {
+        if (node == null) return false;
+        if (node.getMachineIcon() != null && node.getMachineIcon().getNamespace().equalsIgnoreCase("gtceu") && node.getMachineIcon().getPath().contains("boiler")) {
+            return false;
+        }
         return ThermalAugmentHelper.isThermalMachine(node);
     }
 
@@ -271,7 +275,38 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
+    public EnergyType getEnergyType(RecipeNode node) {
+        return EnergyType.ELECTRIC_FE;
+    }
+
+    @Override
     public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
         return ThermalGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
+    }
+
+    @Override
+    public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node == null || stack == null) return defaultRate;
+        double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
+        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        return defaultRate;
+    }
+
+    @Override
+    public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node == null || stack == null) return defaultRate;
+        double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
+        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+            return defaultRate * fuelEnergyMult;
+        }
+        return defaultRate;
     }
 }

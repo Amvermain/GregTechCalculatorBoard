@@ -12,7 +12,7 @@ public class HotkeyHudWidget {
     private boolean expanded;
 
     private static final int EXPANDED_WIDTH = 195;
-    private static final int EXPANDED_HEIGHT = 172;
+    private static final int EXPANDED_HEIGHT = 184;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
 
@@ -82,6 +82,8 @@ public class HotkeyHudWidget {
         // Hotkey lines
         int curY = panelY + 20;
         renderKeyLine(graphics, font, panelX + 6, curY, "B", "gui.gtcalcboard.hotkey_hud.balance");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Shift+B / M", "gui.gtcalcboard.hotkey_hud.bom");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "T", "gui.gtcalcboard.hotkey_hud.time_unit");
         curY += 12;

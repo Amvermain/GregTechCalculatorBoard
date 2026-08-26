@@ -53,6 +53,10 @@ public enum PowerDisplayMode {
         if (node.getEnergyType() == EnergyType.HEAT_OR_SELF) {
             return "§6♨";
         }
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            double steamPerSec = node.getBaseEUt() * 2.0 * 20.0 * node.getMachineCount();
+            return String.format(java.util.Locale.ROOT, "§b♨ %,.0f mB/s", steamPerSec);
+        }
         double totalEUt = node.getEffectiveTotalEUt();
         GTVoltageTier tier = node.getTargetTier();
         if (tier == null) tier = GTVoltageTier.LV;

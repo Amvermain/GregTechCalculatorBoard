@@ -177,7 +177,7 @@ public class GraphSerializationTest {
         NodeClipboard.getInstance().copy(graph, sel);
         Assertions.assertTrue(NodeClipboard.getInstance().hasContent());
 
-        List<RecipeNode> pasted = NodeClipboard.getInstance().paste(graph, 200.0, 200.0);
+        List<RecipeNode> pasted = NodeClipboard.getInstance().paste(graph, 200.0, 200.0).nodes();
         Assertions.assertEquals(2, pasted.size());
         Assertions.assertEquals(4, graph.getNodes().size());
         Assertions.assertEquals(2, graph.getConnections().size());
@@ -362,5 +362,60 @@ public class GraphSerializationTest {
         Assertions.assertFalse(manager.isHotkeyHudExpanded());
         Assertions.assertFalse(manager.isFavoritesDockExpanded());
         Assertions.assertEquals(PowerDisplayMode.AMPS, manager.getPowerDisplayMode());
+    }
+
+    @Test
+    public void testSerializationCompactPayloadAndFidelity() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode macerator = RecipeNode.create("Macerator", 100.0, 30.0, GTVoltageTier.LV);
+        macerator.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        macerator.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0));
+        macerator.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2.0));
+        graph.addNode(macerator);
+
+        RecipeNode furnace = RecipeNode.create("Furnace", 200.0, 120.0, GTVoltageTier.MV);
+        furnace.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
+        furnace.setMultiblock(true);
+        furnace.setParallel(8);
+        furnace.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2.0));
+        furnace.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 2.0));
+        graph.addNode(furnace);
+
+        graph.addConnection(macerator.getId(), 0, furnace.getId(), 0);
+
+        // Serialize to NBT and export to Blueprint string
+        CompoundTag tag = graph.serializeNBT(100.0, 200.0, 1.25);
+        String blueprint = BlueprintCodec.exportToString(graph, 100.0, 200.0, 1.25);
+
+        // Ensure compact size
+        Assertions.assertNotNull(blueprint);
+        Assertions.assertTrue(blueprint.startsWith("GTBOARD:"));
+        Assertions.assertTrue(blueprint.length() < 1200, "Blueprint string should be ultra-compact (< 1200 chars), was: " + blueprint.length());
+
+        // Deserialize and check 100% roundtrip fidelity
+        double[] viewport = new double[3];
+        FlowGraph imported = BlueprintCodec.importFromString(blueprint, viewport);
+        Assertions.assertNotNull(imported);
+        Assertions.assertEquals(100.0, viewport[0], 0.001);
+        Assertions.assertEquals(200.0, viewport[1], 0.001);
+        Assertions.assertEquals(1.25, viewport[2], 0.001);
+
+        Assertions.assertEquals(2, imported.getNodes().size());
+        Assertions.assertEquals(1, imported.getConnections().size());
+
+        RecipeNode importedMacerator = imported.getNodes().get(0);
+        Assertions.assertEquals("Macerator", importedMacerator.getName());
+        Assertions.assertEquals(GTVoltageTier.LV, importedMacerator.getRecipeTier());
+        Assertions.assertEquals(GTVoltageTier.LV, importedMacerator.getTargetTier());
+        Assertions.assertEquals(1.0, importedMacerator.getMachineCount(), 0.001);
+        Assertions.assertEquals(1, importedMacerator.getParallel());
+        Assertions.assertFalse(importedMacerator.isMultiblock());
+
+        RecipeNode importedFurnace = imported.getNodes().get(1);
+        Assertions.assertEquals("Furnace", importedFurnace.getName());
+        Assertions.assertEquals(GTVoltageTier.MV, importedFurnace.getRecipeTier());
+        Assertions.assertEquals(8, importedFurnace.getParallel());
+        Assertions.assertTrue(importedFurnace.isMultiblock());
     }
 }

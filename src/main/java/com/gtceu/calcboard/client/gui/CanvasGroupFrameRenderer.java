@@ -7,67 +7,76 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
-import java.util.List;
-
 /**
- * Renders visual group frames, headers, action buttons, sticky notes, and resize grips on the canvas.
+ * Renders visual group frames, headers, action buttons, and multi-edge resize handles on the canvas.
  */
 public class CanvasGroupFrameRenderer {
 
     public enum FrameAction {
-        NONE, COLOR, COLLAPSE, NOTE, DELETE, RESIZE
+        NONE, COLOR, COLLAPSE, DELETE, RESIZE
+    }
+
+    public enum ResizeDirection {
+        NONE, NORTH, SOUTH, WEST, EAST, NORTH_WEST, NORTH_EAST, SOUTH_WEST, SOUTH_EAST
     }
 
     public static final int BTN_SIZE = 16;
     public static final int BTN_SPACING = 3;
+    public static final double RESIZE_MARGIN = 6.0;
+    public static final double CORNER_SIZE = 14.0;
 
     public static void renderFrames(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, String activeEditingFrameId) {
+        renderFrames(graphics, graph, canvasMouseX, canvasMouseY, activeEditingFrameId, java.util.Collections.emptySet());
+    }
+
+    public static void renderFrames(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, String activeEditingFrameId, java.util.Set<String> selectedFrameIds) {
         if (graph == null || graph.getFrames().isEmpty()) return;
 
         Font font = Minecraft.getInstance().font;
 
         for (CanvasGroupFrame frame : graph.getFrames()) {
-            renderSingleFrame(graphics, font, frame, canvasMouseX, canvasMouseY, frame.getId().equals(activeEditingFrameId));
+            boolean isSelected = selectedFrameIds != null && selectedFrameIds.contains(frame.getId());
+            renderSingleFrame(graphics, font, frame, canvasMouseX, canvasMouseY, frame.getId().equals(activeEditingFrameId), isSelected);
         }
     }
 
-    private static void renderSingleFrame(GuiGraphics graphics, Font font, CanvasGroupFrame frame, double mouseX, double mouseY, boolean isEditingTitle) {
+    private static void renderSingleFrame(GuiGraphics graphics, Font font, CanvasGroupFrame frame, double mouseX, double mouseY, boolean isEditingTitle, boolean selected) {
         int x = (int) frame.getPosX();
         int y = (int) frame.getPosY();
         int w = (int) frame.getWidth();
         int h = (int) frame.getHeight();
         int color = frame.getColor();
 
-        // 1. Semi-transparent background body (Alpha = 0x33 ~ 20%)
+        // Selection highlight glow
+        if (selected) {
+            graphics.renderOutline(x - 2, y - 2, w + 4, h + 4, 0xFF00E5FF);
+            graphics.renderOutline(x - 1, y - 1, w + 2, h + 2, 0x8800E5FF);
+        }
+
+        // 1. Semi-transparent background body (Alpha = 0x28 ~ 16%)
         int bodyBg = (color & 0x00FFFFFF) | 0x28000000;
         int borderCol = (color & 0x00FFFFFF) | 0xCC000000;
         graphics.fill(x, y, x + w, y + h, bodyBg);
         graphics.renderOutline(x, y, w, h, borderCol);
 
-        // 2. Header bar background (Alpha = 0xAA)
+        // 2. Header Bar Background & Border
         int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
-        int headerBg = (color & 0x00FFFFFF) | 0x99000000;
+        int headerBg = (color & 0x00FFFFFF) | 0x66000000;
         graphics.fill(x, y, x + w, y + headerH, headerBg);
         graphics.fill(x, y + headerH - 1, x + w, y + headerH, borderCol);
 
-        // 3. Header Title (Clean without emoji VS16 glyph)
+        // 3. Header Title
         String title = isEditingTitle ? frame.getTitle() + "_" : frame.getTitle();
         graphics.drawString(font, title, x + 6, y + 8, 0xFFFFFFFF, true);
 
         // 4. Header Action Buttons (Right-aligned)
-        // [🎨 Color] [📦 Collapse] [📝 Note] [✕ Delete]
+        // [🎨 Color] [📦 Collapse] [✕ Delete]
         int btnY = y + 4;
         int curBtnX = x + w - BTN_SIZE - 5;
 
         // [✕ Delete / Ungroup]
         boolean delHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
         drawIconButton(graphics, font, "✕", curBtnX, btnY, BTN_SIZE, BTN_SIZE, delHover, 0xFFFF5555, 0x55FF0000);
-        curBtnX -= (BTN_SIZE + BTN_SPACING);
-
-        // [📝 Note]
-        boolean noteHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
-        boolean hasNote = frame.getNote() != null && !frame.getNote().trim().isEmpty();
-        drawIconButton(graphics, font, "📝", curBtnX, btnY, BTN_SIZE, BTN_SIZE, noteHover, hasNote ? 0xFFFFD700 : 0xFFDDDDDD, hasNote ? 0x66FFD700 : 0x44000000);
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
         // [📦 Collapse to Module]
@@ -80,23 +89,39 @@ public class CanvasGroupFrameRenderer {
         boolean colorHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
         drawColorCycleButton(graphics, curBtnX, btnY, BTN_SIZE, BTN_SIZE, colorHover, color);
 
-        // 5. Sticky Note Badge (Bottom-Left)
-        if (hasNote) {
-            String notePreview = frame.getNote();
-            if (notePreview.length() > 36) notePreview = notePreview.substring(0, 33) + "...";
-            String noteText = "📝 " + notePreview;
-            int noteW = font.width(noteText) + 12;
-            int noteH = 14;
-            int noteX = x + 8;
-            int noteY = y + h - noteH - 6;
-
-            graphics.fill(noteX, noteY, noteX + noteW, noteY + noteH, 0xCC1E293B);
-            graphics.renderOutline(noteX, noteY, noteW, noteH, (color & 0x00FFFFFF) | 0x88000000);
-            graphics.drawString(font, noteText, noteX + 6, noteY + 3, 0xFFE2E8F0, false);
-        }
-
-        // 6. Resize Grip (Bottom-Right corner)
+        // 5. Corner Grips & Edge Hover Highlight
+        drawCornerGrip(graphics, x, y, borderCol, false, false);
+        drawCornerGrip(graphics, x + w, y, borderCol, true, false);
+        drawCornerGrip(graphics, x, y + h, borderCol, false, true);
         drawResizeGrip(graphics, x + w - 12, y + h - 12, borderCol);
+
+        ResizeDirection hoverDir = getResizeDirection(frame, mouseX, mouseY);
+        if (hoverDir != ResizeDirection.NONE) {
+            int highlightCol = (color & 0x00FFFFFF) | 0xFF000000;
+            switch (hoverDir) {
+                case NORTH -> graphics.fill(x, y - 1, x + w, y + 2, highlightCol);
+                case SOUTH -> graphics.fill(x, y + h - 2, x + w, y + h + 1, highlightCol);
+                case WEST -> graphics.fill(x - 1, y, x + 2, y + h, highlightCol);
+                case EAST -> graphics.fill(x + w - 2, y, x + w + 1, y + h, highlightCol);
+                case NORTH_WEST -> {
+                    graphics.fill(x - 1, y - 1, x + 16, y + 2, highlightCol);
+                    graphics.fill(x - 1, y - 1, x + 2, y + 16, highlightCol);
+                }
+                case NORTH_EAST -> {
+                    graphics.fill(x + w - 16, y - 1, x + w + 1, y + 2, highlightCol);
+                    graphics.fill(x + w - 2, y - 1, x + w + 1, y + 16, highlightCol);
+                }
+                case SOUTH_WEST -> {
+                    graphics.fill(x - 1, y + h - 2, x + 16, y + h + 1, highlightCol);
+                    graphics.fill(x - 1, y + h - 16, x + 2, y + h + 1, highlightCol);
+                }
+                case SOUTH_EAST -> {
+                    graphics.fill(x + w - 16, y + h - 2, x + w + 1, y + h + 1, highlightCol);
+                    graphics.fill(x + w - 2, y + h - 16, x + w + 1, y + h + 1, highlightCol);
+                }
+                default -> {}
+            }
+        }
     }
 
     public static void renderFrameTooltips(GuiGraphics graphics, Font font, FlowGraph graph, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
@@ -106,7 +131,6 @@ public class CanvasGroupFrameRenderer {
             int x = (int) frame.getPosX();
             int y = (int) frame.getPosY();
             int w = (int) frame.getWidth();
-            int h = (int) frame.getHeight();
 
             int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
             if (canvasMouseY >= y && canvasMouseY <= y + headerH && canvasMouseX >= x && canvasMouseX <= x + w) {
@@ -116,13 +140,6 @@ public class CanvasGroupFrameRenderer {
                 // [✕ Delete]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                     graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
-                    return;
-                }
-                curBtnX -= (BTN_SIZE + BTN_SPACING);
-
-                // [📝 Note]
-                if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§a📝 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_note")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
@@ -137,25 +154,6 @@ public class CanvasGroupFrameRenderer {
                 // [🎨 Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                     graphics.renderTooltip(font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
-                    return;
-                }
-            }
-
-            // Note badge hover
-            boolean hasNote = frame.getNote() != null && !frame.getNote().trim().isEmpty();
-            if (hasNote) {
-                String notePreview = frame.getNote();
-                if (notePreview.length() > 36) notePreview = notePreview.substring(0, 33) + "...";
-                String noteText = "📝 " + notePreview;
-                int noteW = font.width(noteText) + 12;
-                int noteH = 14;
-                int noteX = x + 8;
-                int noteY = y + h - noteH - 6;
-                if (isMouseOver(canvasMouseX, canvasMouseY, noteX, noteY, noteW, noteH)) {
-                    graphics.renderTooltip(font, java.util.List.of(
-                        Component.literal("§e📝 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_note_badge")),
-                        Component.literal("§7" + frame.getNote())
-                    ), java.util.Optional.empty(), mouseX, mouseY);
                     return;
                 }
             }
@@ -183,14 +181,69 @@ public class CanvasGroupFrameRenderer {
     }
 
     private static void drawResizeGrip(GuiGraphics graphics, int gx, int gy, int col) {
-        // Diagonal 3 dots / small lines
         graphics.fill(gx + 8, gy + 8, gx + 10, gy + 10, col);
         graphics.fill(gx + 4, gy + 8, gx + 6, gy + 10, col);
         graphics.fill(gx + 8, gy + 4, gx + 10, gy + 6, col);
     }
 
+    private static void drawCornerGrip(GuiGraphics graphics, int cx, int cy, int col, boolean right, boolean bottom) {
+        int sx = right ? cx - 8 : cx + 2;
+        int sy = bottom ? cy - 8 : cy + 2;
+        int ex = right ? cx - 2 : cx + 8;
+        int ey = bottom ? cy - 2 : cy + 8;
+        graphics.fill(sx, sy, ex, ey, (col & 0x00FFFFFF) | 0x44000000);
+    }
+
     private static boolean isMouseOver(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx <= x + w && my >= y && my <= y + h;
+    }
+
+    public static ResizeDirection getResizeDirection(CanvasGroupFrame frame, double mouseX, double mouseY) {
+        if (frame == null) return ResizeDirection.NONE;
+
+        double x = frame.getPosX();
+        double y = frame.getPosY();
+        double w = frame.getWidth();
+        double h = frame.getHeight();
+
+        if (mouseX < x - RESIZE_MARGIN || mouseX > x + w + RESIZE_MARGIN ||
+            mouseY < y - RESIZE_MARGIN || mouseY > y + h + RESIZE_MARGIN) {
+            return ResizeDirection.NONE;
+        }
+
+        // Header buttons take precedence over top-right resizing
+        double headerH = CanvasGroupFrame.HEADER_HEIGHT;
+        if (mouseY >= y && mouseY <= y + headerH && mouseX >= x && mouseX <= x + w) {
+            double btnY = y + 4;
+            double rightEdge = x + w - 5;
+            if (mouseX >= rightEdge - 65 && mouseX <= rightEdge && mouseY >= btnY && mouseY <= btnY + BTN_SIZE) {
+                return ResizeDirection.NONE;
+            }
+        }
+
+        boolean nearLeft = mouseX <= x + RESIZE_MARGIN;
+        boolean nearRight = mouseX >= x + w - RESIZE_MARGIN;
+        boolean nearTop = mouseY <= y + RESIZE_MARGIN;
+        boolean nearBottom = mouseY >= y + h - RESIZE_MARGIN;
+
+        boolean cornerLeft = mouseX <= x + CORNER_SIZE;
+        boolean cornerRight = mouseX >= x + w - CORNER_SIZE;
+        boolean cornerTop = mouseY <= y + CORNER_SIZE;
+        boolean cornerBottom = mouseY >= y + h - CORNER_SIZE;
+
+        // 4 Corners
+        if (cornerTop && cornerLeft) return ResizeDirection.NORTH_WEST;
+        if (cornerTop && cornerRight) return ResizeDirection.NORTH_EAST;
+        if (cornerBottom && cornerLeft) return ResizeDirection.SOUTH_WEST;
+        if (cornerBottom && cornerRight) return ResizeDirection.SOUTH_EAST;
+
+        // 4 Edges
+        if (nearTop) return ResizeDirection.NORTH;
+        if (nearBottom) return ResizeDirection.SOUTH;
+        if (nearLeft) return ResizeDirection.WEST;
+        if (nearRight) return ResizeDirection.EAST;
+
+        return ResizeDirection.NONE;
     }
 
     public static FrameAction getClickedAction(CanvasGroupFrame frame, double mouseX, double mouseY) {
@@ -201,12 +254,7 @@ public class CanvasGroupFrameRenderer {
         int w = (int) frame.getWidth();
         int h = (int) frame.getHeight();
 
-        // 1. Resize Grip
-        if (mouseX >= x + w - 14 && mouseX <= x + w && mouseY >= y + h - 14 && mouseY <= y + h) {
-            return FrameAction.RESIZE;
-        }
-
-        // 2. Header Bar Actions
+        // 1. Header Bar Action Buttons
         int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
         if (mouseY >= y && mouseY <= y + headerH && mouseX >= x && mouseX <= x + w) {
             int btnY = y + 4;
@@ -215,12 +263,6 @@ public class CanvasGroupFrameRenderer {
             // [✕ Delete / Ungroup]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return FrameAction.DELETE;
-            }
-            curBtnX -= (BTN_SIZE + BTN_SPACING);
-
-            // [📝 Note]
-            if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                return FrameAction.NOTE;
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
@@ -234,9 +276,12 @@ public class CanvasGroupFrameRenderer {
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return FrameAction.COLOR;
             }
+        }
 
-            // Clicked on header body -> NONE (handled as drag/double-click by CanvasInteractionHandler)
-            return FrameAction.NONE;
+        // 2. Multi-direction Resizing Grip & Edge Hit Test
+        ResizeDirection dir = getResizeDirection(frame, mouseX, mouseY);
+        if (dir != ResizeDirection.NONE) {
+            return FrameAction.RESIZE;
         }
 
         return FrameAction.NONE;

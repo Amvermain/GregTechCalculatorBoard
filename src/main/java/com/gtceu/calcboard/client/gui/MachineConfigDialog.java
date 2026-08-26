@@ -11,6 +11,8 @@ import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.api.SteamMode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.Font;
@@ -24,6 +26,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Unified Machine Configuration & Addon Modal Dialog.
@@ -71,11 +74,51 @@ public class MachineConfigDialog {
         this.cachedFilteredCatalog = null;
     }
 
+    public void setSelectedCategory(AddonCategory category) {
+        this.selectedCategory = category;
+        this.isCustomBuilderActive = (category == AddonCategory.CUSTOM);
+        invalidateFilteredCatalog();
+        ensureCategoryVisible(category);
+    }
+
+    private void ensureCategoryVisible(AddonCategory targetCat) {
+        if (node == null) return;
+        List<AddonCategory> allCats = getAllCategoriesForFilter();
+        int targetIdx = (targetCat != null && targetCat.equals(AddonCategory.CUSTOM)) ? (allCats.size() - 1) : allCats.indexOf(targetCat);
+        if (targetIdx < 0) return;
+        var font = net.minecraft.client.Minecraft.getInstance().font;
+        int chipLeft = 0;
+        for (int i = 0; i < targetIdx; i++) {
+            chipLeft += font.width(getCategoryLabel(allCats.get(i))) + 12 + 4;
+        }
+        int chipW = font.width(getCategoryLabel(allCats.get(targetIdx))) + 12;
+        int availW = DIALOG_WIDTH - 20;
+        if (chipLeft < categoryScrollX) {
+            categoryScrollX = chipLeft;
+        } else if (chipLeft + chipW > categoryScrollX + availW) {
+            categoryScrollX = chipLeft + chipW - availW;
+        }
+    }
+
+    public AddonCategory getSelectedCategory() {
+        return this.selectedCategory;
+    }
+
     public void open(RecipeNode node) {
+        open(node, null);
+    }
+
+    public void open(RecipeNode node, AddonCategory initialCategory) {
         this.node = node;
         this.visible = true;
-        this.selectedCategory = MachineAddon.isTurbineMachine(node) ? MachineAddon.Category.ROTOR : null;
-        this.isCustomBuilderActive = false;
+        if (initialCategory != null) {
+            this.selectedCategory = initialCategory;
+        } else {
+            this.selectedCategory = (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) ? MachineAddon.Category.ROTOR : null;
+        }
+        this.isCustomBuilderActive = (this.selectedCategory == AddonCategory.CUSTOM);
+        this.categoryScrollX = 0;
+        ensureCategoryVisible(this.selectedCategory);
         this.activeAddonsScroll = 0;
         this.rotorGridScroll = 0;
         this.lastObservedCatalogVersion = MachineAddonCatalog.getInstance().getVersion();
@@ -158,8 +201,12 @@ public class MachineConfigDialog {
         return visible;
     }
 
+    private List<Component> deferredTooltip = null;
+
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks, int screenWidth, int screenHeight) {
         if (!visible || node == null) return;
+
+        this.deferredTooltip = null;
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 600);
@@ -314,7 +361,7 @@ public class MachineConfigDialog {
             adapter.buildAddonTooltip(node, hoveredActiveAddon, true, tooltip);
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             appendAdvancedTooltipDebugInfo(tooltip, hoveredActiveAddon);
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            this.deferredTooltip = tooltip;
         }
 
         // ==========================================
@@ -334,6 +381,16 @@ public class MachineConfigDialog {
         } else {
             renderCatalogGrid(graphics, font, x + 8, contentY + 4, dialogW - 16, contentH - 8, mouseX, mouseY);
         }
+
+        // Topmost Deferred Tooltip Render
+        if (this.deferredTooltip != null && !this.deferredTooltip.isEmpty()) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 400);
+            graphics.renderTooltip(font, this.deferredTooltip, java.util.Optional.empty(), mouseX, mouseY);
+            graphics.pose().popPose();
+        }
+
+        graphics.pose().popPose();
     }
 
     private String formatAddonBadge(MachineAddon addon) {
@@ -372,32 +429,70 @@ public class MachineConfigDialog {
         return "§7" + addon.getName();
     }
 
+    private double categoryScrollX = 0;
+    private double maxCategoryScrollX = 0;
+
+    private List<AddonCategory> getAllCategoriesForFilter() {
+        List<AddonCategory> list = new ArrayList<>();
+        list.add(null); // All
+        List<AddonCategory> relCats = MachineAddon.getRelevantCategories(node);
+        for (AddonCategory cat : relCats) {
+            if (!cat.equals(AddonCategory.CUSTOM) && !list.contains(cat)) {
+                list.add(cat);
+            }
+        }
+        list.add(AddonCategory.CUSTOM);
+        return list;
+    }
+
     private String getCategoryLabel(AddonCategory cat) {
         if (cat == null) return Component.translatable("gui.gtcalcboard.addon_cat.all").getString();
         return Component.translatable(cat.getTranslatableKey()).getString();
     }
 
     private void renderCategoryFilterChips(GuiGraphics graphics, net.minecraft.client.gui.Font font, int startX, int startY, int dialogX, int dialogW, int mouseX, int mouseY) {
-        int cx = startX;
+        List<AddonCategory> allCats = getAllCategoriesForFilter();
+        int totalCats = allCats.size();
+        int availW = dialogW - 20;
+        int scrollAreaX = startX;
+        int scrollAreaW = availW;
 
-        // 1. All
-        String allLabel = getCategoryLabel(null);
-        int allW = font.width(allLabel) + 12;
-        cx = renderChip(graphics, font, allLabel, !isCustomBuilderActive && selectedCategory == null, cx, startY, allW, mouseX, mouseY);
+        int totalWidth = 0;
+        List<Integer> chipWidths = new ArrayList<>();
+        for (AddonCategory cat : allCats) {
+            int w = font.width(getCategoryLabel(cat)) + 12;
+            chipWidths.add(w);
+            totalWidth += w + 4;
+        }
+        totalWidth = Math.max(0, totalWidth - 4);
 
-        // 2. Relevant Machine Categories
-        List<AddonCategory> relCats = MachineAddon.getRelevantCategories(node);
-        for (AddonCategory cat : relCats) {
-            if (cat.equals(AddonCategory.CUSTOM)) continue;
-            String label = getCategoryLabel(cat);
-            int bw = font.width(label) + 12;
-            cx = renderChip(graphics, font, label, !isCustomBuilderActive && selectedCategory != null && selectedCategory.equals(cat), cx, startY, bw, mouseX, mouseY);
+        maxCategoryScrollX = Math.max(0, totalWidth - scrollAreaW);
+        categoryScrollX = Math.max(0, Math.min(maxCategoryScrollX, categoryScrollX));
+
+        graphics.enableScissor(scrollAreaX, startY - 1, scrollAreaX + scrollAreaW, startY + 17);
+
+        int cx = scrollAreaX - (int) categoryScrollX;
+        for (int i = 0; i < totalCats; i++) {
+            AddonCategory cat = allCats.get(i);
+            int bw = chipWidths.get(i);
+            boolean active = isCustomBuilderActive ? (cat != null && cat.equals(AddonCategory.CUSTOM))
+                    : ((selectedCategory == null && cat == null) || (selectedCategory != null && selectedCategory.equals(cat)));
+            if (cx + bw >= scrollAreaX && cx <= scrollAreaX + scrollAreaW) {
+                renderChip(graphics, font, getCategoryLabel(cat), active, cx, startY, bw, mouseX, mouseY, scrollAreaX, scrollAreaX + scrollAreaW);
+            }
+            cx += bw + 4;
         }
 
-        // 3. Custom Builder
-        String customLabel = getCategoryLabel(AddonCategory.CUSTOM);
-        int custW = font.width(customLabel) + 12;
-        renderChip(graphics, font, customLabel, isCustomBuilderActive, cx, startY, custW, mouseX, mouseY);
+        graphics.disableScissor();
+
+        if (maxCategoryScrollX > 0) {
+            if (categoryScrollX > 2) {
+                graphics.drawString(font, "«", scrollAreaX - 6, startY + 4, 0xFFFFAA00, false);
+            }
+            if (categoryScrollX < maxCategoryScrollX - 2) {
+                graphics.drawString(font, "»", scrollAreaX + scrollAreaW - 6, startY + 4, 0xFFFFAA00, false);
+            }
+        }
     }
 
     private void renderIndexerStatusPill(GuiGraphics graphics, net.minecraft.client.gui.Font font, int rightX, int y, int mouseX, int mouseY) {
@@ -432,16 +527,15 @@ public class MachineConfigDialog {
             } else {
                 tooltip.add(Component.literal(Component.translatable("gui.gtcalcboard.catalog.deep_scan_tooltip_track2_complete").getString()));
             }
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            this.deferredTooltip = tooltip;
         }
     }
 
-    private int renderChip(GuiGraphics graphics, net.minecraft.client.gui.Font font, String label, boolean active, int bx, int by, int bw, int mouseX, int mouseY) {
-        boolean hover = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + 16;
+    private void renderChip(GuiGraphics graphics, net.minecraft.client.gui.Font font, String label, boolean active, int bx, int by, int bw, int mouseX, int mouseY, int clipMinX, int clipMaxX) {
+        boolean hover = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + 16 && mouseX >= clipMinX && mouseX <= clipMaxX;
         graphics.fill(bx, by, bx + bw, by + 16, active ? 0xFF1B1E28 : (hover ? 0xFF2E3544 : 0xFF222733));
         graphics.renderOutline(bx, by, bw, 16, active ? 0xFF58D3FF : 0xFF333A48);
         graphics.drawCenteredString(font, label, bx + bw / 2, by + 4, active ? 0xFF58D3FF : 0xFF9CA5B8);
-        return bx + bw + 4;
     }
 
     private List<MachineAddon> getFilteredCatalog() {
@@ -460,10 +554,14 @@ public class MachineConfigDialog {
         if (adapter != null) {
             List<MachineAddon> resetCards = adapter.getResetAddonCards(node);
             for (MachineAddon resetCard : resetCards) {
-                if (selectedCategory == null || resetCard.getCategory() == selectedCategory) {
-                    if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || "기본".contains(q) || "none".contains(q)) {
-                        filtered.add(resetCard);
-                    }
+                if (!adapter.isAddonCompatible(node, resetCard)) continue;
+                if (selectedCategory != null && !resetCard.getCategory().equals(selectedCategory)) continue;
+                if (selectedCategory == null) {
+                    List<AddonCategory> rel = MachineAddon.getRelevantCategories(node);
+                    if (!rel.contains(resetCard.getCategory())) continue;
+                }
+                if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || "기본".contains(q) || "none".contains(q)) {
+                    filtered.add(resetCard);
                 }
             }
         }
@@ -506,9 +604,23 @@ public class MachineConfigDialog {
             return;
         }
 
-        // Search Bar (Y: startY) + Indexer Status Pill (Right-aligned)
-        int pillSpace = 120;
-        int searchW = width - pillSpace - 6;
+        List<MachineAddon> filtered = getFilteredCatalog();
+        int totalCards = filtered.size();
+        int cols = 3;
+        int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
+        int visibleRows = 2;
+        int cardsPerPage = cols * visibleRows;
+        int maxScroll = Math.max(0, maxRows - visibleRows);
+        if (catalogScroll > maxScroll) catalogScroll = maxScroll;
+
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalCards / (double) cardsPerPage));
+        int currentPage = (catalogScroll / visibleRows) + 1;
+
+        // Search Bar (Y: startY) + Page Navigator + Indexer Status Pill (Right-aligned)
+        int navW = (totalPages > 1) ? 76 : 0;
+        int pillSpace = 100;
+        int searchW = width - pillSpace - navW - 12;
+
         if (searchBox != null) {
             searchBox.setX(startX + 2);
             searchBox.setY(startY);
@@ -525,27 +637,51 @@ public class MachineConfigDialog {
             }
         }
 
+        // Page Navigator (Left / Page X/Y / Right)
+        if (totalPages > 1) {
+            int navX = startX + searchW + 6;
+            boolean prevHov = mouseX >= navX && mouseX <= navX + 14 && mouseY >= startY && mouseY <= startY + 14;
+            graphics.fill(navX, startY, navX + 14, startY + 14, prevHov ? 0xFF3D4558 : 0xFF222733);
+            graphics.renderOutline(navX, startY, 14, 14, prevHov ? 0xFF58D3FF : 0xFF333A48);
+            graphics.drawCenteredString(font, "◀", navX + 7, startY + 3, catalogScroll > 0 ? 0xFFFFFFFF : 0xFF666666);
+
+            String pageText = currentPage + "/" + totalPages;
+            graphics.drawCenteredString(font, "§7" + pageText, navX + 38, startY + 3, 0xFFE0E0E0);
+
+            boolean nextHov = mouseX >= navX + 62 && mouseX <= navX + 76 && mouseY >= startY && mouseY <= startY + 14;
+            graphics.fill(navX + 62, startY, navX + 76, startY + 14, nextHov ? 0xFF3D4558 : 0xFF222733);
+            graphics.renderOutline(navX + 62, startY, 14, 14, nextHov ? 0xFF58D3FF : 0xFF333A48);
+            graphics.drawCenteredString(font, "▶", navX + 69, startY + 3, catalogScroll < maxScroll ? 0xFFFFFFFF : 0xFF666666);
+        }
+
         renderIndexerStatusPill(graphics, font, startX + width - 2, startY, mouseX, mouseY);
 
-        List<MachineAddon> filtered = getFilteredCatalog();
-        int totalCards = filtered.size();
-        int cols = 3;
-        int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
-        int visibleRows = 2;
-        int maxScroll = Math.max(0, maxRows - visibleRows);
-        if (catalogScroll > maxScroll) catalogScroll = maxScroll;
-
         int gridStartY = startY + 18;
-        int cardW = (width - ((cols - 1) * 4)) / cols;
+        int scrollbarW = (maxScroll > 0) ? 6 : 0;
+        int gridW = width - scrollbarW - 2;
+        int cardW = (gridW - ((cols - 1) * 4)) / cols;
         int cardH = 50;
 
-        boolean isScanning = MachineAddonCatalog.getInstance().isExhaustiveScanRunning();
-        if (isScanning || filtered.isEmpty()) {
-            boolean isLoading = !MachineAddonCatalog.getInstance().isReady() || isScanning;
-            if (isLoading && !MachineAddonCatalog.getInstance().isLoading()) {
-                MachineAddonCatalog.getInstance().preloadAsync();
-            }
-            if (isLoading) {
+        // Draw vertical scrollbar
+        if (maxScroll > 0) {
+            int sbX = startX + width - 5;
+            int sbY = gridStartY;
+            int sbH = visibleRows * (cardH + 4) - 4;
+            graphics.fill(sbX, sbY, sbX + 4, sbY + sbH, 0xFF141720);
+            graphics.renderOutline(sbX, sbY, 4, sbH, 0xFF2A3140);
+
+            float thumbRatio = (float) visibleRows / (float) maxRows;
+            int thumbH = Math.max(14, (int) (sbH * thumbRatio));
+            int thumbY = sbY + (int) ((sbH - thumbH) * ((float) catalogScroll / (float) maxScroll));
+            graphics.fill(sbX, thumbY, sbX + 4, thumbY + thumbH, 0xFF4A556B);
+            graphics.renderOutline(sbX, thumbY, 4, thumbH, 0xFF657592);
+        }
+        if (filtered.isEmpty()) {
+            boolean isCatalogEmpty = MachineAddonCatalog.getInstance().getAllAddons().isEmpty();
+            if (isCatalogEmpty && !MachineAddonCatalog.getInstance().isReady()) {
+                if (!MachineAddonCatalog.getInstance().isLoading()) {
+                    MachineAddonCatalog.getInstance().preloadAsync();
+                }
                 double prog = MachineAddonCatalog.getInstance().getExhaustiveProgress();
                 int pct = (int) (prog * 100.0);
                 String msg = "§e⏳ " + Component.translatable("gui.gtcalcboard.loading_addons").getString() + " (" + pct + "%)";
@@ -618,7 +754,23 @@ public class MachineConfigDialog {
             }
 
             // Installed checkmark badge on top right
-            if (isThermal && !isUpgradeKit) {
+            if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
+                if (installedCount > 1) {
+                    graphics.drawString(font, "§a✔ x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
+                } else if (installedCount == 1) {
+                    graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+                }
+            } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
+                int maxSlots = getMaxHatchSlotsAllowed(node, addon);
+                int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, addon);
+                if (installedCount > 1) {
+                    graphics.drawString(font, "§a✔ x" + installedCount, bx + cardW - (installedCount >= 10 ? 36 : 28), by + 4, 0xFFFFFFFF, false);
+                } else if (installedCount == 1) {
+                    graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+                } else if (sameTypeTotal >= maxSlots) {
+                    graphics.drawString(font, "§8" + sameTypeTotal + "/" + maxSlots, bx + cardW - 24, by + 4, 0xFF888888, false);
+                }
+            } else if (isThermal && !isUpgradeKit) {
                 if (installedCount > 1) {
                     graphics.drawString(font, "§a✔ x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
                 } else if (installedCount == 1) {
@@ -657,7 +809,14 @@ public class MachineConfigDialog {
 
             boolean isReset = "gtceu:standard_rotor".equals(hoveredAddon.getId()) || "gtceu:reflector_none".equals(hoveredAddon.getId());
             boolean isInst = !isReset && adapter.isAddonInstalled(node, hoveredAddon);
-            if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains("장착") || c.getString().contains("제거"))) {
+            if (hoveredAddon.getCategory() == MachineAddon.Category.HATCH_BUS) {
+                int maxSlots = getMaxHatchSlotsAllowed(node, hoveredAddon);
+                int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, hoveredAddon);
+                tooltip.add(Component.literal(String.format(Locale.ROOT, "§7[Slots: §a%d §7/ §e%d§7]", sameTypeTotal, maxSlots)));
+                tooltip.add(Component.literal("§eLeft-Click: §aAdd 1 Hatch"));
+                tooltip.add(Component.literal("§eShift + Left-Click: §aFill All (" + maxSlots + "x)"));
+                tooltip.add(Component.literal("§eRight-Click: §cRemove 1 Hatch"));
+            } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains("장착") || c.getString().contains("제거"))) {
                 if (isInst) {
                     tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
                 } else {
@@ -666,10 +825,8 @@ public class MachineConfigDialog {
             }
 
             appendAdvancedTooltipDebugInfo(tooltip, hoveredAddon);
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            this.deferredTooltip = tooltip;
         }
-
-        graphics.pose().popPose();
     }
 
     public static void appendAdvancedTooltipDebugInfo(List<Component> tooltip, MachineAddon addon) {
@@ -708,18 +865,7 @@ public class MachineConfigDialog {
             if (lower.contains("shift") || lower.contains("ctrl") || lower.contains("gregtech ceu modern")) {
                 continue;
             }
-
-            if (trimmed.contains(",")) {
-                String[] parts = trimmed.split(",\\s*");
-                for (String part : parts) {
-                    String p = part.trim();
-                    if (!p.isEmpty()) {
-                        addWrappedBullet(tooltip, font, p);
-                    }
-                }
-            } else {
-                addWrappedBullet(tooltip, font, trimmed);
-            }
+            addWrappedBullet(tooltip, font, trimmed);
         }
     }
 
@@ -1107,8 +1253,16 @@ public class MachineConfigDialog {
             return false;
         }
 
-        // Active addons section scroll (Middle area: y+70 to y+126)
-        if (mouseY >= y + 70 && mouseY <= y + 126) {
+        // 1. Multiblock Model / Controller section scroll (Top area: y+26 to y+68)
+        if (mouseY >= y + 26 && mouseY <= y + 68) {
+            IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null && adapter.handleDialogHeaderScroll(this, node, x, y, dialogW, mouseX, mouseY, delta)) {
+                return true;
+            }
+        }
+
+        // 2. Active addons section scroll (Middle area: y+70 to y+124)
+        if (mouseY >= y + 70 && mouseY <= y + 124) {
             List<MachineAddon> activeAddons = node.getAddons();
             int maxScroll = Math.max(0, activeAddons.size() - 10);
             if (maxScroll > 0) {
@@ -1117,8 +1271,16 @@ public class MachineConfigDialog {
             }
         }
 
-        // Catalog grid scroll (Bottom area: y+128 to y+290)
-        if (!isCustomBuilderActive && mouseY >= y + 128) {
+        // 3. Category Filter Chips section scroll (y+125 to y+145)
+        if (mouseY >= y + 125 && mouseY <= y + 145) {
+            if (maxCategoryScrollX > 0) {
+                categoryScrollX = Math.max(0, Math.min(maxCategoryScrollX, categoryScrollX - (delta * 24.0)));
+                return true;
+            }
+        }
+
+        // 4. Catalog grid scroll (Bottom area: y+146 to y+dialogH)
+        if (!isCustomBuilderActive && mouseY >= y + 146) {
             List<MachineAddon> filtered = getFilteredCatalog();
             int maxRows = (int) Math.ceil((double) filtered.size() / 3.0);
             int maxScroll = Math.max(0, maxRows - 2);
@@ -1164,6 +1326,9 @@ public class MachineConfigDialog {
                     var mbIcon = node.getMultiblockWorkstation();
                     if (mbIcon != null) node.setMachineIcon(mbIcon);
                     com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
+                    if (node.isTurbine()) {
+                        selectedCategory = MachineAddon.Category.ROTOR;
+                    }
                 } else {
                     var sbIcon = node.getSingleblockWorkstation();
                     if (sbIcon != null) node.setMachineIcon(sbIcon);
@@ -1175,37 +1340,39 @@ public class MachineConfigDialog {
                     node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL 
                             || a.getCategory() == MachineAddon.Category.MAINTENANCE 
                             || a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT
-                            || a.getCategory() == MachineAddon.Category.ROTOR);
+                            || a.getCategory() == MachineAddon.Category.ROTOR
+                            || a.getCategory() == MachineAddon.Category.PARALLEL
+                            || a.getCategory() == MachineAddon.Category.ENERGY_HATCH
+                            || a.getCategory() == AddonCategory.THREADING);
                     node.setRotorEfficiency(100);
                     node.setRotorPower(100);
                     node.setRotorName("Standard (100%)");
                     node.setParallel(1);
                     if (parallelBox != null) parallelBox.setValue("1");
-                    if (selectedCategory == MachineAddon.Category.COIL 
-                            || selectedCategory == MachineAddon.Category.MAINTENANCE 
-                            || selectedCategory == MachineAddon.Category.MULTIBLOCK_TRAIT
-                            || selectedCategory == MachineAddon.Category.ROTOR) {
-                        selectedCategory = null;
-                    }
+                    selectedCategory = null;
+                    isCustomBuilderActive = false;
                 }
+                rotorGridScroll = 0;
+                activeAddonsScroll = 0;
+                invalidateFilteredCatalog();
                 if (parent != null) parent.markSummaryDirty();
                 return true;
             }
         }
 
-        // Section 1: Parallel Input Box click
-        if (parallelBox != null && (node.isMultiblock() || ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node))) {
+        // Section 1: Adapter-specific header click (multiblock controllers, parallel action button, boilers, steam modes, rotors, etc.)
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        if (adapter.handleDialogHeaderClick(this, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent)) {
+            return true;
+        }
+
+        // Section 1: Parallel Input Box click (only if not a multiblock)
+        if (parallelBox != null && !node.isMultiblock() && ModAdapterRegistry.getAdapterForNode(node).supportsAddons(node)) {
             parallelBox.setX(x + 10);
             parallelBox.setY(y + 44);
             boolean clicked = parallelBox.mouseClicked(mouseX, mouseY, button);
             parallelBox.setFocused(clicked);
             if (clicked) return true;
-        }
-
-        // Section 1: Adapter-specific header click (boilers, steam modes, rotors, quick presets, rpm, magnets, etc.)
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
-        if (adapter.handleDialogHeaderClick(this, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent)) {
-            return true;
         }
 
 
@@ -1283,44 +1450,31 @@ public class MachineConfigDialog {
 
         var font = Minecraft.getInstance().font;
         int chipY = y + 128;
-        int cx = x + 6;
+        int scrollAreaX = x + 10;
+        int scrollAreaW = dialogW - 20;
 
-        // 1. All
-        String allLabel = getCategoryLabel(null);
-        int allW = font.width(allLabel) + 12;
-        if (mouseX >= cx && mouseX <= cx + allW && mouseY >= chipY && mouseY <= chipY + 16) {
-            isCustomBuilderActive = false;
-            selectedCategory = null;
-            catalogScroll = 0;
-            invalidateFilteredCatalog();
-            return true;
-        }
-        cx += allW + 4;
-
-        // 2. Relevant Machine Categories
-        List<AddonCategory> relCats = MachineAddon.getRelevantCategories(node);
-        for (AddonCategory cat : relCats) {
-            if (cat.equals(AddonCategory.CUSTOM)) continue;
-            String label = getCategoryLabel(cat);
-            int bw = font.width(label) + 12;
-            if (mouseX >= cx && mouseX <= cx + bw && mouseY >= chipY && mouseY <= chipY + 16) {
-                isCustomBuilderActive = false;
-                selectedCategory = cat;
-                catalogScroll = 0;
-                rotorGridScroll = 0;
-                invalidateFilteredCatalog();
-                return true;
+        if (mouseY >= chipY && mouseY <= chipY + 16 && mouseX >= scrollAreaX && mouseX <= scrollAreaX + scrollAreaW) {
+            List<AddonCategory> allCats = getAllCategoriesForFilter();
+            int cx = scrollAreaX - (int) categoryScrollX;
+            for (AddonCategory cat : allCats) {
+                int bw = font.width(getCategoryLabel(cat)) + 12;
+                if (mouseX >= cx && mouseX <= cx + bw) {
+                    if (cat != null && cat.equals(AddonCategory.CUSTOM)) {
+                        isCustomBuilderActive = true;
+                    } else {
+                        isCustomBuilderActive = false;
+                        selectedCategory = cat;
+                    }
+                    catalogScroll = 0;
+                    rotorGridScroll = 0;
+                    invalidateFilteredCatalog();
+                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    );
+                    return true;
+                }
+                cx += bw + 4;
             }
-            cx += bw + 4;
-        }
-
-        // 3. Custom Builder
-        String customLabel = getCategoryLabel(AddonCategory.CUSTOM);
-        int custW = font.width(customLabel) + 12;
-        if (mouseX >= cx && mouseX <= cx + custW && mouseY >= chipY && mouseY <= chipY + 16) {
-            isCustomBuilderActive = true;
-            invalidateFilteredCatalog();
-            return true;
         }
 
         int contentY = y + 146;
@@ -1417,20 +1571,40 @@ public class MachineConfigDialog {
                     node.setMultiblock(true);
                     var mbIcon = node.getMultiblockWorkstation();
                     if (mbIcon != null) node.setMachineIcon(mbIcon);
+                    com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
+                    if (node.isTurbine()) {
+                        selectedCategory = MachineAddon.Category.ROTOR;
+                    }
+                    rotorGridScroll = 0;
+                    activeAddonsScroll = 0;
+                    invalidateFilteredCatalog();
                     if (parent != null) parent.markSummaryDirty();
                     return true;
                 }
             }
         } else {
             // Catalog Search Box & Clear Button
+            List<MachineAddon> filtered = getFilteredCatalog();
+            int totalCards = filtered.size();
+            int cols = 3;
+            int visibleRows = 2;
+            int cardsPerPage = cols * visibleRows;
+            int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
+            int maxScroll = Math.max(0, maxRows - visibleRows);
+            int totalPages = Math.max(1, (int) Math.ceil((double) totalCards / (double) cardsPerPage));
+
+            int navW = (totalPages > 1) ? 76 : 0;
+            int pillSpace = 100;
+            int searchW = width - pillSpace - navW - 12;
+
             if (searchBox != null) {
-                searchBox.setX(startX + 4);
-                searchBox.setY(startY + 2);
-                searchBox.setWidth(width - 8);
+                searchBox.setX(startX + 2);
+                searchBox.setY(startY);
+                searchBox.setWidth(searchW);
 
                 if (!searchBox.getValue().isEmpty()) {
-                    int clearBtnX = startX + width - 18;
-                    int clearBtnY = startY + 3;
+                    int clearBtnX = startX + searchW - 14;
+                    int clearBtnY = startY + 2;
                     if (mouseX >= clearBtnX && mouseX <= clearBtnX + 12 && mouseY >= clearBtnY && mouseY <= clearBtnY + 12) {
                         searchBox.setValue("");
                         catalogScroll = 0;
@@ -1443,12 +1617,42 @@ public class MachineConfigDialog {
                 if (clicked) return true;
             }
 
-            List<MachineAddon> filtered = getFilteredCatalog();
-            int totalCards = filtered.size();
-            int cols = 3;
-            int cardW = (width - ((cols - 1) * 4)) / cols;
-            int cardH = 50;
+            // Page Navigator Clicks
+            if (totalPages > 1) {
+                int navX = startX + searchW + 6;
+                // Click Prev Page ◀
+                if (mouseX >= navX && mouseX <= navX + 14 && mouseY >= startY && mouseY <= startY + 14) {
+                    if (catalogScroll > 0) {
+                        catalogScroll = Math.max(0, catalogScroll - visibleRows);
+                    }
+                    return true;
+                }
+                // Click Next Page ▶
+                if (mouseX >= navX + 62 && mouseX <= navX + 76 && mouseY >= startY && mouseY <= startY + 14) {
+                    if (catalogScroll < maxScroll) {
+                        catalogScroll = Math.min(maxScroll, catalogScroll + visibleRows);
+                    }
+                    return true;
+                }
+            }
+
             int gridStartY = startY + 18;
+            int scrollbarW = (maxScroll > 0) ? 6 : 0;
+            int gridW = width - scrollbarW - 2;
+            int cardW = (gridW - ((cols - 1) * 4)) / cols;
+            int cardH = 50;
+
+            // Scrollbar Track / Slider Click
+            if (maxScroll > 0) {
+                int sbX = startX + width - 8;
+                int sbY = gridStartY;
+                int sbH = visibleRows * (cardH + 4) - 4;
+                if (mouseX >= sbX && mouseX <= sbX + 8 && mouseY >= sbY && mouseY <= sbY + sbH) {
+                    float clickRatio = (float) (mouseY - sbY) / (float) sbH;
+                    catalogScroll = Math.max(0, Math.min(maxScroll, (int) Math.round(clickRatio * maxScroll)));
+                    return true;
+                }
+            }
 
             for (int i = 0; i < cols * 2; i++) {
                 int cardIndex = (catalogScroll * cols) + i;
@@ -1461,10 +1665,49 @@ public class MachineConfigDialog {
 
                 if (mouseX >= bx && mouseX <= bx + cardW && mouseY >= by && mouseY <= by + cardH) {
                     MachineAddon addon = filtered.get(cardIndex);
-                    if (button == 1) {
+                    if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
+                        int installedCount = adapter.getAddonInstalledCount(node, addon);
+                        int totalEnergyHatches = (int) node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH).count();
+                        if (button == 1) {
+                            adapter.handleUninstallAddon(node, addon);
+                        } else {
+                            if (installedCount == 0 || (installedCount == 1 && totalEnergyHatches < 2)) {
+                                adapter.handleInstallAddon(node, addon, false);
+                            } else {
+                                adapter.handleUninstallAddon(node, addon);
+                            }
+                        }
+                    } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
+                        int maxSlots = getMaxHatchSlotsAllowed(node, addon);
+                        int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, addon);
+                        if (button == 1) {
+                            adapter.handleUninstallAddon(node, addon);
+                        } else {
+                            if (Screen.hasShiftDown()) {
+                                int toAdd = Math.max(1, maxSlots - sameTypeTotal);
+                                for (int k = 0; k < toAdd; k++) {
+                                    adapter.handleInstallAddon(node, addon, false);
+                                }
+                            } else if (sameTypeTotal < maxSlots) {
+                                adapter.handleInstallAddon(node, addon, false);
+                            } else {
+                                adapter.handleUninstallAddon(node, addon);
+                            }
+                        }
+                    } else if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getCategory().equals(AddonCategory.THREADING) || addon.getCategory().equals(AddonCategory.THERMAL_AUGMENT)) {
+                        if (button == 1) {
+                            adapter.handleUninstallAddon(node, addon);
+                        } else {
+                            adapter.handleInstallAddon(node, addon, Screen.hasShiftDown());
+                        }
+                    } else if (button == 1) {
                         adapter.handleUninstallAddon(node, addon);
                     } else {
-                        adapter.handleInstallAddon(node, addon, Screen.hasShiftDown());
+                        if (adapter.isAddonInstalled(node, addon)) {
+                            adapter.handleUninstallAddon(node, addon);
+                        } else {
+                            adapter.handleInstallAddon(node, addon, Screen.hasShiftDown());
+                        }
                     }
                     invalidateFilteredCatalog();
                     if (parent != null) parent.markSummaryDirty();
@@ -1504,16 +1747,20 @@ public class MachineConfigDialog {
             return true;
         }
         if (parallelBox != null && parallelBox.isFocused()) {
-            return parallelBox.keyPressed(keyCode, scanCode, modifiers);
+            parallelBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
         }
         if (!isCustomBuilderActive && searchBox != null) {
             if (searchBox.keyPressed(keyCode, scanCode, modifiers)) {
                 catalogScroll = 0;
+            }
+            if (searchBox.isFocused()) {
                 return true;
             }
         }
         if (isCustomBuilderActive && customNameBox != null && customNameBox.isFocused()) {
-            return customNameBox.keyPressed(keyCode, scanCode, modifiers);
+            customNameBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
         }
         return true;
     }
@@ -1533,5 +1780,90 @@ public class MachineConfigDialog {
             return customNameBox.charTyped(codePoint, modifiers);
         }
         return true;
+    }
+
+    public static int getMaxHatchSlotsAllowed(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return 1;
+        GTHatchAddon.HatchType type = getHatchType(addon);
+
+        int reqCount = switch (type) {
+            case FLUID_OUTPUT -> (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
+            case FLUID_INPUT -> (int) node.getInputs().stream().filter(IngredientStack::isFluid).count();
+            case ITEM_OUTPUT -> (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
+            case ITEM_INPUT -> (int) node.getInputs().stream().filter(IngredientStack::isItem).count();
+            case DUAL_INPUT -> Math.max(
+                (int) node.getInputs().stream().filter(IngredientStack::isFluid).count(),
+                (int) node.getInputs().stream().filter(IngredientStack::isItem).count()
+            );
+            case DUAL_OUTPUT -> Math.max(
+                (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count(),
+                (int) node.getOutputs().stream().filter(IngredientStack::isItem).count()
+            );
+            default -> 1;
+        };
+
+        boolean isDT = false;
+        ResourceLocation mbId = node.getMachineIcon();
+        if (mbId == null || !MultiblockDetector.isMultiblock(mbId)) {
+            mbId = node.getMultiblockWorkstation();
+        }
+        if (mbId != null && mbId.getPath().contains("distillation_tower")) {
+            isDT = true;
+        }
+        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("distillation_tower")) {
+            isDT = true;
+        }
+
+        if (isDT && (type == GTHatchAddon.HatchType.FLUID_OUTPUT || type == GTHatchAddon.HatchType.DUAL_OUTPUT)) {
+            return Math.max(1, reqCount);
+        }
+
+        if (mbId != null) {
+            int rFluidOut = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
+            int rItemOut = (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
+            int rFluidIn = (int) node.getInputs().stream().filter(IngredientStack::isFluid).count();
+            int rItemIn = (int) node.getInputs().stream().filter(IngredientStack::isItem).count();
+            var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getMatchingStructure(mbId, rFluidOut, rItemOut, rFluidIn, rItemIn);
+            if (def == null) {
+                def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId);
+            }
+            if (def != null) {
+                int defSlots = switch (type) {
+                    case FLUID_OUTPUT -> def.outputHatchSlotCount();
+                    case FLUID_INPUT -> def.inputHatchSlotCount();
+                    case ITEM_OUTPUT -> def.outputBusSlotCount();
+                    case ITEM_INPUT -> def.inputBusSlotCount();
+                    default -> 1;
+                };
+                reqCount = Math.max(reqCount, defSlots);
+            }
+        }
+
+        return Math.max(1, reqCount);
+    }
+
+    public static int getTotalInstalledHatchesOfSameType(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return 0;
+        GTHatchAddon.HatchType type = getHatchType(addon);
+        int total = 0;
+        for (MachineAddon a : node.getAddons()) {
+            if (a.getCategory() == MachineAddon.Category.HATCH_BUS) {
+                if (getHatchType(a) == type) {
+                    total++;
+                }
+            }
+        }
+        return total;
+    }
+
+    public static GTHatchAddon.HatchType getHatchType(MachineAddon addon) {
+        if (addon instanceof GTHatchAddon gh) return gh.getHatchType();
+        var stats = com.gtceu.calcboard.compat.gtceu.helper.GTHatchHelper.extractStatsFromMachineDef(null, addon.getItemIcon());
+        if (stats != null) return stats.hatchType();
+        String path = addon.getId().toLowerCase(Locale.ROOT);
+        if (path.contains("input_hatch") || path.contains("fluid_import")) return GTHatchAddon.HatchType.FLUID_INPUT;
+        if (path.contains("output_bus") || path.contains("export_bus")) return GTHatchAddon.HatchType.ITEM_OUTPUT;
+        if (path.contains("input_bus") || path.contains("import_bus")) return GTHatchAddon.HatchType.ITEM_INPUT;
+        return GTHatchAddon.HatchType.FLUID_OUTPUT;
     }
 }

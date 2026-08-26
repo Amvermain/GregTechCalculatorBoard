@@ -33,6 +33,7 @@ public class CategoryCapabilityMatrixTest {
         lcrNode.setMultiblock(true);
 
         List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(lcrNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.ENERGY_HATCH));
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.COIL));
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.PARALLEL));
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.MAINTENANCE));
@@ -170,5 +171,39 @@ public class CategoryCapabilityMatrixTest {
 
         // Fast load should provide basic traits
         Assertions.assertTrue(catalog.getAllAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT));
+    }
+
+    @Test
+    void testDynamicMachineIconSynchronization() {
+        RecipeNode node = RecipeNode.create("Chemical Reactor (Rubber)", 20.0, 30.0, GTVoltageTier.LV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:chemical_reactor"));
+        node.setAvailableWorkstations(List.of(
+                ResourceLocation.tryParse("gtceu:lv_chemical_reactor"),
+                ResourceLocation.tryParse("gtceu:mv_chemical_reactor"),
+                ResourceLocation.tryParse("gtceu:hv_chemical_reactor"),
+                ResourceLocation.tryParse("gtceu:ev_chemical_reactor"),
+                ResourceLocation.tryParse("gtceu:large_chemical_reactor")
+        ));
+        node.setMultiblock(false);
+        node.setTargetTier(GTVoltageTier.LV);
+
+        // 1. Initial LV icon
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lv_chemical_reactor"), node.getMachineIcon());
+
+        // 2. Voltage Tier change LV -> HV
+        node.setTargetTier(GTVoltageTier.HV);
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:hv_chemical_reactor"), node.getMachineIcon());
+
+        // 3. Voltage Tier change HV -> EV
+        node.setTargetTier(GTVoltageTier.EV);
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:ev_chemical_reactor"), node.getMachineIcon());
+
+        // 4. Singleblock -> Multiblock switch
+        node.setMultiblock(true);
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:large_chemical_reactor"), node.getMachineIcon());
+
+        // 5. Multiblock -> Singleblock switch (restores EV icon)
+        node.setMultiblock(false);
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:ev_chemical_reactor"), node.getMachineIcon());
     }
 }

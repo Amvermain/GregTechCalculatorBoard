@@ -40,6 +40,10 @@ public enum SteamMode {
         return color;
     }
 
+    public String getShortName() {
+        return this == HIGH_PRESSURE ? "HP" : (this == LOW_PRESSURE ? "LP" : "EL");
+    }
+
     public static SteamMode fromString(String name) {
         if (name == null) return NONE;
         try {

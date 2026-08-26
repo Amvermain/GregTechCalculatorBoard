@@ -131,6 +131,10 @@ public class FlowGraph {
         return null;
     }
 
+    public RecipeNode getNode(String id) {
+        return findNodeById(id);
+    }
+
     public RecipeNode findBaseNode() {
         for (RecipeNode n : nodes) {
             if (n.isBaseNode()) return n;

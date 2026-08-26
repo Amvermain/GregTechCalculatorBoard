@@ -55,6 +55,18 @@ public enum GTVoltageTier {
         return MAX;
     }
 
+    public static GTVoltageTier getMaxTierProvided(long totalEUtCapacity) {
+        GTVoltageTier tier = ULV;
+        for (GTVoltageTier t : values()) {
+            if (totalEUtCapacity >= t.voltage) {
+                tier = t;
+            } else {
+                break;
+            }
+        }
+        return tier;
+    }
+
     public static GTVoltageTier getByIndex(int index) {
         if (index < 0) return ULV;
         if (index >= values().length) return MAX;

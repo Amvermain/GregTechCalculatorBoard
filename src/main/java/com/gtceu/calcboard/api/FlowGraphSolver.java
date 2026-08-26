@@ -77,6 +77,9 @@ public final class FlowGraphSolver {
      */
     public static void autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
         if (graph == null || anchor == null || graph.getNodes().isEmpty()) return;
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.PreSolve(graph));
+        } catch (Throwable ignored) {}
         graph.cleanupInvalidConnections();
 
         double targetAnchorCount = anchor.getMachineCount();
@@ -109,6 +112,9 @@ public final class FlowGraphSolver {
 
         anchor.setMachineCount(targetAnchorCount);
         normalizeNodeCounts(graph, anchor, targetAnchorCount, integerCounts);
+        try {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.PostSolve(graph));
+        } catch (Throwable ignored) {}
     }
 
     private static void solveUpstreamPass(FlowGraph graph, RecipeNode anchor, Map<String, Double> upstreamCounts, boolean integerCounts) {
@@ -540,12 +546,14 @@ public final class FlowGraphSolver {
                 } else {
                     int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
                     totalMachineCount += subMachines;
-                    machineBreakdown.put(node.getName(), machineBreakdown.getOrDefault(node.getName(), 0) + subMachines);
+                    String machineKey = node.getMachineDisplayName();
+                    machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + subMachines);
                 }
             } else {
                 int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
                 totalMachineCount += nodeMachines;
-                machineBreakdown.put(node.getName(), machineBreakdown.getOrDefault(node.getName(), 0) + nodeMachines);
+                String machineKey = node.getMachineDisplayName();
+                machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + nodeMachines);
 
                 if (node.isFusion() && node.getEuToStart() > 0) {
                     int fTier = node.getFusionTier();

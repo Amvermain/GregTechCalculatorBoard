@@ -59,7 +59,7 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getEnergyType() == EnergyType.KINETIC_SU) return true;
+        if (node.isCreateMachine() || node.getRpm() > 0) return true;
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace();
             if (ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION)) return true;
@@ -194,6 +194,11 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
         CreateGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    @Override
+    public EnergyType getEnergyType(RecipeNode node) {
+        return EnergyType.KINETIC_SU;
     }
 
     @Override

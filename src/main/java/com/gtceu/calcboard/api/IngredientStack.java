@@ -187,13 +187,23 @@ public class IngredientStack {
         return type == Type.FLUID;
     }
 
+    public boolean isItem() {
+        return type == Type.ITEM;
+    }
+
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putString("type", type.name());
-        tag.putString("id", id != null ? id.toString() : "");
-        tag.putString("name", displayName);
+        if (id != null) {
+            tag.putString("id", id.toString());
+        }
+        if (displayName != null && !displayName.isEmpty()) {
+            tag.putString("name", displayName);
+        }
         tag.putDouble("amount", amount);
-        tag.putDouble("chance", chance);
+        if (Math.abs(chance - 1.0) > 0.0001) {
+            tag.putDouble("chance", chance);
+        }
         if (tierChanceBoost > 0.0) {
             tag.putDouble("tierChanceBoost", tierChanceBoost);
         }
@@ -210,7 +220,7 @@ public class IngredientStack {
     public static IngredientStack deserializeNBT(CompoundTag tag) {
         Type type = Type.valueOf(tag.getString("type"));
         ResourceLocation id = tag.contains("id") && !tag.getString("id").isEmpty() ? ResourceLocation.tryParse(tag.getString("id")) : null;
-        String name = tag.getString("name");
+        String name = tag.contains("name") ? tag.getString("name") : (id != null ? id.getPath() : "");
         double amount = tag.getDouble("amount");
         double chance = tag.contains("chance") ? tag.getDouble("chance") : 1.0;
         IngredientStack stack = new IngredientStack(type, id, name, amount, chance);

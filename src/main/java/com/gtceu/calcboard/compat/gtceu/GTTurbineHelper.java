@@ -17,7 +17,7 @@ public final class GTTurbineHelper {
      */
     public static boolean isTurbine(RecipeNode node) {
         if (node == null || node.isCreateMachine()) return false;
-        if (node.getEnergyType() != null && node.getEnergyType() != EnergyType.ELECTRIC_EU && node.getEnergyType() != EnergyType.NONE) return false;
+        if (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU && node.getEnergyTypeOverride() != EnergyType.NONE) return false;
         if (node.hasRotorAddon()) return true;
 
         ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
@@ -38,7 +38,7 @@ public final class GTTurbineHelper {
 
         if (node.getName() != null) {
             String sanitized = node.getName().toLowerCase().trim().replace(" ", "_");
-            if (sanitized.contains("turbine")) return true;
+            if (sanitized.contains("turbine") || sanitized.contains("plasma_generator") || sanitized.contains("plasma")) return true;
         }
 
         return false;
@@ -51,14 +51,15 @@ public final class GTTurbineHelper {
         if (node == null || node.isCreateMachine()) {
             return false;
         }
-        if (node.getEnergyType() != null && node.getEnergyType() != EnergyType.ELECTRIC_EU && node.getEnergyType() != EnergyType.NONE) {
+        if (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU && node.getEnergyTypeOverride() != EnergyType.NONE) {
             return false;
         }
         if (hasRotorAddon(node)) return true;
         if (node.isMultiblock()) return isTurbine(node);
         if (node.getName() != null) {
             String sanitized = node.getName().toLowerCase().trim().replace(" ", "_");
-            if (sanitized.contains("large") && sanitized.contains("turbine")) return true;
+            if (sanitized.contains("large") && (sanitized.contains("turbine") || sanitized.contains("plasma"))) return true;
+            if (sanitized.contains("supreme") || sanitized.contains("nyinsane")) return true;
             if (MultiblockDetector.isTurbineMachine(ResourceLocation.tryParse("gtceu:" + sanitized))) return true;
         }
         return false;
@@ -68,7 +69,7 @@ public final class GTTurbineHelper {
      * Checks whether the node has a rotor addon equipped or non-standard rotor properties.
      */
     public static boolean hasRotorAddon(RecipeNode node) {
-        if (node == null || node.isCreateMachine() || node.getEnergyType() != EnergyType.ELECTRIC_EU) return false;
+        if (node == null || node.isCreateMachine() || (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU)) return false;
         String rName = node.getRotorName();
         int rEff = node.getRotorEfficiency();
         int rPow = node.getRotorPower();

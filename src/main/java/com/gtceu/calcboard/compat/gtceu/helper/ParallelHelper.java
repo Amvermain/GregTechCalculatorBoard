@@ -276,6 +276,122 @@ public class ParallelHelper {
         return false;
     }
 
+    public static void discoverGTCEuParallelHatches(java.util.List<MachineAddon> collector) {
+        if (collector == null) return;
+
+        boolean registrySuccess = false;
+        try {
+            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+            if (machinesRegistry instanceof Iterable<?> iterable) {
+                for (Object machineDef : iterable) {
+                    if (machineDef == null) continue;
+                    try {
+                        Method mGetId = machineDef.getClass().getMethod("getId");
+                        ResourceLocation id = (ResourceLocation) mGetId.invoke(machineDef);
+                        if (id == null) continue;
+
+                        String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
+                        if (!path.contains("parallel")) continue;
+
+                        ParallelStats stats = extractStatsFromMachineDef(machineDef);
+                        if (stats == null) {
+                            stats = getParallelStats(id.toString());
+                        }
+
+                        if (stats != null && stats.maxParallel() > 1) {
+                            registrySuccess = true;
+                            ItemStack stack = getItemStackForDef(machineDef, id);
+                            String name = stack != null && !stack.isEmpty() ? stack.getHoverName().getString() : formatDisplayName(id);
+                            String desc = stats.isAbsolute()
+                                    ? net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.absolute_parallel_hatch_desc", String.valueOf(stats.maxParallel())).getString()
+                                    : net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.parallel_hatch_desc", String.valueOf(stats.maxParallel())).getString();
+
+                            GTParallelHatchAddon addon = new GTParallelHatchAddon(id.toString(), name, desc, id, stats.maxParallel(), stats.isAbsolute());
+                            if (stack != null) addon.setItemStackSample(stack);
+                            addon.setDiscoverySource("GTCEu Machine Registry [" + id + "]");
+                            if (!containsAddonId(collector, addon.getId())) {
+                                collector.add(addon);
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        if (!registrySuccess || collector.stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.PARALLEL)) {
+            registerDefaultParallelHatches(collector);
+        }
+    }
+
+    public static void registerDefaultParallelHatches(java.util.List<MachineAddon> collector) {
+        Object[][] tiers = new Object[][]{
+                {"ev", "EV", 4},
+                {"iv", "IV", 16},
+                {"luv", "LuV", 64},
+                {"zpm", "ZPM", 256},
+                {"uv", "UV", 1024},
+                {"uhv", "UHV", 4096},
+                {"uev", "UEV", 16384},
+                {"uiv", "UIV", 65536},
+                {"uxv", "UXV", 262144},
+                {"opv", "OpV", 1048576},
+                {"max", "MAX", 4194304}
+        };
+
+        for (Object[] t : tiers) {
+            String code = (String) t[0];
+            String tierName = (String) t[1];
+            int par = (int) t[2];
+
+            ResourceLocation id = ResourceLocation.tryParse("gtceu:" + code + "_parallel_hatch");
+            String name = tierName + " Parallel Control Hatch";
+            String desc = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.parallel_hatch_desc", String.valueOf(par)).getString();
+
+            GTParallelHatchAddon addon = new GTParallelHatchAddon(id.toString(), name, desc, id, par, false);
+            if (!containsAddonId(collector, addon.getId())) {
+                collector.add(addon);
+            }
+        }
+    }
+
+    private static boolean containsAddonId(java.util.List<MachineAddon> list, String id) {
+        for (MachineAddon a : list) {
+            if (a.getId().equals(id)) return true;
+        }
+        return false;
+    }
+
+    private static ItemStack getItemStackForDef(Object machineDef, ResourceLocation id) {
+        try {
+            Method mAsItem = machineDef.getClass().getMethod("asItem");
+            Object itemObj = mAsItem.invoke(machineDef);
+            if (itemObj instanceof net.minecraft.world.item.Item item) {
+                return new ItemStack(item);
+            }
+        } catch (Throwable ignored) {}
+
+        if (ForgeRegistries.ITEMS != null) {
+            var item = ForgeRegistries.ITEMS.getValue(id);
+            if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                return new ItemStack(item);
+            }
+        }
+        return null;
+    }
+
+    private static String formatDisplayName(ResourceLocation id) {
+        if (id == null) return "";
+        String[] parts = id.getPath().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty()) {
+                sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1)).append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
     public static GTParallelHatchAddon parseParallelHatch(ItemStack stack, ResourceLocation id) {
         ParallelStats stats = getParallelStats(stack);
         if (stats == null || stats.maxParallel() <= 1) {

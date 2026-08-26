@@ -65,6 +65,35 @@ $$\text{Single Machine Expected Output Rate (per sec)} = \text{Amount} \times \t
 
 ---
 
+### 1.6 증기 보일러 (Steam Boilers) 및 쓰로틀(Throttle) 공식
+
+#### 소형 단일 보일러 (Small Boilers)
+* **저압 청동 보일러 (LP Bronze)**: 기본 배율 $1.0\times$ ($120\text{ L/s} = 6\text{ mB/t}$ 증기 배출)
+* **고압 강철 보일러 (HP Steel)**: $3.0\times$ 가속 ($360\text{ L/s} = 18\text{ mB/t}$ 증기 배출)
+
+#### 대형 멀티블록 보일러 (Large Boilers) 및 쓰로틀 ($\theta \in [0.25, 1.0]$)
+* **대형 청동 보일러 (Large Bronze)**: 기본 배율 $1.0\times$ ($16,000\text{ mB/s} = 800\text{ mB/t}$ 증기)
+* **대형 강철 보일러 (Large Steel)**: $2.25\times$ ($36,000\text{ mB/s} = 1,800\text{ mB/t}$ 증기)
+* **대형 티타늄 보일러 (Large Titanium)**: $4.0\times$ ($64,000\text{ mB/s} = 3,200\text{ mB/t}$ 증기)
+* **대형 텅스텐스틸 보일러 (Large Tungstensteel)**: $8.0\times$ ($128,000\text{ mB/s} = 6,400\text{ mB/t}$ 증기)
+
+$$\text{Effective Speed Multiplier} = \text{TierSpeedMultiplier} \times \theta$$
+$$\text{Steam Rate (mB/t)} = \text{BaseSteamRate} \times \text{Effective Speed Multiplier}$$
+$$\text{Water Rate (mB/t)} = \frac{\text{Steam Rate (mB/t)}}{160.0} \quad (1\text{mB 물} \rightarrow 160\text{mB 증기})$$
+$$\text{Effective Duration (ticks)} = \frac{\text{BaseDurationTicks}}{\text{Effective Speed Multiplier}}$$
+
+---
+
+### 1.7 Create: New Age 키네틱 발전기 코일 공식 (Kinetic Generator)
+
+카본 브러시(`create_new_age:carbon_brushes`)와 발전기 코일(`create_new_age:generator_coil`)에 장착된 $N$개의 자석($M$)에 대해:
+
+$$\text{Total Strength} = \sum_{m \in \text{InstalledMagnets}} m.\text{getMagneticForce}()$$
+$$\text{Total Kinetic Stress (SU)} = (24.0 + \text{Total Strength}) \times \text{RPM} \times \text{MachineCount}$$
+$$\text{Generated FE/t} = \text{Total Strength} \times \text{RPM} \times \text{suToEnergy} \times \text{Efficiency} \times \text{MachineCount}$$
+
+---
+
 ## 2. 그래프 해석기 5대 핵심 알고리즘 (`FlowGraphSolver`)
 
 ```mermaid

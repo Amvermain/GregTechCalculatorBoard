@@ -220,8 +220,14 @@ public class NodeThreadingConfig {
         return calculateEnergyMultiplier();
     }
 
+    private boolean active = false;
+
     public boolean isActive() {
-        return !helixCounts.isEmpty() || getTotalAssignedGeneral() > 0;
+        return active || !helixCounts.isEmpty() || getTotalAssignedGeneral() > 0;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public void reset() {
@@ -230,6 +236,7 @@ public class NodeThreadingConfig {
         assignedEfficiency = 0;
         assignedParallels = 0;
         assignedThreading = 0;
+        active = false;
     }
 
     public NodeThreadingConfig copy() {
@@ -239,11 +246,13 @@ public class NodeThreadingConfig {
         copy.assignedEfficiency = this.assignedEfficiency;
         copy.assignedParallels = this.assignedParallels;
         copy.assignedThreading = this.assignedThreading;
+        copy.active = this.active;
         return copy;
     }
 
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
+        if (active) json.addProperty("active", true);
         if (!helixCounts.isEmpty()) {
             JsonObject counts = new JsonObject();
             for (Map.Entry<GTThreadingHelix, Integer> entry : helixCounts.entrySet()) {
@@ -261,6 +270,7 @@ public class NodeThreadingConfig {
     public void fromJson(JsonObject json) {
         reset();
         if (json == null) return;
+        if (json.has("active")) active = json.get("active").getAsBoolean();
         if (json.has("helixes") && json.get("helixes").isJsonObject()) {
             JsonObject counts = json.getAsJsonObject("helixes");
             for (String key : counts.keySet()) {

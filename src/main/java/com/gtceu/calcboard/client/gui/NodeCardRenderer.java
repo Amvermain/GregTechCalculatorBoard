@@ -376,13 +376,14 @@ public class NodeCardRenderer {
                 boolean isDeficit = stats != null && stats.isOutputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), false, i);
+                boolean isInactive = rate <= 0.00001;
                 int portColor;
                 if (!isOperational) {
                     portColor = 0xFF77333B;
                 } else if (isPortGlowing) {
                     portColor = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88);
                 } else if (!isConnected) {
-                    portColor = 0xFF55FF88;
+                    portColor = isInactive ? 0xFF444B5A : 0xFF55FF88;
                 } else if (isBalanced) {
                     portColor = 0xFF55FF88;
                 } else if (isDeficit) {
@@ -404,8 +405,13 @@ public class NodeCardRenderer {
                     rateStr = "§c" + formatRate(0.0, out) + " §4⏸";
                     textColor = 0xFFFF7777;
                 } else if (!isConnected) {
-                    rateStr = "§a+" + formatRate(rate, out);
-                    textColor = 0xFFAAFFAA;
+                    if (isInactive) {
+                        rateStr = "§8+0/s §7(0%)";
+                        textColor = 0xFF778092;
+                    } else {
+                        rateStr = "§a+" + formatRate(rate, out);
+                        textColor = 0xFFAAFFAA;
+                    }
                 } else if (isBalanced) {
                     rateStr = "§a" + formatRate(rate, out) + " §2✔";
                     textColor = 0xFFFFFFFF;
@@ -439,13 +445,14 @@ public class NodeCardRenderer {
                 boolean isDeficit = stats != null && stats.isOutputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), false, i);
+                boolean isInactive = rate <= 0.00001;
                 int portColor;
                 if (!isOperational) {
                     portColor = 0xFF77333B;
                 } else if (isPortGlowing) {
                     portColor = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88);
                 } else if (!isConnected) {
-                    portColor = 0xFF55FF88;
+                    portColor = isInactive ? 0xFF444B5A : 0xFF55FF88;
                 } else if (isBalanced) {
                     portColor = 0xFF55FF88;
                 } else if (isDeficit) {
@@ -465,8 +472,13 @@ public class NodeCardRenderer {
                     rateStr = "§c" + formatRate(0.0, out) + " §4⏸";
                     textColor = 0xFFFF7777;
                 } else if (!isConnected) {
-                    rateStr = "§a+" + formatRate(rate, out);
-                    textColor = 0xFFAAFFAA;
+                    if (isInactive) {
+                        rateStr = "§8+0/s §7(0%)";
+                        textColor = 0xFF778092;
+                    } else {
+                        rateStr = "§a+" + formatRate(rate, out);
+                        textColor = 0xFFAAFFAA;
+                    }
                 } else if (isBalanced) {
                     rateStr = "§a" + formatRate(rate, out) + " §2✔";
                     textColor = 0xFFFFFFFF;

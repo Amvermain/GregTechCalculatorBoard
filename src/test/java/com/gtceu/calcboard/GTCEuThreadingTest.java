@@ -177,4 +177,138 @@ public class GTCEuThreadingTest {
         Assertions.assertEquals(0, cfg.getHelixCount(GTThreadingHelix.MAX_SUPREME));
         Assertions.assertEquals(8, cfg.getHelixCount(GTThreadingHelix.UHV_OVERDRIVE));
     }
+
+    @Test
+    public void testStandardMultiblockThreadingModeToggle() {
+        RecipeNode dtNode = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
+        dtNode.setMultiblock(true);
+        dtNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:distillation_tower"));
+
+        // Standard Distillation Tower is NOT an explicit threading machine
+        Assertions.assertFalse(dtNode.isExplicitThreadingMachine());
+        // Initially, hasThreading must be false
+        Assertions.assertFalse(dtNode.hasThreading());
+
+        var cats = com.gtceu.calcboard.api.MachineAddon.getRelevantCategories(dtNode);
+        Assertions.assertFalse(cats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+
+        // Switch to Threading Mode
+        dtNode.setThreadingActive(true);
+        Assertions.assertTrue(dtNode.hasThreading());
+        var threadingCats = com.gtceu.calcboard.api.MachineAddon.getRelevantCategories(dtNode);
+        Assertions.assertTrue(threadingCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+
+        // Switch back to Standard Mode
+        dtNode.setThreadingActive(false);
+        Assertions.assertFalse(dtNode.hasThreading());
+        var revertedCats = com.gtceu.calcboard.api.MachineAddon.getRelevantCategories(dtNode);
+        Assertions.assertFalse(revertedCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+    }
+
+    @Test
+    public void testPlasmaTurbineRecognition() {
+        RecipeNode argonNode = RecipeNode.create("Plasma Generator (Argon Plasma)", 20.0, 16384.0, GTVoltageTier.IV);
+        argonNode.setMultiblock(true);
+        argonNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_generator"));
+
+        RecipeNode sptNode = RecipeNode.create("Supreme Plasma Turbine (Argon Plasma)", 20.0, 98304.0, GTVoltageTier.IV);
+        sptNode.setMultiblock(true);
+        sptNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_generator"));
+        sptNode.setMachineIcon(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"));
+
+        Assertions.assertTrue(com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(argonNode));
+        Assertions.assertTrue(com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(sptNode));
+
+        Assertions.assertEquals(com.gtceu.calcboard.api.GTPlasmaTurbineModel.LPT, com.gtceu.calcboard.api.GTPlasmaTurbineModel.getModel(argonNode));
+        Assertions.assertEquals(com.gtceu.calcboard.api.GTPlasmaTurbineModel.SPT, com.gtceu.calcboard.api.GTPlasmaTurbineModel.getModel(sptNode));
+    }
+
+    @Test
+    public void testMultiblockControllerVariantAndParallelHatchAddonIntegration() {
+        RecipeNode dtNode = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
+        dtNode.setMultiblock(true);
+        dtNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:distillation_tower"));
+
+        dtNode.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:distillation_tower"));
+        dtNode.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:large_distillery"));
+        dtNode.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:yielding_excession_advanced_seperation_transformator"));
+        dtNode.getAvailableWorkstations().add(ResourceLocation.tryParse("start:threading_processing_plant"));
+
+        // 1. Initial State: Default 1x parallel
+        Assertions.assertEquals(1, dtNode.getTotalParallel());
+
+        // 2. Equip Elite Parallel Hatch (64x)
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(dtNode);
+        com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon elitePar = new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(
+                "gtceu:elite_parallel_hatch", "Elite Parallel Control Hatch", "", ResourceLocation.tryParse("gtceu:elite_parallel_control_hatch"), 64, false
+        );
+        adapter.handleInstallAddon(dtNode, elitePar, false);
+
+        Assertions.assertEquals(64, dtNode.getTotalParallel());
+
+        // Verify BOM reflects the 64x parallel hatch
+        var bomSummary = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(java.util.List.of(dtNode), false);
+        boolean hasEliteHatchInBOM = bomSummary.aggregatedItems().stream().anyMatch(item -> item.itemId().equals(ResourceLocation.tryParse("gtceu:elite_parallel_control_hatch")));
+        Assertions.assertTrue(hasEliteHatchInBOM);
+
+        // 3. Equip Mega Absolute Parallel Hatch (1024x) -> Should cleanly replace Elite
+        com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon megaPar = new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(
+                "start:mega_absolute_parallel_hatch", "Mega Absolute Parallel Hatch", "", ResourceLocation.tryParse("start:mega_absolute_parallel_hatch"), 1024, true
+        );
+        adapter.handleInstallAddon(dtNode, megaPar, false);
+
+        Assertions.assertEquals(1024, dtNode.getTotalParallel());
+        Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.PARALLEL).count());
+
+        // 4. Uninstall Parallel Hatch -> Returns to 1x
+        adapter.handleUninstallAddon(dtNode, megaPar);
+        Assertions.assertEquals(1, dtNode.getTotalParallel());
+        Assertions.assertEquals(0, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.PARALLEL).count());
+
+        // 5. Equip Energy Hatch Addon (UV Energy Input Hatch)
+        com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon uvEnergyHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:uv_energy_input_hatch", "UV Energy Input Hatch", "", ResourceLocation.tryParse("gtceu:uv_energy_input_hatch"), GTVoltageTier.UV, 1, false, false, false
+        );
+        adapter.handleInstallAddon(dtNode, uvEnergyHatch, false);
+
+        Assertions.assertEquals(GTVoltageTier.UV, dtNode.getTargetTier());
+        var bomWithEnergy = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(java.util.List.of(dtNode), false);
+        boolean hasUVEnergyHatch = bomWithEnergy.aggregatedItems().stream().anyMatch(item -> item.itemId().equals(ResourceLocation.tryParse("gtceu:uv_energy_input_hatch")));
+        Assertions.assertTrue(hasUVEnergyHatch);
+
+        // 6. Equip 2nd UV Energy Hatch -> Dual Hatch Overclock (Tier becomes UHV!)
+        adapter.handleInstallAddon(dtNode, uvEnergyHatch, false);
+        Assertions.assertEquals(2, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.ENERGY_HATCH).count());
+        Assertions.assertEquals(GTVoltageTier.UHV, dtNode.getTargetTier());
+
+        var bomWithDualEnergy = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(java.util.List.of(dtNode), false);
+        var uvEntry = bomWithDualEnergy.aggregatedItems().stream().filter(item -> item.itemId().equals(ResourceLocation.tryParse("gtceu:uv_energy_input_hatch"))).findFirst();
+        Assertions.assertTrue(uvEntry.isPresent());
+        Assertions.assertEquals(2, uvEntry.get().totalAmount());
+
+        // 7. Uninstall 1 UV Hatch -> Returns to 1x UV
+        adapter.handleUninstallAddon(dtNode, uvEnergyHatch);
+        Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.ENERGY_HATCH).count());
+        Assertions.assertEquals(GTVoltageTier.UV, dtNode.getTargetTier());
+
+        // 8. Test Asymmetric Hatches: 16A EV + 1A IV -> Total EU/t capacity = 32,768 (EV 16A) + 8,192 (IV 1A) = 40,960 EU/t (LuV power)
+        adapter.handleUninstallAddon(dtNode, uvEnergyHatch);
+        com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon ev16a = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:ev_energy_input_hatch_16a", "EV 16A Energy Input Hatch", "", ResourceLocation.tryParse("gtceu:ev_energy_input_hatch_16a"), GTVoltageTier.EV, 16, false, false, false
+        );
+        com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon iv1a = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:iv_energy_input_hatch", "IV Energy Input Hatch", "", ResourceLocation.tryParse("gtceu:iv_energy_input_hatch"), GTVoltageTier.IV, 1, false, false, false
+        );
+        adapter.handleInstallAddon(dtNode, ev16a, false);
+        adapter.handleInstallAddon(dtNode, iv1a, false);
+
+        // Effective tier for speed overclocking becomes LuV!
+        Assertions.assertEquals(GTVoltageTier.LuV, dtNode.getTargetTier());
+
+        var bomAsym = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(java.util.List.of(dtNode), false);
+        boolean hasEV16A = bomAsym.aggregatedItems().stream().anyMatch(item -> item.itemId().equals(ResourceLocation.tryParse("gtceu:ev_energy_input_hatch_16a")));
+        boolean hasIV1A = bomAsym.aggregatedItems().stream().anyMatch(item -> item.itemId().equals(ResourceLocation.tryParse("gtceu:iv_energy_input_hatch")));
+        Assertions.assertTrue(hasEV16A);
+        Assertions.assertTrue(hasIV1A);
+    }
 }
