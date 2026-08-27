@@ -216,11 +216,11 @@ public class GTCEuThreadingTest {
         sptNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_generator"));
         sptNode.setMachineIcon(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"));
 
-        Assertions.assertTrue(com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(argonNode));
-        Assertions.assertTrue(com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(sptNode));
+        Assertions.assertTrue(com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(argonNode));
+        Assertions.assertTrue(com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(sptNode));
 
-        Assertions.assertEquals(com.gtceu.calcboard.api.GTPlasmaTurbineModel.LPT, com.gtceu.calcboard.api.GTPlasmaTurbineModel.getModel(argonNode));
-        Assertions.assertEquals(com.gtceu.calcboard.api.GTPlasmaTurbineModel.SPT, com.gtceu.calcboard.api.GTPlasmaTurbineModel.getModel(sptNode));
+        Assertions.assertEquals(com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.LPT, com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(argonNode));
+        Assertions.assertEquals(com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.SPT, com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(sptNode));
     }
 
     @Test

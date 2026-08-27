@@ -36,6 +36,10 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.screen instanceof BoardScreen) {
+            mc.setScreen(null);
+        }
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged out. Saving local context and resetting caches.");
         try { BoardManager.getInstance().saveForCurrentContext(); } catch (Throwable t) { GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Error saving board on logout: {}", t.getMessage()); }
         try { BoardManager.getInstance().resetToDefault(); } catch (Throwable ignored) {}
@@ -76,10 +80,20 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onScreenKeyPressed(ScreenEvent.KeyPressed.Pre event) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.screen == null) return;
+        if (mc == null || mc.screen == null || mc.player == null || mc.level == null) return;
+
+        net.minecraft.client.gui.screens.Screen screen = event.getScreen();
+        // Do not intercept if in pause, options, controls/keybinds, death, or configuration screens
+        if (screen instanceof net.minecraft.client.gui.screens.PauseScreen
+                || screen instanceof net.minecraft.client.gui.screens.OptionsScreen
+                || screen instanceof net.minecraft.client.gui.screens.controls.KeyBindsScreen
+                || screen instanceof net.minecraft.client.gui.screens.DeathScreen
+                || screen.getClass().getName().toLowerCase().contains("config")) {
+            return;
+        }
 
         // Do not intercept if player is actively typing inside a text box (EditBox, TextField, Search bar)
-        if (event.getScreen().getFocused() instanceof net.minecraft.client.gui.components.EditBox) {
+        if (screen.getFocused() instanceof net.minecraft.client.gui.components.EditBox) {
             return;
         }
 
@@ -98,8 +112,14 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null || mc.player == null || mc.level == null) {
+                while (KeyBindings.OPEN_BOARD.consumeClick()) {
+                    // Drain clicks while outside world
+                }
+                return;
+            }
             while (KeyBindings.OPEN_BOARD.consumeClick()) {
-                Minecraft mc = Minecraft.getInstance();
                 if (mc.screen == null) {
                     mc.setScreen(new BoardScreen());
                 }

@@ -294,6 +294,42 @@ public class CategoryCapabilityMatrix {
                 ResourceLocation.tryParse("gtceu:lv_alloy_smelter"),
                 true, true, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_alloy_smelter"), ResourceLocation.tryParse("gtceu:hp_steam_alloy_smelter"), null, 0.0
         );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:extractor"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_extractor"), ResourceLocation.tryParse("gtceu:hp_steam_extractor"), ResourceLocation.tryParse("gtceu:lv_extractor")),
+                ResourceLocation.tryParse("gtceu:lv_extractor"),
+                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_extractor"), ResourceLocation.tryParse("gtceu:hp_steam_extractor"), null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:forge_hammer"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_forge_hammer"), ResourceLocation.tryParse("gtceu:hp_steam_forge_hammer"), ResourceLocation.tryParse("gtceu:lv_forge_hammer")),
+                ResourceLocation.tryParse("gtceu:lv_forge_hammer"),
+                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_forge_hammer"), ResourceLocation.tryParse("gtceu:hp_steam_forge_hammer"), null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:ore_washer"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_ore_washer"), ResourceLocation.tryParse("gtceu:hp_steam_ore_washer"), ResourceLocation.tryParse("gtceu:lv_ore_washer")),
+                ResourceLocation.tryParse("gtceu:lv_ore_washer"),
+                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_ore_washer"), ResourceLocation.tryParse("gtceu:hp_steam_ore_washer"), null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:rock_breaker"),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_rock_breaker"), ResourceLocation.tryParse("gtceu:hp_steam_rock_breaker"), ResourceLocation.tryParse("gtceu:lv_rock_breaker")),
+                ResourceLocation.tryParse("gtceu:lv_rock_breaker"),
+                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_rock_breaker"), ResourceLocation.tryParse("gtceu:hp_steam_rock_breaker"), null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:thermal_centrifuge"),
+                List.of(ResourceLocation.tryParse("gtceu:lv_thermal_centrifuge"), ResourceLocation.tryParse("gtceu:mv_thermal_centrifuge"), ResourceLocation.tryParse("gtceu:hv_thermal_centrifuge")),
+                ResourceLocation.tryParse("gtceu:lv_thermal_centrifuge"),
+                true, false, false, false, false, false, false, null, null, null, 0.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:centrifuge"),
+                List.of(ResourceLocation.tryParse("gtceu:mv_centrifuge"), ResourceLocation.tryParse("gtceu:hv_centrifuge")),
+                ResourceLocation.tryParse("gtceu:mv_centrifuge"),
+                true, false, false, false, false, false, false, null, null, null, 0.0
+        );
     }
 
     private void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,

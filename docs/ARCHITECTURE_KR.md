@@ -1,4 +1,4 @@
-﻿# GregTech Calculator Board - 아키텍처 및 개발자 가이드
+# GregTech Calculator Board - 아키텍처 및 개발자 가이드
 
 <p align="center">
   <a href="ARCHITECTURE.md">English</a> | <b>한국어</b>
@@ -39,6 +39,7 @@ graph TD
         HM["HistoryManager (Undo/Redo 커맨드 델타 스택)"]
         BC["BlueprintCodec (NBT & Base64 GZIP 압축 코덱)"]
         BOM["MultiblockBOMCalculator & MultiblockStructureCatalog (BOM 산출 엔진)"]
+        AFR["AddonFactoryRegistry & NodeBadgeRegistry (디커플링된 애드온 팩토리 & 뱃지 레지스트리)"]
         EB["RecipeNodeEvent / FlowGraphEvent (생명주기 이벤트 버스)"]
     end
 

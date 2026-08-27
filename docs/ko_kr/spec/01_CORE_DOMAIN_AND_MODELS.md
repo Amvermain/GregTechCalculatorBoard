@@ -66,6 +66,7 @@ classDiagram
         +int parallel
         +boolean isMultiblock
         +boolean isGenerator
+        +boolean isFlipped
         +SteamMode steamMode
         +List~MachineAddon~ addons
         +ResourceLocation machineIcon
@@ -85,6 +86,7 @@ classDiagram
 * **클린 아키텍처 및 SPI 위임**:
   - `RecipeNode`는 순수 계산 도메인 엔티티로서, 특정 모드(GTCEu, Create, Thermal 등)의 내부 코드를 직접 참조하지 않습니다.
   - 머신 아이콘 변경 이벤트(`setMachineIcon`), 에너지 타입 해소(`getEnergyType`), 단일 기계 전력량 계산(`getSingleMachineEUt`), 노드 운영 유효성 검증(`isOperational`)은 모두 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
+* **`isFlipped`**: 노드의 입력(좌)/출력(우) 포트 렌더링 방향을 좌우 수평 반전하여 복잡한 플로우차트의 배선 교차 최소화.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`)에 의해 상류 원자재 공급 제약 하에서 계산된 기계의 실제 가동률.
 * **`calculateOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
 
@@ -114,6 +116,7 @@ public class NodePropertyStore {
   - `TURBINE_ROTOR_NAME` (`String`, 기본값 `""`): 장착된 터빈 로터 이름
   - `TURBINE_HOLDER_BONUS` (`Integer`, 기본값 `0`): 로터 홀더 추가 효율 보너스 (%)
   - `CLEANROOM_TIER` (`Integer`, 기본값 `0`): 클린룸 요구 레벨
+  - `THROTTLE_PERCENT` (`Integer`, 기본값 `100`): 대형 보일러 가동 쓰로틀 비율 (25% ~ 100%)
 
 ---
 

@@ -286,7 +286,7 @@ public final class BoardTooltipRenderer {
                         tooltipLines.add(Component.literal("§6🌀 " + Component.translatable("gui.gtcalcboard.addon_cat.rotor").getString() + ": §f" + rName));
                         int eff = n.getRotorEfficiency();
                         int pwr = n.getRotorPower();
-                        int holderBonus = n.getTurbineHolderEfficiencyBonus();
+                        int holderBonus = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineHolderEfficiencyBonus(n);
                         String effStr = "§b⏱ " + Component.translatable("gui.gtcalcboard.rotor.eff").getString() + ": §f" + eff + "%";
                         if (holderBonus > 0) {
                             effStr += " §a(+" + holderBonus + "% Holder)";

@@ -323,34 +323,10 @@ public class BoardManager {
     public File getDefaultSaveFile() {
         if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
             try {
-                File clientFile = getClientSaveFile();
+                File clientFile = com.gtceu.calcboard.client.ClientSaveHelper.getClientSaveFile(getSaveDirectory());
                 if (clientFile != null) return clientFile;
             } catch (Throwable ignored) {}
         }
         return new File(getSaveDirectory(), "calcboard_save.nbt");
-    }
-
-    private File getClientSaveFile() {
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc != null) {
-            // Case 1: Singleplayer world
-            if (mc.hasSingleplayerServer() && mc.getSingleplayerServer() != null) {
-                try {
-                    File worldRoot = mc.getSingleplayerServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).toFile();
-                    File dir = new File(worldRoot, "gtcalcboard");
-                    if (!dir.exists()) dir.mkdirs();
-                    return new File(dir, "personal_board.nbt");
-                } catch (Throwable ignored) {}
-            }
-
-            // Case 2: Dedicated multiplayer server connection
-            if (mc.getCurrentServer() != null && mc.getCurrentServer().ip != null && !mc.getCurrentServer().ip.isEmpty()) {
-                String safeIp = mc.getCurrentServer().ip.replaceAll("[^a-zA-Z0-9.-]", "_");
-                File dir = new File(getSaveDirectory(), "servers/" + safeIp);
-                if (!dir.exists()) dir.mkdirs();
-                return new File(dir, "personal_board.nbt");
-            }
-        }
-        return null;
     }
 }

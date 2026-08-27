@@ -193,16 +193,12 @@ public class ThermalAugmentHelper {
     public static boolean isThermalMachine(RecipeNode node) {
         if (node == null) return false;
 
-        // 1. If node already has Thermal augments installed, it is Thermal
-        if (node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT || (a.getModId() != null && a.getModId().equals("thermal")))) {
-            return true;
-        }
-
-        // 2. If explicitly a Thermal machine icon or category, it is Thermal
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
             String ns = icon.getNamespace().toLowerCase(java.util.Locale.ROOT);
-            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams") || isThermalTaggedItem(icon)) {
+            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_foundation")
+                    || ns.equals("thermal_innovation") || ns.equals("thermal_extra") || ns.equals("cofh_core")
+                    || ns.equals("systeams") || isThermalTaggedItem(icon)) {
                 return true;
             }
         }
@@ -210,42 +206,24 @@ public class ThermalAugmentHelper {
         ResourceLocation catId = node.getRecipeCategoryId();
         if (catId != null) {
             String ns = catId.getNamespace().toLowerCase(java.util.Locale.ROOT);
-            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams")) {
+            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_foundation")
+                    || ns.equals("thermal_innovation") || ns.equals("thermal_extra") || ns.equals("cofh_core")
+                    || ns.equals("systeams")) {
                 return true;
             }
         }
 
-        // 3. Name keywords for mock/dynamos
+        // 2. If node already has Thermal augments installed, it is Thermal
+        if (node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT || (a.getModId() != null && a.getModId().equals("thermal")))) {
+            return true;
+        }
+
+        // 3. Fallback for mock test dynamo nodes without explicit thermal icon/category
         if (node.getName() != null) {
             String nl = node.getName().toLowerCase(java.util.Locale.ROOT);
-            if (nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic") || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment") || (nl.contains("thermal") && !nl.contains("thermal_cloth"))) {
-                return true;
-            }
-        }
-
-        // 4. If explicitly GT or Star Technology icon or category, it is NOT Thermal
-        if (icon != null) {
-            String ns = icon.getNamespace().toLowerCase(java.util.Locale.ROOT);
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
-                return false;
-            }
-        }
-        if (catId != null) {
-            String ns = catId.getNamespace().toLowerCase(java.util.Locale.ROOT);
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
-                return false;
-            }
-        }
-
-        // 5. Check Workstations
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                String ns = ws.getNamespace().toLowerCase(java.util.Locale.ROOT);
-                if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("cofh_core") || ns.equals("systeams") || isThermalTaggedItem(ws)) {
+            if (nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic") || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment") || nl.contains("stirling")) {
+                if (icon == null || !icon.getNamespace().equals("gtceu") || nl.contains("dynamo") || nl.contains("lapidary")) {
                     return true;
-                }
-                if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
-                    return false;
                 }
             }
         }
@@ -265,15 +243,13 @@ public class ThermalAugmentHelper {
     public static boolean isDynamoItem(ResourceLocation id) {
         if (id == null) return false;
         if (hasItemTag(id, "thermal:dynamos", "systeams:dynamos", "forge:dynamos")) return true;
-        if (checkItemClassHierarchy(id, "Dynamo")) return true;
-        return id.getPath().contains("dynamo");
+        return checkItemClassHierarchy(id, "Dynamo");
     }
 
     public static boolean isBoilerItem(ResourceLocation id) {
         if (id == null) return false;
         if (hasItemTag(id, "systeams:boilers", "thermal:boilers", "forge:boilers")) return true;
-        if (checkItemClassHierarchy(id, "Boiler")) return true;
-        return id.getPath().contains("boiler");
+        return checkItemClassHierarchy(id, "Boiler");
     }
 
     private static boolean checkItemClassHierarchy(ResourceLocation id, String searchName) {

@@ -6,6 +6,31 @@
 
 **그렉텍 계산기 보드 (GregTech Calculator Board)**의 모든 주요 변경 사항이 이 문서에 기록됩니다.
 
+## [2.0.0-alpha.10] - 2026-08-27
+
+### 신규 기능 (Added)
+- **키네틱 발전기/모터 EMI 레시피 정식 등록 및 스트레스 유닛(SU) 검색 색인 강화 (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
+  - 즐겨찾기(Favorites)에 Large Water Wheel 등의 키네틱 기계를 등록해도 가상 레시피가 연동되지 않던 문제를 EMI 정식 레시피 등록을 통해 해결하고, 검색창에서 `<su`, `<stress`, `large water wheel` 등 출력 및 기계명으로 즉시 검색되도록 색인 지원.
+- **자석(Magnet) 및 다중 스택 애드온 클릭 상호작용 개선 (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
+  - 카탈로그 카드 좌클릭 시 빈 슬롯이 남아있으면 1개씩 순차 장착(+1), Shift+좌클릭 시 12개 슬롯 일괄 채우기(+12) 및 일괄 교체 지원.
+  - 우클릭 시 해당 애드온 1개 제거(-1) 및 상단 `Clear Magnets` 버튼으로 전체 초기화 지원.
+
+### 개선 및 변경 (Changed & Improved)
+- **기계 설정창 애드온 툴팁 지연 렌더링 적용 (`MachineConfigDialog`)**:
+  - 애드온 카드의 긴 설명 텍스트가 다이얼로그 경계 밖에서 잘리던 UI 레이어링 버그를 지연 렌더링 방식으로 수정.
+
+### 버그 수정 (Fixed)
+- **월드 미진입 및 컨피그/설정 화면 단축키 조작 시 크래시 방어 (`BoardScreen`, `ClientForgeEvents`, `NetworkHandler`)**:
+  - 타이틀 화면, 모드 컨피그 화면(Configured 등), 조작 키설정(`KeyBindsScreen`) 등 월드에 진입하지 않은 상태(`mc.player == null`)에서 단축키가 눌렸을 때 보드가 열리며 발생하던 바닐라 `AbstractContainerScreen.containerTick()`의 NPE 크래시를 원천 차단.
+  - 일시정지(`PauseScreen`), 옵션(`OptionsScreen`), 조작키 변경(`KeyBindsScreen`), 사망 화면(`DeathScreen`), 모드 컨피그 화면(`*config*`)에서 계산기 열기 단축키가 가로채지지 않도록 예외 처리.
+  - `BoardScreen`의 `init()` 및 `containerTick()` 전반에 월드 및 플레이어 유효성 방어 가드를 추가하여 안전하게 종료되도록 보강.
+  - 월드 로그아웃(`LoggingOut`) 시 열려 있던 `BoardScreen` 자동 닫기 및 네트워크 연결 종료 상태에서의 패킷 전송 예외 처리.
+- **그렉텍 열원심분리기(Thermal Centrifuge) 및 바닐라 제작(Crafting Table) 레시피의 서멀(Thermal) 모드 오판정 버그 수정 (`ThermalAugmentHelper`, `GTCEuModAdapter`, `CreateModAdapter`, `VanillaModAdapter`, `ModAdapterRegistryTest`)**:
+  - 기계 이름에 `thermal` 단어가 포함된 그렉텍 기계(Thermal Centrifuge)가 서멀 기계로 오인되어 RF 전력과 `⚡ Thermal` 뱃지로 표시되던 휴리스틱 문자열 검사 오류를 제거하고, 명시적 네임스페이스(`gtceu`, `minecraft`) 우선 검증 체계로 수정.
+  - 서멀(Thermal Expansion) 또는 크리에이트(Create)가 바닐라 제작대 레시피에 보조 워크스테이션(Tinker Bench, Mechanical Crafter 등)을 등록했을 때 제작대 노드가 서멀/크리에이트 기계로 오판정되던 문제를 수정하여 바닐라 패시브(`🍃 Passive`)로 정상 판정되도록 수정.
+- **HP Steam 모드에서 ULV/LV 전환 시 단일블록 기계 아이콘 복원 버그 수정 (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
+  - HP Steam 모드 해제 시 멀티블록 워크스테이션으로 강제 전환되던 현상을 수정하여 원래의 티어별 단일블록 기계 아이콘 복원.
+
 ## [2.0.0-alpha.9] - 2026-08-26
 
 ### 신규 기능 (Added)
@@ -50,23 +75,14 @@
   - 기본값 필드 생략을 통해 청사진 및 NBT 저장 데이터 크기 최적화.
 - **UI 레이아웃 및 툴바 정렬 개선 (`BoardScreen`, `ToolbarWidget`)**:
   - 좌상단 툴바 여백 및 즐겨찾기 독(Favorites Dock) 배치 조정.
-- **자석(Magnet) 및 다중 스택 애드온 클릭 상호작용 개선 (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
-  - 카탈로그 카드 좌클릭 시 빈 슬롯이 남아있으면 1개씩 순차 장착(+1), Shift+좌클릭 시 12개 슬롯 일괄 채우기(+12) 및 일괄 교체 지원.
-  - 우클릭 시 해당 애드온 1개 제거(-1) 및 상단 `Clear Magnets` 버튼으로 전체 초기화 지원.
-- **기계 설정창 애드온 툴팁 지연 렌더링 적용 (`MachineConfigDialog`)**:
-  - 애드온 카드의 긴 설명 텍스트가 다이얼로그 경계 밖에서 잘리던 UI 레이어링 버그를 지연 렌더링 방식으로 수정.
 
 ### 버그 수정 (Fixed)
 - **자동 연결(Auto Connect) 시 리라우트 정션 우회 중복 연결 방지 (`ToolbarWidget`)**:
   - 리라우트 정션 허브를 통해 연결된 기계 간에 자동 연결 실행 시 불필요한 직결 와이어가 중복 생성되던 현상 수정.
 - **대형 보일러 레시피 소요 시간 이중 가속 버그 수정 (`GTCEuRecipeHandler`, `GTCEuModAdapter`)**:
   - 소형 보일러 승격 가속 배수가 대형 보일러 전용 레시피에 중복 적용되어 사이클 시간이 0.05초(1틱)로 왜곡되고 용암 소모량이 폭증하던 연산 오류 해결.
-- **HP Steam 모드에서 ULV/LV 전환 시 단일블록 기계 아이콘 복원 버그 수정 (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
-  - HP Steam 모드 해제 시 멀티블록 워크스테이션으로 강제 전환되던 현상을 수정하여 원래의 티어별 단일블록 기계 아이콘 복원.
 - **검색창 및 모달 다이얼로그 텍스트 입력 중 'E' 키/단축키 간섭 버그 수정 (`RecipeSearchDialog`, `BoardScreen`, `MultiblockBOMDialog`, `GlobalBalanceDashboardDialog`)**:
   - 검색창 및 다이얼로그 텍스트 상자에 문자(E, B, T, F, J 등) 입력 시 인벤토리 닫기 키가 작동하여 화면이 닫히거나 전역 캔버스 단축키가 실행되던 키 이벤트 라우팅 오류 해결.
-- **키네틱 발전기/모터 EMI 레시피 정식 등록 및 스트레스 유닛(SU) 검색 색인 강화 (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
-  - 즐겨찾기(Favorites)에 Large Water Wheel 등의 키네틱 기계를 등록해도 가상 레시피가 연동되지 않던 문제를 EMI 정식 레시피 등록을 통해 해결하고, 검색창에서 `<su`, `<stress`, `large water wheel` 등 출력 및 기계명으로 즉시 검색되도록 색인 지원.
 
 ---
 

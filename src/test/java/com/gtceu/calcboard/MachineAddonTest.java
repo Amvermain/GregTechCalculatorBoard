@@ -3,6 +3,7 @@ package com.gtceu.calcboard;
 import com.gtceu.calcboard.api.*;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
@@ -343,9 +344,9 @@ public class MachineAddonTest {
         steamTurbine.setRotorEfficiency(100);
         steamTurbine.setRotorPower(100);
 
-        Assertions.assertEquals(GTVoltageTier.HV, steamTurbine.getTurbineBaseTier());
-        Assertions.assertEquals(10, steamTurbine.getTurbineHolderEfficiencyBonus());
-        Assertions.assertEquals(2048.0, steamTurbine.getNodeRotorHolderMaxEUt(GTVoltageTier.EV, 100));
+        Assertions.assertEquals(GTVoltageTier.HV, GTTurbineHelper.getTurbineBaseTier(steamTurbine));
+        Assertions.assertEquals(10, GTTurbineHelper.getTurbineHolderEfficiencyBonus(steamTurbine));
+        Assertions.assertEquals(2048.0, GTTurbineHelper.getNodeRotorHolderMaxEUt(steamTurbine, GTVoltageTier.EV, 100));
         Assertions.assertEquals(1.10, steamTurbine.getEffectiveDurationSeconds(), 0.001);
 
         RecipeNode gasTurbine = RecipeNode.create("Large Gas Turbine", 40.0, 32.0, GTVoltageTier.IV);
@@ -353,22 +354,22 @@ public class MachineAddonTest {
         gasTurbine.setRotorEfficiency(220);
         gasTurbine.setRotorPower(225);
 
-        Assertions.assertEquals(GTVoltageTier.EV, gasTurbine.getTurbineBaseTier());
-        Assertions.assertEquals(10, gasTurbine.getTurbineHolderEfficiencyBonus());
-        Assertions.assertEquals(18432.0, gasTurbine.getNodeRotorHolderMaxEUt(GTVoltageTier.IV, 225));
+        Assertions.assertEquals(GTVoltageTier.EV, GTTurbineHelper.getTurbineBaseTier(gasTurbine));
+        Assertions.assertEquals(10, GTTurbineHelper.getTurbineHolderEfficiencyBonus(gasTurbine));
+        Assertions.assertEquals(18432.0, GTTurbineHelper.getNodeRotorHolderMaxEUt(gasTurbine, GTVoltageTier.IV, 225));
 
         RecipeNode plasmaTurbine = RecipeNode.create("Large Plasma Turbine", 20.0, 1000.0, GTVoltageTier.LuV);
         plasmaTurbine.setGenerator(true);
         plasmaTurbine.setRotorEfficiency(150);
         plasmaTurbine.setRotorPower(100);
 
-        Assertions.assertEquals(GTVoltageTier.IV, plasmaTurbine.getTurbineBaseTier());
-        Assertions.assertEquals(10, plasmaTurbine.getTurbineHolderEfficiencyBonus());
-        Assertions.assertEquals(32768.0, plasmaTurbine.getNodeRotorHolderMaxEUt(GTVoltageTier.LuV, 100));
+        Assertions.assertEquals(GTVoltageTier.IV, GTTurbineHelper.getTurbineBaseTier(plasmaTurbine));
+        Assertions.assertEquals(10, GTTurbineHelper.getTurbineHolderEfficiencyBonus(plasmaTurbine));
+        Assertions.assertEquals(32768.0, GTTurbineHelper.getNodeRotorHolderMaxEUt(plasmaTurbine, GTVoltageTier.LuV, 100));
 
         RecipeNode nyinsaneTurbine = RecipeNode.create("Nyinsane Plasma Turbine", 20.0, 1000.0, GTVoltageTier.IV);
         nyinsaneTurbine.setGenerator(true);
-        Assertions.assertEquals(196608.0, nyinsaneTurbine.getNodeRotorHolderMaxEUt(GTVoltageTier.IV, 100));
+        Assertions.assertEquals(196608.0, GTTurbineHelper.getNodeRotorHolderMaxEUt(nyinsaneTurbine, GTVoltageTier.IV, 100));
     }
 
     @Test
@@ -387,8 +388,8 @@ public class MachineAddonTest {
 
         // 1. EV Rotor Holder (4,096 * 3.0 = 12,288 EU/t -> 384 parallel)
         node.setTargetTier(GTVoltageTier.EV);
-        Assertions.assertEquals(GTVoltageTier.EV, node.getTurbineBaseTier());
-        Assertions.assertEquals(0, node.getTurbineHolderEfficiencyBonus());
+        Assertions.assertEquals(GTVoltageTier.EV, GTTurbineHelper.getTurbineBaseTier(node));
+        Assertions.assertEquals(0, GTTurbineHelper.getTurbineHolderEfficiencyBonus(node));
         Assertions.assertEquals(384, node.getTotalParallel());
         Assertions.assertEquals(12288.0, node.getSingleMachineEUt(), 0.001);
         Assertions.assertEquals(3.60, node.getEffectiveDurationSeconds(), 0.001);
@@ -396,7 +397,7 @@ public class MachineAddonTest {
 
         // 2. IV Rotor Holder (8,192 * 3.0 = 24,576 EU/t -> 768 parallel, +10% duration bonus)
         node.setTargetTier(GTVoltageTier.IV);
-        Assertions.assertEquals(10, node.getTurbineHolderEfficiencyBonus());
+        Assertions.assertEquals(10, GTTurbineHelper.getTurbineHolderEfficiencyBonus(node));
         Assertions.assertEquals(768, node.getTotalParallel());
         Assertions.assertEquals(24576.0, node.getSingleMachineEUt(), 0.001);
         Assertions.assertEquals(3.80, node.getEffectiveDurationSeconds(), 0.001);
@@ -513,7 +514,7 @@ public class MachineAddonTest {
         arcAug.putString("Type", "Dynamo");
         arcTag.put("AugmentData", arcAug);
 
-        MachineAddon arcAddon = DynamicAddonCrawler.parseThermalAugmentTag(arcTag, "LV ARC Kit", ResourceLocation.tryParse("kubejs:lv_arc_kit"));
+        MachineAddon arcAddon = ThermalAugmentHelper.parseThermalAugmentTag(arcTag, "LV ARC Kit", ResourceLocation.tryParse("kubejs:lv_arc_kit"));
         Assertions.assertNotNull(arcAddon);
         Assertions.assertEquals(1.5, arcAddon.getEutMultiplier(), 0.001);
         Assertions.assertEquals(0.95, arcAddon.getDurationMultiplier(), 0.001);
@@ -525,7 +526,7 @@ public class MachineAddonTest {
         mciAug.putString("Type", "Dynamo");
         mciTag.put("AugmentData", mciAug);
 
-        MachineAddon mciAddon = DynamicAddonCrawler.parseThermalAugmentTag(mciTag, "LV MCI Kit", ResourceLocation.tryParse("kubejs:lv_mci_kit"));
+        MachineAddon mciAddon = ThermalAugmentHelper.parseThermalAugmentTag(mciTag, "LV MCI Kit", ResourceLocation.tryParse("kubejs:lv_mci_kit"));
         Assertions.assertNotNull(mciAddon);
         Assertions.assertEquals(1.0, mciAddon.getEutMultiplier(), 0.001);
         Assertions.assertEquals(1.15, mciAddon.getDurationMultiplier(), 0.001);
@@ -660,7 +661,7 @@ public class MachineAddonTest {
         lvAug.putString("Type", "Upgrade");
         lvTag.put("AugmentData", lvAug);
 
-        MachineAddon lvKit = DynamicAddonCrawler.parseThermalAugmentTag(lvTag, "§7LV§r Upgrade Kit", ResourceLocation.tryParse("kubejs:lv_upgrade_kit"));
+        MachineAddon lvKit = ThermalAugmentHelper.parseThermalAugmentTag(lvTag, "§7LV§r Upgrade Kit", ResourceLocation.tryParse("kubejs:lv_upgrade_kit"));
         Assertions.assertNotNull(lvKit);
         Assertions.assertEquals(6, lvKit.getParallelMultiplier());
 
@@ -670,7 +671,7 @@ public class MachineAddonTest {
         evAug.putString("Type", "Upgrade");
         evTag.put("AugmentData", evAug);
 
-        MachineAddon evKit = DynamicAddonCrawler.parseThermalAugmentTag(evTag, "§5EV§r Upgrade Kit", ResourceLocation.tryParse("kubejs:ev_upgrade_kit"));
+        MachineAddon evKit = ThermalAugmentHelper.parseThermalAugmentTag(evTag, "§5EV§r Upgrade Kit", ResourceLocation.tryParse("kubejs:ev_upgrade_kit"));
         Assertions.assertNotNull(evKit);
         Assertions.assertEquals(48, evKit.getParallelMultiplier());
 
@@ -682,7 +683,7 @@ public class MachineAddonTest {
         evArcAug.putFloat("DynamoPower", 3.0f);
         evArcTag.put("AugmentData", evArcAug);
 
-        MachineAddon evArc = DynamicAddonCrawler.parseThermalAugmentTag(evArcTag, "§5EV§r Auxiliary Reaction Chamber Kit", ResourceLocation.tryParse("kubejs:ev_arc_kit"));
+        MachineAddon evArc = ThermalAugmentHelper.parseThermalAugmentTag(evArcTag, "§5EV§r Auxiliary Reaction Chamber Kit", ResourceLocation.tryParse("kubejs:ev_arc_kit"));
         Assertions.assertNotNull(evArc);
         Assertions.assertEquals(4.0, evArc.getEutMultiplier(), 0.001);
         Assertions.assertEquals(0.80, evArc.getDurationMultiplier(), 0.001);
@@ -694,7 +695,7 @@ public class MachineAddonTest {
         evMciAug.putFloat("DynamoEnergy", 1.60f);
         evMciTag.put("AugmentData", evMciAug);
 
-        MachineAddon evMci = DynamicAddonCrawler.parseThermalAugmentTag(evMciTag, "§5EV§r Multi-cycle Injectors Kit", ResourceLocation.tryParse("kubejs:ev_mci_kit"));
+        MachineAddon evMci = ThermalAugmentHelper.parseThermalAugmentTag(evMciTag, "§5EV§r Multi-cycle Injectors Kit", ResourceLocation.tryParse("kubejs:ev_mci_kit"));
         Assertions.assertNotNull(evMci);
         Assertions.assertEquals(1.0, evMci.getEutMultiplier(), 0.001);
         Assertions.assertEquals(1.60, evMci.getDurationMultiplier(), 0.001);
@@ -751,7 +752,7 @@ public class MachineAddonTest {
         CompoundTag hvKitAug = new CompoundTag();
         hvKitAug.putInt("Scale", 24);
         hvKitTag.put("AugmentData", hvKitAug);
-        MachineAddon hvKit = DynamicAddonCrawler.parseThermalAugmentTag(hvKitTag, "HV Upgrade Kit", ResourceLocation.tryParse("kubejs:hv_upgrade_kit"));
+        MachineAddon hvKit = ThermalAugmentHelper.parseThermalAugmentTag(hvKitTag, "HV Upgrade Kit", ResourceLocation.tryParse("kubejs:hv_upgrade_kit"));
         dynamo.addAddon(hvKit);
 
         // 2. HV ARC (3.0x power = +200%, 0.85x fuel energy)
@@ -761,7 +762,7 @@ public class MachineAddonTest {
         hvArcAug.putFloat("DynamoEnergy", 0.85f);
         hvArcAug.putFloat("DynamoPower", 2.0f); // 1.0 + 2.0 = 3.0x power
         hvArcTag.put("AugmentData", hvArcAug);
-        MachineAddon hvArc = DynamicAddonCrawler.parseThermalAugmentTag(hvArcTag, "HV Auxiliary Reaction Chamber", ResourceLocation.tryParse("kubejs:hv_arc_kit"));
+        MachineAddon hvArc = ThermalAugmentHelper.parseThermalAugmentTag(hvArcTag, "HV Auxiliary Reaction Chamber", ResourceLocation.tryParse("kubejs:hv_arc_kit"));
         dynamo.addAddon(hvArc);
 
         // 3. 2x HV Multi-cycle Injectors Kit (1.45x fuel energy each)
@@ -770,7 +771,7 @@ public class MachineAddonTest {
         hvMciAug.putString("Type", "Dynamo");
         hvMciAug.putFloat("DynamoEnergy", 1.45f);
         hvMciTag.put("AugmentData", hvMciAug);
-        MachineAddon hvMci = DynamicAddonCrawler.parseThermalAugmentTag(hvMciTag, "HV Multi-cycle Injectors Kit", ResourceLocation.tryParse("kubejs:hv_mci_kit"));
+        MachineAddon hvMci = ThermalAugmentHelper.parseThermalAugmentTag(hvMciTag, "HV Multi-cycle Injectors Kit", ResourceLocation.tryParse("kubejs:hv_mci_kit"));
         dynamo.addAddon(hvMci.copy());
         dynamo.addAddon(hvMci.copy());
 

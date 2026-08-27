@@ -293,6 +293,12 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     @Override
     protected void init() {
+        if (this.minecraft == null || this.minecraft.player == null || this.minecraft.level == null) {
+            if (this.minecraft != null) {
+                this.minecraft.setScreen(null);
+            }
+            return;
+        }
         super.init();
         this.searchDialog = new RecipeSearchDialog(this);
         this.machineConfigDialog = new MachineConfigDialog(this);
@@ -504,6 +510,16 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     @Override
     public void containerTick() {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            if (this.minecraft != null) {
+                this.minecraft.setScreen(null);
+            }
+            return;
+        }
+        if (!this.minecraft.player.isAlive() || this.minecraft.player.isRemoved()) {
+            this.onClose();
+            return;
+        }
         super.containerTick();
         com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
         if (state.isCollaborationEnabled() && state.isTeamMode()) {

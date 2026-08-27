@@ -237,6 +237,14 @@ public class MultiblockDetector {
         ResourceLocation cr = ResourceLocation.tryParse("gtceu:chemical_reactor");
         registerCoilMultiblock(lcr, cr);
         registerMultiblock(ResourceLocation.tryParse("gtceu:large_macerator"));
+        registerParallelHatchController(lcr);
+        registerParallelHatchController(cr);
+        registerParallelHatchController(ResourceLocation.tryParse("gtceu:large_macerator"));
+        registerParallelHatchController(ResourceLocation.tryParse("gtceu:processing_array"));
+        registerParallelHatchController(ResourceLocation.tryParse("start_core:star_forge"));
+        registerParallelHatchController(ResourceLocation.tryParse("start_core:supreme_assembly_line"));
+        registerBatchModeMultiblock(lcr);
+        registerBatchModeMultiblock(cr);
 
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_grinder"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_oven"), 8);
@@ -245,7 +253,6 @@ public class MultiblockDetector {
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_hammer"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_alloy_smelter"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_purifier"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_centrifuge"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_rock_breaker"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_kiln"), 8);
     }
@@ -280,32 +287,18 @@ public class MultiblockDetector {
         if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
             initialize();
         }
-        if (machineIcon != null) {
-            if (PARALLEL_HATCH_CONTROLLERS.contains(machineIcon)) return true;
-            String path = machineIcon.getPath().toLowerCase(java.util.Locale.ROOT);
-            if (path.equals("distillation_tower") || path.equals("pyrolyse_oven") ||
-                path.equals("electric_blast_furnace") || path.equals("implosion_compressor") ||
-                path.equals("vacuum_freezer") || path.equals("cracker") || path.contains("oil_cracking_unit")) {
-                return false;
-            }
-            if (path.startsWith("large_") || path.contains("processing_array") || path.contains("star_") || path.contains("supreme_") || path.contains("nyinsane_")) {
-                return true;
-            }
+        if (machineIcon != null && PARALLEL_HATCH_CONTROLLERS.contains(machineIcon)) {
+            return true;
         }
         if (availableWorkstations != null) {
             for (ResourceLocation ws : availableWorkstations) {
-                if (ws != null) {
-                    if (PARALLEL_HATCH_CONTROLLERS.contains(ws)) return true;
-                    String path = ws.getPath().toLowerCase(java.util.Locale.ROOT);
-                    if (path.startsWith("large_") || path.contains("processing_array")) return true;
+                if (ws != null && PARALLEL_HATCH_CONTROLLERS.contains(ws)) {
+                    return true;
                 }
             }
         }
-        if (categoryId != null) {
-            String path = categoryId.getPath().toLowerCase(java.util.Locale.ROOT);
-            if (path.contains("chemical_reactor") || path.contains("large_")) {
-                return true;
-            }
+        if (categoryId != null && PARALLEL_HATCH_CONTROLLERS.contains(categoryId)) {
+            return true;
         }
         return false;
     }
@@ -314,17 +307,13 @@ public class MultiblockDetector {
         if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
             initialize();
         }
-        if (machineIcon != null) {
-            if (BATCH_MODE_CONTROLLERS.contains(machineIcon)) return true;
-            String path = machineIcon.getPath().toLowerCase(java.util.Locale.ROOT);
-            if (path.contains("chemical_reactor")) return true;
+        if (machineIcon != null && BATCH_MODE_CONTROLLERS.contains(machineIcon)) {
+            return true;
         }
         if (availableWorkstations != null) {
             for (ResourceLocation ws : availableWorkstations) {
-                if (ws != null) {
-                    if (BATCH_MODE_CONTROLLERS.contains(ws)) return true;
-                    String path = ws.getPath().toLowerCase(java.util.Locale.ROOT);
-                    if (path.contains("chemical_reactor")) return true;
+                if (ws != null && BATCH_MODE_CONTROLLERS.contains(ws)) {
+                    return true;
                 }
             }
         }

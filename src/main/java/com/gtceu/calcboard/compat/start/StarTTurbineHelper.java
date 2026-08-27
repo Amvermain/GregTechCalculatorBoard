@@ -1,13 +1,13 @@
 package com.gtceu.calcboard.compat.start;
 
-import com.gtceu.calcboard.api.GTPlasmaTurbineModel;
 import com.gtceu.calcboard.api.MachineAddon;
 import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
 
 public class StarTTurbineHelper {
 
     public static boolean isStarTTurbine(RecipeNode node) {
-        if (node == null || !node.isTurbine()) return false;
+        if (node == null) return false;
         GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);
         return model == GTPlasmaTurbineModel.SPT || model == GTPlasmaTurbineModel.NPT;
     }
@@ -20,9 +20,6 @@ public class StarTTurbineHelper {
 
     public static boolean isCompatibleStarTTrait(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null || !isStarTTrait(addon)) {
-            return false;
-        }
-        if (!node.isTurbine()) {
             return false;
         }
         GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);

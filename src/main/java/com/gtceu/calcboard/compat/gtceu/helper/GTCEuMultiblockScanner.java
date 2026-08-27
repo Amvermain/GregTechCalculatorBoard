@@ -33,6 +33,16 @@ public class GTCEuMultiblockScanner {
                 multiblockDefCls = Class.forName("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
             } catch (Throwable ignored) {}
 
+            Class<?> coilWorkableCls = null;
+            try {
+                coilWorkableCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine");
+            } catch (Throwable ignored) {}
+
+            Class<?> largeTurbineCls = null;
+            try {
+                largeTurbineCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.generator.LargeTurbineMachine");
+            } catch (Throwable ignored) {}
+
             Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
             Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
             Iterable<?> iterable = getRegistryIterable(machinesRegistry);
@@ -68,12 +78,14 @@ public class GTCEuMultiblockScanner {
                         MultiblockDetector.registerMultiblock(id);
                     }
 
-                    boolean isCoilMb = isMb && (id.getPath().contains("electric_blast_furnace")
+                    boolean isCoilMb = isMb && ((coilWorkableCls != null && mCls != null && coilWorkableCls.isAssignableFrom(mCls))
+                            || (mCls != null && mCls.getName().toLowerCase(Locale.ROOT).contains("coil"))
+                            || id.getPath().contains("electric_blast_furnace")
                             || id.getPath().contains("pyrolyse")
                             || id.getPath().contains("cracker")
-                            || id.getPath().contains("multi_smelter")
-                            || (mCls != null && mCls.getName().toLowerCase(Locale.ROOT).contains("coil")));
-                    boolean isTurbineMb = isMb && (isTurbineClass
+                            || id.getPath().contains("multi_smelter"));
+                    boolean isTurbineMb = isMb && ((largeTurbineCls != null && mCls != null && largeTurbineCls.isAssignableFrom(mCls))
+                            || isTurbineClass
                             || id.getPath().contains("large_steam_turbine")
                             || id.getPath().contains("large_gas_turbine")
                             || id.getPath().contains("large_plasma_turbine")

@@ -24,6 +24,112 @@ import java.util.Locale;
  */
 public class GTCEuModAdapter implements IModAdapter {
 
+    static {
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.COIL, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.ROTOR, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.REFLECTOR, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.PARALLEL, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.ENERGY_HATCH, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.HATCH_BUS, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon(id, name, desc, icon));
+
+        // 1. Fusion Reactor Badges Provider (RFC-001 & RFC-002)
+        com.gtceu.calcboard.api.property.NodeBadgeRegistry.register((node, store) -> {
+            if (node == null || store == null) return java.util.List.of();
+            long startEU = store.get(com.gtceu.calcboard.api.property.NodeProperties.FUSION_START_EU);
+            boolean isFusionCat = node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion_reactor");
+            if (startEU <= 0 && !isFusionCat) return java.util.List.of();
+
+            int fTier = startEU <= 160_000_000L ? 1 : (startEU <= 320_000_000L ? 2 : 3);
+            String tierBadgeText = "⚛ Mk" + fTier;
+            java.util.List<net.minecraft.network.chat.Component> tierTooltip = java.util.List.of(
+                    net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§d⚛ Fusion Reactor Mk%d", fTier)),
+                    net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Min Voltage Tier: §f%s", fTier == 1 ? "LuV" : (fTier == 2 ? "ZPM" : "UV")))
+            );
+            com.gtceu.calcboard.api.property.NodeBadge tierBadge = new com.gtceu.calcboard.api.property.NodeBadge(tierBadgeText, 0xFFFFFFFF, 0xEE3D1B5E, 0xFFCC44FF, tierTooltip);
+
+            if (startEU > 0) {
+                String startText = "⚡ " + com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(startEU) + " EU";
+                java.util.List<net.minecraft.network.chat.Component> startTooltip = java.util.List.of(
+                        net.minecraft.network.chat.Component.literal("§e⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()),
+                        net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Required Ignition Energy: §e%,d EU", startEU)),
+                        net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Formatted: §f%s EU", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(startEU)))
+                );
+                com.gtceu.calcboard.api.property.NodeBadge startBadge = new com.gtceu.calcboard.api.property.NodeBadge(startText, 0xFFFFAA00, 0xEE3D2B1E, 0xFFFFAA00, startTooltip);
+                return java.util.List.of(tierBadge, startBadge);
+            }
+
+            return java.util.List.of(tierBadge);
+        });
+
+        // 2. Cleanroom Badge Provider
+        com.gtceu.calcboard.api.property.NodeBadgeRegistry.register((node, store) -> {
+            if (node == null || store == null) return java.util.List.of();
+            String cleanroom = store.get(com.gtceu.calcboard.api.property.NodeProperties.CLEANROOM_TYPE);
+            if (cleanroom == null || cleanroom.isEmpty()) return java.util.List.of();
+
+            String label = cleanroom.toLowerCase(java.util.Locale.ROOT).contains("sterile") ? "☣ Sterile" : "🧹 Cleanroom";
+            java.util.List<net.minecraft.network.chat.Component> tooltip = java.util.List.of(
+                    net.minecraft.network.chat.Component.literal("§b🧹 Cleanroom Required"),
+                    net.minecraft.network.chat.Component.literal("§7Type: §f" + cleanroom)
+            );
+            return java.util.List.of(new com.gtceu.calcboard.api.property.NodeBadge(label, 0xFF55FFFF, 0xEE1E2D3D, 0xFF55FFFF, tooltip));
+        });
+
+        // 3. Fusion Reflector Badge Provider
+        com.gtceu.calcboard.api.property.NodeBadgeRegistry.register((node, store) -> {
+            if (node == null || store == null) return java.util.List.of();
+            int reqTier = store.get(com.gtceu.calcboard.api.property.NodeProperties.REQUIRED_REFLECTOR_TIER);
+            int instTier = node.getInstalledReflectorTier();
+            if (reqTier <= 0 && instTier <= 0) return java.util.List.of();
+
+            if (reqTier > 0) {
+                if (instTier >= reqTier) {
+                    String badgeText = "🪞 T" + instTier;
+                    java.util.List<net.minecraft.network.chat.Component> tooltip = java.util.List.of(
+                            net.minecraft.network.chat.Component.literal("§b🪞 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.reflector_valid_title").getString()),
+                            net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Installed Reflector: §aTier %d", instTier)),
+                            net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Required Reflector: §fTier %d", reqTier)),
+                            net.minecraft.network.chat.Component.literal("§a✔ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.reflector_met").getString())
+                    );
+                    return java.util.List.of(new com.gtceu.calcboard.api.property.NodeBadge(badgeText, 0xFF55FFFF, 0xEE1E3D3D, 0xFF55FFFF, tooltip));
+                } else {
+                    String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.reflector_required", reqTier).getString();
+                    java.util.List<net.minecraft.network.chat.Component> tooltip = java.util.List.of(
+                            net.minecraft.network.chat.Component.literal("§c⚠ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.reflector_missing_title").getString()),
+                            net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Required Reflector: §cTier %d", reqTier)),
+                            net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Installed Reflector: §e%s", instTier > 0 ? ("Tier " + instTier) : net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.none").getString())),
+                            net.minecraft.network.chat.Component.literal("§c❌ " + String.format(java.util.Locale.ROOT, net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.reflector_missing_desc").getString(), reqTier))
+                    );
+                    return java.util.List.of(new com.gtceu.calcboard.api.property.NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
+                }
+            } else if (instTier > 0) {
+                String badgeText = "🪞 T" + instTier;
+                java.util.List<net.minecraft.network.chat.Component> tooltip = java.util.List.of(
+                        net.minecraft.network.chat.Component.literal("§b🪞 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.reflector_installed_title").getString()),
+                        net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Installed Reflector: §bTier %d", instTier))
+                );
+                return java.util.List.of(new com.gtceu.calcboard.api.property.NodeBadge(badgeText, 0xFF55FFFF, 0xEE1E3D3D, 0xFF55FFFF, tooltip));
+            }
+            return java.util.List.of();
+        });
+
+        // 4. Turbine Deficit Badge Provider
+        com.gtceu.calcboard.api.property.NodeBadgeRegistry.register((node, store) -> {
+            if (node == null || !GTTurbineHelper.isTurbine(node)) return java.util.List.of();
+            com.gtceu.calcboard.api.FlowGraph graph = com.gtceu.calcboard.api.BoardManager.getInstance().getActiveGraph();
+            if (graph != null && GTTurbineHelper.hasTurbineFlowDeficit(node, graph)) {
+                String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.turbine_deficit").getString();
+                java.util.List<net.minecraft.network.chat.Component> tooltip = java.util.List.of(
+                        net.minecraft.network.chat.Component.literal("§c⚠ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.turbine_deficit_title").getString()),
+                        net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.turbine_deficit_desc").getString()),
+                        net.minecraft.network.chat.Component.literal("§c❌ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_warning.inactive").getString())
+                );
+                return java.util.List.of(new com.gtceu.calcboard.api.property.NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
+            }
+            return java.util.List.of();
+        });
+    }
+
     @Override
     public String getModId() {
         return "gtceu";
@@ -56,26 +162,38 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.isCreateMachine()) return false;
-        if (com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node)) return false;
-        if (node.getRecipeCategoryId() != null && handlesCategory(node.getRecipeCategoryId())) {
-            return true;
-        }
+        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.EnergyType.KINETIC_SU) return false;
+
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace().toLowerCase(Locale.ROOT);
-            if (ns.equals("gtceu")) {
+            if (ns.equals("minecraft") || ns.equals("emi")) {
+                return false;
+            }
+            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+                return true;
+            }
+        }
+        if (node.getRecipeCategoryId() != null) {
+            String ns = node.getRecipeCategoryId().getNamespace().toLowerCase(Locale.ROOT);
+            if (ns.equals("minecraft") || ns.equals("emi")) {
+                return false;
+            }
+            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
                 return true;
             }
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null) {
                 String ns = ws.getNamespace().toLowerCase(Locale.ROOT);
-                if (ns.equals("gtceu")) {
+                if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
                     return true;
                 }
             }
         }
-        return true;
+        if (node.getEnergyTypeOverride() == EnergyType.ELECTRIC_EU || (node.getEnergyTypeOverride() == null && node.getBaseEUt() > 0 && (node.getMachineIcon() == null || !node.getMachineIcon().getNamespace().equals("minecraft")))) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -101,6 +219,27 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public com.gtceu.calcboard.api.bom.MultiblockStructureDef scanMultiblockStructure(ResourceLocation machineId) {
         return com.gtceu.calcboard.compat.gtceu.helper.GTCEuMultiblockStructureScanner.scanSingle(machineId);
+    }
+
+    @Override
+    public boolean isTurbine(RecipeNode node) {
+        return GTTurbineHelper.isTurbine(node);
+    }
+
+    @Override
+    public boolean isLargeTurbine(RecipeNode node) {
+        return GTTurbineHelper.isLargeTurbine(node);
+    }
+
+    @Override
+    public boolean isGenerator(RecipeNode node) {
+        if (node == null) return false;
+        return node.isGenerator() || GTTurbineHelper.isTurbine(node) || node.getBaseEUt() < 0;
+    }
+
+    @Override
+    public double getGeneratorMaxPower(RecipeNode node) {
+        return GTTurbineHelper.getGeneratorMaxEUt(node);
     }
 
     @Override
@@ -143,7 +282,7 @@ public class GTCEuModAdapter implements IModAdapter {
                 List<AddonCategory> cats = new ArrayList<>();
                 cats.add(AddonCategory.ROTOR);
                 cats.add(AddonCategory.MAINTENANCE);
-                if (com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
                     cats.add(AddonCategory.MULTIBLOCK_TRAIT);
                 }
                 cats.add(AddonCategory.CUSTOM);
@@ -1042,14 +1181,6 @@ public class GTCEuModAdapter implements IModAdapter {
         if (node.getRecipeCategoryId() != null) {
             CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
             if (cap != null && cap.supportsSteamMode()) {
-                return true;
-            }
-            String path = node.getRecipeCategoryId().getPath().toLowerCase(java.util.Locale.ROOT);
-            if (node.getRecipeCategoryId().getNamespace().equals("gtceu") && (
-                path.contains("macerator") || path.contains("compressor") || path.contains("extractor") ||
-                path.contains("ore_washer") || path.contains("forge_hammer") || path.contains("alloy_smelter") ||
-                path.contains("furnace") || path.contains("rock_breaker") || path.contains("centrifuge")
-            )) {
                 return true;
             }
         }

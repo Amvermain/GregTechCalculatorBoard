@@ -46,6 +46,11 @@ public class VanillaModAdapter implements IModAdapter {
     }
 
     @Override
+    public EnergyType getEnergyType(RecipeNode node) {
+        return EnergyType.NONE;
+    }
+
+    @Override
     public boolean supportsAddons(RecipeNode node) {
         return false;
     }

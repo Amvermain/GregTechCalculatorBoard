@@ -182,16 +182,15 @@ public class MachineAddonCatalog {
     private boolean wasRecipeReady = false;
 
     public List<MachineAddon> getAllAddons() {
-        try {
-            var mc = net.minecraft.client.Minecraft.getInstance();
-            if (mc != null && mc.getLanguageManager() != null) {
-                String currentLang = mc.getLanguageManager().getSelected();
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+            try {
+                String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
                 if (currentLang != null && !currentLang.equals(lastLanguageCode)) {
                     lastLanguageCode = currentLang;
                     isDirty = true;
                 }
-            }
-        } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+        }
 
         if (isDirty || !isFastLoaded) {
             ensureFastLoaded();

@@ -1,5 +1,6 @@
 package com.gtceu.calcboard;
 
+import com.gtceu.calcboard.api.EnergyType;
 import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.RecipeNode;
 import com.gtceu.calcboard.compat.IModAdapter;
@@ -115,5 +116,30 @@ public class ModAdapterRegistryTest {
         // NPT node must accept NPT coolant, reject SPT coolant
         Assertions.assertTrue(nptAdapter.isAddonCompatible(nptNode, nptCoolant));
         Assertions.assertFalse(nptAdapter.isAddonCompatible(nptNode, sptCoolant));
+    }
+
+    @Test
+    public void testThermalCentrifugeAndCraftingNodeDisambiguation() {
+        // 1. GT Thermal Centrifuge should route to GTCEuModAdapter and have ELECTRIC_EU energy type
+        RecipeNode tcNode = RecipeNode.create("Thermal Centrifuge (Crushed Copper Ore)", 20.0, 30.0, GTVoltageTier.LV);
+        tcNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:thermal_centrifuge"));
+        tcNode.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_thermal_centrifuge"));
+
+        IModAdapter tcAdapter = ModAdapterRegistry.getAdapterForNode(tcNode);
+        Assertions.assertInstanceOf(GTCEuModAdapter.class, tcAdapter);
+        Assertions.assertEquals(EnergyType.ELECTRIC_EU, tcNode.getEnergyType());
+        Assertions.assertFalse(com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(tcNode));
+
+        // 2. Minecraft Vanilla Crafting Table recipe with thermal secondary workstations should route to VanillaModAdapter and have NONE energy type
+        RecipeNode craftNode = RecipeNode.create("Crafting (Small Pile of Blaze Powder)", 20.0, 0.0, GTVoltageTier.ULV);
+        craftNode.setRecipeCategoryId(ResourceLocation.tryParse("minecraft:crafting"));
+        craftNode.setMachineIcon(ResourceLocation.tryParse("minecraft:crafting_table"));
+        craftNode.getAvailableWorkstations().add(ResourceLocation.tryParse("minecraft:crafting_table"));
+        craftNode.getAvailableWorkstations().add(ResourceLocation.tryParse("thermal:tinker_bench"));
+
+        IModAdapter craftAdapter = ModAdapterRegistry.getAdapterForNode(craftNode);
+        Assertions.assertInstanceOf(com.gtceu.calcboard.compat.vanilla.VanillaModAdapter.class, craftAdapter);
+        Assertions.assertEquals(EnergyType.NONE, craftNode.getEnergyType());
+        Assertions.assertFalse(com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(craftNode));
     }
 }

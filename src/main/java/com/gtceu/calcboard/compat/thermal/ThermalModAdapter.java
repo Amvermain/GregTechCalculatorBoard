@@ -21,6 +21,10 @@ import java.util.List;
  */
 public class ThermalModAdapter implements IModAdapter {
 
+    static {
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.THERMAL_AUGMENT, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon(id, name, desc, icon));
+    }
+
     @Override
     public String getModId() {
         return "thermal";

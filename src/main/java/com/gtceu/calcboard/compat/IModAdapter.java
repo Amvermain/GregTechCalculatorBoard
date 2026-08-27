@@ -469,6 +469,36 @@ public interface IModAdapter {
     }
 
     /**
+     * Checks if this recipe node represents a turbine.
+     */
+    default boolean isTurbine(RecipeNode node) {
+        return false;
+    }
+
+    /**
+     * Checks if this recipe node represents a large multiblock turbine.
+     */
+    default boolean isLargeTurbine(RecipeNode node) {
+        return false;
+    }
+
+    /**
+     * Checks if this recipe node represents an energy generator or dynamo.
+     */
+    default boolean isGenerator(RecipeNode node) {
+        if (node == null) return false;
+        return node.getEnergyType() == EnergyType.ELECTRIC_EU && node.getBaseEUt() < 0;
+    }
+
+    /**
+     * Computes the maximum generator power output (EU/t or RF/t) for this node.
+     */
+    default double getGeneratorMaxPower(RecipeNode node) {
+        if (node == null) return 0.0;
+        return Math.abs(node.getBaseEUt());
+    }
+
+    /**
      * Formats the power / energy / stress summary string for the bottom stats line of a node card.
      */
     default String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {

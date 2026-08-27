@@ -1,6 +1,7 @@
 package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.BeforeEach;
@@ -322,12 +323,12 @@ public class GTCEuSteamProcessingTest {
         plasma.setMachineIcon(ResourceLocation.tryParse("gtceu:large_plasma_turbine"));
 
         // 1. Standard LPT: 16,384 EU/t base
-        Assertions.assertEquals(16384.0, plasma.getTurbineBaseProduction(), 0.001);
+        Assertions.assertEquals(16384.0, GTTurbineHelper.getTurbineBaseProduction(plasma), 0.001);
         Assertions.assertEquals(16384.0, plasma.getSingleMachineEUt(), 0.001);
 
         // 2. Supreme Plasma Turbine (SPT): 6x base parallel capacity (98,304 EU/t)
         plasma.setMachineIcon(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"));
-        Assertions.assertEquals(98304.0, plasma.getTurbineBaseProduction(), 0.001);
+        Assertions.assertEquals(98304.0, GTTurbineHelper.getTurbineBaseProduction(plasma), 0.001);
         plasma.setParallel(6);
         Assertions.assertEquals(98304.0, plasma.getSingleMachineEUt(), 0.001);
 
@@ -349,7 +350,7 @@ public class GTCEuSteamProcessingTest {
         // 3. Nyinsane Plasma Turbine (NPT): 12x base parallel capacity (196,608 EU/t)
         plasma.getAddons().clear();
         plasma.setMachineIcon(ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"));
-        Assertions.assertEquals(196608.0, plasma.getTurbineBaseProduction(), 0.001);
+        Assertions.assertEquals(196608.0, GTTurbineHelper.getTurbineBaseProduction(plasma), 0.001);
         plasma.setParallel(12);
         Assertions.assertEquals(196608.0, plasma.getSingleMachineEUt(), 0.001);
     }
@@ -470,6 +471,46 @@ public class GTCEuSteamProcessingTest {
         // 3. Must stay Singleblock
         assertFalse(macerator.isMultiblock(), "Node must not automatically switch to multiblock when transitioning from Steam to ULV");
         assertNotEquals(ResourceLocation.tryParse("gtceu:large_macerator"), macerator.getMachineIcon());
+    }
+
+    @Test
+    void testThermalCentrifugeAndCentrifugeDoNotSupportSteamMode() {
+        // 1. Thermal Centrifuge
+        RecipeNode tcNode = RecipeNode.create("Thermal Centrifuge", 20.0, 30.0, GTVoltageTier.LV);
+        tcNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:thermal_centrifuge"));
+        tcNode.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_thermal_centrifuge"));
+        tcNode.setAvailableWorkstations(List.of(
+                ResourceLocation.tryParse("gtceu:lv_thermal_centrifuge"),
+                ResourceLocation.tryParse("gtceu:mv_thermal_centrifuge"),
+                ResourceLocation.tryParse("gtceu:hv_thermal_centrifuge")
+        ));
+
+        assertFalse(tcNode.supportsSteamMode(), "Thermal Centrifuge must NOT support steam processing mode");
+        assertEquals(SteamMode.NONE, tcNode.getSteamMode());
+
+        com.gtceu.calcboard.client.gui.NodeWidget tcWidget = new com.gtceu.calcboard.client.gui.NodeWidget(tcNode);
+        boolean tcDown = tcWidget.changeTier(-1);
+        assertFalse(tcDown, "Tier change down from min tier (LV) on non-steam node must fail/not enter steam mode");
+        assertEquals(SteamMode.NONE, tcNode.getSteamMode());
+        assertEquals(GTVoltageTier.LV, tcNode.getTargetTier());
+
+        // 2. Standard Centrifuge
+        RecipeNode cNode = RecipeNode.create("Centrifuge", 20.0, 30.0, GTVoltageTier.MV);
+        cNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:centrifuge"));
+        cNode.setMachineIcon(ResourceLocation.tryParse("gtceu:mv_centrifuge"));
+        cNode.setAvailableWorkstations(List.of(
+                ResourceLocation.tryParse("gtceu:mv_centrifuge"),
+                ResourceLocation.tryParse("gtceu:hv_centrifuge")
+        ));
+
+        assertFalse(cNode.supportsSteamMode(), "Centrifuge must NOT support steam processing mode");
+        assertEquals(SteamMode.NONE, cNode.getSteamMode());
+
+        com.gtceu.calcboard.client.gui.NodeWidget cWidget = new com.gtceu.calcboard.client.gui.NodeWidget(cNode);
+        boolean cDown = cWidget.changeTier(-1);
+        assertFalse(cDown, "Tier change down from min tier (MV) on non-steam node must fail/not enter steam mode");
+        assertEquals(SteamMode.NONE, cNode.getSteamMode());
+        assertEquals(GTVoltageTier.MV, cNode.getTargetTier());
     }
 }
 

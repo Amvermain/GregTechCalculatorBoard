@@ -23,6 +23,10 @@ import java.util.List;
  */
 public class CreateNewAgeModAdapter implements IModAdapter {
 
+    static {
+        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.MAGNET, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0));
+    }
+
     public static final String MOD_ID = "create_new_age";
 
     @Override

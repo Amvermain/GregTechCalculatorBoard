@@ -1,11 +1,5 @@
 package com.gtceu.calcboard.api;
 
-import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
-import com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon;
-import com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon;
-import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
-import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
-import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -166,8 +160,7 @@ public class MachineAddon {
         }
         if (itemStackSample != null && !itemStackSample.isEmpty()) {
             try {
-                var player = Minecraft.getInstance().player;
-                var lines = itemStackSample.getTooltipLines(player, TooltipFlag.Default.NORMAL);
+                var lines = itemStackSample.getTooltipLines(null, TooltipFlag.Default.NORMAL);
                 if (lines != null && lines.size() > 1) {
                     StringBuilder sb = new StringBuilder();
                     for (int i = 1; i < lines.size(); i++) {
@@ -181,13 +174,12 @@ public class MachineAddon {
                 }
             } catch (Throwable ignored) {}
         }
-        if (itemIcon != null && !itemIcon.getPath().contains("rotor")) {
+        if (itemIcon != null && category != Category.ROTOR) {
             try {
                 var item = ForgeRegistries.ITEMS.getValue(itemIcon);
                 if (item != null && item != Items.AIR) {
                     ItemStack stack = new ItemStack(item);
-                    var player = Minecraft.getInstance().player;
-                    var lines = stack.getTooltipLines(player, TooltipFlag.Default.NORMAL);
+                    var lines = stack.getTooltipLines(null, TooltipFlag.Default.NORMAL);
                     if (lines != null && lines.size() > 1) {
                         StringBuilder sb = new StringBuilder();
                         for (int i = 1; i < lines.size(); i++) {
@@ -557,24 +549,8 @@ public class MachineAddon {
         String desc = tag.getString("description");
         ResourceLocation icon = tag.contains("icon") ? ResourceLocation.tryParse(tag.getString("icon")) : null;
 
-        MachineAddon addon;
-        if (cat.equals(AddonCategory.COIL)) {
-            addon = new GTCoilAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.ROTOR)) {
-            addon = new GTRotorAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.REFLECTOR)) {
-            addon = new GTReflectorAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.PARALLEL)) {
-            addon = new GTParallelHatchAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.ENERGY_HATCH)) {
-            addon = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.HATCH_BUS)) {
-            addon = new com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.THERMAL_AUGMENT)) {
-            addon = new ThermalAugmentAddon(id, name, desc, icon);
-        } else if (cat.equals(AddonCategory.MAGNET)) {
-            addon = new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0);
-        } else {
+        MachineAddon addon = AddonFactoryRegistry.create(cat, id, name, desc, icon, tag);
+        if (addon == null) {
             addon = new MachineAddon(id, name, cat, desc, icon);
         }
 

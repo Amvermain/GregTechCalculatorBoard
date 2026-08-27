@@ -225,8 +225,40 @@ public class GTCEuAddonCrawler {
         com.gtceu.calcboard.compat.start.StarTAddonCrawler.addBuiltinStarTTraits(list);
     }
 
+    public static boolean isMufflerHatchItem(Item item, ResourceLocation id) {
+        if (item instanceof BlockItem bi) {
+            Block b = bi.getBlock();
+            try {
+                Method mGetDef = b.getClass().getMethod("getDefinition");
+                Object def = mGetDef.invoke(b);
+                if (def != null) {
+                    Class<?> mufflerPartCls = null;
+                    try {
+                        mufflerPartCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.MufflerPartMachine");
+                    } catch (Throwable ignored) {}
+                    if (mufflerPartCls == null) {
+                        try {
+                            mufflerPartCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.MufflerHatchPartMachine");
+                        } catch (Throwable ignored) {}
+                    }
+                    if (mufflerPartCls != null) {
+                        Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
+                        Class<?> mCls = (Class<?>) mGetMachineClass.invoke(def);
+                        if (mCls != null && mufflerPartCls.isAssignableFrom(mCls)) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+        if (id != null && (id.getPath().startsWith("muffler_") || id.getPath().endsWith("_muffler") || id.getPath().contains("muffler_hatch"))) {
+            return true;
+        }
+        return false;
+    }
+
     public static boolean isMaintenanceHatchItem(Item item, ResourceLocation id) {
-        if (id != null && id.getPath().contains("muffler_hatch")) {
+        if (isMufflerHatchItem(item, id)) {
             return true;
         }
         if (item instanceof BlockItem bi) {
@@ -291,7 +323,7 @@ public class GTCEuAddonCrawler {
             eco.setItemStackSample(stack);
             eco.setDiscoverySource("GTCEu Configurable Maintenance Hatch Definition (Eco Mode) [" + id + "]");
             list.add(eco);
-        } else if (id.getPath().contains("muffler")) {
+        } else if (isMufflerHatchItem(stack.getItem(), id)) {
             String name = stack.getHoverName().getString();
             String desc = Component.translatable("gui.gtcalcboard.addon.muffler_hatch_desc").getString();
             MachineAddon addon = new MachineAddon(id.toString(), name.isEmpty() ? id.toString() : name, MachineAddon.Category.MAINTENANCE, desc, id);

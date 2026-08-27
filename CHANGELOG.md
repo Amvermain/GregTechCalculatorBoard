@@ -6,6 +6,32 @@
 
 All notable changes to **GregTech Calculator Board** will be documented in this file.
 
+## [2.0.0-alpha.10] - 2026-08-27
+
+### Added
+- **Kinetic Generator & Motor EMI Recipe Integration & SU Search Indexing (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
+  - Registered kinetic generation and motor recipes as native EMI synthetic recipes with workstations and outputs, allowing seamless favorite pinning and recipe lookup.
+  - Enriched search indices so querying `<su`, `<stress`, or machine names immediately matches stress unit generation recipes.
+- **Magnet & Multi-Stackable Addon Click Interaction (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
+  - Left-clicking catalog cards now stacks addons (+1) up to 12 slots, while Shift + Left-Click fills remaining slots (+12) or batch-replaces them.
+  - Right-clicking uninstalls 1 copy (-1), and the top `Clear Magnets` button resets all installed magnets.
+
+### Changed & Improved
+- **Deferred Addon Tooltip Rendering (`MachineConfigDialog`)**:
+  - Resolved UI layering bug where lengthy addon descriptions were clipped by dialog boundaries.
+
+### Fixed
+- **Guarded Against Crashes When Pressing Keybinds Outside Worlds or in Config Menus (`BoardScreen`, `ClientForgeEvents`, `NetworkHandler`)**:
+  - Prevented a `NullPointerException` crash in vanilla `AbstractContainerScreen.containerTick()` caused by opening `BoardScreen` via hotkey when not in a world (e.g. while in the title screen, controls menu, or mod config screens where `mc.player == null`).
+  - Added guards so hotkeys do not intercept input while in pause, options, controls/keybinds, death, or configuration screens.
+  - Added lifecycle validation guards across `BoardScreen.init()` and `containerTick()` to ensure the screen closes cleanly if world/player context is absent.
+  - Gracefully closes `BoardScreen` upon logging out of a world and guarded packet dispatch against disconnected channels.
+- **GT Thermal Centrifuge & Crafting Table Mod Misidentification Bug (`ThermalAugmentHelper`, `GTCEuModAdapter`, `CreateModAdapter`, `VanillaModAdapter`, `ModAdapterRegistryTest`)**:
+  - Fixed a heuristic string matching bug where GregTech machines containing the word "thermal" (e.g. Thermal Centrifuge) were misclassified as Thermal Expansion machines and rendered with `⚡ Thermal` badges and RF power instead of GT EU/t.
+  - Fixed a workstation routing bug where Vanilla crafting table recipes with secondary workstations from Thermal (Tinker Bench) or Create (Mechanical Crafter) were incorrectly captured by mod adapters instead of falling back cleanly to Vanilla Passive (`🍃 Passive`).
+- **HP Steam to Electric Singleblock Machine Icon Recovery Bug (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
+  - Fixed an issue where disabling HP Steam mode unexpectedly promoted singleblock machines to multiblock icons instead of restoring the original tier-specific singleblock workstation.
+
 ## [2.0.0-alpha.9] - 2026-08-26
 
 ### Added
@@ -50,24 +76,14 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - Omitted default field values during graph serialization to significantly minimize blueprint and NBT data size.
 - **UI Layout and Toolbar Margin Polish (`BoardScreen`, `ToolbarWidget`)**:
   - Refined toolbar button boundaries and padding, improving Favorites Dock placement and responsiveness.
-- **Magnet & Multi-Stackable Addon Click Interaction (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
-  - Left-clicking catalog cards now stacks addons (+1) up to 12 slots, while Shift + Left-Click fills remaining slots (+12) or batch-replaces them.
-  - Right-clicking uninstalls 1 copy (-1), and the top `Clear Magnets` button resets all installed magnets.
-- **Deferred Addon Tooltip Rendering (`MachineConfigDialog`)**:
-  - Resolved UI layering bug where lengthy addon descriptions were clipped by dialog boundaries.
 
 ### Fixed
 - **Auto Connect Duplicate Bypass Wire Prevention (`ToolbarWidget`)**:
   - Prevented redundant direct bypass wires from being created between producers and consumers that are already routed through a reroute junction hub.
 - **Large Boiler Recipe Double-Acceleration Duration Bug (`GTCEuRecipeHandler`, `GTCEuModAdapter`)**:
   - Fixed an issue where singleblock boiler speed multipliers were redundantly applied to large boiler recipes, distorting cycle duration down to 0.05s (1 tick) and vastly overconsuming fuel.
-- **HP Steam to Electric Singleblock Machine Icon Recovery Bug (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
-  - Fixed an issue where disabling HP Steam mode unexpectedly promoted singleblock machines to multiblock icons instead of restoring the original tier-specific singleblock workstation.
 - **Dialog & Search Text Input 'E' Key / Canvas Hotkey Conflict Bug (`RecipeSearchDialog`, `BoardScreen`, `MultiblockBOMDialog`, `GlobalBalanceDashboardDialog`)**:
   - Fixed a key routing bug where typing letters (such as 'E', 'B', 'T', 'F', 'J') into search boxes or modal input fields triggered Minecraft's inventory close key (E) or board canvas shortcuts instead of typing cleanly into the input box.
-- **Kinetic Generator & Motor EMI Recipe Integration & SU Search Indexing (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
-  - Fixed an issue where pinning kinetic generators (such as Large Water Wheel) to EMI favorites did not link to their generation recipes by registering them as native EMI synthetic recipes with workstations and outputs.
-  - Enriched search indices so querying `<su`, `<stress`, or machine names immediately matches stress unit generation recipes.
 
 ---
 

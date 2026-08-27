@@ -45,8 +45,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.isCreateMachine()) return false;
-        if (com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node)) return false;
+        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.EnergyType.KINETIC_SU) return false;
 
         if (node.getRecipeCategoryId() != null && handlesCategory(node.getRecipeCategoryId())) {
             return true;

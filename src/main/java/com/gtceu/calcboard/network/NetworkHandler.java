@@ -56,7 +56,10 @@ public class NetworkHandler {
     }
 
     public static void sendToServer(Object msg) {
-        CHANNEL.sendToServer(msg);
+        try {
+            CHANNEL.sendToServer(msg);
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void sendToPlayer(ServerPlayer player, Object msg) {

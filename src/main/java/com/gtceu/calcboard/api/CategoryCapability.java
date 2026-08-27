@@ -67,7 +67,7 @@ public record CategoryCapability(
             if (node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption) {
                 cats.add(AddonCategory.ROTOR);
                 cats.add(AddonCategory.MAINTENANCE);
-                if (com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
                     cats.add(AddonCategory.MULTIBLOCK_TRAIT);
                 }
                 cats.add(AddonCategory.CUSTOM);

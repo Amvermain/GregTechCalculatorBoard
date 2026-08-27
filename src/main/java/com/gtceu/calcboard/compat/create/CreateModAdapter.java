@@ -59,16 +59,7 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.isCreateMachine() || node.getRpm() > 0) return true;
-        if (node.getMachineIcon() != null) {
-            String ns = node.getMachineIcon().getNamespace();
-            if (ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION)) return true;
-        }
-        if (node.getRecipeCategoryId() != null) {
-            String ns = node.getRecipeCategoryId().getNamespace();
-            return ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION);
-        }
-        return false;
+        return node.isCreateMachine();
     }
 
     @Override

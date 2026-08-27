@@ -16,9 +16,9 @@ public final class GTTurbineHelper {
      * Checks whether the given node represents a GregTech Turbine (Singleblock or Multiblock).
      */
     public static boolean isTurbine(RecipeNode node) {
-        if (node == null || node.isCreateMachine()) return false;
+        if (node == null || node.getEnergyType() == EnergyType.KINETIC_SU) return false;
         if (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU && node.getEnergyTypeOverride() != EnergyType.NONE) return false;
-        if (node.hasRotorAddon()) return true;
+        if (hasRotorAddon(node)) return true;
 
         ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
         if (recipeCategoryId != null && MultiblockDetector.isTurbineRecipeCategory(recipeCategoryId)) {
@@ -48,7 +48,7 @@ public final class GTTurbineHelper {
      * Checks whether the given node represents a GTCEu Large Multiblock Turbine.
      */
     public static boolean isLargeTurbine(RecipeNode node) {
-        if (node == null || node.isCreateMachine()) {
+        if (node == null || node.getEnergyType() == EnergyType.KINETIC_SU) {
             return false;
         }
         if (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU && node.getEnergyTypeOverride() != EnergyType.NONE) {
@@ -69,7 +69,7 @@ public final class GTTurbineHelper {
      * Checks whether the node has a rotor addon equipped or non-standard rotor properties.
      */
     public static boolean hasRotorAddon(RecipeNode node) {
-        if (node == null || node.isCreateMachine() || (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU)) return false;
+        if (node == null || node.getEnergyType() == EnergyType.KINETIC_SU || (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU)) return false;
         String rName = node.getRotorName();
         int rEff = node.getRotorEfficiency();
         int rPow = node.getRotorPower();
@@ -133,7 +133,7 @@ public final class GTTurbineHelper {
      */
     public static int getTurbineHolderEfficiencyBonus(RecipeNode node) {
         if (node == null || !isLargeTurbine(node)) return 0;
-        GTVoltageTier baseTier = node.getTurbineBaseTier();
+        GTVoltageTier baseTier = getTurbineBaseTier(node);
         GTVoltageTier targetTier = node.getTargetTier();
         if (baseTier == null || targetTier == null) return 0;
         int delta = targetTier.ordinal() - baseTier.ordinal();
@@ -146,7 +146,7 @@ public final class GTTurbineHelper {
     public static double getNodeRotorHolderBaseCapacity(RecipeNode node, GTVoltageTier tier) {
         if (tier == null) return getTurbineBaseProduction(node);
         int tierIndex = tier.ordinal();
-        GTVoltageTier baseTier = node.getTurbineBaseTier();
+        GTVoltageTier baseTier = getTurbineBaseTier(node);
         int delta = tierIndex - (baseTier != null ? baseTier.ordinal() : GTVoltageTier.EV.ordinal());
         double baseProd = getTurbineBaseProduction(node);
         if (delta >= 0) {

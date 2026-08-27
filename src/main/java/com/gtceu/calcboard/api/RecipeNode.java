@@ -5,7 +5,6 @@ import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
-import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
@@ -519,8 +518,10 @@ public class RecipeNode {
 
     public static boolean isThermalUpgradeKit(MachineAddon addon) {
         if (addon == null) return false;
-        if (addon.getCategory() != MachineAddon.Category.THERMAL_AUGMENT) return false;
-        return addon.getParallelMultiplier() > 1 || addon.getId().contains("upgrade_kit") || addon.getId().contains("tier_upgrade");
+        if (addon instanceof com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon ta && ta.isUpgradeKit()) {
+            return true;
+        }
+        return addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && addon.getParallelMultiplier() > 1;
     }
 
     public static boolean isMultiblockWorkstation(ResourceLocation ws) {
@@ -948,10 +949,23 @@ public class RecipeNode {
 
     public boolean isCreateMachine() {
         if (energyType == EnergyType.KINETIC_SU) return true;
-        if (machineIcon != null && (machineIcon.getNamespace().equals("create") || machineIcon.getNamespace().equals("createaddition") || machineIcon.getNamespace().equals("create_new_age"))) return true;
-        if (recipeCategoryId != null && (recipeCategoryId.getNamespace().equals("create") || recipeCategoryId.getNamespace().equals("createaddition") || recipeCategoryId.getNamespace().equals("create_new_age"))) return true;
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && (ws.getNamespace().equals("create") || ws.getNamespace().equals("createaddition") || ws.getNamespace().equals("create_new_age"))) return true;
+        if (machineIcon != null) {
+            String ns = machineIcon.getNamespace().toLowerCase(Locale.ROOT);
+            if (ns.equals("minecraft") || ns.equals("emi") || ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+                return false;
+            }
+            if (ns.equals("create") || ns.equals("createaddition") || ns.equals("create_new_age")) {
+                return true;
+            }
+        }
+        if (recipeCategoryId != null) {
+            String ns = recipeCategoryId.getNamespace().toLowerCase(Locale.ROOT);
+            if (ns.equals("minecraft") || ns.equals("emi") || ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+                return false;
+            }
+            if (ns.equals("create") || ns.equals("createaddition") || ns.equals("create_new_age")) {
+                return true;
+            }
         }
         return false;
     }
@@ -984,44 +998,16 @@ public class RecipeNode {
         properties.set(NodeProperties.TURBINE_ROTOR_NAME, rotorName != null ? rotorName : "Standard (100%)");
     }
 
-    public GTVoltageTier getTurbineBaseTier() {
-        return GTTurbineHelper.getTurbineBaseTier(this);
-    }
-
-    public int getTurbineHolderEfficiencyBonus() {
-        return GTTurbineHelper.getTurbineHolderEfficiencyBonus(this);
-    }
-
-    public double getTurbineBaseProduction() {
-        return GTTurbineHelper.getTurbineBaseProduction(this);
-    }
-
-    public boolean hasRotorAddon() {
-        return GTTurbineHelper.hasRotorAddon(this);
-    }
-
     public boolean isLargeTurbine() {
-        return GTTurbineHelper.isLargeTurbine(this);
+        return ModAdapterRegistry.getAdapterForNode(this).isLargeTurbine(this);
     }
 
     public boolean isTurbine() {
-        return GTTurbineHelper.isTurbine(this);
-    }
-
-    public double getNodeRotorHolderBaseCapacity(GTVoltageTier tier) {
-        return GTTurbineHelper.getNodeRotorHolderBaseCapacity(this, tier);
-    }
-
-    public double getNodeRotorHolderMaxEUt(GTVoltageTier tier, int rotorPower) {
-        return GTTurbineHelper.getNodeRotorHolderMaxEUt(this, tier, rotorPower);
+        return ModAdapterRegistry.getAdapterForNode(this).isTurbine(this);
     }
 
     public double getGeneratorMaxEUt() {
-        return GTTurbineHelper.getGeneratorMaxEUt(this);
-    }
-
-    public int getEffectiveTurbineParallel() {
-        return GTTurbineHelper.getEffectiveTurbineParallel(this);
+        return ModAdapterRegistry.getAdapterForNode(this).getGeneratorMaxPower(this);
     }
 
     public void autoCalculateTurbineParallel() {

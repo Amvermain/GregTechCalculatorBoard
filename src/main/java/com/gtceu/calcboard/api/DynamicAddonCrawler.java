@@ -1,9 +1,5 @@
 package com.gtceu.calcboard.api;
 
-import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
-import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
-import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
-import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -54,20 +50,12 @@ public class DynamicAddonCrawler {
     }
 
     public static boolean isRecipeBakingComplete() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.level == null) return false;
-        try {
-            var emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (emiManager != null && emiManager.getRecipes() != null && !emiManager.getRecipes().isEmpty()) {
-                return true;
-            }
-        } catch (Throwable ignored) {}
-        try {
-            if (mc.level.getRecipeManager() != null && !mc.level.getRecipeManager().getRecipes().isEmpty()) {
-                return true;
-            }
-        } catch (Throwable ignored) {}
-        return false;
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+            try {
+                return com.gtceu.calcboard.client.ClientLevelHelper.isRecipeBakingComplete();
+            } catch (Throwable ignored) {}
+        }
+        return true;
     }
 
     public static List<ItemStack> collectAllActiveItemStacks() {
@@ -118,20 +106,9 @@ public class DynamicAddonCrawler {
         } catch (Throwable ignored) {}
 
         // 2. Fallback: Minecraft Level RecipeManager
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null && mc.level != null) {
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
             try {
-                var recipeManager = mc.level.getRecipeManager();
-                if (recipeManager != null) {
-                    for (Recipe<?> r : recipeManager.getRecipes()) {
-                        try {
-                            ItemStack res = r.getResultItem(mc.level.registryAccess());
-                            if (res != null && !res.isEmpty()) {
-                                collector.accept(res);
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                }
+                com.gtceu.calcboard.client.ClientLevelHelper.collectClientRecipes(collector);
             } catch (Throwable ignored) {}
         }
 
@@ -169,21 +146,21 @@ public class DynamicAddonCrawler {
             return;
         }
         if (recipe instanceof net.minecraft.world.item.crafting.Recipe<?> r) {
-            Minecraft mc = Minecraft.getInstance();
-            try {
-                ItemStack res = mc != null && mc.level != null ? r.getResultItem(mc.level.registryAccess()) : r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
-                if (res != null && !res.isEmpty()) {
-                    outputStacks.add(res);
-                }
-            } catch (Throwable ignored) {
+            if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
                 try {
-                    ItemStack res = r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+                    ItemStack res = com.gtceu.calcboard.client.ClientLevelHelper.getRecipeResultItem(r);
                     if (res != null && !res.isEmpty()) {
                         outputStacks.add(res);
                     }
-                } catch (Throwable ignored2) {}
+                    return;
+                } catch (Throwable ignored) {}
             }
-            return;
+            try {
+                ItemStack res = r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+                if (res != null && !res.isEmpty()) {
+                    outputStacks.add(res);
+                }
+            } catch (Throwable ignored) {}
         }
         // Fallback for custom recipe types
         try {
@@ -387,21 +364,5 @@ public class DynamicAddonCrawler {
                 } catch (Throwable ignored) {}
             }
         } catch (Throwable ignored) {}
-    }
-
-    public static MachineAddon parseTurbineRotor(ItemStack stack, ResourceLocation id) {
-        return TurbineRotorHelper.parseTurbineRotor(stack, id);
-    }
-
-    public static MachineAddon parseThermalAugment(ItemStack stack, ResourceLocation id) {
-        return ThermalAugmentHelper.parseThermalAugment(stack, id);
-    }
-
-    public static MachineAddon parseThermalAugmentTag(net.minecraft.nbt.CompoundTag rootTag, String name, ResourceLocation id) {
-        return ThermalAugmentHelper.parseThermalAugmentTag(rootTag, name, id);
-    }
-
-    public static MachineAddon parseCoilBlock(ItemStack stack, ResourceLocation id) {
-        return CoilHelper.parseCoilBlock(stack, id);
     }
 }

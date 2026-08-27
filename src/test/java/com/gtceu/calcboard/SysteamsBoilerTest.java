@@ -2,6 +2,7 @@ package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.api.*;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -55,7 +56,7 @@ public class SysteamsBoilerTest {
         CompoundTag hvKitAug = new CompoundTag();
         hvKitAug.putInt("Scale", 24);
         hvKitTag.put("AugmentData", hvKitAug);
-        MachineAddon hvKit = DynamicAddonCrawler.parseThermalAugmentTag(hvKitTag, "HV Upgrade Kit", ResourceLocation.tryParse("kubejs:hv_upgrade_kit"));
+        MachineAddon hvKit = ThermalAugmentHelper.parseThermalAugmentTag(hvKitTag, "HV Upgrade Kit", ResourceLocation.tryParse("kubejs:hv_upgrade_kit"));
         boiler.addAddon(hvKit);
 
         Assertions.assertEquals(1, boiler.getTotalParallel()); // Thermal machines process 1 item per machine, scale is applied to duration/rate
@@ -87,21 +88,21 @@ public class SysteamsBoilerTest {
         CompoundTag evKitAug = new CompoundTag();
         evKitAug.putInt("Scale", 48);
         evKitTag.put("AugmentData", evKitAug);
-        evBoiler.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(evKitTag, "EV Upgrade Kit", ResourceLocation.tryParse("kubejs:ev_upgrade_kit")));
+        evBoiler.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(evKitTag, "EV Upgrade Kit", ResourceLocation.tryParse("kubejs:ev_upgrade_kit")));
 
         CompoundTag arcTag = new CompoundTag();
         CompoundTag arcAug = new CompoundTag();
         arcAug.putFloat("DynamoPower", 3.0f); // 1.0 + 3.0 = 4.0x Power
         arcAug.putFloat("DynamoEnergy", 0.8f);
         arcTag.put("AugmentData", arcAug);
-        evBoiler.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(arcTag, "EV ARC Kit", ResourceLocation.tryParse("kubejs:ev_arc_kit")));
+        evBoiler.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(arcTag, "EV ARC Kit", ResourceLocation.tryParse("kubejs:ev_arc_kit")));
 
         CompoundTag mciTag = new CompoundTag();
         CompoundTag mciAug = new CompoundTag();
         mciAug.putFloat("DynamoEnergy", 1.6f);
         mciTag.put("AugmentData", mciAug);
-        evBoiler.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(mciTag, "EV MCI Kit 1", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
-        evBoiler.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(mciTag, "EV MCI Kit 2", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
+        evBoiler.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(mciTag, "EV MCI Kit 1", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
+        evBoiler.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(mciTag, "EV MCI Kit 2", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
 
         // Fuel Energy Mult: 0.8 * 1.6 * 1.6 = 2.048 (205% Efficiency)
         Assertions.assertEquals(2.048, evBoiler.getCombinedDurationMultiplier(), 0.001);
@@ -217,21 +218,21 @@ public class SysteamsBoilerTest {
         CompoundTag evKitAug = new CompoundTag();
         evKitAug.putInt("Scale", 48);
         evKitTag.put("AugmentData", evKitAug);
-        dynamo.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(evKitTag, "EV Upgrade Kit", ResourceLocation.tryParse("kubejs:ev_upgrade_kit")));
+        dynamo.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(evKitTag, "EV Upgrade Kit", ResourceLocation.tryParse("kubejs:ev_upgrade_kit")));
 
         CompoundTag arcTag = new CompoundTag();
         CompoundTag arcAug = new CompoundTag();
         arcAug.putFloat("DynamoPower", 3.0f); // 1.0 + 3.0 = 4.0x Power
         arcAug.putFloat("DynamoEnergy", 0.8f);
         arcTag.put("AugmentData", arcAug);
-        dynamo.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(arcTag, "EV ARC Kit", ResourceLocation.tryParse("kubejs:ev_arc_kit")));
+        dynamo.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(arcTag, "EV ARC Kit", ResourceLocation.tryParse("kubejs:ev_arc_kit")));
 
         CompoundTag mciTag = new CompoundTag();
         CompoundTag mciAug = new CompoundTag();
         mciAug.putFloat("DynamoEnergy", 1.6f);
         mciTag.put("AugmentData", mciAug);
-        dynamo.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(mciTag, "EV MCI Kit 1", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
-        dynamo.addAddon(DynamicAddonCrawler.parseThermalAugmentTag(mciTag, "EV MCI Kit 2", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
+        dynamo.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(mciTag, "EV MCI Kit 1", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
+        dynamo.addAddon(ThermalAugmentHelper.parseThermalAugmentTag(mciTag, "EV MCI Kit 2", ResourceLocation.tryParse("kubejs:ev_mci_kit")));
 
         // Generation: 400 RF/t * 48 * 4.0 = 76,800 RF/t
         Assertions.assertEquals(76800.0, dynamo.getSingleMachineEUt(), 0.001);

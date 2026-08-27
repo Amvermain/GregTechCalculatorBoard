@@ -224,14 +224,14 @@ public class GTCEuGuiHandler {
                                            net.minecraft.client.gui.components.EditBox parallelBox,
                                            com.gtceu.calcboard.client.gui.BoardScreen parent) {
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
-            if (com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
-                com.gtceu.calcboard.api.GTPlasmaTurbineModel curModel = com.gtceu.calcboard.api.GTPlasmaTurbineModel.getModel(node);
-                com.gtceu.calcboard.api.GTPlasmaTurbineModel[] models = com.gtceu.calcboard.api.GTPlasmaTurbineModel.values();
+            if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel curModel = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(node);
+                com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel[] models = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.values();
                 int btnW = 82;
                 int gap = 4;
                 int btnY = y + 44;
                 for (int i = 0; i < models.length; i++) {
-                    com.gtceu.calcboard.api.GTPlasmaTurbineModel m = models[i];
+                    com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel m = models[i];
                     int btnX = x + 10 + i * (btnW + gap);
                     boolean isSelected = m == curModel;
                     boolean hover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 16;
@@ -248,7 +248,7 @@ public class GTCEuGuiHandler {
                 int eff = node.getRotorEfficiency();
                 int pwr = node.getRotorPower();
                 String rotorInfo = "§6🌀 §f" + rName + " §7| §b⏱ " + eff + "% §e⚡ " + pwr + "%";
-                int holderBonus = node.getTurbineHolderEfficiencyBonus();
+                int holderBonus = GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
                 if (holderBonus > 0) {
                     rotorInfo += " §a(+" + holderBonus + "% Holder)";
                 }
@@ -274,7 +274,7 @@ public class GTCEuGuiHandler {
                         Component.translatable("gui.gtcalcboard.rotor.eff").getString(), eff,
                         Component.translatable("gui.gtcalcboard.rotor.power").getString(), pwr);
                 if (node.isLargeTurbine()) {
-                    int holderBonus = node.getTurbineHolderEfficiencyBonus();
+                    int holderBonus = GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
                     if (holderBonus > 0) {
                         specStr += String.format(Locale.ROOT, "   §a(+%d%% Holder)", holderBonus);
                     }
@@ -546,13 +546,13 @@ public class GTCEuGuiHandler {
                                                  net.minecraft.client.gui.components.EditBox parallelBox,
                                                  com.gtceu.calcboard.client.gui.BoardScreen parent) {
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
-            if (com.gtceu.calcboard.api.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
-                com.gtceu.calcboard.api.GTPlasmaTurbineModel[] models = com.gtceu.calcboard.api.GTPlasmaTurbineModel.values();
+            if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel[] models = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.values();
                 int btnW = 82;
                 int gap = 4;
                 int btnY = y + 44;
                 for (int i = 0; i < models.length; i++) {
-                    com.gtceu.calcboard.api.GTPlasmaTurbineModel m = models[i];
+                    com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel m = models[i];
                     int btnX = x + 10 + i * (btnW + gap);
                     if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 16) {
                         node.setMachineIcon(m.getMachineIcon());
@@ -560,9 +560,9 @@ public class GTCEuGuiHandler {
                         List<MachineAddon> toRemove = new ArrayList<>();
                         for (MachineAddon a : node.getAddons()) {
                             if (a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-                                if (m == com.gtceu.calcboard.api.GTPlasmaTurbineModel.SPT && a.getId().contains("npt_")) toRemove.add(a);
-                                if (m == com.gtceu.calcboard.api.GTPlasmaTurbineModel.NPT && a.getId().contains("spt_")) toRemove.add(a);
-                                if (m == com.gtceu.calcboard.api.GTPlasmaTurbineModel.LPT && (a.getId().contains("spt_") || a.getId().contains("npt_"))) toRemove.add(a);
+                                if (m == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.SPT && a.getId().contains("npt_")) toRemove.add(a);
+                                if (m == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT && a.getId().contains("spt_")) toRemove.add(a);
+                                if (m == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.LPT && (a.getId().contains("spt_") || a.getId().contains("npt_"))) toRemove.add(a);
                             }
                         }
                         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
