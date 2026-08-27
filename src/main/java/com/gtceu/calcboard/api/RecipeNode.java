@@ -182,6 +182,14 @@ public class RecipeNode {
         if (java.util.Objects.equals(this.machineIcon, machineIcon)) return;
         ResourceLocation oldIcon = this.machineIcon;
         this.machineIcon = machineIcon;
+        if (machineIcon != null) {
+            if (MultiblockDetector.isThreadingMultiblock(machineIcon)) {
+                getThreadingConfig().setActive(true);
+            } else if (threadingConfig != null) {
+                threadingConfig.setActive(false);
+                addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING || a.getId().startsWith("start_core:helix_") || a.getId().contains("helix"));
+            }
+        }
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
         if (adapter != null) {
             adapter.onMachineIconChanged(this, oldIcon, machineIcon);
@@ -441,6 +449,26 @@ public class RecipeNode {
         }
     }
 
+    public double getTargetBatchAmount() {
+        return properties.get(NodeProperties.TARGET_BATCH_AMOUNT);
+    }
+
+    public void setTargetBatchAmount(double amount) {
+        properties.set(NodeProperties.TARGET_BATCH_AMOUNT, Math.max(0.0, amount));
+    }
+
+    public boolean hasTargetBatch() {
+        return getTargetBatchAmount() > 0.00001;
+    }
+
+    public double getTargetBatchTimeSec() {
+        return properties.get(NodeProperties.TARGET_BATCH_TIME_SEC);
+    }
+
+    public void setTargetBatchTimeSec(double seconds) {
+        properties.set(NodeProperties.TARGET_BATCH_TIME_SEC, Math.max(0.0, seconds));
+    }
+
     public boolean isModule() {
         return isModule;
     }
@@ -494,6 +522,16 @@ public class RecipeNode {
     }
 
     public List<ResourceLocation> getAvailableWorkstations() {
+        if (availableWorkstations.isEmpty() && recipeCategoryId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
+            if (cap != null && cap.availableWorkstations() != null && !cap.availableWorkstations().isEmpty()) {
+                for (ResourceLocation ws : cap.availableWorkstations()) {
+                    if (ws != null && !availableWorkstations.contains(ws)) {
+                        availableWorkstations.add(ws);
+                    }
+                }
+            }
+        }
         return availableWorkstations;
     }
 
@@ -690,6 +728,10 @@ public class RecipeNode {
         if (threadingConfig == null) {
             threadingConfig = new NodeThreadingConfig();
         }
+        int max = machineIcon != null ? MultiblockDetector.getMaxHelixCount(machineIcon) : 0;
+        if (max > 0 && threadingConfig.getMaxHelixCapacity() <= 0) {
+            threadingConfig.setMaxHelixCapacity(max);
+        }
         return threadingConfig;
     }
 
@@ -710,8 +752,7 @@ public class RecipeNode {
 
     public boolean hasThreading() {
         if (isExplicitThreadingMachine()) return true;
-        if (threadingConfig != null && threadingConfig.isActive()) return true;
-        return false;
+        return threadingConfig != null && threadingConfig.isActive();
     }
 
     public boolean isThreadingActive() {
@@ -733,9 +774,9 @@ public class RecipeNode {
                 threadingConfig.setActive(false);
             }
             addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING || a.getId().startsWith("start_core:helix_") || a.getId().contains("helix"));
-            if (machineIcon == null || MultiblockDetector.isThreadingMultiblock(machineIcon)) {
+            if (machineIcon != null && MultiblockDetector.isThreadingMultiblock(machineIcon)) {
                 ResourceLocation mbWs = getMultiblockWorkstation();
-                if (mbWs != null) {
+                if (mbWs != null && !MultiblockDetector.isThreadingMultiblock(mbWs)) {
                     setMachineIcon(mbWs);
                 }
             }
@@ -829,49 +870,30 @@ public class RecipeNode {
     }
 
     public ResourceLocation getMultiblockWorkstation() {
-        // 1. Exact match with recipeCategoryId in availableWorkstations
+        List<ResourceLocation> wsList = getAvailableWorkstations();
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            ResourceLocation preferred = adapter.getPreferredMultiblockWorkstation(this, wsList);
+            if (preferred != null) return preferred;
+        }
+
         if (recipeCategoryId != null) {
-            for (ResourceLocation ws : availableWorkstations) {
+            for (ResourceLocation ws : wsList) {
                 if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(recipeCategoryId.getPath())) {
                     return ws;
                 }
             }
         }
 
-        // 2. Base/standard multiblocks before large_/mega_/advanced_
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws)) {
-                String path = ws.getPath().toLowerCase(Locale.ROOT);
-                if (!path.startsWith("large_") && !path.startsWith("mega_") && !path.startsWith("advanced_") && !path.startsWith("yielding_")) {
-                    return ws;
-                }
-            }
-        }
-
-        // 3. Any multiblock in availableWorkstations
-        for (ResourceLocation ws : availableWorkstations) {
+        for (ResourceLocation ws : wsList) {
             if (MultiblockDetector.isMultiblock(ws)) {
                 return ws;
             }
         }
 
-        // 4. Fallback to CategoryCapabilityMatrix
         if (recipeCategoryId != null) {
             CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
             if (cap != null && cap.availableWorkstations() != null) {
-                for (ResourceLocation ws : cap.availableWorkstations()) {
-                    if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(recipeCategoryId.getPath())) {
-                        return ws;
-                    }
-                }
-                for (ResourceLocation ws : cap.availableWorkstations()) {
-                    if (MultiblockDetector.isMultiblock(ws)) {
-                        String path = ws.getPath().toLowerCase(Locale.ROOT);
-                        if (!path.startsWith("large_") && !path.startsWith("mega_") && !path.startsWith("advanced_") && !path.startsWith("yielding_")) {
-                            return ws;
-                        }
-                    }
-                }
                 for (ResourceLocation ws : cap.availableWorkstations()) {
                     if (MultiblockDetector.isMultiblock(ws)) {
                         return ws;
@@ -1121,40 +1143,8 @@ public class RecipeNode {
         IngredientStack out = outputs.get(outputIndex);
         if (out.getChance() >= 1.0) return 1.0;
 
-        // 1. Steam Ore Factory multiblock produces full outputs and byproducts
-        if (isMultiblock() && machineIcon != null && machineIcon.getPath().contains("steam_ore_factory")) {
-            return out.getEffectiveChance(getTierDelta());
-        }
-
-        // 2. Standard Steam machines in GTCEu cannot produce byproducts
-        if (getSteamMode() != null && getSteamMode().isSteam()) {
-            return 0.0;
-        }
-
-        // 2. GTCEu Macerator ore byproduct tier gating (for byproducts with base chance > 0):
-        //    Output 1: 1st Byproduct requires HV (Tier 3)
-        //    Output 2: 2nd Byproduct requires EV (Tier 4)
-        //    Output 3: 3rd Byproduct requires IV (Tier 5)
-        if (outputIndex >= 1 && out.getChance() > 0.0 && recipeCategoryId != null && recipeCategoryId.getPath().contains("macerator")) {
-            GTVoltageTier curTier = getTargetTier();
-            if (curTier == null) curTier = GTVoltageTier.LV;
-            int curTierIdx = curTier.ordinal();
-
-            GTVoltageTier reqTier;
-            if (outputIndex == 1) reqTier = GTVoltageTier.HV;
-            else if (outputIndex == 2) reqTier = GTVoltageTier.EV;
-            else reqTier = GTVoltageTier.IV;
-
-            if (curTierIdx < reqTier.ordinal()) {
-                return 0.0;
-            }
-
-            int extraTiers = curTierIdx - reqTier.ordinal();
-            double boost = out.getTierChanceBoost();
-            return Math.min(1.0, Math.max(0.0, out.getChance() + extraTiers * boost));
-        }
-
-        return out.getEffectiveChance(getTierDelta());
+        double baseChance = out.getEffectiveChance(getTierDelta());
+        return ModAdapterRegistry.getAdapterForNode(this).computeEffectiveOutputChance(this, outputIndex, baseChance);
     }
 
     public double getOutputSlotRate(int index, boolean effective) {

@@ -683,11 +683,63 @@ public class NodeCardRenderer {
         graphics.renderOutline(outDotX - 1, y + 13, 6, 6, outHover ? 0xFFFFFFFF : 0x88000000);
 
         // 4. Center Icon: Ingredient Icon or Direction Arrow (➔ / ⬅)
-        if (!node.getInputs().isEmpty() && node.getInputs().get(0) != null) {
-            IngredientStack stack = node.getInputs().get(0);
+        IngredientStack stack = !node.getInputs().isEmpty() ? node.getInputs().get(0) : null;
+        if (stack != null) {
             IngredientRenderer.render(graphics, stack, x + 8, y + 8);
         } else {
             graphics.drawString(font, isFlipped ? "⬅" : "➔", x + 12, y + 12, 0xFF94A3B8, false);
+        }
+
+        // 5. Target Batch Amount (Inline Editor or Display Text)
+        NodeTargetBatchEditor batchEditor = widget.getTargetBatchEditor();
+        if (batchEditor.isEditing()) {
+            String editStr = batchEditor.getDisplayText();
+            int textW = font.width(editStr);
+            int boxW = Math.max(28, textW + 6);
+            int boxX = x + 16 - boxW / 2;
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 300);
+            graphics.fill(boxX, y + 19, boxX + boxW, y + 29, 0xF00F172A);
+            graphics.renderOutline(boxX, y + 19, boxW, 10, 0xFF38BDF8);
+            graphics.drawString(font, editStr, boxX + (boxW - textW) / 2, y + 20, 0xFFFFFFFF, false);
+            graphics.pose().popPose();
+        } else if (node.hasTargetBatch()) {
+            boolean isFluid = stack != null && stack.isFluid();
+            String amountStr = FormatUtil.formatBatchAmount(node.getTargetBatchAmount(), isFluid);
+            int textW = font.width(amountStr);
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 200);
+            if (textW > 26) {
+                graphics.pose().scale(0.8f, 0.8f, 1.0f);
+                int scaledX = (int) ((x + 16) / 0.8f - textW / 2);
+                int scaledY = (int) ((y + 21) / 0.8f);
+                graphics.drawString(font, amountStr, scaledX, scaledY, 0xFFFFEE55, true);
+            } else {
+                graphics.drawString(font, amountStr, x + 16 - textW / 2, y + 21, 0xFFFFEE55, true);
+            }
+            graphics.pose().popPose();
+        }
+
+        // 6. Estimated Time (ET) Badge below the node
+        if (node.hasTargetBatch() || batchEditor.isEditing()) {
+            FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
+            double netRate = com.gtceu.calcboard.api.ProductionETACalculator.calculateNetInflowRate(graph, node, 0);
+            double targetAmount = node.getTargetBatchAmount();
+            double etaSec = com.gtceu.calcboard.api.ProductionETACalculator.calculateETA(targetAmount, netRate);
+            String etaStr = "ET: " + FormatUtil.formatETA(etaSec);
+
+            int etaW = font.width(etaStr);
+            int badgeW = Math.max(32, etaW + 6);
+            int badgeX = x + 16 - badgeW / 2;
+            int badgeY = y + 33;
+
+            int badgeBg = 0xEE0B132B;
+            int badgeBorder = Double.isInfinite(etaSec) ? 0xFF7F1D1D : (netRate > 0 ? 0xFF15803D : 0xFF475569);
+            int etaTextColor = Double.isInfinite(etaSec) ? 0xFFFCA5A5 : (netRate > 0 ? 0xFF86EFAC : 0xFFCBD5E1);
+
+            graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + 11, badgeBg);
+            graphics.renderOutline(badgeX, badgeY, badgeW, 11, badgeBorder);
+            graphics.drawString(font, etaStr, badgeX + (badgeW - etaW) / 2, badgeY + 2, etaTextColor, false);
         }
     }
 }

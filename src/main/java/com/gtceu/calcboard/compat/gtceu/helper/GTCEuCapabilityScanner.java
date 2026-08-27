@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.MultiblockDetector;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Locale;
 
 public class GTCEuCapabilityScanner {
@@ -17,11 +18,6 @@ public class GTCEuCapabilityScanner {
         }
 
         try {
-            Class<?> multiblockDefCls = null;
-            try {
-                multiblockDefCls = Class.forName("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
-            } catch (Throwable ignored) {}
-
             Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
             Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
             Iterable<?> iterable = MultiblockDetector.getRegistryIterable(machinesRegistry);
@@ -34,42 +30,65 @@ public class GTCEuCapabilityScanner {
                         ResourceLocation mId = (ResourceLocation) mGetId.invoke(def);
                         if (mId == null) continue;
 
-                        boolean isMb = (multiblockDefCls != null && multiblockDefCls.isInstance(def))
-                                || MultiblockDetector.isMultiblock(mId);
-                        boolean usesCoils = MultiblockDetector.isCoilMultiblock(mId);
-                        boolean isTurbine = MultiblockDetector.isTurbineMachine(mId);
+                        List<Object> recipeTypesList = new java.util.ArrayList<>();
+                        try {
+                            Method mGetRecipeTypes = def.getClass().getMethod("getRecipeTypes");
+                            Object rTypes = mGetRecipeTypes.invoke(def);
+                            if (rTypes instanceof Object[] arr) {
+                                for (Object rt : arr) {
+                                    if (rt != null) recipeTypesList.add(rt);
+                                }
+                            } else if (rTypes instanceof Iterable<?> it) {
+                                for (Object rt : it) {
+                                    if (rt != null) recipeTypesList.add(rt);
+                                }
+                            }
+                        } catch (Throwable ignored) {}
 
-                        boolean isSteam = isSteamDefinition(def, mId);
-                        boolean isHp = isHighPressureDefinition(def, mId);
+                        if (recipeTypesList.isEmpty()) {
+                            try {
+                                Method mGetRecipeType = def.getClass().getMethod("getRecipeType");
+                                Object rt = mGetRecipeType.invoke(def);
+                                if (rt != null) recipeTypesList.add(rt);
+                            } catch (Throwable ignored) {}
+                        }
 
-                        GTVoltageTier turbineTier = isTurbine ? MultiblockDetector.getTurbineBaseTier(mId) : null;
-                        double turbineBaseEnergy = isTurbine ? (MultiblockDetector.getTurbineBaseProduction(mId) != null ? MultiblockDetector.getTurbineBaseProduction(mId) : 4096.0) : 0.0;
+                        for (Object rt : recipeTypesList) {
+                            ResourceLocation catId = MultiblockDetector.extractRecipeTypeId(rt);
+                            if (catId != null) {
+                                boolean isMb = MultiblockDetector.inspectAndRegisterMachine(mId, def, catId);
+                                boolean usesCoils = MultiblockDetector.isCoilMultiblock(mId);
+                                boolean isTurbine = MultiblockDetector.isTurbineMachine(mId);
+                                boolean isSteam = isSteamDefinition(def, mId);
+                                boolean isHp = isHighPressureDefinition(def, mId);
 
-                        Method mGetRecipeType = def.getClass().getMethod("getRecipeTypes");
-                        Object rTypes = mGetRecipeType.invoke(def);
-                        if (rTypes instanceof Object[] arr) {
-                            for (Object rt : arr) {
-                                if (rt != null) {
-                                    ResourceLocation catId = MultiblockDetector.extractRecipeTypeId(rt);
-                                    if (catId != null) {
-                                        CategoryCapabilityMatrix.CategoryBuilder b = matrix.getOrCreateBuilder(catId);
-                                        b.addWorkstation(mId, isMb);
-                                        if (usesCoils) b.canUseCoils = true;
-                                        if (isSteam) {
-                                            if (isHp) {
-                                                b.hasHighPressureSteamOption = true;
-                                                b.highPressureWorkstation = mId;
-                                            } else {
-                                                b.hasLowPressureSteamOption = true;
-                                                b.lowPressureWorkstation = mId;
-                                            }
-                                        }
-                                        if (isTurbine) {
-                                            b.isTurbine = true;
-                                            if (turbineTier != null) b.turbineBaseTier = turbineTier;
-                                            if (turbineBaseEnergy > 0) b.turbineBaseProduction = turbineBaseEnergy;
-                                        }
+                                GTVoltageTier turbineTier = isTurbine ? MultiblockDetector.getTurbineBaseTier(mId) : null;
+                                double turbineBaseEnergy = isTurbine ? (MultiblockDetector.getTurbineBaseProduction(mId) != null ? MultiblockDetector.getTurbineBaseProduction(mId) : 4096.0) : 0.0;
+
+                                CategoryCapabilityMatrix.CategoryBuilder b = matrix.getOrCreateBuilder(catId);
+                                b.addWorkstation(mId, isMb);
+                                if (usesCoils) b.canUseCoils = true;
+                                if (isSteam) {
+                                    if (isHp) {
+                                        b.hasHighPressureSteamOption = true;
+                                        b.highPressureWorkstation = mId;
+                                    } else {
+                                        b.hasLowPressureSteamOption = true;
+                                        b.lowPressureWorkstation = mId;
                                     }
+                                }
+                                if (isTurbine) {
+                                    b.isTurbine = true;
+                                    if (turbineTier != null) b.turbineBaseTier = turbineTier;
+                                    if (turbineBaseEnergy > 0) b.turbineBaseProduction = turbineBaseEnergy;
+                                }
+
+                                // Share workstations between large_/extreme_ and base categories (e.g. chemical_reactor <-> large_chemical_reactor)
+                                ResourceLocation relatedCatId = getRelatedRecipeCategory(catId);
+                                if (relatedCatId != null && !relatedCatId.equals(catId)) {
+                                    CategoryCapabilityMatrix.CategoryBuilder relB = matrix.getOrCreateBuilder(relatedCatId);
+                                    relB.addWorkstation(mId, isMb);
+                                    if (usesCoils) relB.canUseCoils = true;
                                 }
                             }
                         }
@@ -77,6 +96,22 @@ public class GTCEuCapabilityScanner {
                 }
             }
         } catch (Throwable ignored) {}
+    }
+
+    public static ResourceLocation getRelatedRecipeCategory(ResourceLocation catId) {
+        if (catId == null) return null;
+        String path = catId.getPath().toLowerCase(Locale.ROOT);
+        String ns = catId.getNamespace();
+        if (path.equals("large_chemical_reactor") || path.equals("extreme_chemical_reactor") || path.equals("incomprehensible_chemical_reactor")) {
+            return ResourceLocation.tryParse(ns + ":chemical_reactor");
+        } else if (path.equals("chemical_reactor")) {
+            return ResourceLocation.tryParse(ns + ":large_chemical_reactor");
+        } else if (path.startsWith("large_")) {
+            return ResourceLocation.tryParse(ns + ":" + path.substring(6));
+        } else if (path.startsWith("mega_")) {
+            return ResourceLocation.tryParse(ns + ":" + path.substring(5));
+        }
+        return null;
     }
 
     public static boolean isSteamDefinition(Object def, ResourceLocation id) {

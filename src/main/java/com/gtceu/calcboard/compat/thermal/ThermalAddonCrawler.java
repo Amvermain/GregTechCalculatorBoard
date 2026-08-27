@@ -16,8 +16,12 @@ import java.util.List;
 public class ThermalAddonCrawler {
 
     public static void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
-        java.util.Map<Item, ItemStack> nbtItemSamples = new java.util.HashMap<>();
+        java.util.Set<String> seenIds = new java.util.HashSet<>();
+        for (MachineAddon a : collector) {
+            if (a != null && a.getId() != null) seenIds.add(a.getId());
+        }
 
+        java.util.Map<Item, ItemStack> nbtItemSamples = new java.util.HashMap<>();
         java.util.Set<Item> activeRecipeItems = new java.util.HashSet<>();
 
         // 1. Scan active recipe output stacks (e.g. customized NBT kits or augments)
@@ -34,7 +38,7 @@ public class ThermalAddonCrawler {
                     }
 
                     MachineAddon aug = ThermalAugmentHelper.parseThermalAugment(s, id);
-                    if (aug != null && !containsAddonId(collector, aug.getId())) {
+                    if (aug != null && seenIds.add(aug.getId())) {
                         collector.add(aug);
                     }
                 } catch (Throwable ignored) {}
@@ -69,7 +73,7 @@ public class ThermalAddonCrawler {
 
                     ItemStack s = nbtItemSamples.getOrDefault(item, new ItemStack(item));
                     MachineAddon aug = ThermalAugmentHelper.parseThermalAugment(s, id);
-                    if (aug != null && !containsAddonId(collector, aug.getId())) {
+                    if (aug != null && seenIds.add(aug.getId())) {
                         collector.add(aug);
                     }
                 } catch (Throwable ignored) {}
@@ -77,7 +81,7 @@ public class ThermalAddonCrawler {
         }
     }
 
-    private static boolean containsAddonId(List<MachineAddon> list, String id) {
+    public static boolean containsAddonId(List<MachineAddon> list, String id) {
         for (MachineAddon a : list) {
             if (a.getId().equals(id)) return true;
         }

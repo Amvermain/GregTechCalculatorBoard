@@ -226,12 +226,12 @@ public class FavoritesDockWidget {
         int count = favorites.size();
         hoveredFavorite = null;
 
-        if (activeFlyoutFavorite != null && !favorites.contains(activeFlyoutFavorite)) {
+        if (screen.isAnyModalOpen() || (activeFlyoutFavorite != null && !favorites.contains(activeFlyoutFavorite))) {
             closeFlyout();
         }
 
         graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 500);
+        graphics.pose().translate(0, 0, 10);
 
         int dockY = getDockY();
         String countDisplay = loading ? Component.translatable("gui.gtcalcboard.favorites_dock.loading").getString() : String.valueOf(count);

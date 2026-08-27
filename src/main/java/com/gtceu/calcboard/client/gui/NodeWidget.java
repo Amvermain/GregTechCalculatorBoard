@@ -26,6 +26,7 @@ public class NodeWidget {
     private final NodeCountEditor countEditor;
     private final NodeParallelEditor parallelEditor;
     private final NodeNameEditor nameEditor;
+    private final NodeTargetBatchEditor targetBatchEditor;
     private long lastHeaderClickTime = 0;
 
     // Cached rates for 144+ FPS performance
@@ -42,6 +43,7 @@ public class NodeWidget {
         this.countEditor = new NodeCountEditor(this);
         this.parallelEditor = new NodeParallelEditor(this);
         this.nameEditor = new NodeNameEditor(this, node);
+        this.targetBatchEditor = new NodeTargetBatchEditor(this);
         invalidateCache();
     }
 
@@ -56,12 +58,14 @@ public class NodeWidget {
     public void updateCountBuffer() {
         countEditor.updateBuffer();
         parallelEditor.updateBuffer();
+        targetBatchEditor.updateBuffer();
     }
 
     public void commitCountEdit() {
         countEditor.commit();
         parallelEditor.commit();
         nameEditor.commitEdit();
+        targetBatchEditor.commit();
     }
 
     public RecipeNode getNode() {
@@ -78,6 +82,10 @@ public class NodeWidget {
 
     public NodeNameEditor getNameEditor() {
         return nameEditor;
+    }
+
+    public NodeTargetBatchEditor getTargetBatchEditor() {
+        return targetBatchEditor;
     }
 
     public BoardScreen getParent() {
@@ -484,6 +492,30 @@ public class NodeWidget {
             return true;
         }
 
+        if (node.isReroute()) {
+            if (button == 0) {
+                if (getHoveredInputPortIndex(mouseX, mouseY) < 0 && getHoveredOutputPortIndex(mouseX, mouseY) < 0) {
+                    if (Screen.hasShiftDown()) {
+                        node.setTargetBatchAmount(0.0);
+                        targetBatchEditor.updateBuffer();
+                        invalidateCache();
+                        if (parent != null) parent.markSummaryDirty();
+                        Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.8F)
+                        );
+                    } else {
+                        commitCountEdit();
+                        targetBatchEditor.startEditing();
+                        Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+                        );
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
         // Machine Icon Click -> Toggle Multiblock / Singleblock mode
         if (button == 0 && isMachineIconHovered(mouseX, mouseY)) {
             if (node.hasMultiblockOption()) {
@@ -654,6 +686,7 @@ public class NodeWidget {
         if (nameEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (countEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
         if (parallelEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
+        if (targetBatchEditor.keyPressed(keyCode, scanCode, modifiers)) return true;
         return false;
     }
 
@@ -661,6 +694,7 @@ public class NodeWidget {
         if (nameEditor.charTyped(codePoint, modifiers)) return true;
         if (countEditor.charTyped(codePoint, modifiers)) return true;
         if (parallelEditor.charTyped(codePoint, modifiers)) return true;
+        if (targetBatchEditor.charTyped(codePoint, modifiers)) return true;
         return false;
     }
 }

@@ -265,7 +265,7 @@ public class RecipeSearchDialog {
     }
 
     public record RecipeLoadingProgress(int currentPhase, int totalPhases, String phaseKey, String detail) {}
-    private static volatile RecipeLoadingProgress CACHING_PROGRESS = new RecipeLoadingProgress(1, 3, "gui.gtcalcboard.loading_recipe_phase.1", "");
+    private static volatile RecipeLoadingProgress CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "");
 
     public static RecipeLoadingProgress getCachingProgress() {
         return CACHING_PROGRESS;
@@ -315,7 +315,7 @@ public class RecipeSearchDialog {
         }
 
         IS_CACHING = true;
-        CACHING_PROGRESS = new RecipeLoadingProgress(1, 3, "gui.gtcalcboard.loading_recipe_phase.1", "Connecting to EMI Recipe Manager");
+        CACHING_PROGRESS = new RecipeLoadingProgress(1, 4, "gui.gtcalcboard.loading_recipe_phase.1", "Connecting to EMI Recipe Manager");
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -325,7 +325,7 @@ public class RecipeSearchDialog {
                     return;
                 }
 
-                CACHING_PROGRESS = new RecipeLoadingProgress(2, 3, "gui.gtcalcboard.loading_recipe_phase.2", recipes.size() + " Recipes");
+                CACHING_PROGRESS = new RecipeLoadingProgress(2, 4, "gui.gtcalcboard.loading_recipe_phase.2", recipes.size() + " Recipes");
                 long startNanos = System.nanoTime();
                 
                 // Smooth low-priority chunked batch indexing with CPU yielding to prevent frame drops
@@ -348,8 +348,10 @@ public class RecipeSearchDialog {
                 }).get();
 
                 List<SearchableRecipe> tempList = new ArrayList<>(rawList);
-                // Index Create & passive kinetic generators
-                tempList.addAll(com.gtceu.calcboard.compat.create.CreateModAdapter.getVirtualKineticSearchRecipes());
+                if (rawList.isEmpty()) {
+                    // Fallback when EMI is empty (e.g. headless unit tests)
+                    tempList.addAll(com.gtceu.calcboard.compat.create.CreateModAdapter.getVirtualKineticSearchRecipes());
+                }
 
                 synchronized (GLOBAL_RECIPES) {
                     GLOBAL_RECIPES.clear();
@@ -358,9 +360,10 @@ public class RecipeSearchDialog {
                     GLOBAL_VERSION++;
                 }
 
-                CACHING_PROGRESS = new RecipeLoadingProgress(3, 3, "gui.gtcalcboard.loading_recipe_phase.3", "Baking Machine Capabilities Matrix");
+                CACHING_PROGRESS = new RecipeLoadingProgress(3, 4, "gui.gtcalcboard.loading_recipe_phase.3", "Baking Machine Capabilities Matrix");
                 RecipeFilterDialog.updateDiscoveredCategories(RecipeSearchEngine.discoverCategories(tempList));
                 com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().bake(recipes);
+                CACHING_PROGRESS = new RecipeLoadingProgress(4, 4, "gui.gtcalcboard.loading_recipe_phase.3", "Completed");
 
                 long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
                 com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
@@ -653,6 +656,7 @@ public class RecipeSearchDialog {
                     int contextualScore = 0;
                     if (hasContext) {
                         ResourceLocation targetId = contextualWireTarget.sourceStack.getId();
+                        boolean isStress = contextualWireTarget.sourceStack.isStressUnit();
                         if (!contextualWireTarget.sourceIsInput) {
                             // Looking for CONSUMERS (recipes with matching input)
                             if (targetId != null && sr.hasExactInput(targetId)) {
@@ -661,6 +665,8 @@ public class RecipeSearchDialog {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactInputName(targetName)) {
                                 contextualScore = 50000;
+                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units") || (sr.recipe() instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg && !kg.isGenerator()))) {
+                                contextualScore = 90000;
                             }
                         } else {
                             // Looking for PRODUCERS (recipes with matching output)
@@ -670,6 +676,8 @@ public class RecipeSearchDialog {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactOutputName(targetName)) {
                                 contextualScore = 50000;
+                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units") || (sr.recipe() instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg && kg.isGenerator()))) {
+                                contextualScore = 90000;
                             }
                         }
                     }
@@ -1367,9 +1375,9 @@ public class RecipeSearchDialog {
         int matchedInIdx = -1;
         for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
             IngredientStack in = node.getInputs().get(inIdx);
-            if (in.equals(sourceStack) || in.matchesOrAlternative(sourceStack)) {
+            if (in.equals(sourceStack) || in.matchesOrAlternative(sourceStack) || (in.isStressUnit() && sourceStack.isStressUnit())) {
                 matchedInIdx = inIdx;
-                if (!in.equals(sourceStack)) {
+                if (!in.equals(sourceStack) && !in.isStressUnit()) {
                     in.selectAlternative(sourceStack.getId());
                 }
                 break;
@@ -1407,9 +1415,9 @@ public class RecipeSearchDialog {
         int matchedOutIdx = -1;
         for (int outIdx = 0; outIdx < node.getOutputs().size(); outIdx++) {
             IngredientStack out = node.getOutputs().get(outIdx);
-            if (out.equals(sourceStack) || sourceStack.matchesOrAlternative(out)) {
+            if (out.equals(sourceStack) || sourceStack.matchesOrAlternative(out) || (out.isStressUnit() && sourceStack.isStressUnit())) {
                 matchedOutIdx = outIdx;
-                if (!out.equals(sourceStack)) {
+                if (!out.equals(sourceStack) && !out.isStressUnit()) {
                     sourceStack.selectAlternative(out.getId());
                 }
                 break;

@@ -9,6 +9,11 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ## [2.0.0-alpha.10] - 2026-08-27
 
 ### Added
+- **Target Batch Production Estimated Time (ETA) & Goal Node System (`RFC-005`, `ProductionETACalculator`, `NodeTargetBatchEditor`, `NodeProperties`, `ETACalculationTest`)**:
+  - Set target batch goals (e.g. `100x`, `1,000x`, `10 B`) on reroute and terminal goal nodes.
+  - Computes real-time estimated completion duration ($T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$) and renders human-readable `ET: 24m 52s` badges beneath cards.
+  - Hovering over goal nodes reveals total energy required (EU) and raw upstream material consumption across the batch duration.
+  - Supports inline clicking/typing to edit batch goals with Shift + Click to reset.
 - **Kinetic Generator & Motor EMI Recipe Integration & SU Search Indexing (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
   - Registered kinetic generation and motor recipes as native EMI synthetic recipes with workstations and outputs, allowing seamless favorite pinning and recipe lookup.
   - Enriched search indices so querying `<su`, `<stress`, or machine names immediately matches stress unit generation recipes.
@@ -17,10 +22,15 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - Right-clicking uninstalls 1 copy (-1), and the top `Clear Magnets` button resets all installed magnets.
 
 ### Changed & Improved
+- **Addon Configuration Dialog Performance & First-Open Stuttering Elimination (`MachineConfigDialog`, `MachineAddonCatalog`, `MultiblockDetector`, `GTCEuMultiblockScanner`, `CoilHelper`, `TurbineRotorHelper`)**:
+  - Eliminated the 1-second freeze and frame drops when opening the machine configuration dialog by converting linear scans across 100,000+ EMI recipes and 10,000+ blocks into pinpoint $O(1)$ category lookups and early keyword skips.
+  - Optimized language code synchronization and preloading lifecycle so registry indexing executes seamlessly in background threads.
 - **Deferred Addon Tooltip Rendering (`MachineConfigDialog`)**:
   - Resolved UI layering bug where lengthy addon descriptions were clipped by dialog boundaries.
 
 ### Fixed
+- **Star Technology Greenhouse & Farm Threading/Coil Capability Misidentification Bug (`CategoryCapabilityMatrix`, `MultiblockDetector`, `StarTModAdapter`, `GTCEuThreadingTest`)**:
+  - Fixed an issue where Farm/Greenhouse multiblocks containing decorative coil blocks were misclassified as heating coil multiblocks or had threading tabs unexpectedly activated upon switching icons.
 - **Guarded Against Crashes When Pressing Keybinds Outside Worlds or in Config Menus (`BoardScreen`, `ClientForgeEvents`, `NetworkHandler`)**:
   - Prevented a `NullPointerException` crash in vanilla `AbstractContainerScreen.containerTick()` caused by opening `BoardScreen` via hotkey when not in a world (e.g. while in the title screen, controls menu, or mod config screens where `mc.player == null`).
   - Added guards so hotkeys do not intercept input while in pause, options, controls/keybinds, death, or configuration screens.
@@ -31,6 +41,10 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - Fixed a workstation routing bug where Vanilla crafting table recipes with secondary workstations from Thermal (Tinker Bench) or Create (Mechanical Crafter) were incorrectly captured by mod adapters instead of falling back cleanly to Vanilla Passive (`🍃 Passive`).
 - **HP Steam to Electric Singleblock Machine Icon Recovery Bug (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
   - Fixed an issue where disabling HP Steam mode unexpectedly promoted singleblock machines to multiblock icons instead of restoring the original tier-specific singleblock workstation.
+- **Stress Unit (SU) Contextual Producer Search & Duplicate/Disabled Kinetic Entry Fix (`RecipeSearchDialog`, `RecipeSearchEngine`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngineTest`)**:
+  - Fixed an issue where dragging from a node's Stress Unit input port into the recipe search dialog yielded `No matching recipes found.` due to missing virtual stress IDs in kinetic generator recipe indices.
+  - Fixed duplicated `[kinetic generation]` and `[Create Kinetic]` entries in search dialogs.
+  - Filtered out non-kinetic or modpack-disabled/hidden items (such as `Solar Heating Plate` and `Reinforced Motor` in Star Technology) from recipe viewer registration.
 
 ## [2.0.0-alpha.9] - 2026-08-26
 

@@ -117,6 +117,8 @@ public class NodePropertyStore {
   - `TURBINE_HOLDER_BONUS` (`Integer`, 기본값 `0`): 로터 홀더 추가 효율 보너스 (%)
   - `CLEANROOM_TIER` (`Integer`, 기본값 `0`): 클린룸 요구 레벨
   - `THROTTLE_PERCENT` (`Integer`, 기본값 `100`): 대형 보일러 가동 쓰로틀 비율 (25% ~ 100%)
+  - `TARGET_BATCH_AMOUNT` (`Double`, 기본값 `0.0`): RFC-005 단말/리라우트 노드 목표 배치 생산 수량
+  - `TARGET_BATCH_TIME_SEC` (`Double`, 기본값 `0.0`): RFC-005 희망 완료 제한 시간 (초 단위 역산 기준)
 
 ---
 

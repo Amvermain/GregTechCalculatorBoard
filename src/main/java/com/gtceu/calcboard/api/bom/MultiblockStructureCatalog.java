@@ -105,24 +105,29 @@ public class MultiblockStructureCatalog {
         }
     }
 
-    public static MultiblockStructureDef getStructure(ResourceLocation id) {
-        if (!initialized && !initializing) {
-            initializeAsync();
-        }
+    public static MultiblockStructureDef getStructureCached(ResourceLocation id) {
         if (id == null) return null;
         MultiblockStructureDef def = STRUCTURES.get(id);
         if (def != null) return def;
 
-        // Try stripped path
         String path = id.getPath();
         if (path.contains("/")) {
             String machineName = path.substring(path.lastIndexOf('/') + 1);
             ResourceLocation stripped = ResourceLocation.tryParse(id.getNamespace() + ":" + machineName);
             if (stripped != null) {
-                MultiblockStructureDef sDef = STRUCTURES.get(stripped);
-                if (sDef != null) return sDef;
+                return STRUCTURES.get(stripped);
             }
         }
+        return null;
+    }
+
+    public static MultiblockStructureDef getStructure(ResourceLocation id) {
+        if (!initialized && !initializing) {
+            initializeAsync();
+        }
+        if (id == null) return null;
+        MultiblockStructureDef def = getStructureCached(id);
+        if (def != null) return def;
 
         // On-demand lazy scan from loaded IModAdapters
         for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
@@ -313,6 +318,25 @@ public class MultiblockStructureCatalog {
             return;
         }
 
+        Set<String> allowedAbilities = new HashSet<>();
+        Set<ResourceLocation> candidateBlocks = new HashSet<>();
+        boolean isSteam = controllerId.getPath().startsWith("steam_") || controllerId.getPath().contains("_steam_");
+
+        for (MultiblockStructurePart p : parts) {
+            if (p != null && p.itemId() != null) {
+                candidateBlocks.add(p.itemId());
+                String path = p.itemId().getPath().toLowerCase(Locale.ROOT);
+                if (path.contains("steam")) isSteam = true;
+            }
+        }
+
+        if (inputBusSlots > 0) allowedAbilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
+        if (outputBusSlots > 0) allowedAbilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
+        if (inputHatchSlots > 0) allowedAbilities.add(isSteam ? "STEAM_IMPORT_FLUIDS" : "IMPORT_FLUIDS");
+        if (outputHatchSlots > 0) allowedAbilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
+        if (energyHatchSlots > 0 && !isSteam) allowedAbilities.add("INPUT_ENERGY");
+        if (maintenanceSlots > 0 && !isSteam) allowedAbilities.add("MAINTENANCE");
+
         MultiblockStructureDef def = new MultiblockStructureDef(
             controllerId,
             controllerName,
@@ -323,7 +347,9 @@ public class MultiblockStructureCatalog {
             outputBusSlots,
             inputHatchSlots,
             outputHatchSlots,
-            maintenanceSlots
+            maintenanceSlots,
+            Collections.unmodifiableSet(allowedAbilities),
+            Collections.unmodifiableSet(candidateBlocks)
         );
 
         for (ResourceLocation id : aliasIds) {
@@ -333,12 +359,20 @@ public class MultiblockStructureCatalog {
 
     public static PartCategory classifyPart(ResourceLocation itemId) {
         if (itemId == null) return PartCategory.OTHER;
-        String path = itemId.getPath().toLowerCase(Locale.ROOT);
-        if (path.contains("coil") || path.contains("magnet")) {
+        if (com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.isHeatingCoil(itemId)) {
             return PartCategory.COIL;
-        } else if (path.contains("hatch") || path.contains("bus") || path.contains("target") || path.contains("source") || path.contains("import") || path.contains("export") || path.contains("augment") || path.contains("upgrade")) {
+        }
+        String path = itemId.getPath().toLowerCase(Locale.ROOT);
+        if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch"))
+                || path.contains("laser_target") || path.contains("laser_source") || path.contains("input_bus")
+                || path.contains("output_bus") || path.contains("input_hatch") || path.contains("output_hatch")
+                || path.contains("maintenance") || path.contains("parallel") || path.contains("hatch")
+                || path.contains("bus") || path.contains("target") || path.contains("source")
+                || path.contains("import") || path.contains("export") || path.contains("augment")
+                || path.contains("upgrade")) {
             return PartCategory.HATCH_BUS;
-        } else if (path.contains("casing") || path.contains("pipe") || path.contains("glass") || path.contains("wall") || path.contains("grate") || path.contains("frame")) {
+        } else if (path.contains("casing") || path.contains("pipe") || path.contains("glass") || path.contains("wall")
+                || path.contains("grate") || path.contains("frame") || path.contains("coil") || path.contains("magnet")) {
             return PartCategory.CASING;
         }
         return PartCategory.OTHER;

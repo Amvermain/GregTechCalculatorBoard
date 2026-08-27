@@ -62,6 +62,7 @@ public class GTHatchAddon extends MachineAddon {
     private int slotCapacity = 1;
     private long tankCapacityMB = 16000L;
     private boolean isME = false;
+    private final java.util.Set<String> abilities = new java.util.LinkedHashSet<>();
 
     public GTHatchAddon(String id, String name, String description, ResourceLocation itemIcon,
                         HatchType hatchType, GTVoltageTier tier, int slotCapacity, long tankCapacityMB, boolean isME) {
@@ -116,7 +117,33 @@ public class GTHatchAddon extends MachineAddon {
     }
 
     public void setME(boolean me) {
-        isME = me;
+        this.isME = me;
+    }
+
+    public java.util.Set<String> getAbilities() {
+        return java.util.Collections.unmodifiableSet(abilities);
+    }
+
+    public void setAbilities(java.util.Collection<String> newAbilities) {
+        this.abilities.clear();
+        if (newAbilities != null) {
+            for (String a : newAbilities) {
+                if (a != null && !a.isBlank()) {
+                    this.abilities.add(a.trim().toUpperCase(Locale.ROOT));
+                }
+            }
+        }
+    }
+
+    public void addAbility(String ability) {
+        if (ability != null && !ability.isBlank()) {
+            this.abilities.add(ability.trim().toUpperCase(Locale.ROOT));
+        }
+    }
+
+    public boolean hasAbility(String ability) {
+        if (ability == null) return false;
+        return this.abilities.contains(ability.trim().toUpperCase(Locale.ROOT));
     }
 
     @Override
@@ -126,6 +153,7 @@ public class GTHatchAddon extends MachineAddon {
         cp.setModId(getModId());
         cp.setDiscoverySource(getDiscoverySource());
         cp.setItemStackSample(getItemStackSample());
+        cp.setAbilities(this.abilities);
         return cp;
     }
 
@@ -137,6 +165,9 @@ public class GTHatchAddon extends MachineAddon {
         tag.putInt("SlotCapacity", slotCapacity);
         tag.putLong("TankCapacityMB", tankCapacityMB);
         tag.putBoolean("IsME", isME);
+        if (!abilities.isEmpty()) {
+            tag.putString("Abilities", String.join(";", abilities));
+        }
         return tag;
     }
 
@@ -159,6 +190,12 @@ public class GTHatchAddon extends MachineAddon {
         }
         if (tag.contains("IsME")) {
             this.isME = tag.getBoolean("IsME");
+        }
+        if (tag.contains("Abilities")) {
+            String raw = tag.getString("Abilities");
+            for (String a : raw.split(";")) {
+                addAbility(a);
+            }
         }
     }
 }

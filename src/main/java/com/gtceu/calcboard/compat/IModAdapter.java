@@ -51,6 +51,13 @@ public interface IModAdapter {
     void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager);
 
     /**
+     * Registers synthetic/virtual recipes into EMI (e.g. kinetic generators, passive power sources).
+     */
+    default void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, Set<net.minecraft.world.item.Item> activeRecipeItems) {
+        // Default no-op
+    }
+
+    /**
      * Scans and registers mod-specific multiblock machines and their capabilities.
      */
     default void scanMultiblocks(Object emiRecipeManager) {
@@ -195,6 +202,27 @@ public interface IModAdapter {
 
         populateExtraBOMParts(node, list);
         return list;
+    }
+
+    /**
+     * Determines the preferred multiblock workstation for a node from the available list.
+     */
+    default ResourceLocation getPreferredMultiblockWorkstation(RecipeNode node, List<ResourceLocation> availableWorkstations) {
+        if (node == null || availableWorkstations == null || availableWorkstations.isEmpty()) return null;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            for (ResourceLocation ws : availableWorkstations) {
+                if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(catId.getPath())) {
+                    return ws;
+                }
+            }
+        }
+        for (ResourceLocation ws : availableWorkstations) {
+            if (MultiblockDetector.isMultiblock(ws)) {
+                return ws;
+            }
+        }
+        return null;
     }
 
     /**
@@ -439,6 +467,13 @@ public interface IModAdapter {
      */
     default double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
         return defaultRate;
+    }
+
+    /**
+     * Computes the effective probability/chance (0.0 ~ 1.0) of producing an output byproduct slot.
+     */
+    default double computeEffectiveOutputChance(RecipeNode node, int outputIndex, double defaultChance) {
+        return defaultChance;
     }
 
     /**

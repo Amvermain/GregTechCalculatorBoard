@@ -60,6 +60,35 @@ public class CategoryCapabilityMatrixTest {
     }
 
     @Test
+    void testChemicalReactorMultiblockWorkstationsDiscovery() {
+        ResourceLocation crCat = ResourceLocation.tryParse("gtceu:chemical_reactor");
+        CategoryCapability cap = matrix.getCapability(crCat);
+
+        Assertions.assertNotNull(cap);
+        List<ResourceLocation> wsList = cap.availableWorkstations();
+        Assertions.assertTrue(wsList.contains(ResourceLocation.tryParse("gtceu:large_chemical_reactor")));
+        Assertions.assertTrue(wsList.contains(ResourceLocation.tryParse("gtceu:extreme_chemical_reactor")));
+        Assertions.assertTrue(wsList.contains(ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor")));
+
+        // Verify Multiblock & Capability detection
+        ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        ResourceLocation ecr = ResourceLocation.tryParse("gtceu:extreme_chemical_reactor");
+        ResourceLocation icr = ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor");
+
+        Assertions.assertTrue(MultiblockDetector.isMultiblock(lcr));
+        Assertions.assertTrue(MultiblockDetector.isMultiblock(ecr));
+        Assertions.assertTrue(MultiblockDetector.isMultiblock(icr));
+
+        Assertions.assertTrue(MultiblockDetector.supportsParallelHatch(lcr, wsList));
+        Assertions.assertTrue(MultiblockDetector.supportsParallelHatch(ecr, wsList));
+        Assertions.assertTrue(MultiblockDetector.supportsParallelHatch(icr, wsList));
+
+        Assertions.assertTrue(MultiblockDetector.supportsBatchMode(lcr, wsList));
+        Assertions.assertTrue(MultiblockDetector.supportsBatchMode(ecr, wsList));
+        Assertions.assertTrue(MultiblockDetector.supportsBatchMode(icr, wsList));
+    }
+
+    @Test
     void testSteamTurbineCapability() {
         ResourceLocation turbineCat = ResourceLocation.tryParse("gtceu:steam_turbine");
         CategoryCapability cap = matrix.getCapability(turbineCat);

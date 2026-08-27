@@ -13,6 +13,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,6 +25,17 @@ public class CoilHelper {
 
     private static final Map<String, CoilStats> STATS_CACHE = new ConcurrentHashMap<>();
 
+    static {
+        STATS_CACHE.put("gtceu:cupronickel_coil_block", new CoilStats(1800, 100, 100, 100, 100, 16));
+        STATS_CACHE.put("gtceu:kanthal_coil_block", new CoilStats(2700, 100, 90, 125, 95, 32));
+        STATS_CACHE.put("gtceu:nichrome_coil_block", new CoilStats(3600, 150, 80, 150, 90, 48));
+        STATS_CACHE.put("gtceu:rtm_alloy_coil_block", new CoilStats(4500, 200, 70, 175, 85, 64));
+        STATS_CACHE.put("gtceu:hssg_coil_block", new CoilStats(5400, 250, 60, 200, 80, 80));
+        STATS_CACHE.put("gtceu:naquadah_coil_block", new CoilStats(7200, 300, 50, 225, 75, 96));
+        STATS_CACHE.put("gtceu:trinium_coil_block", new CoilStats(9001, 350, 40, 250, 70, 112));
+        STATS_CACHE.put("gtceu:tritanium_coil_block", new CoilStats(10800, 400, 30, 275, 65, 128));
+    }
+
     public record CoilStats(
             int temperature,
             int pyrolyseSpeedPercent,
@@ -33,6 +45,24 @@ public class CoilHelper {
             int smelterParallel
     ) {
         public static final CoilStats DEFAULT = new CoilStats(1800, 100, 100, 100, 100, 16);
+    }
+
+    public static boolean isHeatingCoil(ResourceLocation id) {
+        if (id == null) return false;
+        CoilStats stats = getCoilStats(id.toString());
+        return stats != null && stats.temperature() > 0;
+    }
+
+    public static boolean isHeatingCoil(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return false;
+        CoilStats stats = getCoilStats(stack);
+        return stats != null && stats.temperature() > 0;
+    }
+
+    public static boolean isHeatingCoil(Block block) {
+        if (block == null) return false;
+        CoilStats stats = getCoilStats(block);
+        return stats != null && stats.temperature() > 0;
     }
 
     /**
@@ -235,7 +265,7 @@ public class CoilHelper {
         }
 
         String name = stack.getHoverName().getString();
-        String desc = String.format("♨ Heat: %d K\n• Smelter: %dx Par\n• Pyrolyse: %d%% Spd\n• Cracking: %d%% Energy\n• Chemical Reactor: %d%% Spd, %d%% Energy",
+        String desc = String.format("Heat: %d K\nSmelter: %dx Par\nPyrolyse: %d%% Spd\nCracking: %d%% Energy\nChemical Reactor: %d%% Spd, %d%% Energy",
                 stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
 
         GTCoilAddon addon = new GTCoilAddon(id.toString(), name.isEmpty() ? id.toString() : name, desc, id, stats);
@@ -247,15 +277,18 @@ public class CoilHelper {
     public static void discoverGTCEuCoils(java.util.List<MachineAddon> list) {
         try {
             for (Map.Entry<net.minecraft.resources.ResourceKey<Block>, Block> entry : BuiltInRegistries.BLOCK.entrySet()) {
-                Block block = entry.getValue();
                 ResourceLocation id = entry.getKey().location();
+                if (id == null) continue;
+                String path = id.getPath().toLowerCase(Locale.ROOT);
+                if (!path.contains("coil")) continue;
 
+                Block block = entry.getValue();
                 CoilStats stats = extractStatsFromBlockObject(block);
                 if (stats != null && stats.temperature() > 0) {
                     ItemStack stack = new ItemStack(block.asItem());
                     String displayName = !stack.isEmpty() ? stack.getHoverName().getString() : block.getName().getString();
 
-                    String desc = String.format("♨ Heat: %d K\n• Smelter: %dx Par\n• Pyrolyse: %d%% Spd\n• Cracking: %d%% Energy\n• Chemical Reactor: %d%% Spd, %d%% Energy",
+                    String desc = String.format("Heat: %d K\nSmelter: %dx Par\nPyrolyse: %d%% Spd\nCracking: %d%% Energy\nChemical Reactor: %d%% Spd, %d%% Energy",
                             stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
 
                     GTCoilAddon addon = new GTCoilAddon(id.toString(), displayName, desc, id, stats);
@@ -279,83 +312,7 @@ public class CoilHelper {
         MachineAddon cp = source.copy();
         if (node == null) return cp;
 
-        int reqTemp = node.getRecipeTemperature();
-        ResourceLocation catId = node.getRecipeCategoryId();
-        java.util.List<ResourceLocation> wsList = node.getAvailableWorkstations();
-        ResourceLocation icon = node.getMachineIcon();
-        String mName = node.getName() != null ? node.getName().toLowerCase(java.util.Locale.ROOT) : "";
-
-        int pyroSpeed = source.getPyrolyseSpeedPercent();
-        int crackEnergy = source.getCrackingEnergyPercent();
-        int chemSpeed = source.getChemicalSpeedPercent();
-        int chemEnergy = source.getChemicalEnergyPercent();
-        int smelterPar = source.getSmelterParallel();
-        int coilTemp = source.getCoilTemperature();
-
-        // 1. Cracking Unit: Energy % -> EU/t (Energy / 100)
-        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:cracker")) || catId.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
-                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:cracker")) || icon.equals(ResourceLocation.tryParse("gtceu:cracking_unit"))))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:cracker")) || wsList.contains(ResourceLocation.tryParse("gtceu:cracking_unit"))
-                || mName.contains("cracker") || mName.contains("cracking")) {
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(crackEnergy / 100.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 2. Pyrolyse Oven: Speed % -> Duration (100 / Speed)
-        if ((catId != null && catId.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
-                || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:pyrolyse_oven")))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:pyrolyse_oven"))
-                || mName.contains("pyrolyse")) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, pyroSpeed));
-            cp.setEutMultiplier(1.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 3. Large Chemical Reactor / Chemical Reactor: Speed %, Energy %
-        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || catId.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
-                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || icon.equals(ResourceLocation.tryParse("gtceu:chemical_reactor"))))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:large_chemical_reactor")) || wsList.contains(ResourceLocation.tryParse("gtceu:chemical_reactor"))
-                || mName.contains("chemical")) {
-            cp.setDurationMultiplier(100.0 / Math.max(1, chemSpeed));
-            cp.setEutMultiplier(chemEnergy / 100.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        // 4. Multi Smelter / Alloy Smelter: Max Parallel
-        if ((catId != null && (catId.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || catId.equals(ResourceLocation.tryParse("gtceu:alloy_smelter")) || catId.equals(ResourceLocation.tryParse("minecraft:smelting")) || catId.equals(ResourceLocation.tryParse("minecraft:blasting"))))
-                || (icon != null && (icon.equals(ResourceLocation.tryParse("gtceu:multi_smelter")) || icon.equals(ResourceLocation.tryParse("gtceu:alloy_smelter"))))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:multi_smelter")) || wsList.contains(ResourceLocation.tryParse("gtceu:alloy_smelter"))
-                || mName.contains("multi_smelter") || mName.contains("smelter")) {
-            cp.setParallelMultiplier(Math.max(1, smelterPar));
-            cp.setDurationMultiplier(1.0);
-            cp.setEutMultiplier(1.0);
-            return cp;
-        }
-
-        // 5. EBF (Electric Blast Furnace): 5% EU discount per 900K excess temperature above requirement
-        if (reqTemp > 0 || (catId != null && catId.equals(ResourceLocation.tryParse("gtceu:electric_blast_furnace")))
-                || (icon != null && icon.equals(ResourceLocation.tryParse("gtceu:electric_blast_furnace")))
-                || wsList.contains(ResourceLocation.tryParse("gtceu:electric_blast_furnace"))
-                || mName.contains("blast")) {
-            if (reqTemp > 0 && coilTemp > reqTemp) {
-                int excessTemp = coilTemp - reqTemp;
-                int tiersAbove = excessTemp / 900;
-                cp.setEutMultiplier(Math.pow(0.95, tiersAbove));
-            } else {
-                cp.setEutMultiplier(1.0);
-            }
-            cp.setDurationMultiplier(1.0);
-            cp.setParallelMultiplier(1);
-            return cp;
-        }
-
-        cp.setDurationMultiplier(1.0);
-        cp.setEutMultiplier(1.0);
-        cp.setParallelMultiplier(1);
+        GTCEuCoilModifierHelper.applyCoilModifiers(node, cp);
         return cp;
     }
 }

@@ -197,6 +197,11 @@ public class CreateModAdapter implements IModAdapter {
         return CreateGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
+    @Override
+    public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
+        CreateRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
+    }
+
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
         RecipeNode node = CreateRecipeHandler.createKineticGeneratorNode(stack);
         if (node != null) return node;

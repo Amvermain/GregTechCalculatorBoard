@@ -23,10 +23,29 @@ $$\text{Effective Duration} = \max(1.0, \, D_{\text{calc}}) \text{ ticks}$$
 $$\text{Batch Multiplier} = \begin{cases} 1.0 & (D_{\text{calc}} \ge 1.0) \\ \frac{1.0}{D_{\text{calc}}} & (D_{\text{calc}} < 1.0) \end{cases}$$
 $$\text{CPS (Cycles Per Second)} = \frac{20.0}{\text{Effective Duration}} \times \text{Batch Multiplier}$$
 
-### 1.3 Electric Blast Furnace (EBF) Coil Discounts
+### 1.3 Heating Coil Bonuses & Recipe Modifiers
 
-$$\text{Temp Discount} = 0.95^{\lfloor (\text{CoilTemp} - \text{RecipeTemp}) / 900 \rfloor}$$
-$$\text{EU/t}_{\text{final}} = \text{BaseEU/t} \times \text{PowerMultiplier} \times \text{Temp Discount}$$
+* **Electric Blast Furnace (EBF)**:
+  $$\text{Temp Discount} = 0.95^{\lfloor \max(0, \, \text{CoilTemp} - \text{RecipeTemp}) / 900 \rfloor}$$
+  $$\text{EU/t}_{\text{final}} = \text{BaseEU/t} \times \text{PowerMultiplier} \times \text{Temp Discount}$$
+
+* **Pyrolyse Oven**:
+  $$\text{Duration Multiplier} = \frac{100.0}{\text{PyrolyseSpeedPercent}}$$
+
+* **Cracking Unit**:
+  $$\text{Power Multiplier} = \frac{\text{CrackingEnergyPercent}}{100.0}$$
+
+* **Large Chemical Reactor / ECR / ICR**:
+  $$\text{Duration Multiplier} = \frac{100.0}{\text{ChemicalSpeedPercent}}, \quad \text{Power Multiplier} = \frac{\text{ChemicalEnergyPercent}}{100.0}$$
+
+* **Multi Smelter**:
+  $$\text{Parallel} = \text{SmelterParallel} \quad (\text{Base } 32\text{x}, 64\text{x}, 128\text{x}\dots)$$
+
+* **Custom Coil Multiblocks (KubeJS / Addon Modifiers)**:
+  Given coil tier level $L = \max(1, \lfloor (\text{CoilTemp} - 1800) / 900 \rfloor)$:
+  $$\text{Duration Multiplier} = \max(0.01, \, 1.0 - (L \times \text{customDurationMultiplier}))$$
+  $$\text{Power Multiplier} = \max(0.01, \, 1.0 - (L \times \text{customEnergyMultiplier}))$$
+  $$\text{Parallel} = \text{customBaseParallel} + (L \times \text{customParallelMultiplier})$$
 
 ### 1.4 Steam Boilers & Throttle ($\theta \in [0.25, 1.0]$)
 

@@ -9,6 +9,11 @@
 ## [2.0.0-alpha.10] - 2026-08-27
 
 ### 신규 기능 (Added)
+- **목표 배치 생산 소요 시간(ETA / Estimated Time) 산출 및 타겟/리라우트 노드 시스템 (`RFC-005`, `ProductionETACalculator`, `NodeTargetBatchEditor`, `NodeProperties`, `ETACalculationTest`)**:
+  - 단말 및 리라우트(Reroute) 노드에 원하는 목표 배치 생산 수량(예: `100x`, `1,000x`, `10 B`)을 지정할 수 있는 기능 추가.
+  - 상류 공급 노드들의 초당 순 유입 속도($\text{Rate}_{\text{in}}$)를 기반으로 예상 완료 시간($T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$)을 실시간 산출하여 노드 하단에 `ET: 24m 52s` 배지 렌더링.
+  - 노드 호버 시 해당 배치를 완수하는 동안 소비될 전체 전력량(EU) 및 상류 원자재 총 소비량 상세 툴팁 제공.
+  - 인라인 클릭을 통한 빠른 수량 편집 및 `Shift + 클릭`을 통한 목표 수량 초기화 지원.
 - **키네틱 발전기/모터 EMI 레시피 정식 등록 및 스트레스 유닛(SU) 검색 색인 강화 (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
   - 즐겨찾기(Favorites)에 Large Water Wheel 등의 키네틱 기계를 등록해도 가상 레시피가 연동되지 않던 문제를 EMI 정식 레시피 등록을 통해 해결하고, 검색창에서 `<su`, `<stress`, `large water wheel` 등 출력 및 기계명으로 즉시 검색되도록 색인 지원.
 - **자석(Magnet) 및 다중 스택 애드온 클릭 상호작용 개선 (`MachineConfigDialog`, `CreateNewAgeModAdapter`)**:
@@ -16,10 +21,15 @@
   - 우클릭 시 해당 애드온 1개 제거(-1) 및 상단 `Clear Magnets` 버튼으로 전체 초기화 지원.
 
 ### 개선 및 변경 (Changed & Improved)
+- **기계 설정창 최초 오픈 시 화면 멈춤(Stuttering) 및 렉 원천 제거 (`MachineConfigDialog`, `MachineAddonCatalog`, `MultiblockDetector`, `GTCEuMultiblockScanner`, `CoilHelper`, `TurbineRotorHelper`)**:
+  - 설정창 진입 시 100,000개 EMI 레시피 및 10,000개 블록을 전수 선형 순회/리플렉션하던 병목을 카테고리 핀포인트 룩업 및 사전 키워드 스킵으로 최적화하여 1초간 발생하던 멈춤 현상 완전 해결.
+  - 언어 코드 동기화 및 백그라운드 프리로드 생명주기 안정화.
 - **기계 설정창 애드온 툴팁 지연 렌더링 적용 (`MachineConfigDialog`)**:
   - 애드온 카드의 긴 설명 텍스트가 다이얼로그 경계 밖에서 잘리던 UI 레이어링 버그를 지연 렌더링 방식으로 수정.
 
 ### 버그 수정 (Fixed)
+- **Star Technology 온실(Greenhouse) 및 팜(Farm) 멀티블록 스레딩/코일 오판정 버그 수정 (`CategoryCapabilityMatrix`, `MultiblockDetector`, `StarTModAdapter`, `GTCEuThreadingTest`)**:
+  - 농장/온실 구조물에 장식용 코일 블록이 포함되어 있어 가열 코일 멀티블록으로 오인되거나 기계 전환 시 스레딩 탭으로 자동 이동되던 문제 수정.
 - **월드 미진입 및 컨피그/설정 화면 단축키 조작 시 크래시 방어 (`BoardScreen`, `ClientForgeEvents`, `NetworkHandler`)**:
   - 타이틀 화면, 모드 컨피그 화면(Configured 등), 조작 키설정(`KeyBindsScreen`) 등 월드에 진입하지 않은 상태(`mc.player == null`)에서 단축키가 눌렸을 때 보드가 열리며 발생하던 바닐라 `AbstractContainerScreen.containerTick()`의 NPE 크래시를 원천 차단.
   - 일시정지(`PauseScreen`), 옵션(`OptionsScreen`), 조작키 변경(`KeyBindsScreen`), 사망 화면(`DeathScreen`), 모드 컨피그 화면(`*config*`)에서 계산기 열기 단축키가 가로채지지 않도록 예외 처리.
@@ -30,6 +40,10 @@
   - 서멀(Thermal Expansion) 또는 크리에이트(Create)가 바닐라 제작대 레시피에 보조 워크스테이션(Tinker Bench, Mechanical Crafter 등)을 등록했을 때 제작대 노드가 서멀/크리에이트 기계로 오판정되던 문제를 수정하여 바닐라 패시브(`🍃 Passive`)로 정상 판정되도록 수정.
 - **HP Steam 모드에서 ULV/LV 전환 시 단일블록 기계 아이콘 복원 버그 수정 (`CategoryCapabilityMatrix`, `GTCEuModAdapter`, `GTCEuSteamProcessingTest`)**:
   - HP Steam 모드 해제 시 멀티블록 워크스테이션으로 강제 전환되던 현상을 수정하여 원래의 티어별 단일블록 기계 아이콘 복원.
+- **스트레스 유닛(SU) 포트 드래그 생산자 검색 및 비활성화/중복 키네틱 레시피 수정 (`RecipeSearchDialog`, `RecipeSearchEngine`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngineTest`)**:
+  - 노드의 스트레스 유닛(Stress Units) 입력 포트를 드래그하여 검색창을 열었을 때 가상 스트레스 ID 색인 누락으로 `No matching recipes found.`가 표시되던 문제를 수정하여 대형 수차, 풍차, 스팀 엔진 등의 발전기가 정상 추천되도록 개선.
+  - 검색 목록에서 `[kinetic generation]`과 `[Create Kinetic]`으로 키네틱 레시피가 이중 중복 노출되던 문제 해결.
+  - 모드팩에서 비활성화/숨김 처리되었거나 실제 SU 발전기가 아닌 아이템(Star Technology의 `Solar Heating Plate`, `Reinforced Motor` 등)이 레시피 목록에 노출되던 버그 수정.
 
 ## [2.0.0-alpha.9] - 2026-08-26
 

@@ -521,6 +521,9 @@ public class GTCEuGuiHandler {
     private static String getMultiblockShortLabel(ResourceLocation id) {
         if (id == null) return "🏛 Multi";
         String path = id.getPath().toLowerCase(Locale.ROOT);
+        if (path.contains("extreme_chemical_reactor") || path.equals("ecr")) return "⚡ ECR";
+        if (path.contains("incomprehensible_chemical_reactor") || path.equals("icr")) return "⚡ ICR";
+        if (path.contains("large_chemical_reactor") || path.equals("lcr")) return "🏛 LCR";
         if (path.contains("super_cracker") || path.contains("sdf")) return "⚡ SDF Cracker";
         if (path.contains("cracker")) return "🏛 Cracker";
         if (path.contains("supreme")) return "⚡ Supreme";
@@ -785,10 +788,8 @@ public class GTCEuGuiHandler {
                 ResourceLocation mbWs = mbWorkstations.get(i);
                 if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= y + 44 && mouseY <= y + 60) {
                     boolean isThreading = MultiblockDetector.isThreadingMultiblock(mbWs);
-                    if (node.hasThreading()) {
-                        node.setThreadingActive(isThreading);
-                    }
                     node.setMachineIcon(mbWs);
+                    node.setThreadingActive(isThreading);
                     if (!MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations())) {
                         node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
                         node.setParallel(1);
@@ -797,9 +798,7 @@ public class GTCEuGuiHandler {
                         }
                     }
                     if (dialog != null) {
-                        if (isThreading) {
-                            dialog.setSelectedCategory(com.gtceu.calcboard.api.AddonCategory.THREADING);
-                        } else if (dialog.getSelectedCategory() == com.gtceu.calcboard.api.AddonCategory.THREADING) {
+                        if (!isThreading && dialog.getSelectedCategory() == com.gtceu.calcboard.api.AddonCategory.THREADING) {
                             dialog.setSelectedCategory(null);
                         }
                         dialog.invalidateFilteredCatalog();

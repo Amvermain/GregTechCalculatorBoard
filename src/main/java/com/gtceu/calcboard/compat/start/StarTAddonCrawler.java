@@ -13,7 +13,12 @@ import java.util.List;
 public class StarTAddonCrawler {
 
     public static void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
-        addBuiltinStarTTraits(collector);
+        java.util.Set<String> seenIds = new java.util.HashSet<>();
+        for (MachineAddon a : collector) {
+            if (a != null && a.getId() != null) seenIds.add(a.getId());
+        }
+
+        addBuiltinStarTTraits(collector, seenIds);
 
         try {
             if (ForgeRegistries.ITEMS != null) {
@@ -23,22 +28,27 @@ public class StarTAddonCrawler {
                     String ns = id.getNamespace();
                     if (!ns.equals("start_core") && !ns.equals("gtceu_start")) continue;
 
+                    String path = id.getPath();
+                    if (!path.contains("parallel") && !path.contains("reflector") && !path.contains("maintenance") && !path.contains("hatch")) {
+                        continue;
+                    }
+
                     ItemStack stack = new ItemStack(item);
 
                     MachineAddon parallel = ParallelHelper.parseParallelHatch(stack, id);
-                    if (parallel != null && !containsAddonId(collector, parallel.getId())) {
+                    if (parallel != null && seenIds.add(parallel.getId())) {
                         collector.add(parallel);
                         continue;
                     }
 
                     MachineAddon reflector = ReflectorHelper.parseReflectorItem(stack, id);
-                    if (reflector != null && !containsAddonId(collector, reflector.getId())) {
+                    if (reflector != null && seenIds.add(reflector.getId())) {
                         collector.add(reflector);
                         continue;
                     }
 
                     MachineAddon maint = parseStarTMaintenanceHatch(stack, id);
-                    if (maint != null && !containsAddonId(collector, maint.getId())) {
+                    if (maint != null && seenIds.add(maint.getId())) {
                         collector.add(maint);
                     }
                 }
@@ -46,7 +56,20 @@ public class StarTAddonCrawler {
         } catch (Throwable ignored) {}
     }
 
+    private static void tryAddTrait(List<MachineAddon> list, java.util.Set<String> seenIds, MachineAddon addon) {
+        if (addon == null || addon.getId() == null) return;
+        if (seenIds != null) {
+            if (seenIds.add(addon.getId())) list.add(addon);
+        } else if (!containsAddonId(list, addon.getId())) {
+            list.add(addon);
+        }
+    }
+
     public static void addBuiltinStarTTraits(List<MachineAddon> list) {
+        addBuiltinStarTTraits(list, null);
+    }
+
+    public static void addBuiltinStarTTraits(List<MachineAddon> list, java.util.Set<String> seenIds) {
         // SPT Lubricant Boosting (+25% EU/t output)
         MachineAddon sptLubricant = new MachineAddon(
                 "gtceu:spt_lubricant_boosting",
@@ -57,7 +80,7 @@ public class StarTAddonCrawler {
         );
         sptLubricant.setEutMultiplier(1.25);
         sptLubricant.setDiscoverySource("Supreme Plasma Turbine Lubricant Boosting (+25% EU/t)");
-        if (!containsAddonId(list, sptLubricant.getId())) list.add(sptLubricant);
+        tryAddTrait(list, seenIds, sptLubricant);
 
         // SPT Coolant Boosting (+75% EU/t output)
         MachineAddon sptCoolant = new MachineAddon(
@@ -69,7 +92,7 @@ public class StarTAddonCrawler {
         );
         sptCoolant.setEutMultiplier(1.75);
         sptCoolant.setDiscoverySource("Supreme Plasma Turbine Coolant Boosting (+75% EU/t)");
-        if (!containsAddonId(list, sptCoolant.getId())) list.add(sptCoolant);
+        tryAddTrait(list, seenIds, sptCoolant);
 
         // NPT Lubricant Boosting (+50% EU/t output)
         MachineAddon nptLubricant = new MachineAddon(
@@ -81,7 +104,7 @@ public class StarTAddonCrawler {
         );
         nptLubricant.setEutMultiplier(1.50);
         nptLubricant.setDiscoverySource("Nyinsane Plasma Turbine Lubricant Boosting (+50% EU/t)");
-        if (!containsAddonId(list, nptLubricant.getId())) list.add(nptLubricant);
+        tryAddTrait(list, seenIds, nptLubricant);
 
         // Sterile Cleaning Maintenance Hatch (Star Technology Core)
         MachineAddon sterileMaint = new MachineAddon(
@@ -94,7 +117,7 @@ public class StarTAddonCrawler {
         sterileMaint.setDurationMultiplier(1.0);
         sterileMaint.setEutMultiplier(1.0);
         sterileMaint.setDiscoverySource("Star Technology Sterile Cleaning Maintenance Hatch Specification");
-        if (!containsAddonId(list, sterileMaint.getId())) list.add(sterileMaint);
+        tryAddTrait(list, seenIds, sterileMaint);
     }
 
     public static MachineAddon parseStarTMaintenanceHatch(ItemStack stack, ResourceLocation id) {

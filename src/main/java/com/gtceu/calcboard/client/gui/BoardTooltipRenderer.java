@@ -51,6 +51,46 @@ public final class BoardTooltipRenderer {
                     return;
                 }
 
+                if (widget.getNode().isReroute()) {
+                    List<Component> tooltipLines = new ArrayList<>();
+                    RecipeNode rNode = widget.getNode();
+                    IngredientStack rStack = !rNode.getInputs().isEmpty() ? rNode.getInputs().get(0) : null;
+
+                    if (rStack != null) {
+                        tooltipLines.add(Component.literal("§6🎯 §f" + Component.translatable("gui.gtcalcboard.eta.tooltip.title").getString() + " §7(" + rStack.getDisplayName() + "§7)"));
+                        double netRate = com.gtceu.calcboard.api.ProductionETACalculator.calculateNetInflowRate(graph, rNode, 0);
+                        String rateStr = FormatUtil.formatRate(netRate, rStack);
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §a+" + rateStr));
+
+                        if (rNode.hasTargetBatch()) {
+                            double targetAmount = rNode.getTargetBatchAmount();
+                            String goalStr = FormatUtil.formatBatchAmount(targetAmount, rStack.isFluid());
+                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.target").getString() + ": §e" + goalStr));
+
+                            double etaSec = com.gtceu.calcboard.api.ProductionETACalculator.calculateETA(targetAmount, netRate);
+                            String etaFormatted = FormatUtil.formatETA(etaSec);
+                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.duration").getString() + ": §b" + etaFormatted));
+
+                            double totalEU = com.gtceu.calcboard.api.ProductionETACalculator.calculateTotalEnergyForBatch(graph, rNode, targetAmount);
+                            if (totalEU > 0) {
+                                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.total_energy").getString() + ": §e" + FormatUtil.formatCompactNumber(totalEU) + " EU"));
+                            }
+
+                            tooltipLines.add(Component.literal("§8§m------------------------"));
+                            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.eta.tooltip.click_edit").getString()));
+                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.shift_reset").getString()));
+                        } else {
+                            tooltipLines.add(Component.literal("§8§m------------------------"));
+                            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.eta.tooltip.click_set").getString()));
+                        }
+                    } else {
+                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString()));
+                    }
+
+                    graphics.renderComponentTooltip(font, tooltipLines, mouseX, mouseY);
+                    return;
+                }
+
                 int inIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
                 int outIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
 

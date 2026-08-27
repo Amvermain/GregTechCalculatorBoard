@@ -694,7 +694,9 @@ public class MultiblockBOMTest {
                 new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:ev_input_hatch"), "EV Input Hatch", 1, PartCategory.HATCH_BUS),
                 new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:ev_output_hatch"), "EV Output Hatch", 11, PartCategory.HATCH_BUS)
             ),
-            0, 1, 0, 0, 1, 11, 1 // 0 coils, 1 energy, 0 input bus, 0 output bus, 1 input hatch, 11 output hatch, 1 maintenance
+            0, 1, 0, 0, 1, 11, 1,
+            java.util.Set.of("INPUT_ENERGY", "IMPORT_FLUIDS", "EXPORT_FLUIDS", "MAINTENANCE"),
+            java.util.Set.of(ResourceLocation.tryParse("gtceu:clean_machine_casing"))
         );
         MultiblockStructureCatalog.registerManualStructure(mockDef);
 
@@ -824,5 +826,103 @@ public class MultiblockBOMTest {
         Assertions.assertTrue(dualSummary.aggregatedItems().stream().anyMatch(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:auto_maintenance_hatch"))));
         Assertions.assertTrue(dualSummary.aggregatedItems().stream().anyMatch(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_muffler_hatch"))));
         Assertions.assertFalse(dualSummary.aggregatedItems().stream().anyMatch(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:lv_muffler_hatch"))));
+    }
+
+    @Test
+    public void testMultiblockWithoutExplicitHatchesInShapeGetsAutomaticHatchesAndCasingReduction() {
+        ResourceLocation greenhouseId = ResourceLocation.tryParse("gtceu:tree_synthesizer");
+
+        // Multiblock structure with NO hatches in preview shape (only controller, casing, glass, dirt)
+        List<MultiblockStructurePart> parts = List.of(
+            new MultiblockStructurePart(greenhouseId, "Tree Synthesizer", 1, PartCategory.CONTROLLER),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:solid_machine_casing"), "Solid Machine Casing", 48, PartCategory.CASING),
+            new MultiblockStructurePart(ResourceLocation.tryParse("minecraft:glass"), "Glass", 12, PartCategory.CASING),
+            new MultiblockStructurePart(ResourceLocation.tryParse("minecraft:dirt"), "Dirt", 9, PartCategory.CASING)
+        );
+        MultiblockStructureDef def = new MultiblockStructureDef(greenhouseId, "Tree Synthesizer", parts, 0, 0, 0, 0, 0, 0, 0);
+        MultiblockStructureCatalog.registerManualStructure(def);
+
+        RecipeNode node = new RecipeNode("tree_greenhouse_node", "Tree Greenhouse (Water)", 100, 100, GTVoltageTier.EV);
+        node.setMachineIcon(greenhouseId);
+        node.setMultiblock(true);
+        node.setMachineCount(1.0);
+        node.setTargetTier(GTVoltageTier.EV);
+
+        // Inputs: 1 Fluid (Water) + 1 Item (Fertilizer)
+        node.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000.0));
+        node.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:fertilizer"), "Fertilizer", 1.0));
+
+        // Outputs: 1 Fluid (Oxygen) + 2 Items (Oak Log, Oak Sapling)
+        node.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:oxygen"), "Oxygen", 100.0));
+        node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 16.0));
+        node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_sapling"), "Oak Sapling", 2.0));
+
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(List.of(node), false);
+
+        // 1. Check Energy Hatch
+        MultiblockBOMSummary.BOMItemEntry energyHatch = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_energy_input_hatch")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(energyHatch, "Energy Input Hatch should be automatically added");
+        Assertions.assertEquals(1, energyHatch.totalAmount());
+
+        // 2. Check Input Bus (1 item input -> 1 EV input bus)
+        MultiblockBOMSummary.BOMItemEntry inputBus = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_input_bus")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(inputBus, "Input Bus should be automatically added");
+        Assertions.assertEquals(1, inputBus.totalAmount());
+
+        // 3. Check Output Bus (2 item outputs -> 2 EV output buses)
+        MultiblockBOMSummary.BOMItemEntry outputBus = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_output_bus")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(outputBus, "Output Bus should be automatically added");
+        Assertions.assertEquals(2, outputBus.totalAmount());
+
+        // 4. Check Input Hatch (1 fluid input -> 1 EV input hatch)
+        MultiblockBOMSummary.BOMItemEntry inputHatch = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_input_hatch")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(inputHatch, "Input Hatch should be automatically added");
+        Assertions.assertEquals(1, inputHatch.totalAmount());
+
+        // 5. Check Output Hatch (1 fluid output -> 1 EV output hatch)
+        MultiblockBOMSummary.BOMItemEntry outputHatch = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_output_hatch")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(outputHatch, "Output Hatch should be automatically added");
+        Assertions.assertEquals(1, outputHatch.totalAmount());
+
+        // 6. Check Maintenance Hatch (1 maintenance hatch)
+        MultiblockBOMSummary.BOMItemEntry maintHatch = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:maintenance_hatch")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(maintHatch, "Maintenance Hatch should be automatically added");
+        Assertions.assertEquals(1, maintHatch.totalAmount());
+
+        // 7. Check Casing Reduction:
+        // Total extra hatches = 1 (energy) + 1 (in bus) + 2 (out bus) + 1 (in hatch) + 1 (out hatch) + 1 (maint) = 7 hatches.
+        // Solid Machine Casing was 48, reduced by 7 -> 41 casings!
+        MultiblockBOMSummary.BOMItemEntry casing = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:solid_machine_casing")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(casing);
+        Assertions.assertEquals(41, casing.totalAmount(), "Solid Machine Casing should be reduced by 7 (48 - 7 = 41)");
+
+        // 8. Non-replaceable casings (Glass, Dirt) remain unchanged
+        MultiblockBOMSummary.BOMItemEntry glass = summary.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("minecraft:glass")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(glass);
+        Assertions.assertEquals(12, glass.totalAmount());
+
+        // 9. Check Addon Categories: Non-coil multiblock (Tree Synthesizer) MUST NOT have COIL category
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        List<AddonCategory> applicableCats = adapter.getApplicableAddonCategories(node);
+        Assertions.assertTrue(applicableCats.contains(AddonCategory.ENERGY_HATCH));
+        Assertions.assertTrue(applicableCats.contains(AddonCategory.HATCH_BUS));
+        Assertions.assertTrue(applicableCats.contains(AddonCategory.MAINTENANCE));
+        Assertions.assertFalse(applicableCats.contains(AddonCategory.COIL), "Tree Synthesizer MUST NOT have COIL category");
     }
 }

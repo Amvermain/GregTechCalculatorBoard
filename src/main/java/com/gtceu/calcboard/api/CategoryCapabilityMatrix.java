@@ -84,7 +84,17 @@ public class CategoryCapabilityMatrix {
                                 for (dev.emi.emi.api.stack.EmiStack es : ei.getEmiStacks()) {
                                     if (es != null && !es.isEmpty() && es.getId() != null) {
                                         ResourceLocation ws = es.getId();
-                                        boolean isMb = MultiblockDetector.isMultiblock(ws);
+                                        Object machineDef = null;
+                                        try {
+                                            Class<?> gtRegs = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                                            Object machinesReg = gtRegs.getField("MACHINES").get(null);
+                                            if (machinesReg != null) {
+                                                Method mGet = machinesReg.getClass().getMethod("get", ResourceLocation.class);
+                                                machineDef = mGet.invoke(machinesReg, ws);
+                                            }
+                                        } catch (Throwable ignored) {}
+
+                                        boolean isMb = MultiblockDetector.inspectAndRegisterMachine(ws, machineDef, catId);
                                         b.addWorkstation(ws, isMb);
                                         if (MultiblockDetector.isCoilMultiblock(ws)) {
                                             b.canUseCoils = true;
@@ -198,13 +208,22 @@ public class CategoryCapabilityMatrix {
         // Mock Categories for JUnit Test Environments
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
-                List.of(ResourceLocation.tryParse("gtceu:large_chemical_reactor"), ResourceLocation.tryParse("gtceu:extreme_chemical_reactor")),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
+                        ResourceLocation.tryParse("gtceu:extreme_chemical_reactor"),
+                        ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor")
+                ),
                 ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
                 false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:chemical_reactor"),
-                List.of(ResourceLocation.tryParse("gtceu:chemical_reactor"), ResourceLocation.tryParse("gtceu:large_chemical_reactor")),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:chemical_reactor"),
+                        ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
+                        ResourceLocation.tryParse("gtceu:extreme_chemical_reactor"),
+                        ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor")
+                ),
                 ResourceLocation.tryParse("gtceu:chemical_reactor"),
                 true, true, true, false, false, false, false, null, null, null, 0.0
         );

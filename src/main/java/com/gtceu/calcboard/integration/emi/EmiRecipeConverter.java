@@ -103,21 +103,8 @@ public class EmiRecipeConverter {
         }
 
         // Run Extensible Recipe Property Extractor Pipeline (RFC-002)
-        CompoundTag recipeDataTag = null;
-        Object backing = recipe.getBackingRecipe();
-        if (backing != null) {
-            try {
-                Field dataField = backing.getClass().getField("data");
-                Object dataObj = dataField.get(backing);
-                if (dataObj instanceof CompoundTag tag) recipeDataTag = tag;
-            } catch (Throwable ignored) {
-                try {
-                    Method dataMethod = backing.getClass().getMethod("data");
-                    Object dataObj = dataMethod.invoke(backing);
-                    if (dataObj instanceof CompoundTag tag) recipeDataTag = tag;
-                } catch (Throwable ignored2) {}
-            }
-        }
+        Object backing = unwrapBackingRecipe(recipe);
+        CompoundTag recipeDataTag = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractRecipeDataTag(backing);
         com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.extractAll(backing, recipeDataTag, catId, node.getProperties());
 
         if (details.backingRecipeTemp > 0) {
@@ -598,6 +585,34 @@ public class EmiRecipeConverter {
         return sb.toString().trim();
     }
 
+    public static Object unwrapBackingRecipe(EmiRecipe recipe) {
+        if (recipe == null) return null;
+        Object backing = recipe.getBackingRecipe();
+        if (backing != null) return backing;
+
+        Class<?> cur = recipe.getClass();
+        while (cur != null && cur != Object.class) {
+            for (String mName : new String[]{"getRecipe", "recipe", "getGTRecipe", "gtRecipe", "getOriginalRecipe", "originalRecipe", "getValue", "value"}) {
+                try {
+                    Method m = cur.getDeclaredMethod(mName);
+                    m.setAccessible(true);
+                    Object res = m.invoke(recipe);
+                    if (res != null && res != recipe) return res;
+                } catch (Throwable ignored) {}
+            }
+            for (String fName : new String[]{"recipe", "gtRecipe", "backingRecipe", "originalRecipe", "target", "source", "value", "delegate"}) {
+                try {
+                    Field f = cur.getDeclaredField(fName);
+                    f.setAccessible(true);
+                    Object res = f.get(recipe);
+                    if (res != null && res != recipe) return res;
+                } catch (Throwable ignored) {}
+            }
+            cur = cur.getSuperclass();
+        }
+        return null;
+    }
+
     public static class RecipeDetails {
         public double durationTicks = 20.0;
         public double eut = 0.0;
@@ -614,7 +629,7 @@ public class EmiRecipeConverter {
     public static RecipeDetails extractRecipeDetails(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
         RecipeDetails details = new RecipeDetails();
         try {
-            var backing = recipe.getBackingRecipe();
+            var backing = unwrapBackingRecipe(recipe);
             ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
 
             if (preferredWorkstation != null && preferredWorkstation.getNamespace().equals("gtceu")) {
@@ -633,8 +648,9 @@ public class EmiRecipeConverter {
             boolean handled = adapter.adaptRecipeDetails(recipe, backing, details);
 
             if (!handled && backing != null) {
-                if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
-                    extractGTRecipeDetails(backing, details);
+                if (com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
+                    com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeDetails(backing, details);
+                    handled = true;
                 } else {
                     for (com.gtceu.calcboard.compat.IModAdapter a : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
                         if (a != adapter && a.adaptRecipeDetails(recipe, backing, details)) {
@@ -656,118 +672,6 @@ public class EmiRecipeConverter {
         }
 
         return details;
-    }
-
-    private static void extractGTRecipeDetails(Object backing, RecipeDetails details) {
-        try {
-            var durationField = backing.getClass().getField("duration");
-            details.durationTicks = durationField.getInt(backing);
-
-            try {
-                var getOutputEUtMethod = backing.getClass().getMethod("getOutputEUt");
-                Object outEnergy = getOutputEUtMethod.invoke(backing);
-                if (outEnergy != null) {
-                    var voltageMethod = outEnergy.getClass().getMethod("voltage");
-                    var amperageMethod = outEnergy.getClass().getMethod("amperage");
-                    long voltage = (long) voltageMethod.invoke(outEnergy);
-                    long amperage = (long) amperageMethod.invoke(outEnergy);
-                    if (voltage > 0) {
-                        details.eut = Math.max(1.0, voltage * Math.max(1L, amperage));
-                        details.tier = GTVoltageTier.getTierForVoltage(voltage);
-                        details.energyType = com.gtceu.calcboard.api.EnergyType.ELECTRIC_EU;
-                        details.isGenerator = true;
-                    }
-                }
-            } catch (Throwable ignored) {}
-
-            if (!details.isGenerator) {
-                try {
-                    var getInputEUtMethod = backing.getClass().getMethod("getInputEUt");
-                    Object energyStack = getInputEUtMethod.invoke(backing);
-                    if (energyStack != null) {
-                        var voltageMethod = energyStack.getClass().getMethod("voltage");
-                        var amperageMethod = energyStack.getClass().getMethod("amperage");
-                        long voltage = (long) voltageMethod.invoke(energyStack);
-                        long amperage = (long) amperageMethod.invoke(energyStack);
-                        if (voltage > 0) {
-                            details.eut = Math.max(1.0, voltage * Math.max(1L, amperage));
-                            details.tier = GTVoltageTier.getTierForVoltage(voltage);
-                            details.energyType = com.gtceu.calcboard.api.EnergyType.ELECTRIC_EU;
-                        }
-                    }
-                } catch (Throwable ignored) {}
-            }
-
-            int recipeTemp = 0;
-            try {
-                Field dataField = backing.getClass().getField("data");
-                Object dataObj = dataField.get(backing);
-                if (dataObj instanceof CompoundTag tag) {
-                    if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
-                    else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
-                    else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
-                }
-            } catch (Throwable ignored) {
-                try {
-                    Method dataMethod = backing.getClass().getMethod("data");
-                    Object dataObj = dataMethod.invoke(backing);
-                    if (dataObj instanceof CompoundTag tag) {
-                        if (tag.contains("ebf_temp")) recipeTemp = tag.getInt("ebf_temp");
-                        else if (tag.contains("temp")) recipeTemp = tag.getInt("temp");
-                        else if (tag.contains("temperature")) recipeTemp = tag.getInt("temperature");
-                    }
-                } catch (Throwable ignored2) {}
-            }
-            if (recipeTemp > 0) {
-                details.backingRecipeTemp = recipeTemp;
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private static void extractThermalRecipeDetails(EmiRecipe recipe, Object backing, RecipeDetails details) {
-        long energyRF = 0;
-        try {
-            Method getEnergyMethod = backing.getClass().getMethod("getEnergy");
-            Object res = getEnergyMethod.invoke(backing);
-            if (res instanceof Number num) {
-                energyRF = num.longValue();
-            }
-        } catch (Throwable ignored) {
-            try {
-                Field energyField = backing.getClass().getDeclaredField("energy");
-                energyField.setAccessible(true);
-                Object res = energyField.get(backing);
-                if (res instanceof Number num) {
-                    energyRF = num.longValue();
-                }
-            } catch (Throwable ignored2) {}
-        }
-
-        if (energyRF > 0) {
-            ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
-            boolean isDynamo = false;
-            if (catId != null) {
-                String cp = catId.getPath().toLowerCase();
-                if (cp.contains("dynamo") || cp.contains("fuel") || cp.contains("lapidary") || cp.contains("compression")
-                        || cp.contains("magmatic") || cp.contains("gourmand") || cp.contains("numismatic") || cp.contains("stirling") || cp.contains("disenchantment")) {
-                    isDynamo = true;
-                }
-            }
-
-            if (isDynamo) {
-                details.isGenerator = true;
-                double basePowerRF = com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.getThermalDynamoBasePowerRF(catId);
-                details.eut = basePowerRF / 4.0; // Standard 200 RF/t -> 50 EU/t
-                details.durationTicks = Math.max(1.0, (double) energyRF / basePowerRF);
-                details.tier = GTVoltageTier.LV;
-            } else {
-                details.isGenerator = false;
-                double baseMachPowerRF = com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.getThermalMachineBasePowerRF(catId);
-                details.eut = baseMachPowerRF / 4.0; // Standard 20 RF/t -> 5 EU/t
-                details.durationTicks = Math.max(1.0, (double) energyRF / baseMachPowerRF);
-                details.tier = GTVoltageTier.LV;
-            }
-        }
     }
 
     private static boolean isGeneratorCategory(ResourceLocation catId) {

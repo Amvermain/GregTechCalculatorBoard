@@ -96,6 +96,15 @@ public class MachineAddonCatalog {
             return;
         }
 
+        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+            try {
+                String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
+                if (currentLang != null && !currentLang.isEmpty()) {
+                    lastLanguageCode = currentLang;
+                }
+            } catch (Throwable ignored) {}
+        }
+
         List<MachineAddon> fastList = DynamicAddonCrawler.crawlFastRegistries();
         synchronized (allAddons) {
             allAddons.clear();
@@ -105,6 +114,13 @@ public class MachineAddonCatalog {
             isDirty = false;
             catalogVersion++;
         }
+    }
+
+    public CompletableFuture<Void> ensureFastLoadedAsync() {
+        if (isFastLoaded && !isDirty) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.runAsync(this::ensureFastLoaded, Util.backgroundExecutor());
     }
 
     /**
@@ -185,9 +201,13 @@ public class MachineAddonCatalog {
         if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
             try {
                 String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
-                if (currentLang != null && !currentLang.equals(lastLanguageCode)) {
-                    lastLanguageCode = currentLang;
-                    isDirty = true;
+                if (currentLang != null && !currentLang.isEmpty()) {
+                    if (lastLanguageCode.isEmpty()) {
+                        lastLanguageCode = currentLang;
+                    } else if (!currentLang.equals(lastLanguageCode)) {
+                        lastLanguageCode = currentLang;
+                        isDirty = true;
+                    }
                 }
             } catch (Throwable ignored) {}
         }

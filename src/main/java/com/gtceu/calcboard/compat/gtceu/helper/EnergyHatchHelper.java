@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 public class EnergyHatchHelper {
 
     private static final Map<ResourceLocation, EnergyHatchStats> STATS_CACHE = new ConcurrentHashMap<>();
+    private static final EnergyHatchStats NULL_STATS = new EnergyHatchStats(null, 0, false, false);
     private static Object DUMMY_HOLDER_PROXY = null;
     private static final Pattern AMP_PATTERN = Pattern.compile("(\\d+)[aA]");
 
@@ -53,8 +54,8 @@ public class EnergyHatchHelper {
                             ItemStack stack = getItemStackForDef(machineDef, id);
                             String name = stack != null && !stack.isEmpty() ? stack.getHoverName().getString() : formatDisplayName(id);
                             String desc = stats.isLaser()
-                                    ? String.format(Locale.ROOT, "Laser Target Input (%s, %dA)", stats.tier().getName(), stats.amperage())
-                                    : String.format(Locale.ROOT, "Energy Input Hatch (%s, %dA)", stats.tier().getName(), stats.amperage());
+                                    ? String.format(Locale.ROOT, "Laser Target Input (%s, %,dA)", stats.tier().getName(), stats.amperage())
+                                    : String.format(Locale.ROOT, "Energy Input Hatch (%s, %,dA)", stats.tier().getName(), stats.amperage());
 
                             GTEnergyHatchAddon addon = new GTEnergyHatchAddon(id.toString(), name, desc, id, stats.tier(), stats.amperage(), stats.isLaser(), stats.isSubstation(), false);
                             if (stack != null) addon.setItemStackSample(stack);
@@ -68,7 +69,38 @@ public class EnergyHatchHelper {
             }
         } catch (Throwable ignored) {}
 
-        // 2. Fallback / Test environment standard hatch suite
+        // 2. Discover from ForgeRegistries.ITEMS (e.g. Star Technology Core, GTCEu addons)
+        try {
+            if (ForgeRegistries.ITEMS != null) {
+                for (Map.Entry<net.minecraft.resources.ResourceKey<Item>, Item> entry : ForgeRegistries.ITEMS.getEntries()) {
+                    ResourceLocation id = entry.getKey().location();
+                    if (id == null) continue;
+                    String path = id.getPath().toLowerCase(Locale.ROOT);
+                    if (path.contains("output") || path.contains("dynamo") || path.contains("source") || path.contains("emitter") || path.contains("cover")) continue;
+                    if (path.contains("energy_hatch") || path.contains("energy_input_hatch") || path.contains("power_hatch") || path.contains("laser_target") || (path.contains("dream_link") && path.contains("hatch"))) {
+                        EnergyHatchStats stats = getEnergyHatchStats(id);
+                        if (stats != null) {
+                            registrySuccess = true;
+                            Item item = entry.getValue();
+                            ItemStack stack = new ItemStack(item);
+                            String name = stack.getHoverName().getString();
+                            String desc = stats.isLaser()
+                                    ? String.format(Locale.ROOT, "Laser Target Input (%s, %,dA)", stats.tier().getName(), stats.amperage())
+                                    : String.format(Locale.ROOT, "Energy Input Hatch (%s, %,dA)", stats.tier().getName(), stats.amperage());
+
+                            GTEnergyHatchAddon addon = new GTEnergyHatchAddon(id.toString(), name, desc, id, stats.tier(), stats.amperage(), stats.isLaser(), stats.isSubstation(), false);
+                            addon.setItemStackSample(stack);
+                            addon.setDiscoverySource("Item Registry [" + id + "]");
+                            if (!containsAddonId(collector, addon.getId())) {
+                                collector.add(addon);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 3. Fallback / Test environment standard hatch suite
         if (!registrySuccess || collector.stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH)) {
             registerDefaultHatches(collector);
         }
@@ -159,8 +191,9 @@ public class EnergyHatchHelper {
 
     public static EnergyHatchStats getEnergyHatchStats(ResourceLocation id) {
         if (id == null) return null;
-        if (STATS_CACHE.containsKey(id)) {
-            return STATS_CACHE.get(id);
+        EnergyHatchStats cached = STATS_CACHE.get(id);
+        if (cached != null) {
+            return cached == NULL_STATS ? null : cached;
         }
 
         String path = id.getPath().toLowerCase(Locale.ROOT);
@@ -172,13 +205,13 @@ public class EnergyHatchHelper {
             path.contains("sensor") || path.contains("cover") || path.contains("cell") ||
             path.contains("battery") || path.contains("storage") || path.contains("wire") ||
             path.contains("cable") || path.contains("transformer")) {
-            STATS_CACHE.put(id, null);
+            STATS_CACHE.put(id, NULL_STATS);
             return null;
         }
 
         if (!path.contains("energy_input_hatch") && !path.contains("laser_target_hatch") &&
-            !path.contains("substation_input_hatch") && !path.contains("energy_hatch")) {
-            STATS_CACHE.put(id, null);
+            !path.contains("substation_input_hatch") && !path.contains("energy_hatch") && !path.contains("power_hatch") && !(path.contains("dream_link") && path.contains("hatch"))) {
+            STATS_CACHE.put(id, NULL_STATS);
             return null;
         }
 
@@ -202,13 +235,12 @@ public class EnergyHatchHelper {
         // Fallback deductive parsing based on deterministic tokens
         GTVoltageTier tier = parseVoltageTier(path);
         int amperage = 2; // Default GT Energy Hatch is 2A
-        if (path.contains("4096a")) amperage = 4096;
-        else if (path.contains("1024a")) amperage = 1024;
-        else if (path.contains("256a")) amperage = 256;
-        else if (path.contains("64a")) amperage = 64;
-        else if (path.contains("16a")) amperage = 16;
-        else if (path.contains("4a")) amperage = 4;
-        else if (path.contains("1a")) amperage = 1;
+        Matcher m = AMP_PATTERN.matcher(path);
+        if (m.find()) {
+            try {
+                amperage = Integer.parseInt(m.group(1));
+            } catch (Throwable ignored) {}
+        }
 
         boolean isLaser = path.contains("laser");
         boolean isSubstation = path.contains("substation");
@@ -327,9 +359,11 @@ public class EnergyHatchHelper {
     }
 
     private static GTVoltageTier parseVoltageTier(String path) {
-        for (GTVoltageTier tier : GTVoltageTier.values()) {
+        GTVoltageTier[] tiers = GTVoltageTier.values().clone();
+        Arrays.sort(tiers, (a, b) -> Integer.compare(b.name().length(), a.name().length()));
+        for (GTVoltageTier tier : tiers) {
             String nameLower = tier.name().toLowerCase(Locale.ROOT);
-            if (path.startsWith(nameLower + "_") || path.contains("_" + nameLower + "_") || path.endsWith("_" + nameLower)) {
+            if (path.startsWith(nameLower + "_") || path.contains("_" + nameLower + "_") || path.endsWith("_" + nameLower) || path.contains(nameLower)) {
                 return tier;
             }
         }

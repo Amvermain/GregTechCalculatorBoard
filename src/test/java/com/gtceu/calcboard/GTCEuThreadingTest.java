@@ -311,4 +311,95 @@ public class GTCEuThreadingTest {
         Assertions.assertTrue(hasEV16A);
         Assertions.assertTrue(hasIV1A);
     }
+
+    @Test
+    public void testFermentingArborealRejuvenationMonstrosityThreadingRecognition() {
+        ResourceLocation farmId = ResourceLocation.tryParse("gtceu:fermenting_arboreal_rejuvenation_monstrosity");
+        Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.isThreadingMultiblock(farmId));
+        Assertions.assertEquals(8, com.gtceu.calcboard.api.MultiblockDetector.getMaxHelixCount(farmId));
+        Assertions.assertFalse(com.gtceu.calcboard.api.MultiblockDetector.isCoilMultiblock(farmId));
+
+        // Verify fusion coil is classified as CASING, not heating COIL
+        ResourceLocation fusionCoilId = ResourceLocation.tryParse("start_core:advanced_fusion_coil");
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CASING,
+                com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.classifyPart(fusionCoilId));
+        ResourceLocation cupronickelId = ResourceLocation.tryParse("gtceu:cupronickel_coil_block");
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.COIL,
+                com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.classifyPart(cupronickelId));
+
+        RecipeNode farmNode = RecipeNode.create("Fermenting Arboreal Rejuvenation Monstrosity", 200.0, 500000.0, GTVoltageTier.UXV);
+        farmNode.setMultiblock(true);
+        farmNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:tree_greenhouse"));
+        farmNode.setMachineIcon(farmId);
+        farmNode.getAvailableWorkstations().add(farmId);
+
+        Assertions.assertTrue(farmNode.isExplicitThreadingMachine());
+        Assertions.assertTrue(farmNode.hasThreading());
+        Assertions.assertFalse(farmNode.canUseCoils());
+        Assertions.assertEquals(8, farmNode.getThreadingConfig().getMaxHelixCapacity());
+
+        var adapter = ModAdapterRegistry.getAdapterForNode(farmNode);
+        var applicableCats = adapter.getApplicableAddonCategories(farmNode);
+        Assertions.assertTrue(applicableCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        Assertions.assertFalse(applicableCats.contains(com.gtceu.calcboard.api.MachineAddon.Category.COIL));
+
+        // Test CategoryCapability active categories
+        var catCap = com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().getCapability(farmNode.getRecipeCategoryId());
+        var activeCats = catCap.getActiveCategoriesForNode(farmNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.MachineAddon.Category.COIL));
+
+        // Switch to Greenhouse (non-threading multiblock)
+        ResourceLocation greenhouseId = ResourceLocation.tryParse("gtceu:greenhouse");
+        farmNode.setMachineIcon(greenhouseId);
+        farmNode.setThreadingActive(false);
+
+        Assertions.assertFalse(farmNode.isExplicitThreadingMachine());
+        Assertions.assertFalse(farmNode.hasThreading());
+        var ghCats = adapter.getApplicableAddonCategories(farmNode);
+        Assertions.assertFalse(ghCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        var ghActiveCats = catCap.getActiveCategoriesForNode(farmNode);
+        Assertions.assertFalse(ghActiveCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+
+        // Switch back to FARM
+        farmNode.setMachineIcon(farmId);
+        farmNode.setThreadingActive(true);
+        Assertions.assertTrue(farmNode.hasThreading());
+        Assertions.assertTrue(adapter.getApplicableAddonCategories(farmNode).contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+    }
+
+    @Test
+    public void testAllStarTThreadedMultiblocksRecognition() {
+        String[] starTMultis = new String[]{
+                "gtceu:fermenting_arboreal_rejuvenation_monstrosity",
+                "gtceu:multithreaded_component_synthesis_forge",
+                "gtceu:aqueous_transformation_processing_center",
+                "gtceu:ascendant_engraving_matrix",
+                "gtceu:byteforce_unified_incomparable_logistics_depot",
+                "gtceu:electro_magnetic_material_ripper",
+                "gtceu:gravitational_compression_chamber",
+                "gtceu:material_annihilation_array",
+                "gtceu:molecular_inducing_xanadu",
+                "gtceu:subatomic_particle_lattice_isolation_terminal",
+                "gtceu:superior_particulate_isolation_nexus",
+                "gtceu:yielding_excression_advanced_seperation_transformator"
+        };
+
+        for (String idStr : starTMultis) {
+            ResourceLocation id = ResourceLocation.tryParse(idStr);
+            Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.isMultiblock(id), idStr + " should be registered as multiblock");
+            Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.isThreadingMultiblock(id), idStr + " should be recognized as threading multiblock");
+            Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.getMaxHelixCount(id) > 0, idStr + " should have max helix capacity > 0");
+
+            RecipeNode node = RecipeNode.create(id.getPath(), 100.0, 10000.0, GTVoltageTier.UIV);
+            node.setMultiblock(true);
+            node.setMachineIcon(id);
+            node.getAvailableWorkstations().add(id);
+
+            Assertions.assertTrue(node.hasThreading(), idStr + " node should have threading");
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
+            Assertions.assertTrue(adapter.getApplicableAddonCategories(node).contains(com.gtceu.calcboard.api.AddonCategory.THREADING),
+                    idStr + " applicable categories should contain THREADING");
+        }
+    }
 }

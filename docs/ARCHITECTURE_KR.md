@@ -39,6 +39,7 @@ graph TD
         HM["HistoryManager (Undo/Redo 커맨드 델타 스택)"]
         BC["BlueprintCodec (NBT & Base64 GZIP 압축 코덱)"]
         BOM["MultiblockBOMCalculator & MultiblockStructureCatalog (BOM 산출 엔진)"]
+        ETA["ProductionETACalculator (목표 수량 소요 시간 & 총 소요 전력/원자재 연산)"]
         AFR["AddonFactoryRegistry & NodeBadgeRegistry (디커플링된 애드온 팩토리 & 뱃지 레지스트리)"]
         EB["RecipeNodeEvent / FlowGraphEvent (생명주기 이벤트 버스)"]
     end

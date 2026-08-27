@@ -121,6 +121,26 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
         return displayName;
     }
 
+    public List<IngredientStack> getInputStacks() {
+        return inputStacks;
+    }
+
+    public List<IngredientStack> getOutputStacks() {
+        return outputStacks;
+    }
+
+    public boolean isGenerator() {
+        return isGenerator;
+    }
+
+    public EnergyType getEnergyType() {
+        return energyType;
+    }
+
+    public double getEut() {
+        return eut;
+    }
+
     @Override
     public EmiRecipeCategory getCategory() {
         return category;

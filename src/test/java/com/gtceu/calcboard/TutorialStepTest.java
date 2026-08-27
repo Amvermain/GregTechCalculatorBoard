@@ -34,31 +34,25 @@ public class TutorialStepTest {
 
     @Test
     public void testTutorialI18nKeysExist() throws Exception {
-        Gson gson = new Gson();
-        java.lang.reflect.Type mapType = new TypeToken<Map<String, String>>() {}.getType();
+        java.nio.file.Path koPath = java.nio.file.Paths.get("src/main/resources/assets/gtcalcboard/lang/ko_kr.json");
+        java.nio.file.Path enPath = java.nio.file.Paths.get("src/main/resources/assets/gtcalcboard/lang/en_us.json");
 
-        // Check Korean
-        try (InputStream is = getClass().getResourceAsStream("/assets/gtcalcboard/lang/ko_kr.json")) {
-            Assertions.assertNotNull(is, "ko_kr.json must exist");
-            Map<String, String> koMap = gson.fromJson(new InputStreamReader(is, StandardCharsets.UTF_8), mapType);
-            for (TutorialStep step : TutorialStep.values()) {
-                Assertions.assertTrue(koMap.containsKey(step.getTitleKey()), "ko_kr missing: " + step.getTitleKey());
-                Assertions.assertTrue(koMap.containsKey(step.getDescKey()), "ko_kr missing: " + step.getDescKey());
-                Assertions.assertFalse(koMap.get(step.getTitleKey()).isEmpty());
-                Assertions.assertFalse(koMap.get(step.getDescKey()).isEmpty());
-            }
-        }
+        Assertions.assertTrue(java.nio.file.Files.exists(koPath), "ko_kr.json must exist");
+        Assertions.assertTrue(java.nio.file.Files.exists(enPath), "en_us.json must exist");
 
-        // Check English
-        try (InputStream is = getClass().getResourceAsStream("/assets/gtcalcboard/lang/en_us.json")) {
-            Assertions.assertNotNull(is, "en_us.json must exist");
-            Map<String, String> enMap = gson.fromJson(new InputStreamReader(is, StandardCharsets.UTF_8), mapType);
-            for (TutorialStep step : TutorialStep.values()) {
-                Assertions.assertTrue(enMap.containsKey(step.getTitleKey()), "en_us missing: " + step.getTitleKey());
-                Assertions.assertTrue(enMap.containsKey(step.getDescKey()), "en_us missing: " + step.getDescKey());
-                Assertions.assertFalse(enMap.get(step.getTitleKey()).isEmpty());
-                Assertions.assertFalse(enMap.get(step.getDescKey()).isEmpty());
-            }
+        com.google.gson.JsonObject koJson = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(koPath)).getAsJsonObject();
+        com.google.gson.JsonObject enJson = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(enPath)).getAsJsonObject();
+
+        for (TutorialStep step : TutorialStep.values()) {
+            Assertions.assertTrue(koJson.has(step.getTitleKey()), "ko_kr missing: " + step.getTitleKey());
+            Assertions.assertTrue(koJson.has(step.getDescKey()), "ko_kr missing: " + step.getDescKey());
+            Assertions.assertFalse(koJson.get(step.getTitleKey()).getAsString().isEmpty());
+            Assertions.assertFalse(koJson.get(step.getDescKey()).getAsString().isEmpty());
+
+            Assertions.assertTrue(enJson.has(step.getTitleKey()), "en_us missing: " + step.getTitleKey());
+            Assertions.assertTrue(enJson.has(step.getDescKey()), "en_us missing: " + step.getDescKey());
+            Assertions.assertFalse(enJson.get(step.getTitleKey()).getAsString().isEmpty());
+            Assertions.assertFalse(enJson.get(step.getDescKey()).getAsString().isEmpty());
         }
     }
 }

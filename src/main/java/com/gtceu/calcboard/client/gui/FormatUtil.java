@@ -4,6 +4,8 @@ import com.gtceu.calcboard.api.GTVoltageTier;
 import com.gtceu.calcboard.api.IngredientStack;
 import com.gtceu.calcboard.api.RateTimeUnit;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Standard SI / Metric prefix and scientific notation formatter for numbers, rates, and power.
@@ -11,6 +13,9 @@ import java.util.Locale;
  * Supports flexible rate time units (/t, /s, /min, /h, /d).
  */
 public final class FormatUtil {
+
+    private static final Pattern BATCH_AMOUNT_PATTERN =
+            Pattern.compile("^([0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)\\s*([a-zA-Z]+)?$");
 
     private static final String[] SI_PREFIXES = {
         "", "k", "M", "G", "T", "P", "E", "Z", "Y"
@@ -299,5 +304,167 @@ public final class FormatUtil {
         } else {
             return String.format(Locale.ROOT, "%,.4f", val).replaceAll("\\.?0+$", "");
         }
+    }
+
+    /**
+     * Formats estimated time / duration in seconds to human-readable strings (e.g. "< 1s", "24.5s", "24m 52s", "1h 30m", "2d 14h", "∞").
+     */
+    public static String formatETA(double seconds) {
+        if (Double.isNaN(seconds) || Double.isInfinite(seconds) || seconds <= 0.0) {
+            return "∞";
+        }
+        if (seconds < 1.0) {
+            return "< 1s";
+        }
+        if (seconds < 60.0) {
+            return String.format(Locale.ROOT, "%.1fs", seconds).replaceAll("\\.0s$", "s");
+        }
+        if (seconds < 3600.0) {
+            long m = (long) (seconds / 60);
+            long s = (long) Math.round(seconds % 60);
+            if (s >= 60) {
+                m += 1;
+                s = 0;
+            }
+            return s > 0 ? String.format(Locale.ROOT, "%dm %ds", m, s) : String.format(Locale.ROOT, "%dm", m);
+        }
+        if (seconds < 86400.0) {
+            long h = (long) (seconds / 3600);
+            long m = (long) Math.round((seconds % 3600) / 60.0);
+            if (m >= 60) {
+                h += 1;
+                m = 0;
+            }
+            return m > 0 ? String.format(Locale.ROOT, "%dh %dm", h, m) : String.format(Locale.ROOT, "%dh", h);
+        }
+        long d = (long) (seconds / 86400);
+        long h = (long) Math.round((seconds % 86400) / 3600.0);
+        if (h >= 24) {
+            d += 1;
+            h = 0;
+        }
+        return h > 0 ? String.format(Locale.ROOT, "%dd %dh", d, h) : String.format(Locale.ROOT, "%dd", d);
+    }
+
+    /**
+     * Formats a target batch goal amount for display on cards (e.g. "100x", "1k x", "10 B", "500 mB").
+     */
+    public static String formatBatchAmount(double amount, boolean isFluid) {
+        if (amount <= 0.0) return "0";
+        if (isFluid) {
+            if (amount >= 1000.0) {
+                return formatCompactNumber(amount / 1000.0) + " B";
+            } else {
+                return formatCompactNumber(amount) + " mB";
+            }
+        }
+        if (amount >= 1_000_000.0) {
+            return formatCompactNumber(amount) + "x";
+        }
+        if (amount == (long) amount) {
+            return formatExactNumber(amount) + "x";
+        }
+        return formatCompactNumber(amount) + "x";
+    }
+
+    /**
+     * Parses a user-input batch amount string with optional units (e.g. "100.1B", "500mB", "10k", "2st", "64x").
+     * Supports:
+     * - Fluids: B/b (buckets * 1,000), mB/mb (millibuckets * 1), kB/kb (kilo buckets * 1,000,000), MB (mega buckets * 1,000,000,000)
+     * - Items: st/stack/stacks (stacks * 64), x (count multiplier * 1)
+     * - Standard SI prefixes: k/K (* 1,000), M (* 1,000,000), G/g (* 1,000,000,000), T/t (* 1,000,000,000,000)
+     *
+     * @param input Raw user input string.
+     * @param isFluid Whether the target node represents a fluid ingredient.
+     * @return Parsed amount in base units (mB for fluids, count for items).
+     */
+    public static double parseBatchAmount(String input, boolean isFluid) {
+        if (input == null || input.trim().isEmpty()) {
+            return 0.0;
+        }
+        String str = input.trim().replace(",", "");
+        Matcher matcher = BATCH_AMOUNT_PATTERN.matcher(str);
+        if (!matcher.matches()) {
+            return 0.0;
+        }
+        double value;
+        try {
+            value = Double.parseDouble(matcher.group(1));
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+        String unit = matcher.group(2);
+        if (unit == null || unit.isEmpty()) {
+            return value;
+        }
+        unit = unit.trim();
+        String unitLower = unit.toLowerCase(Locale.ROOT);
+
+        if (unitLower.equals("x")) {
+            return value;
+        }
+        if (unitLower.equals("st") || unitLower.equals("stack") || unitLower.equals("stacks") || unitLower.equals("stk")) {
+            return value * 64.0;
+        }
+        if (unit.equals("MB") || unitLower.equals("megabucket") || unitLower.equals("megabuckets")) {
+            return value * 1_000_000_000.0;
+        }
+        if (unit.equalsIgnoreCase("mb") || unitLower.equals("millibucket") || unitLower.equals("millibuckets")) {
+            return value;
+        }
+        if (unitLower.equals("b") || unitLower.equals("bucket") || unitLower.equals("buckets")) {
+            return isFluid ? value * 1000.0 : value;
+        }
+        if (unitLower.equals("kb")) {
+            return value * 1_000_000.0;
+        }
+        if (unitLower.equals("gb") || unitLower.equals("gigabucket") || unitLower.equals("gigabuckets")) {
+            return value * 1_000_000_000_000.0;
+        }
+        if (unitLower.equals("k")) {
+            return value * 1_000.0;
+        }
+        if (unit.equals("M")) {
+            return value * 1_000_000.0;
+        }
+        if (unit.equals("m")) {
+            return isFluid ? value : value * 1_000_000.0;
+        }
+        if (unitLower.equals("g")) {
+            return value * 1_000_000_000.0;
+        }
+        if (unitLower.equals("t")) {
+            return value * 1_000_000_000_000.0;
+        }
+
+        return value;
+    }
+
+    /**
+     * Formats an amount into an editable string representation for input fields.
+     */
+    public static String formatEditAmount(double amount, boolean isFluid) {
+        if (amount <= 0.0) {
+            return isFluid ? "10B" : "100";
+        }
+        if (isFluid) {
+            if (amount >= 1000.0) {
+                double buckets = amount / 1000.0;
+                return formatCleanNumber(buckets) + "B";
+            } else {
+                return formatCleanNumber(amount) + "mB";
+            }
+        }
+        return formatCleanNumber(amount);
+    }
+
+    /**
+     * Formats a clean floating point or integer string without unnecessary trailing zeros.
+     */
+    public static String formatCleanNumber(double val) {
+        if (val == (long) val) {
+            return String.valueOf((long) val);
+        }
+        return String.format(Locale.ROOT, "%.4f", val).replaceAll("\\.?0+$", "");
     }
 }

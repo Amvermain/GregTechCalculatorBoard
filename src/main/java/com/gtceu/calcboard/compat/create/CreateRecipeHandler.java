@@ -208,6 +208,12 @@ public class CreateRecipeHandler {
 
         for (int i = 0; i < items.length; i++) {
             if (items[i] == null) continue;
+            try {
+                var regItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(items[i]);
+                if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {
+                    continue;
+                }
+            } catch (Throwable ignored) {}
             RecipeNode node = createKineticGeneratorNode(items[i], fallbackNames[i]);
             if (node != null) {
                 String displayName = node.getName();
@@ -260,6 +266,19 @@ public class CreateRecipeHandler {
                 String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
                 String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + fallbackNames[i].toLowerCase(Locale.ROOT) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create su").trim();
 
+                List<ResourceLocation> inIdsList = new ArrayList<>();
+                for (IngredientStack in : node.getInputs()) {
+                    if (in.getId() != null) inIdsList.add(in.getId());
+                }
+                List<ResourceLocation> outIdsList = new ArrayList<>();
+                for (IngredientStack out : node.getOutputs()) {
+                    if (out.getId() != null) outIdsList.add(out.getId());
+                }
+                ResourceLocation[] inArr = inIdsList.isEmpty() ? null : inIdsList.toArray(new ResourceLocation[0]);
+                ResourceLocation[] outArr = outIdsList.isEmpty() ? null : outIdsList.toArray(new ResourceLocation[0]);
+                String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
+                String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
+
                 list.add(new RecipeSearchEngine.SearchableRecipe(
                         node,
                         displayName,
@@ -267,10 +286,93 @@ public class CreateRecipeHandler {
                         catId.intern(),
                         catName.intern(),
                         inputSearchIndex,
-                        outputSearchIndex
+                        outputSearchIndex,
+                        inArr,
+                        outArr,
+                        inNamesArr,
+                        outNamesArr
                 ));
             }
         }
         return list;
+    }
+
+    public static double getDynamicStressCapacity(net.minecraft.world.level.block.Block block, double fallback) {
+        if (block == null) return fallback;
+        try {
+            Class<?> bsvClass = Class.forName("com.simibubi.create.content.kinetics.BlockStressValues");
+            java.lang.reflect.Method getCapacityMethod = bsvClass.getMethod("getCapacity", net.minecraft.world.level.block.Block.class);
+            Object res = getCapacityMethod.invoke(null, block);
+            if (res instanceof Number num) {
+                double cap = num.doubleValue();
+                if (cap > 0) return cap;
+            }
+        } catch (Throwable ignored) {}
+        return fallback;
+    }
+
+    public static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
+        if (!(emiRegistryObj instanceof dev.emi.emi.api.EmiRegistry registry) || !(emiCategoryObj instanceof dev.emi.emi.api.recipe.EmiRecipeCategory category)) {
+            return;
+        }
+
+        record KineticCandidate(String modId, String path, String defaultName, double defaultAmount, boolean isGen, List<IngredientStack> inputs, EnergyType energyType) {}
+
+        List<KineticCandidate> candidates = List.of(
+                new KineticCandidate("create", "large_water_wheel", "Large Water Wheel", 512.0, true, null, EnergyType.KINETIC_SU),
+                new KineticCandidate("create", "water_wheel", "Water Wheel", 256.0, true, null, EnergyType.KINETIC_SU),
+                new KineticCandidate("create", "windmill_bearing", "Windmill Bearing", 512.0, true, null, EnergyType.KINETIC_SU),
+                new KineticCandidate("create", "steam_engine", "Steam Engine", 2048.0, true,
+                        List.of(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 200.0)), EnergyType.KINETIC_SU),
+                new KineticCandidate("create", "hand_crank", "Hand Crank", 256.0, true, null, EnergyType.KINETIC_SU),
+                new KineticCandidate("create", "creative_motor", "Creative Motor", 16384.0, true, null, EnergyType.KINETIC_SU),
+                new KineticCandidate("createaddition", "alternator", "Alternator", 256.0, true,
+                        List.of(IngredientStack.stressUnit(256.0)), EnergyType.ELECTRIC_FE),
+                new KineticCandidate("createaddition", "electric_motor", "Electric Motor", 1024.0, false,
+                        List.of(), EnergyType.ELECTRIC_FE)
+        );
+
+        for (KineticCandidate c : candidates) {
+            var itemId = new ResourceLocation(c.modId, c.path);
+            var item = ForgeRegistries.ITEMS.getValue(itemId);
+            if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
+
+            // Skip disabled/hidden items in modpack
+            boolean skip = com.gtceu.calcboard.api.DynamicAddonCrawler.isItemDisabledOrHidden(
+                    item,
+                    (c.path.contains("creative") || c.path.equals("hand_crank") || activeRecipeItems == null || activeRecipeItems.isEmpty()) ? null : activeRecipeItems
+            );
+            if (skip) continue;
+
+            var block = ForgeRegistries.BLOCKS.getValue(itemId);
+            double amount = getDynamicStressCapacity(block, c.defaultAmount);
+
+            var stack = new ItemStack(item);
+            String name = stack.getHoverName().getString();
+            if (name == null || name.isEmpty()) name = c.defaultName;
+
+            List<IngredientStack> outStacks = new ArrayList<>();
+            if (c.energyType == EnergyType.KINETIC_SU) {
+                outStacks.add(IngredientStack.stressUnit(amount));
+            }
+
+            var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
+                    new ResourceLocation("gtcalcboard", "kinetic_gen/" + c.modId + "/" + c.path),
+                    category,
+                    itemId,
+                    name,
+                    20.0,
+                    amount,
+                    GTVoltageTier.LV,
+                    c.energyType,
+                    c.isGen,
+                    c.inputs != null ? c.inputs : List.of(),
+                    outStacks,
+                    stack
+            );
+
+            registry.addWorkstation(category, dev.emi.emi.api.stack.EmiStack.of(stack));
+            registry.addRecipe(recipe);
+        }
     }
 }

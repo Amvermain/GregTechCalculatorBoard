@@ -252,6 +252,14 @@ public class TurbineRotorHelper {
             Method getPropertyMethod = materialCls.getMethod("getProperty", propertyKeyCls);
             Method getBehaviourMethod = behaviourCls.getMethod("getBehaviour", ItemStack.class);
             Method setPartMaterialMethod = behaviourCls.getMethod("setPartMaterial", ItemStack.class, materialCls);
+            Method getNameMethod = materialCls.getMethod("getName");
+
+            Method effM = null;
+            Method pwrM = null;
+            Method durM = null;
+            try { effM = behaviourCls.getMethod("getRotorEfficiency", ItemStack.class); } catch (Throwable ignored) {}
+            try { pwrM = behaviourCls.getMethod("getRotorPower", ItemStack.class); } catch (Throwable ignored) {}
+            try { durM = behaviourCls.getMethod("getPartMaxDurability", ItemStack.class); } catch (Throwable ignored) {}
 
             java.util.List<Object> allMaterials = new java.util.ArrayList<>();
             collectMaterialsFromGTRegistries(allMaterials, materialCls);
@@ -265,10 +273,6 @@ public class TurbineRotorHelper {
 
             for (Object mat : allMaterials) {
                 try {
-                    Method getNameMethod = mat.getClass().getMethod("getName");
-                    String matName = (String) getNameMethod.invoke(mat);
-                    if (matName == null || matName.isEmpty()) continue;
-
                     Boolean hasRotor = false;
                     try {
                         hasRotor = (Boolean) hasPropertyMethod.invoke(mat, rotorKey);
@@ -278,6 +282,13 @@ public class TurbineRotorHelper {
                     try {
                         prop = getPropertyMethod.invoke(mat, rotorKey);
                     } catch (Throwable ignored) {}
+
+                    if ((hasRotor == null || !hasRotor) && prop == null) {
+                        continue;
+                    }
+
+                    String matName = (String) getNameMethod.invoke(mat);
+                    if (matName == null || matName.isEmpty()) continue;
 
                     String cleanMatName = matName;
                     if (cleanMatName.contains(":")) {
@@ -312,18 +323,18 @@ public class TurbineRotorHelper {
 
                     if (behaviour != null && !stack.isEmpty()) {
                         try {
-                            Method effM = behaviourCls.getMethod("getRotorEfficiency", ItemStack.class);
-                            Method pwrM = behaviourCls.getMethod("getRotorPower", ItemStack.class);
-                            Method durM = behaviourCls.getMethod("getPartMaxDurability", ItemStack.class);
-
-                            Number eNum = (Number) effM.invoke(behaviour, stack);
-                            if (eNum != null && eNum.intValue() > 0) eff = eNum.intValue();
-
-                            Number pNum = (Number) pwrM.invoke(behaviour, stack);
-                            if (pNum != null && pNum.intValue() > 0) power = pNum.intValue();
-
-                            Number dNum = (Number) durM.invoke(behaviour, stack);
-                            if (dNum != null && dNum.doubleValue() > 0) durability = dNum.doubleValue();
+                            if (effM != null) {
+                                Number eNum = (Number) effM.invoke(behaviour, stack);
+                                if (eNum != null && eNum.intValue() > 0) eff = eNum.intValue();
+                            }
+                            if (pwrM != null) {
+                                Number pNum = (Number) pwrM.invoke(behaviour, stack);
+                                if (pNum != null && pNum.intValue() > 0) power = pNum.intValue();
+                            }
+                            if (durM != null) {
+                                Number dNum = (Number) durM.invoke(behaviour, stack);
+                                if (dNum != null && dNum.doubleValue() > 0) durability = dNum.doubleValue();
+                            }
                         } catch (Throwable ignored) {}
                     }
 

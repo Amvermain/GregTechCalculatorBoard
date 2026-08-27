@@ -90,22 +90,37 @@ public record CategoryCapability(
         }
 
         if (isMb) {
-            if (!node.isGenerator() && !MultiblockDetector.isSteamMultiblock(node.getMachineIcon()) && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
+            ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+            var def = mbId != null ? com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId) : null;
+            boolean isSteamMb = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || (mbId != null && MultiblockDetector.isSteamMultiblock(mbId));
+
+            if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
+                    && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
                 cats.add(AddonCategory.ENERGY_HATCH);
             }
-            cats.add(AddonCategory.HATCH_BUS);
-            if (canUseCoils || node.canUseCoils()) {
+            if (def == null || !def.allowedAbilities().isEmpty() || def.inputBusSlotCount() > 0 || def.outputBusSlotCount() > 0 || def.inputHatchSlotCount() > 0 || def.outputHatchSlotCount() > 0 || !node.getInputs().isEmpty() || !node.getOutputs().isEmpty() || isMb) {
+                cats.add(AddonCategory.HATCH_BUS);
+            }
+            boolean supportsCoil = false;
+            if (def != null) {
+                supportsCoil = def.coilSlotCount() > 0 || def.supportsAbility("HEATING_COILS") || MultiblockDetector.isCoilMultiblock(mbId);
+            } else {
+                supportsCoil = canUseCoils || node.canUseCoils() || MultiblockDetector.isCoilMultiblock(mbId);
+            }
+            if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
             }
-            if (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations(), node.getRecipeCategoryId())) {
+            if (!isSteamMb && (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations(), node.getRecipeCategoryId()) || (def != null && def.supportsAbility("PARALLEL_HATCH")))) {
                 cats.add(AddonCategory.PARALLEL);
             }
-            cats.add(AddonCategory.MAINTENANCE);
-            if (node.hasThreading() && (node.isThreadingActive() || MultiblockDetector.isThreadingMultiblock(node.getMachineIcon()))) {
+            if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {
+                cats.add(AddonCategory.MAINTENANCE);
+            }
+            if (node.hasThreading()) {
                 cats.add(AddonCategory.THREADING);
             }
             cats.add(AddonCategory.MULTIBLOCK_TRAIT);
-        } else if (node.hasThreading() && (node.isThreadingActive() || MultiblockDetector.isThreadingMultiblock(node.getMachineIcon()))) {
+        } else if (node.hasThreading()) {
             cats.add(AddonCategory.THREADING);
         }
 

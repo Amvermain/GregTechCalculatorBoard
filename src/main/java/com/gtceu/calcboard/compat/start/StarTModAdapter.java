@@ -39,7 +39,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
-        return ns.equals("start_core") || ns.equals("gtceu_start");
+        return ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
     }
 
     @Override
@@ -56,14 +56,8 @@ public class StarTModAdapter extends GTCEuModAdapter {
             if (ns.equals("start_core") || ns.equals("gtceu_start")) {
                 return true;
             }
-        }
-
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                String ns = ws.getNamespace().toLowerCase(Locale.ROOT);
-                if (ns.equals("start_core") || ns.equals("gtceu_start")) {
-                    return true;
-                }
+            if (MultiblockDetector.isThreadingMultiblock(node.getMachineIcon())) {
+                return true;
             }
         }
 
@@ -71,7 +65,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
             return true;
         }
 
-        return MultiblockDetector.getMaxHelixCount(node) > 0 || (node.getThreadingConfig() != null && node.getThreadingConfig().isActive());
+        return node.getThreadingConfig() != null && node.getThreadingConfig().isActive();
     }
 
     @Override
@@ -94,18 +88,17 @@ public class StarTModAdapter extends GTCEuModAdapter {
 
     @Override
     public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
-        if (node == null) return List.of();
-        List<AddonCategory> baseCats = super.getApplicableAddonCategories(node);
-
+        List<AddonCategory> mutable = new ArrayList<>(super.getApplicableAddonCategories(node));
         if (node.isTurbine() && node.isMultiblock() && StarTTurbineHelper.isStarTTurbine(node)) {
-            if (!baseCats.contains(AddonCategory.MULTIBLOCK_TRAIT)) {
-                List<AddonCategory> mutable = new ArrayList<>(baseCats);
+            if (!mutable.contains(AddonCategory.MULTIBLOCK_TRAIT)) {
                 mutable.add(AddonCategory.MULTIBLOCK_TRAIT);
-                return mutable;
             }
         }
+        if (node.hasThreading() && !mutable.contains(AddonCategory.THREADING)) {
+            mutable.add(AddonCategory.THREADING);
+        }
 
-        return baseCats;
+        return mutable;
     }
 
     @Override

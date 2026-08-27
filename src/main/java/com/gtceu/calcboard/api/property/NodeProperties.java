@@ -44,6 +44,14 @@ public final class NodeProperties {
             NodePropertyKey.ofInt("kinetic_rpm", 32)
     );
 
+    // Goal & ETA Properties (RFC-005)
+    public static final NodePropertyKey<Double> TARGET_BATCH_AMOUNT = register(
+            NodePropertyKey.ofDouble("target_batch_amount", 0.0)
+    );
+    public static final NodePropertyKey<Double> TARGET_BATCH_TIME_SEC = register(
+            NodePropertyKey.ofDouble("target_batch_time_sec", 0.0)
+    );
+
     private NodeProperties() {}
 
     public static <T> NodePropertyKey<T> register(NodePropertyKey<T> key) {

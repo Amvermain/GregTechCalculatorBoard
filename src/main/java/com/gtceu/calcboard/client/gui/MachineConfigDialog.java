@@ -62,6 +62,7 @@ public class MachineConfigDialog {
     private boolean wasExhaustiveComplete = false;
     private long lastObservedCatalogVersion = -1;
     private List<MachineAddon> cachedFilteredCatalog = null;
+    private List<AddonCategory> cachedFilterCategories = null;
 
     private static final int DIALOG_WIDTH = 460;
     private static final int DIALOG_HEIGHT = 295;
@@ -72,6 +73,7 @@ public class MachineConfigDialog {
 
     public void invalidateFilteredCatalog() {
         this.cachedFilteredCatalog = null;
+        this.cachedFilterCategories = null;
     }
 
     public void setSelectedCategory(AddonCategory category) {
@@ -109,6 +111,7 @@ public class MachineConfigDialog {
     }
 
     public void open(RecipeNode node, AddonCategory initialCategory) {
+        long tOpenStart = System.nanoTime();
         this.node = node;
         this.visible = true;
         if (initialCategory != null) {
@@ -118,40 +121,15 @@ public class MachineConfigDialog {
         }
         this.isCustomBuilderActive = (this.selectedCategory == AddonCategory.CUSTOM);
         this.categoryScrollX = 0;
+        long tBeforeEnsureCat = System.nanoTime();
         ensureCategoryVisible(this.selectedCategory);
+        long tAfterEnsureCat = System.nanoTime();
         this.activeAddonsScroll = 0;
         this.rotorGridScroll = 0;
         this.lastObservedCatalogVersion = MachineAddonCatalog.getInstance().getVersion();
         this.wasReady = MachineAddonCatalog.getInstance().isReady() && com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().isBaked();
         this.wasExhaustiveComplete = MachineAddonCatalog.getInstance().isExhaustiveScanComplete();
         invalidateFilteredCatalog();
-
-        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
-                "[GTCalcBoard] [Diag] MachineConfigDialog opened:\n" +
-                " - Node Name: '{}'\n" +
-                " - Category ID: {}\n" +
-                " - Machine Icon: {}\n" +
-                " - Available Workstations: {}\n" +
-                " - isMultiblock: {}, hasMultiblockOption: {}\n" +
-                " - canUseCoils: {}\n" +
-                " - isCoilMb(icon): {}\n" +
-                " - isCoilRecipeCategory(cat): {}\n" +
-                " - All Coil Controllers in Cache: {}\n" +
-                " - All Coil Categories in Cache: {}\n" +
-                " - Relevant Addon Categories: {}",
-                node != null ? node.getName() : "null",
-                node != null ? node.getRecipeCategoryId() : "null",
-                node != null ? node.getMachineIcon() : "null",
-                node != null ? node.getAvailableWorkstations() : "null",
-                node != null && node.isMultiblock(),
-                node != null && node.hasMultiblockOption(),
-                node != null && node.canUseCoils(),
-                node != null && node.getMachineIcon() != null && com.gtceu.calcboard.api.MultiblockDetector.isCoilMultiblock(node.getMachineIcon()),
-                node != null && node.getRecipeCategoryId() != null && com.gtceu.calcboard.api.MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId()),
-                com.gtceu.calcboard.api.MultiblockDetector.getAllCoilControllers(),
-                com.gtceu.calcboard.api.MultiblockDetector.getAllCoilCategories(),
-                node != null ? MachineAddon.getRelevantCategories(node) : "null"
-        );
 
         Minecraft mc = Minecraft.getInstance();
 
@@ -183,7 +161,20 @@ public class MachineConfigDialog {
         this.customEutMult = 1.0;
         this.customParallelMult = 1;
 
+        long tBeforeSync = System.nanoTime();
         syncThreadingAddons(node);
+        long tAfterSync = System.nanoTime();
+
+        long tTotal = (System.nanoTime() - tOpenStart) / 1_000_000L;
+        long tCatMs = (tAfterEnsureCat - tBeforeEnsureCat) / 1_000_000L;
+        long tSyncMs = (tAfterSync - tBeforeSync) / 1_000_000L;
+
+        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
+                "[GTCalcBoard] [Perf] MachineConfigDialog.open took {}ms (ensureCategories: {}ms, syncThreading: {}ms) for node '{}' [{}]",
+                tTotal, tCatMs, tSyncMs,
+                node != null ? node.getName() : "null",
+                node != null ? node.getMachineIcon() : "null"
+        );
     }
 
     public static void syncThreadingAddons(RecipeNode node) {
@@ -433,15 +424,40 @@ public class MachineConfigDialog {
     private double maxCategoryScrollX = 0;
 
     private List<AddonCategory> getAllCategoriesForFilter() {
+        if (this.cachedFilterCategories != null) {
+            return this.cachedFilterCategories;
+        }
+
         List<AddonCategory> list = new ArrayList<>();
         list.add(null); // All
         List<AddonCategory> relCats = MachineAddon.getRelevantCategories(node);
+        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        List<MachineAddon> allAddons = MachineAddonCatalog.getInstance().getAllAddons();
+
+        java.util.Set<AddonCategory> activeCategories = new java.util.HashSet<>();
+        if (adapter != null) {
+            for (MachineAddon r : adapter.getResetAddonCards(node)) {
+                if (r != null && adapter.isAddonCompatible(node, r)) {
+                    activeCategories.add(r.getCategory());
+                }
+            }
+        }
+
+        for (MachineAddon a : allAddons) {
+            if (a != null && a.isCompatibleWith(node)) {
+                activeCategories.add(a.getCategory());
+            }
+        }
+
         for (AddonCategory cat : relCats) {
-            if (!cat.equals(AddonCategory.CUSTOM) && !list.contains(cat)) {
-                list.add(cat);
+            if (cat != null && !cat.equals(AddonCategory.CUSTOM) && !list.contains(cat)) {
+                if (cat.equals(AddonCategory.THREADING) || activeCategories.contains(cat)) {
+                    list.add(cat);
+                }
             }
         }
         list.add(AddonCategory.CUSTOM);
+        this.cachedFilterCategories = list;
         return list;
     }
 
@@ -550,16 +566,15 @@ public class MachineConfigDialog {
 
         List<MachineAddon> filtered = new ArrayList<>();
 
+        List<AddonCategory> rel = (selectedCategory == null) ? MachineAddon.getRelevantCategories(node) : null;
+
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) {
             List<MachineAddon> resetCards = adapter.getResetAddonCards(node);
             for (MachineAddon resetCard : resetCards) {
                 if (!adapter.isAddonCompatible(node, resetCard)) continue;
                 if (selectedCategory != null && !resetCard.getCategory().equals(selectedCategory)) continue;
-                if (selectedCategory == null) {
-                    List<AddonCategory> rel = MachineAddon.getRelevantCategories(node);
-                    if (!rel.contains(resetCard.getCategory())) continue;
-                }
+                if (selectedCategory == null && rel != null && !rel.contains(resetCard.getCategory())) continue;
                 if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || "기본".contains(q) || "none".contains(q)) {
                     filtered.add(resetCard);
                 }
@@ -568,12 +583,9 @@ public class MachineConfigDialog {
 
         for (MachineAddon addon : list) {
             if (addon == null) continue;
-            if (!addon.isCompatibleWith(node)) continue;
             if (selectedCategory != null && !addon.getCategory().equals(selectedCategory)) continue;
-            if (selectedCategory == null) {
-                List<AddonCategory> rel = MachineAddon.getRelevantCategories(node);
-                if (!rel.contains(addon.getCategory())) continue;
-            }
+            if (selectedCategory == null && rel != null && !rel.contains(addon.getCategory())) continue;
+            if (!addon.isCompatibleWith(node)) continue;
             if (!q.isEmpty()) {
                 String n = addon.getName().toLowerCase();
                 String d = addon.getDescription() != null ? addon.getDescription().toLowerCase() : "";
@@ -870,7 +882,13 @@ public class MachineConfigDialog {
     }
 
     private void addWrappedBullet(List<Component> tooltip, net.minecraft.client.gui.Font font, String text) {
-        var split = font.split(Component.literal("§7• " + text), 240);
+        String cleanText = text;
+        if (cleanText.startsWith("• ") || cleanText.startsWith("- ") || cleanText.startsWith("* ")) {
+            cleanText = cleanText.substring(2).trim();
+        } else if (cleanText.startsWith("•") || cleanText.startsWith("-") || cleanText.startsWith("*")) {
+            cleanText = cleanText.substring(1).trim();
+        }
+        var split = font.split(Component.literal("§7• " + cleanText), 240);
         for (var seq : split) {
             StringBuilder sb = new StringBuilder();
             seq.accept((index, style, codePoint) -> {

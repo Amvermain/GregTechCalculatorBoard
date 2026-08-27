@@ -229,10 +229,48 @@ public class RecipeSearchEngine {
             }
         }
 
+        // Index synthetic KineticGenerationEmiRecipe outputs and inputs
+        if (recipe instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg) {
+            for (com.gtceu.calcboard.api.IngredientStack out : kg.getOutputStacks()) {
+                if (out != null && out.getId() != null) {
+                    outputIds.add(out.getId());
+                    if (out.getDisplayName() != null) {
+                        outputNames.add(out.getDisplayName());
+                        outSb.append(' ').append(out.getDisplayName().toLowerCase(Locale.ROOT));
+                    }
+                    outSb.append(' ').append(out.getId().toString().toLowerCase(Locale.ROOT));
+                    outSb.append(' ').append(out.getId().getPath().toLowerCase(Locale.ROOT));
+                    if (out.isStressUnit()) {
+                        outSb.append(" su stress units kinetic 스트레스");
+                        outputNames.add("stress units");
+                        outputNames.add("Stress Units");
+                    }
+                }
+            }
+            for (com.gtceu.calcboard.api.IngredientStack in : kg.getInputStacks()) {
+                if (in != null && in.getId() != null) {
+                    inputIds.add(in.getId());
+                    if (in.getDisplayName() != null) {
+                        inputNames.add(in.getDisplayName());
+                        inSb.append(' ').append(in.getDisplayName().toLowerCase(Locale.ROOT));
+                    }
+                    inSb.append(' ').append(in.getId().toString().toLowerCase(Locale.ROOT));
+                    inSb.append(' ').append(in.getId().getPath().toLowerCase(Locale.ROOT));
+                    if (in.isStressUnit()) {
+                        inSb.append(" su stress units kinetic 스트레스");
+                        inputNames.add("stress units");
+                        inputNames.add("Stress Units");
+                    }
+                }
+            }
+        }
+
         // Index virtual kinetic input for Create machine recipes
         if (cat != null && cat.getId() != null && ("create".equals(cat.getId().getNamespace()) || "createaddition".equals(cat.getId().getNamespace()))) {
-            inSb.append(" create:stress_units stress_units stress units");
+            inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
             inputNames.add("stress units");
+            inputNames.add("Stress Units");
+            inputIds.add(ResourceLocation.tryParse("create:stress_units"));
         }
 
         // Index custom adapter recipe outputs/inputs (e.g. gtceu:steam_boiler -> steam output, water input)

@@ -69,8 +69,10 @@ public class DynamicAddonCrawler {
             String ns = key.getNamespace();
             String path = key.getPath();
             // Fast filter: only inspect items from relevant namespaces or addon keywords
-            if (!ns.equals("gtceu") && !ns.equals("thermal") && !ns.equals("thermal_expansion")
-                    && !ns.equals("systeams") && !path.contains("rotor") && !path.contains("augment")
+            if (!ns.equals("gtceu") && !ns.equals("start_core") && !ns.equals("gtceu_start")
+                    && !ns.equals("thermal") && !ns.equals("thermal_expansion") && !ns.equals("thermal_extra")
+                    && !ns.equals("systeams") && !ns.equals("kubejs")
+                    && !path.contains("rotor") && !path.contains("augment")
                     && !path.contains("hatch") && !path.contains("coil")) {
                 return;
             }
@@ -197,6 +199,37 @@ public class DynamicAddonCrawler {
         return result;
     }
 
+    private static volatile net.minecraft.tags.TagKey<Item>[] HIDDEN_TAGS = null;
+
+    @SuppressWarnings("unchecked")
+    private static net.minecraft.tags.TagKey<Item>[] getHiddenTags() {
+        if (HIDDEN_TAGS == null) {
+            synchronized (DynamicAddonCrawler.class) {
+                if (HIDDEN_TAGS == null) {
+                    try {
+                        var reg = net.minecraft.core.registries.Registries.ITEM;
+                        HIDDEN_TAGS = new net.minecraft.tags.TagKey[]{
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("c:hidden_from_recipe_viewers")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewers")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("c:hidden_from_recipe_viewer")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewer")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("emi:hidden_from_recipe_viewers")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("emi:hidden_from_recipe_viewer")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("jei:hidden_from_recipe_viewers")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("c:disabled")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("forge:disabled")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("c:disabled_items")),
+                                net.minecraft.tags.TagKey.create(reg, ResourceLocation.tryParse("forge:disabled_items"))
+                        };
+                    } catch (Throwable t) {
+                        HIDDEN_TAGS = new net.minecraft.tags.TagKey[0];
+                    }
+                }
+            }
+        }
+        return HIDDEN_TAGS;
+    }
+
     public static boolean isItemDisabledOrHidden(Item item, Set<Item> activeRecipeItems) {
         if (item == null || item == net.minecraft.world.item.Items.AIR) return true;
 
@@ -209,18 +242,11 @@ public class DynamicAddonCrawler {
 
         // 2. Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers, etc.)
         try {
-            var itemReg = net.minecraft.core.registries.Registries.ITEM;
             var holder = ForgeRegistries.ITEMS.getHolder(item);
             if (holder.isPresent()) {
                 var h = holder.get();
-                var hiddenTag1 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("c:hidden_from_recipe_viewers"));
-                var hiddenTag2 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewers"));
-                var hiddenTag3 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("c:hidden_from_recipe_viewer"));
-                var hiddenTag4 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("forge:hidden_from_recipe_viewer"));
-                var hiddenTag5 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("emi:hidden_from_recipe_viewers"));
-                var hiddenTag6 = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse("emi:hidden_from_recipe_viewer"));
-                if (h.containsTag(hiddenTag1) || h.containsTag(hiddenTag2) || h.containsTag(hiddenTag3) || h.containsTag(hiddenTag4) || h.containsTag(hiddenTag5) || h.containsTag(hiddenTag6)) {
-                    return true;
+                for (var tag : getHiddenTags()) {
+                    if (h.containsTag(tag)) return true;
                 }
             }
         } catch (Throwable ignored) {}

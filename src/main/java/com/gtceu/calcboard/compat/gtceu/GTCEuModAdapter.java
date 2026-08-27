@@ -156,7 +156,7 @@ public class GTCEuModAdapter implements IModAdapter {
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
-        return ns.equals("gtceu");
+        return ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
     }
 
     @Override
@@ -169,7 +169,7 @@ public class GTCEuModAdapter implements IModAdapter {
             if (ns.equals("minecraft") || ns.equals("emi")) {
                 return false;
             }
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
                 return true;
             }
         }
@@ -178,14 +178,14 @@ public class GTCEuModAdapter implements IModAdapter {
             if (ns.equals("minecraft") || ns.equals("emi")) {
                 return false;
             }
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
                 return true;
             }
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null) {
                 String ns = ws.getNamespace().toLowerCase(Locale.ROOT);
-                if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+                if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
                     return true;
                 }
             }
@@ -240,6 +240,45 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public double getGeneratorMaxPower(RecipeNode node) {
         return GTTurbineHelper.getGeneratorMaxEUt(node);
+    }
+
+    @Override
+    public double computeEffectiveOutputChance(RecipeNode node, int outputIndex, double defaultChance) {
+        if (node == null || outputIndex < 0 || outputIndex >= node.getOutputs().size()) return defaultChance;
+        IngredientStack out = node.getOutputs().get(outputIndex);
+        if (out.getChance() >= 1.0) return 1.0;
+
+        // 1. Steam Ore Factory multiblock produces full outputs and byproducts
+        if (node.isMultiblock() && node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("steam_ore_factory")) {
+            return out.getEffectiveChance(node.getTierDelta());
+        }
+
+        // 2. Standard Steam machines in GTCEu cannot produce byproducts
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            return 0.0;
+        }
+
+        // 3. GTCEu Macerator ore byproduct tier gating:
+        if (outputIndex >= 1 && out.getChance() > 0.0 && node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
+            GTVoltageTier curTier = node.getTargetTier();
+            if (curTier == null) curTier = GTVoltageTier.LV;
+            int curTierIdx = curTier.ordinal();
+
+            GTVoltageTier reqTier;
+            if (outputIndex == 1) reqTier = GTVoltageTier.HV;
+            else if (outputIndex == 2) reqTier = GTVoltageTier.EV;
+            else reqTier = GTVoltageTier.IV;
+
+            if (curTierIdx < reqTier.ordinal()) {
+                return 0.0;
+            }
+
+            int extraTiers = curTierIdx - reqTier.ordinal();
+            double boost = out.getTierChanceBoost();
+            return Math.min(1.0, Math.max(0.0, out.getChance() + extraTiers * boost));
+        }
+
+        return defaultChance;
     }
 
     @Override
@@ -309,19 +348,34 @@ public class GTCEuModAdapter implements IModAdapter {
         }
 
         if (isMb) {
+            ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+            var def = mbId != null ? com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId) : null;
+            boolean isSteamMb = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || (mbId != null && MultiblockDetector.isSteamMultiblock(mbId));
+
             List<AddonCategory> cats = new ArrayList<>();
-            if (!node.isGenerator()) {
+            if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
+                    && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
                 cats.add(AddonCategory.ENERGY_HATCH);
             }
-            cats.add(AddonCategory.HATCH_BUS);
-            if (node.canUseCoils()) {
+            if (def == null || !def.allowedAbilities().isEmpty() || def.inputBusSlotCount() > 0 || def.outputBusSlotCount() > 0 || def.inputHatchSlotCount() > 0 || def.outputHatchSlotCount() > 0 || !node.getInputs().isEmpty() || !node.getOutputs().isEmpty() || isMb) {
+                cats.add(AddonCategory.HATCH_BUS);
+            }
+            boolean supportsCoil = false;
+            if (def != null) {
+                supportsCoil = def.coilSlotCount() > 0 || def.supportsAbility("HEATING_COILS") || MultiblockDetector.isCoilMultiblock(mbId);
+            } else {
+                supportsCoil = node.canUseCoils() || MultiblockDetector.isCoilMultiblock(mbId);
+            }
+            if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
             }
-            if (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations())) {
+            if (!isSteamMb && (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations()) || (def != null && def.supportsAbility("PARALLEL_HATCH")))) {
                 cats.add(AddonCategory.PARALLEL);
             }
-            cats.add(AddonCategory.MAINTENANCE);
-            if (node.hasThreading() && (node.isThreadingActive() || MultiblockDetector.isThreadingMultiblock(node.getMachineIcon()))) {
+            if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {
+                cats.add(AddonCategory.MAINTENANCE);
+            }
+            if (node.hasThreading()) {
                 cats.add(AddonCategory.THREADING);
             }
             cats.add(AddonCategory.MULTIBLOCK_TRAIT);
@@ -403,7 +457,7 @@ public class GTCEuModAdapter implements IModAdapter {
                         boolean hasMuffler = def.parts().stream().anyMatch(p -> p != null && p.itemId() != null && p.itemId().getPath().contains("muffler"));
                         if (!hasMuffler) return false;
                     } else {
-                        if (def.maintenanceSlotCount() == 0) return false;
+                        if (def.maintenanceSlotCount() == 0 && !def.supportsAbility("MAINTENANCE")) return false;
                     }
                 }
             }
@@ -417,7 +471,12 @@ public class GTCEuModAdapter implements IModAdapter {
             }
             if (mbId != null) {
                 var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId);
-                if (def != null && def.energyHatchSlotCount() == 0) return false;
+                if (def != null) {
+                    if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("INPUT_LASER") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")) {
+                        return false;
+                    }
+                    if (def.energyHatchSlotCount() == 0 && (MultiblockDetector.isSteamMultiblock(mbId) || isGen)) return false;
+                }
             }
             return true;
         }
@@ -430,27 +489,43 @@ public class GTCEuModAdapter implements IModAdapter {
             if (mbId != null) {
                 var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbId);
                 if (def != null) {
-                    var type = com.gtceu.calcboard.client.gui.MachineConfigDialog.getHatchType(addon);
-                    switch (type) {
-                        case ITEM_INPUT -> {
-                            if (def.inputBusSlotCount() == 0) return false;
+                    // 1. Candidate block direct match
+                    if (addon.getItemIcon() != null && def.isCandidateBlock(addon.getItemIcon())) {
+                        return true;
+                    }
+
+                    // 2. PartAbility matching
+                    if (def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) {
+                        if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon gh && !gh.getAbilities().isEmpty()) {
+                            for (String reqAbility : gh.getAbilities()) {
+                                if (!def.supportsAbility(reqAbility)) {
+                                    return false;
+                                }
+                            }
+                        } else {
+                            var type = resolveHatchType(addon);
+                            switch (type) {
+                                case ITEM_INPUT -> {
+                                    if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("STEAM_IMPORT_ITEMS")) return false;
+                                }
+                                case ITEM_OUTPUT -> {
+                                    if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("STEAM_EXPORT_ITEMS")) return false;
+                                }
+                                case FLUID_INPUT -> {
+                                    if (!def.supportsAbility("IMPORT_FLUIDS") && !def.supportsAbility("STEAM_IMPORT_FLUIDS")) return false;
+                                }
+                                case FLUID_OUTPUT -> {
+                                    if (!def.supportsAbility("EXPORT_FLUIDS") && !def.supportsAbility("STEAM_EXPORT_FLUIDS")) return false;
+                                }
+                                case DUAL_INPUT -> {
+                                    if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("IMPORT_FLUIDS")) return false;
+                                }
+                                case DUAL_OUTPUT -> {
+                                    if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("EXPORT_FLUIDS")) return false;
+                                }
+                                default -> {}
+                            }
                         }
-                        case ITEM_OUTPUT -> {
-                            if (def.outputBusSlotCount() == 0) return false;
-                        }
-                        case FLUID_INPUT -> {
-                            if (def.inputHatchSlotCount() == 0) return false;
-                        }
-                        case FLUID_OUTPUT -> {
-                            if (def.outputHatchSlotCount() == 0) return false;
-                        }
-                        case DUAL_INPUT -> {
-                            if (def.inputBusSlotCount() == 0 && def.inputHatchSlotCount() == 0) return false;
-                        }
-                        case DUAL_OUTPUT -> {
-                            if (def.outputBusSlotCount() == 0 && def.outputHatchSlotCount() == 0) return false;
-                        }
-                        default -> {}
                     }
                 }
             }
@@ -469,7 +544,7 @@ public class GTCEuModAdapter implements IModAdapter {
             return true;
         }
         if (addon.getCategory().equals(AddonCategory.THREADING)) {
-            return node.hasThreading() && (node.isThreadingActive() || MultiblockDetector.isThreadingMultiblock(node.getMachineIcon()));
+            return node.hasThreading();
         }
         if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
             if (com.gtceu.calcboard.compat.start.StarTTurbineHelper.isStarTTrait(addon)) {
@@ -526,22 +601,36 @@ public class GTCEuModAdapter implements IModAdapter {
                 }
             }
         }
-        ResourceLocation mbWs = node.getMachineIcon();
-        if (mbWs == null) mbWs = node.getMultiblockWorkstation();
-        if (mbWs != null) {
-            var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbWs);
-            if (def != null) {
-                if (addon.getCategory() == MachineAddon.Category.COIL && def.coilSlotCount() == 0) return false;
-                if (addon.getCategory() == MachineAddon.Category.MAINTENANCE && def.maintenanceSlotCount() == 0) return false;
-                if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && def.energyHatchSlotCount() == 0) return false;
-                if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                    var type = com.gtceu.calcboard.client.gui.MachineConfigDialog.getHatchType(addon);
-                    switch (type) {
-                        case ITEM_INPUT -> { if (def.inputBusSlotCount() == 0) return false; }
-                        case ITEM_OUTPUT -> { if (def.outputBusSlotCount() == 0) return false; }
-                        case FLUID_INPUT -> { if (def.inputHatchSlotCount() == 0) return false; }
-                        case FLUID_OUTPUT -> { if (def.outputHatchSlotCount() == 0) return false; }
-                        default -> {}
+        if (node.isMultiblock()) {
+            ResourceLocation mbWs = node.getMachineIcon();
+            if (mbWs == null) mbWs = node.getMultiblockWorkstation();
+            if (mbWs != null) {
+                var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(mbWs);
+                if (def != null) {
+                    if (addon.getCategory() == MachineAddon.Category.COIL && def.coilSlotCount() == 0 && !MultiblockDetector.isCoilMultiblock(mbWs)) return false;
+                    if (addon.getCategory() == MachineAddon.Category.MAINTENANCE && def.maintenanceSlotCount() == 0 && !def.supportsAbility("MAINTENANCE") && def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) return false;
+                    if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && def.energyHatchSlotCount() == 0 && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY") && (MultiblockDetector.isSteamMultiblock(mbWs) || node.isGenerator())) return false;
+                    if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
+                        if (addon.getItemIcon() != null && def.isCandidateBlock(addon.getItemIcon())) {
+                            // Directly matched candidate block
+                        } else if (def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) {
+                            if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon gh && !gh.getAbilities().isEmpty()) {
+                                for (String reqAbility : gh.getAbilities()) {
+                                    if (!def.supportsAbility(reqAbility)) return false;
+                                }
+                            } else {
+                                var type = resolveHatchType(addon);
+                                switch (type) {
+                                    case ITEM_INPUT -> { if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("STEAM_IMPORT_ITEMS")) return false; }
+                                    case ITEM_OUTPUT -> { if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("STEAM_EXPORT_ITEMS")) return false; }
+                                    case FLUID_INPUT -> { if (!def.supportsAbility("IMPORT_FLUIDS") && !def.supportsAbility("STEAM_IMPORT_FLUIDS")) return false; }
+                                    case FLUID_OUTPUT -> { if (!def.supportsAbility("EXPORT_FLUIDS") && !def.supportsAbility("STEAM_EXPORT_FLUIDS")) return false; }
+                                    case DUAL_INPUT -> { if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("IMPORT_FLUIDS")) return false; }
+                                    case DUAL_OUTPUT -> { if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("EXPORT_FLUIDS")) return false; }
+                                    default -> {}
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -550,6 +639,64 @@ public class GTCEuModAdapter implements IModAdapter {
             return false;
         }
         return true;
+    }
+
+    public static com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType resolveHatchType(MachineAddon addon) {
+        if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon gh) {
+            return gh.getHatchType();
+        }
+        if (addon == null || addon.getId() == null) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.ITEM_INPUT;
+        String idStr = addon.getId().toLowerCase(Locale.ROOT);
+        if (idStr.contains("me_pattern_provider") || idStr.contains("pattern_provider")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.ME_PATTERN_PROVIDER;
+        if (idStr.contains("dual_input") || idStr.contains("stocking_input") || idStr.contains("stocking_bus")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.DUAL_INPUT;
+        if (idStr.contains("dual_output")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.DUAL_OUTPUT;
+        if (idStr.contains("input_hatch") || idStr.contains("fluid_import") || idStr.contains("multi_fluid_input")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.FLUID_INPUT;
+        if (idStr.contains("output_hatch") || idStr.contains("fluid_export") || idStr.contains("multi_fluid_output")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.FLUID_OUTPUT;
+        if (idStr.contains("input_bus") || idStr.contains("import_bus") || idStr.contains("item_import")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.ITEM_INPUT;
+        if (idStr.contains("output_bus") || idStr.contains("export_bus") || idStr.contains("item_export")) return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.ITEM_OUTPUT;
+        return com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.ITEM_INPUT;
+    }
+
+    @Override
+    public ResourceLocation getPreferredMultiblockWorkstation(RecipeNode node, List<ResourceLocation> availableWorkstations) {
+        if (node == null || availableWorkstations == null || availableWorkstations.isEmpty()) return null;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null) {
+            for (ResourceLocation ws : availableWorkstations) {
+                if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(catId.getPath())) {
+                    return ws;
+                }
+            }
+        }
+
+        // Standard base large multiblocks (e.g. large_chemical_reactor before extreme_/incomprehensible_)
+        for (ResourceLocation ws : availableWorkstations) {
+            if (MultiblockDetector.isMultiblock(ws)) {
+                String path = ws.getPath().toLowerCase(Locale.ROOT);
+                if (path.startsWith("large_")) {
+                    return ws;
+                }
+            }
+        }
+
+        // Standard base multiblocks before advanced/special variants
+        for (ResourceLocation ws : availableWorkstations) {
+            if (MultiblockDetector.isMultiblock(ws)) {
+                String path = ws.getPath().toLowerCase(Locale.ROOT);
+                if (!path.startsWith("mega_") && !path.startsWith("extreme_") && !path.startsWith("incomprehensible_")
+                        && !path.startsWith("advanced_") && !path.startsWith("yielding_") && !path.startsWith("super_")
+                        && !path.startsWith("supreme_") && !path.startsWith("nyinsane_")) {
+                    return ws;
+                }
+            }
+        }
+
+        for (ResourceLocation ws : availableWorkstations) {
+            if (MultiblockDetector.isMultiblock(ws)) {
+                return ws;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -731,16 +878,16 @@ public class GTCEuModAdapter implements IModAdapter {
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
-            tooltip.add(Component.literal("§6♨ ").append(Component.translatable("gui.gtcalcboard.addon.coil.temp", addon.getCoilTemperature())));
+            tooltip.add(Component.literal("§6♨ ").append(Component.translatable("gui.gtcalcboard.addon.stat.coil_temp", addon.getCoilTemperature())));
             MachineAddon tailored = addon.forMachine(node);
             if (tailored.getParallelMultiplier() > 1) {
-                tooltip.add(Component.literal(String.format(Locale.ROOT, "§b⚡ " + Component.translatable("gui.gtcalcboard.addon.parallel", tailored.getParallelMultiplier()).getString())));
+                tooltip.add(Component.literal("§b⚡ ").append(Component.translatable("gui.gtcalcboard.addon.stat.parallel", tailored.getParallelMultiplier())));
             }
             if (tailored.getDurationMultiplier() != 1.0) {
-                tooltip.add(Component.literal(String.format(Locale.ROOT, "§a⏳ " + Component.translatable("gui.gtcalcboard.addon.speed_boost", String.format(Locale.ROOT, "%.2fx", 1.0 / tailored.getDurationMultiplier())).getString())));
+                tooltip.add(Component.literal("§a⏳ ").append(Component.translatable("gui.gtcalcboard.addon.stat.speed_mult", String.format(Locale.ROOT, "%.2fx", 1.0 / tailored.getDurationMultiplier()))));
             }
             if (tailored.getEutMultiplier() != 1.0) {
-                tooltip.add(Component.literal(String.format(Locale.ROOT, "§e⚡ " + Component.translatable("gui.gtcalcboard.addon.eut_multiplier", String.format(Locale.ROOT, "%.2fx", tailored.getEutMultiplier())).getString())));
+                tooltip.add(Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.addon.stat.eut_mult", String.format(Locale.ROOT, "%.2fx", tailored.getEutMultiplier()))));
             }
             return;
         }

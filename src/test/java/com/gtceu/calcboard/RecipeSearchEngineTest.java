@@ -432,4 +432,33 @@ public class RecipeSearchEngineTest {
         assertFalse(steamPipeCrafting.hasExactOutputName("steam"));
         assertFalse(boilerBlockCrafting.hasExactOutputName("steam"));
     }
+
+    @Test
+    public void testStressUnitsProducerConsumerMatch() {
+        var stressId = new net.minecraft.resources.ResourceLocation("create", "stress_units");
+        var waterWheelId = new net.minecraft.resources.ResourceLocation("create", "large_water_wheel");
+        var mixerId = new net.minecraft.resources.ResourceLocation("create", "mechanical_mixer");
+
+        // Create virtual kinetic recipes
+        List<SearchableRecipe> kineticRecipes = com.gtceu.calcboard.compat.create.CreateRecipeHandler.getVirtualKineticSearchRecipes();
+        assertFalse(kineticRecipes.isEmpty());
+
+        SearchableRecipe waterWheel = kineticRecipes.stream()
+                .filter(r -> r.displayName().contains("Large Water Wheel"))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(waterWheel);
+
+        // Verify water wheel produces Stress Units
+        assertTrue(waterWheel.hasExactOutput(stressId));
+        assertTrue(waterWheel.hasOutputPath("stress_units"));
+        assertTrue(waterWheel.hasExactOutputName("stress units"));
+
+        // Search query verification
+        ParsedQuery qStress = RecipeSearchEngine.parseQuery("<su");
+        assertTrue(RecipeSearchEngine.matches(waterWheel, qStress));
+
+        ParsedQuery qStressName = RecipeSearchEngine.parseQuery("<\"Stress Units\"");
+        assertTrue(RecipeSearchEngine.matches(waterWheel, qStressName));
+    }
 }

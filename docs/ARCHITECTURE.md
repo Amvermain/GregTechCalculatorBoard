@@ -39,6 +39,7 @@ graph TD
         HM["HistoryManager (Undo/Redo Command Delta Stack)"]
         BC["BlueprintCodec (NBT & Base64 GZIP Compressed Codec)"]
         BOM["MultiblockBOMCalculator & MultiblockStructureCatalog (BOM Calculation Engine)"]
+        ETA["ProductionETACalculator (Target Batch Duration & Total Resource Calculation)"]
         AFR["AddonFactoryRegistry & NodeBadgeRegistry (Decoupled Addon Factory & Badge Registry)"]
         EB["RecipeNodeEvent / FlowGraphEvent (Lifecycle Event Bus)"]
     end

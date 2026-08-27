@@ -20,6 +20,8 @@ public class GTCEuMultiblockStructureScanner {
 
     private static final Map<Item, String> ITEM_NAME_CACHE = new ConcurrentHashMap<>();
     private static final Map<Block, String> BLOCK_NAME_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Item, ResourceLocation> ITEM_ID_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Block, ResourceLocation> BLOCK_ID_CACHE = new ConcurrentHashMap<>();
 
     private static volatile Method mGetItemStackCached = null;
     private static volatile Method mGetBlockStateCached = null;
@@ -28,6 +30,11 @@ public class GTCEuMultiblockStructureScanner {
     public static MultiblockStructureDef scanSingle(ResourceLocation controllerId) {
         if (!ModCompatHelper.isGTLoaded() || controllerId == null) {
             return null;
+        }
+
+        MultiblockStructureDef existing = MultiblockStructureCatalog.getStructureCached(controllerId);
+        if (existing != null) {
+            return existing;
         }
 
         try {
@@ -70,6 +77,15 @@ public class GTCEuMultiblockStructureScanner {
             int maxOutHatch = variants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
             int maxMaint = variants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
 
+            GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
+
+            Set<ResourceLocation> allCandidates = new HashSet<>(patternRes.candidateBlocks());
+            for (MultiblockStructurePart p : largest.parts()) {
+                if (p != null && p.itemId() != null) {
+                    allCandidates.add(p.itemId());
+                }
+            }
+
             MultiblockStructureDef canonicalDef = new MultiblockStructureDef(
                     largest.controllerId(),
                     largest.controllerName(),
@@ -80,7 +96,9 @@ public class GTCEuMultiblockStructureScanner {
                     maxOutBus,
                     maxInHatch,
                     maxOutHatch,
-                    maxMaint
+                    maxMaint,
+                    patternRes.allowedAbilities(),
+                    Collections.unmodifiableSet(allCandidates)
             );
 
             MultiblockStructureCatalog.registerStructure(canonicalDef, variants);
@@ -146,6 +164,15 @@ public class GTCEuMultiblockStructureScanner {
                     int maxOutHatch = variants.stream().mapToInt(MultiblockStructureDef::outputHatchSlotCount).max().orElse(0);
                     int maxMaint = variants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
 
+                    GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
+
+                    Set<ResourceLocation> scanCandidates = new HashSet<>(patternRes.candidateBlocks());
+                    for (MultiblockStructurePart p : largest.parts()) {
+                        if (p != null && p.itemId() != null) {
+                            scanCandidates.add(p.itemId());
+                        }
+                    }
+
                     MultiblockStructureDef canonicalDef = new MultiblockStructureDef(
                             largest.controllerId(),
                             largest.controllerName(),
@@ -156,7 +183,9 @@ public class GTCEuMultiblockStructureScanner {
                             maxOutBus,
                             maxInHatch,
                             maxOutHatch,
-                            maxMaint
+                            maxMaint,
+                            patternRes.allowedAbilities(),
+                            Collections.unmodifiableSet(scanCandidates)
                     );
 
                     MultiblockStructureCatalog.registerStructure(canonicalDef, variants);
@@ -203,7 +232,7 @@ public class GTCEuMultiblockStructureScanner {
                             String name = "";
 
                             if (itemStack != null && !itemStack.isEmpty()) {
-                                itemId = ForgeRegistries.ITEMS.getKey(itemStack.getItem());
+                                itemId = ITEM_ID_CACHE.computeIfAbsent(itemStack.getItem(), ForgeRegistries.ITEMS::getKey);
                                 if (itemId != null) {
                                     name = ITEM_NAME_CACHE.computeIfAbsent(itemStack.getItem(), itm -> itm.getDescription().getString());
                                 }
@@ -211,7 +240,7 @@ public class GTCEuMultiblockStructureScanner {
                                 Object bState = mGetBlockStateCached.invoke(bInfo);
                                 if (bState instanceof BlockState bs) {
                                     Block blk = bs.getBlock();
-                                    itemId = ForgeRegistries.BLOCKS.getKey(blk);
+                                    itemId = BLOCK_ID_CACHE.computeIfAbsent(blk, ForgeRegistries.BLOCKS::getKey);
                                     if (itemId != null) {
                                         name = BLOCK_NAME_CACHE.computeIfAbsent(blk, b -> b.getName().getString());
                                     }

@@ -820,7 +820,13 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
         super.render(graphics, mouseX, mouseY, partialTicks);
 
-        // 8. Top-level Modal Dialogs (Highest Layer)
+        // 8. Top-level Modal Dialogs (Highest Layer: Clear depth buffer for complete modal isolation)
+        if (isAnyModalOpen()) {
+            graphics.flush();
+            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+            RenderSystem.disableDepthTest();
+        }
+
         if (welcomeDialog != null && welcomeDialog.isVisible()) {
             welcomeDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
@@ -854,7 +860,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         BoardToast.render(graphics, font, width, height);
     }
 
-    private boolean isAnyModalOpen() {
+    public boolean isAnyModalOpen() {
         return (welcomeDialog != null && welcomeDialog.isVisible())
             || (globalBalanceDialog != null && globalBalanceDialog.isVisible())
             || (multiblockBOMDialog != null && multiblockBOMDialog.isVisible())

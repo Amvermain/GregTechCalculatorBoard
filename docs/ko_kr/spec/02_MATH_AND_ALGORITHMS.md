@@ -48,11 +48,30 @@ $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \tex
 $$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()$$
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
-#### EBF (전기 고로) 코일 온도 할인 수식
-레시피 요구 온도 $T_{\text{recipe}}$, 코일 온도 $T_{\text{coil}}$일 때:
-$$\Delta T_{\text{excess}} = \max(0, \, T_{\text{coil}} - T_{\text{recipe}})$$
-$$\text{EUt Discount Multiplier} = 0.95^{\lfloor \Delta T_{\text{excess}} / 900 \rfloor}$$
-*(900K 초과 온도마다 전력 소모 $5\%$ 복합 할인)*
+#### 가열 코일 (Heating Coil) 기계별 보너스 연역 수식
+- **전기로 (EBF, Electric Blast Furnace)**:
+  레시피 요구 온도 $T_{\text{recipe}}$, 코일 온도 $T_{\text{coil}}$일 때:
+  $$\Delta T_{\text{excess}} = \max(0, \, T_{\text{coil}} - T_{\text{recipe}})$$
+  $$\text{EUt Multiplier} = 0.95^{\lfloor \Delta T_{\text{excess}} / 900 \rfloor}$$
+  *(900K 초과 온도마다 전력 소모 $5\%$ 복합 할인)*
+
+- **열분해로 (Pyrolyse Oven)**:
+  $$\text{Duration Multiplier} = \frac{100.0}{\text{PyrolyseSpeedPercent}}$$
+
+- **크래킹 유닛 (Cracking Unit)**:
+  $$\text{EUt Multiplier} = \frac{\text{CrackingEnergyPercent}}{100.0}$$
+
+- **화학 반응기 (Large Chemical Reactor / ECR / ICR)**:
+  $$\text{Duration Multiplier} = \frac{100.0}{\text{ChemicalSpeedPercent}}, \quad \text{EUt Multiplier} = \frac{\text{ChemicalEnergyPercent}}{100.0}$$
+
+- **대형 제련로 (Multi Smelter)**:
+  $$\text{Parallel} = \text{SmelterParallel} \quad (\text{기본 } 32\text{x}, 64\text{x}, 128\text{x}\dots)$$
+
+- **커스텀 코일 멀티블록 (KubeJS / 애드온 Custom Multiblock)**:
+  코일 레벨 $L = \max(1, \lfloor (T_{\text{coil}} - 1800) / 900 \rfloor)$일 때:
+  $$\text{Duration Multiplier} = \max(0.01, \, 1.0 - (L \times \text{customDurationMultiplier}))$$
+  $$\text{EUt Multiplier} = \max(0.01, \, 1.0 - (L \times \text{customEnergyMultiplier}))$$
+  $$\text{Parallel} = \text{customBaseParallel} + (L \times \text{customParallelMultiplier})$$
 
 ---
 
@@ -170,6 +189,24 @@ flowchart LR
 와이어를 드래그하여 포트에 연결할 때 `Shift` 키를 누르고 있으면, 해당 포트의 유량을 1:1로 맞추기 위한 대상 기계의 대수를 즉시 산출합니다:
 
 $$\text{Target Machine Count} = \frac{\text{Source Port Flow Rate}}{\text{Target Single Machine Port Rate}}$$
+
+---
+
+### [알고리즘 6] 목표 배치 생산 소요 시간(ETA) 및 총 소요 자원 연산 (`ProductionETACalculator`, RFC-005)
+
+타겟/리라우트 노드에 지정된 목표 수량($A_{\text{target}}$)과 상류 공급 노드들의 순 유입 속도($\text{Rate}_{\text{in}}$)를 기반으로 전체 배치 완료 소요 시간과 필요 자원을 연산합니다:
+
+1. **순 유입 속도 ($\text{Rate}_{\text{in}}$)**:
+   $$\text{Rate}_{\text{in}} = \sum_{U \in \text{UpstreamEdges}} \text{calculateIncomingSupplyRecursive}(U)$$
+2. **배치 예상 소요 시간 ($T_{\text{ET}}$)**:
+   $$T_{\text{ET}} = \begin{cases} 
+   \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} & (\text{Rate}_{\text{in}} > 0) \\
+   \infty & (\text{Rate}_{\text{in}} \le 0)
+   \end{cases}$$
+3. **배치 총 소요 전력량 ($E_{\text{total}}$)**:
+   $$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
+4. **상류 원자재 총 소요량 ($C_{\text{raw}}$)**:
+   $$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
 
 ---
 

@@ -38,68 +38,26 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
         var category = new dev.emi.emi.api.recipe.EmiRecipeCategory(new ResourceLocation("gtcalcboard", "kinetic_generation"), iconStack);
         registry.addCategory(category);
 
-        registerCreateKinetic(registry, category, "create", "large_water_wheel", "Large Water Wheel", 512.0, true, null);
-        registerCreateKinetic(registry, category, "create", "water_wheel", "Water Wheel", 256.0, true, null);
-        registerCreateKinetic(registry, category, "create", "windmill_bearing", "Windmill Bearing", 512.0, true, null);
-        registerCreateKinetic(registry, category, "create", "steam_engine", "Steam Engine", 2048.0, true,
-                List.of(com.gtceu.calcboard.api.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 200.0)));
-        registerCreateKinetic(registry, category, "create", "hand_crank", "Hand Crank", 256.0, true, null);
-        registerCreateKinetic(registry, category, "create", "creative_motor", "Creative Motor", 16384.0, true, null);
-        registerCreateKinetic(registry, category, "createaddition", "alternator", "Alternator", 256.0, true,
-                List.of(com.gtceu.calcboard.api.IngredientStack.stressUnit(256.0)), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
-        registerCreateKinetic(registry, category, "createaddition", "electric_motor", "Electric Motor", 1024.0, false,
-                List.of(), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
+        java.util.Set<net.minecraft.world.item.Item> activeRecipeItems = new java.util.HashSet<>();
+        try {
+            var rm = registry.getRecipeManager();
+            if (rm != null) {
+                for (var r : rm.getRecipes()) {
+                    try {
+                        net.minecraft.world.item.ItemStack res = r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+                        if (res != null && !res.isEmpty() && res.getItem() != net.minecraft.world.item.Items.AIR) {
+                            activeRecipeItems.add(res.getItem());
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
 
-        // Create: New Age
-        registerCreateKinetic(registry, category, "create_new_age", "generator_coil", "Generator Coil", 512.0, true,
-                List.of(com.gtceu.calcboard.api.IngredientStack.stressUnit(768.0)), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
-        registerCreateKinetic(registry, category, "create_new_age", "carbon_brushes", "Carbon Brushes", 256.0, true,
-                List.of(com.gtceu.calcboard.api.IngredientStack.stressUnit(768.0)), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
-        registerCreateKinetic(registry, category, "create_new_age", "basic_motor", "Basic Motor", 512.0, false,
-                List.of(), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
-        registerCreateKinetic(registry, category, "create_new_age", "advanced_motor", "Advanced Motor", 2048.0, false,
-                List.of(), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
-        registerCreateKinetic(registry, category, "create_new_age", "reinforced_motor", "Reinforced Motor", 8192.0, false,
-                List.of(), com.gtceu.calcboard.api.EnergyType.ELECTRIC_FE);
-        registerCreateKinetic(registry, category, "create_new_age", "stirling_engine", "Stirling Engine", 1024.0, true, null);
-        registerCreateKinetic(registry, category, "create_new_age", "solar_heating_plate", "Solar Heating Plate", 256.0, true, null);
-    }
-
-    private void registerCreateKinetic(EmiRegistry registry, dev.emi.emi.api.recipe.EmiRecipeCategory category, String modId, String path, String defaultName, double amount, boolean isGen, List<com.gtceu.calcboard.api.IngredientStack> inputs) {
-        registerCreateKinetic(registry, category, modId, path, defaultName, amount, isGen, inputs, com.gtceu.calcboard.api.EnergyType.KINETIC_SU);
-    }
-
-    private void registerCreateKinetic(EmiRegistry registry, dev.emi.emi.api.recipe.EmiRecipeCategory category, String modId, String path, String defaultName, double amount, boolean isGen, List<com.gtceu.calcboard.api.IngredientStack> inputs, com.gtceu.calcboard.api.EnergyType energyType) {
-        var itemId = new ResourceLocation(modId, path);
-        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(itemId);
-        if (item == null || item == net.minecraft.world.item.Items.AIR) return;
-
-        var stack = new net.minecraft.world.item.ItemStack(item);
-        String name = stack.getHoverName().getString();
-        if (name == null || name.isEmpty()) name = defaultName;
-
-        List<com.gtceu.calcboard.api.IngredientStack> outStacks = new java.util.ArrayList<>();
-        if (energyType == com.gtceu.calcboard.api.EnergyType.KINETIC_SU) {
-            outStacks.add(com.gtceu.calcboard.api.IngredientStack.stressUnit(amount));
+        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+            try {
+                adapter.registerSyntheticEmiRecipes(registry, category, activeRecipeItems);
+            } catch (Throwable ignored) {}
         }
-
-        var recipe = new KineticGenerationEmiRecipe(
-                new ResourceLocation("gtcalcboard", "kinetic_gen/" + modId + "/" + path),
-                category,
-                itemId,
-                name,
-                20.0,
-                amount,
-                com.gtceu.calcboard.api.GTVoltageTier.LV,
-                energyType,
-                isGen,
-                inputs != null ? inputs : List.of(),
-                outStacks,
-                stack
-        );
-
-        registry.addWorkstation(category, EmiStack.of(stack));
-        registry.addRecipe(recipe);
     }
 
     public static void addRecipeToBoard(EmiRecipe recipe) {
