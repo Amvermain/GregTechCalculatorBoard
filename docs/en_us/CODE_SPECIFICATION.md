@@ -9,7 +9,7 @@ This document serves as the official Master Index for the **GregTech Calculator 
 | Field | Description |
 | :--- | :--- |
 | **Specification Version** | `2.0.0` (Base Commit: `6c63984`) |
-| **Target Platform** | Minecraft 1.20.1 (Forge / NeoForge compatible, 1.7.10 backport-ready architecture) |
+| **Target Platform** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
 | **Dependencies** | Java 17+, GregTech CEu Modern, EMI (Recipe Viewer) |
 | **Soft Dependencies** | FTB Teams (Multiplayer team sync) |
 | **Language** | English (`en_us`) / [한국어 (`ko_kr`)](../ko_kr/CODE_SPECIFICATION.md) |

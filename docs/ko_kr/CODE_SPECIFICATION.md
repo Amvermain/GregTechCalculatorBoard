@@ -9,7 +9,7 @@
 | 항목 | 내용 |
 | :--- | :--- |
 | **문서 버전** | `2.0.0` (기준 커밋: `6c63984`) |
-| **대상 플랫폼** | Minecraft 1.20.1 (Forge / NeoForge 호환 구조, 1.7.10 백포트 아키텍처 지원) |
+| **대상 플랫폼** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
 | **의존성** | Java 17+, GregTech CEu Modern, EMI (Recipe Viewer) |
 | **소프트 의존성** | FTB Teams (멀티플레이 팀 연동) |
 | **작성 언어** | 한국어 (Korean) |

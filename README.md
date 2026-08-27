@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Minecraft-1.20.1-brightgreen.svg" alt="Minecraft 1.20.1">
-  <img src="https://img.shields.io/badge/Loader-NeoForge%20%2F%20Forge%2047.2.0+-orange.svg" alt="Forge">
+  <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
   <img src="https://img.shields.io/badge/GregTech-CEu%20Modern-blue.svg" alt="GTCEu Modern">
   <img src="https://img.shields.io/badge/Recipe%20Viewer-EMI%20%2F%20JEI%20Supported-purple.svg" alt="EMI & JEI">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
@@ -129,15 +129,23 @@ GregTech Calculator Board is completely optional on both client and server sides
 
 ---
 
-## Requirements
+## Requirements & Mod Compatibility
 
 - **Minecraft**: `1.20.1`
-- **Mod Loader**: `Forge (47.2.0+)` / `NeoForge`
-- **Required Dependencies**: None
-- **Recommended**:
-  - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern)
-  - [EMI](https://curseforge.com/minecraft/mc-mods/emi) or [JEI](https://curseforge.com/minecraft/mc-mods/jei)
-  - [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (Optional, for multiplayer team sync)
+- **Mod Loader**: `Minecraft Forge (47.2.0+)`
+- **Required Dependencies**: **None** (Fully standalone, 0 hard dependencies required)
+- **Supported Recipe Viewers**:
+  - [EMI](https://curseforge.com/minecraft/mc-mods/emi) (1.1.24+ / Recommended)
+  - [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+)
+  - [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM recipe tree integration)
+- **Supported Tech & Factory Mods**:
+  - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ or Star Technology forks)
+  - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
+  - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
+  - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
+- **Optional Team Synchronization**:
+  - [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (For dedicated server multiplayer team workspaces)
 
 ---
 

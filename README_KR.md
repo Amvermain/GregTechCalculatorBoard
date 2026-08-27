@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Minecraft-1.20.1-brightgreen.svg" alt="Minecraft 1.20.1">
-  <img src="https://img.shields.io/badge/Loader-NeoForge%20%2F%20Forge%2047.2.0+-orange.svg" alt="Forge">
+  <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
   <img src="https://img.shields.io/badge/GregTech-CEu%20Modern-blue.svg" alt="GTCEu Modern">
   <img src="https://img.shields.io/badge/Recipe%20Viewer-EMI%20%2F%20JEI%20Supported-purple.svg" alt="EMI & JEI">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
@@ -129,15 +129,23 @@
 
 ---
 
-## 요구 사항
+## 요구 사양 및 모드 호환성 (Requirements & Mod Compatibility)
 
 - **마인크래프트**: `1.20.1`
-- **모드 로더**: `Forge (47.2.0+)` / `NeoForge`
-- **필수 모드**: 없음 (단독 구동 가능)
-- **권장 모드**:
-  - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern)
-  - [EMI](https://curseforge.com/minecraft/mc-mods/emi) 또는 [JEI](https://curseforge.com/minecraft/mc-mods/jei)
-  - [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (멀티플레이어 팀 동기화 선택 모드)
+- **모드 로더**: `Minecraft Forge (47.2.0+)`
+- **필수 모드**: **없음** (완전 독립 구동 가능, 0 필수 종속성)
+- **지원 레시피 뷰어**:
+  - [EMI](https://curseforge.com/minecraft/mc-mods/emi) (1.1.24+ / 권장)
+  - [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+)
+  - [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM 레시피 트리 목표 등록)
+- **지원 산업 및 팩토리 모드**:
+  - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ 또는 Star Technology 포크)
+  - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
+  - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
+  - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
+- **멀티플레이어 팀 동기화 (선택)**:
+  - [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (전용 서버 멀티플레이어 팀 워크스페이스 공유)
 
 ---
 

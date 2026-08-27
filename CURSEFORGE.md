@@ -92,12 +92,20 @@ The mod is fully optional on both client and server:
 
 ***
 
-### Requirements & Compatibility
+### Requirements & Mod Compatibility
 
 *   **Minecraft**: `1.20.1`
-*   **Mod Loader**: `Forge (47.2.0+)` / `NeoForge`
-*   **Dependencies / Recommended**:
+*   **Mod Loader**: `Minecraft Forge (47.2.0+)`
+*   **Required Dependencies**: **None** (Fully standalone, 0 hard dependencies required)
+*   **Supported Recipe Viewers**:
+    *   [EMI](https://curseforge.com/minecraft/mc-mods/emi) (1.1.24+ / Recommended)
+    *   [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+)
+    *   [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM recipe tree integration)
+*   **Supported Tech & Factory Mods**:
     *   [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ or Star Technology forks)
-    *   [EMI](https://curseforge.com/minecraft/mc-mods/emi) or [JEI](https://curseforge.com/minecraft/mc-mods/jei)
-    *   [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (Optional, for team workspace sync)
-*   **Soft Compatibility**: Create, Create: New Age, Thermal Series, Systeams.
+    *   [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
+    *   [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+    *   [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
+    *   [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
+*   **Optional Team Synchronization**:
+    *   [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (For dedicated server multiplayer team workspaces)
