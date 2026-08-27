@@ -1,9 +1,12 @@
 package com.gtceu.calcboard.compat.createnewage;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -25,48 +28,49 @@ public class CreateNewAgeRecipeHandler {
     public static final String MOD_ID = "create_new_age";
 
     public static boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
-        if (emiRecipe instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
-            ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
-            if (catId != null && catId.getNamespace().equals(MOD_ID)) {
-                String path = catId.getPath().toLowerCase(Locale.ROOT);
+        ResourceLocation catId = null;
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            catId = EmiCreateNewAgeHelper.getCategoryId(emiRecipe);
+        }
+        if (catId != null && catId.getNamespace().equals(MOD_ID)) {
+            String path = catId.getPath().toLowerCase(Locale.ROOT);
 
-                if (path.contains("energising") || path.contains("energizing")) {
-                    details.energyType = EnergyType.ELECTRIC_FE;
-                    int duration = 100;
-                    double energy = 5000.0;
-                    if (backingRecipe != null) {
+            if (path.contains("energising") || path.contains("energizing")) {
+                details.energyType = EnergyType.ELECTRIC_FE;
+                int duration = 100;
+                double energy = 5000.0;
+                if (backingRecipe != null) {
+                    try {
+                        var getEnergyMethod = backingRecipe.getClass().getMethod("getEnergy");
+                        energy = ((Number) getEnergyMethod.invoke(backingRecipe)).doubleValue();
+                    } catch (Throwable ignored) {
                         try {
-                            var getEnergyMethod = backingRecipe.getClass().getMethod("getEnergy");
-                            energy = ((Number) getEnergyMethod.invoke(backingRecipe)).doubleValue();
-                        } catch (Throwable ignored) {
-                            try {
-                                var energyField = backingRecipe.getClass().getField("energy");
-                                energy = ((Number) energyField.get(backingRecipe)).doubleValue();
-                            } catch (Throwable ignored2) {}
-                        }
-                        try {
-                            var getDurationMethod = backingRecipe.getClass().getMethod("getDuration");
-                            duration = (int) getDurationMethod.invoke(backingRecipe);
-                        } catch (Throwable ignored) {
-                            try {
-                                var durationField = backingRecipe.getClass().getField("duration");
-                                duration = (int) durationField.get(backingRecipe);
-                            } catch (Throwable ignored2) {}
-                        }
+                            var energyField = backingRecipe.getClass().getField("energy");
+                            energy = ((Number) energyField.get(backingRecipe)).doubleValue();
+                        } catch (Throwable ignored2) {}
                     }
-                    details.durationTicks = duration > 0 ? duration : 100;
-                    details.eut = energy / (double) details.durationTicks;
-                    details.tier = GTVoltageTier.getTierForVoltage((long) (details.eut / 4.0));
-                    return true;
+                    try {
+                        var getDurationMethod = backingRecipe.getClass().getMethod("getDuration");
+                        duration = (int) getDurationMethod.invoke(backingRecipe);
+                    } catch (Throwable ignored) {
+                        try {
+                            var durationField = backingRecipe.getClass().getField("duration");
+                            duration = (int) durationField.get(backingRecipe);
+                        } catch (Throwable ignored2) {}
+                    }
                 }
-
-                details.energyType = EnergyType.KINETIC_SU;
-                details.tier = GTVoltageTier.ULV;
-                details.durationTicks = 100;
-                details.eut = 128.0;
-                details.extraInputs.add(IngredientStack.stressUnit(128.0 * (100.0 / 20.0)));
+                details.durationTicks = duration > 0 ? duration : 100;
+                details.eut = energy / (double) details.durationTicks;
+                details.tier = GTVoltageTier.getTierForVoltage((long) (details.eut / 4.0));
                 return true;
             }
+
+            details.energyType = EnergyType.KINETIC_SU;
+            details.tier = GTVoltageTier.ULV;
+            details.durationTicks = 100;
+            details.eut = 128.0;
+            details.extraInputs.add(IngredientStack.stressUnit(128.0 * (100.0 / 20.0)));
+            return true;
         }
         return false;
     }
@@ -201,7 +205,7 @@ public class CreateNewAgeRecipeHandler {
             if (items[i] == null) continue;
             try {
                 var regItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(items[i]);
-                if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {
+                if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {
                     continue;
                 }
             } catch (Throwable ignored) {}
@@ -289,66 +293,83 @@ public class CreateNewAgeRecipeHandler {
     }
 
     public static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        if (!(emiRegistryObj instanceof dev.emi.emi.api.EmiRegistry registry) || !(emiCategoryObj instanceof dev.emi.emi.api.recipe.EmiRecipeCategory category)) {
-            return;
+        if (!com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) return;
+        EmiCreateNewAgeHelper.registerSyntheticEmiRecipes(emiRegistryObj, emiCategoryObj, activeRecipeItems);
+    }
+
+    private static class EmiCreateNewAgeHelper {
+        private static ResourceLocation getCategoryId(Object emiRecipe) {
+            if (emiRecipe instanceof dev.emi.emi.api.recipe.EmiRecipe recipe && recipe.getCategory() != null) {
+                return recipe.getCategory().getId();
+            }
+            return null;
         }
 
-        record CNACandidate(String path, String defaultName, double amount, boolean isGen, List<IngredientStack> inputs, EnergyType energyType) {}
-
-        List<CNACandidate> candidates = List.of(
-                new CNACandidate("generator_coil", "Generator Coil", 512.0, true,
-                        List.of(IngredientStack.stressUnit(768.0)), EnergyType.ELECTRIC_FE),
-                new CNACandidate("carbon_brushes", "Carbon Brushes", 256.0, true,
-                        List.of(IngredientStack.stressUnit(768.0)), EnergyType.ELECTRIC_FE),
-                new CNACandidate("basic_motor", "Basic Motor", 512.0, false,
-                        List.of(), EnergyType.ELECTRIC_FE),
-                new CNACandidate("advanced_motor", "Advanced Motor", 2048.0, false,
-                        List.of(), EnergyType.ELECTRIC_FE),
-                new CNACandidate("reinforced_motor", "Reinforced Motor", 8192.0, false,
-                        List.of(), EnergyType.ELECTRIC_FE),
-                new CNACandidate("stirling_engine", "Stirling Engine", 1024.0, true,
-                        null, EnergyType.KINETIC_SU)
-        );
-
-        for (CNACandidate c : candidates) {
-            var itemId = new ResourceLocation(MOD_ID, c.path);
-            var item = ForgeRegistries.ITEMS.getValue(itemId);
-            if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
-
-            // Strict check: if the item is disabled or hidden from recipe viewers or has no recipes in modpack, do NOT register!
-            if (com.gtceu.calcboard.api.DynamicAddonCrawler.isItemDisabledOrHidden(item, (activeRecipeItems != null && !activeRecipeItems.isEmpty()) ? activeRecipeItems : null)) {
-                continue;
+        private static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
+            if (!(emiRegistryObj instanceof dev.emi.emi.api.EmiRegistry registry) || !(emiCategoryObj instanceof dev.emi.emi.api.recipe.EmiRecipeCategory category)) {
+                return;
             }
 
-            var block = ForgeRegistries.BLOCKS.getValue(itemId);
-            double amount = com.gtceu.calcboard.compat.create.CreateRecipeHandler.getDynamicStressCapacity(block, c.amount);
+            record CNACandidate(String path, String defaultName, double amount, boolean isGen, List<IngredientStack> inputs, EnergyType energyType) {}
 
-            var stack = new ItemStack(item);
-            String name = stack.getHoverName().getString();
-            if (name == null || name.isEmpty()) name = c.defaultName;
-
-            List<IngredientStack> outStacks = new ArrayList<>();
-            if (c.energyType == EnergyType.KINETIC_SU) {
-                outStacks.add(IngredientStack.stressUnit(amount));
-            }
-
-            var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
-                    new ResourceLocation("gtcalcboard", "kinetic_gen/" + MOD_ID + "/" + c.path),
-                    category,
-                    itemId,
-                    name,
-                    20.0,
-                    amount,
-                    GTVoltageTier.LV,
-                    c.energyType,
-                    c.isGen,
-                    c.inputs != null ? c.inputs : List.of(),
-                    outStacks,
-                    stack
+            List<CNACandidate> candidates = List.of(
+                    new CNACandidate("generator_coil", "Generator Coil", 512.0, true,
+                            List.of(IngredientStack.stressUnit(768.0)), EnergyType.ELECTRIC_FE),
+                    new CNACandidate("carbon_brushes", "Carbon Brushes", 256.0, true,
+                            List.of(IngredientStack.stressUnit(768.0)), EnergyType.ELECTRIC_FE),
+                    new CNACandidate("basic_motor", "Basic Motor", 512.0, false,
+                            List.of(), EnergyType.ELECTRIC_FE),
+                    new CNACandidate("advanced_motor", "Advanced Motor", 2048.0, false,
+                            List.of(), EnergyType.ELECTRIC_FE),
+                    new CNACandidate("reinforced_motor", "Reinforced Motor", 8192.0, false,
+                            List.of(), EnergyType.ELECTRIC_FE),
+                    new CNACandidate("stirling_engine", "Stirling Engine", 1024.0, true,
+                            null, EnergyType.KINETIC_SU)
             );
 
-            registry.addWorkstation(category, dev.emi.emi.api.stack.EmiStack.of(stack));
-            registry.addRecipe(recipe);
+            for (CNACandidate c : candidates) {
+                var itemId = new ResourceLocation(MOD_ID, c.path);
+                var item = ForgeRegistries.ITEMS.getValue(itemId);
+                if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
+
+                // Strict check: if the item is disabled or hidden from recipe viewers or has no recipes in modpack, do NOT register!
+                if (com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(item, (activeRecipeItems != null && !activeRecipeItems.isEmpty()) ? activeRecipeItems : null)) {
+                    continue;
+                }
+
+                var block = ForgeRegistries.BLOCKS.getValue(itemId);
+                double amount = com.gtceu.calcboard.compat.create.CreateRecipeHandler.getDynamicStressCapacity(block, c.amount);
+
+                var stack = new ItemStack(item);
+                String name = stack.getHoverName().getString();
+                if (name == null || name.isEmpty()) name = c.defaultName;
+
+                List<IngredientStack> outStacks = new ArrayList<>();
+                if (c.energyType == EnergyType.KINETIC_SU) {
+                    outStacks.add(IngredientStack.stressUnit(amount));
+                }
+
+                var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
+                        new ResourceLocation("gtcalcboard", "kinetic_gen/" + MOD_ID + "/" + c.path),
+                        category,
+                        itemId,
+                        name,
+                        20.0,
+                        amount,
+                        GTVoltageTier.LV,
+                        c.energyType,
+                        c.isGen,
+                        c.inputs != null ? c.inputs : List.of(),
+                        outStacks,
+                        stack
+                );
+
+                registry.addWorkstation(category, dev.emi.emi.api.stack.EmiStack.of(stack));
+                registry.addRecipe(recipe);
+            }
         }
     }
 }
+
+
+

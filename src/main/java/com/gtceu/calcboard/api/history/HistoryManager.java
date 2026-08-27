@@ -1,7 +1,6 @@
 package com.gtceu.calcboard.api.history;
 
-import com.gtceu.calcboard.api.FlowGraph;
-
+import com.gtceu.calcboard.api.model.FlowGraph;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -60,3 +59,4 @@ public class HistoryManager {
         redoStack.clear();
     }
 }
+

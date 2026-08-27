@@ -1,10 +1,9 @@
 package com.gtceu.calcboard.client.gui.search;
 
-import dev.emi.emi.api.recipe.EmiRecipe;
-import dev.emi.emi.api.recipe.EmiRecipeCategory;
-import dev.emi.emi.api.stack.EmiIngredient;
-import dev.emi.emi.api.stack.EmiStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 
+import com.gtceu.calcboard.api.model.IngredientStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -27,6 +26,12 @@ import java.util.regex.Pattern;
 public class RecipeSearchEngine {
 
     public record CategoryInfo(String displayName, int count) {}
+
+    public record MatchedOutputResult(
+            ResourceLocation id,
+            String name,
+            int index
+    ) {}
 
     public record SearchableRecipe(
             Object recipe,
@@ -176,249 +181,263 @@ public class RecipeSearchEngine {
 
     private static final Pattern TOKEN_PATTERN = Pattern.compile("(!?(?:in:|input:|out:|output:|>|<|\\^))?\"([^\"]*)\"|\\[([^\\]]*)\\]|(\\S+)");
 
-    public static SearchableRecipe buildIndex(EmiRecipe recipe) {
+    public static SearchableRecipe buildIndex(Object recipe) {
         if (recipe == null) return null;
-
-        String displayName = extractDisplayName(recipe);
-        String modId = "";
-        String categoryId = "";
-        String categoryName = "";
-
-        if (recipe.getId() != null) {
-            modId = recipe.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            return EmiRecipeIndexer.buildIndex(recipe);
         }
+        return null;
+    }
 
-        EmiRecipeCategory cat = recipe.getCategory();
-        if (cat != null) {
-            if (cat.getId() != null) {
-                categoryId = cat.getId().getPath().toLowerCase(Locale.ROOT).intern();
-                if (modId.isEmpty()) {
-                    modId = cat.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
-                }
+    private static class EmiRecipeIndexer {
+        public static SearchableRecipe buildIndex(Object recipe) {
+            if (!(recipe instanceof dev.emi.emi.api.recipe.EmiRecipe er)) return null;
+
+            String displayName = extractDisplayName(er);
+            String modId = "";
+            String categoryId = "";
+            String categoryName = "";
+
+            if (er.getId() != null) {
+                modId = er.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
             }
-            try {
-                if (cat.getName() != null) {
-                    categoryName = cat.getName().getString().toLowerCase(Locale.ROOT).intern();
-                }
-            } catch (Throwable ignored) {}
-        }
 
-        List<ResourceLocation> outputIds = new ArrayList<>(2);
-        List<String> outputNames = new ArrayList<>(2);
-        StringBuilder outSb = new StringBuilder();
-        if (recipe.getOutputs() != null) {
-            for (EmiStack out : recipe.getOutputs()) {
-                if (out != null) {
-                    indexStackCompact(out, outSb, outputIds, outputNames);
+            dev.emi.emi.api.recipe.EmiRecipeCategory cat = er.getCategory();
+            if (cat != null) {
+                if (cat.getId() != null) {
+                    categoryId = cat.getId().getPath().toLowerCase(Locale.ROOT).intern();
+                    if (modId.isEmpty()) {
+                        modId = cat.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
+                    }
                 }
+                try {
+                    if (cat.getName() != null) {
+                        categoryName = cat.getName().getString().toLowerCase(Locale.ROOT).intern();
+                    }
+                } catch (Throwable ignored) {}
             }
-        }
 
-        List<ResourceLocation> inputIds = new ArrayList<>(4);
-        List<String> inputNames = new ArrayList<>(4);
-        StringBuilder inSb = new StringBuilder();
-        if (recipe.getInputs() != null) {
-            for (EmiIngredient in : recipe.getInputs()) {
-                if (in != null && in.getEmiStacks() != null) {
-                    for (EmiStack stack : in.getEmiStacks()) {
-                        if (stack != null) {
-                            indexStackCompact(stack, inSb, inputIds, inputNames);
-                        }
+            List<ResourceLocation> outputIds = new ArrayList<>(2);
+            List<String> outputNames = new ArrayList<>(2);
+            StringBuilder outSb = new StringBuilder();
+            if (er.getOutputs() != null) {
+                for (dev.emi.emi.api.stack.EmiStack out : er.getOutputs()) {
+                    if (out != null) {
+                        indexStackCompact(out, outSb, outputIds, outputNames);
                     }
                 }
             }
-        }
 
-        // Index synthetic KineticGenerationEmiRecipe outputs and inputs
-        if (recipe instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg) {
-            for (com.gtceu.calcboard.api.IngredientStack out : kg.getOutputStacks()) {
-                if (out != null && out.getId() != null) {
-                    outputIds.add(out.getId());
-                    if (out.getDisplayName() != null) {
-                        outputNames.add(out.getDisplayName());
-                        outSb.append(' ').append(out.getDisplayName().toLowerCase(Locale.ROOT));
-                    }
-                    outSb.append(' ').append(out.getId().toString().toLowerCase(Locale.ROOT));
-                    outSb.append(' ').append(out.getId().getPath().toLowerCase(Locale.ROOT));
-                    if (out.isStressUnit()) {
-                        outSb.append(" su stress units kinetic 스트레스");
-                        outputNames.add("stress units");
-                        outputNames.add("Stress Units");
-                    }
-                }
-            }
-            for (com.gtceu.calcboard.api.IngredientStack in : kg.getInputStacks()) {
-                if (in != null && in.getId() != null) {
-                    inputIds.add(in.getId());
-                    if (in.getDisplayName() != null) {
-                        inputNames.add(in.getDisplayName());
-                        inSb.append(' ').append(in.getDisplayName().toLowerCase(Locale.ROOT));
-                    }
-                    inSb.append(' ').append(in.getId().toString().toLowerCase(Locale.ROOT));
-                    inSb.append(' ').append(in.getId().getPath().toLowerCase(Locale.ROOT));
-                    if (in.isStressUnit()) {
-                        inSb.append(" su stress units kinetic 스트레스");
-                        inputNames.add("stress units");
-                        inputNames.add("Stress Units");
-                    }
-                }
-            }
-        }
-
-        // Index virtual kinetic input for Create machine recipes
-        if (cat != null && cat.getId() != null && ("create".equals(cat.getId().getNamespace()) || "createaddition".equals(cat.getId().getNamespace()))) {
-            inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
-            inputNames.add("stress units");
-            inputNames.add("Stress Units");
-            inputIds.add(ResourceLocation.tryParse("create:stress_units"));
-        }
-
-        // Index custom adapter recipe outputs/inputs (e.g. gtceu:steam_boiler -> steam output, water input)
-        if (cat != null && cat.getId() != null && (cat.getId().getPath().contains("boiler") || cat.getId().getPath().contains("turbine") || cat.getId().getPath().contains("generator"))) {
-            try {
-                com.gtceu.calcboard.integration.emi.EmiRecipeConverter.RecipeDetails details =
-                        com.gtceu.calcboard.integration.emi.EmiRecipeConverter.extractRecipeDetails(recipe, null);
-                if (details != null) {
-                    if (details.overrideOutputs && !details.customOutputs.isEmpty()) {
-                        for (com.gtceu.calcboard.api.IngredientStack cos : details.customOutputs) {
-                            if (cos != null && cos.getId() != null) {
-                                outputIds.add(cos.getId());
-                                if (cos.getDisplayName() != null) {
-                                    outputNames.add(cos.getDisplayName());
-                                    outSb.append(' ').append(cos.getDisplayName().toLowerCase(Locale.ROOT));
-                                }
-                                outSb.append(' ').append(cos.getId().toString().toLowerCase(Locale.ROOT));
-                                outSb.append(' ').append(cos.getId().getPath().toLowerCase(Locale.ROOT));
-                            }
-                        }
-                    }
-                    if (!details.extraInputs.isEmpty()) {
-                        for (com.gtceu.calcboard.api.IngredientStack ein : details.extraInputs) {
-                            if (ein != null && ein.getId() != null) {
-                                inputIds.add(ein.getId());
-                                if (ein.getDisplayName() != null) {
-                                    inputNames.add(ein.getDisplayName());
-                                    inSb.append(' ').append(ein.getDisplayName().toLowerCase(Locale.ROOT));
-                                }
-                                inSb.append(' ').append(ein.getId().toString().toLowerCase(Locale.ROOT));
-                                inSb.append(' ').append(ein.getId().getPath().toLowerCase(Locale.ROOT));
+            List<ResourceLocation> inputIds = new ArrayList<>(4);
+            List<String> inputNames = new ArrayList<>(4);
+            StringBuilder inSb = new StringBuilder();
+            if (er.getInputs() != null) {
+                for (dev.emi.emi.api.stack.EmiIngredient in : er.getInputs()) {
+                    if (in != null && in.getEmiStacks() != null) {
+                        for (dev.emi.emi.api.stack.EmiStack stack : in.getEmiStacks()) {
+                            if (stack != null) {
+                                indexStackCompact(stack, inSb, inputIds, inputNames);
                             }
                         }
                     }
                 }
+            }
+
+            if (er instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg) {
+                for (com.gtceu.calcboard.api.model.IngredientStack out : kg.getOutputStacks()) {
+                    if (out != null && out.getId() != null) {
+                        outputIds.add(out.getId());
+                        if (out.getDisplayName() != null) {
+                            outputNames.add(out.getDisplayName());
+                            outSb.append(' ').append(out.getDisplayName().toLowerCase(Locale.ROOT));
+                        }
+                        outSb.append(' ').append(out.getId().toString().toLowerCase(Locale.ROOT));
+                        outSb.append(' ').append(out.getId().getPath().toLowerCase(Locale.ROOT));
+                        if (out.isStressUnit()) {
+                            outSb.append(" su stress units kinetic 스트레스");
+                            outputNames.add("stress units");
+                            outputNames.add("Stress Units");
+                        }
+                    }
+                }
+                for (com.gtceu.calcboard.api.model.IngredientStack in : kg.getInputStacks()) {
+                    if (in != null && in.getId() != null) {
+                        inputIds.add(in.getId());
+                        if (in.getDisplayName() != null) {
+                            inputNames.add(in.getDisplayName());
+                            inSb.append(' ').append(in.getDisplayName().toLowerCase(Locale.ROOT));
+                        }
+                        inSb.append(' ').append(in.getId().toString().toLowerCase(Locale.ROOT));
+                        inSb.append(' ').append(in.getId().getPath().toLowerCase(Locale.ROOT));
+                        if (in.isStressUnit()) {
+                            inSb.append(" su stress units kinetic 스트레스");
+                            inputNames.add("stress units");
+                            inputNames.add("Stress Units");
+                        }
+                    }
+                }
+            }
+
+            if (cat != null && cat.getId() != null && ("create".equals(cat.getId().getNamespace()) || "createaddition".equals(cat.getId().getNamespace()))) {
+                inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
+                inputNames.add("stress units");
+                inputNames.add("Stress Units");
+                inputIds.add(ResourceLocation.tryParse("create:stress_units"));
+            }
+
+            if (cat != null && cat.getId() != null && (cat.getId().getPath().contains("boiler") || cat.getId().getPath().contains("turbine") || cat.getId().getPath().contains("generator"))) {
+                try {
+                    com.gtceu.calcboard.integration.emi.EmiRecipeConverter.RecipeDetails details =
+                            com.gtceu.calcboard.integration.emi.EmiRecipeConverter.extractRecipeDetails(er, null);
+                    if (details != null) {
+                        if (details.overrideOutputs && !details.customOutputs.isEmpty()) {
+                            for (com.gtceu.calcboard.api.model.IngredientStack cos : details.customOutputs) {
+                                if (cos != null && cos.getId() != null) {
+                                    outputIds.add(cos.getId());
+                                    if (cos.getDisplayName() != null) {
+                                        outputNames.add(cos.getDisplayName());
+                                        outSb.append(' ').append(cos.getDisplayName().toLowerCase(Locale.ROOT));
+                                    }
+                                    outSb.append(' ').append(cos.getId().toString().toLowerCase(Locale.ROOT));
+                                    outSb.append(' ').append(cos.getId().getPath().toLowerCase(Locale.ROOT));
+                                }
+                            }
+                        }
+                        if (!details.extraInputs.isEmpty()) {
+                            for (com.gtceu.calcboard.api.model.IngredientStack ein : details.extraInputs) {
+                                if (ein != null && ein.getId() != null) {
+                                    inputIds.add(ein.getId());
+                                    if (ein.getDisplayName() != null) {
+                                        inputNames.add(ein.getDisplayName());
+                                        inSb.append(' ').append(ein.getDisplayName().toLowerCase(Locale.ROOT));
+                                    }
+                                    inSb.append(' ').append(ein.getId().toString().toLowerCase(Locale.ROOT));
+                                    inSb.append(' ').append(ein.getId().getPath().toLowerCase(Locale.ROOT));
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            if (cat != null) {
+                inSb.append(getCategoryWorkstationText(cat));
+            }
+
+            ResourceLocation[] inArr = inputIds.isEmpty() ? null : inputIds.toArray(new ResourceLocation[0]);
+            ResourceLocation[] outArr = outputIds.isEmpty() ? null : outputIds.toArray(new ResourceLocation[0]);
+            String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
+            String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
+
+            return new SearchableRecipe(
+                    er,
+                    displayName,
+                    modId,
+                    categoryId,
+                    categoryName,
+                    inSb.toString().trim(),
+                    outSb.toString().trim(),
+                    inArr,
+                    outArr,
+                    inNamesArr,
+                    outNamesArr
+            );
+        }
+
+        private static final Map<dev.emi.emi.api.recipe.EmiRecipeCategory, String> CATEGORY_WS_TEXT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+        private static String getCategoryWorkstationText(dev.emi.emi.api.recipe.EmiRecipeCategory cat) {
+            if (cat == null) return "";
+            return CATEGORY_WS_TEXT_CACHE.computeIfAbsent(cat, c -> {
+                StringBuilder sb = new StringBuilder();
+                try {
+                    var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+                    if (rm != null) {
+                        var workstations = rm.getWorkstations(c);
+                        if (workstations != null) {
+                            for (dev.emi.emi.api.stack.EmiIngredient wsIng : workstations) {
+                                if (wsIng != null && wsIng.getEmiStacks() != null) {
+                                    for (dev.emi.emi.api.stack.EmiStack wsStack : wsIng.getEmiStacks()) {
+                                        if (wsStack != null) {
+                                            if (wsStack.getId() != null) {
+                                                sb.append(' ').append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
+                                                sb.append(' ').append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
+                                            }
+                                            try {
+                                                if (wsStack.getName() != null) {
+                                                    sb.append(' ').append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
+                                                }
+                                            } catch (Throwable ignored) {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+                return sb.toString();
+            });
+        }
+
+        private static void indexStackCompact(dev.emi.emi.api.stack.EmiStack stack, StringBuilder sb, List<ResourceLocation> ids, List<String> names) {
+            if (stack == null) return;
+            ResourceLocation id = stack.getId();
+            if (id == null) return;
+
+            ids.add(id);
+            StackSearchData data = STACK_DATA_CACHE.get(id);
+            if (data == null) {
+                String n = "";
+                try {
+                    Component comp = stack.getName();
+                    if (comp != null) n = comp.getString();
+                } catch (Throwable ignored) {}
+
+                StringBuilder ssb = new StringBuilder();
+                ssb.append(' ').append(id.toString().toLowerCase(Locale.ROOT));
+                ssb.append(' ').append(id.getPath().toLowerCase(Locale.ROOT));
+                if (id.getPath().contains("stress_unit") || id.getPath().equals("cogwheel")) {
+                    ssb.append(" su stress units kinetic 스트레스");
+                }
+                if (!n.isEmpty()) {
+                    ssb.append(' ').append(n.toLowerCase(Locale.ROOT));
+                }
+                data = new StackSearchData(n, ssb.toString());
+                STACK_DATA_CACHE.put(id, data);
+            }
+
+            sb.append(data.searchText());
+            if (!data.name().isEmpty()) {
+                names.add(data.name());
+            }
+        }
+
+        private static String extractDisplayName(dev.emi.emi.api.recipe.EmiRecipe recipe) {
+            try {
+                if (recipe.getOutputs() != null && !recipe.getOutputs().isEmpty()) {
+                    var firstOut = recipe.getOutputs().get(0);
+                    if (firstOut != null && firstOut.getName() != null) {
+                        return firstOut.getName().getString();
+                    }
+                }
             } catch (Throwable ignored) {}
+            if (recipe.getId() != null) {
+                String path = recipe.getId().getPath();
+                if (path.contains("/")) {
+                    path = path.substring(path.lastIndexOf('/') + 1);
+                }
+                return com.gtceu.calcboard.integration.emi.EmiRecipeConverter.formatName(path);
+            }
+            return "Unknown Recipe";
         }
 
-        // Index category workstations via precomputed cache
-        if (cat != null) {
-            inSb.append(getCategoryWorkstationText(cat));
+        public static void clearCaches() {
+            CATEGORY_WS_TEXT_CACHE.clear();
         }
-
-        ResourceLocation[] inArr = inputIds.isEmpty() ? null : inputIds.toArray(new ResourceLocation[0]);
-        ResourceLocation[] outArr = outputIds.isEmpty() ? null : outputIds.toArray(new ResourceLocation[0]);
-        String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
-        String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
-
-        return new SearchableRecipe(
-                recipe,
-                displayName,
-                modId,
-                categoryId,
-                categoryName,
-                inSb.toString().trim(),
-                outSb.toString().trim(),
-                inArr,
-                outArr,
-                inNamesArr,
-                outNamesArr
-        );
     }
 
     public record StackSearchData(String name, String searchText) {}
     private static final Map<ResourceLocation, StackSearchData> STACK_DATA_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
-
-    private static void indexStackCompact(EmiStack stack, StringBuilder sb, List<ResourceLocation> ids, List<String> names) {
-        if (stack == null) return;
-        ResourceLocation id = stack.getId();
-        if (id == null) return;
-
-        ids.add(id);
-        StackSearchData data = STACK_DATA_CACHE.get(id);
-        if (data == null) {
-            String n = "";
-            try {
-                Component comp = stack.getName();
-                if (comp != null) n = comp.getString();
-            } catch (Throwable ignored) {}
-
-            StringBuilder ssb = new StringBuilder();
-            ssb.append(' ').append(id.toString().toLowerCase(Locale.ROOT));
-            ssb.append(' ').append(id.getPath().toLowerCase(Locale.ROOT));
-            if (id.getPath().contains("stress_unit") || id.getPath().equals("cogwheel")) {
-                ssb.append(" su stress units kinetic 스트레스");
-            }
-            if (!n.isEmpty()) {
-                ssb.append(' ').append(n.toLowerCase(Locale.ROOT));
-            }
-            data = new StackSearchData(n, ssb.toString());
-            STACK_DATA_CACHE.put(id, data);
-        }
-
-        sb.append(data.searchText());
-        if (!data.name().isEmpty()) {
-            names.add(data.name());
-        }
-    }
-
-    private static void indexStack(EmiStack stack, List<String> names, List<String> ids, List<String> fluidIds, StringBuilder sb) {
-        try {
-            if (stack.getName() != null) {
-                String name = stack.getName().getString().toLowerCase(Locale.ROOT);
-                names.add(name);
-                sb.append(name).append(" ");
-            }
-        } catch (Throwable ignored) {}
-
-        if (stack.getId() != null) {
-            String fullId = stack.getId().toString().toLowerCase(Locale.ROOT);
-            String path = stack.getId().getPath().toLowerCase(Locale.ROOT);
-            ids.add(fullId);
-            ids.add(path);
-            sb.append(fullId).append(" ").append(path).append(" ");
-
-            boolean isFluid = false;
-            try {
-                Object key = stack.getKey();
-                if (key instanceof net.minecraft.world.level.material.Fluid) {
-                    isFluid = true;
-                } else if (stack instanceof dev.emi.emi.api.stack.FluidEmiStack) {
-                    isFluid = true;
-                }
-            } catch (Throwable ignored) {}
-
-            if (isFluid && fluidIds != null) {
-                fluidIds.add(fullId);
-                fluidIds.add(path);
-            }
-        }
-    }
-
-    private static String extractDisplayName(EmiRecipe recipe) {
-        try {
-            if (recipe.getOutputs() != null && !recipe.getOutputs().isEmpty()) {
-                var firstOut = recipe.getOutputs().get(0);
-                if (firstOut != null && firstOut.getName() != null) {
-                    return firstOut.getName().getString();
-                }
-            }
-        } catch (Throwable ignored) {}
-        if (recipe.getId() != null) {
-            String path = recipe.getId().getPath();
-            if (path.contains("/")) path = path.substring(path.lastIndexOf('/') + 1);
-            return formatName(path);
-        }
-        return "Recipe";
-    }
 
     private static String formatName(String path) {
         String[] parts = path.replace('_', ' ').replace('-', ' ').split("\\s+");
@@ -656,6 +675,155 @@ public class RecipeSearchEngine {
     }
 
     /**
+     * Finds the primary output matching the active search query or contextual target.
+     * Used for promoting the matched secondary output to the front of row icons and title label.
+     */
+    public static MatchedOutputResult findMatchedOutput(SearchableRecipe recipe, ParsedQuery query, ResourceLocation contextId, String contextName) {
+        if (recipe == null) return null;
+
+        // 1. Contextual Wire Target Match
+        if (contextId != null && recipe.outputIds() != null) {
+            for (int i = 0; i < recipe.outputIds().length; i++) {
+                ResourceLocation outId = recipe.outputIds()[i];
+                if (outId != null && (outId.equals(contextId) || outId.getPath().equalsIgnoreCase(contextId.getPath()))) {
+                    String name = (recipe.outputNames() != null && i < recipe.outputNames().length) ? recipe.outputNames()[i] : null;
+                    return new MatchedOutputResult(outId, name, i);
+                }
+            }
+        }
+        if (contextName != null && !contextName.isEmpty() && recipe.outputNames() != null) {
+            for (int i = 0; i < recipe.outputNames().length; i++) {
+                String outName = recipe.outputNames()[i];
+                if (outName != null && outName.equalsIgnoreCase(contextName)) {
+                    ResourceLocation id = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
+                    return new MatchedOutputResult(id, outName, i);
+                }
+            }
+        }
+
+        // 2. Query Search Match
+        if (query != null && !query.isEmpty() && query.orGroups() != null && recipe.outputNames() != null) {
+            for (AndGroup group : query.orGroups()) {
+                for (QueryTerm term : group.terms()) {
+                    if (term.negated()) continue;
+                    if (term.scope() == Scope.INPUT || term.type() == MatchType.CATEGORY) continue;
+
+                    String t = term.text().toLowerCase(Locale.ROOT).trim();
+                    String tSpaced = t.replace('_', ' ').trim();
+                    String tUnder = t.replace(' ', '_').trim();
+                    if (t.isEmpty()) continue;
+
+                    // Priority 1: Exact or prefix match across outputs
+                    for (int i = 0; i < recipe.outputNames().length; i++) {
+                        String outName = recipe.outputNames()[i];
+                        ResourceLocation outId = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
+                        if (outName != null) {
+                            String lowerName = outName.toLowerCase(Locale.ROOT);
+                            if (lowerName.equals(t) || lowerName.equals(tSpaced) || lowerName.startsWith(t) || lowerName.startsWith(tSpaced)) {
+                                return new MatchedOutputResult(outId, outName, i);
+                            }
+                        }
+                        if (outId != null) {
+                            String lowerPath = outId.getPath().toLowerCase(Locale.ROOT);
+                            if (lowerPath.equals(t) || lowerPath.equals(tUnder) || lowerPath.startsWith(t) || lowerPath.startsWith(tUnder)) {
+                                return new MatchedOutputResult(outId, outName, i);
+                            }
+                        }
+                    }
+
+                    // Priority 2: Contains substring match across outputs
+                    for (int i = 0; i < recipe.outputNames().length; i++) {
+                        String outName = recipe.outputNames()[i];
+                        ResourceLocation outId = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
+                        if (outName != null) {
+                            String lowerName = outName.toLowerCase(Locale.ROOT);
+                            if (lowerName.contains(t) || (!tSpaced.isEmpty() && lowerName.contains(tSpaced))) {
+                                return new MatchedOutputResult(outId, outName, i);
+                            }
+                        }
+                        if (outId != null) {
+                            String lowerPath = outId.getPath().toLowerCase(Locale.ROOT);
+                            if (lowerPath.contains(t) || (!tUnder.isEmpty() && lowerPath.contains(tUnder))) {
+                                return new MatchedOutputResult(outId, outName, i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Finds alternative recipes suitable for switching an existing node,
+     * ranked by category/machine match and shared output ingredients.
+     */
+    public static List<SearchableRecipe> findAlternativeRecipes(com.gtceu.calcboard.api.model.RecipeNode node, List<SearchableRecipe> allRecipes) {
+        if (node == null || allRecipes == null || allRecipes.isEmpty()) return Collections.emptyList();
+
+        ResourceLocation machineIcon = node.getMachineIcon();
+        ResourceLocation catId = node.getRecipeCategoryId();
+        String machinePath = (machineIcon != null) ? machineIcon.getPath().toLowerCase(Locale.ROOT) : "";
+        String catPath = (catId != null) ? catId.getPath().toLowerCase(Locale.ROOT) : "";
+
+        List<IngredientStack> currentOutputs = node.getOutputs();
+        Set<ResourceLocation> outIds = new HashSet<>();
+        Set<String> outNames = new HashSet<>();
+        for (IngredientStack out : currentOutputs) {
+            if (out != null) {
+                if (out.getId() != null) outIds.add(out.getId());
+                if (out.getDisplayName() != null) outNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
+            }
+        }
+
+        record ScoredAlternative(SearchableRecipe recipe, int score) {}
+        List<ScoredAlternative> list = new ArrayList<>();
+
+        for (SearchableRecipe sr : allRecipes) {
+            if (sr == null) continue;
+            int score = 0;
+
+            String srCat = sr.categoryId().toLowerCase(Locale.ROOT);
+            boolean machineMatch = (!machinePath.isEmpty() && (srCat.equals(machinePath) || srCat.contains(machinePath)))
+                    || (!catPath.isEmpty() && (srCat.equals(catPath) || srCat.contains(catPath)));
+
+            if (machineMatch) {
+                score += 10000;
+            }
+
+            int sharedOutputs = 0;
+            if (sr.outputIds() != null) {
+                for (ResourceLocation rid : sr.outputIds()) {
+                    if (rid != null && outIds.contains(rid)) {
+                        sharedOutputs++;
+                        score += 4000;
+                    }
+                }
+            }
+            if (sr.outputNames() != null) {
+                for (String oname : sr.outputNames()) {
+                    if (oname != null && outNames.contains(oname.toLowerCase(Locale.ROOT))) {
+                        sharedOutputs++;
+                        score += 2000;
+                    }
+                }
+            }
+
+            if (score > 0) {
+                list.add(new ScoredAlternative(sr, score));
+            }
+        }
+
+        list.sort((a, b) -> Integer.compare(b.score(), a.score()));
+
+        return list.stream()
+                .limit(80)
+                .map(ScoredAlternative::recipe)
+                .toList();
+    }
+
+    /**
      * Categorical ranking score:
      * 3: Query matches directly in outputs or display name
      * 2: Query matches in inputs or category
@@ -821,43 +989,13 @@ public class RecipeSearchEngine {
         return score;
     }
 
-    private static final Map<EmiRecipeCategory, String> CATEGORY_WS_TEXT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
-
-    private static String getCategoryWorkstationText(EmiRecipeCategory cat) {
-        if (cat == null) return "";
-        return CATEGORY_WS_TEXT_CACHE.computeIfAbsent(cat, c -> {
-            StringBuilder sb = new StringBuilder();
-            try {
-                var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-                if (rm != null) {
-                    var workstations = rm.getWorkstations(c);
-                    if (workstations != null) {
-                        for (dev.emi.emi.api.stack.EmiIngredient wsIng : workstations) {
-                            if (wsIng != null && wsIng.getEmiStacks() != null) {
-                                for (EmiStack wsStack : wsIng.getEmiStacks()) {
-                                    if (wsStack != null) {
-                                        if (wsStack.getId() != null) {
-                                            sb.append(' ').append(wsStack.getId().toString().toLowerCase(Locale.ROOT));
-                                            sb.append(' ').append(wsStack.getId().getPath().toLowerCase(Locale.ROOT));
-                                        }
-                                        try {
-                                            if (wsStack.getName() != null) {
-                                                sb.append(' ').append(wsStack.getName().getString().toLowerCase(Locale.ROOT));
-                                            }
-                                        } catch (Throwable ignored) {}
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-            return sb.toString();
-        });
-    }
-
     public static void clearCaches() {
-        CATEGORY_WS_TEXT_CACHE.clear();
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            EmiRecipeIndexer.clearCaches();
+        }
         STACK_DATA_CACHE.clear();
     }
 }
+
+
+

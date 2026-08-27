@@ -1,12 +1,14 @@
 package com.gtceu.calcboard.api.bom;
 
-import com.gtceu.calcboard.api.AddonCategory;
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTBoilerTier;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTBoilerTier;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
@@ -660,7 +662,7 @@ public class MultiblockBOMTest {
             com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType.FLUID_OUTPUT, GTVoltageTier.LV, 1, 16000L, false
         );
 
-        int maxSlots = com.gtceu.calcboard.client.gui.MachineConfigDialog.getMaxHatchSlotsAllowed(dt5, lvHatch);
+        int maxSlots = com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog.getMaxHatchSlotsAllowed(dt5, lvHatch);
         Assertions.assertEquals(5, maxSlots);
 
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(dt5);
@@ -926,3 +928,6 @@ public class MultiblockBOMTest {
         Assertions.assertFalse(applicableCats.contains(AddonCategory.COIL), "Tree Synthesizer MUST NOT have COIL category");
     }
 }
+
+
+

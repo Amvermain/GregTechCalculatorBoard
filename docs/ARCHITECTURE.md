@@ -20,28 +20,21 @@ The codebase is organized into four strictly decoupled architectural layers foll
 ```mermaid
 graph TD
     subgraph UI["1. Presentation & UI Layer (com.gtceu.calcboard.client.gui)"]
-        BS["BoardScreen (Viewport, 2D Camera, Pan & Zoom, Screen Matrix)"]
+        BS["BoardScreen & Editor (Viewport, 2D Camera, Pan & Zoom, Screen Matrix)"]
         CIH["CanvasInteractionHandler (Mouse Drag, Marquee Selection, Port Wiring)"]
-        Widgets["NodeWidget & NodeCardRenderer (Card Layouts, Badges, Port Sockets)"]
-        CR["ConnectionRenderer (Cubic Bezier Splines & Curve Hit-Testing)"]
-        Dialogs["MachineConfigDialog & AddonCatalogPanel (Addon Rack, Search Engine)"]
-        Overlays["SummaryOverlay, GuideDialog, MultiblockBOMDialog"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, FavoritesDockWidget, HotkeyHudWidget)"]
+        Render["render.* (NodeCardRenderer, ConnectionRenderer, CanvasGroupFrameRenderer)"]
+        Dialogs["dialog.* (MachineConfigDialog, MultiblockBOMDialog, RecipeSearchDialog, GlobalBalanceDialog)"]
+        Overlays["SummaryOverlay, GuideDialog"]
     end
 
     subgraph Core["2. Core Math & Graph Engine (com.gtceu.calcboard.api)"]
-        BM["BoardManager & BoardPage (Multi-Page Documents & Local Storage)"]
-        FG["FlowGraph & ConnectionEdge (Topology, Nodes, Directed Wires, Subgraphs)"]
-        RN["RecipeNode (Pure Domain Model, Inputs/Outputs, Rate & CPS Storage)"]
-        NPS["NodePropertyStore & NodeProperties (Type-Safe Dynamic Property Registry)"]
-        OC["OverclockMode (Standard, Perfect, Lossless & Sub-tick Batches)"]
-        FGS["FlowGraphSolver (Fixed-Point Relaxation, BFS AutoRatio, Port Stats)"]
-        FGMH["FlowGraphModuleHandler (Compound Module Grouping & Expansion)"]
-        HM["HistoryManager (Undo/Redo Command Delta Stack)"]
-        BC["BlueprintCodec (NBT & Base64 GZIP Compressed Codec)"]
-        BOM["MultiblockBOMCalculator & MultiblockStructureCatalog (BOM Calculation Engine)"]
-        ETA["ProductionETACalculator (Target Batch Duration & Total Resource Calculation)"]
-        AFR["AddonFactoryRegistry & NodeBadgeRegistry (Decoupled Addon Factory & Badge Registry)"]
-        EB["RecipeNodeEvent / FlowGraphEvent (Lifecycle Event Bus)"]
+        Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec)"]
+        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, PortFlowStats, OverclockResult)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, FlowGraphModuleHandler, AlternativeRecipeFinder, ProductionETACalculator, MultiblockBOMCalculator)"]
+        Catalog["catalog.* (MultiblockStructureCatalog, AddonFactoryRegistry, NodeBadgeRegistry)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, FontScale)"]
+        Util["util.* (FormatUtil, NodeProperties, NodePropertyStore, EventBus)"]
     end
 
     subgraph Compat["3. Mod Compatibility SPI Layer (com.gtceu.calcboard.compat)"]
@@ -60,14 +53,23 @@ graph TD
         IMA --> Adapters
     end
 
-    subgraph Integration["4. Integration & Pre-baking Layer (com.gtceu.calcboard.integration)"]
-        ERC["EmiRecipeConverter (Deep Recursive Ingredient & Chance Extraction)"]
+    subgraph Integration["4. Integration & Recipe Viewer SPI Layer (com.gtceu.calcboard.integration)"]
+        RVR["RecipeViewerRegistry (Active Adapter Selection SPI)"]
+        IVA["IRecipeViewerAdapter (Common SPI Interface)"]
+        subgraph Viewers["Recipe Viewer Adapters"]
+            EMI_AD["EmiRecipeViewerAdapter (Priority: 100)"]
+            JEI_AD["JeiRecipeViewerAdapter (Priority: 50)"]
+            VAN_AD["VanillaRecipeViewerAdapter (Priority: 0 Fallback)"]
+        end
         CCM["CategoryCapabilityMatrix (Pre-baked O(1) Machine & Workstation Cache)"]
         MD["MultiblockDetector (Deterministic Structure & Part Recipe Scanner)"]
         DAC["DynamicAddonCrawler (Harvests active stacks & orchestrates adapters)"]
+        RVR --> IVA
+        IVA --> Viewers
     end
 
     UI -->|Dispatches user actions & UI rendering| Core
+    UI -->|Queries search, lookup & BoM sync| RVR
     UI -->|Delegates custom controls & tooltips| Compat
     Integration -->|Ingests recipe and machine data| Core
     Integration -->|Discovers addons & bakes capabilities| Compat
@@ -85,13 +87,21 @@ The core math engine (`com.gtceu.calcboard.api`) has zero dependencies on Minecr
 * **Zero Direct Mod Coupling**: `RecipeNode` contains no hardcoded GregTech, Create, or Thermal specific mechanics.
 * **Lifecycle & Event Delegation**: Machine icon changes (`setMachineIcon`), energy type queries (`getEnergyType`), default parallels (`getDefaultParallel`), single machine power (`getSingleMachineEUt`), and node operating validation (`isOperational`) are dynamically dispatched to the active `IModAdapter` via `ModAdapterRegistry.getAdapterForNode(node)`.
 * **Type-Safe Dynamic Properties**: Additional mod-specific or feature-specific metadata is stored cleanly in `NodePropertyStore` using type-safe `NodeProperty<T>` keys without bloating the core node class fields.
+* **In-Place Alternative Recipe Switching (`AlternativeRecipeFinder`)**: Switch recipes directly without deleting nodes, automatically preserving identical ingredient port connections with full Undo/Redo support.
 
-### 2.2 Addon & Spec Deductive Analysis Policy (Rule 5)
+### 2.2 Pluggable Recipe Viewer SPI (`IRecipeViewerAdapter`)
+* **Dynamic Adapter Election**: Automatically selects the highest-priority recipe viewer adapter (EMI ➔ JEI ➔ Vanilla Fallback) available in the runtime environment.
+* **BoM Tree Integration**: Register full multiblock structural bills of materials into the EMI Recipe Tree or JEI++ shopping lists with a single click.
+
+### 2.3 Addon & Spec Deductive Analysis Policy (Rule 5)
 * **Strict Anti-Heuristic Rule**: String matching on tooltips, item display names, or raw item paths (`id.getPath().contains(...)`) to guess machine tiers or addon values is strictly forbidden.
 * **Deterministic Deduction**:
   1. Official mod APIs and runtime Java reflection (`Functional Deduction`).
   2. In-game object / simulation state execution.
   3. Pure NBT numeric tags (e.g. `AugmentData` float/int compound tags) and official Forge `TagKey` registries.
+
+### 2.4 Lifecycle Event Bus
+Fires Forge lifecycle events (`RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`) allowing external addons to extend node creation, mutation, calculation, and catalog baking.
 
 ---
 
@@ -181,10 +191,15 @@ flowchart TD
     end
     G2 --> CanvasSpace
     CanvasSpace --> G3["3. Canvas Matrix Pop"]
-    G3 --> G4["4. Screen HUD (Tabs, Toolbar, Hotkeys, Process Summary)"]
+    G3 --> G4["4. Screen HUD (Tabs with Overflow Navigation, Toolbar, Hotkeys, Process Summary)"]
     G4 --> G5["5. Tooltips (Port Flow, Items, Addons)"]
-    G5 --> G6["6. Modal Dialogs (MachineConfigDialog, BOM, Search, Guide)"]
+    G5 --> G6["6. Modal Dialogs (MachineConfigDialog with FontScale, BOM, Search, Guide)"]
 ```
+
+### 6.1 Accessibility & Readability Features
+* **5-Level UI Font Scale (`FontScale`)**: Scale `MachineConfigDialog` UI from 0.75x to 1.30x via the `[Aa 1.0x]` button (mouse click, wheel scroll, or `+`/`-` hotkeys).
+* **Tab Bar Overflow Click Navigation (`PageTabBarWidget`)**: Click left/right `«`, `»` indicators or scroll mouse wheel to smoothly navigate through multiple board tabs with proper scissor padding.
+* **Uniform Global Fluid Units (`FluidUnitMode`)**: Toggle between `AUTO` (smart auto-scaling), `ALWAYS_MB` (force millibuckets), and `ALWAYS_B` (force buckets) on the toolbar (`Shift+T`) for canvas-wide unit consistency.
 
 ---
 

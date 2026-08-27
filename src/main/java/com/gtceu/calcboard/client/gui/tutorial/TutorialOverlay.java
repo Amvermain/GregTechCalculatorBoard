@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.client.gui.tutorial;
 
 import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -115,3 +115,4 @@ public class TutorialOverlay {
         graphics.drawCenteredString(font, text, bx + bw / 2, by + (bh - 8) / 2, textColor);
     }
 }
+

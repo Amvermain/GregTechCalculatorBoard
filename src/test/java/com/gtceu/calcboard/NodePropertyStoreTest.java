@@ -1,7 +1,11 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.property.NodeProperties;
+import com.gtceu.calcboard.api.property.NodePropertyStore;
+import com.gtceu.calcboard.api.type.OverclockMode;
+
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.property.*;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -190,3 +194,5 @@ public class NodePropertyStoreTest {
         assertTrue(foundCleanBadge, "Sterile cleanroom badge must be present");
     }
 }
+
+

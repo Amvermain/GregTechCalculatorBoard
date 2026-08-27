@@ -1,6 +1,11 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.SteamMode;
+
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import net.minecraft.resources.ResourceLocation;
@@ -164,3 +169,5 @@ public class SteamParallelTest {
         Assertions.assertEquals(1280.0, kiln.calculateSingleMachineInputRate(steamStack), 0.01);
     }
 }
+
+

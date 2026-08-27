@@ -1,6 +1,28 @@
 package com.gtceu.calcboard.compat.gtceu;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
+import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.AddonFactoryRegistry;
+import com.gtceu.calcboard.api.catalog.CategoryCapability;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTBoilerTier;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
+
 import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon;
@@ -25,12 +47,12 @@ import java.util.Locale;
 public class GTCEuModAdapter implements IModAdapter {
 
     static {
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.COIL, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon(id, name, desc, icon));
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.ROTOR, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon(id, name, desc, icon));
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.REFLECTOR, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon(id, name, desc, icon));
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.PARALLEL, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(id, name, desc, icon));
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.ENERGY_HATCH, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(id, name, desc, icon));
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.HATCH_BUS, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.COIL, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.REFLECTOR, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.ENERGY_HATCH, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.HATCH_BUS, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon(id, name, desc, icon));
 
         // 1. Fusion Reactor Badges Provider (RFC-001 & RFC-002)
         com.gtceu.calcboard.api.property.NodeBadgeRegistry.register((node, store) -> {
@@ -48,11 +70,11 @@ public class GTCEuModAdapter implements IModAdapter {
             com.gtceu.calcboard.api.property.NodeBadge tierBadge = new com.gtceu.calcboard.api.property.NodeBadge(tierBadgeText, 0xFFFFFFFF, 0xEE3D1B5E, 0xFFCC44FF, tierTooltip);
 
             if (startEU > 0) {
-                String startText = "⚡ " + com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(startEU) + " EU";
+                String startText = "⚡ " + com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(startEU) + " EU";
                 java.util.List<net.minecraft.network.chat.Component> startTooltip = java.util.List.of(
                         net.minecraft.network.chat.Component.literal("§e⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()),
                         net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Required Ignition Energy: §e%,d EU", startEU)),
-                        net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Formatted: §f%s EU", com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(startEU)))
+                        net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Formatted: §f%s EU", com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(startEU)))
                 );
                 com.gtceu.calcboard.api.property.NodeBadge startBadge = new com.gtceu.calcboard.api.property.NodeBadge(startText, 0xFFFFAA00, 0xEE3D2B1E, 0xFFFFAA00, startTooltip);
                 return java.util.List.of(tierBadge, startBadge);
@@ -116,7 +138,7 @@ public class GTCEuModAdapter implements IModAdapter {
         // 4. Turbine Deficit Badge Provider
         com.gtceu.calcboard.api.property.NodeBadgeRegistry.register((node, store) -> {
             if (node == null || !GTTurbineHelper.isTurbine(node)) return java.util.List.of();
-            com.gtceu.calcboard.api.FlowGraph graph = com.gtceu.calcboard.api.BoardManager.getInstance().getActiveGraph();
+            com.gtceu.calcboard.api.model.FlowGraph graph = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph();
             if (graph != null && GTTurbineHelper.hasTurbineFlowDeficit(node, graph)) {
                 String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.turbine_deficit").getString();
                 java.util.List<net.minecraft.network.chat.Component> tooltip = java.util.List.of(
@@ -143,10 +165,8 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean isLoaded() {
         try {
-            Class<?> mlClass = Class.forName("net.minecraftforge.fml.ModList");
-            Object ml = mlClass.getMethod("get").invoke(null);
-            if (ml != null) {
-                return (boolean) mlClass.getMethod("isLoaded", String.class).invoke(ml, "gtceu");
+            if (ModList.get() != null) {
+                return ModList.get().isLoaded("gtceu");
             }
         } catch (Throwable ignored) {}
         return true;
@@ -162,7 +182,7 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.EnergyType.KINETIC_SU) return false;
+        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU) return false;
 
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace().toLowerCase(Locale.ROOT);
@@ -1505,12 +1525,12 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
         return GTCEuGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
     @Override
-    public boolean handleDialogHeaderScroll(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, double delta) {
+    public boolean handleDialogHeaderScroll(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, double delta) {
         return GTCEuGuiHandler.handleControllerScroll(node, delta);
     }
 
@@ -1555,3 +1575,6 @@ public class GTCEuModAdapter implements IModAdapter {
         return IModAdapter.super.resolveStructureParts(node, dualLowerTierEnergyHatches);
     }
 }
+
+
+

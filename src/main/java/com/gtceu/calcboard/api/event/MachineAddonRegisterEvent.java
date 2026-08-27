@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.api.event;
 
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import net.minecraftforge.eventbus.ListenerList;
 import net.minecraftforge.eventbus.api.Event;
 
@@ -45,3 +45,4 @@ public class MachineAddonRegisterEvent extends Event {
         LISTENER_LIST = new ListenerList();
     }
 }
+

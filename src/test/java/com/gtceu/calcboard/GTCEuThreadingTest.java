@@ -1,9 +1,19 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.GTThreadingHelix;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.NodeThreadingConfig;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.bom.MultiblockBOMCalculator;
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.bom.PartCategory;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.CategoryCapability;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.compat.IModAdapter;
+
+import com.gtceu.calcboard.api.type.GTThreadingHelix;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -168,7 +178,7 @@ public class GTCEuThreadingTest {
 
         // Test uninstall via adapter
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-        com.gtceu.calcboard.api.MachineAddon maxHelixAddon = node.getAddons().stream()
+        com.gtceu.calcboard.api.catalog.MachineAddon maxHelixAddon = node.getAddons().stream()
                 .filter(a -> a.getName().contains("MAX Supreme"))
                 .findFirst().orElseThrow();
         adapter.handleUninstallAddon(node, maxHelixAddon);
@@ -189,20 +199,20 @@ public class GTCEuThreadingTest {
         // Initially, hasThreading must be false
         Assertions.assertFalse(dtNode.hasThreading());
 
-        var cats = com.gtceu.calcboard.api.MachineAddon.getRelevantCategories(dtNode);
-        Assertions.assertFalse(cats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        var cats = com.gtceu.calcboard.api.catalog.MachineAddon.getRelevantCategories(dtNode);
+        Assertions.assertFalse(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
 
         // Switch to Threading Mode
         dtNode.setThreadingActive(true);
         Assertions.assertTrue(dtNode.hasThreading());
-        var threadingCats = com.gtceu.calcboard.api.MachineAddon.getRelevantCategories(dtNode);
-        Assertions.assertTrue(threadingCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        var threadingCats = com.gtceu.calcboard.api.catalog.MachineAddon.getRelevantCategories(dtNode);
+        Assertions.assertTrue(threadingCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
 
         // Switch back to Standard Mode
         dtNode.setThreadingActive(false);
         Assertions.assertFalse(dtNode.hasThreading());
-        var revertedCats = com.gtceu.calcboard.api.MachineAddon.getRelevantCategories(dtNode);
-        Assertions.assertFalse(revertedCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        var revertedCats = com.gtceu.calcboard.api.catalog.MachineAddon.getRelevantCategories(dtNode);
+        Assertions.assertFalse(revertedCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
     }
 
     @Test
@@ -258,12 +268,12 @@ public class GTCEuThreadingTest {
         adapter.handleInstallAddon(dtNode, megaPar, false);
 
         Assertions.assertEquals(1024, dtNode.getTotalParallel());
-        Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.PARALLEL).count());
+        Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.catalog.MachineAddon.Category.PARALLEL).count());
 
         // 4. Uninstall Parallel Hatch -> Returns to 1x
         adapter.handleUninstallAddon(dtNode, megaPar);
         Assertions.assertEquals(1, dtNode.getTotalParallel());
-        Assertions.assertEquals(0, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.PARALLEL).count());
+        Assertions.assertEquals(0, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.catalog.MachineAddon.Category.PARALLEL).count());
 
         // 5. Equip Energy Hatch Addon (UV Energy Input Hatch)
         com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon uvEnergyHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
@@ -278,7 +288,7 @@ public class GTCEuThreadingTest {
 
         // 6. Equip 2nd UV Energy Hatch -> Dual Hatch Overclock (Tier becomes UHV!)
         adapter.handleInstallAddon(dtNode, uvEnergyHatch, false);
-        Assertions.assertEquals(2, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.ENERGY_HATCH).count());
+        Assertions.assertEquals(2, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.catalog.MachineAddon.Category.ENERGY_HATCH).count());
         Assertions.assertEquals(GTVoltageTier.UHV, dtNode.getTargetTier());
 
         var bomWithDualEnergy = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(java.util.List.of(dtNode), false);
@@ -288,7 +298,7 @@ public class GTCEuThreadingTest {
 
         // 7. Uninstall 1 UV Hatch -> Returns to 1x UV
         adapter.handleUninstallAddon(dtNode, uvEnergyHatch);
-        Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.MachineAddon.Category.ENERGY_HATCH).count());
+        Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.catalog.MachineAddon.Category.ENERGY_HATCH).count());
         Assertions.assertEquals(GTVoltageTier.UV, dtNode.getTargetTier());
 
         // 8. Test Asymmetric Hatches: 16A EV + 1A IV -> Total EU/t capacity = 32,768 (EV 16A) + 8,192 (IV 1A) = 40,960 EU/t (LuV power)
@@ -315,9 +325,9 @@ public class GTCEuThreadingTest {
     @Test
     public void testFermentingArborealRejuvenationMonstrosityThreadingRecognition() {
         ResourceLocation farmId = ResourceLocation.tryParse("gtceu:fermenting_arboreal_rejuvenation_monstrosity");
-        Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.isThreadingMultiblock(farmId));
-        Assertions.assertEquals(8, com.gtceu.calcboard.api.MultiblockDetector.getMaxHelixCount(farmId));
-        Assertions.assertFalse(com.gtceu.calcboard.api.MultiblockDetector.isCoilMultiblock(farmId));
+        Assertions.assertTrue(com.gtceu.calcboard.api.catalog.MultiblockDetector.isThreadingMultiblock(farmId));
+        Assertions.assertEquals(8, com.gtceu.calcboard.api.catalog.MultiblockDetector.getMaxHelixCount(farmId));
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(farmId));
 
         // Verify fusion coil is classified as CASING, not heating COIL
         ResourceLocation fusionCoilId = ResourceLocation.tryParse("start_core:advanced_fusion_coil");
@@ -340,14 +350,14 @@ public class GTCEuThreadingTest {
 
         var adapter = ModAdapterRegistry.getAdapterForNode(farmNode);
         var applicableCats = adapter.getApplicableAddonCategories(farmNode);
-        Assertions.assertTrue(applicableCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
-        Assertions.assertFalse(applicableCats.contains(com.gtceu.calcboard.api.MachineAddon.Category.COIL));
+        Assertions.assertTrue(applicableCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
+        Assertions.assertFalse(applicableCats.contains(com.gtceu.calcboard.api.catalog.MachineAddon.Category.COIL));
 
         // Test CategoryCapability active categories
-        var catCap = com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().getCapability(farmNode.getRecipeCategoryId());
+        var catCap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(farmNode.getRecipeCategoryId());
         var activeCats = catCap.getActiveCategoriesForNode(farmNode);
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
-        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.MachineAddon.Category.COIL));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
+        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.catalog.MachineAddon.Category.COIL));
 
         // Switch to Greenhouse (non-threading multiblock)
         ResourceLocation greenhouseId = ResourceLocation.tryParse("gtceu:greenhouse");
@@ -357,15 +367,15 @@ public class GTCEuThreadingTest {
         Assertions.assertFalse(farmNode.isExplicitThreadingMachine());
         Assertions.assertFalse(farmNode.hasThreading());
         var ghCats = adapter.getApplicableAddonCategories(farmNode);
-        Assertions.assertFalse(ghCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        Assertions.assertFalse(ghCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
         var ghActiveCats = catCap.getActiveCategoriesForNode(farmNode);
-        Assertions.assertFalse(ghActiveCats.contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        Assertions.assertFalse(ghActiveCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
 
         // Switch back to FARM
         farmNode.setMachineIcon(farmId);
         farmNode.setThreadingActive(true);
         Assertions.assertTrue(farmNode.hasThreading());
-        Assertions.assertTrue(adapter.getApplicableAddonCategories(farmNode).contains(com.gtceu.calcboard.api.AddonCategory.THREADING));
+        Assertions.assertTrue(adapter.getApplicableAddonCategories(farmNode).contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING));
     }
 
     @Test
@@ -387,9 +397,9 @@ public class GTCEuThreadingTest {
 
         for (String idStr : starTMultis) {
             ResourceLocation id = ResourceLocation.tryParse(idStr);
-            Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.isMultiblock(id), idStr + " should be registered as multiblock");
-            Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.isThreadingMultiblock(id), idStr + " should be recognized as threading multiblock");
-            Assertions.assertTrue(com.gtceu.calcboard.api.MultiblockDetector.getMaxHelixCount(id) > 0, idStr + " should have max helix capacity > 0");
+            Assertions.assertTrue(com.gtceu.calcboard.api.catalog.MultiblockDetector.isMultiblock(id), idStr + " should be registered as multiblock");
+            Assertions.assertTrue(com.gtceu.calcboard.api.catalog.MultiblockDetector.isThreadingMultiblock(id), idStr + " should be recognized as threading multiblock");
+            Assertions.assertTrue(com.gtceu.calcboard.api.catalog.MultiblockDetector.getMaxHelixCount(id) > 0, idStr + " should have max helix capacity > 0");
 
             RecipeNode node = RecipeNode.create(id.getPath(), 100.0, 10000.0, GTVoltageTier.UIV);
             node.setMultiblock(true);
@@ -398,8 +408,11 @@ public class GTCEuThreadingTest {
 
             Assertions.assertTrue(node.hasThreading(), idStr + " node should have threading");
             var adapter = ModAdapterRegistry.getAdapterForNode(node);
-            Assertions.assertTrue(adapter.getApplicableAddonCategories(node).contains(com.gtceu.calcboard.api.AddonCategory.THREADING),
+            Assertions.assertTrue(adapter.getApplicableAddonCategories(node).contains(com.gtceu.calcboard.api.catalog.AddonCategory.THREADING),
                     idStr + " applicable categories should contain THREADING");
         }
     }
 }
+
+
+

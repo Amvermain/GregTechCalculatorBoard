@@ -1,9 +1,11 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.FlowGraph;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.client.gui.widget.ToolbarWidget;
+
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -83,10 +85,13 @@ public class AutoConnectUndoTest {
         Assertions.assertEquals(4, graph.getConnections().size());
 
         // Perform Auto Connect
-        List<FlowGraph.ConnectionEdge> added = com.gtceu.calcboard.client.gui.ToolbarWidget.autoConnect(graph, null);
+        List<FlowGraph.ConnectionEdge> added = com.gtceu.calcboard.client.gui.widget.ToolbarWidget.autoConnect(graph, null);
 
         // Must NOT add any duplicate or bypass edges
         Assertions.assertEquals(0, added.size(), "Auto Connect must not add bypass duplicate wires when nodes are already connected through a reroute junction!");
         Assertions.assertEquals(4, graph.getConnections().size());
     }
 }
+
+
+

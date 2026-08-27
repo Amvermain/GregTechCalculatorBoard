@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
-import com.gtceu.calcboard.api.ModCompatHelper;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
@@ -317,3 +317,4 @@ public class GTCEuMultiblockStructureScanner {
         }
     }
 }
+

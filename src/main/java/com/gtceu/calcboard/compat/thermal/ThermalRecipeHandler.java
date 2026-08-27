@@ -1,10 +1,11 @@
 package com.gtceu.calcboard.compat.thermal;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import dev.emi.emi.api.recipe.EmiRecipe;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
@@ -17,8 +18,8 @@ public class ThermalRecipeHandler {
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
         ResourceLocation catId = null;
-        if (emiRecipeObj instanceof EmiRecipe recipe && recipe.getCategory() != null) {
-            catId = recipe.getCategory().getId();
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            catId = EmiThermalHelper.getCategoryId(emiRecipeObj);
         }
 
         if (catId != null) {
@@ -80,4 +81,16 @@ public class ThermalRecipeHandler {
         }
         return 0;
     }
+
+    private static class EmiThermalHelper {
+        private static ResourceLocation getCategoryId(Object emiRecipeObj) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe && recipe.getCategory() != null) {
+                return recipe.getCategory().getId();
+            }
+            return null;
+        }
+    }
 }
+
+
+

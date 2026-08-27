@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.api.event;
 
-import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import net.minecraftforge.eventbus.ListenerList;
 import net.minecraftforge.eventbus.api.Event;
 
@@ -75,3 +75,4 @@ public abstract class FlowGraphEvent extends Event {
         }
     }
 }
+

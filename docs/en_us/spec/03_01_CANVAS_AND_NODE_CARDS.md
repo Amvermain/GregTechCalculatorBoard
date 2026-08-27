@@ -185,4 +185,16 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 
 ---
 
+## 4. Page Tab Bar Overflow Navigation (`PageTabBarWidget`)
+
+Provides smooth scrolling and click navigation when multiple board pages exceed available screen width:
+
+* **Left / Right Overflow Indicators**:
+  - Clicking the left `«` indicator scrolls left by 1 tab width (`scrollX -= 80px`).
+  - Clicking the right `»` indicator scrolls right by 1 tab width (`scrollX += 80px`).
+* **Mouse Wheel Scrolling**: Scroll the mouse wheel anywhere over the tab bar for fast horizontal scrolling.
+* **Right Padding & Scissor Guard**: Includes a 16px right margin buffer so the last tab and the `[+]` new page button are never obscured behind the `»` indicator.
+
+---
+
 > ➡️ **Next Chapter**: [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)

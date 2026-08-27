@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.compat.thermal.addon;
 
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
@@ -58,3 +58,4 @@ public class ThermalAugmentAddon extends MachineAddon {
         }
     }
 }
+

@@ -25,6 +25,7 @@ public class RecipeFilterDialog {
     public RecipeFilterDialog() {
         Font font = Minecraft.getInstance().font;
         this.searchBox = new EditBox(font, 0, 0, 100, 14, Component.translatable("gui.gtcalcboard.search"));
+        this.searchBox.setMaxLength(256);
         this.searchBox.setResponder(this::onSearchQueryChanged);
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.filter.search_hint"));
     }

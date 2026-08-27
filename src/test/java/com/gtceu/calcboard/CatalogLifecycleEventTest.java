@@ -1,6 +1,9 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
 import com.gtceu.calcboard.api.event.ModAdapterRegisterEvent;
 import com.gtceu.calcboard.compat.IModAdapter;
@@ -98,11 +101,11 @@ public class CatalogLifecycleEventTest {
         }
 
         @Override
-        public void discoverAddons(java.util.List<com.gtceu.calcboard.api.MachineAddon> collector, java.util.List<net.minecraft.world.item.ItemStack> recipeOutputStacks) {
+        public void discoverAddons(java.util.List<com.gtceu.calcboard.api.catalog.MachineAddon> collector, java.util.List<net.minecraft.world.item.ItemStack> recipeOutputStacks) {
         }
 
         @Override
-        public void enrichCapabilities(com.gtceu.calcboard.api.CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
+        public void enrichCapabilities(com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
         }
     }
 
@@ -121,3 +124,6 @@ public class CatalogLifecycleEventTest {
         Assertions.assertEquals("custom_mod", found.getModId());
     }
 }
+
+
+

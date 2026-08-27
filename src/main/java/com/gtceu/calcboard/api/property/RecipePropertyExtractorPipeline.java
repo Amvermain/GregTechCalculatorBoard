@@ -53,7 +53,7 @@ public final class RecipePropertyExtractorPipeline {
 
             @Override
             public boolean matches(Object backingRecipe, ResourceLocation categoryId) {
-                if (categoryId != null && (categoryId.getPath().contains("fusion_reactor") || categoryId.getNamespace().equals("gtceu"))) return true;
+                if (categoryId != null && "gtceu".equals(categoryId.getNamespace())) return true;
                 return backingRecipe != null && backingRecipe.getClass().getName().contains("GTRecipe");
             }
 

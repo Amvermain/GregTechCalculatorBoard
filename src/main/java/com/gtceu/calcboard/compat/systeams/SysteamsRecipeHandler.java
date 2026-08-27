@@ -1,12 +1,13 @@
 package com.gtceu.calcboard.compat.systeams;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.compat.thermal.ThermalModAdapter;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import dev.emi.emi.api.recipe.EmiRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.fluids.FluidStack;
@@ -20,9 +21,10 @@ import java.lang.reflect.Method;
 public class SysteamsRecipeHandler {
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details, SysteamsModAdapter adapter) {
-        if (!(emiRecipeObj instanceof EmiRecipe recipe)) return false;
-
-        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
+        ResourceLocation catId = null;
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            catId = EmiSysteamsHelper.getCategoryId(emiRecipeObj);
+        }
         if (catId == null || !adapter.handlesCategory(catId)) {
             return false;
         }
@@ -32,6 +34,15 @@ public class SysteamsRecipeHandler {
         }
 
         return adaptBoilerRecipe(backing, details, catId);
+    }
+
+    private static class EmiSysteamsHelper {
+        private static ResourceLocation getCategoryId(Object emiRecipeObj) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe && recipe.getCategory() != null) {
+                return recipe.getCategory().getId();
+            }
+            return null;
+        }
     }
 
     public static boolean isSteamDynamo(Object backing, ResourceLocation catId) {
@@ -191,3 +202,6 @@ public class SysteamsRecipeHandler {
         return Math.max(1.0, baseProcessTick * speedMult * steamRatio);
     }
 }
+
+
+

@@ -167,7 +167,11 @@
       </div>
       <div style="display: flex; justify-content: space-between;">
         <span style="background: #1e293b; color: #f1f5f9; padding: 0 4px; border-radius: 2px; font-family: monospace;">T</span>
-        <span style="color: #94a3b8;">시간 단위 순환 (/t, /s, /min)</span>
+        <span style="color: #94a3b8;">시간 단위 순환 (/s, /min, /h, /d, /t)</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="background: #1e293b; color: #f1f5f9; padding: 0 4px; border-radius: 2px; font-family: monospace;">Shift+T</span>
+        <span style="color: #38bdf8;">유체 단위 순환 (Auto, mB, B)</span>
       </div>
       <div style="display: flex; justify-content: space-between;">
         <span style="background: #1e293b; color: #f1f5f9; padding: 0 4px; border-radius: 2px; font-family: monospace;">Space</span>

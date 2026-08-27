@@ -1,11 +1,10 @@
 package com.gtceu.calcboard.api.bom;
 
-import com.gtceu.calcboard.api.ModCompatHelper;
-import dev.emi.emi.api.EmiApi;
-import dev.emi.emi.api.recipe.EmiRecipe;
-import dev.emi.emi.api.recipe.EmiRecipeCategory;
-import dev.emi.emi.api.stack.EmiIngredient;
-import dev.emi.emi.api.stack.EmiStack;
+import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
+import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -58,10 +57,12 @@ public class MultiblockStructureCatalog {
                 }
 
                 // 2. Complementary scan of EMI multiblock_info recipes (only once EMI is fully ready)
-                if (com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) {
-                    scanEmiMultiblockRecipes();
-                } else {
-                    com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(MultiblockStructureCatalog::scanEmiMultiblockRecipes);
+                if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+                    if (com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) {
+                        scanEmiMultiblockRecipes();
+                    } else {
+                        com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(MultiblockStructureCatalog::scanEmiMultiblockRecipes);
+                    }
                 }
             } catch (Throwable t) {
                 // Headless test or pre-init environment
@@ -183,16 +184,25 @@ public class MultiblockStructureCatalog {
     }
 
     private static void scanEmiMultiblockRecipes() {
+        if (!ModCompatHelper.isEmiLoaded()) return;
         try {
-            var recipeManager = EmiApi.getRecipeManager();
+            EmiStructureScanner.scan();
+        } catch (Throwable ignored) {}
+    }
+
+    private static final Map<net.minecraft.world.item.Item, String> ITEM_NAME_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static class EmiStructureScanner {
+        private static void scan() {
+            var recipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
             if (recipeManager != null && recipeManager.getCategories() != null) {
-                for (EmiRecipeCategory cat : recipeManager.getCategories()) {
+                for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : recipeManager.getCategories()) {
                     if (cat == null || cat.getId() == null) continue;
                     ResourceLocation catId = cat.getId();
                     if (catId.getPath().contains("multiblock_info") || catId.getPath().contains("multiblock")) {
-                        List<EmiRecipe> recipes = recipeManager.getRecipes(cat);
+                        List<dev.emi.emi.api.recipe.EmiRecipe> recipes = recipeManager.getRecipes(cat);
                         if (recipes != null) {
-                            for (EmiRecipe recipe : recipes) {
+                            for (dev.emi.emi.api.recipe.EmiRecipe recipe : recipes) {
                                 if (recipe != null) {
                                     parseEmiMultiblockRecipe(recipe);
                                 }
@@ -201,159 +211,157 @@ public class MultiblockStructureCatalog {
                     }
                 }
             }
-        } catch (Throwable ignored) {}
-    }
-
-    private static final Map<net.minecraft.world.item.Item, String> ITEM_NAME_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
-
-    private static void parseEmiMultiblockRecipe(EmiRecipe recipe) {
-        ResourceLocation controllerId = null;
-        String controllerName = "";
-        Set<ResourceLocation> aliasIds = new HashSet<>();
-
-        if (!recipe.getOutputs().isEmpty()) {
-            EmiStack out = recipe.getOutputs().get(0);
-            if (out != null && out.getItemStack() != null) {
-                ItemStack stack = out.getItemStack();
-                if (!stack.isEmpty()) {
-                    controllerId = ForgeRegistries.ITEMS.getKey(stack.getItem());
-                    controllerName = ITEM_NAME_CACHE.computeIfAbsent(stack.getItem(), itm -> itm.getDescription().getString());
-                    if (controllerId != null) aliasIds.add(controllerId);
-                }
-            }
         }
 
-        if (recipe.getId() != null) {
-            aliasIds.add(recipe.getId());
-            String rPath = recipe.getId().getPath();
-            if (rPath.contains("/")) {
-                String machineName = rPath.substring(rPath.lastIndexOf('/') + 1);
-                ResourceLocation strippedId = ResourceLocation.tryParse(recipe.getId().getNamespace() + ":" + machineName);
-                if (strippedId != null) {
-                    aliasIds.add(strippedId);
-                    if (controllerId == null) {
-                        controllerId = strippedId;
-                        controllerName = formatMachineName(machineName);
-                    }
-                }
-            } else if (controllerId == null) {
-                controllerId = recipe.getId();
-                controllerName = formatMachineName(rPath);
-            }
-        }
+        private static void parseEmiMultiblockRecipe(dev.emi.emi.api.recipe.EmiRecipe recipe) {
+            ResourceLocation controllerId = null;
+            String controllerName = "";
+            Set<ResourceLocation> aliasIds = new HashSet<>();
 
-        if (controllerId == null) {
-            return;
-        }
-
-        MultiblockStructureDef existing = STRUCTURES.get(controllerId);
-        int existingBlockCount = 0;
-        if (existing != null) {
-            for (MultiblockStructurePart p : existing.parts()) {
-                if (p != null) existingBlockCount += p.amount();
-            }
-        }
-
-        List<MultiblockStructurePart> parts = new ArrayList<>();
-        int coilSlots = 0;
-        int energyHatchSlots = 0;
-        int inputBusSlots = 0;
-        int outputBusSlots = 0;
-        int inputHatchSlots = 0;
-        int outputHatchSlots = 0;
-        int maintenanceSlots = 0;
-
-        for (EmiIngredient ing : recipe.getInputs()) {
-            if (ing == null || ing.getEmiStacks().isEmpty()) continue;
-            for (EmiStack stack : ing.getEmiStacks()) {
-                if (stack == null || stack.getItemStack() == null) continue;
-                ItemStack is = stack.getItemStack();
-                if (!is.isEmpty()) {
-                    ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
-                    if (itemId != null) {
-                        int amount = (int) stack.getAmount();
-                        if (amount <= 0) amount = 1;
-                        String name = ITEM_NAME_CACHE.computeIfAbsent(is.getItem(), itm -> is.getHoverName().getString());
-                        PartCategory category = classifyPart(itemId);
-
-                        String path = itemId.getPath().toLowerCase(Locale.ROOT);
-                        if (category == PartCategory.COIL) {
-                            coilSlots = Math.max(coilSlots, amount);
-                        } else if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch")) || path.contains("laser_target") || path.contains("laser_source")) {
-                            energyHatchSlots = Math.max(energyHatchSlots, amount);
-                        } else if (path.contains("input_bus") || path.contains("import_bus")) {
-                            inputBusSlots = Math.max(inputBusSlots, amount);
-                        } else if (path.contains("output_bus") || path.contains("export_bus")) {
-                            outputBusSlots = Math.max(outputBusSlots, amount);
-                        } else if (path.contains("input_hatch") || path.contains("fluid_import")) {
-                            inputHatchSlots = Math.max(inputHatchSlots, amount);
-                        } else if (path.contains("output_hatch") || path.contains("fluid_export")) {
-                            outputHatchSlots = Math.max(outputHatchSlots, amount);
-                        } else if (path.contains("maintenance")) {
-                            maintenanceSlots = Math.max(maintenanceSlots, amount);
-                        }
-
-                        if (!itemId.equals(controllerId)) {
-                            parts.add(new MultiblockStructurePart(itemId, name, amount, category));
-                        }
-                        break;
+            if (!recipe.getOutputs().isEmpty()) {
+                dev.emi.emi.api.stack.EmiStack out = recipe.getOutputs().get(0);
+                if (out != null && out.getItemStack() != null) {
+                    ItemStack stack = out.getItemStack();
+                    if (!stack.isEmpty()) {
+                        controllerId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                        controllerName = ITEM_NAME_CACHE.computeIfAbsent(stack.getItem(), itm -> itm.getDescription().getString());
+                        if (controllerId != null) aliasIds.add(controllerId);
                     }
                 }
             }
-        }
 
-        parts.add(0, new MultiblockStructurePart(
-            controllerId,
-            controllerName != null && !controllerName.isBlank() ? controllerName : controllerId.getPath(),
-            1,
-            PartCategory.CONTROLLER
-        ));
-
-        int newBlockCount = 0;
-        for (MultiblockStructurePart p : parts) {
-            if (p != null) newBlockCount += p.amount();
-        }
-
-        if (existing != null && existingBlockCount >= newBlockCount) {
-            return;
-        }
-
-        Set<String> allowedAbilities = new HashSet<>();
-        Set<ResourceLocation> candidateBlocks = new HashSet<>();
-        boolean isSteam = controllerId.getPath().startsWith("steam_") || controllerId.getPath().contains("_steam_");
-
-        for (MultiblockStructurePart p : parts) {
-            if (p != null && p.itemId() != null) {
-                candidateBlocks.add(p.itemId());
-                String path = p.itemId().getPath().toLowerCase(Locale.ROOT);
-                if (path.contains("steam")) isSteam = true;
+            if (recipe.getId() != null) {
+                aliasIds.add(recipe.getId());
+                String rPath = recipe.getId().getPath();
+                if (rPath.contains("/")) {
+                    String machineName = rPath.substring(rPath.lastIndexOf('/') + 1);
+                    ResourceLocation strippedId = ResourceLocation.tryParse(recipe.getId().getNamespace() + ":" + machineName);
+                    if (strippedId != null) {
+                        aliasIds.add(strippedId);
+                        if (controllerId == null) {
+                            controllerId = strippedId;
+                            controllerName = formatMachineName(machineName);
+                        }
+                    }
+                } else if (controllerId == null) {
+                    controllerId = recipe.getId();
+                    controllerName = formatMachineName(rPath);
+                }
             }
-        }
 
-        if (inputBusSlots > 0) allowedAbilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
-        if (outputBusSlots > 0) allowedAbilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
-        if (inputHatchSlots > 0) allowedAbilities.add(isSteam ? "STEAM_IMPORT_FLUIDS" : "IMPORT_FLUIDS");
-        if (outputHatchSlots > 0) allowedAbilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
-        if (energyHatchSlots > 0 && !isSteam) allowedAbilities.add("INPUT_ENERGY");
-        if (maintenanceSlots > 0 && !isSteam) allowedAbilities.add("MAINTENANCE");
+            if (controllerId == null) {
+                return;
+            }
 
-        MultiblockStructureDef def = new MultiblockStructureDef(
-            controllerId,
-            controllerName,
-            parts,
-            coilSlots,
-            energyHatchSlots,
-            inputBusSlots,
-            outputBusSlots,
-            inputHatchSlots,
-            outputHatchSlots,
-            maintenanceSlots,
-            Collections.unmodifiableSet(allowedAbilities),
-            Collections.unmodifiableSet(candidateBlocks)
-        );
+            MultiblockStructureDef existing = STRUCTURES.get(controllerId);
+            int existingBlockCount = 0;
+            if (existing != null) {
+                for (MultiblockStructurePart p : existing.parts()) {
+                    if (p != null) existingBlockCount += p.amount();
+                }
+            }
 
-        for (ResourceLocation id : aliasIds) {
-            STRUCTURES.put(id, def);
+            List<MultiblockStructurePart> parts = new ArrayList<>();
+            int coilSlots = 0;
+            int energyHatchSlots = 0;
+            int inputBusSlots = 0;
+            int outputBusSlots = 0;
+            int inputHatchSlots = 0;
+            int outputHatchSlots = 0;
+            int maintenanceSlots = 0;
+
+            for (dev.emi.emi.api.stack.EmiIngredient ing : recipe.getInputs()) {
+                if (ing == null || ing.getEmiStacks().isEmpty()) continue;
+                for (dev.emi.emi.api.stack.EmiStack stack : ing.getEmiStacks()) {
+                    if (stack == null || stack.getItemStack() == null) continue;
+                    ItemStack is = stack.getItemStack();
+                    if (!is.isEmpty()) {
+                        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
+                        if (itemId != null) {
+                            int amount = (int) stack.getAmount();
+                            if (amount <= 0) amount = 1;
+                            String name = ITEM_NAME_CACHE.computeIfAbsent(is.getItem(), itm -> is.getHoverName().getString());
+                            PartCategory category = classifyPart(itemId);
+
+                            String path = itemId.getPath().toLowerCase(Locale.ROOT);
+                            if (category == PartCategory.COIL) {
+                                coilSlots = Math.max(coilSlots, amount);
+                            } else if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch")) || path.contains("laser_target") || path.contains("laser_source")) {
+                                energyHatchSlots = Math.max(energyHatchSlots, amount);
+                            } else if (path.contains("input_bus") || path.contains("import_bus")) {
+                                inputBusSlots = Math.max(inputBusSlots, amount);
+                            } else if (path.contains("output_bus") || path.contains("export_bus")) {
+                                outputBusSlots = Math.max(outputBusSlots, amount);
+                            } else if (path.contains("input_hatch") || path.contains("fluid_import")) {
+                                inputHatchSlots = Math.max(inputHatchSlots, amount);
+                            } else if (path.contains("output_hatch") || path.contains("fluid_export")) {
+                                outputHatchSlots = Math.max(outputHatchSlots, amount);
+                            } else if (path.contains("maintenance")) {
+                                maintenanceSlots = Math.max(maintenanceSlots, amount);
+                            }
+
+                            if (!itemId.equals(controllerId)) {
+                                parts.add(new MultiblockStructurePart(itemId, name, amount, category));
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            parts.add(0, new MultiblockStructurePart(
+                controllerId,
+                controllerName != null && !controllerName.isBlank() ? controllerName : controllerId.getPath(),
+                1,
+                PartCategory.CONTROLLER
+            ));
+
+            int newBlockCount = 0;
+            for (MultiblockStructurePart p : parts) {
+                if (p != null) newBlockCount += p.amount();
+            }
+
+            if (existing != null && existingBlockCount >= newBlockCount) {
+                return;
+            }
+
+            Set<String> allowedAbilities = new HashSet<>();
+            Set<ResourceLocation> candidateBlocks = new HashSet<>();
+            boolean isSteam = controllerId.getPath().startsWith("steam_") || controllerId.getPath().contains("_steam_");
+
+            for (MultiblockStructurePart p : parts) {
+                if (p != null && p.itemId() != null) {
+                    candidateBlocks.add(p.itemId());
+                    String path = p.itemId().getPath().toLowerCase(Locale.ROOT);
+                    if (path.contains("steam")) isSteam = true;
+                }
+            }
+
+            if (inputBusSlots > 0) allowedAbilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
+            if (outputBusSlots > 0) allowedAbilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
+            if (inputHatchSlots > 0) allowedAbilities.add(isSteam ? "STEAM_IMPORT_FLUIDS" : "IMPORT_FLUIDS");
+            if (outputHatchSlots > 0) allowedAbilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
+            if (energyHatchSlots > 0 && !isSteam) allowedAbilities.add("INPUT_ENERGY");
+            if (maintenanceSlots > 0 && !isSteam) allowedAbilities.add("MAINTENANCE");
+
+            MultiblockStructureDef def = new MultiblockStructureDef(
+                controllerId,
+                controllerName,
+                parts,
+                coilSlots,
+                energyHatchSlots,
+                inputBusSlots,
+                outputBusSlots,
+                inputHatchSlots,
+                outputHatchSlots,
+                maintenanceSlots,
+                Collections.unmodifiableSet(allowedAbilities),
+                Collections.unmodifiableSet(candidateBlocks)
+            );
+
+            for (ResourceLocation id : aliasIds) {
+                STRUCTURES.put(id, def);
+            }
         }
     }
 
@@ -397,3 +405,6 @@ public class MultiblockStructureCatalog {
         return Collections.unmodifiableMap(STRUCTURES);
     }
 }
+
+
+

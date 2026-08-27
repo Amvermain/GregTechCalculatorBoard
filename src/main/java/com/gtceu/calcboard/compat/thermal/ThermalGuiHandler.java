@@ -1,9 +1,12 @@
 package com.gtceu.calcboard.compat.thermal;
 
-import com.gtceu.calcboard.api.PowerDisplayMode;
-import com.gtceu.calcboard.api.RecipeNode;
-import com.gtceu.calcboard.client.gui.NodeCardRenderer;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -111,7 +114,7 @@ public class ThermalGuiHandler {
         }
     }
 
-    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
                                                  RecipeNode node, int x, int y, int dialogW,
                                                  double mouseX, double mouseY, int button,
                                                  net.minecraft.client.gui.components.EditBox parallelBox,
@@ -134,3 +137,6 @@ public class ThermalGuiHandler {
         return false;
     }
 }
+
+
+

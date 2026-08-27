@@ -1,6 +1,14 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.CategoryCapability;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,12 +40,12 @@ public class CategoryCapabilityMatrixTest {
         lcrNode.setRecipeCategoryId(lcrCat);
         lcrNode.setMultiblock(true);
 
-        List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(lcrNode);
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.ENERGY_HATCH));
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.COIL));
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.PARALLEL));
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.MAINTENANCE));
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT));
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(lcrNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ENERGY_HATCH));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT));
     }
 
     @Test
@@ -54,9 +62,9 @@ public class CategoryCapabilityMatrixTest {
         singleNode.setRecipeCategoryId(crCat);
         singleNode.setMultiblock(false);
 
-        List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(singleNode);
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.COIL));
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.PARALLEL));
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(singleNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL));
     }
 
     @Test
@@ -104,9 +112,9 @@ public class CategoryCapabilityMatrixTest {
         turbineNode.setGenerator(true);
         turbineNode.setMultiblock(true);
 
-        List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(turbineNode);
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.ROTOR));
-        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.COIL));
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(turbineNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR));
+        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL));
     }
 
     @Test
@@ -123,9 +131,9 @@ public class CategoryCapabilityMatrixTest {
         dynamoNode.setRecipeCategoryId(lapidaryCat);
         dynamoNode.setGenerator(true);
 
-        List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(dynamoNode);
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.THERMAL_AUGMENT));
-        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.COIL));
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(dynamoNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.THERMAL_AUGMENT));
+        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL));
     }
 
     @Test
@@ -152,16 +160,16 @@ public class CategoryCapabilityMatrixTest {
         turbineNode.setGenerator(true);
         turbineNode.setMultiblock(true);
 
-        List<com.gtceu.calcboard.api.AddonCategory> activeCats = cap.getActiveCategoriesForNode(turbineNode);
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.ROTOR));
-        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.MAINTENANCE));
-        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.PARALLEL));
-        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT));
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(turbineNode);
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR));
+        Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
+        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL));
+        Assertions.assertFalse(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT));
 
-        List<com.gtceu.calcboard.api.AddonCategory> relCats = MachineAddon.getRelevantCategories(turbineNode);
-        Assertions.assertTrue(relCats.contains(com.gtceu.calcboard.api.AddonCategory.ROTOR));
-        Assertions.assertTrue(relCats.contains(com.gtceu.calcboard.api.AddonCategory.MAINTENANCE));
-        Assertions.assertFalse(relCats.contains(com.gtceu.calcboard.api.AddonCategory.PARALLEL));
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> relCats = MachineAddon.getRelevantCategories(turbineNode);
+        Assertions.assertTrue(relCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR));
+        Assertions.assertTrue(relCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
+        Assertions.assertFalse(relCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL));
     }
 
     @Test
@@ -236,3 +244,6 @@ public class CategoryCapabilityMatrixTest {
         Assertions.assertEquals(ResourceLocation.tryParse("gtceu:ev_chemical_reactor"), node.getMachineIcon());
     }
 }
+
+
+

@@ -1,8 +1,12 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+
 import com.gtceu.calcboard.api.history.BoardCommand;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -92,3 +96,6 @@ public class NodeFlipTest {
         Assertions.assertFalse(node2.isFlipped());
     }
 }
+
+
+

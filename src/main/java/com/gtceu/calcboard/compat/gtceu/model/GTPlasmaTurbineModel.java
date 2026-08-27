@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.compat.gtceu.model;
 
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Set;
@@ -146,3 +146,4 @@ public enum GTPlasmaTurbineModel {
         return false;
     }
 }
+

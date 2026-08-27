@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.compat.thermal.helper;
 
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -384,3 +384,4 @@ public class ThermalAugmentHelper {
         return 20.0;
     }
 }
+

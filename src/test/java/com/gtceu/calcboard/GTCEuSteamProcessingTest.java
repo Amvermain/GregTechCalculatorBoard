@@ -1,6 +1,19 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTBoilerTier;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -308,10 +321,10 @@ public class GTCEuSteamProcessingTest {
         Assertions.assertTrue(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
 
         var cats = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine);
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.ROTOR));
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.MAINTENANCE));
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.CUSTOM));
-        Assertions.assertFalse(cats.contains(com.gtceu.calcboard.api.AddonCategory.PARALLEL));
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR));
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM));
+        Assertions.assertFalse(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL));
     }
 
     @Test
@@ -362,7 +375,7 @@ public class GTCEuSteamProcessingTest {
         node.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:huge_restrictive_tin_item_pipe"), "Pipe", 1.0));
         node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:tin_dust"), "Tin Dust", 1.0));
 
-        com.gtceu.calcboard.client.gui.NodeWidget widget = new com.gtceu.calcboard.client.gui.NodeWidget(node);
+        com.gtceu.calcboard.client.gui.widget.NodeWidget widget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(node);
 
         assertEquals(GTVoltageTier.ULV, node.getTargetTier());
         assertEquals(SteamMode.NONE, node.getSteamMode());
@@ -488,7 +501,7 @@ public class GTCEuSteamProcessingTest {
         assertFalse(tcNode.supportsSteamMode(), "Thermal Centrifuge must NOT support steam processing mode");
         assertEquals(SteamMode.NONE, tcNode.getSteamMode());
 
-        com.gtceu.calcboard.client.gui.NodeWidget tcWidget = new com.gtceu.calcboard.client.gui.NodeWidget(tcNode);
+        com.gtceu.calcboard.client.gui.widget.NodeWidget tcWidget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(tcNode);
         boolean tcDown = tcWidget.changeTier(-1);
         assertFalse(tcDown, "Tier change down from min tier (LV) on non-steam node must fail/not enter steam mode");
         assertEquals(SteamMode.NONE, tcNode.getSteamMode());
@@ -506,12 +519,15 @@ public class GTCEuSteamProcessingTest {
         assertFalse(cNode.supportsSteamMode(), "Centrifuge must NOT support steam processing mode");
         assertEquals(SteamMode.NONE, cNode.getSteamMode());
 
-        com.gtceu.calcboard.client.gui.NodeWidget cWidget = new com.gtceu.calcboard.client.gui.NodeWidget(cNode);
+        com.gtceu.calcboard.client.gui.widget.NodeWidget cWidget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(cNode);
         boolean cDown = cWidget.changeTier(-1);
         assertFalse(cDown, "Tier change down from min tier (MV) on non-steam node must fail/not enter steam mode");
         assertEquals(SteamMode.NONE, cNode.getSteamMode());
         assertEquals(GTVoltageTier.MV, cNode.getTargetTier());
     }
 }
+
+
+
 
 

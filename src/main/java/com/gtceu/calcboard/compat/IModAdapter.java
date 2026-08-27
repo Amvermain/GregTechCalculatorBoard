@@ -1,6 +1,28 @@
 package com.gtceu.calcboard.compat;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
+import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
+import com.gtceu.calcboard.api.bom.PartCategory;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTBoilerTier;
+import com.gtceu.calcboard.api.type.GTThreadingHelix;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -246,7 +268,7 @@ public interface IModAdapter {
     default void handleUninstallAddon(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return;
         if (addon.getCategory().equals(AddonCategory.THREADING)) {
-            com.gtceu.calcboard.api.GTThreadingHelix helix = com.gtceu.calcboard.api.GTThreadingHelix.fromId(addon.getId());
+            com.gtceu.calcboard.api.type.GTThreadingHelix helix = com.gtceu.calcboard.api.type.GTThreadingHelix.fromId(addon.getId());
             if (helix != null && node.getThreadingConfig() != null) {
                 node.getThreadingConfig().setHelixCount(helix, 0);
             }
@@ -558,7 +580,7 @@ public interface IModAdapter {
             tooltipLines.add(net.minecraft.network.chat.Component.literal("§a⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.total_gen").getString()));
             double totEUt = node.getEffectiveTotalEUt();
             var tier = node.getTargetTier();
-            if (tier == null) tier = com.gtceu.calcboard.api.GTVoltageTier.LV;
+            if (tier == null) tier = com.gtceu.calcboard.api.type.GTVoltageTier.LV;
             double amps = totEUt / (double) tier.getVoltage();
             tooltipLines.add(net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Total Generation: §a+%,.2f EU/t", totEUt)));
             tooltipLines.add(net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §a+%,.4fA %s", amps, tier.getName())));
@@ -570,7 +592,7 @@ public interface IModAdapter {
             tooltipLines.add(net.minecraft.network.chat.Component.literal("§e⚡ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.total_power").getString()));
             double totEUt = node.getEffectiveTotalEUt();
             var tier = node.getTargetTier();
-            if (tier == null) tier = com.gtceu.calcboard.api.GTVoltageTier.LV;
+            if (tier == null) tier = com.gtceu.calcboard.api.type.GTVoltageTier.LV;
             double amps = totEUt / (double) tier.getVoltage();
             tooltipLines.add(net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Total Consumption: §c%,.2f EU/t", totEUt)));
             tooltipLines.add(net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §e%,.4fA %s", amps, tier.getName())));
@@ -588,13 +610,13 @@ public interface IModAdapter {
                                    boolean isGlowing) {
         // Default GT/Electric Controls
         GTVoltageTier tier = node.getTargetTier();
-        com.gtceu.calcboard.client.gui.NodeCardRenderer.drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
+        com.gtceu.calcboard.client.gui.render.NodeCardRenderer.drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
 
         int nextCtrlX = x + 42;
         if (node.isGenerator()) {
             String genBadge = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.gen_badge").getString();
             int genW = Math.max(28, font.width(genBadge) + 4);
-            com.gtceu.calcboard.client.gui.NodeCardRenderer.drawBtn(graphics, font, genBadge, nextCtrlX, row2Y, genW, 14, mouseX, mouseY, 0xFF55FF88);
+            com.gtceu.calcboard.client.gui.render.NodeCardRenderer.drawBtn(graphics, font, genBadge, nextCtrlX, row2Y, genW, 14, mouseX, mouseY, 0xFF55FF88);
             nextCtrlX += genW + 3;
 
             String dynamoPar = "⚙ " + node.getParallel() + "x";
@@ -602,13 +624,13 @@ public interface IModAdapter {
                 dynamoPar += " (+" + node.getAddons().size() + ")";
             }
             int parW = Math.max(46, (x + cardW - 6) - nextCtrlX);
-            com.gtceu.calcboard.client.gui.NodeCardRenderer.drawBtn(graphics, font, dynamoPar, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
+            com.gtceu.calcboard.client.gui.render.NodeCardRenderer.drawBtn(graphics, font, dynamoPar, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
         } else {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = net.minecraft.network.chat.Component.translatable(ocKey).getString();
             int ocColor = node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA;
             int ocW = Math.max(50, font.width(ocText) + 6);
-            com.gtceu.calcboard.client.gui.NodeCardRenderer.drawBtn(graphics, font, ocText, nextCtrlX, row2Y, ocW, 14, mouseX, mouseY, ocColor);
+            com.gtceu.calcboard.client.gui.render.NodeCardRenderer.drawBtn(graphics, font, ocText, nextCtrlX, row2Y, ocW, 14, mouseX, mouseY, ocColor);
             nextCtrlX += ocW + 3;
 
             String parLabel = "⚙ " + node.getTotalParallel() + "x";
@@ -616,7 +638,7 @@ public interface IModAdapter {
                 parLabel += " (+" + node.getAddons().size() + ")";
             }
             int parW = Math.max(46, (x + cardW - 6) - nextCtrlX);
-            com.gtceu.calcboard.client.gui.NodeCardRenderer.drawBtn(graphics, font, parLabel, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
+            com.gtceu.calcboard.client.gui.render.NodeCardRenderer.drawBtn(graphics, font, parLabel, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
         }
     }
 
@@ -624,14 +646,14 @@ public interface IModAdapter {
      * Checks if the primary tier / speed selector button on row 2 is hovered.
      */
     default boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.NONE) return false;
+        if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
         int row2Y = ctrlY + 18;
         int btnW = 32;
         if (node.isLiquidBoilerRecipe() || isBoilerRecipe(node)) {
-            com.gtceu.calcboard.api.GTBoilerTier bTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
+            com.gtceu.calcboard.api.type.GTBoilerTier bTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
             btnW = Math.max(54, net.minecraft.client.Minecraft.getInstance().font.width(bTier.getDisplayName()) + 8);
         } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
             String steamText = node.isMultiblock() ? ("🏛 " + node.getSteamMode().getShortName()) : node.getSteamMode().getDisplayName();
@@ -644,7 +666,7 @@ public interface IModAdapter {
      * Checks if the secondary mode button (e.g. Overclock Mode STD/PERF) is hovered.
      */
     default boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node.isGenerator() || node.isFusion() || node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF || node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.NONE || (node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
+        if (node.isGenerator() || node.isFusion() || node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF || node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE || (node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
@@ -658,7 +680,7 @@ public interface IModAdapter {
      * Checks if the machine configuration / parallel / hardware button on row 2 is hovered.
      */
     default boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.NONE) return false;
+        if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
@@ -681,12 +703,12 @@ public interface IModAdapter {
      * Handles clicking on row 2 controls for this node.
      * Returns true if handled.
      */
-    default boolean handleControlClick(com.gtceu.calcboard.client.gui.NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+    default boolean handleControlClick(com.gtceu.calcboard.client.gui.widget.NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             if (node.isMultiblock() && !node.isGenerator() && !node.isTurbine() && supportsAddons(node)) {
                 if (widget.getParent() != null) {
-                    widget.getParent().openMachineConfigDialog(node, com.gtceu.calcboard.api.AddonCategory.ENERGY_HATCH);
+                    widget.getParent().openMachineConfigDialog(node, com.gtceu.calcboard.api.catalog.AddonCategory.ENERGY_HATCH);
                 }
                 return true;
             }
@@ -721,7 +743,7 @@ public interface IModAdapter {
      * Handles mouse wheel scrolling on row 2 controls for this node.
      * Returns true if handled.
      */
-    default boolean handleControlScroll(com.gtceu.calcboard.client.gui.NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
+    default boolean handleControlScroll(com.gtceu.calcboard.client.gui.widget.NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             return widget.changeTier(delta > 0 ? 1 : -1);
@@ -777,7 +799,7 @@ public interface IModAdapter {
     /**
      * Handles clicks on Section 1 controls inside MachineConfigDialog.
      */
-    default boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+    default boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
                                            RecipeNode node, int x, int y, int dialogW,
                                            double mouseX, double mouseY, int button,
                                            net.minecraft.client.gui.components.EditBox parallelBox,
@@ -817,9 +839,12 @@ public interface IModAdapter {
     /**
      * Handles mouse wheel scroll on Section 1 header inside MachineConfigDialog.
      */
-    default boolean handleDialogHeaderScroll(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+    default boolean handleDialogHeaderScroll(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
                                              RecipeNode node, int x, int y, int dialogW,
                                              double mouseX, double mouseY, double delta) {
         return false;
     }
 }
+
+
+

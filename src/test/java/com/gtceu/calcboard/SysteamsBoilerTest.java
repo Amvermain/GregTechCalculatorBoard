@@ -1,6 +1,16 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.BalanceSummary;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.api.type.RateTimeUnit;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
+
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -129,18 +139,18 @@ public class SysteamsBoilerTest {
         Assertions.assertEquals(1.875, evBoiler.getInputSlotRate(0, true), 0.001); // 1.875 diamonds/s
 
         // Test in PER_TICK mode:
-        com.gtceu.calcboard.client.gui.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_TICK);
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_TICK);
         try {
-            String steamTickStr = com.gtceu.calcboard.client.gui.FormatUtil.formatRate(evBoiler.getOutputSlotRate(0, true), true);
+            String steamTickStr = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(evBoiler.getOutputSlotRate(0, true), true);
             Assertions.assertEquals("28.8 B/t", steamTickStr); // Exact match with in-game 28800 mB/t!
 
-            String waterTickStr = com.gtceu.calcboard.client.gui.FormatUtil.formatRate(evBoiler.getInputSlotRate(1, true), true);
+            String waterTickStr = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(evBoiler.getInputSlotRate(1, true), true);
             Assertions.assertEquals("7.2 B/t", waterTickStr); // Exact match with in-game 7200 mB/t!
 
-            String diamondTickStr = com.gtceu.calcboard.client.gui.FormatUtil.formatRate(evBoiler.getInputSlotRate(0, true), false);
+            String diamondTickStr = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(evBoiler.getInputSlotRate(0, true), false);
             Assertions.assertEquals("0.094/t", diamondTickStr); // 1.875 / 20 = 0.09375 -> 0.094/t!
         } finally {
-            com.gtceu.calcboard.client.gui.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+            com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }
 
         // 4. Verify GUI Header and Tooltip match the in-game display
@@ -244,12 +254,15 @@ public class SysteamsBoilerTest {
         // Steam consumption: 1,000 mB * 375.0 = 375,000 mB/s = 375 B/s = 18,750 mB/t = 18.75 B/t!
         Assertions.assertEquals(375000.0, dynamo.getInputSlotRate(0, true), 0.1);
 
-        com.gtceu.calcboard.client.gui.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_TICK);
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_TICK);
         try {
-            String steamTickStr = com.gtceu.calcboard.client.gui.FormatUtil.formatRate(dynamo.getInputSlotRate(0, true), true);
+            String steamTickStr = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(dynamo.getInputSlotRate(0, true), true);
             Assertions.assertEquals("18.75 B/t", steamTickStr); // Exact match 18,750 mB/t -> 18.75 B/t
         } finally {
-            com.gtceu.calcboard.client.gui.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+            com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }
     }
 }
+
+
+

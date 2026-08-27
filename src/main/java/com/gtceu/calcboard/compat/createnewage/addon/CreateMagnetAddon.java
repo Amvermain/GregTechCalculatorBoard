@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.compat.createnewage.addon;
 
-import com.gtceu.calcboard.api.AddonCategory;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -41,3 +41,4 @@ public class CreateMagnetAddon extends MachineAddon {
         return cp;
     }
 }
+

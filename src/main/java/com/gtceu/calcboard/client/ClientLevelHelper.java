@@ -1,5 +1,7 @@
 package com.gtceu.calcboard.client;
 
+import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.item.ItemStack;
@@ -18,13 +20,7 @@ public final class ClientLevelHelper {
     public static boolean isRecipeBakingComplete() {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.level == null) return false;
-        try {
-            var emiManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (emiManager != null && !emiManager.getRecipes().isEmpty()) {
-                return true;
-            }
-        } catch (Throwable ignored) {}
-        return true;
+        return com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().isRecipeBakingComplete();
     }
 
     public static void collectClientRecipes(Consumer<ItemStack> collector) {
@@ -69,3 +65,4 @@ public final class ClientLevelHelper {
         return null;
     }
 }
+

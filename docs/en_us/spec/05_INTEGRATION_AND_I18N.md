@@ -5,49 +5,52 @@
 
 ---
 
-## 1. EMI Recipe Viewer Integration (`com.gtceu.calcboard.integration.emi`)
+## 1. Unified Recipe Viewer SPI System (`com.gtceu.calcboard.integration.spi`)
 
-GTCalcBoard deeply integrates with EMI (Recipe Viewer) using official recipe handlers and favorites synchronization:
+Following Clean Architecture principles, GTCalcBoard does not hardcode dependencies on any specific recipe viewer. It provides a pluggable **Recipe Viewer SPI (`IRecipeViewerAdapter`)** that dynamically elects the optimal viewer at runtime:
 
 ```mermaid
 flowchart TB
-    subgraph EMI["EMI (Recipe Viewer)"]
+    subgraph Viewers["Recipe Viewer Ecosystem"]
         direction LR
-        REG["EMI Registry Complete Event"] ~~~ PLUS["Recipe [+] Button Click"] ~~~ FAV["EMI Favorites"]
+        EMI["EMI (Priority: 100)"] ~~~ JEI["JEI / JEI++ (Priority: 50)"] ~~~ VAN["Vanilla RecipeManager (Priority: 0)"]
     end
 
-    subgraph Plugin["CalcBoardEmiPlugin & EmiRecipeHandler"]
+    subgraph SPI["Unified SPI Layer (com.gtceu.calcboard.integration.spi)"]
         direction LR
-        BAKE_TRIGGER["CategoryCapabilityMatrix.bake() Async"] ~~~ HOOK["EmiRecipeHandler<br/>(Hooks [+] only when BoardScreen is open)"] ~~~ FAV_LOAD["EmiFavorites.favorites<br/>Extract Pinned Recipes"]
+        RVR["RecipeViewerRegistry<br/>(Priority-Based Auto Election)"] --- IVA["IRecipeViewerAdapter<br/>(Common SPI Interface)"]
     end
 
-    subgraph Board["GTCalcBoard Engine"]
+    subgraph Adapters["Adapter Implementations"]
         direction LR
-        CONVERT["EmiRecipeConverter<br/>(EmiRecipe ➔ RecipeNode)"] ~~~ SPAWN["Spawn Node on Active Page"] ~~~ SEARCH_UI["RecipeSearchDialog<br/>[⭐ Favorites] Tab Filtering"]
+        E_AD["EmiRecipeViewerAdapter"] ~~~ J_AD["JeiRecipeViewerAdapter"] ~~~ V_AD["VanillaRecipeViewerAdapter"]
     end
 
-    REG --> BAKE_TRIGGER
-    PLUS --> HOOK --> CONVERT --> SPAWN
-    FAV --> FAV_LOAD --> SEARCH_UI
+    subgraph Features["Board Integrations"]
+        direction LR
+        SRCH["Recipe Index & Search"] ~~~ HOV["[R]/[U] Hotkey Lookup"] ~~~ FAV_B["Favorites Bar Sync"] ~~~ BOM_T["BoM Tree Target Sync"]
+    end
+
+    Viewers --> SPI --> Adapters --> Features
 ```
 
-### 1.1 Plugin Lifecycle & Recipe Handler (`CalcBoardEmiPlugin`)
-* Implements `dev.emi.emi.api.EmiPlugin`.
-* Listens for EMI registry completion to trigger asynchronous matrix pre-baking (`CategoryCapabilityMatrix.bake()`).
-* **Registers Official `EmiRecipeHandler`**:
-  - `supportsRecipe(recipe)`: Supports all `EmiRecipe` instances.
-  - `canCraft(recipe, context)`: Active (`true`) only when `Minecraft.getInstance().screen instanceof BoardScreen`.
-  - `craft(recipe, context)`: Spawns the node on the active board page without interfering with standard crafting tables or machine GUIs.
+### 1.1 `IRecipeViewerAdapter` Core Contract
+* `getName()` / `getPriority()`: Adapter identifier and priority weighting.
+* `isAvailable()`: Mod loading verification and runtime environment check.
+* `getAllRecipes()`: Harvests all valid recipes instantiable as canvas nodes.
+* `getFavorites()`: Real-time synchronization with player pinned/bookmarked recipes.
+* `registerBomToRecipeTree(bomSummary, warnings)`: 1-click registration of BoM shopping lists into the recipe tree / calculation goals.
+* `lookupRecipe(stack)` / `lookupUsage(stack)`: Triggers recipe or usage views on `[R]` / `[U]` hover.
 
-### 1.2 Recipe Search Favorites Filtering (`RecipeSearchDialog`)
-* Directly reads pinned/bookmarked recipes from `dev.emi.emi.registry.EmiFavorites.favorites`.
-* Provides a quick `[⭐ Favorites]` toggle button in the search dialog to load bookmarked recipes with a single click.
-
-### 1.3 Recipe Converter (`EmiRecipeConverter`)
-Converts native `EmiRecipe` objects into pure domain `RecipeNode` representations:
-* Extracts duration in ticks (`recipe.getDuration()`)
-* Extracts base EU/t (`recipe.getEnergy()`)
-* Extracts item/fluid inputs and outputs into `IngredientStack` lists.
+### 1.2 Pluggable Adapter Implementations
+* **`EmiRecipeViewerAdapter` (`integration.emi`)**:
+  - Registers official `EmiRecipeHandler` to place nodes directly from EMI `[+]` buttons when the board is open.
+  - Syncs `EmiFavorites.favorites` and integrates with `EmiRecipeTree` BoM targets.
+* **`JeiRecipeViewerAdapter` (`integration.jei`)**:
+  - Indexes JEI recipe catalogs, handles `[R]`/`[U]` lookups, and synchronizes JEI bookmarks.
+  - Integrates with JEI++ (Just Enough Calculation) for BoM recipe tree target registration.
+* **`VanillaRecipeViewerAdapter` (`integration.vanilla`)**:
+  - Fallback adapter for pure vanilla or headless environments without recipe viewer mods. Indexes base Minecraft `RecipeManager` recipes.
 
 ---
 
@@ -130,14 +133,19 @@ $$\text{Displayed Rate} = \text{RatePerSecond} \times \text{Multiplier}$$
 | **Hour** | `HOUR` | $3,600.0$ | `/h`, `B/h` |
 | **Day** | `DAY` | $86,400.0$ | `/d`, `B/d` |
 
-### 2.2 Energy & Flow Formatting (`FormatUtil`)
+### 3.2 Energy & Flow Formatting (`FormatUtil`)
 
 * **Energy**: `formatEU(4800)` $\rightarrow$ `"4.80k EU/t"`, `formatEU(125000000)` $\rightarrow$ `"125.0M EU/t"`
 * **Flows**: `formatFluid(1200)` $\rightarrow$ `"1.20k mB/s"`, `formatFluid(0.5)` $\rightarrow$ `"0.50 mB/s"`
+* **Global Fluid Unit Formatting (`FluidUnitMode`)**:
+  - `AUTO` (Default): Smart scaling ($< 1,000\text{ mB}$ in $\text{mB/s}$, $\ge 1,000\text{ mB}$ in $\text{B/s}$).
+  - `ALWAYS_MB`: Force all fluids to millibuckets (`500 mB/s`, `2500 mB/s`, `0.10 mB/s`).
+  - `ALWAYS_B`: Force all fluids to buckets (`0.50 B/s`, `2.50 B/s`, `0.0001 B/s`).
+  - Toggled via the toolbar button (`Shift+T`) and persisted in client configuration.
 
 ---
 
-## 3. Localization & i18n Synchronization (`assets/gtcalcboard/lang`)
+## 4. Localization & i18n Synchronization (`assets/gtcalcboard/lang`)
 
 UI text is strictly managed via language translation files with 100% key synchronization between `en_us.json` and `ko_kr.json`.
 

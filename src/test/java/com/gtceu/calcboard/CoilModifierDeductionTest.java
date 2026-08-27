@@ -1,8 +1,8 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
@@ -102,3 +102,4 @@ public class CoilModifierDeductionTest {
         Assertions.assertEquals(2, spec.customMultiplier().baseParallel());
     }
 }
+

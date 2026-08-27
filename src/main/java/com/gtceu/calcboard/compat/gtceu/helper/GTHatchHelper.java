@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType;
 import net.minecraft.resources.ResourceLocation;
@@ -423,3 +423,4 @@ public class GTHatchHelper {
         return sb.toString();
     }
 }
+

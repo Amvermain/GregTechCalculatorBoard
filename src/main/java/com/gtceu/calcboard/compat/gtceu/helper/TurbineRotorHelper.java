@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.MultiblockDetector;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -455,3 +455,4 @@ public class TurbineRotorHelper {
         return sb.toString().trim();
     }
 }
+

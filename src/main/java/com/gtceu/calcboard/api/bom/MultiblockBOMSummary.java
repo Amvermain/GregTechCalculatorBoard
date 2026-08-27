@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.api.bom;
 
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -53,3 +53,4 @@ public record MultiblockBOMSummary(
         List<MultiblockStructurePart> requiredParts
     ) {}
 }
+

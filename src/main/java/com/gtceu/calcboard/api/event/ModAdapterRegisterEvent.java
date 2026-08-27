@@ -1,5 +1,7 @@
 package com.gtceu.calcboard.api.event;
 
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+
 import com.gtceu.calcboard.compat.IModAdapter;
 import net.minecraftforge.eventbus.ListenerList;
 import net.minecraftforge.eventbus.api.Event;
@@ -45,3 +47,4 @@ public class ModAdapterRegisterEvent extends Event {
         LISTENER_LIST = new ListenerList();
     }
 }
+

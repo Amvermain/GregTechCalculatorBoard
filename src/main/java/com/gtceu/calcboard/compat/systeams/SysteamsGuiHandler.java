@@ -1,12 +1,12 @@
 package com.gtceu.calcboard.compat.systeams;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.PowerDisplayMode;
-import com.gtceu.calcboard.api.RecipeNode;
-import com.gtceu.calcboard.client.gui.FormatUtil;
-import com.gtceu.calcboard.client.gui.NodeCardRenderer;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -108,3 +108,4 @@ public class SysteamsGuiHandler {
         return false;
     }
 }
+

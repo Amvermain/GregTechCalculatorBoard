@@ -1,7 +1,13 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import net.minecraft.resources.ResourceLocation;
@@ -77,7 +83,7 @@ public class CreateKineticTest {
 
     @Test
     public void testRpmSpeedAndStressScaling() {
-        RecipeNode millstone = RecipeNode.create("Millstone (Wheat)", 100.0, 256.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        RecipeNode millstone = RecipeNode.create("Millstone (Wheat)", 100.0, 256.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
         millstone.setEnergyType(EnergyType.KINETIC_SU);
         millstone.setMachineIcon(ResourceLocation.tryParse("create:millstone"));
         millstone.setRpm(32);
@@ -104,7 +110,7 @@ public class CreateKineticTest {
 
     @Test
     public void testFanProcessingFixedDuration() {
-        RecipeNode fanBlasting = RecipeNode.create("Fan Blasting (Copper Dust)", 150.0, 128.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        RecipeNode fanBlasting = RecipeNode.create("Fan Blasting (Copper Dust)", 150.0, 128.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
         fanBlasting.setEnergyType(EnergyType.KINETIC_SU);
         fanBlasting.setRecipeCategoryId(ResourceLocation.tryParse("create:blasting"));
         fanBlasting.setMachineIcon(ResourceLocation.tryParse("create:encased_fan"));
@@ -127,7 +133,7 @@ public class CreateKineticTest {
 
     @Test
     public void testRpmCycling() {
-        RecipeNode node = RecipeNode.create("Mechanical Press", 60.0, 256.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        RecipeNode node = RecipeNode.create("Mechanical Press", 60.0, 256.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
         node.setEnergyType(EnergyType.KINETIC_SU);
         node.setRpm(32);
 
@@ -160,10 +166,10 @@ public class CreateKineticTest {
         Assertions.assertEquals(512.0, waterWheel.getOutputSlotRate(0, true), 0.001); // 512 SU/s
 
         // Consumer node: Mechanical Press (100 ticks = 5s, 256 SU impact @ 32 RPM -> 1280 SU per batch)
-        RecipeNode press = RecipeNode.create("Mechanical Press", 100.0, 256.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        RecipeNode press = RecipeNode.create("Mechanical Press", 100.0, 256.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
         press.setEnergyType(EnergyType.KINETIC_SU);
         press.setRpm(32);
-        press.addInput(com.gtceu.calcboard.api.IngredientStack.stressUnit(1280.0)); // 256 * 5s
+        press.addInput(com.gtceu.calcboard.api.model.IngredientStack.stressUnit(1280.0)); // 256 * 5s
 
         // At 32 RPM: CPS = 0.2 /s -> 1280 * 0.2 = 256 SU/s
         Assertions.assertEquals(256.0, press.getInputSlotRate(0, true), 0.001);
@@ -175,16 +181,16 @@ public class CreateKineticTest {
 
     @Test
     public void testKineticGraphBalancing() {
-        com.gtceu.calcboard.api.FlowGraph graph = new com.gtceu.calcboard.api.FlowGraph();
+        com.gtceu.calcboard.api.model.FlowGraph graph = new com.gtceu.calcboard.api.model.FlowGraph();
 
         RecipeNode waterWheel = CreateModAdapter.createKineticGeneratorNode(
                 ResourceLocation.tryParse("create:large_water_wheel"),
                 "Large Water Wheel"
         );
-        RecipeNode press = RecipeNode.create("Mechanical Press", 100.0, 256.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        RecipeNode press = RecipeNode.create("Mechanical Press", 100.0, 256.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
         press.setEnergyType(EnergyType.KINETIC_SU);
         press.setRpm(32);
-        press.addInput(com.gtceu.calcboard.api.IngredientStack.stressUnit(1280.0)); // 256 SU/s
+        press.addInput(com.gtceu.calcboard.api.model.IngredientStack.stressUnit(1280.0)); // 256 SU/s
 
         graph.addNode(waterWheel);
         graph.addNode(press);
@@ -193,7 +199,7 @@ public class CreateKineticTest {
         graph.addConnection(waterWheel.getId(), 0, press.getId(), 0);
 
         // 1 Large Water Wheel (+512 SU/s) powers 2 Mechanical Presses (-256 SU/s each)
-        com.gtceu.calcboard.api.FlowGraphSolver.autoRatioFromAnchor(graph, waterWheel, true);
+        com.gtceu.calcboard.api.solver.FlowGraphSolver.autoRatioFromAnchor(graph, waterWheel, true);
 
         Assertions.assertEquals(1.0, waterWheel.getMachineCount(), 0.001);
         Assertions.assertEquals(2.0, press.getMachineCount(), 0.001); // 2 presses needed to absorb 512 SU
@@ -204,20 +210,20 @@ public class CreateKineticTest {
         // Fan Washing: Crushed Iron Ore (150 ticks = 7.5s at 32 RPM standard Create default)
         // Output 1: Crushed Iron Ore (100% chance, 1.0) -> 1.0 * (20/150) = 0.1333/s
         // Output 2: Nickel Dust (7% chance, 1.0) -> 0.07 * (20/150) = 0.00933/s
-        RecipeNode washing = RecipeNode.create("Fan Washing (Crushed Iron Ore)", 150.0, 128.0, com.gtceu.calcboard.api.GTVoltageTier.LV);
+        RecipeNode washing = RecipeNode.create("Fan Washing (Crushed Iron Ore)", 150.0, 128.0, com.gtceu.calcboard.api.type.GTVoltageTier.LV);
         washing.setEnergyType(EnergyType.KINETIC_SU);
         washing.setRpm(32);
-        washing.addInput(com.gtceu.calcboard.api.IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1.0));
-        washing.addInput(com.gtceu.calcboard.api.IngredientStack.stressUnit(960.0));
-        washing.addOutput(com.gtceu.calcboard.api.IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1.0, 1.0));
-        washing.addOutput(com.gtceu.calcboard.api.IngredientStack.item(ResourceLocation.tryParse("gtceu:nickel_dust"), "Nickel Dust", 1.0, 0.07));
+        washing.addInput(com.gtceu.calcboard.api.model.IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1.0));
+        washing.addInput(com.gtceu.calcboard.api.model.IngredientStack.stressUnit(960.0));
+        washing.addOutput(com.gtceu.calcboard.api.model.IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 1.0, 1.0));
+        washing.addOutput(com.gtceu.calcboard.api.model.IngredientStack.item(ResourceLocation.tryParse("gtceu:nickel_dust"), "Nickel Dust", 1.0, 0.07));
 
         Assertions.assertEquals(0.1333, washing.getEffectiveCyclesPerSecond(), 0.001);
         Assertions.assertEquals(0.1333, washing.getOutputSlotRate(0, true), 0.001); // 0.1333/s Crushed Iron Ore
         Assertions.assertEquals(0.00933, washing.getOutputSlotRate(1, true), 0.001); // 0.00933/s Nickel Dust (7% of 0.1333)
 
         // Verify formatted string
-        String nickelRateStr = com.gtceu.calcboard.client.gui.FormatUtil.formatRate(washing.getOutputSlotRate(1, true), false);
+        String nickelRateStr = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(washing.getOutputSlotRate(1, true), false);
         Assertions.assertEquals("0.0093/s", nickelRateStr);
     }
 
@@ -315,3 +321,6 @@ public class CreateKineticTest {
         Assertions.assertTrue(matchesLww.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
     }
 }
+
+
+

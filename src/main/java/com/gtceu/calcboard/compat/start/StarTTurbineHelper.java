@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.compat.start;
 
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.resources.ResourceLocation;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
 
@@ -39,3 +39,4 @@ public class StarTTurbineHelper {
         return false;
     }
 }
+

@@ -1,10 +1,12 @@
 package com.gtceu.calcboard.client.gui;
 
-import com.gtceu.calcboard.api.CanvasGroupFrame;
-import com.gtceu.calcboard.api.CanvasStickyNote;
-import com.gtceu.calcboard.api.FlowGraph;
-import com.gtceu.calcboard.api.NodeClipboard;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
+
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.storage.NodeClipboard;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import net.minecraft.network.chat.Component;
@@ -342,4 +344,6 @@ public class BoardSelectionModel {
         pasteSelection(screen, canvasX, canvasY);
     }
 }
+
+
 

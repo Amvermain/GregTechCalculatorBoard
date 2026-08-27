@@ -20,28 +20,21 @@
 ```mermaid
 graph TD
     subgraph UI["1. 프레젠테이션 & UI 계층 (com.gtceu.calcboard.client.gui)"]
-        BS["BoardScreen (2D 뷰포트, 카메라 이동/줌, 화면 매트릭스)"]
+        BS["BoardScreen & Editor (2D 뷰포트, 카메라 이동/줌, 화면 매트릭스)"]
         CIH["CanvasInteractionHandler (마우스 드래그, 박스 선택, 포트 와이어링)"]
-        Widgets["NodeWidget & NodeCardRenderer (카드 레이아웃, 뱃지, 소켓)"]
-        CR["ConnectionRenderer (3차 베지어 곡선 & 클릭 판정)"]
-        Dialogs["MachineConfigDialog & AddonCatalogPanel (애드온 랙, 검색 엔진)"]
-        Overlays["SummaryOverlay, GuideDialog, MultiblockBOMDialog, GlobalBalanceDialog"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, FavoritesDockWidget, HotkeyHudWidget)"]
+        Render["render.* (NodeCardRenderer, ConnectionRenderer, CanvasGroupFrameRenderer)"]
+        Dialogs["dialog.* (MachineConfigDialog, MultiblockBOMDialog, RecipeSearchDialog, GlobalBalanceDialog)"]
+        Overlays["SummaryOverlay, GuideDialog"]
     end
 
     subgraph Core["2. 코어 수학 & 그래프 엔진 (com.gtceu.calcboard.api)"]
-        BM["BoardManager & BoardPage (다중 페이지 문서 & 로컬/NBT 영속화)"]
-        FG["FlowGraph & ConnectionEdge (토폴로지, 노드, 유향 와이어, 서브그래프)"]
-        RN["RecipeNode (순수 도메인 모델, 입출력 슬롯, 생산율 & CPS)"]
-        NPS["NodePropertyStore & NodeProperties (타입 세이프 동적 프로퍼티 레지스트리)"]
-        OC["OverclockMode (표준, 퍼펙트, 무손실 & 서브틱 배치)"]
-        FGS["FlowGraphSolver (고정점 병목 해석, 양방향 BFS 비율 맞춤, 포트 통계)"]
-        FGMH["FlowGraphModuleHandler (복합 공정 모듈화 & 펼치기)"]
-        HM["HistoryManager (Undo/Redo 커맨드 델타 스택)"]
-        BC["BlueprintCodec (NBT & Base64 GZIP 압축 코덱)"]
-        BOM["MultiblockBOMCalculator & MultiblockStructureCatalog (BOM 산출 엔진)"]
-        ETA["ProductionETACalculator (목표 수량 소요 시간 & 총 소요 전력/원자재 연산)"]
-        AFR["AddonFactoryRegistry & NodeBadgeRegistry (디커플링된 애드온 팩토리 & 뱃지 레지스트리)"]
-        EB["RecipeNodeEvent / FlowGraphEvent (생명주기 이벤트 버스)"]
+        Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec)"]
+        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, PortFlowStats, OverclockResult)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, FlowGraphModuleHandler, AlternativeRecipeFinder, ProductionETACalculator, MultiblockBOMCalculator)"]
+        Catalog["catalog.* (MultiblockStructureCatalog, AddonFactoryRegistry, NodeBadgeRegistry)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, FontScale)"]
+        Util["util.* (FormatUtil, NodeProperties, NodePropertyStore, EventBus)"]
     end
 
     subgraph Compat["3. 모드 호환성 SPI 계층 (com.gtceu.calcboard.compat)"]
@@ -60,14 +53,23 @@ graph TD
         IMA --> Adapters
     end
 
-    subgraph Integration["4. 외부 연동 & 사전 베이킹 계층 (com.gtceu.calcboard.integration)"]
-        ERC["EmiRecipeConverter (재귀적 재료/확률 추출 & EMI 가상 레시피 등록)"]
+    subgraph Integration["4. 외부 연동 & 레시피 뷰어 SPI 계층 (com.gtceu.calcboard.integration)"]
+        RVR["RecipeViewerRegistry (우선순위 기반 뷰어 어댑터 선출)"]
+        IVA["IRecipeViewerAdapter (공통 SPI 인터페이스)"]
+        subgraph Viewers["레시피 뷰어 어댑터"]
+            EMI_AD["EmiRecipeViewerAdapter (Priority: 100)"]
+            JEI_AD["JeiRecipeViewerAdapter (Priority: 50)"]
+            VAN_AD["VanillaRecipeViewerAdapter (Priority: 0 Fallback)"]
+        end
         CCM["CategoryCapabilityMatrix (사전 베이킹된 O(1) 기계/워크스테이션 캐시)"]
         MD["MultiblockDetector (결정론적 멀티블록 구조체/레시피 스캐너)"]
         DAC["DynamicAddonCrawler (활성 아이템 스캔 & 어댑터 조율)"]
+        RVR --> IVA
+        IVA --> Viewers
     end
 
     UI -->|사용자 인터랙션 전달 & 렌더링 디스패치| Core
+    UI -->|레시피 검색, 조회 & BoM 동기화 요청| RVR
     UI -->|커스텀 컨트롤 & 툴팁 위임| Compat
     Integration -->|레시피 및 기계 데이터 적재| Core
     Integration -->|애드온 탐색 & 수용능력 베이킹| Compat
@@ -85,15 +87,20 @@ graph TD
 * **모드 종속성 일체 배제**: `RecipeNode` 내부에는 특정 모드(GTCEu, Create, Thermal 등)의 규칙이 하드코딩되지 않습니다.
 * **생명주기 및 동작 위임**: 기계 아이콘 교체(`setMachineIcon`), 에너지 형태 판별(`getEnergyType`), 기본 병렬(`getDefaultParallel`), 단일 기계 소비/발전량(`getSingleMachineEUt`), 가동 유효성 검증(`isOperational`), BOM 추가 부품 산출(`populateExtraBOMParts`) 등 모든 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(node)`를 통해 해당 모드의 `IModAdapter` 구현체로 위임됩니다.
 * **타입 세이프 동적 속성 관리**: 특정 모드나 피처 전용 메타데이터(반사판 티어, 터빈 로터 효율, 클린룸 레벨 등)는 클래스 필드로 확장하지 않고, `NodePropertyStore`와 `NodeProperties`를 통해 타입 안전하게 캡슐화됩니다.
+* **인플레이스 대체 레시피 교체 (`AlternativeRecipeFinder`)**: 노드를 삭제하지 않고 동일 머신/산출물의 대체 레시피로 즉시 스위칭하며, 동일 재료 포트 와이어를 자동 보존하고 Undo/Redo를 지원합니다.
 
-### 2.2 애드온 및 스펙 연역적 분석 원칙 (Rule 5)
+### 2.2 통합 레시피 뷰어 SPI (`IRecipeViewerAdapter`)
+* **플러그형 레시피 뷰어 연동**: `RecipeViewerRegistry`를 통해 런타임에 설치된 모드에 맞춰 최적의 레시피 뷰어 어댑터(EMI ➔ JEI ➔ Vanilla Fallback)를 자동 선출합니다.
+* **BoM 트리 목표 등록**: 멀티블록 BoM 쇼핑 리스트를 EMI Recipe Tree 또는 JEI++ 목표로 1클릭 등록하여 하위 재료 크래프팅을 역추적할 수 있습니다.
+
+### 2.3 애드온 및 스펙 연역적 분석 원칙 (Rule 5)
 * **휴리스틱 문자열 추론 금지**: 툴팁 텍스트, 아이템 이름, 아이템 ID 경로(`id.getPath().contains(...)`)를 매칭하여 기계 티어나 애드온 수치를 추측하는 것을 엄격히 금지합니다.
 * **결정론적 연역 획득 (Deterministic Deduction)**:
   1. 대상 모드의 공식 API 및 런타임 Java 리플렉션을 통한 기능적 연역.
   2. 모드 내부 객체/물리 시뮬레이션 실행.
   3. 결정론적 NBT 수치 데이터(예: `AugmentData` 실수/정수 복합 태그) 및 공식 Forge `TagKey` 직접 검사.
 
-### 2.3 생명주기 이벤트 버스 (Lifecycle Event Bus)
+### 2.4 생명주기 이벤트 버스 (Lifecycle Event Bus)
 외부 모드나 애드온이 캔버스 노드 생성, 수정, 삭제, 계산 전/후, 카탈로그 구축 이벤트를 구독하고 확장할 수 있도록 표준 Forge 이벤트(`RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`)를 발행합니다.
 
 ---
@@ -177,10 +184,15 @@ flowchart TD
     end
     G2 --> CanvasSpace
     CanvasSpace --> G3["3. 캔버스 매트릭스 복원 (Matrix Pop)"]
-    G3 --> G4["4. 화면 HUD (탭바, 툴바, 단축키 위젯, 결산 오버레이)"]
+    G3 --> G4["4. 화면 HUD (오버플로우 네비게이션 탭바, 툴바, 단축키 위젯, 결산 오버레이)"]
     G4 --> G5["5. 툴팁 레이어 (포트 유량, 아이템, 애드온 지연 렌더링)"]
-    G5 --> G6["6. 모달 다이얼로그 (MachineConfigDialog, BOM, 검색창, 가이드북)"]
+    G5 --> G6["6. 모달 다이얼로그 (MachineConfigDialog(FontScale 지원), BOM, 검색창, 가이드북)"]
 ```
+
+### 6.1 접근성 및 UI 가독성 확장
+* **5단계 UI 배율 (`FontScale`)**: `MachineConfigDialog` 내 `[Aa 1.0x]` 버튼을 통해 0.75x~1.30x 실시간 스케일 조절 지원 (마우스 좌/우클릭, 휠 스크롤, `+`/`-` 단축키).
+* **탭 바 오버플로우 클릭 네비게이션 (`PageTabBarWidget`)**: 다수의 페이지 생성 시 좌/우 `«`, `»` 인디케이터 클릭 및 휠 스크롤로 매끄러운 탭 이동 지원.
+* **전역 유체 단위 모드 (`FluidUnitMode`)**: 툴바의 유체 단위 토글 버튼(`Shift+T`)을 통해 `AUTO`(자동 스케일링), `ALWAYS_MB`(항상 mB), `ALWAYS_B`(항상 B)로 캔버스 전체 유량 표기 일괄 통일.
 
 ---
 

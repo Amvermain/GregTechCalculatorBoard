@@ -1,11 +1,13 @@
 package com.gtceu.calcboard.api.property;
 
+import com.gtceu.calcboard.api.model.RecipeNode;
+
 import net.minecraft.nbt.CompoundTag;
 
 import java.util.*;
 
 /**
- * Type-safe, lightweight dynamic property store for {@link com.gtceu.calcboard.api.RecipeNode}.
+ * Type-safe, lightweight dynamic property store for {@link com.gtceu.calcboard.api.model.RecipeNode}.
  * Holds special machine metadata (temperatures, fusion ignition, RPM, cleanroom, etc.)
  * and automates NBT serialization without bloating the core node class.
  */
@@ -150,3 +152,5 @@ public class NodePropertyStore {
         return "NodePropertyStore" + values;
     }
 }
+
+

@@ -1,11 +1,21 @@
 package com.gtceu.calcboard.compat.gtceu;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.MultiblockDetector;
-import com.gtceu.calcboard.api.OverclockMode;
-import com.gtceu.calcboard.api.RecipeNode;
-import com.gtceu.calcboard.client.gui.NodeCardRenderer;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTBoilerTier;
+import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -40,13 +50,13 @@ public class GTCEuGuiHandler {
         int tierBtnW = 32;
         int nextCtrlX = x + 42;
 
-        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.NONE) {
+        if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
             String bannerText = "🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
             int bannerW = cardW - 12;
             NodeCardRenderer.drawBtn(graphics, font, bannerText, x + 6, row2Y, bannerW, 14, mouseX, mouseY, 0xFF88D49E, false, false);
             return;
         } else if (isBoiler(node)) {
-            com.gtceu.calcboard.api.GTBoilerTier boilerTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
+            com.gtceu.calcboard.api.type.GTBoilerTier boilerTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
             String boilerText = boilerTier.getDisplayName();
             if (boilerTier.isMultiblock() && node.getBoilerThrottle() < 100) {
                 boilerText += " (" + node.getBoilerThrottle() + "%)";
@@ -123,7 +133,7 @@ public class GTCEuGuiHandler {
                 NodeCardRenderer.drawBtn(graphics, font, dynamoPar, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, configColor, !isOperational, isGlowing);
             }
         } else {
-            if (!node.isFusion() && node.getEnergyType() != com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
+            if (!node.isFusion() && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
                 String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
                 String ocText = Component.translatable(ocKey).getString();
                 int ocColor = !isOperational ? 0xFFFF8888 : (node.getOverclockMode() == OverclockMode.PERFECT ? 0xFF55FF55 : 0xFFAAAAAA);
@@ -146,14 +156,14 @@ public class GTCEuGuiHandler {
 
     public static List<Component> buildEnergyTooltip(RecipeNode node) {
         List<Component> tooltipLines = new ArrayList<>();
-        if (node.getEnergyType() == com.gtceu.calcboard.api.EnergyType.NONE) {
+        if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
             tooltipLines.add(Component.literal("§7- " + Component.translatable("gui.gtcalcboard.energy_passive").getString()));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.2fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
             return tooltipLines;
         }
 
         if (isBoiler(node)) {
-            com.gtceu.calcboard.api.GTBoilerTier boilerTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
+            com.gtceu.calcboard.api.type.GTBoilerTier boilerTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
             tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_title").getString()));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Boiler Type: %s%s", boilerTier.getFormatCode(), boilerTier.getDisplayName())));
             if (boilerTier.isMultiblock()) {
@@ -170,7 +180,7 @@ public class GTCEuGuiHandler {
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Steam Consumption: §b♨ %,.1f L/s", steamRate)));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Operating Mode: %s%s", node.getSteamMode().getFormatCode(), node.getSteamMode().getDisplayName())));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§8* Steam Ratio: 1 EU = 2 mB Steam (Speed: %s)", node.getSteamMode() == com.gtceu.calcboard.api.SteamMode.LOW_PRESSURE ? "0.5x" : "1.0x")));
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§8* Steam Ratio: 1 EU = 2 mB Steam (Speed: %s)", node.getSteamMode() == com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE ? "0.5x" : "1.0x")));
             return tooltipLines;
         }
 
@@ -179,7 +189,7 @@ public class GTCEuGuiHandler {
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§d⚛ Fusion Reactor Mk%d", fTier)));
             long startEU = node.getEuToStart();
             if (startEU > 0) {
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Start Ignition Energy: §e%,d EU §7(§f%s EU§7)", startEU, com.gtceu.calcboard.client.gui.FormatUtil.formatCompactNumber(startEU))));
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Start Ignition Energy: §e%,d EU §7(§f%s EU§7)", startEU, com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(startEU))));
             }
             double totEUt = node.getEffectiveTotalEUt();
             var tier = node.getTargetTier();
@@ -290,7 +300,7 @@ public class GTCEuGuiHandler {
             }
         } else if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
             graphics.drawString(font, "§6♨ " + Component.translatable("gui.gtcalcboard.boiler_type_title").getString(), x + 10, y + 30, 0xFFFFFFFF, false);
-            com.gtceu.calcboard.api.GTBoilerTier curTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
+            com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
 
             // Multiblock Boiler Throttle Control Bar (Top-Right)
             if (curTier.isMultiblock()) {
@@ -334,14 +344,14 @@ public class GTCEuGuiHandler {
                 }
             }
 
-            com.gtceu.calcboard.api.GTBoilerTier[] bTiers = com.gtceu.calcboard.api.GTBoilerTier.values();
+            com.gtceu.calcboard.api.type.GTBoilerTier[] bTiers = com.gtceu.calcboard.api.type.GTBoilerTier.values();
             boolean isLiquid = node.isLiquidBoilerRecipe();
             int btnW = 70;
             int gap = 4;
             int btnY = y + 44;
-            com.gtceu.calcboard.api.GTBoilerTier hoveredTier = null;
+            com.gtceu.calcboard.api.type.GTBoilerTier hoveredTier = null;
             for (int i = 0; i < bTiers.length; i++) {
-                com.gtceu.calcboard.api.GTBoilerTier bt = bTiers[i];
+                com.gtceu.calcboard.api.type.GTBoilerTier bt = bTiers[i];
                 boolean active = curTier == bt;
                 int btnX = x + 10 + i * (btnW + gap);
                 boolean hov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 16;
@@ -367,23 +377,23 @@ public class GTCEuGuiHandler {
             if (node.supportsSteamMode()) {
                 graphics.drawString(font, "§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_mode_title").getString(), x + 10, y + 30, 0xFFFFFFFF, false);
                 int btnX = x + 10;
-                com.gtceu.calcboard.api.SteamMode curSteam = node.getSteamMode();
+                com.gtceu.calcboard.api.type.SteamMode curSteam = node.getSteamMode();
 
-                boolean lpActive = curSteam == com.gtceu.calcboard.api.SteamMode.LOW_PRESSURE;
+                boolean lpActive = curSteam == com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE;
                 boolean lpHover = mouseX >= btnX && mouseX <= btnX + 110 && mouseY >= y + 44 && mouseY <= y + 60;
                 graphics.fill(btnX, y + 44, btnX + 110, y + 60, lpActive ? 0xFF5D3E1A : (lpHover ? 0xFF3D4558 : 0xFF282D3B));
                 graphics.renderOutline(btnX, y + 44, 110, 16, lpActive ? 0xFFD28C38 : 0xFF3F4658);
                 graphics.drawCenteredString(font, "♨ LP Steam (0.5x)", btnX + 55, y + 48, lpActive ? 0xFFFFD28C : 0xFFB0B8C8);
                 btnX += 116;
 
-                boolean hpActive = curSteam == com.gtceu.calcboard.api.SteamMode.HIGH_PRESSURE;
+                boolean hpActive = curSteam == com.gtceu.calcboard.api.type.SteamMode.HIGH_PRESSURE;
                 boolean hpHover = mouseX >= btnX && mouseX <= btnX + 110 && mouseY >= y + 44 && mouseY <= y + 60;
                 graphics.fill(btnX, y + 44, btnX + 110, y + 60, hpActive ? 0xFF4A4A4A : (hpHover ? 0xFF3D4558 : 0xFF282D3B));
                 graphics.renderOutline(btnX, y + 44, 110, 16, hpActive ? 0xFFAAAAAA : 0xFF3F4658);
                 graphics.drawCenteredString(font, "♨ HP Steam (1.0x)", btnX + 55, y + 48, hpActive ? 0xFFFFFFFF : 0xFFB0B8C8);
                 btnX += 116;
 
-                boolean elecActive = curSteam == com.gtceu.calcboard.api.SteamMode.NONE;
+                boolean elecActive = curSteam == com.gtceu.calcboard.api.type.SteamMode.NONE;
                 boolean elecHover = mouseX >= btnX && mouseX <= btnX + 90 && mouseY >= y + 44 && mouseY <= y + 60;
                 graphics.fill(btnX, y + 44, btnX + 90, y + 60, elecActive ? 0xFF2A5288 : (elecHover ? 0xFF3D4558 : 0xFF282D3B));
                 graphics.renderOutline(btnX, y + 44, 90, 16, elecActive ? 0xFF589CFF : 0xFF3F4658);
@@ -543,7 +553,7 @@ public class GTCEuGuiHandler {
         return "🏛 " + id.getPath();
     }
 
-    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
                                                  RecipeNode node, int x, int y, int dialogW,
                                                  double mouseX, double mouseY, int button,
                                                  net.minecraft.client.gui.components.EditBox parallelBox,
@@ -626,7 +636,7 @@ public class GTCEuGuiHandler {
                 }
             }
         } else if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
-            com.gtceu.calcboard.api.GTBoilerTier curTier = com.gtceu.calcboard.api.GTBoilerTier.getBoilerTier(node);
+            com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
 
             // Multiblock Boiler Throttle Click Handling
             if (curTier.isMultiblock()) {
@@ -678,12 +688,12 @@ public class GTCEuGuiHandler {
                 }
             }
 
-            com.gtceu.calcboard.api.GTBoilerTier[] bTiers = com.gtceu.calcboard.api.GTBoilerTier.values();
+            com.gtceu.calcboard.api.type.GTBoilerTier[] bTiers = com.gtceu.calcboard.api.type.GTBoilerTier.values();
             int btnW = 70;
             int gap = 4;
             int btnY = y + 44;
             for (int i = 0; i < bTiers.length; i++) {
-                com.gtceu.calcboard.api.GTBoilerTier bt = bTiers[i];
+                com.gtceu.calcboard.api.type.GTBoilerTier bt = bTiers[i];
                 int btnX = x + 10 + i * (btnW + gap);
                 if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 16) {
                     boolean isLiquid = node.isLiquidBoilerRecipe();
@@ -700,7 +710,7 @@ public class GTCEuGuiHandler {
             if (node.supportsSteamMode()) {
                 int btnX = x + 10;
                 if (mouseX >= btnX && mouseX <= btnX + 110 && mouseY >= y + 44 && mouseY <= y + 60) {
-                    node.setSteamMode(com.gtceu.calcboard.api.SteamMode.LOW_PRESSURE);
+                    node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE);
                     if (parent != null) parent.markSummaryDirty();
                     net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
@@ -709,7 +719,7 @@ public class GTCEuGuiHandler {
                 }
                 btnX += 116;
                 if (mouseX >= btnX && mouseX <= btnX + 110 && mouseY >= y + 44 && mouseY <= y + 60) {
-                    node.setSteamMode(com.gtceu.calcboard.api.SteamMode.HIGH_PRESSURE);
+                    node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.HIGH_PRESSURE);
                     if (parent != null) parent.markSummaryDirty();
                     net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
@@ -718,7 +728,7 @@ public class GTCEuGuiHandler {
                 }
                 btnX += 116;
                 if (mouseX >= btnX && mouseX <= btnX + 90 && mouseY >= y + 44 && mouseY <= y + 60) {
-                    node.setSteamMode(com.gtceu.calcboard.api.SteamMode.NONE);
+                    node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.NONE);
                     if (parent != null) parent.markSummaryDirty();
                     net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
@@ -798,7 +808,7 @@ public class GTCEuGuiHandler {
                         }
                     }
                     if (dialog != null) {
-                        if (!isThreading && dialog.getSelectedCategory() == com.gtceu.calcboard.api.AddonCategory.THREADING) {
+                        if (!isThreading && dialog.getSelectedCategory() == com.gtceu.calcboard.api.catalog.AddonCategory.THREADING) {
                             dialog.setSelectedCategory(null);
                         }
                         dialog.invalidateFilteredCatalog();
@@ -883,3 +893,6 @@ public class GTCEuGuiHandler {
         return false;
     }
 }
+
+
+

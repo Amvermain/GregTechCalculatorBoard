@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.api.event;
 
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraftforge.eventbus.ListenerList;
 import net.minecraftforge.eventbus.api.Event;
 
@@ -113,3 +113,4 @@ public abstract class RecipeNodeEvent extends Event {
         }
     }
 }
+

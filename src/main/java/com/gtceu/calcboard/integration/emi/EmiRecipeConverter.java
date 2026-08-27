@@ -1,11 +1,16 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.ModCompatHelper;
-import com.gtceu.calcboard.api.MultiblockDetector;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.CategoryCapability;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
@@ -195,7 +200,7 @@ public class EmiRecipeConverter {
 
         if (catId != null) {
             node.setRecipeCategoryId(catId);
-            com.gtceu.calcboard.api.CategoryCapability cap = com.gtceu.calcboard.api.CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            com.gtceu.calcboard.api.catalog.CategoryCapability cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(catId);
             if (cap != null && !cap.availableWorkstations().isEmpty()) {
                 node.setAvailableWorkstations(new ArrayList<>(cap.availableWorkstations()));
                 if (cap.hasMultiblockOption() && !cap.hasSingleblockOption()) {
@@ -618,7 +623,7 @@ public class EmiRecipeConverter {
         public double eut = 0.0;
         public GTVoltageTier tier = GTVoltageTier.ULV;
         public boolean isGenerator = false;
-        public com.gtceu.calcboard.api.EnergyType energyType = com.gtceu.calcboard.api.EnergyType.NONE;
+        public com.gtceu.calcboard.api.type.EnergyType energyType = com.gtceu.calcboard.api.type.EnergyType.NONE;
         public int backingRecipeTemp = 0;
         public List<IngredientStack> extraInputs = new ArrayList<>();
         public List<IngredientStack> extraOutputs = new ArrayList<>();
@@ -684,3 +689,6 @@ public class EmiRecipeConverter {
                 || ((catNs.equals("thermal") || catNs.equals("thermal_expansion") || catNs.equals("systeams")) && catPath.contains("fuel"));
     }
 }
+
+
+

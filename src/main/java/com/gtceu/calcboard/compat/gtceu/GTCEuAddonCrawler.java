@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.compat.gtceu;
 
-import com.gtceu.calcboard.api.DynamicAddonCrawler;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
@@ -375,3 +375,4 @@ public class GTCEuAddonCrawler {
         return list;
     }
 }
+

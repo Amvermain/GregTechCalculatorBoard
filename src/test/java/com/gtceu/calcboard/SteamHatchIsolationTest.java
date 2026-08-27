@@ -1,6 +1,11 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+
 import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
@@ -106,7 +111,7 @@ public class SteamHatchIsolationTest {
         steamNode.setEnergyType(EnergyType.ELECTRIC_EU);
 
         // Discovery collector
-        List<com.gtceu.calcboard.api.MachineAddon> allHatches = new ArrayList<>();
+        List<com.gtceu.calcboard.api.catalog.MachineAddon> allHatches = new ArrayList<>();
         GTHatchHelper.discoverGTCEuHatches(allHatches);
 
         GTHatchAddon steamInBus = (GTHatchAddon) allHatches.stream()
@@ -165,7 +170,7 @@ public class SteamHatchIsolationTest {
         lcrNode.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
         lcrNode.setEnergyType(EnergyType.ELECTRIC_EU);
 
-        List<com.gtceu.calcboard.api.MachineAddon> allHatches = new ArrayList<>();
+        List<com.gtceu.calcboard.api.catalog.MachineAddon> allHatches = new ArrayList<>();
         GTHatchHelper.discoverGTCEuHatches(allHatches);
 
         GTHatchAddon steamInBus = (GTHatchAddon) allHatches.stream()
@@ -193,3 +198,6 @@ public class SteamHatchIsolationTest {
         assertTrue(applicableCategories.contains(AddonCategory.MAINTENANCE));
     }
 }
+
+
+

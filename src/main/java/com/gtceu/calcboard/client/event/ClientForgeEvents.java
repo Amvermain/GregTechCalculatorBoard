@@ -1,13 +1,17 @@
 package com.gtceu.calcboard.client.event;
 
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.client.gui.BoardHotkeyHandler;
+
 import com.gtceu.calcboard.GregTechCalcBoard;
-import com.gtceu.calcboard.api.BoardManager;
-import com.gtceu.calcboard.api.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.api.MachineAddonCatalog;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
 import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.RecipeSearchDialog;
+import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
 import com.gtceu.calcboard.client.key.KeyBindings;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.network.NetworkHandler;
@@ -34,13 +38,17 @@ public class ClientForgeEvents {
         MachineAddonCatalog.getInstance().ensureFastLoaded();
 
         // Eagerly pre-index multiblock capabilities and 3D structures in the background so board opens instantly
-        com.gtceu.calcboard.api.MultiblockDetector.initializeAsync();
+        com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
 
-        // Eagerly pre-index EMI recipes as soon as EMI baking is ready
-        com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> {
+        // Eagerly pre-index recipes as soon as recipe viewer is ready
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> {
+                RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+            });
+        } else {
             RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
-        });
+        }
     }
 
     @SubscribeEvent
@@ -57,7 +65,9 @@ public class ClientForgeEvents {
         try { RecipeSearchDialog.clearGlobalCache(); } catch (Throwable ignored) {}
         try { CategoryCapabilityMatrix.getInstance().reset(); } catch (Throwable ignored) {}
         try { MultiblockStructureCatalog.clear(); } catch (Throwable ignored) {}
-        try { com.gtceu.calcboard.integration.emi.EmiLifecycleHook.reset(); } catch (Throwable ignored) {}
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            try { com.gtceu.calcboard.integration.emi.EmiLifecycleHook.reset(); } catch (Throwable ignored) {}
+        }
     }
 
     @SubscribeEvent
@@ -66,12 +76,16 @@ public class ClientForgeEvents {
         try { MachineAddonCatalog.getInstance().markDirty(); } catch (Throwable ignored) {}
         try { RecipeSearchDialog.clearGlobalCache(); } catch (Throwable ignored) {}
         try { MultiblockStructureCatalog.clear(); } catch (Throwable ignored) {}
-        com.gtceu.calcboard.api.MultiblockDetector.initializeAsync();
+        com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
         MachineAddonCatalog.getInstance().ensureFastLoadedAsync();
-        com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> {
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> {
+                RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+            });
+        } else {
             RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
-        });
+        }
     }
 
     @SubscribeEvent
@@ -80,7 +94,7 @@ public class ClientForgeEvents {
             "[GTCalcBoard] [Lifecycle] RecipesReady event received ({} recipes in {}ms). Triggering multiblock & addon deep scan...",
             event.getRecipeCount(), event.getElapsedMs()
         );
-        com.gtceu.calcboard.api.MultiblockDetector.initializeAsync();
+        com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
         MachineAddonCatalog.getInstance().ensureFastLoadedAsync();
     }
@@ -143,3 +157,6 @@ public class ClientForgeEvents {
         }
     }
 }
+
+
+

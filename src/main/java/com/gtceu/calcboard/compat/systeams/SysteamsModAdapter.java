@@ -1,7 +1,15 @@
 package com.gtceu.calcboard.compat.systeams;
 
-import com.gtceu.calcboard.api.*;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
@@ -33,10 +41,8 @@ public class SysteamsModAdapter implements IModAdapter {
     @Override
     public boolean isLoaded() {
         try {
-            Class<?> mlClass = Class.forName("net.minecraftforge.fml.ModList");
-            Object ml = mlClass.getMethod("get").invoke(null);
-            if (ml != null) {
-                return (boolean) mlClass.getMethod("isLoaded", String.class).invoke(ml, "systeams");
+            if (ModList.get() != null) {
+                return ModList.get().isLoaded("systeams");
             }
         } catch (Throwable ignored) {}
         return true;
@@ -217,3 +223,6 @@ public class SysteamsModAdapter implements IModAdapter {
         return defaultRate;
     }
 }
+
+
+

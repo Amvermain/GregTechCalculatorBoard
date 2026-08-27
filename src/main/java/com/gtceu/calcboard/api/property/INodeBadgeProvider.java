@@ -1,7 +1,6 @@
 package com.gtceu.calcboard.api.property;
 
-import com.gtceu.calcboard.api.RecipeNode;
-
+import com.gtceu.calcboard.api.model.RecipeNode;
 import java.util.List;
 
 /**
@@ -18,3 +17,4 @@ public interface INodeBadgeProvider {
      */
     List<NodeBadge> createBadges(RecipeNode node, NodePropertyStore store);
 }
+

@@ -1,6 +1,12 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
@@ -940,3 +946,5 @@ public class MachineAddonTest {
         Assertions.assertTrue(adapter.isAddonCompatible(lcrNode, sterileHatch), "Sterile Cleaning Maintenance Hatch must be compatible with multiblock");
     }
 }
+
+

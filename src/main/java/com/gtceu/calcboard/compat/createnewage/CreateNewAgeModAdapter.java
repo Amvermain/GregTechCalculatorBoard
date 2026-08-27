@@ -1,7 +1,21 @@
 package com.gtceu.calcboard.compat.createnewage;
 
-import com.gtceu.calcboard.api.*;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
+import com.gtceu.calcboard.api.bom.PartCategory;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.AddonFactoryRegistry;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.create.CreateGuiHandler;
@@ -24,7 +38,7 @@ import java.util.List;
 public class CreateNewAgeModAdapter implements IModAdapter {
 
     static {
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.MAGNET, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.MAGNET, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0));
     }
 
     public static final String MOD_ID = "create_new_age";
@@ -368,7 +382,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
         return CreateNewAgeGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
@@ -377,3 +391,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         CreateNewAgeRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
     }
 }
+
+
+
+

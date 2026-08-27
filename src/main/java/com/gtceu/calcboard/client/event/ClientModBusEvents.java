@@ -1,7 +1,10 @@
 package com.gtceu.calcboard.client.event;
 
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
+
 import com.gtceu.calcboard.GregTechCalcBoard;
-import com.gtceu.calcboard.api.MachineAddonCatalog;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.client.key.KeyBindings;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraftforge.api.distmarker.Dist;
@@ -28,7 +31,12 @@ public class ClientModBusEvents {
     public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((ResourceManagerReloadListener) resourceManager -> {
             MachineAddonCatalog.getInstance().markDirty();
-            com.gtceu.calcboard.client.gui.RecipeSearchDialog.clearGlobalCache();
+            if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+                com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.clearGlobalCache();
+            }
         });
     }
 }
+
+
+

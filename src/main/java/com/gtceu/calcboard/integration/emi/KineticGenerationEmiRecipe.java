@@ -1,10 +1,10 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
-import com.gtceu.calcboard.client.gui.IngredientRenderer;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
 import dev.emi.emi.api.stack.EmiIngredient;
@@ -69,7 +69,7 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
         List<EmiIngredient> inList = new ArrayList<>();
         if (inputStacks != null) {
             for (IngredientStack in : inputStacks) {
-                var emi = IngredientRenderer.toEmiStack(in);
+                var emi = EmiStackHelper.toEmiStack(in);
                 if (!emi.isEmpty()) inList.add(emi);
             }
         }
@@ -81,7 +81,7 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
         }
         if (outputStacks != null) {
             for (IngredientStack out : outputStacks) {
-                var emi = IngredientRenderer.toEmiStack(out);
+                var emi = EmiStackHelper.toEmiStack(out);
                 if (!emi.isEmpty()) outList.add(emi);
             }
         }
@@ -213,3 +213,4 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
         return null;
     }
 }
+

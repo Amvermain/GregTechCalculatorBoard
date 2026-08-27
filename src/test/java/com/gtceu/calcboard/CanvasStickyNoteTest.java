@@ -1,7 +1,10 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.CanvasStickyNote;
-import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.RecipeNode;
+
+import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -78,24 +81,24 @@ public class CanvasStickyNoteTest {
     @Test
     public void testFrameDynamicContainmentWithNotesAndNodes() {
         FlowGraph graph = new FlowGraph();
-        com.gtceu.calcboard.api.RecipeNode node = com.gtceu.calcboard.api.RecipeNode.createReroute(100, 100);
+        com.gtceu.calcboard.api.model.RecipeNode node = com.gtceu.calcboard.api.model.RecipeNode.createReroute(100, 100);
         CanvasStickyNote note = CanvasStickyNote.create("Check Ratio", "Line 1\nLine 2\nLine 3", CanvasStickyNote.COLOR_AMBER, 120, 120);
-        com.gtceu.calcboard.api.RecipeNode outsideNode = com.gtceu.calcboard.api.RecipeNode.createReroute(500, 500);
+        com.gtceu.calcboard.api.model.RecipeNode outsideNode = com.gtceu.calcboard.api.model.RecipeNode.createReroute(500, 500);
 
         graph.addNode(node);
         graph.addNode(outsideNode);
         graph.addStickyNote(note);
 
-        com.gtceu.calcboard.api.CanvasGroupFrame frame = com.gtceu.calcboard.api.CanvasGroupFrame.createFromElements(
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromElements(
                 "My Sub-Process",
                 java.util.List.of(node),
                 java.util.List.of(note),
-                com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE
+                com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE
         );
         graph.addFrame(frame);
 
         // Verify dynamic containment
-        java.util.List<com.gtceu.calcboard.api.RecipeNode> enclosedNodes = frame.getEnclosedNodes(graph);
+        java.util.List<com.gtceu.calcboard.api.model.RecipeNode> enclosedNodes = frame.getEnclosedNodes(graph);
         java.util.List<CanvasStickyNote> enclosedNotes = frame.getEnclosedNotes(graph);
 
         Assertions.assertEquals(1, enclosedNodes.size());
@@ -115,28 +118,28 @@ public class CanvasStickyNoteTest {
     @Test
     public void testModuleCollapseAndExpandWithStickyNotes() {
         FlowGraph graph = new FlowGraph();
-        com.gtceu.calcboard.api.RecipeNode node1 = com.gtceu.calcboard.api.RecipeNode.createReroute(100, 100);
-        com.gtceu.calcboard.api.RecipeNode node2 = com.gtceu.calcboard.api.RecipeNode.createReroute(100, 200);
+        com.gtceu.calcboard.api.model.RecipeNode node1 = com.gtceu.calcboard.api.model.RecipeNode.createReroute(100, 100);
+        com.gtceu.calcboard.api.model.RecipeNode node2 = com.gtceu.calcboard.api.model.RecipeNode.createReroute(100, 200);
         CanvasStickyNote note = CanvasStickyNote.create("Process Note", "test note content", CanvasStickyNote.COLOR_AMBER, 150, 150);
 
         graph.addNode(node1);
         graph.addNode(node2);
         graph.addStickyNote(note);
 
-        com.gtceu.calcboard.api.CanvasGroupFrame frame = com.gtceu.calcboard.api.CanvasGroupFrame.createFromElements(
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromElements(
                 "Group Frame",
                 java.util.List.of(node1, node2),
                 java.util.List.of(note),
-                com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE
+                com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE
         );
         graph.addFrame(frame);
 
         // Collapse into module
         java.util.Set<String> nodeIds = new java.util.HashSet<>();
-        for (com.gtceu.calcboard.api.RecipeNode n : frame.getEnclosedNodes(graph)) {
+        for (com.gtceu.calcboard.api.model.RecipeNode n : frame.getEnclosedNodes(graph)) {
             nodeIds.add(n.getId());
         }
-        com.gtceu.calcboard.api.RecipeNode module = graph.groupIntoModule(nodeIds, frame.getTitle());
+        com.gtceu.calcboard.api.model.RecipeNode module = graph.groupIntoModule(nodeIds, frame.getTitle());
         Assertions.assertNotNull(module);
 
         // Main graph should not contain the note or frame
@@ -161,3 +164,6 @@ public class CanvasStickyNoteTest {
         Assertions.assertEquals(2, graph.getNodes().size());
     }
 }
+
+
+

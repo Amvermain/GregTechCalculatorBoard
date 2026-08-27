@@ -1,8 +1,10 @@
 package com.gtceu.calcboard.compat.gtceu;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -49,8 +51,8 @@ public class GTCEuRecipeHandler {
         if (backing == null && emiRecipeObj == null) return false;
 
         ResourceLocation catId = null;
-        if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe && emiRecipe.getCategory() != null) {
-            catId = emiRecipe.getCategory().getId();
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            catId = EmiGTCEuHelper.getCategoryId(emiRecipeObj);
         }
 
         boolean isGT = isGTRecipe(backing) || (catId != null && (catId.getNamespace().equals("gtceu") || catId.getNamespace().equals("start_core") || catId.getNamespace().equals("gtceu_start") || catId.getNamespace().equals("start")));
@@ -60,13 +62,8 @@ public class GTCEuRecipeHandler {
         if (catId != null && (catId.getPath().contains("boiler") || catId.getPath().contains("steam_boiler"))) {
             isGTBoiler = true;
         }
-        if (!isGTBoiler && emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
-            if (er.getId() != null && er.getId().getPath().contains("boiler")) {
-                isGTBoiler = true;
-            }
-            if (!isGTBoiler && er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("boiler")) {
-                isGTBoiler = true;
-            }
+        if (!isGTBoiler && com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            isGTBoiler = EmiGTCEuHelper.isBoiler(emiRecipeObj);
         }
         if (!isGTBoiler && backing != null && isGTRecipe(backing)) {
             if (catId != null && catId.getPath().contains("boiler")) {
@@ -83,19 +80,16 @@ public class GTCEuRecipeHandler {
             details.eut = 0.0;
             details.tier = GTVoltageTier.ULV;
 
-            // In GTCEu:
-            // Solid fuel in Small Bronze Boiler produces 6.0 mB/t steam baseline (120 L/s).
-            // Liquid fuel in Small Bronze Boiler produces 15.0 mB/t steam baseline (300 L/s).
-            // Both consume Water at 1:160 ratio (1 mB Water = 160 mB Steam).
             boolean isLiquidFuel = false;
             if (backing != null) {
                 try {
-                    Method mInputs = backing.getClass().getMethod("inputs");
-                    Object inMap = mInputs.invoke(backing);
+                    Field inputsField = backing.getClass().getField("inputs");
+                    Object inMap = inputsField.get(backing);
                     if (inMap instanceof Map<?, ?> map) {
-                        for (Map.Entry<?, ?> entry : map.entrySet()) {
-                            if (entry.getKey() != null && entry.getKey().toString().toLowerCase(Locale.ROOT).contains("fluid")) {
-                                if (entry.getValue() instanceof List<?> flList && !flList.isEmpty()) {
+                        for (Object key : map.keySet()) {
+                            if (key != null) {
+                                String kName = key.getClass().getName().toLowerCase(Locale.ROOT);
+                                if (kName.contains("fluid") || key.toString().toLowerCase(Locale.ROOT).contains("fluid")) {
                                     isLiquidFuel = true;
                                     break;
                                 }
@@ -104,45 +98,16 @@ public class GTCEuRecipeHandler {
                     }
                 } catch (Throwable ignored) {}
             }
-            if (!isLiquidFuel && emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe) {
-                if (emiRecipe.getInputs() != null) {
-                    for (var in : emiRecipe.getInputs()) {
-                        if (in != null && in.getEmiStacks() != null) {
-                            for (var st : in.getEmiStacks()) {
-                                if (st != null) {
-                                    Object key = st.getKey();
-                                    if (key instanceof net.minecraft.world.level.material.Fluid || (key != null && key.getClass().getName().contains("Fluid"))) {
-                                        isLiquidFuel = true;
-                                        break;
-                                    }
-                                    ResourceLocation sId = st.getId();
-                                    if (sId != null && net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(sId)) {
-                                        isLiquidFuel = true;
-                                        break;
-                                    }
-                                    if (st.getItemStack() != null && st.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem bi && bi.getFluid() != net.minecraft.world.level.material.Fluids.EMPTY) {
-                                        isLiquidFuel = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if (isLiquidFuel) break;
-                    }
-                }
+            if (!isLiquidFuel && com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+                isLiquidFuel = EmiGTCEuHelper.isLiquidFuel(emiRecipeObj);
             }
 
             boolean isLargeBoiler = false;
             if (catId != null && catId.getPath().contains("large_boiler")) {
                 isLargeBoiler = true;
             }
-            if (!isLargeBoiler && emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
-                if (er.getId() != null && er.getId().getPath().contains("large_boiler")) {
-                    isLargeBoiler = true;
-                }
-                if (!isLargeBoiler && er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("large_boiler")) {
-                    isLargeBoiler = true;
-                }
+            if (!isLargeBoiler && com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+                isLargeBoiler = EmiGTCEuHelper.isLargeBoiler(emiRecipeObj);
             }
             if (!isLargeBoiler && backing != null && isGTRecipe(backing)) {
                 try {
@@ -169,23 +134,8 @@ public class GTCEuRecipeHandler {
             details.customOutputs.clear();
             details.customOutputs.add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", totalSteam));
 
-            // If input contains a container item (e.g. lava bucket -> bucket), add empty bucket to outputs
-            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe) {
-                if (emiRecipe.getInputs() != null) {
-                    for (var in : emiRecipe.getInputs()) {
-                        if (in != null && in.getEmiStacks() != null) {
-                            for (var st : in.getEmiStacks()) {
-                                if (st != null && st.getId() != null) {
-                                    String itemPath = st.getId().getPath();
-                                    if (itemPath.equals("lava_bucket") || itemPath.endsWith("_bucket")) {
-                                        details.customOutputs.add(IngredientStack.item(ResourceLocation.tryParse("minecraft:bucket"), "Bucket", 1.0));
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+            if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+                EmiGTCEuHelper.enrichBucketOutputs(emiRecipeObj, details);
             }
 
             details.extraInputs.add(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", totalWater));
@@ -197,6 +147,74 @@ public class GTCEuRecipeHandler {
             return true;
         }
         return false;
+    }
+
+    private static class EmiGTCEuHelper {
+        private static ResourceLocation getCategoryId(Object emiRecipeObj) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe && recipe.getCategory() != null) {
+                return recipe.getCategory().getId();
+            }
+            return null;
+        }
+
+        private static boolean isBoiler(Object emiRecipeObj) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
+                if (er.getId() != null && er.getId().getPath().contains("boiler")) return true;
+                if (er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("boiler")) return true;
+            }
+            return false;
+        }
+
+        private static boolean isLargeBoiler(Object emiRecipeObj) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
+                if (er.getId() != null && er.getId().getPath().contains("large_boiler")) return true;
+                if (er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("large_boiler")) return true;
+            }
+            return false;
+        }
+
+        private static boolean isLiquidFuel(Object emiRecipeObj) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe && emiRecipe.getInputs() != null) {
+                for (var in : emiRecipe.getInputs()) {
+                    if (in != null && in.getEmiStacks() != null) {
+                        for (var st : in.getEmiStacks()) {
+                            if (st != null) {
+                                Object key = st.getKey();
+                                if (key instanceof net.minecraft.world.level.material.Fluid || (key != null && key.getClass().getName().contains("Fluid"))) {
+                                    return true;
+                                }
+                                ResourceLocation sId = st.getId();
+                                if (sId != null && net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(sId)) {
+                                    return true;
+                                }
+                                if (st.getItemStack() != null && st.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem bi && bi.getFluid() != net.minecraft.world.level.material.Fluids.EMPTY) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static void enrichBucketOutputs(Object emiRecipeObj, EmiRecipeConverter.RecipeDetails details) {
+            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe && emiRecipe.getInputs() != null) {
+                for (var in : emiRecipe.getInputs()) {
+                    if (in != null && in.getEmiStacks() != null) {
+                        for (var st : in.getEmiStacks()) {
+                            if (st != null && st.getId() != null) {
+                                String itemPath = st.getId().getPath();
+                                if (itemPath.equals("lava_bucket") || itemPath.endsWith("_bucket")) {
+                                    details.customOutputs.add(IngredientStack.item(ResourceLocation.tryParse("minecraft:bucket"), "Bucket", 1.0));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public static void extractGTRecipeDetails(Object backing, EmiRecipeConverter.RecipeDetails details) {
@@ -504,4 +522,7 @@ public class GTCEuRecipeHandler {
         return null;
     }
 }
+
+
+
 

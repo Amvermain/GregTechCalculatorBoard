@@ -6,12 +6,39 @@
 
 **그렉텍 계산기 보드 (GregTech Calculator Board)**의 모든 주요 변경 사항이 이 문서에 기록됩니다.
 
+## [2.0.0-alpha.11] - 2026-08-28
+
+### 신규 기능 (Added)
+- **인플레이스 대체 레시피 교체 (In-Place Recipe Switching)**:
+  - 머신 설정 다이얼로그의 `[🔄 Switch Recipe]` 버튼 또는 노드 우클릭 컨텍스트 메뉴를 통해 이미 캔버스에 배치된 머신 노드를 삭제하지 않고 동일 기계/동일 주요 산출물의 대체 레시피로 즉시 전환할 수 있는 기능 추가.
+  - 레시피 전환 시 동일한 아이템 및 유체 포트의 와이어 연결이 끊어지지 않고 자동으로 유지(Smart Wire Preservation)되며, 단축키 `Ctrl+Z` / `Ctrl+Y`로 언제든 실행 취소 및 다시 실행 가능.
+- **통합 레시피 뷰어 지원 확장 (JEI / JEI++ 및 바닐라 호환)**:
+  - EMI뿐만 아니라 JEI(Just Enough Items) 및 JEI++(Just Enough Calculation) 모드가 설치된 환경에서도 레시피 색인, `[R]`/`[U]` 키를 통한 레시피/용도 조회, 북마크 연동 및 멀티블록 BoM 자재 명세서 등록 지원.
+  - 레시피 뷰어 모드가 없는 순수 바닐라 환경에서도 바닐라 레시피 매니저 기반으로 기본 레시피 노드 생성 및 조작 지원.
+- **전역 유체 단위 표기 통일 옵션 (Fluid Unit Mode)**:
+  - 상단 툴바의 유체 단위 토글 버튼 또는 단축키 `Shift+T`를 통해 캔버스 전체의 유체 유량 표기 방식을 `자동(Auto)`, `항상 mB(Always mB)`, `항상 버킷(Always B)` 중 원하는 방식으로 일괄 통일할 수 있는 옵션 추가.
+  - 선택된 유체 단위 설정은 게임 재접속 시에도 유지되도록 클라이언트 설정에 자동 영속화.
+- **머신 설정 다이얼로그 5단계 가독성 UI 배율 조절 (Font Scale)**:
+  - 머신 설정창 우측 상단의 `[Aa 1.0x]` 버튼을 통해 UI 배율을 5단계(`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`)로 실시간 조절 지원.
+  - 좌/우클릭, 마우스 휠 스크롤, 키보드 단축키 `+`/`-`로 손쉽게 배율을 조정할 수 있으며, 고해상도 모니터나 소형 화면에서도 정밀한 클릭 판정과 가독성 제공.
+
+### 개선 및 변경 (Changed & Improved)
+- **페이지 탭 바 오버플로우 클릭 네비게이션 개선**:
+  - 다수의 캔버스 페이지가 생성되어 화면 너비를 초과할 때 양 끝에 나타나는 `«`, `»` 인디케이터를 마우스로 직접 클릭하여 탭을 좌우로 스크롤할 수 있도록 인터랙션 개선.
+  - 탭 바 우측에 여유 공간(패딩 16px)을 추가하여 마지막 탭 및 `[+]` 신규 탭 생성 버튼이 화살표에 가려지지 않도록 레이아웃 보정.
+- **단축키 안내 HUD(Hotkey HUD) 유체 단위 조작 안내 추가**:
+  - 좌측 하단 단축키 안내 위젯에 `Shift+T` 유체 표기 단위 순환 단축키 가이드 추가.
+
+### 버그 수정 (Fixed)
+- **다수 페이지 생성 시 탭 바 우측 경계 잘림 및 스크롤 불가 버그 수정**:
+  - 화면 너비를 초과하는 페이지 탭이 존재할 때 `»` 버튼을 클릭해도 스크롤이 동작하지 않고 마지막 탭의 오른쪽 테두리가 시저(Scissor) 영역 밖으로 잘리던 현상 해결.
+
 ## [2.0.0-alpha.10] - 2026-08-27
 
 ### 신규 기능 (Added)
 - **목표 배치 생산 소요 시간(ETA / Estimated Time) 산출 및 타겟/리라우트 노드 시스템 (`RFC-005`, `ProductionETACalculator`, `NodeTargetBatchEditor`, `NodeProperties`, `ETACalculationTest`)**:
   - 단말 및 리라우트(Reroute) 노드에 원하는 목표 배치 생산 수량(예: `100x`, `1,000x`, `10 B`)을 지정할 수 있는 기능 추가.
-  - 상류 공급 노드들의 초당 순 유입 속도($\text{Rate}_{\text{in}}$)를 기반으로 예상 완료 시간($T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$)을 실시간 산출하여 노드 하단에 `ET: 24m 52s` 배지 렌더링.
+  - 상류 공급 노드들의 초당 순 유입 속도를 기반으로 예상 완료 시간(목표 수량 / 유입 속도)을 실시간 산출하여 노드 하단에 `ET: 24m 52s` 배지 렌더링.
   - 노드 호버 시 해당 배치를 완수하는 동안 소비될 전체 전력량(EU) 및 상류 원자재 총 소비량 상세 툴팁 제공.
   - 인라인 클릭을 통한 빠른 수량 편집 및 `Shift + 클릭`을 통한 목표 수량 초기화 지원.
 - **키네틱 발전기/모터 EMI 레시피 정식 등록 및 스트레스 유닛(SU) 검색 색인 강화 (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
@@ -65,8 +92,8 @@
 - **생명주기 이벤트 버스(Lifecycle Event Bus) 및 애드온 훅 시스템 (`RFC-001`, `RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`, `LifecycleEventBusTest`)**:
   - 캔버스 노드 생성, 수정, 삭제, 계산 전/후, 카탈로그 빌드 시점을 통지하는 Forge 이벤트 버스 연동.
 - **그렉텍 대형 증기 보일러(Large Multiblock Boilers) 지원 및 쓰로틀(Throttle) 제어 (`GTBoilerTier`, `GTCEuRecipeHandler`, `GTCEuModAdapter`, `MachineConfigDialog`)**:
-  - 대형 청동/강철/티타늄/텅스텐스틸 보일러 레시피(`gtceu:large_boiler`)를 정상 인식하고 대형 청동 보일러 기준 증기 생산량($800\text{ mB/t} = 16,000\text{ mB/s}$) 및 물 소비량($5\text{ mB/t} = 100\text{ mB/s}$, 1:160 비율) 자동 산출.
-  - 대형 보일러 티어별 속도 배수 지원: L-Bronze $1.0\times$ ($800\text{ mB/t}$), L-Steel $2.25\times$ ($1,800\text{ mB/t}$), L-Titanium $4.0\times$ ($3,200\text{ mB/t}$), L-Tungstensteel $8.0\times$ ($6,400\text{ mB/t}$).
+  - 대형 청동/강철/티타늄/텅스텐스틸 보일러 레시피(`gtceu:large_boiler`)를 정상 인식하고 대형 청동 보일러 기준 증기 생산량(800 mB/t = 16,000 mB/s) 및 물 소비량(5 mB/t = 100 mB/s, 1:160 비율) 자동 산출.
+  - 대형 보일러 티어별 속도 배수 지원: L-Bronze 1.0x (800 mB/t), L-Steel 2.25x (1,800 mB/t), L-Titanium 4.0x (3,200 mB/t), L-Tungstensteel 8.0x (6,400 mB/t).
   - 기계 설정 창(`MachineConfigDialog`) 및 노드 카드에 25% ~ 100% 쓰로틀 슬라이더 및 프리셋 버튼 연동 (쓰로틀 비율에 따른 소요 시간, 연료 소비율, 증기 생산율 비례 스케일링).
 - **그룹 프레임(CanvasGroupFrame) 선택 모델, 클립보드 및 실행 취소/다시 실행 완전 통합 (`BoardSelectionModel`, `CanvasGroupFrameRenderer`, `CanvasInteractionHandler`, `NodeClipboard`, `BoardCommand`, `CanvasGroupFrameTest`)**:
   - 마우스 드래그 영역 선택(Marquee Box Selection) 시 프레임 자동 포함 및 헤더 클릭 Shift/Ctrl 다중 선택 지원.
@@ -107,15 +134,15 @@
   - 스레딩을 지원하는 모든 그렉텍 멀티블록 기계에 대해 기계 설정 창(`MachineConfigDialog`) 전용 `[🧵 Threading]` 서브 탭 추가 (Generalis, Velocitas, Efficienta, Parallelismus, Filum 포인트 배분).
   - 스레딩 빌더와 상단 `Active Addons` 슬롯 간 실시간 양방향 동기화 지원 (헬릭스 장착 시 종합 스탯 뱃지 및 `8x OpV Weaving Thread Helix`와 같이 수량 연동).
   - 애드온 아이콘 슬롯 및 캔버스 카드 트레이에 수량 뱃지(예: `8`) 렌더링 지원.
-  - 플라즈마 터빈 모델 다변화 지원: 대형 플라즈마 터빈(LPT, $1\times$), 슈프림 플라즈마 터빈(SPT, $6\times$), 냥세인 플라즈마 터빈(NPT, $12\times$).
+  - 플라즈마 터빈 모델 다변화 지원: 대형 플라즈마 터빈(LPT, 1x), 슈프림 플라즈마 터빈(SPT, 6x), 냥세인 플라즈마 터빈(NPT, 12x).
   - Star Technology 멀티블록 부스팅 특성(Traits) 지원: 윤활유 부스팅(+25% / +50% EU/t, 이황화텅스텐 소모) 및 냉각제 부스팅(+75% / +150% EU/t, 초상태 헬륨-3 / 오가네손 안정화 BEC 소모).
 - **그렉텍 초기 증기 가공 기계(저압 청동 LP / 고압 강철 HP) 지원 및 증기 직결 소모 모드 (`SteamMode`, `RecipeNode`, `CategoryCapabilityMatrix`, `GTCEuGuiHandler`, `MachineConfigDialog`)**:
   - 증기 시대 가공 기계(분쇄기, 압축기, 합금 제련기, 화로, 추출기, 암석 분쇄기 등)를 워크스테이션으로 갖는 모든 그렉텍 레시피에 대해 증기 직결 소모 모드(`LP Steam`, `HP Steam`) 추가.
-  - **그렉텍 증기 변환 공식 적용**: $1\text{ EU} = 2\text{ mB Steam}$ ($2\text{ L Steam}$).
-  - **저압 청동 증기 (LP Steam)**: 가공 시간 $2.0\times$ ($0.5\times$ 속도), 전력망 비연결($0\text{ EU/t}$), $\text{BaseEUt} \times 2\text{ mB/t}$ 증기(`gtceu:steam`) 유체 입력 슬롯 활성화.
-  - **고압 강철 증기 (HP Steam)**: 가공 시간 $1.0\times$ ($1.0\times$ 기본 LV 속도), 전력망 비연결($0\text{ EU/t}$), $\text{BaseEUt} \times 2\text{ mB/t}$ 증기(`gtceu:steam`) 유체 입력 슬롯 활성화.
+  - **그렉텍 증기 변환 공식 적용**: 1 EU = 2 mB Steam (2 L Steam).
+  - **저압 청동 증기 (LP Steam)**: 가공 시간 2.0x (0.5x 속도), 전력망 비연결(0 EU/t), BaseEUt * 2 mB/t 증기(`gtceu:steam`) 유체 입력 슬롯 활성화.
+  - **고압 강철 증기 (HP Steam)**: 가공 시간 1.0x (1.0x 기본 LV 속도), 전력망 비연결(0 EU/t), BaseEUt * 2 mB/t 증기(`gtceu:steam`) 유체 입력 슬롯 활성화.
   - **노드 카드 및 기계 설정 UI 연동**: 노드 카드 티어 버튼 순환(`[LP Steam] ↔ [HP Steam] ↔ [LV] ↔ ...`) 및 기계 설정 모달창(`MachineConfigDialog`)에서 원클릭 프리셋 전환 지원.
-  - **보일러 직결 및 자동 비율 맞춤(Auto-Ratio)**: 증기 보일러(`gtceu:steam_boiler`) $\rightarrow$ 증기 가공 기계로 유체 와이어를 직접 연결하여 `Shift + Connect` 대수 자동 최적화 완벽 지원.
+  - **보일러 직결 및 자동 비율 맞춤(Auto-Ratio)**: 증기 보일러(`gtceu:steam_boiler`) -> 증기 가공 기계로 유체 와이어를 직접 연결하여 `Shift + Connect` 대수 자동 최적화 완벽 지원.
 - **즐겨찾기 상호작용 및 실시간 동기화 개선 (`RecipeSearchDialog`, `FavoritesDockWidget`)**:
   - 레시피 검색창의 각 검색 결과 행에 즐겨찾기 별표(⭐) 토글 버튼 추가 및 행 우클릭 즐겨찾기 등록/해제 지원.
   - 즐겨찾기 독(Favorites Dock)에서 항목 우클릭 시 즐겨찾기 즉시 제거 기능 추가.
@@ -137,9 +164,9 @@
   - 팬 가공의 생산 속도를 올리려면 팬의 회전 속도를 올리는 것이 아니라 **팬의 대수(`대수: N`)**를 늘려야 함을 툴팁으로 안내.
 - **그렉텍 증기 보일러 및 증기 생산 공정 완벽 연동 (`GTCEuRecipeHandler`, `GTCEuModAdapter`, `SysteamsModAdapter`)**:
   - `SysteamsModAdapter`가 `gtceu:steam_boiler` 카테고리를 가로채던 라우팅 버그 수정.
-  - 그렉텍 증기 보일러(`gtceu:steam_boiler`) 레시피 등록 시 연료(용암 양동이, 석탄, 목탄 등) 및 물(`minecraft:water`) 소비와 증기(`gtceu:steam`) 생산량을 그렉텍 공식 비율(소형 청동 보일러 기준 $120\text{ L/s} = 6\text{ mB/t}$ 증기, $1\text{mB 물} \rightarrow 160\text{mB 증기}$)로 정확히 자동 산출.
+  - 그렉텍 증기 보일러(`gtceu:steam_boiler`) 레시피 등록 시 연료(용암 양동이, 석탄, 목탄 등) 및 물(`minecraft:water`) 소비와 증기(`gtceu:steam`) 생산량을 그렉텍 공식 비율(소형 청동 보일러 기준 120 L/s = 6 mB/t 증기, 1 mB 물 -> 160 mB 증기)로 정확히 자동 산출.
   - 용암 양동이 등 용기형 연료 사용 시 빈 양동이(`minecraft:bucket`) 부산물 자동 반환 지원.
-  - 고압 강철 보일러($3\times$), 대형 청동 보일러($8\times$), 대형 강철 보일러($15\times$), 대형 티타늄 보일러($26.6\times$), 대형 텅스텐강 보일러($40\times$) 등 워크스테이션 변경 시의 연소 속도 및 증기 배출량 비례 스케일링 지원.
+  - 고압 강철 보일러(3x), 대형 청동 보일러(8x), 대형 강철 보일러(15x), 대형 티타늄 보일러(26.6x), 대형 텅스텐강 보일러(40x) 등 워크스테이션 변경 시의 연소 속도 및 증기 배출량 비례 스케일링 지원.
 - **레시피 추가 단축키('A') 제거 (`ClientForgeEvents`, `KeyBindings`)**:
   - EMI/JEI 북마크 및 키 바인딩 충돌을 방지하기 위해 화면 단축키로 레시피를 추가하던 기능 제거.
 
@@ -161,14 +188,14 @@
 - **Create: New Age 모드 연동 (`CreateNewAgeModAdapter`, `CreateNewAgeGuiHandler`, `CreateNewAgeRecipeHandler`, `CreateNewAgeAddonCrawler`, `CreateMagnetAddon`)**:
   - **발전기 코일 및 탄소 브러시 계산**:
     - 발전기 코일 링에 최대 12개의 자석 아이템 장착 및 Shift-클릭 일괄 장착 지원.
-    - 발전기 코일 기본 부하(`24.0 SU/RPM`) 및 자석 강도에 따른 회전 부하($(24.0 + \text{Strength}) \times \text{RPM}$) 계산.
-    - 모드 설정(`suToEnergy`)을 런타임에 조회하여 실제 발전량($\text{FE/t} = \text{Strength} \times \text{RPM} \times \text{suToEnergy}$) 계산.
+    - 발전기 코일 기본 부하(`24.0 SU/RPM`) 및 자석 강도에 따른 회전 부하(((24.0 + Strength) * RPM)) 계산.
+    - 모드 설정(`suToEnergy`)을 런타임에 조회하여 실제 발전량(FE/t = Strength * RPM * suToEnergy) 계산.
     - 고글 스타일 GUI 헤더 및 에너지 통계(Base Stress, Total Stress, Efficiency, FE/t) 렌더링.
   - **모터 및 모터 확장기 계산**: 기본, 고급, 강화 모터의 SU 출력 및 FE 소비량 연산과 확장기 배율 지원.
   - **키네틱 과부하(Overstressed) 처리 (`FlowGraphSolver`)**: 회전력 결핍 시 즉시 정지(`0.0 efficiency`, `0 FE/t`, `0 SU/s`)하도록 계산 처리.
 - **GTCEu 핵융합로(Fusion Reactor) 시뮬레이션 및 점화 에너지 집계 (`RecipeNode`, `FlowGraphSolver`, `SummaryOverlay`, `NodeBadgeRegistry`)**:
   - 레시피의 `eu_to_start` (점화 필요 EU) 데이터 추출 및 NBT 저장.
-  - 점화 에너지에 따른 핵융합 티어(Mk1 $\le 160\text{M}$, Mk2 $\le 320\text{M}$, Mk3 $> 320\text{M EU}$) 및 최소 전압 티어(LuV/ZPM/UV) 자동 결정 및 전압 하한 클램핑.
+  - 점화 에너지에 따른 핵융합 티어(Mk1 <= 160M, Mk2 <= 320M, Mk3 > 320M EU) 및 최소 전압 티어(LuV/ZPM/UV) 자동 결정 및 전압 하한 클램핑.
   - 핵융합 반사판(`GTReflectorAddon`, T1~T3) 애드온 장착 및 스펙 연동.
   - 노드 카드 상단에 점화 버퍼 뱃지 표시.
   - 우측 요약 오버레이(`SummaryOverlay`)에 플로우차트 내 모든 핵융합로의 티어별 대수 및 총 점화 버퍼 합산(`⚛ Fusion Start Buffer`) 집계 및 툴팁 렌더링.
@@ -195,7 +222,7 @@
 ### 신규 기능 (Added)
 - **Create 모드 키네틱 시스템 및 스트레스 유닛(SU) 연동 (`CreateModAdapter`, `CreateRecipeHandler`, `CreateGuiHandler`)**:
   - 대형 물레방아, 물레방아, 풍차 베어링, 증기 기관, 핸드 크랭크, 크리에이티브 모터, 전기 모터 등 키네틱 발전기의 발전량 계산 지원.
-  - 32 RPM 기준 회전 속도(RPM)에 따른 가공 시간 및 스트레스 소비량($\text{Base SU} \times \frac{\text{RPM}}{32}$) 비례 스케일링 적용.
+  - 32 RPM 기준 회전 속도(RPM)에 따른 가공 시간 및 스트레스 소비량(기본 SU * RPM / 32) 비례 스케일링 적용.
   - 키네틱 노드 `create:stress_units` 입출력 포트 추가 및 와이어 연결, Auto-Ratio 자동 비율 계산 지원.
   - Create 가공 레시피(압축, 분쇄, 제분, 교반, 절단, 연마 등)를 SU 소비자 검색 목록에 색인.
   - Create Crafts & Additions의 알터네이터 및 전기 모터 SU/FE 변환 지원.
@@ -320,7 +347,7 @@
   - 연역된 카테고리를 `MultiblockDetector.registerCoilCategory` 및 `registerTurbineCategory`와 양방향 동기화.
 - **써멀 기계 업그레이드 킷(1개 제한/교체) 및 일반 증강 3슬롯 중복 장착(Stacking) 지원 (`RecipeNode`, `MachineConfigDialog`, `ThermalAugmentHelper`)**:
   - 기계당 업그레이드 킷(LV~EV, 6x~48x 병렬)은 단 1개만 장착되며, 다른 킷 클릭 시 기존 킷이 자동으로 교체됩니다.
-  - 일반 증강(ARC, MCI 등)은 최대 3슬롯 내에서 동일 증강의 중복 장착(Stacking)을 지원합니다. (예: 3x EV MCI = $4.096\times$ 연료 에너지 / 순수 NBT `AugmentData.Type: Dynamo_Fuel` 태그 파싱).
+  - 일반 증강(ARC, MCI 등)은 최대 3슬롯 내에서 동일 증강의 중복 장착(Stacking)을 지원합니다. (예: 3x EV MCI = 4.096x 연료 에너지 / 순수 NBT `AugmentData.Type: Dynamo_Fuel` 태그 파싱).
   - 카탈로그 카드 배지(`✔ x2`, `✔ x3`, `3/3`), 마우스 좌클릭(+1)/우클릭(-1) 및 상단 활성 슬롯 클릭 개별 해제 기능을 지원합니다.
 
 ### 개선 및 변경 (Changed)
@@ -330,8 +357,8 @@
 - **반응형 다이얼로그 로딩 오버레이 & 실시간 상태 갱신 UX (`MachineConfigDialog`, `RecipeSearchDialog`)**:
   - 백그라운드 인덱싱 진행 중 섹션 단위의 깔끔한 다크 로딩 오버레이와 애니메이션 표시.
   - 베이킹 완료 즉시 `[♨ Coil]`, `[⚡ Parallel]`, `[🔧 Maint]` 탭 및 카탈로그 카드가 창을 껐다 켤 필요 없이 실시간 자동 갱신(Live Auto-Populate)되도록 개선.
-- **레시피 검색 인덱스 병렬화 및 초고속화 ($250\times$ 속도 향상, 2분 $\rightarrow$ 1초 미만) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
-  - 전체 레시피 인덱싱 시 $O(N^2)$ 중복 순회를 제거하고 멀티코어 `parallelStream`을 도입하여 170,000+개 레시피 인덱싱 시간을 1초 미만으로 단축했습니다.
+- **레시피 검색 인덱스 병렬화 및 초고속화 (250x 속도 향상, 2분 -> 1초 미만) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - 전체 레시피 인덱싱 시 O(N^2) 중복 순회를 제거하고 멀티코어 `parallelStream`을 도입하여 170,000+개 레시피 인덱싱 시간을 1초 미만으로 단축했습니다.
   - 유체 타입 판정 시 레지스트리 맵 조회 대신 `FluidEmiStack` 인스턴스 검사로 최적화했습니다.
 - **동적 애드온 크롤러 20ms 즉시 추출 및 비활성 모드 아이템 누출 차단 (`DynamicAddonCrawler`)**:
   - 무거운 리플렉션 루프를 걷어내고 `EmiRecipe.getOutputs()`에서 NBT가 보존된 `EmiStack`을 직접 추출하도록 개선하여 크롤링 시간을 20ms 미만으로 단축했습니다.
@@ -431,7 +458,7 @@
 
 ### 버그 수정 (Fixed)
 - **글로벌 대시보드 품목 행 텍스트 겹침 현상 수정 (`GlobalBalanceDashboardDialog`)**:
-  - 고정 좌표로 인해 유량 수치와 생산/소비 세부 내역이 겹쳐서 출력되던 현상을 우측 $\rightarrow$ 좌측 동적 체이닝 레이아웃으로 개편하여 글자 겹침을 원천 해결했습니다.
+  - 고정 좌표로 인해 유량 수치와 생산/소비 세부 내역이 겹쳐서 출력되던 현상을 우측 -> 좌측 동적 체이닝 레이아웃으로 개편하여 글자 겹침을 원천 해결했습니다.
   - 대시보드 기본 가로 너비를 `580px`로 확장하고, 기계 대수가 수억 대 단위로 커질 때 SI 접두사로 깔끔하게 축약 표기되도록 개선했습니다.
 
 ---
@@ -635,9 +662,9 @@
   - **3D 비주얼 아이템 그리드 모달 (`[⚙ 220%]` 클릭)**: 각 로터의 고유 텍스처 색상(청록색 엔더륨, 갈색 드래곤스틸, 황금색 셸라이트 등)을 3D 아이템으로 렌더링하며 효율 배지와 실시간 검색창을 제공합니다.
   - **완벽한 한국어 지원**: 언어 설정에 맞춰 `트리타늄 터빈 로터`, `터빈 효율: 220%`, `터빈 출력: 220%`, `클릭하여 터빈에 장착` 등 완벽한 다국어 툴팁을 출력합니다.
 - **로터 파워 & 티어 기반 정격 병렬 자동 도출**:
-  - 그렉텍 대형 터빈의 실제 바이트코드 공식($V_{\text{max}} = V_{\text{holder}} \times \frac{P_{\text{rotor}}}{100.0}$)을 완벽하게 적용했습니다.
+  - 그렉텍 대형 터빈의 실제 바이트코드 공식(V_max = V_holder * P_rotor / 100.0)을 완벽하게 적용했습니다.
   - 로터(효율/파워) 또는 로터홀더 전압 티어(`EV`, `IV`, `LuV`, `ZPM` 등)를 선택/변경하는 즉시 **터빈이 낼 수 있는 최대 정격 병렬 수(Par)와 발전량(+EU/t)이 1초 만에 자동 계산되어 입력**됩니다.
-  - *예: 니트로벤젠 기본 32 EU/t + 셸라이트 로터 (파워 450%) + IV 로터홀더 $\rightarrow$ **1,152x 병렬, +36,864.0 EU/t, 4.00초 주기, 288.0 mB/s 소모율** 완벽 일치!*
+  - *예: 니트로벤젠 기본 32 EU/t + 셸라이트 로터 (파워 450%) + IV 로터홀더 -> **1,152x 병렬, +36,864.0 EU/t, 4.00초 주기, 288.0 mB/s 소모율** 완벽 일치!*
 - **Thermal Dynamo & Non-GT Generator Support (써멀 다이나모 및 타 모드 발전기 완벽 지원)**:
   - 써멀의 보석 다이나모(`Lapidary Dynamo`), 증기 다이나모(`Stirling Dynamo`), 마그마 다이나모(`Magmatic Dynamo`) 등 모든 다이나모 레시피의 RF/FE 발전량(`300,000 RF`)을 그렉텍 EU로 정밀 자동 변환하여 연소 시간과 초당 소모율을 정확히 계산합니다.
   - 무의미한 해시 문자열 ID 대신 `보석 다이나모 (다이아몬드)` / `Lapidary Dynamo (Diamond)`와 같이 스마트한 기계 및 연료 이름을 자동으로 명명합니다.
@@ -655,8 +682,8 @@
   - **마우스 휠 조절**: `Par` 버튼 위에서 마우스 휠을 굴려 2배 증가/감소 또는 `Shift + 휠`로 +1/-1 정밀 조절이 가능합니다.
   - **우클릭 1/2배수 조절**: 우클릭 시 즉시 절반으로 줄어듭니다.
 - **정수 대수 올림 & 병목 방지 보장 (`Supply >= Demand`)**:
-  - 실제 공장 건축에 맞춰 Auto Ratio 및 Shift+드래그 계산 시 모든 기계 대수가 **정수($1, 2, 3...$)로 올림(`Ceiling`)**되도록 변경했습니다.
-  - 상류 공급 기계의 생산 속도가 하류 소비 기계의 요구 속도보다 **언제나 크거나 같도록($\text{Supply} \ge \text{Demand}$)** 정수 올림하여 공정에서 원료 부족으로 인한 병목(Starvation)이 발생하지 않습니다.
+  - 실제 공장 건축에 맞춰 Auto Ratio 및 Shift+드래그 계산 시 모든 기계 대수가 **정수(1, 2, 3...)로 올림(`Ceiling`)**되도록 변경했습니다.
+  - 상류 공급 기계의 생산 속도가 하류 소비 기계의 요구 속도보다 **언제나 크거나 같도록(Supply >= Demand)** 정수 올림하여 공정에서 원료 부족으로 인한 병목(Starvation)이 발생하지 않습니다.
 - **양방향 Shift+드래그 비율 자동 맞춤 & 다중 공급 부족분 보충 (Deficit Matching)**:
   - **순방향 (출력 -> 입력)**: Shift를 누른 채 출력 포트에서 입력 포트로 선을 연결하면, 공급량에 맞춰 뒤 기계의 대수를 안전하게 자동 계산합니다 (소비자 대수는 공급량을 초과하지 않도록 내림).
   - **역방향 (입력 -> 출력)**: Shift를 누른 채 입력(요구량) 포트에서 출력 포트로 선을 역드래그하면, 뒤 기계의 소비 요구량에 맞춰 앞 기계의 대수를 올림으로 맞춥니다.

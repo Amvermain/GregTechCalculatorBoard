@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
 import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -74,3 +74,4 @@ public class ClientPacketHandler {
         BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.getMessageKey()).getString());
     }
 }
+

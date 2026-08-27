@@ -1,8 +1,11 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
@@ -104,13 +107,13 @@ public class ModAdapterRegistryTest {
 
         IModAdapter nptAdapter = ModAdapterRegistry.getAdapterForNode(nptNode);
         Assertions.assertInstanceOf(StarTModAdapter.class, nptAdapter);
-        Assertions.assertTrue(nptAdapter.getApplicableAddonCategories(nptNode).contains(com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT));
+        Assertions.assertTrue(nptAdapter.getApplicableAddonCategories(nptNode).contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT));
 
-        com.gtceu.calcboard.api.MachineAddon nptCoolant = new com.gtceu.calcboard.api.MachineAddon(
-                "gtceu:npt_coolant_boosting", "NPT Coolant", com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT, "+150% EU/t", null
+        com.gtceu.calcboard.api.catalog.MachineAddon nptCoolant = new com.gtceu.calcboard.api.catalog.MachineAddon(
+                "gtceu:npt_coolant_boosting", "NPT Coolant", com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT, "+150% EU/t", null
         );
-        com.gtceu.calcboard.api.MachineAddon sptCoolant = new com.gtceu.calcboard.api.MachineAddon(
-                "gtceu:spt_coolant_boosting", "SPT Coolant", com.gtceu.calcboard.api.AddonCategory.MULTIBLOCK_TRAIT, "+75% EU/t", null
+        com.gtceu.calcboard.api.catalog.MachineAddon sptCoolant = new com.gtceu.calcboard.api.catalog.MachineAddon(
+                "gtceu:spt_coolant_boosting", "SPT Coolant", com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT, "+75% EU/t", null
         );
 
         // NPT node must accept NPT coolant, reject SPT coolant
@@ -143,3 +146,6 @@ public class ModAdapterRegistryTest {
         Assertions.assertFalse(com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(craftNode));
     }
 }
+
+
+

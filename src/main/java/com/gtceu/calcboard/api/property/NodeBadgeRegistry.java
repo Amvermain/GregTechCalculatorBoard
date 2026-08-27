@@ -1,7 +1,6 @@
 package com.gtceu.calcboard.api.property;
 
-import com.gtceu.calcboard.api.RecipeNode;
-
+import com.gtceu.calcboard.api.model.RecipeNode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -43,3 +42,4 @@ public final class NodeBadgeRegistry {
         return list;
     }
 }
+

@@ -1,7 +1,7 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.nbt.CompoundTag;
@@ -164,3 +164,4 @@ public class GTRecipeExtractionTest {
         Assertions.assertEquals(240.0, dur, 1e-6);
     }
 }
+

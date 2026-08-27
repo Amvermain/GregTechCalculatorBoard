@@ -1,9 +1,9 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.api.BoardManager;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import dev.emi.emi.api.EmiDragDropHandler;
 import dev.emi.emi.api.stack.EmiIngredient;
@@ -45,3 +45,4 @@ public class BoardEmiDragDropHandler implements EmiDragDropHandler<BoardScreen> 
         return false;
     }
 }
+

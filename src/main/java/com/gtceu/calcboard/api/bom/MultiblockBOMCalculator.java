@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.api.bom;
 
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;

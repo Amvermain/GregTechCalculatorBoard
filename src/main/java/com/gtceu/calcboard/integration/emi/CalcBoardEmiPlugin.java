@@ -1,9 +1,14 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.api.BoardManager;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
+import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
+import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import dev.emi.emi.api.EmiEntrypoint;
 import dev.emi.emi.api.EmiPlugin;
 import dev.emi.emi.api.EmiRegistry;
@@ -28,8 +33,8 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
             } catch (Throwable ignored) {}
         }
         registerKineticRecipes(registry);
-        com.gtceu.calcboard.api.MachineAddonCatalog.getInstance().markDirty();
-        com.gtceu.calcboard.client.gui.RecipeSearchDialog.invalidateCache();
+        com.gtceu.calcboard.api.catalog.MachineAddonCatalog.getInstance().markDirty();
+        com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.invalidateCache();
     }
 
     private void registerKineticRecipes(EmiRegistry registry) {
@@ -96,3 +101,6 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
         }
     }
 }
+
+
+

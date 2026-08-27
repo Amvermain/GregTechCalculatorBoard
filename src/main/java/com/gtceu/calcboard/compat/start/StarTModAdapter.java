@@ -1,6 +1,13 @@
 package com.gtceu.calcboard.compat.start;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTThreadingHelix;
+import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import net.minecraft.resources.ResourceLocation;
@@ -28,8 +35,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
         try {
             if (ModList.get() != null) {
                 return ModList.get().isLoaded("start_core") || ModList.get().isLoaded("gtceu_start")
-                        || ModList.get().isLoaded("start") || ModList.get().isLoaded("star_technology")
-                        || ModList.get().isLoaded("gtceu");
+                        || ModList.get().isLoaded("start") || ModList.get().isLoaded("star_technology");
             }
         } catch (Throwable ignored) {}
         return true;
@@ -45,7 +51,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.EnergyType.KINETIC_SU) return false;
+        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU) return false;
 
         if (node.getRecipeCategoryId() != null && handlesCategory(node.getRecipeCategoryId())) {
             return true;
@@ -177,3 +183,6 @@ public class StarTModAdapter extends GTCEuModAdapter {
         }
     }
 }
+
+
+

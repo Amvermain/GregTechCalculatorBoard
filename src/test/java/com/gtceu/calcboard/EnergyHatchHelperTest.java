@@ -1,6 +1,6 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.helper.EnergyHatchHelper;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -84,3 +84,4 @@ public class EnergyHatchHelperTest {
         Assertions.assertNull(EnergyHatchHelper.getEnergyHatchStats(cable));
     }
 }
+

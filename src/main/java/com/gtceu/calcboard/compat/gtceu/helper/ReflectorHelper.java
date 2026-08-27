@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -176,3 +176,4 @@ public class ReflectorHelper {
         }
     }
 }
+

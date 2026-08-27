@@ -37,10 +37,23 @@ This document is the official QA verification checklist for testing all core fea
   - [ ] Switch pages (camera position and zoom level are remembered per page).
   - [ ] Right-click tab header to rename inline.
   - [ ] Click `x` to delete tab (first tab is protected).
+  - [ ] **Tab Bar Overflow Navigation**: When tabs exceed screen width, verify left/right `«`, `»` indicator clicking and wheel scrolling navigate smoothly with 16px right padding.
 - [ ] **Save & Load**: `💾 Save` / `📂 Load` persistently writes and restores all pages, nodes, frames, notes, and wires to/from `calcboard_save.nbt`.
 - [ ] **Blueprint Sharing**:
   - [ ] `📋 Share` exports the factory into a compressed text blueprint code copied to clipboard.
   - [ ] `📥 Import` restores shared blueprint codes with 100% fidelity.
+
+### 1.4 Alternative Recipe Switching & Accessibility (Recipe Switcher & UI Scaling)
+- [ ] **In-Place Recipe Switching (Switch Recipe)**:
+  - [ ] Verify `[🔄 Switch Recipe]` in `MachineConfigDialog` or context menu displays matching candidate recipes.
+  - [ ] Verify ports with identical item/fluid IDs preserve incoming and outgoing wire connections automatically.
+  - [ ] Verify full undo/redo support via `Ctrl+Z` / `Ctrl+Y`.
+- [ ] **5-Level UI Font Scale (`FontScale`)**:
+  - [ ] Verify `[Aa 1.0x]` button click (left/right), wheel scroll, and `+`/`-` keys scale the machine dialog from 0.75x to 1.30x.
+  - [ ] Verify center-anchored matrix unprojection maintains pixel-perfect button clicking.
+- [ ] **Uniform Global Fluid Units (`FluidUnitMode`)**:
+  - [ ] Verify cycling `Auto` ➔ `Always mB` ➔ `Always B` via toolbar button or `Shift+T`.
+  - [ ] Verify canvas-wide fluid rates and tooltips render consistently in the selected unit.
 
 ---
 

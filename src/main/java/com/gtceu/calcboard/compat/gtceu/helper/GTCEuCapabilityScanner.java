@@ -1,9 +1,9 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
-import com.gtceu.calcboard.api.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.ModCompatHelper;
-import com.gtceu.calcboard.api.MultiblockDetector;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Method;
@@ -173,3 +173,4 @@ public class GTCEuCapabilityScanner {
         return true;
     }
 }
+

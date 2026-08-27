@@ -1,8 +1,12 @@
 package com.gtceu.calcboard.client.gui.tutorial;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.type.EnergyType;
+
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -47,7 +51,7 @@ public class TutorialManager {
         if (screen != null) {
             if (!screen.getGraph().getNodes().isEmpty()) {
                 String pageName = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tutorial.page_name").getString();
-                com.gtceu.calcboard.api.BoardManager.getInstance().addPage(pageName);
+                com.gtceu.calcboard.api.storage.BoardManager.getInstance().addPage(pageName);
             }
             screen.getSummaryOverlay().setCollapsed(true);
             screen.getGraph().getNodes().clear();
@@ -112,7 +116,7 @@ public class TutorialManager {
 
         // 1. Boiler: produces Steam 500 mB/s
         RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
-        boiler.setEnergyType(com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF);
+        boiler.setEnergyType(com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF);
         boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
         boiler.setPosX(-180);
         boiler.setPosY(-50);
@@ -183,8 +187,8 @@ public class TutorialManager {
             RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
             if (boiler != null && turbine != null) {
                 String defaultTitle = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.default_frame_name").getString();
-                com.gtceu.calcboard.api.CanvasGroupFrame frame = com.gtceu.calcboard.api.CanvasGroupFrame.createFromNodes(
-                        defaultTitle, java.util.List.of(boiler, turbine), com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE);
+                com.gtceu.calcboard.api.model.CanvasGroupFrame frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromNodes(
+                        defaultTitle, java.util.List.of(boiler, turbine), com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE);
                 currentScreen.getGraph().addFrame(frame);
             }
         }
@@ -197,7 +201,7 @@ public class TutorialManager {
 
         if (boilerNodeId == null || currentScreen.getGraph().findNodeById(boilerNodeId) == null) {
             RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
-            boiler.setEnergyType(com.gtceu.calcboard.api.EnergyType.HEAT_OR_SELF);
+            boiler.setEnergyType(com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF);
             boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
             boiler.setPosX(-180);
             boiler.setPosY(-50);
@@ -410,3 +414,6 @@ public class TutorialManager {
         );
     }
 }
+
+
+

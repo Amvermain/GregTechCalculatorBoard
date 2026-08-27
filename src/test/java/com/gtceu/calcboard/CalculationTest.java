@@ -1,6 +1,16 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.BalanceSummary;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -655,8 +665,8 @@ public class CalculationTest {
         fusionNode.setRequiredReflectorTier(2);
 
         com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter adapter = new com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter();
-        List<com.gtceu.calcboard.api.AddonCategory> cats = adapter.getApplicableAddonCategories(fusionNode);
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.REFLECTOR), "Fusion node must support REFLECTOR category");
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> cats = adapter.getApplicableAddonCategories(fusionNode);
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.REFLECTOR), "Fusion node must support REFLECTOR category");
 
         com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon t1 = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_1", "T1 Reflector", "", null, 1);
         com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon t2 = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_2", "T2 Reflector", "", null, 2);
@@ -830,3 +840,6 @@ public class CalculationTest {
         Assertions.assertEquals(0.0, summary.totalFE(), 0.001);
     }
 }
+
+
+

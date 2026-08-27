@@ -115,14 +115,31 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
+    // Recipe Viewer Selection: 'emi' (Default) or 'jei' (Pure GTCEuM + JEI + JEI++ testing environment)
+    def envViewer = System.getenv('recipe_viewer') ?: System.getenv('RECIPE_VIEWER')
+    def propViewer = project.findProperty('recipe_viewer')
+    def recipeViewer = envViewer ?: propViewer ?: 'emi'
+    def jeiPlusPlusFileId = System.getenv('jei_plus_plus_file_id') ?: project.findProperty('jei_plus_plus_file_id') ?: '8659409'
+
+    println ">>> [GTCalcBoard] Active Recipe Viewer Profile: ${recipeViewer}"
+
     // EMI API & Runtime (Deobfuscated automatically by ForgeGradle)
     compileOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
-    runtimeOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
+    testImplementation fg.deobf("curse.maven:emi-580555:${emi_file_id}")
+    if (recipeViewer != 'jei') {
+        runtimeOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
+    }
 
-    // JEI API & Runtime (Required for Thermal Series native JEI plugin -> EMI bridge)
+    // JEI API & Runtime (Required for JEI integration and Thermal Series native JEI plugin)
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+    testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     runtimeOnly fg.deobf("local:jei-${minecraft_version}-forge-${jei_runtime_version}:${jei_runtime_version}")
+
+    // JEI++ (JEI Plus) Runtime (Loaded in pure JEI mode or when explicitly requested)
+    if (recipeViewer == 'jei' || project.hasProperty('include_jei_plus')) {
+        runtimeOnly fg.deobf("curse.maven:jei-plus-plus-1645653:${jeiPlusPlusFileId}")
+    }
 
     // Jade (WAILA / Block Tooltip HUD mod for runClient testing)
     runtimeOnly fg.deobf("maven.modrinth:jade:11.13.2+forge")
@@ -131,26 +148,35 @@ dependencies {
     def gtceuVariant = project.findProperty('gtceu_variant') ?: 'official'
     if (gtceuVariant == 'start_fork') {
         compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
+        testImplementation fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
         runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
         runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
     } else {
         compileOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
+        testImplementation fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
         runtimeOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
         runtimeOnly fg.deobf("curse.maven:ldlib-626676:${ldlib_curseforge_file_id}")
     }
 
     // Thermal Series (CoFH Core, Thermal Foundation, Thermal Expansion, Thermal Cultivation)
     compileOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
-    runtimeOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
+    testImplementation fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
     compileOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
-    runtimeOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
+    testImplementation fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
     compileOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
-    runtimeOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
+    testImplementation fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
     compileOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
-    runtimeOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
+    testImplementation fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
+    if (recipeViewer != 'jei') {
+        runtimeOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
+        runtimeOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
+        runtimeOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
+        runtimeOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
+    }
 
-    // Create (필요 시 주석 해제)
-    // runtimeOnly fg.deobf(name: "create-${minecraft_version}-${create_version}")
+    // Create & Create New Age (Test classpath support)
+    testImplementation fg.deobf("local:create-${minecraft_version}-${create_version}:${create_version}")
+    testImplementation fg.deobf("local:create-new-age-forge-${minecraft_version}-1.1.4:1.1.4")
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'

@@ -1,11 +1,14 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
-import com.gtceu.calcboard.api.AddonCategory;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.MultiblockDetector;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTThreadingHelix;
+
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
@@ -153,7 +156,7 @@ public final class GTCEuBOMHelper {
         }
 
         boolean handledHelixes = false;
-        Map<com.gtceu.calcboard.api.GTThreadingHelix, Integer> equippedHelixes = null;
+        Map<com.gtceu.calcboard.api.type.GTThreadingHelix, Integer> equippedHelixes = null;
         if (node.hasThreading() && node.getThreadingConfig() != null && node.getThreadingConfig().getTotalHelixCount() > 0) {
             equippedHelixes = node.getThreadingConfig().getHelixCounts();
         }
@@ -487,7 +490,7 @@ public final class GTCEuBOMHelper {
                         PartCategory.HATCH_BUS
                     ));
                 }
-            } else if (baseHatchCount == 0 && !node.isGenerator() && node.getEnergyType() != com.gtceu.calcboard.api.EnergyType.NONE && node.getEnergyType() != com.gtceu.calcboard.api.EnergyType.KINETIC_SU && (node.getSteamMode() == null || !node.getSteamMode().isSteam()) && !MultiblockDetector.isSteamMultiblock(def.controllerId())) {
+            } else if (baseHatchCount == 0 && !node.isGenerator() && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU && (node.getSteamMode() == null || !node.getSteamMode().isSteam()) && !MultiblockDetector.isSteamMultiblock(def.controllerId())) {
                 ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
                 int count = dualLowerTierEnergyHatches ? 2 : 1;
                 if (ehId != null) {
@@ -546,7 +549,7 @@ public final class GTCEuBOMHelper {
                     1,
                     PartCategory.HATCH_BUS
                 ));
-            } else if (baseHatchCount == 0 && node.getEnergyType() != com.gtceu.calcboard.api.EnergyType.NONE && (node.getSteamMode() == null || !node.getSteamMode().isSteam()) && !MultiblockDetector.isSteamMultiblock(def.controllerId())) {
+            } else if (baseHatchCount == 0 && node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE && (node.getSteamMode() == null || !node.getSteamMode().isSteam()) && !MultiblockDetector.isSteamMultiblock(def.controllerId())) {
                 ResourceLocation defMaint = ResourceLocation.tryParse("gtceu:maintenance_hatch");
                 if (defMaint != null) {
                     list.add(new MultiblockStructurePart(
@@ -667,3 +670,5 @@ public final class GTCEuBOMHelper {
         return MultiblockStructureCatalog.formatMachineName(id.getPath());
     }
 }
+
+

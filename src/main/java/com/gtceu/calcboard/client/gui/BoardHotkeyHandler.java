@@ -1,8 +1,16 @@
 package com.gtceu.calcboard.client.gui;
 
-import com.gtceu.calcboard.api.IngredientStack;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.type.FluidUnitMode;
+import com.gtceu.calcboard.api.type.RateTimeUnit;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
+
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
-import dev.emi.emi.api.EmiApi;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -154,7 +162,7 @@ public final class BoardHotkeyHandler {
             }
         }
 
-        // 6. EMI recipe lookup under cursor [R] / [U]
+        // 6. Recipe lookup under cursor [R] / [U] (EMI, JEI, etc.)
         if (keyCode == GLFW.GLFW_KEY_R || keyCode == GLFW.GLFW_KEY_U) {
             double canvasMouseX = screen.toCanvasX(lastMouseX);
             double canvasMouseY = screen.toCanvasY(lastMouseY);
@@ -165,16 +173,14 @@ public final class BoardHotkeyHandler {
                 if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
                     IngredientStack hovered = widget.getHoveredIngredient(canvasMouseX, canvasMouseY);
                     if (hovered != null) {
-                        var emiStack = IngredientRenderer.toEmiStack(hovered);
-                        if (!emiStack.isEmpty()) {
-                            if (keyCode == GLFW.GLFW_KEY_R) {
-                                EmiApi.displayRecipes(emiStack);
-                            } else {
-                                EmiApi.displayUses(emiStack);
+                        try {
+                            var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
+                            boolean success = (keyCode == GLFW.GLFW_KEY_R) ? adapter.displayRecipes(hovered) : adapter.displayUses(hovered);
+                            if (success) {
+                                TutorialManager.getInstance().onRecipeLookup();
+                                return true;
                             }
-                            TutorialManager.getInstance().onRecipeLookup();
-                            return true;
-                        }
+                        } catch (Throwable ignored) {}
                     }
                 }
             }
@@ -196,6 +202,9 @@ public final class BoardHotkeyHandler {
 
         // 8.5 Toggle Multiblock BOM Dialog: Shift + B or M
         if (((keyCode == GLFW.GLFW_KEY_B && (modifiers & GLFW.GLFW_MOD_SHIFT) != 0) || (keyCode == GLFW.GLFW_KEY_M && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0))) {
+            if (!com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported()) {
+                return false;
+            }
             if (screen.getMultiblockBOMDialog() != null) {
                 if (screen.getMultiblockBOMDialog().isVisible()) {
                     screen.getMultiblockBOMDialog().close();
@@ -218,14 +227,28 @@ public final class BoardHotkeyHandler {
             }
         }
 
-        // 10. Cycle Time Unit (/t, /s, /min, /h, /d): T
+        // 10. Cycle Time Unit (T) or Fluid Unit (Shift+T)
         if (keyCode == GLFW.GLFW_KEY_T && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
-            com.gtceu.calcboard.api.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
-            com.gtceu.calcboard.api.RateTimeUnit next = curUnit.next();
-            FormatUtil.setActiveTimeUnit(next);
-            BoardToast.show(net.minecraft.network.chat.Component.literal("§e⏱ ").append(
-                net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
-            ));
+            boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
+            if (shift) {
+                com.gtceu.calcboard.api.type.FluidUnitMode curFluid = FormatUtil.getActiveFluidUnitMode();
+                com.gtceu.calcboard.api.type.FluidUnitMode next = curFluid.next();
+                FormatUtil.setActiveFluidUnitMode(next);
+                BoardManager.getInstance().setFluidUnitMode(next);
+                BoardManager.getInstance().saveForCurrentContext();
+                BoardToast.show(net.minecraft.network.chat.Component.literal("§b💧 ").append(
+                    net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.fluid_unit_changed", net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
+                ));
+            } else {
+                com.gtceu.calcboard.api.type.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
+                com.gtceu.calcboard.api.type.RateTimeUnit next = curUnit.next();
+                FormatUtil.setActiveTimeUnit(next);
+                BoardManager.getInstance().setTimeUnit(next);
+                BoardManager.getInstance().saveForCurrentContext();
+                BoardToast.show(net.minecraft.network.chat.Component.literal("§e⏱ ").append(
+                    net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
+                ));
+            }
             net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F)
             );
@@ -242,3 +265,6 @@ public final class BoardHotkeyHandler {
         return false;
     }
 }
+
+
+

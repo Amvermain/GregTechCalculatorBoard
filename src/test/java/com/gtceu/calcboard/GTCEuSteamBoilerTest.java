@@ -1,9 +1,12 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
@@ -86,15 +89,15 @@ public class GTCEuSteamBoilerTest {
         Assertions.assertTrue(adapter.supportsAddons(mbBoiler), "Multiblock boiler must support hardware addons (Maintenance & Hatches)");
         var cats = adapter.getApplicableAddonCategories(mbBoiler);
         Assertions.assertEquals(3, cats.size());
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.MAINTENANCE));
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.HATCH_BUS));
-        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.AddonCategory.CUSTOM));
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.HATCH_BUS));
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM));
 
         // Test addon compatibility
-        var maintAddon = new com.gtceu.calcboard.api.MachineAddon("gtceu:maintenance_hatch", "Maintenance Hatch", com.gtceu.calcboard.api.AddonCategory.MAINTENANCE, "", null);
-        var hatchAddon = new com.gtceu.calcboard.api.MachineAddon("gtceu:lv_input_hatch", "Input Hatch (LV)", com.gtceu.calcboard.api.AddonCategory.HATCH_BUS, "", null);
-        var parallelAddon = new com.gtceu.calcboard.api.MachineAddon("gtceu:parallel_hatch", "Parallel Hatch", com.gtceu.calcboard.api.AddonCategory.PARALLEL, "", null);
-        var coilAddon = new com.gtceu.calcboard.api.MachineAddon("gtceu:cupronickel_coil", "Cupronickel Coil", com.gtceu.calcboard.api.AddonCategory.COIL, "", null);
+        var maintAddon = new com.gtceu.calcboard.api.catalog.MachineAddon("gtceu:maintenance_hatch", "Maintenance Hatch", com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE, "", null);
+        var hatchAddon = new com.gtceu.calcboard.api.catalog.MachineAddon("gtceu:lv_input_hatch", "Input Hatch (LV)", com.gtceu.calcboard.api.catalog.AddonCategory.HATCH_BUS, "", null);
+        var parallelAddon = new com.gtceu.calcboard.api.catalog.MachineAddon("gtceu:parallel_hatch", "Parallel Hatch", com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL, "", null);
+        var coilAddon = new com.gtceu.calcboard.api.catalog.MachineAddon("gtceu:cupronickel_coil", "Cupronickel Coil", com.gtceu.calcboard.api.catalog.AddonCategory.COIL, "", null);
 
         Assertions.assertTrue(adapter.isAddonCompatible(mbBoiler, maintAddon), "Maintenance hatch must be compatible with multiblock boiler");
         Assertions.assertTrue(adapter.isAddonCompatible(mbBoiler, hatchAddon), "Input hatch must be compatible with multiblock boiler");
@@ -201,3 +204,6 @@ public class GTCEuSteamBoilerTest {
         Assertions.assertEquals(225.0, node.getInputSlotRate(1, false), 0.01); // 225 mB/s Water (11.25 mB/t)
     }
 }
+
+
+

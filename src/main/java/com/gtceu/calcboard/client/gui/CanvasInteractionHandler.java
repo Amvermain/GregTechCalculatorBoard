@@ -1,9 +1,18 @@
 package com.gtceu.calcboard.client.gui;
 
-import com.gtceu.calcboard.api.FlowGraph;
-import com.gtceu.calcboard.api.FlowGraphSolver;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
+import com.gtceu.calcboard.client.gui.render.CanvasStickyNoteRenderer;
+import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
@@ -46,22 +55,22 @@ public class CanvasInteractionHandler {
     private final Map<String, double[]> dragStartPositions = new HashMap<>();
 
     // Frame Dragging & Resizing State (RFC-002)
-    private com.gtceu.calcboard.api.CanvasGroupFrame draggingFrame = null;
-    private com.gtceu.calcboard.api.CanvasGroupFrame resizingFrame = null;
+    private com.gtceu.calcboard.api.model.CanvasGroupFrame draggingFrame = null;
+    private com.gtceu.calcboard.api.model.CanvasGroupFrame resizingFrame = null;
     private CanvasGroupFrameRenderer.ResizeDirection resizeFrameDir = CanvasGroupFrameRenderer.ResizeDirection.NONE;
     private double resizeFrameStartX, resizeFrameStartY;
     private double origFrameX, origFrameY;
     private double origFrameWidth, origFrameHeight;
     private long lastFrameHeaderClickTime = 0;
-    private com.gtceu.calcboard.api.CanvasGroupFrame lastClickedFrame = null;
+    private com.gtceu.calcboard.api.model.CanvasGroupFrame lastClickedFrame = null;
 
     // Sticky Note Dragging & Resizing State
-    private com.gtceu.calcboard.api.CanvasStickyNote draggingNote = null;
-    private com.gtceu.calcboard.api.CanvasStickyNote resizingNote = null;
+    private com.gtceu.calcboard.api.model.CanvasStickyNote draggingNote = null;
+    private com.gtceu.calcboard.api.model.CanvasStickyNote resizingNote = null;
     private double resizeNoteStartX, resizeNoteStartY;
     private double origNoteWidth, origNoteHeight;
     private long lastNoteHeaderClickTime = 0;
-    private com.gtceu.calcboard.api.CanvasStickyNote lastClickedNote = null;
+    private com.gtceu.calcboard.api.model.CanvasStickyNote lastClickedNote = null;
 
     // Wire Double-Click Split State (RFC-001)
     private long lastWireClickTime = 0;
@@ -285,13 +294,13 @@ public class CanvasInteractionHandler {
                             }
                         }
                         for (String selNoteId : screen.getSelectedNoteIds()) {
-                            com.gtceu.calcboard.api.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
+                            com.gtceu.calcboard.api.model.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
                             if (sn != null) {
                                 dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                             }
                         }
                         for (String selFrameId : screen.getSelectedFrameIds()) {
-                            com.gtceu.calcboard.api.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
+                            com.gtceu.calcboard.api.model.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
                             if (sf != null) {
                                 dragStartPositions.put(sf.getId(), new double[]{sf.getPosX(), sf.getPosY()});
                             }
@@ -353,7 +362,7 @@ public class CanvasInteractionHandler {
 
         // 2.5 Frame Actions & Header Dragging (RFC-002)
         for (int i = graph.getFrames().size() - 1; i >= 0; i--) {
-            com.gtceu.calcboard.api.CanvasGroupFrame frame = graph.getFrames().get(i);
+            com.gtceu.calcboard.api.model.CanvasGroupFrame frame = graph.getFrames().get(i);
             CanvasGroupFrameRenderer.FrameAction action = CanvasGroupFrameRenderer.getClickedAction(frame, canvasMouseX, canvasMouseY);
             if (action != CanvasGroupFrameRenderer.FrameAction.NONE) {
                 if (!screen.ensureEditPermission()) return true;
@@ -411,13 +420,13 @@ public class CanvasInteractionHandler {
 
                 if (selFrames.contains(frame.getId())) {
                     for (String fid : selFrames) {
-                        com.gtceu.calcboard.api.CanvasGroupFrame f = graph.findFrameById(fid);
+                        com.gtceu.calcboard.api.model.CanvasGroupFrame f = graph.findFrameById(fid);
                         if (f != null) {
                             dragStartPositions.put(f.getId(), new double[]{f.getPosX(), f.getPosY()});
                             for (RecipeNode sn : f.getEnclosedNodes(graph)) {
                                 dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                             }
-                            for (com.gtceu.calcboard.api.CanvasStickyNote sn : f.getEnclosedNotes(graph)) {
+                            for (com.gtceu.calcboard.api.model.CanvasStickyNote sn : f.getEnclosedNotes(graph)) {
                                 dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                             }
                         }
@@ -429,7 +438,7 @@ public class CanvasInteractionHandler {
                         }
                     }
                     for (String noteId : selNotes) {
-                        com.gtceu.calcboard.api.CanvasStickyNote note = graph.findStickyNoteById(noteId);
+                        com.gtceu.calcboard.api.model.CanvasStickyNote note = graph.findStickyNoteById(noteId);
                         if (note != null) {
                             dragStartPositions.put(note.getId(), new double[]{note.getPosX(), note.getPosY()});
                         }
@@ -438,7 +447,7 @@ public class CanvasInteractionHandler {
                     for (RecipeNode sn : frame.getEnclosedNodes(graph)) {
                         dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                     }
-                    for (com.gtceu.calcboard.api.CanvasStickyNote sn : frame.getEnclosedNotes(graph)) {
+                    for (com.gtceu.calcboard.api.model.CanvasStickyNote sn : frame.getEnclosedNotes(graph)) {
                         dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                     }
                     dragStartPositions.put(frame.getId(), new double[]{frame.getPosX(), frame.getPosY()});
@@ -449,7 +458,7 @@ public class CanvasInteractionHandler {
 
         // 2.6 Sticky Note Actions & Header Dragging
         for (int i = graph.getStickyNotes().size() - 1; i >= 0; i--) {
-            com.gtceu.calcboard.api.CanvasStickyNote note = graph.getStickyNotes().get(i);
+            com.gtceu.calcboard.api.model.CanvasStickyNote note = graph.getStickyNotes().get(i);
             CanvasStickyNoteRenderer.NoteAction action = CanvasStickyNoteRenderer.getClickedAction(note, canvasMouseX, canvasMouseY);
             if (action != CanvasStickyNoteRenderer.NoteAction.NONE) {
                 if (!screen.ensureEditPermission()) return true;
@@ -503,11 +512,11 @@ public class CanvasInteractionHandler {
                             if (sn != null) dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                         }
                         for (String selNoteId : screen.getSelectedNoteIds()) {
-                            com.gtceu.calcboard.api.CanvasStickyNote sn = graph.findStickyNoteById(selNoteId);
+                            com.gtceu.calcboard.api.model.CanvasStickyNote sn = graph.findStickyNoteById(selNoteId);
                             if (sn != null) dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
                         }
                         for (String selFrameId : screen.getSelectedFrameIds()) {
-                            com.gtceu.calcboard.api.CanvasGroupFrame sf = graph.findFrameById(selFrameId);
+                            com.gtceu.calcboard.api.model.CanvasGroupFrame sf = graph.findFrameById(selFrameId);
                             if (sf != null) dragStartPositions.put(sf.getId(), new double[]{sf.getPosX(), sf.getPosY()});
                         }
                     } else {
@@ -702,7 +711,7 @@ public class CanvasInteractionHandler {
                             screen.getSelectedNodeIds().add(w.getNode().getId());
                         }
                     }
-                    for (com.gtceu.calcboard.api.CanvasStickyNote note : screen.getGraph().getStickyNotes()) {
+                    for (com.gtceu.calcboard.api.model.CanvasStickyNote note : screen.getGraph().getStickyNotes()) {
                         double nx = note.getPosX();
                         double ny = note.getPosY();
                         double nw = note.getWidth();
@@ -712,7 +721,7 @@ public class CanvasInteractionHandler {
                             screen.getSelectedNoteIds().add(note.getId());
                         }
                     }
-                    for (com.gtceu.calcboard.api.CanvasGroupFrame frame : screen.getGraph().getFrames()) {
+                    for (com.gtceu.calcboard.api.model.CanvasGroupFrame frame : screen.getGraph().getFrames()) {
                         double fx = frame.getPosX();
                         double fy = frame.getPosY();
                         double fw = frame.getWidth();
@@ -953,8 +962,8 @@ public class CanvasInteractionHandler {
             double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeNoteStartX;
             double deltaY = canvasMouseY - resizeNoteStartY;
-            resizingNote.setWidth(Math.max(com.gtceu.calcboard.api.CanvasStickyNote.MIN_WIDTH, origNoteWidth + deltaX));
-            resizingNote.setHeight(Math.max(com.gtceu.calcboard.api.CanvasStickyNote.MIN_HEIGHT, origNoteHeight + deltaY));
+            resizingNote.setWidth(Math.max(com.gtceu.calcboard.api.model.CanvasStickyNote.MIN_WIDTH, origNoteWidth + deltaX));
+            resizingNote.setHeight(Math.max(com.gtceu.calcboard.api.model.CanvasStickyNote.MIN_HEIGHT, origNoteHeight + deltaY));
             screen.markSummaryDirty();
             return true;
         }
@@ -975,13 +984,13 @@ public class CanvasInteractionHandler {
                     }
                 }
                 for (String selNoteId : screen.getSelectedNoteIds()) {
-                    com.gtceu.calcboard.api.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
+                    com.gtceu.calcboard.api.model.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
                     if (sn != null) {
                         sn.moveBy(deltaX, deltaY);
                     }
                 }
                 for (String selFrameId : screen.getSelectedFrameIds()) {
-                    com.gtceu.calcboard.api.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
+                    com.gtceu.calcboard.api.model.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
                     if (sf != null) {
                         sf.moveBy(deltaX, deltaY);
                     }
@@ -999,8 +1008,8 @@ public class CanvasInteractionHandler {
             double deltaX = canvasMouseX - resizeFrameStartX;
             double deltaY = canvasMouseY - resizeFrameStartY;
 
-            double minW = com.gtceu.calcboard.api.CanvasGroupFrame.MIN_WIDTH;
-            double minH = com.gtceu.calcboard.api.CanvasGroupFrame.MIN_HEIGHT;
+            double minW = com.gtceu.calcboard.api.model.CanvasGroupFrame.MIN_WIDTH;
+            double minH = com.gtceu.calcboard.api.model.CanvasGroupFrame.MIN_HEIGHT;
 
             // Horizontal Resizing
             switch (resizeFrameDir) {
@@ -1039,7 +1048,7 @@ public class CanvasInteractionHandler {
             lastDragCanvasY = curCanvasY;
 
             for (String id : dragStartPositions.keySet()) {
-                com.gtceu.calcboard.api.CanvasGroupFrame f = screen.getGraph().findFrameById(id);
+                com.gtceu.calcboard.api.model.CanvasGroupFrame f = screen.getGraph().findFrameById(id);
                 if (f != null) {
                     f.moveBy(deltaX, deltaY);
                     continue;
@@ -1049,7 +1058,7 @@ public class CanvasInteractionHandler {
                     n.setPos(n.getPosX() + deltaX, n.getPosY() + deltaY);
                     continue;
                 }
-                com.gtceu.calcboard.api.CanvasStickyNote note = screen.getGraph().findStickyNoteById(id);
+                com.gtceu.calcboard.api.model.CanvasStickyNote note = screen.getGraph().findStickyNoteById(id);
                 if (note != null) {
                     note.moveBy(deltaX, deltaY);
                 }
@@ -1087,13 +1096,13 @@ public class CanvasInteractionHandler {
                     }
                 }
                 for (String selNoteId : screen.getSelectedNoteIds()) {
-                    com.gtceu.calcboard.api.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
+                    com.gtceu.calcboard.api.model.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
                     if (sn != null) {
                         sn.moveBy(deltaX, deltaY);
                     }
                 }
                 for (String selFrameId : screen.getSelectedFrameIds()) {
-                    com.gtceu.calcboard.api.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
+                    com.gtceu.calcboard.api.model.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
                     if (sf != null) {
                         sf.moveBy(deltaX, deltaY);
                     }
@@ -1154,3 +1163,6 @@ public class CanvasInteractionHandler {
         }
     }
 }
+
+
+

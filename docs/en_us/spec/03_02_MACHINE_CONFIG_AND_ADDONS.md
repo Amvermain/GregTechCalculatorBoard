@@ -135,4 +135,36 @@ flowchart TB
 
 ---
 
-> ➡️ **Next Chapter**: [[03-03] Page Summary & Global Balance Dashboard UI](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)
+## 3. In-Place Alternative Recipe Switching (`AlternativeRecipeFinder`)
+
+Switch recipes for machines directly on the canvas without deleting nodes, preserving ports and wiring connections:
+
+* **Entry Point**: Click `[🔄 Switch Recipe]` in the header of `MachineConfigDialog` or select from the node context menu.
+* **Candidate Ranking**:
+  1. **Tier 1**: Same Machine ID / Category + Same primary outputs (1st/2nd outputs).
+  2. **Tier 2**: All other valid alternative recipes within the same machine category.
+* **Smart Wire Preservation**:
+  - Preserves incoming/outgoing wire connections for matching item/fluid IDs (`IngredientStack.getId()`).
+  - Gracefully disconnects only wires whose ingredients are absent in the newly selected recipe.
+  - Fully integrated with the `Undo/Redo` stack (`Ctrl+Z`).
+
+---
+
+## 4. UI Font Scale & Accessibility (`FontScale`)
+
+Provides 5 preset UI scaling levels for `MachineConfigDialog` across high-DPI displays and compact viewports:
+
+* **5 Preset Scaling Levels**:
+  - `MINI (0.75x)`: Ultra-compact mode for GUI Scale 4/Auto.
+  - `COMPACT (0.85x)`: Dense overview for large addon racks.
+  - `NORMAL (1.0x)`: Standard Minecraft UI scale.
+  - `LARGE (1.15x)`: Enhanced readability on 1440p displays.
+  - `HUGE (1.30x)`: Maximum scale for 4K / accessibility.
+* **Interactive Controls**:
+  - `[Aa 1.0x]` Header Button: Left-click (cycle zoom in), Right-click (cycle zoom out), Mouse wheel scroll.
+  - Keyboard Hotkeys: `+` / `Numpad +` (zoom in), `-` / `Numpad -` (zoom out).
+  - Center-anchored matrix transformation and virtual mouse unprojection guarantee 100% pixel-perfect button hit detection.
+
+---
+
+> ➡️ **Proceed to next section**: [[03-03] Page Summary and Global Balance Dashboard](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)

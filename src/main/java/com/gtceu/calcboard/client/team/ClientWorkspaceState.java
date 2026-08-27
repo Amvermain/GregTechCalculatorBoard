@@ -1,7 +1,9 @@
 package com.gtceu.calcboard.client.team;
 
-import com.gtceu.calcboard.api.BlueprintCodec;
-import com.gtceu.calcboard.api.FlowGraph;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+
+import com.gtceu.calcboard.api.storage.BlueprintCodec;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.network.packet.s2c.S2CBroadcastPresencePacket;
 import com.gtceu.calcboard.server.storage.CommitLogEntry;
 import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
@@ -106,7 +108,7 @@ public class ClientWorkspaceState {
 
             FlowGraph graph = screen.getGraph();
             net.minecraft.nbt.CompoundTag tag = graph.serializeNBT();
-            byte[] compressed = com.gtceu.calcboard.api.BlueprintCodec.compressTag(tag);
+            byte[] compressed = com.gtceu.calcboard.api.storage.BlueprintCodec.compressTag(tag);
             int nodeCount = graph.getNodes().size();
 
             com.gtceu.calcboard.network.NetworkHandler.sendToServer(
@@ -292,3 +294,6 @@ public class ClientWorkspaceState {
         dirtyPages.clear();
     }
 }
+
+
+

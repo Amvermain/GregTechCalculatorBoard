@@ -1,6 +1,15 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphModuleHandler;
+import com.gtceu.calcboard.api.storage.NodeClipboard;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.client.gui.BoardSelectionModel;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -326,3 +335,5 @@ public class CanvasGroupFrameTest {
         Assertions.assertEquals(1, graph.getFrames().size());
     }
 }
+
+

@@ -1,6 +1,12 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+
 import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.history.HistoryManager;
 import net.minecraft.resources.ResourceLocation;
@@ -127,8 +133,8 @@ public class HistoryTest {
         historyManager.record(BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), GTVoltageTier.LV, GTVoltageTier.HV));
 
         // Modify OverclockMode (STANDARD -> PERFECT)
-        node.setOverclockMode(com.gtceu.calcboard.api.OverclockMode.PERFECT);
-        historyManager.record(BoardCommand.ModifyPropertyCommand.overclockMode(node.getId(), com.gtceu.calcboard.api.OverclockMode.STANDARD, com.gtceu.calcboard.api.OverclockMode.PERFECT));
+        node.setOverclockMode(com.gtceu.calcboard.api.type.OverclockMode.PERFECT);
+        historyManager.record(BoardCommand.ModifyPropertyCommand.overclockMode(node.getId(), com.gtceu.calcboard.api.type.OverclockMode.STANDARD, com.gtceu.calcboard.api.type.OverclockMode.PERFECT));
 
         // Modify Parallel (1 -> 16)
         node.setParallel(16);
@@ -145,7 +151,7 @@ public class HistoryTest {
         assertEquals(220, node.getRotorEfficiency());
         assertTrue(node.isBaseNode());
         assertEquals(16, node.getParallel());
-        assertEquals(com.gtceu.calcboard.api.OverclockMode.PERFECT, node.getOverclockMode());
+        assertEquals(com.gtceu.calcboard.api.type.OverclockMode.PERFECT, node.getOverclockMode());
         assertEquals(GTVoltageTier.HV, node.getTargetTier());
         assertEquals("Sulfuric Acid Line 1", node.getName());
         assertEquals(8.0, node.getMachineCount(), 0.001);
@@ -164,7 +170,7 @@ public class HistoryTest {
 
         // Undo OC
         historyManager.undo(graph);
-        assertEquals(com.gtceu.calcboard.api.OverclockMode.STANDARD, node.getOverclockMode());
+        assertEquals(com.gtceu.calcboard.api.type.OverclockMode.STANDARD, node.getOverclockMode());
 
         // Undo Tier
         historyManager.undo(graph);
@@ -191,7 +197,7 @@ public class HistoryTest {
         assertEquals(GTVoltageTier.HV, node.getTargetTier());
 
         historyManager.redo(graph); // OC
-        assertEquals(com.gtceu.calcboard.api.OverclockMode.PERFECT, node.getOverclockMode());
+        assertEquals(com.gtceu.calcboard.api.type.OverclockMode.PERFECT, node.getOverclockMode());
 
         historyManager.redo(graph); // Parallel
         assertEquals(16, node.getParallel());
@@ -285,3 +291,6 @@ public class HistoryTest {
         assertEquals(1.0, node.getMachineCount(), 0.0001);
     }
 }
+
+
+

@@ -26,6 +26,15 @@ public class RecipeSearchEngineTest {
         inputNames.forEach(i -> inSb.append(i.toLowerCase()).append(" "));
         tags.forEach(t -> outSb.append(t.toLowerCase()).append(" "));
 
+        net.minecraft.resources.ResourceLocation[] outIds = outputNames.stream()
+                .map(n -> net.minecraft.resources.ResourceLocation.tryParse(modId + ":" + n.toLowerCase().replace(' ', '_')))
+                .toArray(net.minecraft.resources.ResourceLocation[]::new);
+        net.minecraft.resources.ResourceLocation[] inIds = inputNames.stream()
+                .map(n -> net.minecraft.resources.ResourceLocation.tryParse(modId + ":" + n.toLowerCase().replace(' ', '_')))
+                .toArray(net.minecraft.resources.ResourceLocation[]::new);
+        String[] outNamesArr = outputNames.toArray(new String[0]);
+        String[] inNamesArr = inputNames.toArray(new String[0]);
+
         return new SearchableRecipe(
                 null,
                 displayName,
@@ -33,7 +42,11 @@ public class RecipeSearchEngineTest {
                 categoryId.toLowerCase(),
                 categoryName.toLowerCase(),
                 inSb.toString().trim(),
-                outSb.toString().trim()
+                outSb.toString().trim(),
+                inIds,
+                outIds,
+                inNamesArr,
+                outNamesArr
         );
     }
 
@@ -460,5 +473,43 @@ public class RecipeSearchEngineTest {
 
         ParsedQuery qStressName = RecipeSearchEngine.parseQuery("<\"Stress Units\"");
         assertTrue(RecipeSearchEngine.matches(waterWheel, qStressName));
+    }
+
+    @Test
+    public void testFindMatchedOutputSecondaryPromotion() {
+        SearchableRecipe pyrolyseOven = createMockRecipe(
+                "Charcoal", "gtceu", "pyrolyse_oven", "Pyrolyse Oven",
+                List.of("Charcoal", "Wood Tar", "Creosote Oil"),
+                List.of("Oak Log", "Nitrogen"),
+                List.of()
+        );
+
+        // 1. Search for secondary output "Wood Tar"
+        ParsedQuery qWoodTar = RecipeSearchEngine.parseQuery("output:wood tar");
+        RecipeSearchEngine.MatchedOutputResult res1 = RecipeSearchEngine.findMatchedOutput(pyrolyseOven, qWoodTar, null, null);
+        assertNotNull(res1);
+        assertEquals("Wood Tar", res1.name());
+        assertEquals(1, res1.index());
+
+        // 2. Search for third output "Creosote"
+        ParsedQuery qCreosote = RecipeSearchEngine.parseQuery("creosote");
+        RecipeSearchEngine.MatchedOutputResult res2 = RecipeSearchEngine.findMatchedOutput(pyrolyseOven, qCreosote, null, null);
+        assertNotNull(res2);
+        assertEquals("Creosote Oil", res2.name());
+        assertEquals(2, res2.index());
+
+        // 3. Search for primary output "Charcoal"
+        ParsedQuery qCharcoal = RecipeSearchEngine.parseQuery("charcoal");
+        RecipeSearchEngine.MatchedOutputResult res3 = RecipeSearchEngine.findMatchedOutput(pyrolyseOven, qCharcoal, null, null);
+        assertNotNull(res3);
+        assertEquals("Charcoal", res3.name());
+        assertEquals(0, res3.index());
+
+        // 4. Contextual target match
+        var woodTarId = net.minecraft.resources.ResourceLocation.tryParse("gtceu:wood_tar");
+        RecipeSearchEngine.MatchedOutputResult resCtx = RecipeSearchEngine.findMatchedOutput(pyrolyseOven, null, woodTarId, null);
+        assertNotNull(resCtx);
+        assertEquals(woodTarId, resCtx.id());
+        assertEquals(1, resCtx.index());
     }
 }

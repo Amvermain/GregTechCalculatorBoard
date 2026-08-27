@@ -1,6 +1,13 @@
 package com.gtceu.calcboard.compat.gtceu;
 
-import com.gtceu.calcboard.api.*;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+
 import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
 import net.minecraft.resources.ResourceLocation;
 
@@ -280,3 +287,5 @@ public final class GTTurbineHelper {
         return false;
     }
 }
+
+

@@ -6,12 +6,40 @@
 
 All notable changes to **GregTech Calculator Board** will be documented in this file.
 
+## [2.0.0-alpha.11] - 2026-08-28
+
+### Added
+- **In-Place Alternative Recipe Switching (`RecipeNode`, `AlternativeRecipeFinder`, `MachineConfigDialog`, `RecipeSwitchTest`)**:
+  - Switch recipes for existing nodes on the canvas directly without deletion via the `[🔄 Switch Recipe]` header button in `MachineConfigDialog` or the right-click node context menu.
+  - Automatically matches and ranks candidate recipes by same machine ID and shared primary outputs.
+  - Smart wire preservation retains existing connections for shared input/output ingredients (`IngredientStack.getId()`), with complete Undo/Redo (`Ctrl+Z` / `Ctrl+Y`) support.
+- **Unified Recipe Viewer Support Extension (JEI / JEI++ & Vanilla Integration) (`IRecipeViewerAdapter`, `RecipeViewerRegistry`, `JeiRecipeViewerAdapter`, `VanillaRecipeViewerAdapter`, `RecipeViewerRegistryTest`)**:
+  - Seamlessly supports environments running JEI (Just Enough Items) and JEI++ (Just Enough Calculation / BoM) with recipe catalog indexing, `[R]`/`[U]` hotkey lookups, bookmark synchronization, and one-click multiblock BoM tree registration.
+  - Pure vanilla fallback enables offline and vanilla recipe catalog lookup when no recipe viewer mod is present.
+- **Uniform Global Fluid Unit Formatting Option (`FluidUnitMode`, `FormatUtil`, `ToolbarWidget`, `HotkeyHudWidget`, `UiFormattingTest`)**:
+  - Added canvas-wide fluid rate display unit toggles between `Auto` (smart unit scaling), `Always mB` (forced millibuckets), and `Always B` (forced buckets) via the toolbar button and `Shift+T` hotkey.
+  - Selected fluid unit preference is automatically persisted across game sessions in client configuration.
+- **5-Level UI Font Scale for Machine Configuration Dialog (`FontScale`, `MachineConfigDialog`)**:
+  - Scale machine settings UI across 5 presets (`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`) via the `[Aa 1.0x]` header button.
+  - Supports left/right click cycling, mouse wheel scrolling, and `+`/`-` keyboard shortcuts with pixel-perfect center-anchored matrix unprojection.
+
+### Changed & Improved
+- **Page Tab Bar Overflow Navigation & Padding (`PageTabBarWidget`)**:
+  - Added click support on `«` and `»` overflow indicators to smoothly scroll through tab bars when page counts exceed screen width.
+  - Added a 16px right margin buffer preventing the final tab and the `[+]` button from being obscured by overflow arrows.
+- **Hotkey HUD Fluid Unit Guide (`HotkeyHudWidget`)**:
+  - Added `Shift+T` fluid unit cycle shortcut guide in the bottom-left hotkeys HUD widget.
+
+### Fixed
+- **Page Tab Bar Scissor Boundary Clipping & Unclickable Overflow Arrow Bug (`PageTabBarWidget`)**:
+  - Fixed an issue where the right overflow arrow `»` failed to respond to mouse clicks and the right border of the final tab was clipped outside the scissor rendering rectangle.
+
 ## [2.0.0-alpha.10] - 2026-08-27
 
 ### Added
 - **Target Batch Production Estimated Time (ETA) & Goal Node System (`RFC-005`, `ProductionETACalculator`, `NodeTargetBatchEditor`, `NodeProperties`, `ETACalculationTest`)**:
   - Set target batch goals (e.g. `100x`, `1,000x`, `10 B`) on reroute and terminal goal nodes.
-  - Computes real-time estimated completion duration ($T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$) and renders human-readable `ET: 24m 52s` badges beneath cards.
+  - Computes real-time estimated completion duration (Target Amount / Net Inflow Rate) and renders human-readable `ET: 24m 52s` badges beneath cards.
   - Hovering over goal nodes reveals total energy required (EU) and raw upstream material consumption across the batch duration.
   - Supports inline clicking/typing to edit batch goals with Shift + Click to reset.
 - **Kinetic Generator & Motor EMI Recipe Integration & SU Search Indexing (`KineticGenerationEmiRecipe`, `CalcBoardEmiPlugin`, `CreateRecipeHandler`, `CreateNewAgeRecipeHandler`, `RecipeSearchEngine`)**:
@@ -23,7 +51,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ### Changed & Improved
 - **Addon Configuration Dialog Performance & First-Open Stuttering Elimination (`MachineConfigDialog`, `MachineAddonCatalog`, `MultiblockDetector`, `GTCEuMultiblockScanner`, `CoilHelper`, `TurbineRotorHelper`)**:
-  - Eliminated the 1-second freeze and frame drops when opening the machine configuration dialog by converting linear scans across 100,000+ EMI recipes and 10,000+ blocks into pinpoint $O(1)$ category lookups and early keyword skips.
+  - Eliminated the 1-second freeze and frame drops when opening the machine configuration dialog by converting linear scans across 100,000+ EMI recipes and 10,000+ blocks into pinpoint O(1) category lookups and early keyword skips.
   - Optimized language code synchronization and preloading lifecycle so registry indexing executes seamlessly in background threads.
 - **Deferred Addon Tooltip Rendering (`MachineConfigDialog`)**:
   - Resolved UI layering bug where lengthy addon descriptions were clipped by dialog boundaries.
@@ -66,8 +94,8 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 - **Lifecycle Event Bus & Addon Hooks System (`RFC-001`, `RecipeNodeEvent`, `FlowGraphEvent`, `MachineCatalogEvent`, `LifecycleEventBusTest`)**:
   - Standardized Forge event bus hooks notifying external listeners on node lifecycle stages (create, modify, delete, pre/post calculation, and catalog build).
 - **GregTech Large Multiblock Steam Boilers & Throttle Control (`GTBoilerTier`, `GTCEuRecipeHandler`, `GTCEuModAdapter`, `MachineConfigDialog`)**:
-  - Accurately parses Large Boiler recipes (`gtceu:large_boiler`), calculating baseline steam production ($800\text{ mB/t} = 16,000\text{ mB/s}$) and water consumption ($5\text{ mB/t} = 100\text{ mB/s}$, 1:160 ratio) for the Large Bronze Boiler.
-  - Multi-tier speed scaling for large boilers: L-Bronze $1.0\times$ ($800\text{ mB/t}$), L-Steel $2.25\times$ ($1,800\text{ mB/t}$), L-Titanium $4.0\times$ ($3,200\text{ mB/t}$), and L-Tungstensteel $8.0\times$ ($6,400\text{ mB/t}$).
+  - Accurately parses Large Boiler recipes (`gtceu:large_boiler`), calculating baseline steam production (800 mB/t = 16,000 mB/s) and water consumption (5 mB/t = 100 mB/s, 1:160 ratio) for the Large Bronze Boiler.
+  - Multi-tier speed scaling for large boilers: L-Bronze 1.0x (800 mB/t), L-Steel 2.25x (1,800 mB/t), L-Titanium 4.0x (3,200 mB/t), and L-Tungstensteel 8.0x (6,400 mB/t).
   - Integrated 25% ~ 100% Throttle slider and preset buttons in `MachineConfigDialog` and node cards, dynamically scaling duration, fuel burn rate, and steam output.
 - **Canvas Group Frame Selection Model, Clipboard & Undo/Redo Integration (`BoardSelectionModel`, `CanvasGroupFrameRenderer`, `CanvasInteractionHandler`, `NodeClipboard`, `BoardCommand`, `CanvasGroupFrameTest`)**:
   - Full marquee box selection and Shift/Ctrl multi-selection support for group frames.
@@ -108,13 +136,13 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - Added dedicated `[🧵 Threading]` sub-tab in `MachineConfigDialog` for all GTCEu multiblock machines supporting Threading (Generalis, Velocitas, Efficienta, Parallelismus, Filum).
   - Live two-way synchronization between the Threading Builder and the top `Active Addons` tray with combined stats badges and quantity indicators (e.g. `8x OpV Weaving Thread Helix`).
   - Added item decoration quantity badges on addon slot icons and node card trays (e.g. `8`).
-  - Multi-model Plasma Turbine support: Large Plasma Turbine (LPT, $1\times$), Supreme Plasma Turbine (SPT, $6\times$), and Nyinsane Plasma Turbine (NPT, $12\times$).
+  - Multi-model Plasma Turbine support: Large Plasma Turbine (LPT, 1x), Supreme Plasma Turbine (SPT, 6x), and Nyinsane Plasma Turbine (NPT, 12x).
   - Star Technology Multiblock Traits: Lubricant Boosting (+25% / +50% EU/t with Tungsten Disulfide) and Coolant Boosting (+75% / +150% EU/t with Superstate Helium 3 / Oganesson Stabilized BEC).
 - **GregTech Steam-Era Processing Machinery (LP Bronze / HP Steel) & Direct Steam Consumption Mode (`SteamMode`, `RecipeNode`, `CategoryCapabilityMatrix`, `GTCEuGuiHandler`, `MachineConfigDialog`)**:
   - Added direct steam processing modes (`LP Steam`, `HP Steam`) for all GregTech recipes that support steam processing machinery (Macerators, Compressors, Alloy Smelters, Furnaces, Extractors, Rock Breakers, etc.).
-  - **GregTech Steam Physics Ratio**: $1\text{ EU} = 2\text{ mB Steam}$ ($2\text{ L Steam}$).
-  - **Low Pressure Steam (LP Bronze)**: $2.0\times$ duration ($0.5\times$ speed), disconnected from electric EU grid ($0\text{ EU/t}$), activates a $\text{BaseEUt} \times 2\text{ mB/t}$ Steam (`gtceu:steam`) fluid input slot.
-  - **High Pressure Steam (HP Steel)**: $1.0\times$ duration ($1.0\times$ standard LV speed), disconnected from electric EU grid ($0\text{ EU/t}$), activates a $\text{BaseEUt} \times 2\text{ mB/t}$ Steam (`gtceu:steam`) fluid input slot.
+  - **GregTech Steam Physics Ratio**: 1 EU = 2 mB Steam (2 L Steam).
+  - **Low Pressure Steam (LP Bronze)**: 2.0x duration (0.5x speed), disconnected from electric EU grid (0 EU/t), activates a BaseEUt * 2 mB/t Steam (`gtceu:steam`) fluid input slot.
+  - **High Pressure Steam (HP Steel)**: 1.0x duration (1.0x standard LV speed), disconnected from electric EU grid (0 EU/t), activates a BaseEUt * 2 mB/t Steam (`gtceu:steam`) fluid input slot.
   - **Node Card Controls & Dialog Presets**: Interactive tier button cycling (`[LP Steam] ↔ [HP Steam] ↔ [LV] ↔ ...`) and 1-click preset buttons in `MachineConfigDialog`.
   - **Direct Boiler Wiring & Auto-Ratio**: Seamlessly drag steam wires from Steam Boilers (`gtceu:steam_boiler`) directly to steam machines, fully supporting `Shift + Connect` Auto-Ratio machine scaling.
 - **Favorites Interactions & Live Synchronization (`RecipeSearchDialog`, `FavoritesDockWidget`)**:
@@ -138,9 +166,9 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - Added tooltip guidance noting that throughput is increased by placing multiple fans (`Machine Count: N`), not by speeding up RPM.
 - **Full GregTech Steam Boiler & Steam Production Support (`GTCEuRecipeHandler`, `GTCEuModAdapter`, `SysteamsModAdapter`)**:
   - Fixed category routing collision where `SysteamsModAdapter` hijacked `gtceu:steam_boiler` recipes.
-  - Automatically calculates fuel burn, water consumption (`minecraft:water`), and steam production (`gtceu:steam`) based on official GTCEu ratios (Small Bronze Boiler baseline: $120\text{ L/s} = 6\text{ mB/t}$ Steam, $1\text{mB Water} \rightarrow 160\text{mB Steam}$).
+  - Automatically calculates fuel burn, water consumption (`minecraft:water`), and steam production (`gtceu:steam`) based on official GTCEu ratios (Small Bronze Boiler baseline: 120 L/s = 6 mB/t Steam, 1 mB Water -> 160 mB Steam).
   - Automatically generates empty container outputs (e.g. `minecraft:bucket` from Lava Buckets).
-  - Supported speed & throughput scaling across all boiler tiers: High Pressure Steel Boiler ($3\times$), Large Bronze Boiler ($8\times$), Large Steel Boiler ($15\times$), Large Titanium Boiler ($26.6\times$), and Large Tungstensteel Boiler ($40\times$).
+  - Supported speed & throughput scaling across all boiler tiers: High Pressure Steel Boiler (3x), Large Bronze Boiler (8x), Large Steel Boiler (15x), Large Titanium Boiler (26.6x), and Large Tungstensteel Boiler (40x).
 - **Removed Recipe Shortcut Key ('A') (`ClientForgeEvents`, `KeyBindings`)**:
   - Removed screen shortcut key recipe addition to eliminate keybinding conflicts with EMI/JEI bookmarks.
 
@@ -162,14 +190,14 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 - **Create: New Age Integration (`CreateNewAgeModAdapter`, `CreateNewAgeGuiHandler`, `CreateNewAgeRecipeHandler`, `CreateNewAgeAddonCrawler`, `CreateMagnetAddon`)**:
   - **Generator Coil & Carbon Brushes Calculations**:
     - Supported equipping up to 12 magnet items with Shift-click batch install.
-    - Calculated Generator Coil base stress (`24.0 SU/RPM`) and total stress load ($(24.0 + \text{Strength}) \times \text{RPM}$).
-    - Dynamically retrieved mod config (`suToEnergy`) via runtime reflection for power output ($\text{FE/t} = \text{Strength} \times \text{RPM} \times \text{suToEnergy}$).
+    - Calculated Generator Coil base stress (`24.0 SU/RPM`) and total stress load ((24.0 + Strength) * RPM).
+    - Dynamically retrieved mod config (`suToEnergy`) via runtime reflection for power output (FE/t = Strength * RPM * suToEnergy).
     - Rendered Goggle-style UI header with energy stats (Base Stress, Total Stress, Efficiency, FE/t).
   - **Motors & Motor Extensions Calculations**: Calculated SU output and FE power consumption for motors and extension multipliers.
   - **Kinetic Overstressed Handling (`FlowGraphSolver`)**: Halts nodes (`0.0 efficiency`, `0 FE/t`, `0 SU/s`) when Stress Unit supply is deficient.
 - **GTCEu Fusion Reactor Simulation & Start Buffer Aggregation (`RecipeNode`, `FlowGraphSolver`, `SummaryOverlay`, `NodeBadgeRegistry`)**:
   - Extracted recipe `eu_to_start` (ignition requirement) and preserved in NBT.
-  - Automatically determined Fusion Tier (Mk1 $\le 160\text{M}$, Mk2 $\le 320\text{M}$, Mk3 $> 320\text{M EU}$) and minimum voltage tier (LuV/ZPM/UV) with target tier clamping.
+  - Automatically determined Fusion Tier (Mk1 <= 160M, Mk2 <= 320M, Mk3 > 320M EU) and minimum voltage tier (LuV/ZPM/UV) with target tier clamping.
   - Supported Fusion Reflector addons (T1-T3) and spec integration.
   - Displayed Fusion Start Buffer badge on node card headers.
   - Aggregated per-tier reactor counts and total startup EU (`⚛ Fusion Start Buffer`) in the Summary Overlay with detailed tooltips.
@@ -196,7 +224,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ### Added
 - **Create Mod Kinetic System & Stress Unit (SU) Scaling (`CreateModAdapter`, `CreateRecipeHandler`, `CreateGuiHandler`)**:
   - Added power generation calculations for Large Water Wheel, Water Wheel, Windmill Bearing, Steam Engine, Hand Crank, Creative Motor, and Electric Motor.
-  - Applied proportional scaling for processing duration and stress impact ($\text{Base SU} \times \frac{\text{RPM}}{32}$) based on rotation speed relative to 32 RPM.
+  - Applied proportional scaling for processing duration and stress impact (Base SU * RPM / 32) based on rotation speed relative to 32 RPM.
   - Added `create:stress_units` I/O ports with real-time rate display, wire connections, and Auto-Ratio balancing.
   - Indexed Create processing recipes (Pressing, Crushing, Milling, Mixing, Cutting, Polishing, Rolling, etc.) under the SU consumer search dialog.
   - Added SU/FE conversion and UI controls for Create Crafts & Additions Alternator and Electric Motor.
@@ -314,7 +342,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 
 ### Added
 - **Category Capability Matrix Engine (`CategoryCapabilityMatrix`, `CategoryCapability`)**:
-  - Implemented pre-baked $O(1)$ capability lookup matrix mapping recipe categories directly to machine workstations and supported addon categories.
+  - Implemented pre-baked O(1) capability lookup matrix mapping recipe categories directly to machine workstations and supported addon categories.
   - Added deterministic capability deduction for Heating Coils, Turbine Rotors, Parallel Hatches, Maintenance Hatches, and Thermal Series Augments.
   - Added dedicated unit test suite (`CategoryCapabilityMatrixTest`) covering singleblock, multiblock, turbine, dynamo, and filtrator categories.
 - **Deductive Multiblock Capability Mapping (`MultiblockDetector`, `EmiRecipeConverter`)**:
@@ -322,7 +350,7 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - Dynamically synchronize deduced categories with `MultiblockDetector.registerCoilCategory` and `registerTurbineCategory`.
 - **Thermal Machine Upgrade Kit Replacement & 3-Slot Augment Stacking (`RecipeNode`, `MachineConfigDialog`, `ThermalAugmentHelper`)**:
   - Implemented 1-Kit-only rule for Thermal Upgrade Kits (LV~EV, 6x~48x parallel scale) with automatic replacement upon selecting a new tier.
-  - Added support for stacking identical regular augments (ARC, MCI, etc.) across up to 3 slots (e.g. 3x EV MCI = $4.096\times$ fuel energy) using pure NBT float tags (`AugmentData.Type: Dynamo_Fuel`).
+  - Added support for stacking identical regular augments (ARC, MCI, etc.) across up to 3 slots (e.g. 3x EV MCI = 4.096x fuel energy) using pure NBT float tags (`AugmentData.Type: Dynamo_Fuel`).
   - Added catalog card badges (`✔ x2`, `✔ x3`, `3/3`), Left-Click (+1) / Right-Click (-1), and single-instance removal from top active slot bar.
 
 ### Changed
@@ -332,8 +360,8 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 - **Responsive Dialog Loading Overlays & Live State Updates (`MachineConfigDialog`, `RecipeSearchDialog`)**:
   - Added clean section-level loading overlays with animated indicators while background indexing is in progress.
   - Implemented reactive live updates: as soon as background baking completes, the `[♨ Coil]`, `[⚡ Parallel]`, and `[🔧 Maint]` chips auto-populate seamlessly without modal freezing or needing to reopen dialogs.
-- **Massive Recipe Search Indexing Speedup ($250\times$ faster, 2m $\rightarrow$ <1s) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
-  - Eliminated $O(N^2)$ category loops in EMI recipe caching using multi-core `parallelStream`, indexing 170,000+ recipes in under 1 second.
+- **Massive Recipe Search Indexing Speedup (250x faster, 2m -> <1s) (`RecipeSearchDialog`, `RecipeSearchEngine`)**:
+  - Eliminated O(N^2) category loops in EMI recipe caching using multi-core `parallelStream`, indexing 170,000+ recipes in under 1 second.
   - Streamlined fluid stack detection using direct `FluidEmiStack` instance checks.
 - **Dynamic Addon Crawler 20ms Direct Extraction & Disabled Item Guard (`DynamicAddonCrawler`)**:
   - Streamlined output collection directly from `EmiRecipe.getOutputs()` with preserved NBT, finishing in under 20ms.
@@ -639,9 +667,9 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - **3D Visual Item Grid Modal (`[⚙ 220%]` click)**: Displays authentic 3D item icons with genuine material tint colors (cyan Enderium, bronze Dragonsteel, golden Scheelite, etc.), efficiency badges, and live search.
   - **Full Multilingual Localization**: Automatically formats item names and tooltips (e.g. `Tritanium Turbine Rotor`, `Turbine Efficiency: 220%`, `Turbine Power: 220%`, `Click to equip to turbine`).
 - **Rotor Power & Voltage Tier Auto-Parallel Derivation**:
-  - Fully integrated with GTCEu's bytecode formula ($V_{\text{max}} = V_{\text{holder}} \times \frac{P_{\text{rotor}}}{100.0}$).
+  - Fully integrated with GTCEu's bytecode formula (V_max = V_holder * P_rotor / 100.0).
   - Selecting a rotor or changing voltage tier (`EV`, `IV`, `LuV`, `ZPM`, etc.) instantly derives and applies the optimal rated parallel count (Par) and power generation (+EU/t).
-  - *Example: Nitrobenzene 32 EU/t + Scheelite Rotor (450% Power) + IV Rotor Holder $\rightarrow$ **1,152x Par, +36,864.0 EU/t, 4.00s cycle, 288.0 mB/s consumption**.*
+  - *Example: Nitrobenzene 32 EU/t + Scheelite Rotor (450% Power) + IV Rotor Holder -> **1,152x Par, +36,864.0 EU/t, 4.00s cycle, 288.0 mB/s consumption**.*
 - **Thermal Dynamo & Non-GT Generator Support**:
   - Automatically recognizes Thermal Expansion Dynamos (Lapidary, Stirling, Magmatic, Compression, etc.) as power generators, converting RF/FE energy (`300,000 RF`) into GT equivalent EU and calculating duration/consumption rates accurately.
   - Replaces raw hash recipe IDs with clean, smart localized titles (e.g. `Lapidary Dynamo (Diamond)`).
@@ -659,8 +687,8 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
   - **Mouse Wheel Control**: Scroll over `Par` button to scale by 2x (or `Shift + Wheel` for +/- 1 fine stepping).
   - **Right Click**: Instantly halves parallel count.
 - **Integer Machine Count & Bottleneck-Free Ceiling**:
-  - Auto Ratio and Shift+Drag calculations now round all machine counts up to integers ($1, 2, 3...$).
-  - Guarantees $\text{Supply} \ge \text{Demand}$ across the entire chain to prevent upstream fuel/raw material starvation.
+  - Auto Ratio and Shift+Drag calculations now round all machine counts up to integers (1, 2, 3...).
+  - Guarantees Supply >= Demand across the entire chain to prevent upstream fuel/raw material starvation.
 - **Bidirectional Shift + Drag Smart Rate Matching & Deficit Supplementing**:
   - **Forward (Output -> Input)**: Shift+Drag from output port to input port scales consumer machine count to match available supply safely without over-consumption.
   - **Reverse (Input -> Output)**: Shift+Drag from input (demand) port to output port scales producer machine count to match consumer demand with ceiling.

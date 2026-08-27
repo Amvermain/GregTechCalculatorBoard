@@ -1,7 +1,20 @@
 package com.gtceu.calcboard.compat.thermal;
 
-import com.gtceu.calcboard.api.*;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.AddonFactoryRegistry;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
@@ -22,7 +35,7 @@ import java.util.List;
 public class ThermalModAdapter implements IModAdapter {
 
     static {
-        com.gtceu.calcboard.api.AddonFactoryRegistry.register(com.gtceu.calcboard.api.AddonCategory.THERMAL_AUGMENT, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon(id, name, desc, icon));
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.THERMAL_AUGMENT, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon(id, name, desc, icon));
     }
 
     @Override
@@ -37,6 +50,11 @@ public class ThermalModAdapter implements IModAdapter {
 
     @Override
     public boolean isLoaded() {
+        try {
+            if (ModList.get() != null) {
+                return ModCompatHelper.isThermalLoaded() || ModList.get().isLoaded("cofh_core");
+            }
+        } catch (Throwable ignored) {}
         return true;
     }
 
@@ -284,7 +302,7 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
         return ThermalGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
@@ -314,3 +332,7 @@ public class ThermalModAdapter implements IModAdapter {
         return defaultRate;
     }
 }
+
+
+
+

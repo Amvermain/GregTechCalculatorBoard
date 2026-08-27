@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.compat.gtceu.addon;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
@@ -109,3 +109,4 @@ public class GTEnergyHatchAddon extends MachineAddon {
         if (tag.contains("IsDualLowerTier")) this.isDualLowerTier = tag.getBoolean("IsDualLowerTier");
     }
 }
+

@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.compat.start;
 
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -143,3 +143,4 @@ public class StarTAddonCrawler {
         return false;
     }
 }
+

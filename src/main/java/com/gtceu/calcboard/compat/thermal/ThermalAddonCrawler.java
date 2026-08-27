@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.compat.thermal;
 
-import com.gtceu.calcboard.api.DynamicAddonCrawler;
-import com.gtceu.calcboard.api.MachineAddon;
+import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -88,3 +88,4 @@ public class ThermalAddonCrawler {
         return false;
     }
 }
+

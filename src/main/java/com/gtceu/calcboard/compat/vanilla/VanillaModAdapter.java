@@ -1,8 +1,15 @@
 package com.gtceu.calcboard.compat.vanilla;
 
-import com.gtceu.calcboard.api.*;
-import com.gtceu.calcboard.client.gui.NodeCardRenderer;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+
+import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.client.gui.Font;
@@ -125,3 +132,6 @@ public class VanillaModAdapter implements IModAdapter {
         return false;
     }
 }
+
+
+

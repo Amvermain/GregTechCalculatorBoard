@@ -1,12 +1,15 @@
 package com.gtceu.calcboard.compat.createnewage;
 
-import com.gtceu.calcboard.api.AddonCategory;
-import com.gtceu.calcboard.api.EnergyType;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.PowerDisplayMode;
-import com.gtceu.calcboard.api.RecipeNode;
-import com.gtceu.calcboard.client.gui.NodeCardRenderer;
-import com.gtceu.calcboard.client.gui.NodeWidget;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.type.EnergyType;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.type.PowerDisplayMode;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -250,7 +253,7 @@ public class CreateNewAgeGuiHandler {
         }
     }
 
-    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.MachineConfigDialog dialog,
+    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
                                                  RecipeNode node, int x, int y, int dialogW,
                                                  double mouseX, double mouseY, int button,
                                                  net.minecraft.client.gui.components.EditBox parallelBox,
@@ -283,3 +286,6 @@ public class CreateNewAgeGuiHandler {
         return false;
     }
 }
+
+
+

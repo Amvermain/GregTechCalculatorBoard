@@ -1,13 +1,13 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.AddonCategory;
-import com.gtceu.calcboard.api.DynamicAddonCrawler;
-import com.gtceu.calcboard.api.FlowGraph;
-import com.gtceu.calcboard.api.FlowGraphSolver;
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.IngredientStack;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.event.FlowGraphEvent;
 import com.gtceu.calcboard.api.event.MachineAddonRegisterEvent;
 import com.gtceu.calcboard.api.event.RecipeNodeEvent;
@@ -141,3 +141,4 @@ public class LifecycleEventBusTest {
         Assertions.assertTrue(containsCustom, "Custom addon injected via MachineAddonRegisterEvent must be in getBuiltinTraits()");
     }
 }
+

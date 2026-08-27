@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.compat;
 
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
@@ -109,3 +109,4 @@ public class ModAdapterRegistry {
         return FALLBACK_ADAPTER;
     }
 }
+

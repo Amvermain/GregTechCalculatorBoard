@@ -1,8 +1,8 @@
 package com.gtceu.calcboard;
 
-import com.gtceu.calcboard.api.GTVoltageTier;
-import com.gtceu.calcboard.api.MachineAddon;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.property.NodeBadge;
 import com.gtceu.calcboard.api.property.NodeBadgeRegistry;
 import com.gtceu.calcboard.api.property.NodeProperties;
@@ -181,3 +181,4 @@ public class ModDomainModularizationTest {
         assertEquals(3, node.getCombinedParallelMultiplier());
     }
 }
+

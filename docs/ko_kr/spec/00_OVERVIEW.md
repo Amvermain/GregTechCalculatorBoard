@@ -76,44 +76,46 @@ flowchart TB
 src/main/java/com/gtceu/calcboard/
 ├── GregTechCalcBoard.java           # 모드 메인 엔트리포인트
 ├── api/                             # [Core] 수학, 그래프, 도메인 엔진 (헤드리스 독립)
-│   ├── BoardManager.java            # 멀티 페이지/문서 관리자
-│   ├── BoardPage.java               # 개별 보드 페이지 모델
-│   ├── FlowGraph.java               # 유향 노드-엣지 그래프 컨테이너
-│   ├── RecipeNode.java              # 공정 기계/발전기/모듈 노드 모델
-│   ├── IngredientStack.java         # 아이템/유체 입출력 스택
-│   ├── GTVoltageTier.java           # 15단계 전압 티어 정의
-│   ├── RateTimeUnit.java            # 시간 단위 환산 열거형 (/t, /s, /min, /h, /d)
-│   ├── CategoryCapabilityMatrix.java# 결정론적 수용능력 사전 베이킹 매트릭스
-│   ├── CategoryCapability.java      # 레시피 카테고리별 수용능력 불변 레코드
-│   ├── FlowGraphSolver.java         # 5대 그래프 해석 알고리즘 엔진
-│   ├── FlowGraphModuleHandler.java  # 복합 모듈 패키징/전개 엔진
-│   ├── GlobalBalanceAggregator.java # 전역 밸런스 대시보드 집계 엔진
-│   ├── BlueprintCodec.java          # NBT/GZIP/Base64 직렬화 코덱
-│   ├── CoilHelper.java              # 결정론적 코일 스펙 추출기
-│   ├── TurbineRotorHelper.java      # 대형 터빈 로터 스펙 추출기
-│   ├── ThermalAugmentHelper.java    # 써멀 증강 스펙 추출기
-│   ├── ParallelHelper.java          # 병렬 제어 해치 스펙 추출기
-│   └── history/                     # Command 패턴 Undo/Redo 스택
+│   ├── model/                       #   - 핵심 도메인 모델 (RecipeNode, FlowGraph, IngredientStack 등)
+│   ├── solver/                      #   - 수학 솔버 알고리즘 (FlowGraphSolver, ModuleHandler, ETA 등)
+│   ├── storage/                     #   - 보드/페이지 문서 관리 및 코덱 (BoardManager, BlueprintCodec 등)
+│   ├── catalog/                     #   - 기계 애드온 카탈로그 & 매트릭스 (CapabilityMatrix, Addons 등)
+│   ├── type/                        #   - 전압 티어 및 물리/동작 모드 열거형 (GTVoltageTier, EnergyType 등)
+│   ├── util/                        #   - 공통 유틸리티 (ModCompatHelper)
+│   ├── bom/                         #   - 멀티블록 BOM 엔진 (MultiblockBOMCalculator 등)
+│   ├── event/                       #   - 라이프사이클 이벤트 (FlowGraphEvent, CatalogLifecycleEvent 등)
+│   ├── history/                     #   - Undo/Redo 커맨드 스택 (HistoryManager, IUndoableCommand 등)
+│   └── property/                    #   - 타입 세이프 프로퍼티 레지스트리 (NodePropertyStore 등)
 ├── client/                          # [UI] 캔버스 및 렌더링 파이프라인
-│   ├── gui/                         # 화면, 렌더러, 대화상자, 위젯
-│   │   ├── BoardScreen.java         # 2D 캔버스 메인 화면
-│   │   ├── CanvasInteractionHandler.java # 마우스 드래그/선택 인터랙션
-│   │   ├── ConnectionRenderer.java  # 3차 베지어 와이어 렌더러
-│   │   ├── NodeCardRenderer.java    # 노드 카드 렌더러
-│   │   ├── MachineConfigDialog.java # 기계 상세 설정창
-│   │   ├── GlobalBalanceDashboardDialog.java # 전역 수지 대시보드 창
-│   │   ├── search/                  # 비동기 레시피 검색 엔진 및 필터
-│   │   └── tutorial/                # 인터랙티브 온보딩 튜토리얼
-│   ├── key/                         # 단축키 바인딩
-│   └── team/                        # 클라이언트 워크스페이스 실시간 상태 머신
+│   ├── gui/                         #   - 메인 화면 및 뷰포트 (BoardScreen, CanvasInteractionHandler)
+│   │   ├── render/                  #     - 캔버스 렌더러 (NodeCardRenderer, ConnectionRenderer 등)
+│   │   ├── dialog/                  #     - 모달 다이얼로그 (MachineConfigDialog, BOMDialog 등)
+│   │   ├── widget/                  #     - HUD, 탭바, 툴바, 팝업 (SummaryOverlay, ToolbarWidget 등)
+│   │   ├── editor/                  #     - 인라인 수치/이름 에디터 (NodeCountEditor, NodeParallelEditor 등)
+│   │   ├── util/                    #     - UI 포맷팅 유틸리티 (FormatUtil)
+│   │   ├── search/                  #     - 비동기 레시피 검색 엔진 및 필터
+│   │   └── tutorial/                #     - 인터랙티브 온보딩 튜토리얼
+│   ├── key/                         #   - 단축키 바인딩
+│   └── team/                        #   - 클라이언트 워크스페이스 실시간 상태 머신
+├── compat/                          # [Mod Compat SPI] 외부 모드 연동 어댑터
+│   ├── gtceu/                       #   - GregTech CEu Modern 어댑터, 애드온 및 헬퍼
+│   ├── create/                      #   - Create 어댑터 및 키네틱 핸들러
+│   ├── createnewage/                #   - Create New Age 어댑터 및 자석 애드온
+│   ├── thermal/                     #   - Thermal Series 어댑터 및 증강 애드온
+│   ├── systeams/                    #   - Thermal Systeams 증기 보일러/다이나모 어댑터
+│   ├── start/                       #   - Star Technology 플라즈마 터빈/헬릭스 어댑터
+│   └── vanilla/                     #   - 바닐라 무전력 패시브 폴백
+├── integration/                     # [Recipe Viewer SPI] 외부 레시피 뷰어 연동
+│   ├── spi/                         #   - IRecipeViewerAdapter, RecipeViewerRegistry
+│   ├── emi/                         #   - EMI 플러그인, 레시피 변환기 및 가상 레시피
+│   ├── jei/                         #   - JEI 플러그인 및 뷰어 어댑터
+│   └── vanilla/                     #   - 순수 레시피 매니저 폴백
 ├── network/                         # [Network] SimpleChannel 네트워크 파이프라인
-│   ├── NetworkHandler.java          # 패킷 등록 및 라우팅
-│   └── packet/                      # C2S 6종, S2C 4종 패킷
-├── server/                          # [Server] 서버 사이드 영속화 및 팀 시스템
-│   ├── storage/                     # SavedData 기반 NBT 영속화 및 락 관리
-│   └── team/                        # ITeamProvider 추상화 (FTB Teams, Vanilla)
-└── integration/                     # [Integration] 외부 모드 연동
-    └── emi/                         # EMI 플러그인 및 레시피 변환기
+│   ├── NetworkHandler.java          #   - 패킷 등록 및 라우팅
+│   └── packet/                      #   - C2S 6종, S2C 4종 패킷 (c2s, s2c)
+└── server/                          # [Server] 서버 사이드 영속화 및 팀 시스템
+    ├── storage/                     #   - SavedData 기반 NBT 영속화 및 락 관리
+    └── team/                        #   - ITeamProvider 추상화 (FTB Teams, Vanilla)
 ```
 
 ---

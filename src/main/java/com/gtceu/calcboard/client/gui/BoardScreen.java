@@ -1,12 +1,40 @@
 package com.gtceu.calcboard.client.gui;
 
-import com.gtceu.calcboard.api.BalanceSummary;
-import com.gtceu.calcboard.api.BoardManager;
-import com.gtceu.calcboard.api.BoardPage;
-import com.gtceu.calcboard.api.FlowGraph;
-import com.gtceu.calcboard.api.FlowGraphSolver;
-import com.gtceu.calcboard.api.MachineAddonCatalog;
-import com.gtceu.calcboard.api.RecipeNode;
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.client.gui.dialog.DeletePageConfirmDialog;
+import com.gtceu.calcboard.client.gui.dialog.ExportToTeamDialog;
+import com.gtceu.calcboard.client.gui.dialog.FrameEditDialog;
+import com.gtceu.calcboard.client.gui.dialog.GlobalBalanceDashboardDialog;
+import com.gtceu.calcboard.client.gui.dialog.GuideDialog;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+import com.gtceu.calcboard.client.gui.dialog.MultiblockBOMDialog;
+import com.gtceu.calcboard.client.gui.dialog.NoteEditDialog;
+import com.gtceu.calcboard.client.gui.dialog.RecentSavesDialog;
+import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
+import com.gtceu.calcboard.client.gui.dialog.SaveToTeamDialog;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
+import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
+import com.gtceu.calcboard.client.gui.render.CanvasStickyNoteRenderer;
+import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
+import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
+import com.gtceu.calcboard.client.gui.widget.HotkeyHudWidget;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.gui.widget.PageTabBarWidget;
+import com.gtceu.calcboard.client.gui.widget.SummaryOverlay;
+import com.gtceu.calcboard.client.gui.widget.ToolbarWidget;
+import com.gtceu.calcboard.client.gui.widget.WorkspaceTabBarWidget;
+
+import com.gtceu.calcboard.api.solver.BalanceSummary;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay;
@@ -495,7 +523,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
                 ? page.getLockHolderName()
                 : state.resolvePlayerName(page.getLockHolderUUID());
-            com.gtceu.calcboard.client.gui.BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
+            com.gtceu.calcboard.client.gui.widget.BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
             Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.VILLAGER_NO, 1.0F)
             );
@@ -1228,6 +1256,12 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         if (noteEditDialog != null && noteEditDialog.isVisible()) {
             return noteEditDialog.keyPressed(keyCode, scanCode, modifiers);
         }
+        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            return machineConfigDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (pageTabBar.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         if (BoardHotkeyHandler.handleKeyPressed(this, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
             return true;
         }
@@ -1250,11 +1284,35 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
 
+    public void openRecipeSwitchDialog(RecipeNode node) {
+        if (!ensureEditPermission()) return;
+        if (searchDialog != null) {
+            searchDialog.openForSwitch(node);
+        }
+    }
+
+    public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) {
+        if (!ensureEditPermission()) return;
+        if (targetNode == null || newRecipeTemplate == null) return;
+
+        var cmd = getGraph().switchNodeRecipe(targetNode, newRecipeTemplate);
+        if (cmd != null) {
+            recordCommand(cmd);
+            markSummaryDirty();
+            for (NodeWidget w : nodeWidgets) {
+                if (w.getNode().getId().equals(targetNode.getId())) {
+                    w.invalidateCache();
+                }
+            }
+            BoardToast.show(Component.literal("§e🔄 ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
+        }
+    }
+
     public void openMachineConfigDialog(RecipeNode node) {
         openMachineConfigDialog(node, null);
     }
 
-    public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.AddonCategory initialCategory) {
+    public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.catalog.AddonCategory initialCategory) {
         if (machineConfigDialog == null) {
             machineConfigDialog = new MachineConfigDialog(this);
         }
@@ -1262,7 +1320,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         machineConfigDialog.open(node, initialCategory);
     }
 
-    public void openFrameEditDialog(com.gtceu.calcboard.api.CanvasGroupFrame frame) {
+    public void openFrameEditDialog(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
         if (frameEditDialog == null) {
             frameEditDialog = new FrameEditDialog(this);
         }
@@ -1283,9 +1341,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
                 }
             }
         }
-        List<com.gtceu.calcboard.api.CanvasStickyNote> selectedNotes = new ArrayList<>();
+        List<com.gtceu.calcboard.api.model.CanvasStickyNote> selectedNotes = new ArrayList<>();
         if (selectedNoteIds != null && !selectedNoteIds.isEmpty()) {
-            for (com.gtceu.calcboard.api.CanvasStickyNote note : graph.getStickyNotes()) {
+            for (com.gtceu.calcboard.api.model.CanvasStickyNote note : graph.getStickyNotes()) {
                 if (selectedNoteIds.contains(note.getId())) {
                     selectedNotes.add(note);
                 }
@@ -1293,13 +1351,13 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
 
         String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
-        com.gtceu.calcboard.api.CanvasGroupFrame frame;
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame;
         if (!selectedNodes.isEmpty() || !selectedNotes.isEmpty()) {
-            frame = com.gtceu.calcboard.api.CanvasGroupFrame.createFromElements(defaultTitle, selectedNodes, selectedNotes, com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE);
+            frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromElements(defaultTitle, selectedNodes, selectedNotes, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE);
         } else {
             double cx = toCanvasX(width / 2.0) - 100;
             double cy = toCanvasY(height / 2.0) - 60;
-            frame = new com.gtceu.calcboard.api.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE, cx, cy, 200, 120);
+            frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE, cx, cy, 200, 120);
         }
         graph.addFrame(frame);
         clearSelection();
@@ -1319,7 +1377,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
 
         String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
-        com.gtceu.calcboard.api.CanvasGroupFrame frame = new com.gtceu.calcboard.api.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.CanvasGroupFrame.COLOR_BLUE, canvasX - 100, canvasY - 60, 200, 120);
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE, canvasX - 100, canvasY - 60, 200, 120);
         getGraph().addFrame(frame);
         clearSelection();
         rebuildWidgets();
@@ -1333,10 +1391,10 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         if (!ensureEditPermission()) return;
         FlowGraph graph = getGraph();
         String defaultTitle = Component.translatable("gui.gtcalcboard.default_note_name").getString();
-        com.gtceu.calcboard.api.CanvasStickyNote note = com.gtceu.calcboard.api.CanvasStickyNote.create(
+        com.gtceu.calcboard.api.model.CanvasStickyNote note = com.gtceu.calcboard.api.model.CanvasStickyNote.create(
             defaultTitle,
             "",
-            com.gtceu.calcboard.api.CanvasStickyNote.COLOR_AMBER,
+            com.gtceu.calcboard.api.model.CanvasStickyNote.COLOR_AMBER,
             canvasX - 80, canvasY - 50
         );
         graph.addStickyNote(note);
@@ -1347,7 +1405,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
     }
 
-    public void openNoteEditDialog(com.gtceu.calcboard.api.CanvasStickyNote note) {
+    public void openNoteEditDialog(com.gtceu.calcboard.api.model.CanvasStickyNote note) {
         if (noteEditDialog == null) {
             noteEditDialog = new NoteEditDialog(this);
         }
@@ -1372,7 +1430,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         groupNodesIntoModule(targetNodeIds, moduleName, null);
     }
 
-    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName, com.gtceu.calcboard.api.CanvasGroupFrame primaryFrame) {
+    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName, com.gtceu.calcboard.api.model.CanvasGroupFrame primaryFrame) {
         if (!ensureEditPermission()) return;
         FlowGraph graph = getGraph();
         if (targetNodeIds == null || targetNodeIds.isEmpty()) return;
@@ -1403,7 +1461,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
     }
 
-    public void collapseFrameIntoModule(com.gtceu.calcboard.api.CanvasGroupFrame frame) {
+    public void collapseFrameIntoModule(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
         if (!ensureEditPermission()) return;
         FlowGraph graph = getGraph();
         if (frame == null) return;
@@ -1485,3 +1543,6 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         return BoardManager.getInstance().isPauseGameInSingleplayer();
     }
 }
+
+
+
