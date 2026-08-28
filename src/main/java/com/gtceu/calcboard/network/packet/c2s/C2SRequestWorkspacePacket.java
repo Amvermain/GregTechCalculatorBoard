@@ -41,7 +41,7 @@ public class C2SRequestWorkspacePacket {
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
             if (playerTeamId == null) {
-                NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(403, "gui.gtcalcboard.error.access_denied"));
+                NetworkHandler.sendToPlayer(player, new S2CSyncWorkspacePacket(new UUID(0L, 0L), "", 0, java.util.Collections.emptyList(), java.util.Collections.emptyList()));
                 return;
             }
 

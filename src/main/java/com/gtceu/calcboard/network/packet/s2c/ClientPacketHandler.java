@@ -16,11 +16,19 @@ public class ClientPacketHandler {
     public static void handleSyncWorkspace(S2CSyncWorkspacePacket packet) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         state.setServerSupported(true);
-        state.setCurrentTeamId(packet.getTeamId());
-        state.setCurrentTeamName(packet.getTeamName());
-        state.setGlobalRevision(packet.getGlobalRevision());
-        state.updateRemotePages(packet.getPages());
-        state.updateCommitHistory(packet.getCommits());
+        UUID teamId = packet.getTeamId();
+        if (teamId == null || (teamId.getMostSignificantBits() == 0L && teamId.getLeastSignificantBits() == 0L)) {
+            state.setCurrentTeamId(null);
+            state.setCurrentTeamName("Team Workspace");
+            state.updateRemotePages(java.util.Collections.emptyList());
+            state.updateCommitHistory(java.util.Collections.emptyList());
+        } else {
+            state.setCurrentTeamId(teamId);
+            state.setCurrentTeamName(packet.getTeamName());
+            state.setGlobalRevision(packet.getGlobalRevision());
+            state.updateRemotePages(packet.getPages());
+            state.updateCommitHistory(packet.getCommits());
+        }
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof BoardScreen bs) {

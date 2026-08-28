@@ -350,14 +350,12 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         });
         rebuildWidgets();
 
-        if (com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled()) {
+        if (minecraft != null && minecraft.getConnection() != null) {
             UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
             String pageId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getActiveTeamPageId();
             boolean isTeamMode = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode();
             com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, pageId, isTeamMode));
-            if (isTeamMode) {
-                com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, pageId != null ? pageId : "page_main"));
-            }
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, pageId != null ? pageId : "page_main"));
         }
 
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);

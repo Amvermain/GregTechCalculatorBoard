@@ -26,14 +26,15 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
             property 'forge.logging.console.level', 'debug'
+            property 'java.net.preferIPv4Stack', 'true'
 
             // Mixin refmap remapping in dev environment
             property 'mixin.env.remapRefMap', 'true'
             property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
 
-            // Dev memory allocation
+            // Dev memory allocation & networking
             jvmArgs '-XX:+AllowEnhancedClassRedefinition'
-            jvmArgs '-Xmx4G', '-Xms2G'
+            jvmArgs '-Xmx4G', '-Xms2G', '-Djava.net.preferIPv4Stack=true'
 
             mods {
                 "${mod_id}" {
@@ -46,8 +47,10 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
             property 'forge.logging.console.level', 'debug'
+            property 'java.net.preferIPv4Stack', 'true'
             property 'mixin.env.remapRefMap', 'true'
             property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            jvmArgs '-Djava.net.preferIPv4Stack=true'
             args 'nogui'
 
             mods {
@@ -126,6 +129,7 @@ dependencies {
     def propTeam = project.findProperty('team_mod') ?: project.findProperty('team_provider')
     def teamMod = envTeam ?: propTeam ?: 'none'
     def phoenixGuildsFileId = System.getenv('phoenix_guilds_file_id') ?: System.getenv('PHOENIX_GUILDS_FILE_ID') ?: project.findProperty('phoenix_guilds_file_id') ?: '8743646'
+    def phoenixWikiFileId = System.getenv('phoenix_wiki_file_id') ?: System.getenv('PHOENIX_WIKI_FILE_ID') ?: project.findProperty('phoenix_wiki_file_id') ?: '8735977'
     def ftbTeamsFileId = System.getenv('ftb_teams_file_id') ?: System.getenv('FTB_TEAMS_FILE_ID') ?: project.findProperty('ftb_teams_file_id') ?: '5610363'
     def ftbLibFileId = System.getenv('ftb_library_file_id') ?: System.getenv('FTB_LIBRARY_FILE_ID') ?: project.findProperty('ftb_library_file_id') ?: '5623049'
     def archFileId = System.getenv('architectury_file_id') ?: System.getenv('ARCHITECTURY_FILE_ID') ?: project.findProperty('architectury_file_id') ?: '5137938'
@@ -136,6 +140,7 @@ dependencies {
     // Team Provider Runtime Mod Injection
     if (teamMod == 'phoenix' || teamMod == 'phoenix_guilds') {
         runtimeOnly fg.deobf("curse.maven:phoenix-guilds-1612085:${phoenixGuildsFileId}")
+        runtimeOnly fg.deobf("curse.maven:phoenixwiki-1647798:${phoenixWikiFileId}")
     } else if (teamMod == 'ftbteams' || teamMod == 'ftb_teams') {
         runtimeOnly fg.deobf("curse.maven:ftb-teams-forge-404468:${ftbTeamsFileId}")
         runtimeOnly fg.deobf("curse.maven:ftb-library-forge-404465:${ftbLibFileId}")

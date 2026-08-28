@@ -57,14 +57,10 @@ public class ClientWorkspaceState {
 
     public boolean isCollaborationEnabled() {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc == null) {
+        if (mc == null || mc.player == null) {
             return false;
         }
-        if (mc.hasSingleplayerServer()) {
-            var singleServer = mc.getSingleplayerServer();
-            return singleServer != null && singleServer.isPublished();
-        }
-        return serverSupported && mc.getConnection() != null;
+        return currentTeamId != null;
     }
 
     public WorkspaceMode getCurrentMode() {
