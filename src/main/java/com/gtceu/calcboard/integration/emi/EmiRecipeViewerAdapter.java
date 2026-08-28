@@ -419,6 +419,87 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
             }
         }
     }
+
+    @Override
+    public boolean isSearchFieldFocused() {
+        if (!isAvailable()) return false;
+        try {
+            if (EmiScreenManager.search != null && EmiScreenManager.search.isFocused()) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    @Override
+    public boolean tryAddHoveredRecipeToBoard(net.minecraft.client.gui.screens.Screen screen, double mouseX, double mouseY) {
+        if (!isAvailable()) return false;
+        try {
+            int mX = (int) Math.round(mouseX);
+            int mY = (int) Math.round(mouseY);
+
+            // 1. Try resolving directly from EmiScreenManager hovered interaction (Works on RecipeScreen, Sidebar, Favorites, and Chest/Inventory overlays)
+            try {
+                var interaction = dev.emi.emi.screen.EmiScreenManager.getHoveredStack(mX, mY, true);
+                if (interaction != null) {
+                    EmiRecipe r = interaction.getRecipeContext();
+                    if (r != null) {
+                        CalcBoardEmiPlugin.addRecipeToBoard(r, false);
+                        return true;
+                    }
+                    var ing = interaction.getStack();
+                    if (ing != null && !ing.isEmpty() && !ing.getEmiStacks().isEmpty()) {
+                        EmiStack es = ing.getEmiStacks().get(0);
+                        var rm = EmiApi.getRecipeManager();
+                        if (rm != null) {
+                            List<EmiRecipe> recipes = rm.getRecipesByOutput(es);
+                            if (recipes != null && !recipes.isEmpty()) {
+                                CalcBoardEmiPlugin.addRecipeToBoard(recipes.get(0), false);
+                                return true;
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            // 3. Fallback: inspect RecipeScreen currentPage widget groups
+            if (screen instanceof dev.emi.emi.screen.RecipeScreen recipeScreen) {
+                try {
+                    var field = dev.emi.emi.screen.RecipeScreen.class.getDeclaredField("currentPage");
+                    field.setAccessible(true);
+                    Object pageObj = field.get(recipeScreen);
+                    if (pageObj instanceof List<?> list) {
+                        EmiRecipe targetRecipe = null;
+                        for (Object o : list) {
+                            if (o instanceof dev.emi.emi.screen.WidgetGroup wg && wg.recipe != null) {
+                                int x = wg.x();
+                                int y = wg.y();
+                                int w = wg.getWidth();
+                                int h = wg.getHeight();
+                                if (mX >= x && mX <= x + w && mY >= y && mY <= y + h) {
+                                    targetRecipe = wg.recipe;
+                                    break;
+                                }
+                            }
+                        }
+                        if (targetRecipe == null) {
+                            for (Object o : list) {
+                                if (o instanceof dev.emi.emi.screen.WidgetGroup wg && wg.recipe != null) {
+                                    targetRecipe = wg.recipe;
+                                    break;
+                                }
+                            }
+                        }
+                        if (targetRecipe != null) {
+                            CalcBoardEmiPlugin.addRecipeToBoard(targetRecipe, false);
+                            return true;
+                        }
+                    }
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
 }
 
 

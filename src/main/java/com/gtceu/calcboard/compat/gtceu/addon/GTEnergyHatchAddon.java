@@ -27,6 +27,11 @@ public class GTEnergyHatchAddon extends MachineAddon {
         this.isDualLowerTier = isDualLowerTier;
     }
 
+    public GTEnergyHatchAddon(String id, String name, String description, ResourceLocation itemIcon,
+                              GTVoltageTier tier, int amperage) {
+        this(id, name, description, itemIcon, tier, amperage, false, false, false);
+    }
+
     public GTEnergyHatchAddon(String id, String name, String description, ResourceLocation itemIcon) {
         super(id, name, Category.ENERGY_HATCH, description, itemIcon);
         setModId("gtceu");

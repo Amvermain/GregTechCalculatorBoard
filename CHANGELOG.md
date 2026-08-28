@@ -6,6 +6,43 @@
 
 All notable changes to **GregTech Calculator Board** will be documented in this file.
 
+## [2.0.0-alpha.12] - 2026-08-29
+
+### Added
+- **Integrated Board Settings Modal Dialog (`BoardSettingsDialog`, `ToolbarWidget`)**:
+  - Added a dedicated settings modal accessible via the `[⚙ Settings]` button on the top-right toolbar to easily configure and manage global fluid units (Auto, Always mB, Always B), time units (/s, /t, /min, /h), singleplayer pause toggling, and default overclock modes.
+
+### Changed & Improved
+- **Enhanced Hovered Recipe Addition Hotkey (`Shift + A`)**:
+  - Hovering over items or recipes anywhere—including EMI and JEI recipe viewer screens, container/inventory sidebars, and bookmark/favorites panels—and pressing `Shift + A` now immediately adds the target recipe to the flowchart board.
+  - Resolved modifier key conflicts ensuring `Shift + A` triggers reliably without interfering with active text inputs (`EditBox` search bar focus).
+- **Multiblock Model Controller Selection in Machine Configuration Dialog**:
+  - All valid multiblock machine variants (e.g. Large Macerator, Advanced Large Miner) supporting the same recipe category are now properly displayed and switchable via clicking or mouse-wheel scrolling in the dialog header.
+- **Auto-Hide FTB Library Sidebar Buttons in `BoardScreen` (`ClientForgeEvents`)**:
+  - Automatically hides FTB Quests, FTB Chunks, and FTB Teams sidebar buttons that previously overlapped the top-left canvas area in `BoardScreen`, providing a clean workspace while 100% preserving native EMI `[+]` transfer functionality.
+
+### Fixed
+- **Multiblock Energy Hatch & Parallel Hatch Combined Overclock Calculation Bug (`GTCEuModAdapter`, `GTParallelHatchAddon`, `EnergyHatchHelper`)**:
+  - Fixed an issue where parallel overclocking exceeded maximum supported voltage/amperage when energy hatches were installed and added support for dual lower-tier energy hatch tier-up (+1 tier).
+  - Fixed a multiplier calculation flaw where a machine's base parallel and equipped parallel hatch were erroneously compounded.
+- **Multiblock BoM Optional Hatch & Parallel Hatch Casing Reduction (`GTCEuBOMHelper`, `MultiblockStructureCatalog`)**:
+  - Uninstalled optional hatches (such as preview Elite Parallel Control Hatches) present in base 3D blueprint shapes are now properly excluded from the BoM and seamlessly restored to base structural casings (+1 count).
+  - Intelligently pruned unnecessary item/fluid buses from recipes without corresponding I/O.
+- **JEI / EMI Search Bar Typing Shortcut (`B`) Collision Bug (`ClientForgeEvents`)**:
+  - Fixed an issue where typing into JEI or EMI search boxes inside inventory, container, or recipe viewer screens would inadvertently intercept the `B` key and open the calculator board.
+- **JEI Recipe Indexing & Discovery in Search Dialog (`JeiRecipeViewerAdapter`)**:
+  - Fixed an issue in JEI-only environments where recipes were delayed or failed to populate when opening the Recipe Search Dialog.
+- **Programmed Circuit Input Port Bug in JEI Mode (`JeiRecipeConverter`, `GTCEuRecipeHandler`)**:
+  - Fixed an issue where non-consumed configuration circuits (`gtceu:programmed_circuit`, `gtceu:integrated_circuit`) were incorrectly added as demand input ports (`-0/s` or `Demand: 2/s`) when converting recipes from JEI.
+- **Steam Machine Tier Switching Icon Corruption (`GTCEuModAdapter`)**:
+  - Fixed an issue where changing tiers or switching from LP/HP steam machines would erroneously redirect the machine icon to an unrelated controller (e.g. Large Miner).
+- **Layered Recipe Extraction & Reflection Hardening (`LayeredRecipeHelper`)**:
+  - Resolved missing layout slots and wrapper object extraction issues during GTCEu and third-party recipe conversion.
+
+### Known Issues
+- **Unintended Byproduct Output Ports in JEI Mode for LV/MV Macerator Recipes**:
+  - When importing certain GTCEu recipes (e.g. Raw Chicken maceration) via JEI, byproducts with 0% chance that should be inactive at lower voltage tiers (LV/MV) are temporarily instantiated as output ports. (To be resolved in the next release).
+
 ## [2.0.0-alpha.11] - 2026-08-28
 
 ### Added

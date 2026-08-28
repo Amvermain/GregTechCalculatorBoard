@@ -3,6 +3,7 @@ package com.gtceu.calcboard;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.ParsedQuery;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
+import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -526,5 +527,40 @@ public class RecipeSearchEngineTest {
                 "Crusher", "in", "out", null, null, null, null, false
         );
         assertFalse(unsupportedRecipe.isSupported());
+    }
+
+    @Test
+    public void testKineticGenerationRecipeIndexingAndSearch() {
+        var cat = new dev.emi.emi.api.recipe.EmiRecipeCategory(
+                ResourceLocation.tryParse("gtcalcboard:kinetic_generation"),
+                dev.emi.emi.api.stack.EmiStack.EMPTY
+        );
+        var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
+                ResourceLocation.tryParse("gtcalcboard:kinetic_gen/create/water_wheel"),
+                cat,
+                ResourceLocation.tryParse("create:water_wheel"),
+                "Water Wheel",
+                20.0,
+                256.0,
+                com.gtceu.calcboard.api.type.GTVoltageTier.LV,
+                com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU,
+                true,
+                List.of(),
+                List.of(com.gtceu.calcboard.api.model.IngredientStack.stressUnit(256.0)),
+                null
+        );
+
+        SearchableRecipe sr = RecipeSearchEngine.buildIndex(recipe);
+        assertNotNull(sr);
+        assertTrue(sr.isSupported(), "Kinetic generation recipes must be natively supported");
+        assertEquals("create", sr.modId());
+        assertEquals("Water Wheel", sr.displayName());
+
+        // Test search queries
+        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("water wheel")));
+        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("@create")));
+        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("[kinetic_generation]")));
+        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("su")));
+        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("kinetic")));
     }
 }

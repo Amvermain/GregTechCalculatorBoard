@@ -525,6 +525,69 @@ public class GTCEuSteamProcessingTest {
         assertEquals(SteamMode.NONE, cNode.getSteamMode());
         assertEquals(GTVoltageTier.MV, cNode.getTargetTier());
     }
+
+    @Test
+    void testMaceratorSteamAndTierCycling() {
+        RecipeNode macerator = RecipeNode.create("Macerator (Naquadah Alloy)", 400.0, 30.0, GTVoltageTier.LV);
+        macerator.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        macerator.setMachineIcon(ResourceLocation.tryParse("gtceu:lp_steam_macerator"));
+        macerator.setSteamMode(SteamMode.LOW_PRESSURE);
+        macerator.setAvailableWorkstations(List.of(
+                ResourceLocation.tryParse("gtceu:lp_steam_macerator"),
+                ResourceLocation.tryParse("gtceu:hp_steam_macerator"),
+                ResourceLocation.tryParse("gtceu:lv_macerator"),
+                ResourceLocation.tryParse("gtceu:mv_macerator"),
+                ResourceLocation.tryParse("gtceu:hv_macerator"),
+                ResourceLocation.tryParse("gtceu:ev_macerator"),
+                ResourceLocation.tryParse("gtceu:advanced_large_miner_iii")
+        ));
+
+        com.gtceu.calcboard.client.gui.widget.NodeWidget widget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(macerator);
+
+        // 1. Changing tier down (-1) from LP Steam should NOT change to multiblock or corrupt icon
+        boolean downFromLp = widget.changeTier(-1);
+        assertFalse(downFromLp, "Tier down from LP Steam on standard GT machine must return false");
+        assertEquals(SteamMode.LOW_PRESSURE, macerator.getSteamMode());
+        assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), macerator.getMachineIcon());
+        assertFalse(macerator.isMultiblock());
+
+        // 2. Changing tier up (+1) to HP Steam
+        boolean up1 = widget.changeTier(1);
+        assertTrue(up1);
+        assertEquals(SteamMode.HIGH_PRESSURE, macerator.getSteamMode());
+        assertEquals(ResourceLocation.tryParse("gtceu:hp_steam_macerator"), macerator.getMachineIcon());
+
+        // 3. Changing tier up (+1) to LV electric
+        boolean up2 = widget.changeTier(1);
+        assertTrue(up2);
+        assertEquals(SteamMode.NONE, macerator.getSteamMode());
+        assertEquals(GTVoltageTier.LV, macerator.getTargetTier());
+        assertEquals(ResourceLocation.tryParse("gtceu:lv_macerator"), macerator.getMachineIcon());
+
+        // 4. Changing tier up (+1) to MV electric
+        boolean up3 = widget.changeTier(1);
+        assertTrue(up3);
+        assertEquals(GTVoltageTier.MV, macerator.getTargetTier());
+        assertEquals(ResourceLocation.tryParse("gtceu:mv_macerator"), macerator.getMachineIcon());
+
+        // 5. Changing tier down (-1) from MV -> LV -> HP Steam -> LP Steam
+        assertTrue(widget.changeTier(-1));
+        assertEquals(GTVoltageTier.LV, macerator.getTargetTier());
+        assertEquals(ResourceLocation.tryParse("gtceu:lv_macerator"), macerator.getMachineIcon());
+
+        assertTrue(widget.changeTier(-1));
+        assertEquals(SteamMode.HIGH_PRESSURE, macerator.getSteamMode());
+        assertEquals(ResourceLocation.tryParse("gtceu:hp_steam_macerator"), macerator.getMachineIcon());
+
+        assertTrue(widget.changeTier(-1));
+        assertEquals(SteamMode.LOW_PRESSURE, macerator.getSteamMode());
+        assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), macerator.getMachineIcon());
+
+        // 6. Final check: cannot decrease below LP Steam
+        assertFalse(widget.changeTier(-1));
+        assertEquals(SteamMode.LOW_PRESSURE, macerator.getSteamMode());
+        assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), macerator.getMachineIcon());
+    }
 }
 
 

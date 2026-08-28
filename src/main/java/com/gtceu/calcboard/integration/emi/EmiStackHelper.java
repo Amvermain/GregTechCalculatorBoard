@@ -30,16 +30,18 @@ public final class EmiStackHelper {
                 return EmiStack.of(fluid, Math.max(1, (long) ingredient.getAmount()));
             }
         } else {
-            if (ingredient.isStressUnit()) {
-                var cogItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("create:cogwheel"));
-                if (cogItem != null && cogItem != Items.AIR) {
-                    return EmiStack.of(cogItem, 1);
+            try {
+                if (ingredient.isStressUnit()) {
+                    var cogItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("create:cogwheel"));
+                    if (cogItem != null && cogItem != Items.AIR) {
+                        return EmiStack.of(cogItem, 1);
+                    }
                 }
-            }
-            var item = ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != Items.AIR) {
-                return EmiStack.of(item, Math.max(1, (long) Math.round(ingredient.getAmount())));
-            }
+                var item = ForgeRegistries.ITEMS.getValue(id);
+                if (item != null && item != Items.AIR) {
+                    return EmiStack.of(item, Math.max(1, (long) Math.round(ingredient.getAmount())));
+                }
+            } catch (Throwable ignored) {}
         }
         return EmiStack.EMPTY;
     }

@@ -108,7 +108,7 @@ public class ClientForgeEvents {
     }
 
     @SubscribeEvent
-    public static void onScreenKeyPressed(ScreenEvent.KeyPressed.Pre event) {
+    public static void onScreenKeyPressed(ScreenEvent.KeyPressed.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.screen == null || mc.player == null || mc.level == null) return;
 
@@ -122,8 +122,8 @@ public class ClientForgeEvents {
             return;
         }
 
-        // Do not intercept if player is actively typing inside a text box (EditBox, TextField, Search bar)
-        if (screen.getFocused() instanceof net.minecraft.client.gui.components.EditBox) {
+        // Do not intercept if player is actively typing inside a text box or external recipe viewer search bar
+        if (isScreenTypingActive(screen) || com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.isAnySearchFocused()) {
             return;
         }
 
@@ -132,11 +132,56 @@ public class ClientForgeEvents {
             return;
         }
 
+        // Allow adding hovered recipe directly from external recipe viewers (EMI, JEI) via hotkey (Shift + A)
+        boolean matchesAddRecipe = KeyBindings.ADD_RECIPE_TO_BOARD.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))
+                || (net.minecraft.client.gui.screens.Screen.hasShiftDown() && event.getKeyCode() == org.lwjgl.glfw.GLFW.GLFW_KEY_A);
+        if (matchesAddRecipe) {
+            double mouseX = mc.mouseHandler.xpos() * (double) mc.getWindow().getGuiScaledWidth() / (double) Math.max(1, mc.getWindow().getScreenWidth());
+            double mouseY = mc.mouseHandler.ypos() * (double) mc.getWindow().getGuiScaledHeight() / (double) Math.max(1, mc.getWindow().getScreenHeight());
+            if (com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.tryAddHoveredRecipeToBoard(screen, mouseX, mouseY)) {
+                event.setCanceled(true);
+                return;
+            }
+        }
+
         // Allow opening Calculator Board directly from inventory, chests, crafting tables, etc.
         if (KeyBindings.OPEN_BOARD.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))) {
             mc.setScreen(new BoardScreen());
             event.setCanceled(true);
         }
+    }
+
+    private static boolean isScreenTypingActive(net.minecraft.client.gui.screens.Screen screen) {
+        if (screen == null) return false;
+        if (isWidgetFocusedAndTyping(screen.getFocused())) {
+            return true;
+        }
+        for (var child : screen.children()) {
+            if (isWidgetFocusedAndTyping(child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isWidgetFocusedAndTyping(net.minecraft.client.gui.components.events.GuiEventListener listener) {
+        if (listener == null) return false;
+        if (listener instanceof net.minecraft.client.gui.components.EditBox editBox) {
+            return editBox.canConsumeInput();
+        }
+        if (listener instanceof net.minecraft.client.gui.components.events.ContainerEventHandler container) {
+            if (isWidgetFocusedAndTyping(container.getFocused())) {
+                return true;
+            }
+            for (var nestedChild : container.children()) {
+                if (nestedChild != container && nestedChild.isFocused() && isWidgetFocusedAndTyping(nestedChild)) {
+                    return true;
+                }
+            }
+        }
+        String className = listener.getClass().getName().toLowerCase();
+        return (className.contains("editbox") || className.contains("textfield") || className.contains("search") || className.contains("filter"))
+                && listener.isFocused();
     }
 
     @SubscribeEvent

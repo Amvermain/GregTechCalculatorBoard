@@ -55,6 +55,17 @@ public final class RecipeViewerRegistry {
         ADAPTERS.sort(Comparator.comparingInt(IRecipeViewerAdapter::getPriority).reversed());
     }
 
+    public static synchronized void unregister(String viewerId) {
+        if (viewerId == null) return;
+        ADAPTERS.removeIf(a -> a.getViewerId().equals(viewerId));
+    }
+
+    public static synchronized void reset() {
+        initialized = false;
+        ADAPTERS.clear();
+        init();
+    }
+
     public static IRecipeViewerAdapter getActiveAdapter() {
         if (!initialized) {
             init();
@@ -74,6 +85,34 @@ public final class RecipeViewerRegistry {
             init();
         }
         return List.copyOf(ADAPTERS);
+    }
+
+    public static boolean isAnySearchFocused() {
+        if (!initialized) {
+            init();
+        }
+        for (IRecipeViewerAdapter adapter : ADAPTERS) {
+            try {
+                if (adapter.isAvailable() && adapter.isSearchFieldFocused()) {
+                    return true;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return false;
+    }
+
+    public static boolean tryAddHoveredRecipeToBoard(net.minecraft.client.gui.screens.Screen screen, double mouseX, double mouseY) {
+        if (!initialized) {
+            init();
+        }
+        for (IRecipeViewerAdapter adapter : ADAPTERS) {
+            try {
+                if (adapter.isAvailable() && adapter.tryAddHoveredRecipeToBoard(screen, mouseX, mouseY)) {
+                    return true;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return false;
     }
 }
 

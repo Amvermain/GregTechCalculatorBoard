@@ -19,6 +19,16 @@ public final class EmiStepRecipeDetector {
      * Returns a bonded {@link CompoundRecipeBuilder.CompoundCluster} if confirmed, or {@code null} otherwise.
      */
     public static CompoundRecipeBuilder.CompoundCluster tryDetectAndBuild(
+            Object recipeObj,
+            ResourceLocation preferredWorkstation,
+            double startX,
+            double startY
+    ) {
+        if (!(recipeObj instanceof EmiRecipe recipe)) return null;
+        return tryDetectAndBuild(recipe, preferredWorkstation, startX, startY);
+    }
+
+    public static CompoundRecipeBuilder.CompoundCluster tryDetectAndBuild(
             EmiRecipe recipe,
             ResourceLocation preferredWorkstation,
             double startX,

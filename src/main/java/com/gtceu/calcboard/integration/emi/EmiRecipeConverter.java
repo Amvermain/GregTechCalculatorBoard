@@ -24,6 +24,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class EmiRecipeConverter {
@@ -128,7 +129,6 @@ public class EmiRecipeConverter {
         if (node.isFusion()) {
             GTVoltageTier minTier = node.getMinFusionVoltageTier();
             if (node.getTargetTier().ordinal() < minTier.ordinal()) {
-                node.setRecipeTier(minTier);
                 node.setTargetTier(minTier);
             }
         }
@@ -142,13 +142,13 @@ public class EmiRecipeConverter {
 
             for (EmiStack stack : input.getEmiStacks()) {
                 if (stack == null || stack.isEmpty()) continue;
-                if (isDummyConditionMarker(stack.getId())) continue;
+                if (isIgnoredInput(stack.getId(), reqChance > 0 ? reqChance : stack.getChance())) continue;
 
                 long finalAmount = reqAmount > 0 ? reqAmount : stack.getAmount();
                 float finalChance = reqChance > 0 ? reqChance : stack.getChance();
                 IngredientStack is = convertEmiStack(stack, finalAmount, finalChance);
                 if (is != null && is.getId() != null) {
-                    if (isDummyConditionMarker(is.getId())) continue;
+                    if (isIgnoredInput(is.getId(), is.getChance())) continue;
                     if (primaryStack == null) {
                         primaryStack = is;
                     }
@@ -294,6 +294,22 @@ public class EmiRecipeConverter {
                 }
             }
         }
+    }
+
+    public static boolean isIgnoredInput(ResourceLocation id, double chance) {
+        if (id == null) return true;
+        if (isDummyConditionMarker(id)) return true;
+        if (isProgrammedCircuit(id)) return true;
+        if (chance <= 0.0) return true;
+        return false;
+    }
+
+    public static boolean isProgrammedCircuit(ResourceLocation id) {
+        if (id == null) return false;
+        String path = id.getPath().toLowerCase(Locale.ROOT);
+        String ns = id.getNamespace().toLowerCase(Locale.ROOT);
+        return ("gtceu".equals(ns) || "gtce".equals(ns) || "gregtech".equals(ns))
+                && (path.equals("programmed_circuit") || path.equals("integrated_circuit") || path.startsWith("circuit_config"));
     }
 
     public static boolean isDummyConditionMarker(ResourceLocation id) {
@@ -558,7 +574,7 @@ public class EmiRecipeConverter {
                     } catch (Throwable ignored) {}
                 }
 
-                for (String mName : new String[]{"getContent", "getInner", "getStack", "getItems", "getMatchingStacks", "getItemStack", "getFluid", "getRawFluid", "getIngredient"}) {
+                for (String mName : new String[]{"content", "getContent", "getInner", "getStack", "getItems", "getMatchingStacks", "getItemStack", "getFluid", "getRawFluid", "getIngredient", "inner"}) {
                     try {
                         Method m = inner.getClass().getMethod(mName);
                         next = m.invoke(inner);

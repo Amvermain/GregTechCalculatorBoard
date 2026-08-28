@@ -28,12 +28,12 @@ public class CoilHelper {
     static {
         STATS_CACHE.put("gtceu:cupronickel_coil_block", new CoilStats(1800, 100, 100, 100, 100, 16));
         STATS_CACHE.put("gtceu:kanthal_coil_block", new CoilStats(2700, 100, 90, 125, 95, 32));
-        STATS_CACHE.put("gtceu:nichrome_coil_block", new CoilStats(3600, 150, 80, 150, 90, 48));
-        STATS_CACHE.put("gtceu:rtm_alloy_coil_block", new CoilStats(4500, 200, 70, 175, 85, 64));
-        STATS_CACHE.put("gtceu:hssg_coil_block", new CoilStats(5400, 250, 60, 200, 80, 80));
-        STATS_CACHE.put("gtceu:naquadah_coil_block", new CoilStats(7200, 300, 50, 225, 75, 96));
-        STATS_CACHE.put("gtceu:trinium_coil_block", new CoilStats(9001, 350, 40, 250, 70, 112));
-        STATS_CACHE.put("gtceu:tritanium_coil_block", new CoilStats(10800, 400, 30, 275, 65, 128));
+        STATS_CACHE.put("gtceu:nichrome_coil_block", new CoilStats(3600, 150, 80, 150, 90, 64));
+        STATS_CACHE.put("gtceu:rtm_alloy_coil_block", new CoilStats(4500, 200, 70, 175, 85, 128));
+        STATS_CACHE.put("gtceu:hssg_coil_block", new CoilStats(5400, 250, 60, 200, 80, 256));
+        STATS_CACHE.put("gtceu:naquadah_coil_block", new CoilStats(7200, 300, 50, 225, 75, 2048));
+        STATS_CACHE.put("gtceu:trinium_coil_block", new CoilStats(9001, 350, 40, 250, 70, 4096));
+        STATS_CACHE.put("gtceu:tritanium_coil_block", new CoilStats(10800, 400, 30, 275, 65, 8192));
     }
 
     public record CoilStats(
@@ -175,8 +175,9 @@ public class CoilHelper {
         int chemSpeed = 75 + (tier * 25);
         int chemEnergy = Math.max(50, 100 - (tier * 5));
 
-        // 4. Multi Smelter: parallel = level * 32
-        int smelterPar = level * 32;
+        // 4. Multi Smelter: parallel = tier-based exponential scaling (Tier 0: 16, Tier 1: 32, Tier 2: 64, Tier 3: 128, ...)
+        int rawSmelterPar = extractInt(coilTypeObj, "getSmelterParallel", "getSmelterMaxParallel", "getMaxParallel", "getParallelMultiplier");
+        int smelterPar = (rawSmelterPar > 0) ? rawSmelterPar : (int) (16 * Math.pow(2, Math.max(0, tier)));
 
         return new CoilStats(heat, pyroSpeed, crackEnergyPercent, chemSpeed, chemEnergy, smelterPar);
     }

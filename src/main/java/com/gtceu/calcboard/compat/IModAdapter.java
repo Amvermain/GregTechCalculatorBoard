@@ -105,6 +105,14 @@ public interface IModAdapter {
     }
 
     /**
+     * Classifies a multiblock structure part into a BOM category (Coil, Hatch/Bus, Casing, Controller, etc.).
+     * Returns null if this adapter does not recognize the part.
+     */
+    default PartCategory classifyBOMPart(ResourceLocation itemId) {
+        return null;
+    }
+
+    /**
      * Adapts compound recipes (e.g. water+fuel -> steam) or mod-specific energy/duration rules.
      * Returns true if custom handling was applied.
      */
@@ -227,6 +235,35 @@ public interface IModAdapter {
         }
 
         populateExtraBOMParts(node, list);
+        return list;
+    }
+
+    /**
+     * Resolves the appropriate workstation ResourceLocation for a given target tier on this node.
+     * Default implementation delegates to node.getWorkstationForTierFromList(tier).
+     * Mod adapters (e.g. GTCEuModAdapter) can deductively derive tier-specific machine IDs
+     * (e.g. gtceu:opv_macerator) via official registry or naming conventions even if the recipe viewer
+     * didn't inject all tier variants into availableWorkstations.
+     */
+    default ResourceLocation getWorkstationForTier(RecipeNode node, GTVoltageTier tier) {
+        if (node == null || tier == null) return null;
+        return node.getWorkstationForTierFromList(tier);
+    }
+
+    /**
+     * Resolves all valid multiblock controller workstations for this node.
+     * Default implementation filters node.getAvailableWorkstations() for multiblocks.
+     * Mod adapters (e.g. GTCEuModAdapter) can deductively discover all multiblock machines
+     * that support this node's recipe category via official registries.
+     */
+    default List<ResourceLocation> getMultiblockWorkstations(RecipeNode node) {
+        if (node == null) return java.util.Collections.emptyList();
+        List<ResourceLocation> list = new ArrayList<>();
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && MultiblockDetector.isMultiblock(ws) && !list.contains(ws)) {
+                list.add(ws);
+            }
+        }
         return list;
     }
 
@@ -658,10 +695,10 @@ public interface IModAdapter {
         int btnW = 32;
         if (node.isLiquidBoilerRecipe() || isBoilerRecipe(node)) {
             com.gtceu.calcboard.api.type.GTBoilerTier bTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
-            btnW = Math.max(54, net.minecraft.client.Minecraft.getInstance().font.width(bTier.getDisplayName()) + 8);
+            btnW = Math.max(54, safeFontWidth(bTier.getDisplayName(), 46) + 8);
         } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
             String steamText = node.isMultiblock() ? ("🏛 " + node.getSteamMode().getShortName()) : node.getSteamMode().getDisplayName();
-            btnW = Math.max(48, net.minecraft.client.Minecraft.getInstance().font.width(steamText) + 8);
+            btnW = Math.max(48, safeFontWidth(steamText, 40) + 8);
         }
         return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
@@ -676,7 +713,7 @@ public interface IModAdapter {
         int ctrlY = y + 20 + 6;
         int row2Y = ctrlY + 18;
         int ocX = x + 42;
-        int ocW = Math.max(50, net.minecraft.client.Minecraft.getInstance().font.width("STD OC") + 6);
+        int ocW = Math.max(50, safeFontWidth("STD OC", 44) + 6);
         return mouseX >= ocX && mouseX <= ocX + ocW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
@@ -692,15 +729,25 @@ public interface IModAdapter {
         int configStartX;
         if (node.isGenerator()) {
             String genBadge = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.gen_badge").getString();
-            int genW = Math.max(28, net.minecraft.client.Minecraft.getInstance().font.width(genBadge) + 4);
+            int genW = Math.max(28, safeFontWidth(genBadge, 24) + 4);
             configStartX = x + 42 + genW + 3;
         } else {
             String ocKey = node.getOverclockMode() == OverclockMode.PERFECT ? "gui.gtcalcboard.oc_perf" : "gui.gtcalcboard.oc_std";
             String ocText = net.minecraft.network.chat.Component.translatable(ocKey).getString();
-            int ocW = Math.max(50, net.minecraft.client.Minecraft.getInstance().font.width(ocText) + 6);
+            int ocW = Math.max(50, safeFontWidth(ocText, 44) + 6);
             configStartX = x + 42 + ocW + 3;
         }
         return mouseX >= configStartX && mouseX <= x + node.getCardWidth() - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    private static int safeFontWidth(String text, int defaultWidth) {
+        try {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.font != null) {
+                return mc.font.width(text);
+            }
+        } catch (Throwable ignored) {}
+        return defaultWidth;
     }
 
     /**

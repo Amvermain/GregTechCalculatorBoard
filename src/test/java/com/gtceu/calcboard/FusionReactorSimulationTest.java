@@ -58,7 +58,7 @@ public class FusionReactorSimulationTest {
     @Test
     @DisplayName("Voltage tier clamping and overclock tier delta for Fusion Reactors")
     void testVoltageTierClampingAndOverclocking() {
-        RecipeNode mk2 = RecipeNode.create("Fusion Mk2", 40, 32768, GTVoltageTier.HV);
+        RecipeNode mk2 = RecipeNode.create("Fusion Mk2", 40, 32768, GTVoltageTier.ZPM);
         mk2.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
         mk2.setEuToStart(320_000_000L); // Mk2 min voltage is ZPM
 
@@ -79,6 +79,80 @@ public class FusionReactorSimulationTest {
         mk2.setTargetTier(GTVoltageTier.UHV);
         assertEquals(GTVoltageTier.UHV, mk2.getTargetTier());
         assertEquals(2, mk2.getTierDelta());
+    }
+
+    @Test
+    @DisplayName("Fusion IV recipe correctly overclocks to LuV with 2:2 rule (double EU, half duration)")
+    void testFusionEvRecipeOverclocksToLuV() {
+        // Base IV fusion recipe (4096 EU/t): 144 ticks (7.20s), 40M EU ignition
+        RecipeNode node = RecipeNode.create("Fusion Mk1 - D-T", 144, 4096, GTVoltageTier.IV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
+        node.setEuToStart(40_000_000L);
+
+        assertEquals(GTVoltageTier.IV, node.getRecipeTier());
+        assertEquals(GTVoltageTier.LuV, node.getTargetTier()); // Target clamped to min fusion tier LuV
+        assertEquals(1, node.getTierDelta()); // LuV (6) - IV (5) = 1
+
+        var oc = node.getOverclockResult();
+        assertEquals(72.0, oc.durationTicks(), 0.001); // 72 ticks = 3.60s (half the base duration)
+        assertEquals(8192.0, oc.eut(), 0.001); // 8,192 EU/t (2x base energy cost under 2:2 fusion rule)
+        assertEquals(1, oc.overclocks());
+    }
+
+    @Test
+    @DisplayName("Fusion Reactor enforces matching Energy Hatch tier")
+    void testFusionEnergyHatchTierRestriction() {
+        RecipeNode mk1 = RecipeNode.create("Fusion Mk1", 144, 4096, GTVoltageTier.IV);
+        mk1.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
+        mk1.setEuToStart(40_000_000L); // targetTier is LuV
+
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(mk1);
+
+        // LuV energy hatch on LuV fusion reactor -> Compatible
+        var luvHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_luv", "LuV Energy Hatch", "", null, GTVoltageTier.LuV, 2);
+        assertTrue(adapter.isAddonCompatible(mk1, luvHatch));
+
+        // ZPM energy hatch on LuV fusion reactor -> Incompatible (Must build Mk2 for ZPM)
+        var zpmHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_zpm", "ZPM Energy Hatch", "", null, GTVoltageTier.ZPM, 2);
+        assertFalse(adapter.isAddonCompatible(mk1, zpmHatch));
+    }
+
+    @Test
+    @DisplayName("Switching Fusion Controller model to Mk2 (ZPM) updates targetTier, badges, 2:2 overclock, and energy hatch compatibility")
+    void testSwitchingFusionControllerToMk2UpdatesTierAndOverclock() {
+        RecipeNode node = RecipeNode.create("Fusion D-T", 144, 4096, GTVoltageTier.IV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
+        node.setEuToStart(40_000_000L);
+        node.setMachineIcon(ResourceLocation.tryParse("start_core:luv_fusion_reactor"));
+
+        assertEquals(GTVoltageTier.LuV, node.getTargetTier());
+        assertEquals(1, node.getTierDelta()); // LuV - IV = 1
+        var oc1 = node.getOverclockResult();
+        assertEquals(72.0, oc1.durationTicks(), 0.001); // 3.60s (1 OC)
+        assertEquals(8192.0, oc1.eut(), 0.001);
+
+        // Switch controller to Mk2 (start_core:zpm_fusion_reactor)
+        node.setMachineIcon(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"));
+
+        assertEquals(GTVoltageTier.ZPM, node.getTargetTier());
+        assertEquals(2, node.getTierDelta()); // ZPM - IV = 2
+
+        var oc2 = node.getOverclockResult();
+        assertEquals(36.0, oc2.durationTicks(), 0.001); // 1.80s (2 OCs under 2:2 rule)
+        assertEquals(16384.0, oc2.eut(), 0.001); // 4096 * 2 * 2 = 16384 EU/t
+        assertEquals(2, oc2.overclocks());
+
+        // Check badge reflects Mk2
+        var badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node);
+        assertTrue(badges.stream().anyMatch(b -> b.text().contains("Mk2")));
+
+        // Check ZPM energy hatch is now compatible, while LuV is incompatible
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var luvHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_luv", "LuV Energy Hatch", "", null, GTVoltageTier.LuV, 2);
+        var zpmHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_zpm", "ZPM Energy Hatch", "", null, GTVoltageTier.ZPM, 2);
+
+        assertFalse(adapter.isAddonCompatible(node, luvHatch));
+        assertTrue(adapter.isAddonCompatible(node, zpmHatch));
     }
 
     @Test

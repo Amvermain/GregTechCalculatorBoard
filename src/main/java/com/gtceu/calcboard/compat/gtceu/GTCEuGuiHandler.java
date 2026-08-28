@@ -403,14 +403,9 @@ public class GTCEuGuiHandler {
                 graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_desc").getString(), x + 10, y + 48, 0xFF888888, false);
             }
         } else {
-            List<ResourceLocation> mbWorkstations = new ArrayList<>();
-            for (ResourceLocation ws : node.getAvailableWorkstations()) {
-                if (ws != null && MultiblockDetector.isMultiblock(ws) && !mbWorkstations.contains(ws)) {
-                    mbWorkstations.add(ws);
-                }
-            }
+            List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
             if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
-                mbWorkstations.add(node.getMachineIcon());
+                mbWorkstations = List.of(node.getMachineIcon());
             }
 
             // Find equipped parallel addon
@@ -737,14 +732,9 @@ public class GTCEuGuiHandler {
                 }
             }
         } else {
-            List<ResourceLocation> mbWorkstations = new ArrayList<>();
-            for (ResourceLocation ws : node.getAvailableWorkstations()) {
-                if (ws != null && MultiblockDetector.isMultiblock(ws) && !mbWorkstations.contains(ws)) {
-                    mbWorkstations.add(ws);
-                }
-            }
+            List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
             if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
-                mbWorkstations.add(node.getMachineIcon());
+                mbWorkstations = List.of(node.getMachineIcon());
             }
 
             // Find equipped parallel addon
@@ -858,14 +848,9 @@ public class GTCEuGuiHandler {
 
     public static boolean handleControllerScroll(RecipeNode node, double delta) {
         if (node == null || !node.isMultiblock()) return false;
-        List<ResourceLocation> mbWorkstations = new ArrayList<>();
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null && MultiblockDetector.isMultiblock(ws) && !mbWorkstations.contains(ws)) {
-                mbWorkstations.add(ws);
-            }
-        }
+        List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
         if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
-            mbWorkstations.add(node.getMachineIcon());
+            mbWorkstations = List.of(node.getMachineIcon());
         }
         int totalCount = mbWorkstations.size();
         boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());

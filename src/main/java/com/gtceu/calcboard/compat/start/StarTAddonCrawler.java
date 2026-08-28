@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.compat.start;
 
+import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
@@ -20,6 +21,15 @@ public class StarTAddonCrawler {
 
         addBuiltinStarTTraits(collector, seenIds);
 
+        java.util.Set<Item> activeRecipeItems = new java.util.HashSet<>();
+        if (recipeOutputStacks != null) {
+            for (ItemStack s : recipeOutputStacks) {
+                if (s != null && !s.isEmpty()) {
+                    activeRecipeItems.add(s.getItem());
+                }
+            }
+        }
+
         try {
             if (ForgeRegistries.ITEMS != null) {
                 for (Item item : ForgeRegistries.ITEMS) {
@@ -30,6 +40,10 @@ public class StarTAddonCrawler {
 
                     String path = id.getPath();
                     if (!path.contains("parallel") && !path.contains("reflector") && !path.contains("maintenance") && !path.contains("hatch")) {
+                        continue;
+                    }
+
+                    if (DynamicAddonCrawler.isItemDisabledOrHidden(item, activeRecipeItems)) {
                         continue;
                     }
 

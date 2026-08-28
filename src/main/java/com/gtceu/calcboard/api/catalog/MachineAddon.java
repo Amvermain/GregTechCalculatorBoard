@@ -60,6 +60,7 @@ public class MachineAddon {
     private double eutMultiplier = 1.0;
     private int parallelMultiplier = 1;
     private boolean powerConstant = false;
+    private boolean upgradeTierKit = false;
     private int magneticForce = 0;
     private String discoverySource;
 
@@ -219,25 +220,24 @@ public class MachineAddon {
     }
 
     public ItemStack getItemStackSample() {
-        if (itemStackSample != null) return itemStackSample;
-        if (itemIcon != null) {
-            try {
+        return itemStackSample;
+    }
+
+    public ItemStack getRenderItemStack() {
+        try {
+            if (itemStackSample != null && !itemStackSample.isEmpty()) {
+                return itemStackSample;
+            }
+            if (itemIcon != null) {
                 Item item = ForgeRegistries.ITEMS.getValue(itemIcon);
                 if (item != null && item != Items.AIR) {
                     return new ItemStack(item);
                 }
-            } catch (Throwable ignored) {}
-        }
-        try {
+            }
             return ItemStack.EMPTY;
         } catch (Throwable ignored) {
             return null;
         }
-    }
-
-    public ItemStack getRenderItemStack() {
-        ItemStack sample = getItemStackSample();
-        return (sample != null && !sample.isEmpty()) ? sample : ItemStack.EMPTY;
     }
 
     public void setItemStackSample(ItemStack itemStackSample) {
@@ -274,6 +274,14 @@ public class MachineAddon {
 
     public void setPowerConstant(boolean powerConstant) {
         this.powerConstant = powerConstant;
+    }
+
+    public boolean isUpgradeTierKit() {
+        return upgradeTierKit;
+    }
+
+    public void setUpgradeTierKit(boolean upgradeTierKit) {
+        this.upgradeTierKit = upgradeTierKit;
     }
 
     public String getDiscoverySource() {
@@ -429,6 +437,7 @@ public class MachineAddon {
         cp.setEutMultiplier(this.eutMultiplier);
         cp.setParallelMultiplier(this.parallelMultiplier);
         cp.setPowerConstant(this.powerConstant);
+        cp.setUpgradeTierKit(this.upgradeTierKit);
         cp.setMagneticForce(this.magneticForce);
         cp.setCoilTemperature(this.coilTemperature);
         cp.setPyrolyseSpeedPercent(this.pyrolyseSpeedPercent);
@@ -473,6 +482,9 @@ public class MachineAddon {
         }
         if (powerConstant) {
             tag.putBoolean("powerConstant", true);
+        }
+        if (upgradeTierKit) {
+            tag.putBoolean("upgradeTierKit", true);
         }
         if (magneticForce != 0) {
             tag.putInt("magneticForce", magneticForce);
@@ -527,6 +539,8 @@ public class MachineAddon {
         if (tag.contains("eutMultiplier")) setEutMultiplier(tag.getDouble("eutMultiplier"));
         if (tag.contains("parallelMultiplier")) setParallelMultiplier(tag.getInt("parallelMultiplier"));
         if (tag.contains("powerConstant")) setPowerConstant(tag.getBoolean("powerConstant"));
+        if (tag.contains("upgradeTierKit")) setUpgradeTierKit(tag.getBoolean("upgradeTierKit"));
+        else if (tag.contains("isUpgradeKit")) setUpgradeTierKit(tag.getBoolean("isUpgradeKit"));
         if (tag.contains("magneticForce")) setMagneticForce(tag.getInt("magneticForce"));
         if (tag.contains("coilTemperature")) setCoilTemperature(tag.getInt("coilTemperature"));
         if (tag.contains("pyrolyseSpeedPercent")) setPyrolyseSpeedPercent(tag.getInt("pyrolyseSpeedPercent"));

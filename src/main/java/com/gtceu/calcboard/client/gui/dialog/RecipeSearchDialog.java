@@ -260,7 +260,7 @@ public class RecipeSearchDialog {
 
                 CACHING_PROGRESS = new RecipeLoadingProgress(2, 4, "gui.gtcalcboard.loading_recipe_phase.2", rawList.size() + " Recipes");
                 List<SearchableRecipe> tempList = new ArrayList<>(rawList);
-                if (rawList.isEmpty()) {
+                if (ModCompatHelper.isCreateLoaded() || ModCompatHelper.isCreateNewAgeLoaded() || ModCompatHelper.isCreateAdditionsLoaded()) {
                     tempList.addAll(com.gtceu.calcboard.compat.create.CreateModAdapter.getVirtualKineticSearchRecipes());
                 }
 
@@ -494,9 +494,11 @@ public class RecipeSearchDialog {
         ResourceLocation[] outArr = outputIds.isEmpty() ? null : outputIds.toArray(new ResourceLocation[0]);
         String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
         String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
+        ResourceLocation recipeId = template.getRecipeCategoryId() != null ? template.getRecipeCategoryId() : template.getMachineIcon();
 
         return new SearchableRecipe(
                 template,
+                recipeId,
                 template.getName(),
                 modId.intern(),
                 categoryId.intern(),
@@ -506,7 +508,8 @@ public class RecipeSearchDialog {
                 inArr,
                 outArr,
                 inNamesArr,
-                outNamesArr
+                outNamesArr,
+                true
         );
     }
 
@@ -559,7 +562,7 @@ public class RecipeSearchDialog {
 
         ResourceLocation contextualDefaultRecipeId = null;
         if (hasContext && contextualWireTarget.sourceStack != null && ModCompatHelper.isEmiLoaded()) {
-            contextualDefaultRecipeId = EmiSearchHelper.resolveContextualDefaultRecipeId(contextualWireTarget.sourceStack, targetIsFluid);
+            contextualDefaultRecipeId = com.gtceu.calcboard.integration.emi.EmiSearchHelper.resolveContextualDefaultRecipeId(contextualWireTarget.sourceStack, targetIsFluid);
         }
         this.currentContextualDefaultRecipeId = contextualDefaultRecipeId;
         final ResourceLocation finalContextualDefaultId = contextualDefaultRecipeId;
@@ -567,7 +570,7 @@ public class RecipeSearchDialog {
         List<ScoredRecipe> candidateList = sourceList.parallelStream()
                 .filter(sr -> {
                     if (showFavoritesOnly) {
-                        ResourceLocation rId = EmiSearchHelper.getRecipeId(sr.recipe());
+                        ResourceLocation rId = sr.recipeId();
                         if (rId == null || favoriteIds == null || !favoriteIds.contains(rId)) {
                             return false;
                         }
@@ -593,7 +596,7 @@ public class RecipeSearchDialog {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactInputName(targetName)) {
                                 contextualScore = 50000;
-                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units") || (EmiSearchHelper.isKineticGenerator(sr.recipe()) == Boolean.FALSE))) {
+                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units") || (ModCompatHelper.isEmiLoaded() && !com.gtceu.calcboard.integration.emi.EmiSearchHelper.isKineticGenerator(sr.recipe())))) {
                                 contextualScore = 90000;
                             }
                         } else {
@@ -604,7 +607,7 @@ public class RecipeSearchDialog {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactOutputName(targetName)) {
                                 contextualScore = 50000;
-                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units") || (EmiSearchHelper.isKineticGenerator(sr.recipe()) == Boolean.TRUE))) {
+                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units") || (ModCompatHelper.isEmiLoaded() && com.gtceu.calcboard.integration.emi.EmiSearchHelper.isKineticGenerator(sr.recipe())))) {
                                 contextualScore = 90000;
                             }
                         }
@@ -625,7 +628,7 @@ public class RecipeSearchDialog {
                     }
 
                     boolean isFav = false;
-                    ResourceLocation rId = EmiSearchHelper.getRecipeId(sr.recipe());
+                    ResourceLocation rId = sr.recipeId();
                     if (rId != null && allFavoriteIds != null && allFavoriteIds.contains(rId)) {
                         isFav = true;
                     }
@@ -641,7 +644,7 @@ public class RecipeSearchDialog {
         for (ScoredRecipe sr : candidateList) {
             boolean isDefault = false;
             if (ModCompatHelper.isEmiLoaded()) {
-                isDefault = EmiSearchHelper.isDefaultRecipe(sr.recipe().recipe(), hasContext, finalContextualDefaultId, hasQuery, parsedQuery);
+                isDefault = com.gtceu.calcboard.integration.emi.EmiSearchHelper.isDefaultRecipe(sr.recipe().recipe(), hasContext, finalContextualDefaultId, hasQuery, parsedQuery);
             }
             resolvedMatches.add(new ScoredRecipe(sr.recipe(), sr.score(), sr.contextualScore(), isDefault, sr.isFavorite()));
         }
@@ -872,7 +875,7 @@ public class RecipeSearchDialog {
 
                 boolean isDefault = false;
                 if (ModCompatHelper.isEmiLoaded()) {
-                    isDefault = EmiSearchHelper.isDefaultRecipe(sr.recipe(), this.contextualWireTarget != null, currentContextualDefaultRecipeId, searchBox != null && !searchBox.getValue().trim().isEmpty(), searchBox != null ? searchBox.getValue().trim() : "");
+                    isDefault = com.gtceu.calcboard.integration.emi.EmiSearchHelper.isDefaultRecipe(sr.recipe(), this.contextualWireTarget != null, currentContextualDefaultRecipeId, searchBox != null && !searchBox.getValue().trim().isEmpty(), searchBox != null ? searchBox.getValue().trim() : "");
                 }
 
                 boolean isRowSelectedOrHovered = rowHover || (stickyHoverRecipe == sr);
@@ -1227,8 +1230,8 @@ public class RecipeSearchDialog {
         }
 
         com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster cluster = null;
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded() && sr.recipe() instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
-            cluster = com.gtceu.calcboard.integration.emi.EmiStepRecipeDetector.tryDetectAndBuild(er, null, spawnX, spawnY);
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            cluster = com.gtceu.calcboard.integration.emi.EmiStepRecipeDetector.tryDetectAndBuild(sr.recipe(), null, spawnX, spawnY);
         }
 
         if (cluster != null && !cluster.nodes().isEmpty()) {
@@ -1422,111 +1425,6 @@ public class RecipeSearchDialog {
             return filterDialog.charTyped(codePoint, modifiers);
         }
         return searchBox.charTyped(codePoint, modifiers);
-    }
-
-    // =========================================================================
-    // Static Nested Implementation: Only loaded by JVM when EMI is present
-    // =========================================================================
-    private static class EmiSearchHelper {
-
-        private static ResourceLocation getRecipeId(Object recipeObj) {
-            if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
-                return er.getId();
-            }
-            return null;
-        }
-
-        private static Boolean isKineticGenerator(Object recipeObj) {
-            if (recipeObj instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg) {
-                return kg.isGenerator();
-            }
-            return null;
-        }
-
-        private static ResourceLocation resolveContextualDefaultRecipeId(IngredientStack sourceStack, boolean targetIsFluid) {
-            try {
-                ResourceLocation id = sourceStack.getId();
-                if (id != null) {
-                    if (targetIsFluid) {
-                        var fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(id);
-                        if (fluid != null) {
-                            var emiStack = dev.emi.emi.api.stack.EmiStack.of(fluid);
-                            var def = dev.emi.emi.bom.BoM.getRecipe(emiStack);
-                            return def != null ? def.getId() : null;
-                        }
-                    } else {
-                        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-                        if (item != null) {
-                            var emiStack = dev.emi.emi.api.stack.EmiStack.of(item);
-                            var def = dev.emi.emi.bom.BoM.getRecipe(emiStack);
-                            return def != null ? def.getId() : null;
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-            return null;
-        }
-
-        private static boolean isDefaultRecipe(Object recipeObj, boolean hasContext, ResourceLocation finalContextualDefaultId, boolean hasQuery, ParsedQuery parsedQuery) {
-            if (!(recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er)) return false;
-            if (hasContext && finalContextualDefaultId != null) {
-                return er.getId() != null && er.getId().equals(finalContextualDefaultId);
-            }
-            try {
-                for (var out : er.getOutputs()) {
-                    dev.emi.emi.api.recipe.EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(out);
-                    boolean matchesDef = (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
-                            || dev.emi.emi.bom.BoM.isDefaultRecipe(out, er);
-                    if (matchesDef) {
-                        if (hasQuery && parsedQuery != null) {
-                            String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
-                            String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
-                            String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
-                            for (var group : parsedQuery.orGroups()) {
-                                for (var term : group.terms()) {
-                                    if (!term.negated()) {
-                                        String t = term.text();
-                                        if (outName.contains(t) || outId.contains(t) || outPath.contains(t)) {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            return true;
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-            return false;
-        }
-
-        private static boolean isDefaultRecipe(Object recipeObj, boolean hasContext, ResourceLocation finalContextualDefaultId, boolean hasQuery, String searchBoxValue) {
-            if (!(recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er)) return false;
-            if (hasContext && finalContextualDefaultId != null) {
-                return er.getId() != null && er.getId().equals(finalContextualDefaultId);
-            }
-            try {
-                for (var out : er.getOutputs()) {
-                    dev.emi.emi.api.recipe.EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(out);
-                    boolean matchesDef = (def != null && (def.equals(er) || (def.getId() != null && def.getId().equals(er.getId()))))
-                            || dev.emi.emi.bom.BoM.isDefaultRecipe(out, er);
-                    if (matchesDef) {
-                        String q = searchBoxValue != null ? searchBoxValue.trim().toLowerCase(Locale.ROOT) : "";
-                        if (q.isEmpty()) {
-                            return true;
-                        }
-                        String outName = out.getName() != null ? out.getName().getString().toLowerCase(Locale.ROOT) : "";
-                        String outId = out.getId() != null ? out.getId().toString().toLowerCase(Locale.ROOT) : "";
-                        String outPath = out.getId() != null ? out.getId().getPath().toLowerCase(Locale.ROOT) : "";
-                        if (outName.contains(q) || outId.contains(q) || outPath.contains(q)) {
-                            return true;
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-            return false;
-        }
     }
 }
 

@@ -13,7 +13,13 @@ import org.junit.jupiter.api.Test;
 
 public class CoilModifierDeductionTest {
 
-    @Test
+    @org.junit.jupiter.api.BeforeAll
+    public static void setupMinecraft() {
+        try {
+            net.minecraft.SharedConstants.tryDetectVersion();
+            net.minecraft.server.Bootstrap.bootStrap();
+        } catch (Throwable ignored) {}
+    }
     @DisplayName("Test EBF Excess Temperature Discount (5% per 900K)")
     public void testEbfExcessTemperatureDiscount() {
         RecipeNode node = new RecipeNode("node-ebf", "EBF Node", 10.0, 120.0, GTVoltageTier.MV);
@@ -72,11 +78,26 @@ public class CoilModifierDeductionTest {
     }
 
     @Test
-    @DisplayName("Test Multi Smelter Parallel Multiplier")
+    @DisplayName("Test Multi Smelter Parallel Multiplier and Node Total Parallel")
     public void testMultiSmelterParallelMultiplier() {
         RecipeNode node = new RecipeNode("node-smelt", "Smelt Node", 10.0, 120.0, GTVoltageTier.MV);
         node.setMachineIcon(new ResourceLocation("gtceu", "multi_smelter"));
+        node.setMultiblock(true);
 
+        // 1. Without coil: default parallel is 1
+        Assertions.assertEquals(1, node.getTotalParallel());
+
+        // 2. With RTM Alloy coil (smelterParallel = 128)
+        CoilHelper.CoilStats rtmStats = new CoilHelper.CoilStats(4500, 200, 70, 175, 85, 128);
+        GTCoilAddon rtmCoil = new GTCoilAddon("gtceu:rtm_alloy_coil_block", "RTM Alloy Coil Block", "4500K", null, rtmStats);
+        MachineAddon tailoredRtm = CoilHelper.tailorCoilAddon(rtmCoil, node);
+        node.getAddons().add(tailoredRtm);
+
+        // Effective total parallel should be exactly 128 (not 8 * 128 = 1024)
+        Assertions.assertEquals(128, node.getTotalParallel());
+
+        // 3. Clear and test Naquadah coil (smelterParallel = 64)
+        node.getAddons().clear();
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(3600, 150, 70, 125, 80, 64);
         GTCoilAddon coil = new GTCoilAddon("gtceu:naquadah_coil", "Naquadah Coil", "3600K", null, stats);
 
@@ -84,6 +105,9 @@ public class CoilModifierDeductionTest {
         Assertions.assertEquals(64, tailored.getParallelMultiplier());
         Assertions.assertEquals(1.0, tailored.getDurationMultiplier(), 0.001);
         Assertions.assertEquals(1.0, tailored.getEutMultiplier(), 0.001);
+
+        node.getAddons().add(tailored);
+        Assertions.assertEquals(64, node.getTotalParallel());
     }
 
     @Test

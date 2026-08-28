@@ -18,6 +18,7 @@ public class TeamProviderTest {
         StandaloneFallbackProvider provider = new StandaloneFallbackProvider();
         assertTrue(provider.isAvailable());
         assertEquals("standalone", provider.getProviderId());
+        assertNull(provider.getPlayerTeamId(null), "Standalone provider should return null team ID to disable team board");
 
         UUID dummy = UUID.randomUUID();
         String name = provider.getTeamDisplayName(dummy);

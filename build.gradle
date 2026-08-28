@@ -157,6 +157,7 @@ dependencies {
     // JEI API & Runtime (Required for JEI integration and Thermal Series native JEI plugin)
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
+    testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     runtimeOnly fg.deobf("local:jei-${minecraft_version}-forge-${jei_runtime_version}:${jei_runtime_version}")
 

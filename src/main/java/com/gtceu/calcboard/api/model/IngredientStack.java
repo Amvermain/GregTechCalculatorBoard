@@ -17,7 +17,7 @@ public class IngredientStack {
     private ResourceLocation id;
     private final String displayName;
     private final double amount;
-    private final double chance; // 0.0 ~ 1.0 (1.0 = 100%)
+    private double chance; // 0.0 ~ 1.0 (1.0 = 100%)
     private final java.util.List<ResourceLocation> alternatives = new java.util.ArrayList<>();
     private int selectedAltIndex = 0;
 
@@ -167,6 +167,10 @@ public class IngredientStack {
 
     public void setTierChanceBoost(double tierChanceBoost) {
         this.tierChanceBoost = Math.max(0.0, tierChanceBoost);
+    }
+
+    public void setChance(double chance) {
+        this.chance = Math.max(0.0, Math.min(1.0, chance));
     }
 
     public double getEffectiveChance(int tierDelta) {

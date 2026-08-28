@@ -225,6 +225,10 @@ public final class GTCEuCoilModifierHelper {
         if (targetId == null && node.getRecipeCategoryId() != null) {
             targetId = node.getRecipeCategoryId();
         }
+        if (targetId == null && node.getName() != null) {
+            String sanitized = node.getName().toLowerCase(Locale.ROOT).replace(" ", "_");
+            targetId = ResourceLocation.tryParse("gtceu:" + sanitized);
+        }
 
         CoilMachineSpec spec = getCoilMachineSpec(targetId);
         int reqTemp = node.getRecipeTemperature();

@@ -504,10 +504,10 @@ public class MachineConfigDialog {
             sb.append(String.format("§a⚡%dx ", addon.getParallelMultiplier()));
         }
         if (addon.getDurationMultiplier() != 1.0) {
-            sb.append(String.format("§b⏱%.2fx ", addon.getDurationMultiplier()));
+            sb.append(String.format("§b⏱%.1fx ", addon.getDurationMultiplier()));
         }
         if (addon.getEutMultiplier() != 1.0) {
-            sb.append(String.format("§e⚡%.2fx ", addon.getEutMultiplier()));
+            sb.append(String.format("§e⚡%.1fx ", addon.getEutMultiplier()));
         }
         String res = sb.toString().trim();
         return !res.isEmpty() ? res : "§7" + Component.translatable("gui.gtcalcboard.addon.subtitle.default").getString();

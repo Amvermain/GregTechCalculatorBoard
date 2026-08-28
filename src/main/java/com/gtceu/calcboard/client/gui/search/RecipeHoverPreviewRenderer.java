@@ -50,6 +50,15 @@ public class RecipeHoverPreviewRenderer {
             int maxRows = Math.max(1, Math.max(inCount, outCount));
             contentW = (inCount == 0 || outCount == 0) ? 140 : 190;
             contentH = maxRows * 18 + 4;
+        } else if (sr.recipe() instanceof com.gtceu.calcboard.integration.jei.JeiRecipeWrapper<?> jrw) {
+            RecipeNode rn = com.gtceu.calcboard.integration.jei.JeiRecipeConverter.convert(jrw);
+            if (rn != null) {
+                int inCount = rn.getInputs().size();
+                int outCount = rn.getOutputs().size();
+                int maxRows = Math.max(1, Math.max(inCount, outCount));
+                contentW = (inCount == 0 || outCount == 0) ? 140 : 190;
+                contentH = maxRows * 18 + 4;
+            }
         }
 
         int extraWarningH = (sr != null && !sr.isSupported()) ? 24 : 0;
@@ -121,6 +130,11 @@ public class RecipeHoverPreviewRenderer {
             EmiPreviewRendererImpl.renderEmiRecipePreview(graphics, font, sr, sr.recipe(), dialogX, dialogY, dialogW, dialogH, hoveredRowY, mouseX, mouseY, partialTick, screenW, screenH);
         } else if (sr.recipe() instanceof RecipeNode rn) {
             renderRecipeNodePreview(graphics, font, sr, rn, dialogX, dialogY, dialogW, dialogH, hoveredRowY, mouseX, mouseY, screenW, screenH);
+        } else if (sr.recipe() instanceof com.gtceu.calcboard.integration.jei.JeiRecipeWrapper<?> jrw) {
+            RecipeNode rn = com.gtceu.calcboard.integration.jei.JeiRecipeConverter.convert(jrw);
+            if (rn != null) {
+                renderRecipeNodePreview(graphics, font, sr, rn, dialogX, dialogY, dialogW, dialogH, hoveredRowY, mouseX, mouseY, screenW, screenH);
+            }
         }
     }
 

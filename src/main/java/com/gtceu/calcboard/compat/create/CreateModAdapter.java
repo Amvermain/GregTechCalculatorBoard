@@ -63,7 +63,8 @@ public class CreateModAdapter implements IModAdapter {
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace();
-        return ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION);
+        if (ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION)) return true;
+        return "gtcalcboard".equals(ns) && "kinetic_generation".equals(categoryId.getPath());
     }
 
     @Override

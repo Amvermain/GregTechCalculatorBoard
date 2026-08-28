@@ -8,9 +8,12 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -519,6 +522,303 @@ public class GTCEuRecipeHandler {
             cur = cur.getSuperclass();
         }
 
+        return null;
+    }
+
+    public static Object unwrapRecipe(Object backing) {
+        if (backing == null) return null;
+        Object cur = backing;
+        for (int i = 0; i < 4 && cur != null; i++) {
+            if (cur.getClass().getName().contains("GTRecipe")) return cur;
+            Object next = null;
+            for (String mName : new String[]{"value", "getRecipe", "getGTRecipe", "recipe", "getBackingRecipe", "backingRecipe"}) {
+                try {
+                    Method m = cur.getClass().getMethod(mName);
+                    next = m.invoke(cur);
+                    if (next != null && next != cur) break;
+                } catch (Throwable ignored) {}
+            }
+            if (next == null) {
+                for (String fName : new String[]{"value", "recipe", "gtRecipe", "backingRecipe", "backing"}) {
+                    try {
+                        Field f = null;
+                        try { f = cur.getClass().getField(fName); } catch (Throwable ignored) {
+                            f = cur.getClass().getDeclaredField(fName);
+                            f.setAccessible(true);
+                        }
+                        if (f != null) {
+                            next = f.get(cur);
+                            if (next != null && next != cur) break;
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+            if (next == null || next == cur) break;
+            cur = next;
+        }
+        return cur;
+    }
+
+    public static List<IngredientStack> extractGTRecipeContents(Object gtRecipe, String fieldName) {
+        List<IngredientStack> result = new ArrayList<>();
+        if (gtRecipe == null) return result;
+
+        Object unwrapped = unwrapRecipe(gtRecipe);
+        if (unwrapped == null) unwrapped = gtRecipe;
+
+        try {
+            Object mapObj = null;
+            // 1. Try getter methods on unwrapped recipe
+            for (String mName : new String[]{fieldName, "get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1), "get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1) + "Contents", fieldName + "Contents"}) {
+                try {
+                    Method m = unwrapped.getClass().getMethod(mName);
+                    Object res = m.invoke(unwrapped);
+                    if (res instanceof Map<?, ?>) {
+                        mapObj = res;
+                        break;
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            // 2. Try fields on unwrapped recipe
+            if (mapObj == null) {
+                Class<?> cur = unwrapped.getClass();
+                while (cur != null && cur != Object.class) {
+                    try {
+                        Field f = null;
+                        try { f = cur.getField(fieldName); } catch (Throwable ignored) {
+                            f = cur.getDeclaredField(fieldName);
+                            f.setAccessible(true);
+                        }
+                        if (f != null) {
+                            Object res = f.get(unwrapped);
+                            if (res instanceof Map<?, ?>) {
+                                mapObj = res;
+                                break;
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                    cur = cur.getSuperclass();
+                }
+            }
+
+            // 3. Try data sub-object (e.g. unwrapped.data / unwrapped.getData())
+            if (mapObj == null) {
+                Object dataObj = null;
+                for (String mName : new String[]{"data", "getData", "getRecipeData"}) {
+                    try {
+                        Method m = unwrapped.getClass().getMethod(mName);
+                        Object res = m.invoke(unwrapped);
+                        if (res != null && res != unwrapped) {
+                            dataObj = res;
+                            break;
+                        }
+                    } catch (Throwable ignored) {}
+                }
+                if (dataObj == null) {
+                    for (String fName : new String[]{"data", "recipeData", "mRecipeData"}) {
+                        try {
+                            Field f = null;
+                            try { f = unwrapped.getClass().getField(fName); } catch (Throwable ignored) {
+                                f = unwrapped.getClass().getDeclaredField(fName);
+                                f.setAccessible(true);
+                            }
+                            if (f != null) {
+                                Object res = f.get(unwrapped);
+                                if (res != null && res != unwrapped) {
+                                    dataObj = res;
+                                    break;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+                if (dataObj != null) {
+                    for (String mName : new String[]{fieldName, "get" + Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1)}) {
+                        try {
+                            Method m = dataObj.getClass().getMethod(mName);
+                            Object res = m.invoke(dataObj);
+                            if (res instanceof Map<?, ?>) {
+                                mapObj = res;
+                                break;
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                    if (mapObj == null) {
+                        try {
+                            Field f = null;
+                            try { f = dataObj.getClass().getField(fieldName); } catch (Throwable ignored) {
+                                f = dataObj.getClass().getDeclaredField(fieldName);
+                                f.setAccessible(true);
+                            }
+                            if (f != null) {
+                                Object res = f.get(dataObj);
+                                if (res instanceof Map<?, ?>) {
+                                    mapObj = res;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+            }
+
+            if (mapObj instanceof Map<?, ?> map) {
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    Object cap = entry.getKey();
+                    Object contentList = entry.getValue();
+                    if (contentList instanceof List<?> list) {
+                        boolean isFluid = cap != null && cap.toString().toLowerCase(Locale.ROOT).contains("fluid");
+                        boolean isInput = "inputs".equalsIgnoreCase(fieldName);
+                        for (Object contentObj : list) {
+                            IngredientStack is = parseGTContent(contentObj, isFluid);
+                            if (is != null && is.getId() != null) {
+                                if (isInput && com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isIgnoredInput(is.getId(), is.getChance())) {
+                                    continue;
+                                }
+                                if (!isInput && com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(is.getId())) {
+                                    continue;
+                                }
+                                result.add(is);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return result;
+    }
+
+    private static IngredientStack parseGTContent(Object contentObj, boolean isFluid) {
+        if (contentObj == null) return null;
+        try {
+            Object inner = contentObj;
+            for (String mName : new String[]{"content", "getContent", "getInner", "getStack", "getItems", "getItemStack", "getFluid", "getIngredient", "inner"}) {
+                try {
+                    Method m = contentObj.getClass().getMethod(mName);
+                    Object res = m.invoke(contentObj);
+                    if (res != null && res != contentObj) {
+                        inner = res;
+                        break;
+                    }
+                } catch (Throwable ignored) {}
+            }
+            if (inner == contentObj) {
+                for (String fName : new String[]{"content", "inner", "stack", "itemStack", "ingredient", "fluid"}) {
+                    try {
+                        Field f = null;
+                        try { f = contentObj.getClass().getField(fName); } catch (Throwable ignored) {
+                            f = contentObj.getClass().getDeclaredField(fName);
+                            f.setAccessible(true);
+                        }
+                        if (f != null) {
+                            Object res = f.get(contentObj);
+                            if (res != null && res != contentObj) {
+                                inner = res;
+                                break;
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+
+            double chance = 1.0;
+            try {
+                Field chanceField = null;
+                try { chanceField = contentObj.getClass().getField("chance"); } catch (Throwable ignored) {
+                    chanceField = contentObj.getClass().getDeclaredField("chance");
+                    chanceField.setAccessible(true);
+                }
+                if (chanceField != null) {
+                    Object val = chanceField.get(contentObj);
+                    if (val instanceof Number n) chance = n.doubleValue();
+                }
+            } catch (Throwable ignored) {
+                for (String mName : new String[]{"chance", "getChance", "chancePercent"}) {
+                    try {
+                        Method m = contentObj.getClass().getMethod(mName);
+                        Object val = m.invoke(contentObj);
+                        if (val instanceof Number n) {
+                            chance = n.doubleValue();
+                            break;
+                        }
+                    } catch (Throwable ignored2) {}
+                }
+            }
+            if (chance > 1.0) {
+                chance = chance / 10000.0; // GTCEu uses 10000 = 100%
+            }
+            chance = Math.max(0.0, Math.min(1.0, chance));
+
+            double tierChanceBoost = 0.0;
+            try {
+                Field boostField = null;
+                try { boostField = contentObj.getClass().getField("tierChanceBoost"); } catch (Throwable ignored) {
+                    boostField = contentObj.getClass().getDeclaredField("tierChanceBoost");
+                    boostField.setAccessible(true);
+                }
+                if (boostField != null) {
+                    Object val = boostField.get(contentObj);
+                    if (val instanceof Number n) tierChanceBoost = n.doubleValue();
+                }
+            } catch (Throwable ignored) {
+                for (String mName : new String[]{"tierChanceBoost", "getTierChanceBoost", "tierBoost"}) {
+                    try {
+                        Method m = contentObj.getClass().getMethod(mName);
+                        Object val = m.invoke(contentObj);
+                        if (val instanceof Number n) {
+                            tierChanceBoost = n.doubleValue();
+                            break;
+                        }
+                    } catch (Throwable ignored2) {}
+                }
+            }
+            if (tierChanceBoost > 1.0) {
+                tierChanceBoost = tierChanceBoost / 10000.0;
+            }
+            tierChanceBoost = Math.max(0.0, tierChanceBoost);
+
+            IngredientStack is = null;
+            if (inner instanceof ItemStack stack) {
+                if (stack.isEmpty()) return null;
+                ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                String name = stack.getHoverName().getString();
+                is = IngredientStack.item(id, name, stack.getCount(), (float) chance);
+            } else if (inner instanceof net.minecraftforge.fluids.FluidStack fStack) {
+                if (fStack.isEmpty()) return null;
+                ResourceLocation id = ForgeRegistries.FLUIDS.getKey(fStack.getFluid());
+                String name = fStack.getDisplayName().getString();
+                is = IngredientStack.fluid(id, name, fStack.getAmount(), (float) chance);
+            } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
+                var items = ing.getItems();
+                if (items != null && items.length > 0 && !items[0].isEmpty()) {
+                    ItemStack first = items[0];
+                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(first.getItem());
+                    String name = first.getHoverName().getString();
+                    long amount = 1;
+                    try {
+                        Method getAmountMethod = inner.getClass().getMethod("getAmount");
+                        amount = ((Number) getAmountMethod.invoke(inner)).longValue();
+                    } catch (Throwable ignored) {}
+                    is = IngredientStack.item(id, name, amount, (float) chance);
+                }
+            } else if (inner != null && inner.getClass().getName().contains("FluidIngredient")) {
+                try {
+                    Method getStacksMethod = inner.getClass().getMethod("getStacks");
+                    Object res = getStacksMethod.invoke(inner);
+                    if (res instanceof net.minecraftforge.fluids.FluidStack[] fArray && fArray.length > 0) {
+                        net.minecraftforge.fluids.FluidStack first = fArray[0];
+                        ResourceLocation id = ForgeRegistries.FLUIDS.getKey(first.getFluid());
+                        String name = first.getDisplayName().getString();
+                        is = IngredientStack.fluid(id, name, first.getAmount(), (float) chance);
+                    }
+                } catch (Throwable ignored) {}
+            }
+
+            if (is != null && tierChanceBoost > 0.0) {
+                is.setTierChanceBoost(tierChanceBoost);
+            }
+            return is;
+        } catch (Throwable ignored) {}
         return null;
     }
 }

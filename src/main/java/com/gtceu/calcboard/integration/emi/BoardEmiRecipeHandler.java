@@ -27,6 +27,11 @@ public class BoardEmiRecipeHandler implements EmiRecipeHandler<BoardMenu> {
     }
 
     @Override
+    public boolean alwaysDisplaySupport(EmiRecipe recipe) {
+        return true;
+    }
+
+    @Override
     public boolean canCraft(EmiRecipe recipe, EmiCraftContext<BoardMenu> context) {
         return true;
     }

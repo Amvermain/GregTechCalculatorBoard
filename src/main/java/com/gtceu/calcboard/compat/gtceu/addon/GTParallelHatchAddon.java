@@ -17,7 +17,7 @@ public class GTParallelHatchAddon extends MachineAddon {
         this.isAbsolute = isAbsolute;
         setParallelMultiplier(parallel);
         setDurationMultiplier(1.0);
-        setEutMultiplier(isAbsolute ? 1.0 : parallel);
+        setEutMultiplier(1.0);
         setPowerConstant(isAbsolute);
     }
 

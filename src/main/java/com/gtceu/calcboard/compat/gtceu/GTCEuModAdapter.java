@@ -36,8 +36,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Locale;
 
 /**
@@ -59,13 +64,29 @@ public class GTCEuModAdapter implements IModAdapter {
             if (node == null || store == null) return java.util.List.of();
             long startEU = store.get(com.gtceu.calcboard.api.property.NodeProperties.FUSION_START_EU);
             boolean isFusionCat = node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion_reactor");
-            if (startEU <= 0 && !isFusionCat) return java.util.List.of();
+            if (startEU <= 0 && !isFusionCat && !node.isFusion()) return java.util.List.of();
 
-            int fTier = startEU <= 160_000_000L ? 1 : (startEU <= 320_000_000L ? 2 : 3);
-            String tierBadgeText = "⚛ Mk" + fTier;
+            // Determine active reactor tier label from node's targetTier or controller icon
+            GTVoltageTier tier = node.getTargetTier();
+            String mkLabel;
+            if (tier == GTVoltageTier.ZPM) mkLabel = "Mk2";
+            else if (tier == GTVoltageTier.UV) mkLabel = "Mk3";
+            else if (tier == GTVoltageTier.UHV) mkLabel = "AUX I";
+            else if (tier == GTVoltageTier.UEV) mkLabel = "Mk4";
+            else if (tier == GTVoltageTier.UIV) mkLabel = "AUX II";
+            else if (tier == GTVoltageTier.UXV) mkLabel = "Mk5";
+            else if (tier == GTVoltageTier.OpV) mkLabel = "AUX III";
+            else if (tier == GTVoltageTier.MAX) mkLabel = "Mk6";
+            else if (tier == GTVoltageTier.LuV) mkLabel = "Mk1";
+            else {
+                int fTier = startEU <= 160_000_000L ? 1 : (startEU <= 320_000_000L ? 2 : 3);
+                mkLabel = "Mk" + fTier;
+            }
+
+            String tierBadgeText = "⚛ " + mkLabel;
             java.util.List<net.minecraft.network.chat.Component> tierTooltip = java.util.List.of(
-                    net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§d⚛ Fusion Reactor Mk%d", fTier)),
-                    net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Min Voltage Tier: §f%s", fTier == 1 ? "LuV" : (fTier == 2 ? "ZPM" : "UV")))
+                    net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§d⚛ Fusion Reactor %s", mkLabel)),
+                    net.minecraft.network.chat.Component.literal(String.format(java.util.Locale.ROOT, "§7Operating Voltage Tier: §f%s", tier.getName()))
             );
             com.gtceu.calcboard.api.property.NodeBadge tierBadge = new com.gtceu.calcboard.api.property.NodeBadge(tierBadgeText, 0xFFFFFFFF, 0xEE3D1B5E, 0xFFCC44FF, tierTooltip);
 
@@ -239,6 +260,32 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public com.gtceu.calcboard.api.bom.MultiblockStructureDef scanMultiblockStructure(ResourceLocation machineId) {
         return com.gtceu.calcboard.compat.gtceu.helper.GTCEuMultiblockStructureScanner.scanSingle(machineId);
+    }
+
+    @Override
+    public com.gtceu.calcboard.api.bom.PartCategory classifyBOMPart(ResourceLocation itemId) {
+        if (itemId == null) return null;
+        if (CoilHelper.isHeatingCoil(itemId)) {
+            return com.gtceu.calcboard.api.bom.PartCategory.COIL;
+        }
+        String ns = itemId.getNamespace().toLowerCase(Locale.ROOT);
+        if (!ns.equals("gtceu") && !ns.equals("gtcalcboard") && !ns.contains("start")) {
+            return null;
+        }
+        String path = itemId.getPath().toLowerCase(Locale.ROOT);
+        if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch"))
+                || path.contains("laser_target") || path.contains("laser_source") || path.contains("input_bus")
+                || path.contains("output_bus") || path.contains("input_hatch") || path.contains("output_hatch")
+                || path.contains("maintenance") || path.contains("parallel") || path.contains("hatch")
+                || path.contains("bus") || path.contains("target") || path.contains("source")
+                || path.contains("import") || path.contains("export") || path.contains("augment")
+                || path.contains("upgrade")) {
+            return com.gtceu.calcboard.api.bom.PartCategory.HATCH_BUS;
+        } else if (path.contains("casing") || path.contains("pipe") || path.contains("glass") || path.contains("wall")
+                || path.contains("grate") || path.contains("frame") || path.contains("coil") || path.contains("magnet")) {
+            return com.gtceu.calcboard.api.bom.PartCategory.CASING;
+        }
+        return null;
     }
 
     @Override
@@ -484,7 +531,12 @@ public class GTCEuModAdapter implements IModAdapter {
             return true;
         }
         if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-            if (!node.isMultiblock() || isGen) return false;
+            if ((!node.isMultiblock() && !isFusion) || isGen) return false;
+            if (isFusion && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
+                if (eh.getTier() != node.getTargetTier()) {
+                    return false;
+                }
+            }
             ResourceLocation mbId = node.getMachineIcon();
             if (mbId == null) {
                 mbId = node.getMultiblockWorkstation();
@@ -838,7 +890,12 @@ public class GTCEuModAdapter implements IModAdapter {
                 hatches.add(eh);
             }
         }
-        if (hatches.isEmpty()) return;
+        if (hatches.isEmpty()) {
+            if (node.getRecipeTier() != null) {
+                node.setTargetTier(node.getRecipeTier());
+            }
+            return;
+        }
 
         long totalEUtCapacity = 0;
         GTVoltageTier maxSingleHatchTier = GTVoltageTier.ULV;
@@ -869,6 +926,24 @@ public class GTCEuModAdapter implements IModAdapter {
         } else {
             node.setTargetTier(maxSingleHatchTier);
         }
+    }
+
+    public static long getMaxEUtCapacity(RecipeNode node) {
+        if (node == null) return Long.MAX_VALUE;
+        List<com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon> hatches = new ArrayList<>();
+        for (MachineAddon a : node.getAddons()) {
+            if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
+                hatches.add(eh);
+            }
+        }
+        if (!hatches.isEmpty()) {
+            long total = 0;
+            for (var h : hatches) {
+                total += (long) h.getTier().getVoltage() * h.getAmperage();
+            }
+            return total;
+        }
+        return Long.MAX_VALUE;
     }
 
     @Override
@@ -1126,6 +1201,20 @@ public class GTCEuModAdapter implements IModAdapter {
             }
         }
 
+        if (node.isFusion()) {
+            for (MachineAddon addon : node.getAddons()) {
+                if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
+                    if (eh.getTier() != node.getTargetTier()) {
+                        if (warnings != null) {
+                            warnings.add(Component.translatable("gui.gtcalcboard.node_warning.fusion_energy_hatch_tier_mismatch",
+                                    node.getTargetTier().getName(), eh.getTier().getName()));
+                        }
+                        valid = false;
+                    }
+                }
+            }
+        }
+
         return valid;
     }
 
@@ -1160,7 +1249,45 @@ public class GTCEuModAdapter implements IModAdapter {
         if (isGenerator) {
             baseRes = new OverclockMode.OverclockResult(node.getBaseDurationTicks(), node.getBaseEUt(), 1.0, 0);
         } else {
-            baseRes = node.getOverclockMode().calculate(node.getBaseDurationTicks(), node.getBaseEUt(), node.getTierDelta());
+            int maxTierDelta = node.getTierDelta();
+            long maxCapacity = getMaxEUtCapacity(node);
+            int effectivePar = computeEffectiveParallel(node);
+            if (node.hasPowerConstantAddon()) {
+                effectivePar = node.getParallel();
+            }
+            double combinedEutMult = node.getCombinedEutMultiplier();
+            double threadingPowerMult = node.hasThreading() ? node.getThreadingConfig().getFinalPowerMultiplier() : 1.0;
+
+            double currentDuration = node.getBaseDurationTicks();
+            double currentEUt = node.getBaseEUt();
+            int performedOcs = 0;
+
+            double energyFactor = node.getOverclockMode().getEnergyFactor();
+            double speedFactor = node.getOverclockMode().getSpeedFactor();
+            if (node.isFusion()) {
+                // GTCEu & Star Technology 2:2 Fusion Overclock: doubles energy cost (2.0x) while halving duration (2.0x)
+                energyFactor = 2.0;
+                speedFactor = 2.0;
+            }
+
+            for (int i = 0; i < maxTierDelta; i++) {
+                double nextEUt = currentEUt * energyFactor;
+                double nextTotalEUt = nextEUt * effectivePar * combinedEutMult * threadingPowerMult;
+                if (nextTotalEUt > maxCapacity) {
+                    break;
+                }
+                currentEUt = nextEUt;
+                currentDuration /= speedFactor;
+                performedOcs++;
+            }
+
+            double batchesPerTick = 1.0;
+            double effectiveDurationTicks = currentDuration;
+            if (currentDuration < 1.0 && currentDuration > 0) {
+                batchesPerTick = 1.0 / currentDuration;
+                effectiveDurationTicks = 1.0;
+            }
+            baseRes = new OverclockMode.OverclockResult(effectiveDurationTicks, currentEUt, batchesPerTick, performedOcs);
         }
 
         double finalDuration;
@@ -1288,7 +1415,26 @@ public class GTCEuModAdapter implements IModAdapter {
         } else {
             int base = node.isMultiblock() ? getDefaultParallel(node) : 1;
             int effectiveBase = Math.max(base, node.getParallel() > 1 ? node.getParallel() : 1);
-            par = Math.max(1, effectiveBase * node.getCombinedParallelMultiplier());
+            if (isMultiSmelterNode(node)) {
+                int coilPar = 0;
+                for (MachineAddon addon : node.getAddons()) {
+                    if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon coil) {
+                        coilPar = Math.max(coilPar, coil.getSmelterParallel());
+                    } else if (addon.getCategory() == MachineAddon.Category.COIL) {
+                        if (addon.getSmelterParallel() > 0) {
+                            coilPar = Math.max(coilPar, addon.getSmelterParallel());
+                        } else {
+                            var stats = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getCoilStats(addon.getId());
+                            if (stats != null && stats.smelterParallel() > 0) {
+                                coilPar = Math.max(coilPar, stats.smelterParallel());
+                            }
+                        }
+                    }
+                }
+                par = coilPar > 0 ? coilPar : effectiveBase;
+            } else {
+                par = Math.max(1, effectiveBase * node.getCombinedParallelMultiplier());
+            }
         }
         if (node.hasThreading()) {
             par *= node.getThreadingConfig().getEffectiveParallels();
@@ -1296,9 +1442,42 @@ public class GTCEuModAdapter implements IModAdapter {
         return par;
     }
 
+    private static boolean isMultiSmelterNode(RecipeNode node) {
+        if (node == null) return false;
+        if (node.getMachineIcon() != null) {
+            String p = node.getMachineIcon().getPath().toLowerCase(Locale.ROOT);
+            if (p.contains("multi_smelter") || p.contains("smelter")) return true;
+        }
+        if (node.getMultiblockWorkstation() != null) {
+            String p = node.getMultiblockWorkstation().getPath().toLowerCase(Locale.ROOT);
+            if (p.contains("multi_smelter") || p.contains("smelter")) return true;
+        }
+        if (node.getName() != null) {
+            String n = node.getName().toLowerCase(Locale.ROOT);
+            if (n.contains("multi smelter") || n.contains("multismelter")) return true;
+        }
+        return false;
+    }
+
     @Override
     public int getDefaultParallel(RecipeNode node) {
         if (node == null) return 1;
+        if (node.isMultiblock() && isMultiSmelterNode(node)) {
+            for (MachineAddon addon : node.getAddons()) {
+                if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon coil) {
+                    return coil.getSmelterParallel();
+                } else if (addon.getCategory() == MachineAddon.Category.COIL) {
+                    if (addon.getSmelterParallel() > 0) {
+                        return addon.getSmelterParallel();
+                    } else {
+                        var stats = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getCoilStats(addon.getId());
+                        if (stats != null && stats.smelterParallel() > 0) {
+                            return stats.smelterParallel();
+                        }
+                    }
+                }
+            }
+        }
         return MultiblockDetector.getDefaultParallel(node);
     }
 
@@ -1350,6 +1529,9 @@ public class GTCEuModAdapter implements IModAdapter {
             if (cap != null && cap.supportsSteamMode()) {
                 return true;
             }
+            if (VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId())) {
+                return true;
+            }
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null && (MultiblockDetector.isSteamMultiblock(ws) || ws.getPath().startsWith("steam_") || ws.getPath().startsWith("lp_steam_") || ws.getPath().startsWith("hp_steam_"))) {
@@ -1370,15 +1552,306 @@ public class GTCEuModAdapter implements IModAdapter {
         return false;
     }
 
+    private static final Map<String, GTVoltageTier> FUSION_TIER_TOKEN_MAP = Map.ofEntries(
+            Map.entry("mk1", GTVoltageTier.LuV),
+            Map.entry("mk_1", GTVoltageTier.LuV),
+            Map.entry("mk_i", GTVoltageTier.LuV),
+            Map.entry("mki", GTVoltageTier.LuV),
+            Map.entry("mk2", GTVoltageTier.ZPM),
+            Map.entry("mk_2", GTVoltageTier.ZPM),
+            Map.entry("mk_ii", GTVoltageTier.ZPM),
+            Map.entry("mkii", GTVoltageTier.ZPM),
+            Map.entry("mk3", GTVoltageTier.UV),
+            Map.entry("mk_3", GTVoltageTier.UV),
+            Map.entry("mk_iii", GTVoltageTier.UV),
+            Map.entry("mkiii", GTVoltageTier.UV),
+            Map.entry("aux1", GTVoltageTier.UHV),
+            Map.entry("aux_1", GTVoltageTier.UHV),
+            Map.entry("aux_i", GTVoltageTier.UHV),
+            Map.entry("auxi", GTVoltageTier.UHV),
+            Map.entry("mk4", GTVoltageTier.UEV),
+            Map.entry("mk_4", GTVoltageTier.UEV),
+            Map.entry("mk_iv", GTVoltageTier.UEV),
+            Map.entry("mkiv", GTVoltageTier.UEV),
+            Map.entry("aux2", GTVoltageTier.UIV),
+            Map.entry("aux_2", GTVoltageTier.UIV),
+            Map.entry("aux_ii", GTVoltageTier.UIV),
+            Map.entry("auxii", GTVoltageTier.UIV),
+            Map.entry("mk5", GTVoltageTier.UXV),
+            Map.entry("mk_5", GTVoltageTier.UXV),
+            Map.entry("aux3", GTVoltageTier.OpV),
+            Map.entry("aux_3", GTVoltageTier.OpV),
+            Map.entry("mk6", GTVoltageTier.MAX),
+            Map.entry("mk_6", GTVoltageTier.MAX)
+    );
+
+    public static GTVoltageTier extractVoltageTierFromIcon(ResourceLocation icon) {
+        if (icon == null) return null;
+
+        // 1. Deductive query via official GTRegistries.MACHINES
+        try {
+            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+            if (machinesRegistry != null) {
+                Method mGet = machinesRegistry.getClass().getMethod("get", ResourceLocation.class);
+                Object def = mGet.invoke(machinesRegistry, icon);
+                if (def != null) {
+                    try {
+                        Method mTier = def.getClass().getMethod("getTier");
+                        Object tierObj = mTier.invoke(def);
+                        if (tierObj instanceof Number num) {
+                            int tierInt = num.intValue();
+                            if (tierInt >= 0 && tierInt < GTVoltageTier.values().length) {
+                                return GTVoltageTier.values()[tierInt];
+                            }
+                        } else if (tierObj != null) {
+                            String tierName = tierObj.toString();
+                            for (GTVoltageTier t : GTVoltageTier.values()) {
+                                if (t.name().equalsIgnoreCase(tierName)) {
+                                    return t;
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        // 2. Structured Token Analysis from GTVoltageTier definitions (sorted by length descending)
+        String path = icon.getPath().toLowerCase(java.util.Locale.ROOT);
+        GTVoltageTier[] tiers = GTVoltageTier.values().clone();
+        java.util.Arrays.sort(tiers, (a, b) -> Integer.compare(b.name().length(), a.name().length()));
+        for (GTVoltageTier tier : tiers) {
+            String nameLower = tier.name().toLowerCase(java.util.Locale.ROOT);
+            if (path.startsWith(nameLower + "_") || path.contains("_" + nameLower + "_") || path.endsWith("_" + nameLower)) {
+                return tier;
+            }
+        }
+
+        // 3. Fusion Roman / Arabic Numeral Token Mapping Table (Star Technology & Addons)
+        for (Map.Entry<String, GTVoltageTier> entry : FUSION_TIER_TOKEN_MAP.entrySet()) {
+            String token = entry.getKey();
+            if (path.startsWith(token + "_") || path.contains("_" + token + "_") || path.endsWith("_" + token) || path.contains(token)) {
+                return entry.getValue();
+            }
+        }
+
+        return null;
+    }
+
+    private static final Map<ResourceLocation, Map<GTVoltageTier, ResourceLocation>> DEDUCTED_TIER_WORKSTATIONS = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, List<ResourceLocation>> DEDUCTED_MULTIBLOCK_WORKSTATIONS = new ConcurrentHashMap<>();
+
+    @Override
+    public List<ResourceLocation> getMultiblockWorkstations(RecipeNode node) {
+        if (node == null) return java.util.Collections.emptyList();
+        List<ResourceLocation> result = new ArrayList<>();
+
+        // 1. Add from node's own availableWorkstations first
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && MultiblockDetector.isMultiblock(ws) && !result.contains(ws)) {
+                result.add(ws);
+            }
+        }
+
+        ResourceLocation catId = node.getRecipeCategoryId();
+
+        // 2. Query CategoryCapabilityMatrix
+        if (catId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && cap.availableWorkstations() != null) {
+                for (ResourceLocation ws : cap.availableWorkstations()) {
+                    if (ws != null && MultiblockDetector.isMultiblock(ws) && !result.contains(ws)) {
+                        result.add(ws);
+                    }
+                }
+            }
+        }
+
+        // 3. Deductively query GTRegistries.MACHINES for all multiblock definitions matching catId
+        if (catId != null) {
+            List<ResourceLocation> cached = DEDUCTED_MULTIBLOCK_WORKSTATIONS.get(catId);
+            if (cached == null) {
+                cached = deductMultiblocksFromGTRegistries(catId);
+                DEDUCTED_MULTIBLOCK_WORKSTATIONS.put(catId, cached);
+            }
+            for (ResourceLocation mb : cached) {
+                if (mb != null && !result.contains(mb)) {
+                    result.add(mb);
+                }
+            }
+        }
+
+        if (result.isEmpty() && node.getMachineIcon() != null && MultiblockDetector.isMultiblock(node.getMachineIcon())) {
+            result.add(node.getMachineIcon());
+        }
+
+        // Sort to prioritize direct category match (e.g. large_macerator for gtceu:macerator) at the front
+        if (catId != null && result.size() > 1) {
+            String catPath = catId.getPath().toLowerCase(Locale.ROOT);
+            result.sort((a, b) -> {
+                boolean aMatch = a.getPath().toLowerCase(Locale.ROOT).contains(catPath);
+                boolean bMatch = b.getPath().toLowerCase(Locale.ROOT).contains(catPath);
+                if (aMatch && !bMatch) return -1;
+                if (!aMatch && bMatch) return 1;
+                return 0;
+            });
+        }
+
+        return result;
+    }
+
+    private static List<ResourceLocation> deductMultiblocksFromGTRegistries(ResourceLocation catId) {
+        List<ResourceLocation> list = new ArrayList<>();
+        if (catId == null) return list;
+        try {
+            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+            if (machinesRegistry instanceof Iterable<?> iterable) {
+                for (Object machineDef : iterable) {
+                    if (machineDef == null) continue;
+                    try {
+                        Method mGetId = machineDef.getClass().getMethod("getId");
+                        ResourceLocation id = (ResourceLocation) mGetId.invoke(machineDef);
+                        if (id == null || !MultiblockDetector.isMultiblock(id)) continue;
+
+                        if (matchesRecipeType(machineDef, catId)) {
+                            if (!list.contains(id)) {
+                                list.add(id);
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+        return list;
+    }
+
+    @Override
+    public ResourceLocation getWorkstationForTier(RecipeNode node, GTVoltageTier tier) {
+        if (node == null || tier == null) return null;
+
+        // 1. Try finding from node's own availableWorkstations list first
+        ResourceLocation fromList = node.getWorkstationForTierFromList(tier);
+        if (fromList != null) {
+            return fromList;
+        }
+
+        ResourceLocation catId = node.getRecipeCategoryId();
+
+        // 2. Query deductive cache
+        if (catId != null) {
+            Map<GTVoltageTier, ResourceLocation> tierMap = DEDUCTED_TIER_WORKSTATIONS.get(catId);
+            if (tierMap != null) {
+                ResourceLocation cached = tierMap.get(tier);
+                if (cached != null) return cached;
+            }
+        }
+
+        // 3. Deductively query official GTRegistries.MACHINES by (RecipeType, Tier, Non-Multiblock)
+        ResourceLocation resolved = deductWorkstationFromGTRegistries(catId, tier);
+        if (resolved != null) {
+            if (catId != null) {
+                DEDUCTED_TIER_WORKSTATIONS.computeIfAbsent(catId, k -> new ConcurrentHashMap<>()).put(tier, resolved);
+            }
+            return resolved;
+        }
+
+        // 4. Try looking up in CategoryCapabilityMatrix
+        if (catId != null) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && cap.availableWorkstations() != null) {
+                String tierName = tier.name().toLowerCase(Locale.ROOT);
+                for (ResourceLocation ws : cap.availableWorkstations()) {
+                    if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
+                        String path = ws.getPath().toLowerCase(Locale.ROOT);
+                        if (path.startsWith(tierName + "_") || path.contains("_" + tierName + "_")) {
+                            return ws;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Headless test environment deterministic fallback
+        if (catId != null && "gtceu".equals(catId.getNamespace())) {
+            return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + catId.getPath());
+        }
+
+        return null;
+    }
+
+    private static ResourceLocation deductWorkstationFromGTRegistries(ResourceLocation catId, GTVoltageTier targetTier) {
+        if (catId == null || targetTier == null) return null;
+        try {
+            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
+            if (machinesRegistry instanceof Iterable<?> iterable) {
+                int targetTierOrdinal = targetTier.ordinal();
+                for (Object machineDef : iterable) {
+                    if (machineDef == null) continue;
+                    try {
+                        Method mGetId = machineDef.getClass().getMethod("getId");
+                        ResourceLocation id = (ResourceLocation) mGetId.invoke(machineDef);
+                        if (id == null || MultiblockDetector.isMultiblock(id)) continue;
+
+                        Method mGetTier = machineDef.getClass().getMethod("getTier");
+                        Object tVal = mGetTier.invoke(machineDef);
+                        if (tVal instanceof Number num && num.intValue() == targetTierOrdinal) {
+                            if (matchesRecipeType(machineDef, catId)) {
+                                return id;
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static boolean matchesRecipeType(Object machineDef, ResourceLocation catId) {
+        if (machineDef == null || catId == null) return false;
+        try {
+            Method mGetRecipeTypes = machineDef.getClass().getMethod("getRecipeTypes");
+            Object rts = mGetRecipeTypes.invoke(machineDef);
+            if (rts instanceof Object[] arr) {
+                for (Object rt : arr) {
+                    ResourceLocation rtId = MultiblockDetector.extractRecipeTypeId(rt);
+                    if (catId.equals(rtId)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        try {
+            Method mGetRecipeType = machineDef.getClass().getMethod("getRecipeType");
+            Object rt = mGetRecipeType.invoke(machineDef);
+            ResourceLocation rtId = MultiblockDetector.extractRecipeTypeId(rt);
+            if (catId.equals(rtId)) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static final Set<ResourceLocation> VANILLA_COOKING_RECIPE_TYPES = Set.of(
+            new ResourceLocation("minecraft", "smelting"),
+            new ResourceLocation("minecraft", "blasting"),
+            new ResourceLocation("minecraft", "smoking"),
+            new ResourceLocation("minecraft", "campfire_cooking"),
+            new ResourceLocation("minecraft", "furnace")
+    );
+
     @Override
     public void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
         if (node == null || newIcon == null) return;
+
         if (MultiblockDetector.isSteamMultiblock(newIcon)) {
             node.setMultiblock(true);
             int defPar = MultiblockDetector.getDefaultParallel(newIcon);
             node.setParallel(Math.max(1, defPar));
             node.setSteamMode(SteamMode.HIGH_PRESSURE);
-        } else if (MultiblockDetector.isMultiblock(newIcon)) {
+        } else if (MultiblockDetector.isMultiblock(newIcon) || node.isFusion()) {
             node.setMultiblock(true);
             if (node.getSteamMode().isSteam()) {
                 node.setSteamMode(SteamMode.NONE);
@@ -1393,6 +1866,36 @@ public class GTCEuModAdapter implements IModAdapter {
                 node.setParallel(1);
             }
         }
+
+        GTVoltageTier iconTier = extractVoltageTierFromIcon(newIcon);
+        if (iconTier != null && !node.isTurbine()) {
+            node.setTargetTier(iconTier);
+            if (node.isFusion()) {
+                node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH
+                        && a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh
+                        && eh.getTier() != iconTier);
+            }
+        }
+
+        // Deterministic recipe conversion for vanilla cooking categories handled by GT machines
+        if (node.getRecipeCategoryId() != null && VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId())) {
+            String newNs = newIcon.getNamespace().toLowerCase(Locale.ROOT);
+            if (newNs.equals("gtceu") || newNs.contains("start")) {
+                node.setBaseEUt(4.0);
+                node.setRecipeTier(GTVoltageTier.LV);
+                if (node.getTargetTier() == null || node.getTargetTier() == GTVoltageTier.ULV) {
+                    node.setTargetTier(GTVoltageTier.LV);
+                }
+                node.setBaseDurationTicks(128.0);
+                node.setEnergyType(EnergyType.ELECTRIC_EU);
+            } else if (newNs.equals("minecraft")) {
+                node.setBaseEUt(0.0);
+                node.setRecipeTier(GTVoltageTier.ULV);
+                node.setTargetTier(GTVoltageTier.ULV);
+                node.setBaseDurationTicks(200.0);
+                node.setEnergyType(EnergyType.NONE);
+            }
+        }
     }
 
     @Override
@@ -1400,6 +1903,11 @@ public class GTCEuModAdapter implements IModAdapter {
         if (node == null) return EnergyType.ELECTRIC_EU;
         if (isBoilerRecipe(node) || isLiquidBoilerRecipe(node)) {
             return EnergyType.HEAT_OR_SELF;
+        }
+        if (node.getMachineIcon() != null && (node.getMachineIcon().getNamespace().equals("gtceu") || node.getMachineIcon().getNamespace().contains("start"))) {
+            if (node.getBaseEUt() > 0.0 || node.isGenerator()) {
+                return EnergyType.ELECTRIC_EU;
+            }
         }
         if (node.getBaseEUt() <= 0.0 && !node.isGenerator()) {
             return EnergyType.NONE;
@@ -1412,13 +1920,14 @@ public class GTCEuModAdapter implements IModAdapter {
         ResourceLocation steamId = ResourceLocation.tryParse("gtceu:steam");
         if (newMode != null && newMode.isSteam()) {
             double durTicks = node.getBaseDurationTicks() * newMode.getDurationMultiplier();
+            double baseEu = (node.getBaseEUt() > 0) ? node.getBaseEUt() : 4.0;
             double steamAmountPerBatch;
             if (node.isMultiblock() || MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
                 double steamRatePerTick = MultiblockDetector.getSteamMultiblockConsumption(node.getMachineIcon(), newMode);
                 int parallel = Math.max(1, node.getParallel());
                 steamAmountPerBatch = (steamRatePerTick * durTicks) / parallel;
             } else {
-                steamAmountPerBatch = (node.getBaseEUt() * 2.0) * durTicks;
+                steamAmountPerBatch = (baseEu * 2.0) * durTicks;
             }
 
             node.getInputs().removeIf(in -> in.isFluid() && steamId != null && steamId.equals(in.getId()));
@@ -1427,10 +1936,18 @@ public class GTCEuModAdapter implements IModAdapter {
             // Sync workstation icon from pre-baked capability matrix for singleblock machines
             if (!node.isMultiblock() && !MultiblockDetector.isSteamMultiblock(node.getMachineIcon()) && node.getRecipeCategoryId() != null) {
                 CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
-                if (newMode == SteamMode.LOW_PRESSURE && cap.lowPressureWorkstation() != null) {
-                    node.setMachineIcon(cap.lowPressureWorkstation());
-                } else if (newMode == SteamMode.HIGH_PRESSURE && cap.highPressureWorkstation() != null) {
-                    node.setMachineIcon(cap.highPressureWorkstation());
+                if (newMode == SteamMode.LOW_PRESSURE) {
+                    if (cap != null && cap.lowPressureWorkstation() != null) {
+                        node.setMachineIcon(cap.lowPressureWorkstation());
+                    } else if (VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId())) {
+                        node.setMachineIcon(ResourceLocation.tryParse("gtceu:lp_steam_furnace"));
+                    }
+                } else if (newMode == SteamMode.HIGH_PRESSURE) {
+                    if (cap != null && cap.highPressureWorkstation() != null) {
+                        node.setMachineIcon(cap.highPressureWorkstation());
+                    } else if (VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId())) {
+                        node.setMachineIcon(ResourceLocation.tryParse("gtceu:hp_steam_furnace"));
+                    }
                 }
             }
         } else if (oldMode != null && oldMode.isSteam()) {

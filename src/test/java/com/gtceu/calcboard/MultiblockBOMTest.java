@@ -927,6 +927,93 @@ public class MultiblockBOMTest {
         Assertions.assertTrue(applicableCats.contains(AddonCategory.MAINTENANCE));
         Assertions.assertFalse(applicableCats.contains(AddonCategory.COIL), "Tree Synthesizer MUST NOT have COIL category");
     }
+
+    @Test
+    public void testOptionalParallelHatchAndUnusedIOExcludedAndCasingRestored() {
+        ResourceLocation dtId = ResourceLocation.tryParse("gtceu:distillation_tower_sample");
+
+        // Structure def containing preview sample: Casing 63, Pipe 4, Energy 1, Maint 1, Muffler 1, InputHatch 1, OutputHatch 4, OutputBus 1, EliteParallel 1 (Total: 78 blocks)
+        List<MultiblockStructurePart> parts = List.of(
+            new MultiblockStructurePart(dtId, "Distillation Tower", 1, PartCategory.CONTROLLER),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:watertight_casing"), "Watertight Casing", 63, PartCategory.CASING),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:steel_pipe_casing"), "Steel Pipe Casing", 4, PartCategory.CASING),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:mv_energy_input_hatch"), "MV Energy Input Hatch", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:maintenance_hatch"), "Maintenance Hatch", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:mv_muffler_hatch"), "MV Muffler Hatch", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:mv_input_hatch"), "MV Input Hatch", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:mv_output_hatch"), "MV Output Hatch", 4, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:mv_output_bus"), "MV Output Bus", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:elite_parallel_control_hatch"), "Elite Parallel Control Hatch", 1, PartCategory.HATCH_BUS)
+        );
+        MultiblockStructureDef def = new MultiblockStructureDef(dtId, "Distillation Tower", parts, 0, 1, 0, 1, 1, 4, 1);
+        MultiblockStructureCatalog.registerManualStructure(def);
+
+        // Case 1: Fluid-only recipe without parallel addon
+        RecipeNode nodeNoParallel = new RecipeNode("dt_fluid_only", "Distillation Tower (Naphtha)", 100, 100, GTVoltageTier.MV);
+        nodeNoParallel.setMachineIcon(dtId);
+        nodeNoParallel.setMultiblock(true);
+        nodeNoParallel.setMachineCount(1.0);
+        nodeNoParallel.setTargetTier(GTVoltageTier.MV);
+
+        // 1 Fluid Input, 4 Fluid Outputs, NO Items
+        nodeNoParallel.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:naphtha"), "Naphtha", 1000.0));
+        for (int i = 0; i < 4; i++) {
+            nodeNoParallel.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fraction_" + i), "Fraction " + i, 250.0));
+        }
+
+        MultiblockBOMSummary summary1 = MultiblockBOMCalculator.calculateBOM(List.of(nodeNoParallel), false);
+
+        // Parallel Hatch MUST NOT be present
+        boolean hasParallel = summary1.aggregatedItems().stream().anyMatch(e -> e.itemId().getPath().contains("parallel"));
+        Assertions.assertFalse(hasParallel, "Parallel hatch must NOT be in BOM when not equipped");
+
+        // Watertight Casing must be restored from 63 to 64 (from removed parallel hatch)
+        MultiblockBOMSummary.BOMItemEntry casing1 = summary1.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:watertight_casing")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(casing1);
+        Assertions.assertEquals(64, casing1.totalAmount(), "Watertight casing must be restored from 63 to 64");
+
+        // Total blocks must equal exactly 78
+        int totalBlocks1 = summary1.aggregatedItems().stream().mapToInt(MultiblockBOMSummary.BOMItemEntry::totalAmount).sum();
+        Assertions.assertEquals(78, totalBlocks1, "Total structure block count must be perfectly preserved");
+
+        // Case 2: Fluid-only recipe WITH Advanced Parallel Hatch equipped
+        RecipeNode nodeWithParallel = new RecipeNode("dt_with_parallel", "Distillation Tower (Naphtha + Parallel)", 100, 100, GTVoltageTier.MV);
+        nodeWithParallel.setMachineIcon(dtId);
+        nodeWithParallel.setMultiblock(true);
+        nodeWithParallel.setMachineCount(1.0);
+        nodeWithParallel.setTargetTier(GTVoltageTier.MV);
+        nodeWithParallel.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:naphtha"), "Naphtha", 1000.0));
+        for (int i = 0; i < 4; i++) {
+            nodeWithParallel.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fraction_" + i), "Fraction " + i, 250.0));
+        }
+
+        com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon advParallel = new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(
+            "gtceu:advanced_parallel_control_hatch", "Advanced Parallel Control Hatch", "", ResourceLocation.tryParse("gtceu:advanced_parallel_control_hatch"), 16, false
+        );
+        nodeWithParallel.getAddons().add(advParallel);
+
+        MultiblockBOMSummary summary2 = MultiblockBOMCalculator.calculateBOM(List.of(nodeWithParallel), false);
+
+        // Advanced Parallel Hatch MUST be present (amount 1)
+        MultiblockBOMSummary.BOMItemEntry parEntry = summary2.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:advanced_parallel_control_hatch")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(parEntry);
+        Assertions.assertEquals(1, parEntry.totalAmount());
+
+        // Watertight Casing: 63
+        MultiblockBOMSummary.BOMItemEntry casing2 = summary2.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:watertight_casing")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(casing2);
+        Assertions.assertEquals(63, casing2.totalAmount());
+
+        // Total blocks must still equal 78
+        int totalBlocks2 = summary2.aggregatedItems().stream().mapToInt(MultiblockBOMSummary.BOMItemEntry::totalAmount).sum();
+        Assertions.assertEquals(78, totalBlocks2, "Total structure block count must be perfectly preserved");
+    }
 }
 
 

@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Handles dynamic discovery of Thermal augments and KubeJS upgrade kits with AugmentData.
@@ -45,40 +46,46 @@ public class ThermalAddonCrawler {
             }
         }
 
-        // 2. Scan Forge Item Registry with NBT samples fallback (Only when activeRecipeItems is available in Track 2)
-        if (ForgeRegistries.ITEMS != null && !activeRecipeItems.isEmpty()) {
-            for (Item item : ForgeRegistries.ITEMS) {
-                try {
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
-                    if (id == null) continue;
+        // 2. Scan Forge Item Registry with NBT samples fallback
+        try {
+            if (ForgeRegistries.ITEMS != null) {
+                for (Item item : ForgeRegistries.ITEMS) {
+                    try {
+                        ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+                        if (id == null) continue;
 
-                    // Filter out disabled or recipe-less dummy items
-                    if (DynamicAddonCrawler.isItemDisabledOrHidden(item, activeRecipeItems)) {
-                        continue;
-                    }
+                        // When recipes have been scanned, only discover items that actually have an active recipe!
+                        if (!activeRecipeItems.isEmpty() && !activeRecipeItems.contains(item)) {
+                            continue;
+                        }
 
-                    String ns = id.getNamespace().toLowerCase();
-                    String path = id.getPath().toLowerCase();
+                        if (DynamicAddonCrawler.isItemDisabledOrHidden(item, activeRecipeItems)) {
+                            continue;
+                        }
 
-                    boolean isCandidate = ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_foundation")
-                            || ns.equals("thermal_innovation") || ns.equals("thermal_extra") || ns.equals("cofh_core")
-                            || ns.equals("systeams") || ns.equals("kubejs")
-                            || path.contains("augment") || path.contains("upgrade_kit") || path.contains("integral_component")
-                            || path.contains("reaction_chamber") || path.contains("injector") || path.contains("amplifier")
-                            || path.contains("sieve") || path.contains("throttle");
+                        String ns = id.getNamespace().toLowerCase();
+                        String path = id.getPath().toLowerCase();
 
-                    if (!isCandidate) {
-                        continue;
-                    }
+                        boolean isCandidate = ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_foundation")
+                                || ns.equals("thermal_innovation") || ns.equals("thermal_extra") || ns.equals("cofh_core")
+                                || ns.equals("systeams") || ns.equals("kubejs")
+                                || path.contains("augment") || path.contains("upgrade_kit") || path.contains("integral_component")
+                                || path.contains("reaction_chamber") || path.contains("injector") || path.contains("amplifier")
+                                || path.contains("sieve") || path.contains("throttle");
 
-                    ItemStack s = nbtItemSamples.getOrDefault(item, new ItemStack(item));
-                    MachineAddon aug = ThermalAugmentHelper.parseThermalAugment(s, id);
-                    if (aug != null && seenIds.add(aug.getId())) {
-                        collector.add(aug);
-                    }
-                } catch (Throwable ignored) {}
+                        if (!isCandidate) {
+                            continue;
+                        }
+
+                        ItemStack s = nbtItemSamples.getOrDefault(item, new ItemStack(item));
+                        MachineAddon aug = ThermalAugmentHelper.parseThermalAugment(s, id);
+                        if (aug != null && seenIds.add(aug.getId())) {
+                            collector.add(aug);
+                        }
+                    } catch (Throwable ignored) {}
+                }
             }
-        }
+        } catch (Throwable ignored) {}
     }
 
     public static boolean containsAddonId(List<MachineAddon> list, String id) {

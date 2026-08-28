@@ -174,16 +174,51 @@ public class FTBTeamsProvider implements ITeamProvider {
         return Collections.emptySet();
     }
 
+    private boolean isActualPartyTeam(Object team) {
+        if (team == null) return false;
+        try {
+            // 1. Check isParty() or isPartyTeam() method
+            for (Method m : team.getClass().getMethods()) {
+                if ((m.getName().equals("isParty") || m.getName().equals("isPartyTeam")) && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
+                    return (boolean) m.invoke(team);
+                }
+            }
+            // 2. Check isPlayerTeam() method (if true -> NOT a shared party team)
+            for (Method m : team.getClass().getMethods()) {
+                if (m.getName().equals("isPlayerTeam") && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
+                    boolean isPlayer = (boolean) m.invoke(team);
+                    if (isPlayer) return false;
+                }
+            }
+            // 3. Check getType() -> TeamType.isParty() or enum name
+            for (Method m : team.getClass().getMethods()) {
+                if (m.getName().equals("getType") && m.getParameterCount() == 0) {
+                    Object typeObj = m.invoke(team);
+                    if (typeObj != null) {
+                        String typeName = typeObj.toString().toUpperCase(Locale.ROOT);
+                        if (typeName.contains("PARTY") || typeName.contains("SERVER")) {
+                            return true;
+                        }
+                        if (typeName.contains("PLAYER")) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     @Override
     public UUID getPlayerTeamId(ServerPlayer player) {
         if (!isAvailable() || player == null) {
-            return player != null ? player.getUUID() : null;
+            return null;
         }
 
         Object manager = getTeamManager();
         if (manager != null) {
             Object team = getTeamObjectForPlayer(manager, player);
-            if (team != null) {
+            if (team != null && isActualPartyTeam(team)) {
                 UUID id = extractTeamId(team);
                 if (id != null) {
                     return id;
@@ -191,7 +226,7 @@ public class FTBTeamsProvider implements ITeamProvider {
             }
         }
 
-        return player.getUUID();
+        return null;
     }
 
     @Override
@@ -254,13 +289,13 @@ public class FTBTeamsProvider implements ITeamProvider {
         }
 
         if (!isAvailable()) {
-            return player.getUUID().equals(teamId);
+            return false;
         }
 
         Object manager = getTeamManager();
         if (manager != null) {
             Object team = getTeamObjectById(manager, teamId);
-            if (team != null) {
+            if (team != null && isActualPartyTeam(team)) {
                 try {
                     // 1. Direct Owner UUID check
                     for (Method m : team.getClass().getMethods()) {
@@ -303,7 +338,7 @@ public class FTBTeamsProvider implements ITeamProvider {
             }
         }
 
-        return player.getUUID().equals(teamId);
+        return false;
     }
 
     @Override

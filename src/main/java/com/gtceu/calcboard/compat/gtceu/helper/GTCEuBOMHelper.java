@@ -251,8 +251,15 @@ public final class GTCEuBOMHelper {
                         part.amount(),
                         PartCategory.HATCH_BUS
                     ));
-                } else {
-                    list.add(part);
+                }
+            } else if (path.contains("data_access") || path.contains("computing_data") || path.contains("optical_data") || path.contains("object_holder")) {
+                boolean equipped = false;
+                for (MachineAddon addon : node.getAddons()) {
+                    if (addon != null && addon.getItemIcon() != null && addon.getItemIcon().equals(part.itemId())) {
+                        list.add(part);
+                        equipped = true;
+                        break;
+                    }
                 }
             } else if (path.contains("helix")) {
                 if (equippedHelixes != null && !equippedHelixes.isEmpty()) {
@@ -562,7 +569,7 @@ public final class GTCEuBOMHelper {
             }
         }
 
-        // Adjust primary structural casing count based on extra hatches added
+        // Adjust primary structural casing count based on hatch count difference
         int resolvedHatchCount = 0;
         for (MultiblockStructurePart p : list) {
             if (p != null && p.category() == PartCategory.HATCH_BUS) {
@@ -571,7 +578,7 @@ public final class GTCEuBOMHelper {
         }
 
         int extraHatches = resolvedHatchCount - baseHatchCount;
-        if (extraHatches > 0) {
+        if (extraHatches != 0) {
             int maxCasingIdx = -1;
             int maxCasingAmount = 0;
             for (int i = 0; i < list.size(); i++) {
@@ -586,12 +593,12 @@ public final class GTCEuBOMHelper {
 
             if (maxCasingIdx >= 0) {
                 MultiblockStructurePart primaryCasing = list.get(maxCasingIdx);
-                int reducedAmount = Math.max(0, primaryCasing.amount() - extraHatches);
-                if (reducedAmount > 0) {
+                int adjustedAmount = Math.max(0, primaryCasing.amount() - extraHatches);
+                if (adjustedAmount > 0) {
                     list.set(maxCasingIdx, new MultiblockStructurePart(
                         primaryCasing.itemId(),
                         primaryCasing.displayName(),
-                        reducedAmount,
+                        adjustedAmount,
                         PartCategory.CASING
                     ));
                 } else {

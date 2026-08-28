@@ -6,6 +6,7 @@ import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -78,6 +79,13 @@ public class CategoryCapabilityMatrix {
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             try {
                 EmiMatrixScanner.scan(builders);
+            } catch (Throwable ignored) {}
+        }
+
+        // 2-2. Query JEI Category Catalysts directly
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isJeiLoaded()) {
+            try {
+                JeiMatrixScanner.scan(builders, emiRecipeManager);
             } catch (Throwable ignored) {}
         }
 
@@ -265,9 +273,9 @@ public class CategoryCapabilityMatrix {
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:macerator"),
-                List.of(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), ResourceLocation.tryParse("gtceu:hp_steam_macerator"), ResourceLocation.tryParse("gtceu:lv_macerator")),
+                List.of(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), ResourceLocation.tryParse("gtceu:hp_steam_macerator"), ResourceLocation.tryParse("gtceu:lv_macerator"), ResourceLocation.tryParse("gtceu:large_macerator")),
                 ResourceLocation.tryParse("gtceu:lv_macerator"),
-                true, false, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_macerator"), ResourceLocation.tryParse("gtceu:hp_steam_macerator"), null, 0.0
+                true, true, false, false, false, true, true, ResourceLocation.tryParse("gtceu:lp_steam_macerator"), ResourceLocation.tryParse("gtceu:hp_steam_macerator"), null, 0.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:compressor"),
@@ -504,6 +512,67 @@ public class CategoryCapabilityMatrix {
                     }
                 }
             }
+        }
+    }
+
+    private static class JeiMatrixScanner {
+        private static void scan(Map<ResourceLocation, CategoryBuilder> builders, Object jeiRuntimeObj) {
+            if (jeiRuntimeObj == null) {
+                try {
+                    jeiRuntimeObj = com.gtceu.calcboard.integration.jei.JeiRecipeViewerAdapter.getJeiRuntime();
+                } catch (Throwable ignored) {}
+            }
+            if (!(jeiRuntimeObj instanceof mezz.jei.api.runtime.IJeiRuntime runtime)) return;
+            try {
+                var recipeManager = runtime.getRecipeManager();
+                var categoryLookup = recipeManager.createRecipeCategoryLookup();
+                if (categoryLookup != null) {
+                    for (mezz.jei.api.recipe.category.IRecipeCategory<?> cat : categoryLookup.get().toList()) {
+                        if (cat == null || cat.getRecipeType() == null) continue;
+                        ResourceLocation catId = cat.getRecipeType().getUid();
+                        CategoryBuilder b = builders.computeIfAbsent(catId, CategoryBuilder::new);
+
+                        try {
+                            var catalystLookup = recipeManager.createRecipeCatalystLookup(cat.getRecipeType());
+                            if (catalystLookup != null) {
+                                for (var typedIng : catalystLookup.get().toList()) {
+                                    if (typedIng != null) {
+                                        ItemStack is = typedIng.getItemStack().orElse(ItemStack.EMPTY);
+                                        if (is.isEmpty() && typedIng.getIngredient() instanceof ItemStack s) {
+                                            is = s;
+                                        }
+                                        if (!is.isEmpty()) {
+                                            ResourceLocation ws = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(is.getItem());
+                                            if (ws != null) {
+                                                Object machineDef = null;
+                                                try {
+                                                    Class<?> gtRegs = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                                                    Object machinesReg = gtRegs.getField("MACHINES").get(null);
+                                                    if (machinesReg != null) {
+                                                        Method mGet = machinesReg.getClass().getMethod("get", ResourceLocation.class);
+                                                        machineDef = mGet.invoke(machinesReg, ws);
+                                                    }
+                                                } catch (Throwable ignored) {}
+
+                                                boolean isMb = MultiblockDetector.inspectAndRegisterMachine(ws, machineDef, catId);
+                                                b.addWorkstation(ws, isMb);
+                                                if (MultiblockDetector.isCoilMultiblock(ws)) {
+                                                    b.canUseCoils = true;
+                                                    MultiblockDetector.registerCoilCategory(catId);
+                                                }
+                                                if (MultiblockDetector.isTurbineMachine(ws)) {
+                                                    b.isTurbine = true;
+                                                    MultiblockDetector.registerTurbineCategory(catId);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+            } catch (Throwable ignored) {}
         }
     }
 }

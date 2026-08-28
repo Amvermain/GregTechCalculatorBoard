@@ -65,23 +65,27 @@ public class DynamicAddonCrawler {
 
     public static List<ItemStack> collectAllActiveItemStacks() {
         List<ItemStack> stacks = new ArrayList<>();
-        Set<Item> seenItems = new HashSet<>();
+        Set<String> seenItemKeys = new HashSet<>();
         java.util.function.Consumer<ItemStack> collector = is -> {
             if (is == null || is.isEmpty()) return;
             Item item = is.getItem();
             ResourceLocation key = ForgeRegistries.ITEMS.getKey(item);
             if (key == null) return;
-            String ns = key.getNamespace();
-            String path = key.getPath();
+            String ns = key.getNamespace().toLowerCase(java.util.Locale.ROOT);
+            String path = key.getPath().toLowerCase(java.util.Locale.ROOT);
             // Fast filter: only inspect items from relevant namespaces or addon keywords
             if (!ns.equals("gtceu") && !ns.equals("start_core") && !ns.equals("gtceu_start")
-                    && !ns.equals("thermal") && !ns.equals("thermal_expansion") && !ns.equals("thermal_extra")
+                    && !ns.equals("thermal") && !ns.equals("thermal_expansion") && !ns.equals("thermal_foundation")
+                    && !ns.equals("thermal_innovation") && !ns.equals("thermal_extra") && !ns.equals("cofh_core")
                     && !ns.equals("systeams") && !ns.equals("kubejs")
                     && !path.contains("rotor") && !path.contains("augment")
-                    && !path.contains("hatch") && !path.contains("coil")) {
+                    && !path.contains("hatch") && !path.contains("coil")
+                    && !path.contains("kit") && !path.contains("component")
+                    && !path.contains("reflector")) {
                 return;
             }
-            if (seenItems.add(item)) {
+            String itemKey = key.toString() + (is.hasTag() ? "@" + is.getTag().toString() : "");
+            if (seenItemKeys.add(itemKey)) {
                 stacks.add(is);
             }
         };
@@ -95,7 +99,35 @@ public class DynamicAddonCrawler {
             } catch (Throwable ignored) {}
         }
 
-        // 2. Fallback: Minecraft Level RecipeManager
+        // 2. GTCEu Modern Machine Recipes (Assembler, Formers, etc.)
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isGTLoaded()) {
+            try {
+                Class<?> regClass = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
+                Object recipeTypes = regClass.getField("RECIPE_TYPES").get(null);
+                if (recipeTypes instanceof Iterable<?> iterable) {
+                    List<ItemStack> tempOutputs = new ArrayList<>();
+                    for (Object rt : iterable) {
+                        if (rt != null) {
+                            try {
+                                Method mGetRecipes = rt.getClass().getMethod("getRecipes");
+                                Object recipes = mGetRecipes.invoke(rt);
+                                if (recipes instanceof Collection<?> col) {
+                                    for (Object r : col) {
+                                        tempOutputs.clear();
+                                        extractRecipeOutputs(r, tempOutputs);
+                                        for (ItemStack out : tempOutputs) {
+                                            collector.accept(out);
+                                        }
+                                    }
+                                }
+                            } catch (Throwable ignored) {}
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // 3. Fallback: Minecraft Level RecipeManager
         if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
             try {
                 com.gtceu.calcboard.client.ClientLevelHelper.collectClientRecipes(collector);
@@ -169,17 +201,18 @@ public class DynamicAddonCrawler {
     public static List<MachineAddon> crawlFastRegistries() {
         long startNanos = System.nanoTime();
         List<MachineAddon> result = new ArrayList<>();
+        List<ItemStack> activeStacks = collectAllActiveItemStacks();
 
         for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
             try {
-                adapter.discoverAddons(result, Collections.emptyList());
+                adapter.discoverAddons(result, activeStacks);
             } catch (Throwable ignored) {}
         }
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
         com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
-                "[GTCalcBoard] [Crawler] Fast Track: Loaded {} registry addons in {}ms.",
-                result.size(), elapsedMs
+                "[GTCalcBoard] [Crawler] Fast Track: Loaded {} registry addons (active stacks: {}) in {}ms.",
+                result.size(), activeStacks.size(), elapsedMs
         );
         return result;
     }
@@ -218,14 +251,7 @@ public class DynamicAddonCrawler {
     public static boolean isItemDisabledOrHidden(Item item, Set<Item> activeRecipeItems) {
         if (item == null || item == net.minecraft.world.item.Items.AIR) return true;
 
-        // 1. Check if item has any active crafting recipes
-        if (activeRecipeItems != null && !activeRecipeItems.isEmpty()) {
-            if (!activeRecipeItems.contains(item)) {
-                return true; // No active recipe producing this item
-            }
-        }
-
-        // 2. Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers, etc.)
+        // Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers, c:disabled, etc.)
         try {
             var holder = ForgeRegistries.ITEMS.getHolder(item);
             if (holder.isPresent()) {

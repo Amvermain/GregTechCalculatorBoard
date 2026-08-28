@@ -112,6 +112,9 @@ public class ModAdapterRegistry {
     public static boolean isCategorySupported(ResourceLocation categoryId) {
         init();
         if (categoryId == null) return false;
+        if ("gtcalcboard".equals(categoryId.getNamespace()) && "kinetic_generation".equals(categoryId.getPath())) {
+            return true;
+        }
 
         for (IModAdapter a : ADAPTERS) {
             if (a.isGenericFallback()) continue;
@@ -129,6 +132,20 @@ public class ModAdapterRegistry {
         if (modId == null || modId.isEmpty()) return false;
         IModAdapter adapter = getAdapterForModId(modId);
         return adapter != null && !adapter.isGenericFallback() && adapter.isLoaded();
+    }
+
+    public static com.gtceu.calcboard.api.bom.PartCategory classifyBOMPart(ResourceLocation itemId) {
+        init();
+        if (itemId == null) return com.gtceu.calcboard.api.bom.PartCategory.OTHER;
+        for (IModAdapter a : ADAPTERS) {
+            if (a.isLoaded()) {
+                com.gtceu.calcboard.api.bom.PartCategory cat = a.classifyBOMPart(itemId);
+                if (cat != null) {
+                    return cat;
+                }
+            }
+        }
+        return com.gtceu.calcboard.api.bom.PartCategory.OTHER;
     }
 }
 

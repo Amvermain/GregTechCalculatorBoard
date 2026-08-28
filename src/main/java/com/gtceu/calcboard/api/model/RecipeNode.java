@@ -202,6 +202,8 @@ public class RecipeNode {
     public void setMachineIcon(ResourceLocation machineIcon) {
         if (java.util.Objects.equals(this.machineIcon, machineIcon)) return;
         ResourceLocation oldIcon = this.machineIcon;
+        IModAdapter oldAdapter = ModAdapterRegistry.getAdapterForNode(this);
+
         this.machineIcon = machineIcon;
         if (machineIcon != null) {
             if (MultiblockDetector.isThreadingMultiblock(machineIcon)) {
@@ -211,9 +213,12 @@ public class RecipeNode {
                 addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING || a.getId().startsWith("start_core:helix_") || a.getId().contains("helix"));
             }
         }
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
-        if (adapter != null) {
-            adapter.onMachineIconChanged(this, oldIcon, machineIcon);
+        IModAdapter newAdapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (oldAdapter != null && oldAdapter != newAdapter) {
+            oldAdapter.onMachineIconChanged(this, oldIcon, machineIcon);
+        }
+        if (newAdapter != null) {
+            newAdapter.onMachineIconChanged(this, oldIcon, machineIcon);
         }
     }
 
@@ -298,21 +303,33 @@ public class RecipeNode {
 
     public ResourceLocation getWorkstationForTier(GTVoltageTier tier) {
         if (tier == null) return null;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            ResourceLocation ws = adapter.getWorkstationForTier(this, tier);
+            if (ws != null) return ws;
+        }
+        return getWorkstationForTierFromList(tier);
+    }
+
+    public ResourceLocation getWorkstationForTierFromList(GTVoltageTier tier) {
+        if (tier == null) return null;
         String prefix = tier.name().toLowerCase(java.util.Locale.ROOT) + "_";
+        String catName = recipeCategoryId != null ? recipeCategoryId.getPath().toLowerCase(java.util.Locale.ROOT) : null;
+        ResourceLocation bestMatch = null;
         for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null) {
+            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
                 String path = ws.getPath().toLowerCase(java.util.Locale.ROOT);
                 if (path.startsWith(prefix) || path.contains("_" + prefix)) {
-                    return ws;
+                    if (catName != null && path.contains(catName)) {
+                        return ws;
+                    }
+                    if (bestMatch == null) {
+                        bestMatch = ws;
+                    }
                 }
             }
         }
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
-                return ws;
-            }
-        }
-        return null;
+        return bestMatch;
     }
 
     public double getMachineCount() {
@@ -577,10 +594,7 @@ public class RecipeNode {
 
     public static boolean isThermalUpgradeKit(MachineAddon addon) {
         if (addon == null) return false;
-        if (addon instanceof com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon ta && ta.isUpgradeKit()) {
-            return true;
-        }
-        return addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && addon.getParallelMultiplier() > 1;
+        return addon.isUpgradeTierKit() || (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && addon.getParallelMultiplier() > 1);
     }
 
     public static boolean isMultiblockWorkstation(ResourceLocation ws) {
@@ -684,7 +698,15 @@ public class RecipeNode {
     }
 
     public boolean supportsSteamMode() {
-        return ModAdapterRegistry.getAdapterForNode(this).supportsSteamMode(this);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null && !adapter.isGenericFallback()) {
+            return adapter.supportsSteamMode(this);
+        }
+        IModAdapter gtAdapter = ModAdapterRegistry.getAdapterForModId("gtceu");
+        if (gtAdapter != null && gtAdapter.supportsSteamMode(this)) {
+            return true;
+        }
+        return false;
     }
 
     public boolean isLiquidBoilerRecipe() {
@@ -692,7 +714,15 @@ public class RecipeNode {
     }
 
     public void syncSteamInputSlot(SteamMode oldMode, SteamMode newMode) {
-        ModAdapterRegistry.getAdapterForNode(this).onSteamModeChanged(this, oldMode, newMode);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null && !adapter.isGenericFallback()) {
+            adapter.onSteamModeChanged(this, oldMode, newMode);
+        } else {
+            IModAdapter gtAdapter = ModAdapterRegistry.getAdapterForModId("gtceu");
+            if (gtAdapter != null) {
+                gtAdapter.onSteamModeChanged(this, oldMode, newMode);
+            }
+        }
     }
 
     public int getRecipeTemperature() {
@@ -851,17 +881,17 @@ public class RecipeNode {
             }
             if (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon)) {
                 ResourceLocation mbWs = getMultiblockWorkstation();
-                if (mbWs != null) {
+                if (mbWs != null && !java.util.Objects.equals(machineIcon, mbWs)) {
                     setMachineIcon(mbWs);
                 }
             }
         } else {
-            if (machineIcon == null || MultiblockDetector.isMultiblock(machineIcon)) {
+            if (machineIcon != null && MultiblockDetector.isMultiblock(machineIcon)) {
                 ResourceLocation sbWs = getWorkstationForTier(targetTier);
                 if (sbWs == null) {
                     sbWs = getSingleblockWorkstation();
                 }
-                if (sbWs != null) {
+                if (sbWs != null && !java.util.Objects.equals(machineIcon, sbWs)) {
                     setMachineIcon(sbWs);
                 }
             }
@@ -887,47 +917,48 @@ public class RecipeNode {
         return false;
     }
 
-    public ResourceLocation getMultiblockWorkstation() {
-        List<ResourceLocation> wsList = getAvailableWorkstations();
+    public List<ResourceLocation> getMultiblockWorkstations() {
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
         if (adapter != null) {
-            ResourceLocation preferred = adapter.getPreferredMultiblockWorkstation(this, wsList);
+            List<ResourceLocation> list = adapter.getMultiblockWorkstations(this);
+            if (list != null && !list.isEmpty()) return list;
+        }
+        List<ResourceLocation> list = new ArrayList<>();
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && MultiblockDetector.isMultiblock(ws) && !list.contains(ws)) {
+                list.add(ws);
+            }
+        }
+        return list;
+    }
+
+    public ResourceLocation getMultiblockWorkstation() {
+        List<ResourceLocation> mbList = getMultiblockWorkstations();
+        if (!mbList.isEmpty()) {
+            return mbList.get(0);
+        }
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            ResourceLocation preferred = adapter.getPreferredMultiblockWorkstation(this, getAvailableWorkstations());
             if (preferred != null) return preferred;
-        }
-
-        if (recipeCategoryId != null) {
-            for (ResourceLocation ws : wsList) {
-                if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(recipeCategoryId.getPath())) {
-                    return ws;
-                }
-            }
-        }
-
-        for (ResourceLocation ws : wsList) {
-            if (MultiblockDetector.isMultiblock(ws)) {
-                return ws;
-            }
-        }
-
-        if (recipeCategoryId != null) {
-            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
-            if (cap != null && cap.availableWorkstations() != null) {
-                for (ResourceLocation ws : cap.availableWorkstations()) {
-                    if (MultiblockDetector.isMultiblock(ws)) {
-                        return ws;
-                    }
-                }
-            }
         }
         return null;
     }
 
     public ResourceLocation getSingleblockWorkstation() {
+        String catName = recipeCategoryId != null ? recipeCategoryId.getPath().toLowerCase(java.util.Locale.ROOT) : null;
+        ResourceLocation bestMatch = null;
         for (ResourceLocation ws : availableWorkstations) {
             if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
-                return ws;
+                if (catName != null && ws.getPath().toLowerCase(java.util.Locale.ROOT).contains(catName)) {
+                    return ws;
+                }
+                if (bestMatch == null) {
+                    bestMatch = ws;
+                }
             }
         }
+        if (bestMatch != null) return bestMatch;
         if (recipeCategoryId != null && !MultiblockDetector.isMultiblock(recipeCategoryId)) {
             return recipeCategoryId;
         }
@@ -1059,14 +1090,7 @@ public class RecipeNode {
     // =========================================================================
 
     public int getTierDelta() {
-        GTVoltageTier base = recipeTier;
-        if (isFusion()) {
-            GTVoltageTier minFusionTier = getMinFusionVoltageTier();
-            if (minFusionTier.ordinal() > base.ordinal()) {
-                base = minFusionTier;
-            }
-        }
-        return Math.max(0, targetTier.ordinal() - base.ordinal());
+        return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {

@@ -23,7 +23,6 @@ public class ModAdapterSupportTest {
 
     @Test
     public void testSupportedCategories() {
-        // GTCEu Categories
         assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("gtceu:electric_blast_furnace")));
         assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("gtceu:centrifuge")));
         assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("gtceu:chemical_reactor")));
@@ -48,6 +47,10 @@ public class ModAdapterSupportTest {
         assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("minecraft:smoking")));
         assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("minecraft:stonecutting")));
         assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("minecraft:smithing")));
+
+        // Synthetic Categories
+        assertTrue(ModAdapterRegistry.isCategorySupported(ResourceLocation.tryParse("gtcalcboard:kinetic_generation")));
+        assertEquals("create", ModAdapterRegistry.getAdapterForCategory(ResourceLocation.tryParse("gtcalcboard:kinetic_generation")).getModId());
     }
 
     @Test

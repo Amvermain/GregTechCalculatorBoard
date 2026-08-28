@@ -109,12 +109,17 @@ public class ThermalAugmentHelper {
         int parallel = extractTagInt(augTag, 1, "Scale", "BaseMod", "Factor", "Tier", "Level", "DynScale", "DynamoScale", "MachineScale", "Parallel");
 
         double eutMult = 1.0;
+        boolean hasDynamoKeys = false;
+        boolean hasMachineKeys = false;
+
         if (augTag.contains("DynamoPower") || augTag.contains("DynPower")) {
             double dynPower = extractTagRawNumber(augTag, "DynamoPower", "DynPower");
             eutMult = 1.0 + dynPower;
+            hasDynamoKeys = true;
         } else if (augTag.contains("MachinePower") || augTag.contains("ProcessPower")) {
             double machPower = extractTagRawNumber(augTag, "MachinePower", "ProcessPower");
             eutMult = 1.0 + machPower;
+            hasMachineKeys = true;
         } else if (augTag.contains("PowerMod") || augTag.contains("EnergyMod")) {
             eutMult = extractTagNumber(augTag, "PowerMod", "EnergyMod");
         }
@@ -122,26 +127,48 @@ public class ThermalAugmentHelper {
         double durMult = 1.0;
         if (augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy")) {
             durMult = extractTagNumber(augTag, "DynamoEnergy", "DynEnergy");
+            hasDynamoKeys = true;
         } else if (augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed")) {
             double spd = extractTagRawNumber(augTag, "MachineSpeed", "ProcessSpeed");
             if (spd > 0) {
                 durMult = 1.0 / (1.0 + spd);
             }
+            hasMachineKeys = true;
         } else if (augTag.contains("SpeedMod")) {
             double spdMod = extractTagNumber(augTag, "SpeedMod");
             if (spdMod > 0) {
                 durMult = 1.0 / spdMod;
             }
-        } else if (augTag.contains("FuelMod") || augTag.contains("EfficiencyMod") || augTag.contains("ProcessEnergy") || augTag.contains("MachineEnergy")) {
-            durMult = extractTagNumber(augTag, "FuelMod", "EfficiencyMod", "ProcessEnergy", "MachineEnergy");
+        } else if (augTag.contains("FuelMod")) {
+            durMult = extractTagNumber(augTag, "FuelMod");
+            hasDynamoKeys = true;
+        } else if (augTag.contains("EfficiencyMod") || augTag.contains("ProcessEnergy") || augTag.contains("MachineEnergy")) {
+            durMult = extractTagNumber(augTag, "EfficiencyMod", "ProcessEnergy", "MachineEnergy");
+            hasMachineKeys = true;
         }
 
         if (parallel <= 1 && eutMult == 1.0 && durMult == 1.0) {
             return null;
         }
 
-        String desc = "";
         boolean isKit = parallel > 1;
+        ThermalAugmentAddon.AugmentTarget target = ThermalAugmentAddon.AugmentTarget.ALL;
+        if (!isKit) {
+            String typeStr = augTag.getString("Type").toLowerCase(java.util.Locale.ROOT);
+            String path = id != null ? id.getPath().toLowerCase(java.util.Locale.ROOT) : "";
+
+            if (hasDynamoKeys || typeStr.contains("dynamo") || typeStr.contains("fuel")
+                    || path.contains("dynamo") || path.contains("reaction_chamber") || path.contains("injector")
+                    || path.contains("flux_linkage")) {
+                target = ThermalAugmentAddon.AugmentTarget.DYNAMO;
+            } else if (hasMachineKeys || typeStr.contains("machine") || typeStr.contains("process")
+                    || path.contains("machine") || path.contains("sieve") || path.contains("reclamation")
+                    || path.contains("catalyst") || path.contains("filter")) {
+                target = ThermalAugmentAddon.AugmentTarget.MACHINE;
+            }
+        }
+
+        String desc = "";
         if (isKit) {
             desc = String.format("⚡ %dx Scale Factor", parallel);
         } else if (eutMult != 1.0 && durMult != 1.0) {
@@ -154,9 +181,38 @@ public class ThermalAugmentHelper {
 
         String addonId = id.toString() + (parallel > 1 ? "_scale_" + parallel : "");
 
-        ThermalAugmentAddon addon = new ThermalAugmentAddon(addonId, name == null || name.isEmpty() ? id.getPath() : name, desc, id, parallel, durMult, eutMult, isKit);
+        ThermalAugmentAddon addon = new ThermalAugmentAddon(addonId, name == null || name.isEmpty() ? id.getPath() : name, desc, id, parallel, durMult, eutMult, isKit, target);
         addon.setDiscoverySource("AugmentData NBT Tag [" + id + "]");
         return addon;
+    }
+
+    public static boolean isDynamoNode(RecipeNode node) {
+        if (node == null) return false;
+        if (node.isGenerator() || node.getBaseEUt() < 0) return true;
+
+        if (node.getRecipeCategoryId() != null) {
+            String p = node.getRecipeCategoryId().getPath().toLowerCase(java.util.Locale.ROOT);
+            if (p.contains("fuel") || p.contains("dynamo") || p.contains("lapidary") || p.contains("magmatic")
+                    || p.contains("numismatic") || p.contains("gourmand") || p.contains("compression")
+                    || p.contains("disenchantment") || p.contains("stirling")) {
+                return true;
+            }
+        }
+        if (node.getMachineIcon() != null) {
+            String p = node.getMachineIcon().getPath().toLowerCase(java.util.Locale.ROOT);
+            if (p.contains("dynamo") || p.contains("lapidary") || p.contains("magmatic")
+                    || p.contains("numismatic") || p.contains("gourmand") || p.contains("compression")
+                    || p.contains("disenchantment") || p.contains("stirling")) {
+                return true;
+            }
+        }
+        if (node.getName() != null) {
+            String n = node.getName().toLowerCase(java.util.Locale.ROOT);
+            if (n.contains("dynamo") || n.contains("lapidary") || n.contains("fuel")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static double extractTagRawNumber(CompoundTag tag, String... keys) {

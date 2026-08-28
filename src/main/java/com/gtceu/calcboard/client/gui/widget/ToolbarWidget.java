@@ -64,19 +64,25 @@ public class ToolbarWidget {
         List<ToolbarButtonDef> list = new ArrayList<>();
         FlowGraph graph = screen.getGraph();
 
+        BoardManager bm = BoardManager.getInstance();
+
         // 0. Guide & Manual
-        String guideTxt = "§e📖 " + Component.translatable("gui.gtcalcboard.guide_btn").getString();
-        list.add(new ToolbarButtonDef("guide", guideTxt, 0xFFFFEE55, 0xFF352E1B, 0xFF5A4A28, 0xFF776433, font.width(guideTxt) + 12, btn -> {
-            if (screen.getGuideDialog() != null) {
-                screen.getGuideDialog().open();
-            }
-        }));
+        if (bm.isShowGuideButton()) {
+            String guideTxt = "§e📖 " + Component.translatable("gui.gtcalcboard.guide_btn").getString();
+            list.add(new ToolbarButtonDef("guide", guideTxt, 0xFFFFEE55, 0xFF352E1B, 0xFF5A4A28, 0xFF776433, font.width(guideTxt) + 12, btn -> {
+                if (screen.getGuideDialog() != null) {
+                    screen.getGuideDialog().open();
+                }
+            }));
+        }
 
         // 0.05 Tutorial
-        String tutTxt = "§a🎓 " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
-        list.add(new ToolbarButtonDef("tutorial", tutTxt, 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38, 0xFF3B774E, font.width(tutTxt) + 12, btn -> {
-            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
-        }));
+        if (bm.isShowTutorialButton()) {
+            String tutTxt = "§a🎓 " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
+            list.add(new ToolbarButtonDef("tutorial", tutTxt, 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38, 0xFF3B774E, font.width(tutTxt) + 12, btn -> {
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
+            }));
+        }
 
         // 1. Connect
         String connTxt = "⚡ " + Component.translatable("gui.gtcalcboard.auto_connect").getString();
@@ -100,7 +106,7 @@ public class ToolbarWidget {
         }));
 
         // 3.55 Multiblock Construction BOM (Only enabled when EMI or JEI is loaded)
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported()) {
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported() && bm.isShowMultiblockBomButton()) {
             String bomTxt = "§6📋 " + Component.translatable("gui.gtcalcboard.bom").getString();
             list.add(new ToolbarButtonDef("multiblock_bom", bomTxt, 0xFFFFCC66, 0xFF352B1C, 0xFF4D3D28, 0xFF665035, font.width(bomTxt) + 12, btn -> {
                 if (screen.getMultiblockBOMDialog() != null) {
@@ -110,38 +116,42 @@ public class ToolbarWidget {
         }
 
         // 3.6 Time Unit Toggle (/t, /s, /min, /h, /d)
-        com.gtceu.calcboard.api.type.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
-        String unitTxt = "§e⏱ " + curUnit.getSuffix() + " ▼";
-        list.add(new ToolbarButtonDef("time_unit", unitTxt, 0xFFFFF176, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(unitTxt) + 12, btn -> {
-            com.gtceu.calcboard.api.type.RateTimeUnit next = curUnit.next();
-            FormatUtil.setActiveTimeUnit(next);
-            BoardManager.getInstance().setTimeUnit(next);
-            BoardManager.getInstance().saveForCurrentContext();
-            BoardToast.show(Component.literal("§e⏱ ").append(
-                Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), Component.translatable(next.getTranslationKey()).getString())
-            ));
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-            );
-            screen.markSummaryDirty();
-        }));
+        if (bm.isShowTimeUnitButton()) {
+            com.gtceu.calcboard.api.type.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
+            String unitTxt = "§e⏱ " + curUnit.getSuffix() + " ▼";
+            list.add(new ToolbarButtonDef("time_unit", unitTxt, 0xFFFFF176, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(unitTxt) + 12, btn -> {
+                com.gtceu.calcboard.api.type.RateTimeUnit next = curUnit.next();
+                FormatUtil.setActiveTimeUnit(next);
+                BoardManager.getInstance().setTimeUnit(next);
+                BoardManager.getInstance().saveForCurrentContext();
+                BoardToast.show(Component.literal("§e⏱ ").append(
+                    Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), Component.translatable(next.getTranslationKey()).getString())
+                ));
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+                );
+                screen.markSummaryDirty();
+            }));
+        }
 
         // 3.7 Fluid Unit Toggle (Auto, Always mB, Always B)
-        com.gtceu.calcboard.api.type.FluidUnitMode curFluidMode = FormatUtil.getActiveFluidUnitMode();
-        String fluidTxt = "§b💧 " + curFluidMode.getLabel() + " ▼";
-        list.add(new ToolbarButtonDef("fluid_unit", fluidTxt, 0xFF66E5FF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(fluidTxt) + 12, btn -> {
-            com.gtceu.calcboard.api.type.FluidUnitMode next = curFluidMode.next();
-            FormatUtil.setActiveFluidUnitMode(next);
-            BoardManager.getInstance().setFluidUnitMode(next);
-            BoardManager.getInstance().saveForCurrentContext();
-            BoardToast.show(Component.literal("§b💧 ").append(
-                Component.translatable("gui.gtcalcboard.toast.fluid_unit_changed", Component.translatable(next.getTranslationKey()).getString())
-            ));
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-            );
-            screen.markSummaryDirty();
-        }));
+        if (bm.isShowFluidUnitButton()) {
+            com.gtceu.calcboard.api.type.FluidUnitMode curFluidMode = FormatUtil.getActiveFluidUnitMode();
+            String fluidTxt = "§b💧 " + curFluidMode.getLabel() + " ▼";
+            list.add(new ToolbarButtonDef("fluid_unit", fluidTxt, 0xFF66E5FF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(fluidTxt) + 12, btn -> {
+                com.gtceu.calcboard.api.type.FluidUnitMode next = curFluidMode.next();
+                FormatUtil.setActiveFluidUnitMode(next);
+                BoardManager.getInstance().setFluidUnitMode(next);
+                BoardManager.getInstance().saveForCurrentContext();
+                BoardToast.show(Component.literal("§b💧 ").append(
+                    Component.translatable("gui.gtcalcboard.toast.fluid_unit_changed", Component.translatable(next.getTranslationKey()).getString())
+                ));
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+                );
+                screen.markSummaryDirty();
+            }));
+        }
 
         // 4. Share
         String shareTxt = "📋 " + Component.translatable("gui.gtcalcboard.export").getString();
@@ -169,7 +179,7 @@ public class ToolbarWidget {
 
             String copyTxt = "§b📋 " + Component.translatable("gui.gtcalcboard.btn_copy_to_personal").getString();
             list.add(new ToolbarButtonDef("copy_to_personal", copyTxt, 0xFF66DDFF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(copyTxt) + 12, btn -> {
-                BoardManager bm = BoardManager.getInstance();
+                BoardManager bmInstance = BoardManager.getInstance();
                 com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage(activePageId);
                 String pageTitle = (remotePage != null && remotePage.getTitle() != null && !remotePage.getTitle().trim().isEmpty())
                     ? remotePage.getTitle() : "Team Page";
@@ -181,8 +191,8 @@ public class ToolbarWidget {
                 for (FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
                     newPage.getGraph().getConnections().add(e);
                 }
-                bm.addPage(newPage);
-                bm.setActivePageIndex(bm.getPages().size() - 1);
+                bmInstance.addPage(newPage);
+                bmInstance.setActivePageIndex(bmInstance.getPages().size() - 1);
                 state.setCurrentMode(com.gtceu.calcboard.client.team.ClientWorkspaceState.WorkspaceMode.LOCAL);
                 screen.rebuildWidgets();
                 screen.markSummaryDirty();
@@ -239,7 +249,7 @@ public class ToolbarWidget {
         int tbH = 18;
         int tbW = width - tbX - 8;
 
-        String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
+        String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString() + " §7⚙";
         int titleRight = tbX + 6 + font.width(titleStr) + 8;
 
         List<ToolbarButtonDef> buttons = buildButtons(font);
@@ -259,8 +269,15 @@ public class ToolbarWidget {
         graphics.fill(tbX, tbY, tbX + actualToolbarW, tbY + tbH, 0xEE1E222B);
         graphics.renderOutline(tbX, tbY, actualToolbarW, tbH, 0xFF3D4455);
 
-        // Fixed title on the left
-        graphics.drawString(font, titleStr, tbX + 6, tbY + 5, 0xFFFFFFFF, false);
+        // Fixed clickable title & settings gear on the left
+        boolean isTitleHovered = mouseX >= tbX + 2 && mouseX <= titleRight - 2 && mouseY >= tbY && mouseY <= tbY + tbH;
+        if (isTitleHovered) {
+            graphics.fill(tbX + 2, tbY + 1, titleRight - 2, tbY + tbH - 1, 0xFF2A364D);
+            graphics.renderOutline(tbX + 2, tbY + 1, (titleRight - 4) - tbX, tbH - 2, 0xFF5B9BD5);
+            graphics.drawString(font, "§e" + Component.translatable("gui.gtcalcboard.title").getString() + " §b⚙", tbX + 6, tbY + 5, 0xFFFFFFFF, false);
+        } else {
+            graphics.drawString(font, titleStr, tbX + 6, tbY + 5, 0xFFFFFFFF, false);
+        }
 
         graphics.enableScissor(scrollAreaX, tbY + 1, tbX + tbW - 2, tbY + tbH - 1);
 
@@ -302,6 +319,8 @@ public class ToolbarWidget {
             } else {
                 graphics.renderTooltip(font, Component.translatable(tooltipKey), mouseX, mouseY);
             }
+        } else if (isTitleHovered) {
+            graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.tooltip.open_settings"), mouseX, mouseY);
         }
     }
 
@@ -328,7 +347,7 @@ public class ToolbarWidget {
         }
 
         Font font = Minecraft.getInstance().font;
-        String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
+        String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString() + " §7⚙";
         int titleRight = screen.getDynamicLeftMargin() + 6 + font.width(titleStr) + 8;
         List<ToolbarButtonDef> buttons = buildButtons(font);
         int totalBtnW = 0;
@@ -361,11 +380,21 @@ public class ToolbarWidget {
         // If not dragged (simple click), trigger button click at dragStartX / dragStartY
         if (!hasDragged && button == pressedButton) {
             Font font = Minecraft.getInstance().font;
-            String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString();
-            int titleRight = screen.getDynamicLeftMargin() + 6 + font.width(titleStr) + 8;
-            int curX = titleRight - (int) scrollX;
+            String titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString() + " §7⚙";
+            int tbX = screen.getDynamicLeftMargin();
+            int titleRight = tbX + 6 + font.width(titleStr) + 8;
             int tbY = screen.getToolbarY();
 
+            // Check if title / settings was clicked
+            if (dragStartX >= tbX + 2 && dragStartX <= titleRight - 2 && dragStartY >= tbY && dragStartY <= tbY + 18) {
+                screen.openSettingsDialog();
+                Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+                );
+                return true;
+            }
+
+            int curX = titleRight - (int) scrollX;
             List<ToolbarButtonDef> buttons = buildButtons(font);
             for (ToolbarButtonDef btn : buttons) {
                 if (dragStartX >= curX && dragStartX <= curX + btn.width && dragStartY >= tbY && dragStartY <= tbY + 18) {

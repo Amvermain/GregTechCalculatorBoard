@@ -13,7 +13,7 @@ public class StandaloneFallbackProvider implements ITeamProvider {
 
     @Override
     public UUID getPlayerTeamId(ServerPlayer player) {
-        return player != null ? player.getUUID() : null;
+        return null;
     }
 
     @Override

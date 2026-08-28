@@ -5,6 +5,8 @@ import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
 
+import com.gtceu.calcboard.api.type.WireColorPreset;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
@@ -27,6 +29,18 @@ public class BoardManager {
     private boolean summaryOverlayCollapsed = false;
     private boolean hotkeyHudExpanded = true;
     private boolean favoritesDockExpanded = true;
+
+    // Customization & Visibility Preferences
+    private boolean showGuideButton = true;
+    private boolean showTutorialButton = true;
+    private boolean showTimeUnitButton = true;
+    private boolean showFluidUnitButton = true;
+    private boolean showMultiblockBomButton = true;
+    private boolean showHotkeyHud = true;
+    private boolean showWirePulseAnimation = true;
+    private WireColorPreset wireColorPreset = WireColorPreset.CYAN;
+    private WireColorPreset matchedWireColorPreset = WireColorPreset.GREEN;
+
     private boolean autoLoaded = false;
 
     private BoardManager() {
@@ -52,12 +66,22 @@ public class BoardManager {
         this.pages.add(BoardPage.createDefault("Page 1"));
         this.activePageIndex = 0;
         this.hasSeenWelcomePrompt = false;
+        this.powerDisplayMode = PowerDisplayMode.EUT;
         this.fluidUnitMode = FluidUnitMode.AUTO;
         this.timeUnit = RateTimeUnit.PER_SECOND;
         this.pauseGameInSingleplayer = false;
         this.summaryOverlayCollapsed = false;
         this.hotkeyHudExpanded = true;
         this.favoritesDockExpanded = true;
+        this.showGuideButton = true;
+        this.showTutorialButton = true;
+        this.showTimeUnitButton = true;
+        this.showFluidUnitButton = true;
+        this.showMultiblockBomButton = true;
+        this.showHotkeyHud = true;
+        this.showWirePulseAnimation = true;
+        this.wireColorPreset = WireColorPreset.CYAN;
+        this.matchedWireColorPreset = WireColorPreset.GREEN;
         this.autoLoaded = false;
     }
 
@@ -157,6 +181,86 @@ public class BoardManager {
 
     public void setFavoritesDockExpanded(boolean favoritesDockExpanded) {
         this.favoritesDockExpanded = favoritesDockExpanded;
+    }
+
+    public boolean isShowGuideButton() {
+        return showGuideButton;
+    }
+
+    public void setShowGuideButton(boolean showGuideButton) {
+        this.showGuideButton = showGuideButton;
+    }
+
+    public boolean isShowTutorialButton() {
+        return showTutorialButton;
+    }
+
+    public void setShowTutorialButton(boolean showTutorialButton) {
+        this.showTutorialButton = showTutorialButton;
+    }
+
+    public boolean isShowTimeUnitButton() {
+        return showTimeUnitButton;
+    }
+
+    public void setShowTimeUnitButton(boolean showTimeUnitButton) {
+        this.showTimeUnitButton = showTimeUnitButton;
+    }
+
+    public boolean isShowFluidUnitButton() {
+        return showFluidUnitButton;
+    }
+
+    public void setShowFluidUnitButton(boolean showFluidUnitButton) {
+        this.showFluidUnitButton = showFluidUnitButton;
+    }
+
+    public boolean isShowMultiblockBomButton() {
+        return showMultiblockBomButton;
+    }
+
+    public void setShowMultiblockBomButton(boolean showMultiblockBomButton) {
+        this.showMultiblockBomButton = showMultiblockBomButton;
+    }
+
+    public boolean isShowHotkeyHud() {
+        return showHotkeyHud;
+    }
+
+    public void setShowHotkeyHud(boolean showHotkeyHud) {
+        this.showHotkeyHud = showHotkeyHud;
+    }
+
+    public boolean isShowWirePulseAnimation() {
+        return showWirePulseAnimation;
+    }
+
+    public void setShowWirePulseAnimation(boolean showWirePulseAnimation) {
+        this.showWirePulseAnimation = showWirePulseAnimation;
+    }
+
+    public WireColorPreset getWireColorPreset() {
+        return wireColorPreset != null ? wireColorPreset : WireColorPreset.CYAN;
+    }
+
+    public void setWireColorPreset(WireColorPreset wireColorPreset) {
+        this.wireColorPreset = wireColorPreset != null ? wireColorPreset : WireColorPreset.CYAN;
+    }
+
+    public int getWireColor() {
+        return getWireColorPreset().getArgb();
+    }
+
+    public WireColorPreset getMatchedWireColorPreset() {
+        return matchedWireColorPreset != null ? matchedWireColorPreset : WireColorPreset.GREEN;
+    }
+
+    public void setMatchedWireColorPreset(WireColorPreset matchedWireColorPreset) {
+        this.matchedWireColorPreset = matchedWireColorPreset != null ? matchedWireColorPreset : WireColorPreset.GREEN;
+    }
+
+    public int getMatchedWireColor() {
+        return getMatchedWireColorPreset().getArgb();
     }
 
     public static BoardManager getInstance() {
@@ -282,6 +386,15 @@ public class BoardManager {
             rootTag.putBoolean("summaryOverlayCollapsed", summaryOverlayCollapsed);
             rootTag.putBoolean("hotkeyHudExpanded", hotkeyHudExpanded);
             rootTag.putBoolean("favoritesDockExpanded", favoritesDockExpanded);
+            rootTag.putBoolean("showGuideButton", showGuideButton);
+            rootTag.putBoolean("showTutorialButton", showTutorialButton);
+            rootTag.putBoolean("showTimeUnitButton", showTimeUnitButton);
+            rootTag.putBoolean("showFluidUnitButton", showFluidUnitButton);
+            rootTag.putBoolean("showMultiblockBomButton", showMultiblockBomButton);
+            rootTag.putBoolean("showHotkeyHud", showHotkeyHud);
+            rootTag.putBoolean("showWirePulseAnimation", showWirePulseAnimation);
+            rootTag.putString("wireColorPreset", getWireColorPreset().name());
+            rootTag.putString("matchedWireColorPreset", getMatchedWireColorPreset().name());
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
@@ -330,6 +443,37 @@ public class BoardManager {
                 }
                 if (rootTag.contains("favoritesDockExpanded")) {
                     this.favoritesDockExpanded = rootTag.getBoolean("favoritesDockExpanded");
+                }
+                if (rootTag.contains("showGuideButton")) {
+                    this.showGuideButton = rootTag.getBoolean("showGuideButton");
+                }
+                if (rootTag.contains("showTutorialButton")) {
+                    this.showTutorialButton = rootTag.getBoolean("showTutorialButton");
+                }
+                if (rootTag.contains("showTimeUnitButton")) {
+                    this.showTimeUnitButton = rootTag.getBoolean("showTimeUnitButton");
+                }
+                if (rootTag.contains("showFluidUnitButton")) {
+                    this.showFluidUnitButton = rootTag.getBoolean("showFluidUnitButton");
+                }
+                if (rootTag.contains("showMultiblockBomButton")) {
+                    this.showMultiblockBomButton = rootTag.getBoolean("showMultiblockBomButton");
+                }
+                if (rootTag.contains("showHotkeyHud")) {
+                    this.showHotkeyHud = rootTag.getBoolean("showHotkeyHud");
+                }
+                if (rootTag.contains("showWirePulseAnimation")) {
+                    this.showWirePulseAnimation = rootTag.getBoolean("showWirePulseAnimation");
+                }
+                if (rootTag.contains("wireColorPreset")) {
+                    try {
+                        this.wireColorPreset = WireColorPreset.valueOf(rootTag.getString("wireColorPreset"));
+                    } catch (Exception ignored) {}
+                }
+                if (rootTag.contains("matchedWireColorPreset")) {
+                    try {
+                        this.matchedWireColorPreset = WireColorPreset.valueOf(rootTag.getString("matchedWireColorPreset"));
+                    } catch (Exception ignored) {}
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);

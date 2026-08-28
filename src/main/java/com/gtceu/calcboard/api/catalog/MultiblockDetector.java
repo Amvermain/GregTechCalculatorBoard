@@ -152,6 +152,8 @@ public class MultiblockDetector {
             if (initialized || initializing) return;
             initializing = true;
             try {
+                initTestEnvironmentDefaults();
+
                 // 1. Scan universal EMI "multiblock_info" recipe category
                 scanEmiMultiblockRecipes(rmObj);
 
@@ -167,9 +169,6 @@ public class MultiblockDetector {
                     }
                 }
             } finally {
-                if (MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
-                    initTestEnvironmentDefaults();
-                }
                 initialized = true;
                 initializing = false;
             }
@@ -377,6 +376,7 @@ public class MultiblockDetector {
         STEAM_MULTIBLOCKS.clear();
         STEAM_MULTIBLOCK_CONSUMPTIONS.clear();
         THREADING_MAX_HELIX_CAPACITY.clear();
+        initTestEnvironmentDefaults();
         initialize(rmObj);
     }
 
@@ -388,8 +388,8 @@ public class MultiblockDetector {
         if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
             initialize();
         }
-        if (machineIcon != null && PARALLEL_HATCH_CONTROLLERS.contains(machineIcon)) {
-            return true;
+        if (machineIcon != null && isMultiblock(machineIcon)) {
+            return PARALLEL_HATCH_CONTROLLERS.contains(machineIcon);
         }
         if (availableWorkstations != null) {
             for (ResourceLocation ws : availableWorkstations) {

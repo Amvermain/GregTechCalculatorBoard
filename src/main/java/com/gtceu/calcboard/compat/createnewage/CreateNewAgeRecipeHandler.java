@@ -172,6 +172,9 @@ public class CreateNewAgeRecipeHandler {
     }
 
     public static List<RecipeSearchEngine.SearchableRecipe> getVirtualSearchRecipes() {
+        if (!ModCompatHelper.isCreateNewAgeLoaded()) {
+            return Collections.emptyList();
+        }
         List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
         String catId = "create_new_age:generation";
         String catName = Component.translatable("category.gtcalcboard.create_new_age").getString();
@@ -370,6 +373,3 @@ public class CreateNewAgeRecipeHandler {
         }
     }
 }
-
-
-

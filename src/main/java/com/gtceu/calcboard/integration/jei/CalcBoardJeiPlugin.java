@@ -18,5 +18,6 @@ public class CalcBoardJeiPlugin implements IModPlugin {
     @Override
     public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
         JeiRecipeViewerAdapter.setJeiRuntime(jeiRuntime);
+        com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().bake(jeiRuntime);
     }
 }

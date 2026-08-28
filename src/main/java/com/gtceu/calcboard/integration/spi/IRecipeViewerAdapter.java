@@ -68,6 +68,16 @@ public interface IRecipeViewerAdapter {
     boolean isBoMGoalRegistrationSupported();
 
     void registerBoMGoal(MultiblockBOMSummary summary);
+
+    // 7. Search Focus
+    default boolean isSearchFieldFocused() {
+        return false;
+    }
+
+    // 8. Hotkey Node Addition (Shift + A)
+    default boolean tryAddHoveredRecipeToBoard(net.minecraft.client.gui.screens.Screen screen, double mouseX, double mouseY) {
+        return false;
+    }
 }
 
 

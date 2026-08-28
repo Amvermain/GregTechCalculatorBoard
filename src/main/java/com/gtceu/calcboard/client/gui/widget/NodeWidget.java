@@ -21,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
 
@@ -416,6 +417,8 @@ public class NodeWidget {
             maxIdx = GTVoltageTier.HV.ordinal();
         }
 
+        boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
+
         if (node.supportsSteamMode()) {
             SteamMode curSteam = node.getSteamMode();
             if (curSteam == SteamMode.LOW_PRESSURE) {
@@ -425,13 +428,26 @@ public class NodeWidget {
                     invalidateCache();
                     return true;
                 } else if (direction < 0) {
-                    return false;
+                    if (isVanillaCooking) {
+                        node.setSteamMode(SteamMode.NONE);
+                        node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
+                        if (parent != null) parent.markSummaryDirty();
+                        invalidateCache();
+                        return true;
+                    }
+                    return false; // LP Steam is the absolute lowest tier for standard steam machines
                 }
             } else if (curSteam == SteamMode.HIGH_PRESSURE) {
                 if (direction > 0) {
                     node.setSteamMode(SteamMode.NONE);
-                    GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal()) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+                    GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
                     node.setTargetTier(lowestElectric);
+                    ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
+                    if (sbWs != null) {
+                        node.setMachineIcon(sbWs);
+                    } else if (isVanillaCooking) {
+                        node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
+                    }
                     if (parent != null) parent.markSummaryDirty();
                     invalidateCache();
                     return true;
@@ -442,17 +458,59 @@ public class NodeWidget {
                     return true;
                 }
             } else {
-                int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
-                int lowestAllowedElectric = (minIdx == GTVoltageTier.ULV.ordinal()) ? GTVoltageTier.ULV.ordinal() : GTVoltageTier.LV.ordinal();
-                if (direction < 0) {
-                    if (curIdx <= lowestAllowedElectric) {
-                        node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
+                    if (direction > 0) {
+                        if (node.supportsSteamMode()) {
+                            node.setSteamMode(SteamMode.LOW_PRESSURE);
+                        } else {
+                            GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+                            node.setTargetTier(lowestElectric);
+                            ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
+                            if (sbWs != null) {
+                                node.setMachineIcon(sbWs);
+                            } else if (isVanillaCooking) {
+                                node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
+                            }
+                        }
                         if (parent != null) parent.markSummaryDirty();
                         invalidateCache();
                         return true;
                     }
+                    return false;
+                }
+
+                int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
+                int lowestAllowedElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV.ordinal() : GTVoltageTier.LV.ordinal();
+                if (direction < 0) {
+                    if (curIdx <= lowestAllowedElectric) {
+                        if (node.supportsSteamMode()) {
+                            node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                            if (parent != null) parent.markSummaryDirty();
+                            invalidateCache();
+                            return true;
+                        } else if (isVanillaCooking) {
+                            node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
+                            if (parent != null) parent.markSummaryDirty();
+                            invalidateCache();
+                            return true;
+                        }
+                        return false;
+                    }
                 }
             }
+        } else if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
+            if (direction > 0) {
+                GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+                node.setTargetTier(lowestElectric);
+                ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
+                if (sbWs != null) {
+                    node.setMachineIcon(sbWs);
+                }
+                if (parent != null) parent.markSummaryDirty();
+                invalidateCache();
+                return true;
+            }
+            return false;
         }
 
         int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
@@ -475,6 +533,12 @@ public class NodeWidget {
         GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
 
         node.setTargetTier(newTier);
+        if (!node.isMultiblock()) {
+            ResourceLocation sbWs = node.getWorkstationForTier(newTier);
+            if (sbWs != null) {
+                node.setMachineIcon(sbWs);
+            }
+        }
         com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
         if (parent != null) {
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
@@ -667,7 +731,14 @@ public class NodeWidget {
 
         // Count Input Box Click
         int countBoxX = countMinusX + 16;
-        int countBoxW = Math.max(28, Minecraft.getInstance().font.width(countEditor.getDisplayText()) + 6);
+        int textW = 20;
+        try {
+            var mc = Minecraft.getInstance();
+            if (mc != null && mc.font != null) {
+                textW = mc.font.width(countEditor.getDisplayText());
+            }
+        } catch (Throwable ignored) {}
+        int countBoxW = Math.max(28, textW + 6);
         if (mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             countEditor.startEditing();
             return true;

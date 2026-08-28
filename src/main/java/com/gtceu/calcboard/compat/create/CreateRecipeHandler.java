@@ -181,6 +181,9 @@ public class CreateRecipeHandler {
     }
 
     public static List<RecipeSearchEngine.SearchableRecipe> getVirtualKineticSearchRecipes() {
+        if (!ModCompatHelper.isCreateLoaded() && !ModCompatHelper.isCreateAdditionsLoaded()) {
+            return Collections.emptyList();
+        }
         List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
         String catId = "create:kinetic_generation";
         String catName = Component.translatable("category.gtcalcboard.create_kinetic").getString();
@@ -212,6 +215,9 @@ public class CreateRecipeHandler {
 
         for (int i = 0; i < items.length; i++) {
             if (items[i] == null) continue;
+            String itemMod = items[i].getNamespace();
+            if ("create".equals(itemMod) && !ModCompatHelper.isCreateLoaded()) continue;
+            if ("createaddition".equals(itemMod) && !ModCompatHelper.isCreateAdditionsLoaded()) continue;
             try {
                 var regItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(items[i]);
                 if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {

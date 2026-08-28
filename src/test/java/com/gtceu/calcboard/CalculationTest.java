@@ -26,7 +26,13 @@ import java.util.List;
 
 public class CalculationTest {
 
-    @Test
+    @org.junit.jupiter.api.BeforeAll
+    public static void setupMinecraft() {
+        try {
+            net.minecraft.SharedConstants.tryDetectVersion();
+            net.minecraft.server.Bootstrap.bootStrap();
+        } catch (Throwable ignored) {}
+    }
     public void testHierarchicalMaterialTreeResolution() {
         Assertions.assertDoesNotThrow(() -> {
             Class<?> matNodeCls = Class.forName("dev.emi.emi.bom.MaterialNode");

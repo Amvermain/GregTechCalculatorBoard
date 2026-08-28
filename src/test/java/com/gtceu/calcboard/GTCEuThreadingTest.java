@@ -268,7 +268,13 @@ public class GTCEuThreadingTest {
         adapter.handleInstallAddon(dtNode, megaPar, false);
 
         Assertions.assertEquals(1024, dtNode.getTotalParallel());
+        Assertions.assertTrue(dtNode.hasPowerConstantAddon());
         Assertions.assertEquals(1, dtNode.getAddons().stream().filter(a -> a.getCategory() == com.gtceu.calcboard.api.catalog.MachineAddon.Category.PARALLEL).count());
+
+        // Power remains 1x recipe power (not 1024x)!
+        double singleRecipePower = adapter.computeOverclock(dtNode, dtNode.getTargetTier(), false).eut();
+        Assertions.assertEquals(singleRecipePower, adapter.computeSingleMachinePower(dtNode), 0.001);
+        Assertions.assertEquals(singleRecipePower, dtNode.getTotalEUt(), 0.001);
 
         // 4. Uninstall Parallel Hatch -> Returns to 1x
         adapter.handleUninstallAddon(dtNode, megaPar);
@@ -412,7 +418,77 @@ public class GTCEuThreadingTest {
                     idStr + " applicable categories should contain THREADING");
         }
     }
+
+    @Test
+    public void testEnergyHatchCapacityAndParallelOverclockSimulation() {
+        // 1. Create Chemical Reactor (Nitrobenzene) node: MV 90 EU/t, 160 ticks (8.0s)
+        RecipeNode lcrNode = RecipeNode.create("Large Chemical Reactor (Nitrobenzene)", 160.0, 90.0, GTVoltageTier.MV);
+        lcrNode.setMultiblock(true);
+        lcrNode.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
+        lcrNode.addOutput(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:nitrobenzene"), "Nitrobenzene", 8000.0, 1.0));
+        lcrNode.addOutput(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diluted_sulfuric_acid"), "Diluted Sulfuric Acid", 1000.0, 1.0));
+
+        var adapter = ModAdapterRegistry.getAdapterForNode(lcrNode);
+
+        // 2. Install IV 1A Energy Input Hatch (8,192 EU/t) and 16x Parallel Control Hatch
+        com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon ivEnergyHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:iv_energy_input_hatch", "IV Energy Input Hatch", "", ResourceLocation.tryParse("gtceu:iv_energy_input_hatch"), GTVoltageTier.IV, 1, false, false, false
+        );
+        com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon par16x = new com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon(
+                "gtceu:luv_parallel_hatch", "Master Parallel Control Hatch", "", ResourceLocation.tryParse("gtceu:luv_parallel_hatch"), 16, false
+        );
+
+        adapter.handleInstallAddon(lcrNode, ivEnergyHatch, false);
+        adapter.handleInstallAddon(lcrNode, par16x, false);
+
+        // Node target tier is IV, but power capacity limit (8,192 EU/t) constrains overclocks to 1 OC (HV)
+        Assertions.assertEquals(GTVoltageTier.IV, lcrNode.getTargetTier());
+        Assertions.assertEquals(16, lcrNode.getTotalParallel());
+
+        var oc = adapter.computeOverclock(lcrNode, lcrNode.getTargetTier(), false);
+        // Base 160 ticks -> 1 OC (80 ticks = 4.00s)
+        Assertions.assertEquals(80.0, oc.durationTicks(), 0.001);
+        Assertions.assertEquals(4.00, lcrNode.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(1, oc.overclocks());
+
+        // Single recipe EUt is 360 EU/t, 16 parallel total power is 5,760 EU/t (0.7 A @ IV)
+        double totalPower = adapter.computeSingleMachinePower(lcrNode);
+        Assertions.assertEquals(5760.0, totalPower, 0.001);
+        Assertions.assertEquals(5760.0, lcrNode.getTotalEUt(), 0.001);
+
+        // CPS is (20/80) * 16 = 4.0 cps
+        Assertions.assertEquals(4.0, lcrNode.getCyclesPerSecond(), 0.001);
+
+        // Outputs: 8,000 mB * 4.0 = 32,000 mB/s (32 B/s), 1,000 mB * 4.0 = 4,000 mB/s (4 B/s)
+        var outRates = lcrNode.calculateOutputRates();
+        var nitroEntry = outRates.entrySet().stream().filter(e -> e.getKey().getDisplayName().equals("Nitrobenzene")).findFirst();
+        var acidEntry = outRates.entrySet().stream().filter(e -> e.getKey().getDisplayName().equals("Diluted Sulfuric Acid")).findFirst();
+        Assertions.assertTrue(nitroEntry.isPresent());
+        Assertions.assertTrue(acidEntry.isPresent());
+        Assertions.assertEquals(32000.0, nitroEntry.get().getValue(), 0.001);
+        Assertions.assertEquals(4000.0, acidEntry.get().getValue(), 0.001);
+
+        // 3. Upgrade to LuV 1A Energy Hatch (32,768 EU/t) -> Unlocks 2nd OC (EV level, 2.00s, 23,040 EU/t)
+        com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon luvEnergyHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:luv_energy_input_hatch", "LuV Energy Input Hatch", "", ResourceLocation.tryParse("gtceu:luv_energy_input_hatch"), GTVoltageTier.LuV, 1, false, false, false
+        );
+        adapter.handleUninstallAddon(lcrNode, ivEnergyHatch);
+        adapter.handleInstallAddon(lcrNode, luvEnergyHatch, false);
+
+        Assertions.assertEquals(GTVoltageTier.LuV, lcrNode.getTargetTier());
+        var ocLuV = adapter.computeOverclock(lcrNode, lcrNode.getTargetTier(), false);
+        Assertions.assertEquals(40.0, ocLuV.durationTicks(), 0.001); // 2.00s
+        Assertions.assertEquals(2.00, lcrNode.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(2, ocLuV.overclocks());
+        Assertions.assertEquals(23040.0, lcrNode.getTotalEUt(), 0.001); // 1,440 * 16 = 23,040 EU/t
+        Assertions.assertEquals(8.0, lcrNode.getCyclesPerSecond(), 0.001);
+
+        // 4. Uninstall energy hatches -> Resets target tier to recipe tier (MV)
+        adapter.handleUninstallAddon(lcrNode, luvEnergyHatch);
+        Assertions.assertEquals(GTVoltageTier.MV, lcrNode.getTargetTier());
+    }
 }
+
 
 
 

@@ -88,15 +88,50 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
         }
     }
 
+    private static final Set<ResourceLocation> FAVORITE_RECIPES = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     @Override
     public List<SearchableRecipe> collectSearchableRecipes() {
-        return Collections.emptyList();
+        if (!isAvailable() || jeiRuntime == null) return Collections.emptyList();
+        List<SearchableRecipe> list = new ArrayList<>();
+        try {
+            var recipeManager = jeiRuntime.getRecipeManager();
+            var categoryLookup = recipeManager.createRecipeCategoryLookup();
+            if (categoryLookup != null) {
+                var categories = categoryLookup.get().toList();
+                for (var category : categories) {
+                    if (category == null || category.getRecipeType() == null) continue;
+                    try {
+                        var recipeLookup = recipeManager.createRecipeLookup(category.getRecipeType());
+                        if (recipeLookup != null) {
+                            var recipes = recipeLookup.get().toList();
+                            for (var recipe : recipes) {
+                                if (recipe != null) {
+                                    SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndexUntyped(category, recipe, jeiRuntime);
+                                    if (sr != null) {
+                                        list.add(sr);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Throwable t) {
+                        // Skip category if individual lookup throws
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            com.mojang.logging.LogUtils.getLogger().error("Failed to collect searchable recipes from JEI", t);
+        }
+        return list;
     }
 
     @Override
     public RecipeNode convertToNode(Object viewerRecipe) {
         if (viewerRecipe instanceof RecipeNode rn) {
             return rn.copy();
+        }
+        if (viewerRecipe instanceof JeiRecipeWrapper<?> wrapper) {
+            return JeiRecipeConverter.convert(wrapper);
         }
         return null;
     }
@@ -141,16 +176,35 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     @Override
     public Set<ResourceLocation> getFavoriteRecipeIds() {
-        return Collections.emptySet();
+        return Collections.unmodifiableSet(FAVORITE_RECIPES);
     }
 
     @Override
     public boolean isFavorite(Object viewerRecipe) {
-        return false;
+        ResourceLocation id = getRecipeId(viewerRecipe);
+        return id != null && FAVORITE_RECIPES.contains(id);
     }
 
     @Override
-    public void toggleFavorite(Object viewerRecipe) {}
+    public void toggleFavorite(Object viewerRecipe) {
+        ResourceLocation id = getRecipeId(viewerRecipe);
+        if (id != null) {
+            if (FAVORITE_RECIPES.contains(id)) {
+                FAVORITE_RECIPES.remove(id);
+            } else {
+                FAVORITE_RECIPES.add(id);
+            }
+        }
+    }
+
+    private ResourceLocation getRecipeId(Object viewerRecipe) {
+        if (viewerRecipe instanceof JeiRecipeWrapper<?> wrapper) {
+            return wrapper.getRecipeId();
+        } else if (viewerRecipe instanceof RecipeNode rn) {
+            return rn.getRecipeCategoryId();
+        }
+        return null;
+    }
 
     @Override
     public int[] calculatePreviewBounds(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int screenW, int screenH) {
@@ -179,7 +233,13 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     @Override
     public int renderRowIcon(GuiGraphics graphics, Font font, Object viewerRecipe, int listX, int rowY, ResourceLocation matchedOutputId, String matchedOutputName) {
-        if (viewerRecipe instanceof RecipeNode rn) {
+        RecipeNode rn = null;
+        if (viewerRecipe instanceof RecipeNode r) {
+            rn = r;
+        } else if (viewerRecipe instanceof JeiRecipeWrapper<?> wrapper) {
+            rn = JeiRecipeConverter.convert(wrapper);
+        }
+        if (rn != null) {
             int currentX = listX + 6;
             if (!rn.getInputs().isEmpty()) {
                 com.gtceu.calcboard.client.gui.render.IngredientRenderer.render(graphics, rn.getInputs().get(0), currentX, rowY + 8);
@@ -259,6 +319,120 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
                 }
             }
         }
+    }
+
+    @Override
+    public boolean isSearchFieldFocused() {
+        if (!isAvailable() || jeiRuntime == null) return false;
+        try {
+            var overlay = jeiRuntime.getIngredientListOverlay();
+            if (overlay != null) {
+                try {
+                    var m = overlay.getClass().getMethod("hasKeyboardFocus");
+                    if (Boolean.TRUE.equals(m.invoke(overlay))) return true;
+                } catch (NoSuchMethodException ignored) {}
+                try {
+                    var m = overlay.getClass().getMethod("isFilterFocused");
+                    if (Boolean.TRUE.equals(m.invoke(overlay))) return true;
+                } catch (NoSuchMethodException ignored) {}
+            }
+            var bookmarkOverlay = jeiRuntime.getBookmarkOverlay();
+            if (bookmarkOverlay != null) {
+                try {
+                    var m = bookmarkOverlay.getClass().getMethod("hasKeyboardFocus");
+                    if (Boolean.TRUE.equals(m.invoke(bookmarkOverlay))) return true;
+                } catch (NoSuchMethodException ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    @Override
+    public boolean tryAddHoveredRecipeToBoard(net.minecraft.client.gui.screens.Screen screen, double mouseX, double mouseY) {
+        if (!isAvailable() || jeiRuntime == null || screen == null) return false;
+        try {
+            if (screen.getClass().getName().contains("RecipesGui")) {
+                var layoutsField = screen.getClass().getDeclaredField("layouts");
+                layoutsField.setAccessible(true);
+                Object recipeGuiLayouts = layoutsField.get(screen);
+                if (recipeGuiLayouts != null) {
+                    var listField = recipeGuiLayouts.getClass().getDeclaredField("recipeLayoutsWithButtons");
+                    listField.setAccessible(true);
+                    @SuppressWarnings("unchecked")
+                    List<?> layoutsWithButtons = (List<?>) listField.get(recipeGuiLayouts);
+                    if (layoutsWithButtons != null && !layoutsWithButtons.isEmpty()) {
+                        mezz.jei.api.gui.IRecipeLayoutDrawable targetLayout = null;
+                        for (Object lwb : layoutsWithButtons) {
+                            if (lwb != null) {
+                                try {
+                                    var layoutMethod = lwb.getClass().getMethod("recipeLayout");
+                                    Object res = layoutMethod.invoke(lwb);
+                                    if (res instanceof mezz.jei.api.gui.IRecipeLayoutDrawable layoutDrawable) {
+                                        if (layoutDrawable.isMouseOver(mouseX, mouseY)) {
+                                            targetLayout = layoutDrawable;
+                                            break;
+                                        }
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                        }
+                        if (targetLayout == null) {
+                            for (Object lwb : layoutsWithButtons) {
+                                if (lwb != null) {
+                                    try {
+                                        var layoutMethod = lwb.getClass().getMethod("recipeLayout");
+                                        Object res = layoutMethod.invoke(lwb);
+                                        if (res instanceof mezz.jei.api.gui.IRecipeLayoutDrawable layoutDrawable) {
+                                            targetLayout = layoutDrawable;
+                                            break;
+                                        }
+                                    } catch (Throwable ignored) {}
+                                }
+                            }
+                        }
+                        if (targetLayout != null) {
+                            var category = targetLayout.getRecipeCategory();
+                            var recipeObj = targetLayout.getRecipe();
+                            if (category != null && recipeObj != null) {
+                                @SuppressWarnings({"rawtypes", "unchecked"})
+                                JeiRecipeWrapper<?> wrapper = new JeiRecipeWrapper(category, recipeObj);
+                                RecipeNode node = JeiRecipeConverter.convert(wrapper);
+                                if (node != null) {
+                                    Minecraft mc = Minecraft.getInstance();
+                                    int screenW = mc.getWindow().getGuiScaledWidth();
+                                    int screenH = mc.getWindow().getGuiScaledHeight();
+                                    double[] pos = com.gtceu.calcboard.client.gui.BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+                                    node.setPosX(pos[0]);
+                                    node.setPosY(pos[1]);
+                                    com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph().addNode(node);
+
+                                    String name = node.getName();
+                                    if (name == null || name.isEmpty()) {
+                                        name = category.getTitle().getString();
+                                    }
+                                    com.gtceu.calcboard.client.gui.widget.BoardToast.show(
+                                        Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name))
+                                    );
+                                    mc.getSoundManager().play(
+                                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                            net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F
+                                        )
+                                    );
+                                    if (mc.screen instanceof com.gtceu.calcboard.client.gui.BoardScreen boardScreen) {
+                                        boardScreen.rebuildWidgets();
+                                        boardScreen.markSummaryDirty();
+                                    }
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Failed to capture JEI recipe under mouse: {}", t.getMessage());
+        }
+        return false;
     }
 }
 

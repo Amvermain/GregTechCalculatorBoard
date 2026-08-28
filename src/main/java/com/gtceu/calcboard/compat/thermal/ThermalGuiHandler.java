@@ -87,7 +87,9 @@ public class ThermalGuiHandler {
                                            net.minecraft.client.gui.components.EditBox parallelBox,
                                            com.gtceu.calcboard.client.gui.BoardScreen parent) {
         if (!node.isMultiblock()) {
-            graphics.drawString(font, "§b" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_fixed").getString(), x + 10, y + 32, 0xFFFFFFFF, false);
+            int scale = node.getCombinedParallelMultiplier();
+            String scaleInfo = scale > 1 ? " §7(§d⚡ " + scale + "x Scale§7)" : "";
+            graphics.drawString(font, "§b" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_fixed").getString() + scaleInfo, x + 10, y + 32, 0xFFFFFFFF, false);
             graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_desc").getString(), x + 10, y + 48, 0xFF888888, false);
         } else {
             int curPar = node.getParallel();

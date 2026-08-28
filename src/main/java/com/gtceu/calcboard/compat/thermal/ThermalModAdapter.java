@@ -88,7 +88,18 @@ public class ThermalModAdapter implements IModAdapter {
     public boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
         if (addon.getCategory().equals(AddonCategory.CUSTOM)) return true;
-        return addon.getCategory().equals(AddonCategory.THERMAL_AUGMENT);
+        if (!addon.getCategory().equals(AddonCategory.THERMAL_AUGMENT)) return false;
+
+        if (addon instanceof ThermalAugmentAddon ta) {
+            boolean isDynamo = ThermalAugmentHelper.isDynamoNode(node);
+            if (ta.getTarget() == ThermalAugmentAddon.AugmentTarget.DYNAMO && !isDynamo) {
+                return false;
+            }
+            if (ta.getTarget() == ThermalAugmentAddon.AugmentTarget.MACHINE && isDynamo) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -199,16 +210,16 @@ public class ThermalModAdapter implements IModAdapter {
         if (addon == null) return "";
         boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
         if (isKit) {
-            return String.format("§d⚡ %dx Scale", addon.getParallelMultiplier());
+            return String.format("§d⚡%dx", addon.getParallelMultiplier());
         }
         if (addon.getDurationMultiplier() != 1.0 && addon.getEutMultiplier() != 1.0) {
-            return String.format("§e⚡ %.1fx ⏱ %.1fx", addon.getEutMultiplier(), addon.getDurationMultiplier());
+            return String.format("§e⚡%.1f ⏱%.1f", addon.getEutMultiplier(), addon.getDurationMultiplier());
         }
         if (addon.getEutMultiplier() != 1.0) {
-            return String.format("§e⚡ %.2fx", addon.getEutMultiplier());
+            return String.format("§e⚡%.1fx", addon.getEutMultiplier());
         }
         if (addon.getDurationMultiplier() != 1.0) {
-            return String.format("§a⏱ %.2fx", addon.getDurationMultiplier());
+            return String.format("§a⏱%.1fx", addon.getDurationMultiplier());
         }
         return "";
     }

@@ -8,6 +8,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeManager;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -30,11 +31,21 @@ public final class ClientLevelHelper {
                 RecipeManager recipeManager = mc.level.getRecipeManager();
                 if (recipeManager != null) {
                     RegistryAccess access = mc.level.registryAccess();
+                    List<ItemStack> temp = new java.util.ArrayList<>();
                     for (Recipe<?> r : recipeManager.getRecipes()) {
                         try {
-                            ItemStack res = r.getResultItem(access);
-                            if (res != null && !res.isEmpty()) {
-                                collector.accept(res);
+                            temp.clear();
+                            com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.extractRecipeOutputs(r, temp);
+                            if (temp.isEmpty()) {
+                                ItemStack res = r.getResultItem(access);
+                                if (res != null && !res.isEmpty()) {
+                                    temp.add(res);
+                                }
+                            }
+                            for (ItemStack is : temp) {
+                                if (is != null && !is.isEmpty()) {
+                                    collector.accept(is);
+                                }
                             }
                         } catch (Throwable ignored) {}
                     }

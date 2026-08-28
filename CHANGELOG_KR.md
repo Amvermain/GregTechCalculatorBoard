@@ -6,6 +6,43 @@
 
 **그렉텍 계산기 보드 (GregTech Calculator Board)**의 모든 주요 변경 사항이 이 문서에 기록됩니다.
 
+## [2.0.0-alpha.12] - 2026-08-29
+
+### 신규 기능 (Added)
+- **통합 보드 환경설정 모달 다이얼로그 (`BoardSettingsDialog`, `ToolbarWidget`)**:
+  - 툴바 우측 상단 `[⚙ Settings]` 버튼을 통해 전역 유체 단위(Auto, Always mB, Always B), 시간 단위(/s, /t, /min, /h), 싱글플레이 게임 일시정지(Pause) 토글, 기본 오버클럭 모드 등을 손쉽게 설정하고 관리할 수 있는 전용 설정창 추가.
+
+### 개선 및 최적화 (Changed & Improved)
+- **호버 레시피 핫키 즉시 추가 기능 전면 강화 (`Shift + A`)**:
+  - EMI 및 JEI 레시피 상세 화면뿐만 아니라 인벤토리 및 상자 열람 상태의 우측 사이드바 및 즐겨찾기/북마크 패널에서도 아이템에 마우스를 올리고 `Shift + A`를 누르면 해당 레시피가 계산 보드에 즉시 추가되도록 조작성 개선.
+  - 검색창 텍스트 입력(EditBox 포커스) 상태를 방해하지 않으면서 다양한 화면 환경에서 `Shift + A` 단축키가 정확하게 반응하도록 안정화.
+- **머신 설정 다이얼로그 멀티블록 모델 선택 연동 지원**:
+  - 동일 레시피 카테고리를 지원하는 다양한 멀티블록 머신(대형 분쇄기, 대형 채굴기 등)이 설정창 상단 멀티블록 목록에 정상 노출되고 클릭 및 마우스 휠 스크롤로 손쉽게 전환할 수 있도록 개선.
+- **`BoardScreen` 내 FTB Library 사이드바 버튼 자동 숨김 처리 (`ClientForgeEvents`)**:
+  - 계산기 보드 열람 시 화면 좌상단을 가리던 FTB Quests, FTB Chunks, FTB Teams 등의 사이드바 버튼을 자동으로 숨겨 넓고 깔끔한 캔버스 작업 환경 제공 (EMI `[+]` 레시피 전송 기능은 100% 정상 보존).
+
+### 버그 수정 (Fixed)
+- **멀티블록 에너지 해치 및 병렬 해치(Parallel Hatch) 복합 오버클록 연산 버그 수정 (`GTCEuModAdapter`, `GTParallelHatchAddon`, `EnergyHatchHelper`)**:
+  - 에너지 해치 장착 시 최대 수용 전압/전류를 초과하는 병렬 오버클럭 제한 및 다중 에너지 해치(Dual Energy Hatch) 티어 상승(1티어 승급) 연산 지원.
+  - `GTParallelHatchAddon` 장착 시 기계의 기본 병렬(Base Parallel)과 해치 병렬이 중복 곱연산되던 왜곡 수정.
+- **멀티블록 BoM 자재 명세서 선택적 부품(패러랠 해치 등) 자동 케이싱 환원 처리 (`GTCEuBOMHelper`, `MultiblockStructureCatalog`)**:
+  - 기본 청사진 3D 형상에 예시로 포함되어 있던 패러럴 제어 해치(Elite Parallel Control Hatch 등)가 미장착 시 BoM에서 자동 제외되고 해당 멀티블록의 기본 구조 케이싱으로 환원(+1)되도록 수정.
+  - 레시피상 불필요한 버스/해치 및 선택적 부품들의 지능적 BoM 정규화.
+- **JEI / EMI 검색창 타이핑 시 계산기 보드 단축키(`B`) 충돌 버그 수정 (`ClientForgeEvents`)**:
+  - 인벤토리, 상자 또는 레시피 뷰어 화면에서 JEI/EMI 검색창에 포커스를 두고 텍스트를 입력할 때 계산기 보드 열기 단축키(`B`)가 가로채져 보드가 강제로 열리던 문제 완전 해결.
+- **JEI 환경 레시피 인덱싱 및 다이얼로그 연동 누락 수정 (`JeiRecipeViewerAdapter`)**:
+  - JEI 모드 단독 실행 환경에서 레시피 검색 다이얼로그 열람 시 레시피 목록이 비정상적으로 지연되거나 누락되던 수집 로직 안정화.
+- **JEI 모드 프로그래밍 회로(Programmed Circuit) 입력 포트 오인 등록 버그 수정 (`JeiRecipeConverter`, `GTCEuRecipeHandler`)**:
+  - JEI에서 레시피를 가져올 때 모드 선택용 비소모 회로(`gtceu:programmed_circuit`, `gtceu:integrated_circuit`)가 실제 소비 원자재로 등록되어 `-0/s` 요구 포트가 생성되던 문제 해결.
+- **스팀 기계 티어 전환 시 엉뚱한 머신(Large Miner 등)으로 아이콘이 변경되던 오류 수정 (`GTCEuModAdapter`)**:
+  - LP/HP 스팀 기계에서 전기 티어로 전환하거나 티어를 변경할 때 올바른 동일 기계의 해당 티어 아이콘으로 안전하게 갱신되도록 해결.
+- **다단계 레시피 추출기 및 리플렉션 무결성 강화 (`LayeredRecipeHelper`)**:
+  - GTCEu 및 타 모드 레시피 변환 중 발생할 수 있는 레이아웃 누락 및 래퍼 객체 참조 오류 해결.
+
+### 알려진 문제점 (Known Issues)
+- **JEI 모드 GTCEu 분쇄기(Macerator) 등 LV/MV 티어에서의 확률형 부산물(Byproduct) 비정상 노출 이슈**:
+  - JEI를 통해 레시피를 보드로 가져올 때, 기본 전압 티어(LV/MV)에서 비활성화되어야 하는 일부 GTCEu 레시피(예: 생닭 분쇄 시 뼈가루/깃털 등 0% 확률 부산물)의 출력이 노드 포트에 생성되는 현상이 확인되었습니다. (차기 릴리즈에서 정밀 수정 예정)
+
 ## [2.0.0-alpha.11] - 2026-08-28
 
 ### 신규 기능 (Added)

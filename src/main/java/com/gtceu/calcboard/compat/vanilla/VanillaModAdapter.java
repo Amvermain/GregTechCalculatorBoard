@@ -128,7 +128,13 @@ public class VanillaModAdapter implements IModAdapter {
 
     @Override
     public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        return false;
+        if (node == null || node.isModule()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int ctrlY = y + NodeWidget.HEADER_HEIGHT + 6;
+        int row2Y = ctrlY + 18;
+        int cardW = node.getCardWidth();
+        return mouseX >= x + 6 && mouseX <= x + cardW - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
     @Override
@@ -143,6 +149,9 @@ public class VanillaModAdapter implements IModAdapter {
 
     @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+        if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
+            return widget.changeTier(button == 1 ? -1 : 1);
+        }
         return false;
     }
 }

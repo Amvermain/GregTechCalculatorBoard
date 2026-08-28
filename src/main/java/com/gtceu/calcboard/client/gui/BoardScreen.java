@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.client.gui.dialog.BoardSettingsDialog;
 import com.gtceu.calcboard.client.gui.dialog.DeletePageConfirmDialog;
 import com.gtceu.calcboard.client.gui.dialog.TutorialExitConfirmDialog;
 import com.gtceu.calcboard.client.gui.dialog.ExportToTeamDialog;
@@ -108,6 +109,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     private RecentSavesDialog recentSavesDialog;
     private FrameEditDialog frameEditDialog;
     private NoteEditDialog noteEditDialog;
+    private BoardSettingsDialog settingsDialog;
 
     // Viewport Coordinates
     private double panX = lastPanX;
@@ -342,6 +344,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         this.recentSavesDialog = new RecentSavesDialog(this);
         this.frameEditDialog = new FrameEditDialog(this);
         this.noteEditDialog = new NoteEditDialog(this);
+        this.settingsDialog = new BoardSettingsDialog(this);
 
         BoardManager.getInstance().setPageRemovalListener(page -> {
             if (TutorialManager.getInstance().isTutorialPage(page.getId())) {
@@ -381,6 +384,16 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
                 getGraph().getConnections().size(),
                 com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode()
         );
+    }
+
+    public BoardSettingsDialog getSettingsDialog() {
+        return settingsDialog;
+    }
+
+    public void openSettingsDialog() {
+        if (settingsDialog != null) {
+            settingsDialog.open();
+        }
     }
 
     public SaveToTeamDialog getSaveToTeamDialog() {
@@ -768,7 +781,8 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
                     boolean isHovered = ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, fromDirX, toDirX, canvasMouseX, canvasMouseY, 6.0);
                     boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
-                    int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : 0xFF00E5FF);
+                    int defWireColor = BoardManager.getInstance().getWireColor();
+                    int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : defWireColor);
                     float wireThick = isWireGlowing ? 3.5f : 2.0f;
                     ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
                     visibleWires.add(new float[]{x1, y1, x2, y2, fromDirX, toDirX});
@@ -780,7 +794,8 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         NodeWidget wireStart = canvasHandler.getWireStartNode();
         if (wireStart != null) {
             float x1, y1;
-            int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : 0xFF00E676;
+            int matchedColor = BoardManager.getInstance().getMatchedWireColor();
+            int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
             if (canvasHandler.isWireStartInput()) {
                 x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
                 y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
@@ -796,7 +811,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         ConnectionRenderer.endBatch();
 
         // Draw animated flow pulse dots (Single-batch GPU rendering)
-        if (zoom >= 0.28) {
+        if (zoom >= 0.28 && BoardManager.getInstance().isShowWirePulseAnimation()) {
             ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWires);
         }
 
@@ -891,7 +906,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
-        hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
+        if (BoardManager.getInstance().isShowHotkeyHud()) {
+            hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
+        }
         favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
 
         if (summaryDirty || cachedSummary == null) {
@@ -921,6 +938,8 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
         if (welcomeDialog != null && welcomeDialog.isVisible()) {
             welcomeDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (settingsDialog != null && settingsDialog.isVisible()) {
+            settingsDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             globalBalanceDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
@@ -956,6 +975,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     public boolean isAnyModalOpen() {
         return (welcomeDialog != null && welcomeDialog.isVisible())
+            || (settingsDialog != null && settingsDialog.isVisible())
             || (globalBalanceDialog != null && globalBalanceDialog.isVisible())
             || (multiblockBOMDialog != null && multiblockBOMDialog.isVisible())
             || (guideDialog != null && guideDialog.isVisible())
@@ -1139,6 +1159,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         if (welcomeDialog.mouseClicked(this, width, height, mouseX, mouseY, button)) {
             return true;
         }
+        if (settingsDialog != null && settingsDialog.isVisible()) {
+            return settingsDialog.mouseClicked(mouseX, mouseY, button);
+        }
         if (TutorialOverlay.mouseClicked(this, width, height, mouseX, mouseY, button)) {
             return true;
         }
@@ -1178,7 +1201,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         if (favoritesDockWidget.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        if (hotkeyHudWidget.mouseClicked(mouseX, mouseY, button)) {
+        if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
         if (summaryOverlay.mouseClicked(mouseX, mouseY, button, width, height)) {
@@ -1313,6 +1336,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
             return saveToTeamDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (settingsDialog != null && settingsDialog.isVisible()) {
+            return settingsDialog.keyPressed(keyCode, scanCode, modifiers);
         }
         if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
             return exportToTeamDialog.keyPressed(keyCode, scanCode, modifiers);

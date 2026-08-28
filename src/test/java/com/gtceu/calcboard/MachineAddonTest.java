@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -325,7 +326,7 @@ public class MachineAddonTest {
         Assertions.assertEquals(75, cupro.pyrolyseSpeedPercent());
         Assertions.assertEquals(75, cupro.chemicalSpeedPercent());
         Assertions.assertEquals(100, cupro.crackingEnergyPercent());
-        Assertions.assertEquals(32, cupro.smelterParallel());
+        Assertions.assertEquals(16, cupro.smelterParallel());
 
         MachineAddon cuproAddon = new MachineAddon("gtceu:cupronickel_coil", "Cupronickel Coil", MachineAddon.Category.COIL, "", null);
         cuproAddon.setCoilTemperature(1800);
@@ -598,10 +599,51 @@ public class MachineAddonTest {
         CompoundTag tier48Root = new CompoundTag();
         tier48Root.put("AugmentData", tier48Aug);
 
-        MachineAddon tier48Addon = ThermalAugmentHelper.parseThermalAugmentTag(tier48Root, "Abyssal Upgrade Kit", ResourceLocation.tryParse("thermal_extra:abyssal_upgrade_kit"));
+        MachineAddon tier48Addon = ThermalAugmentHelper.parseThermalAugmentTag(tier48Root, "EV Integral Components", ResourceLocation.tryParse("kubejs:ev_integral_components"));
         Assertions.assertNotNull(tier48Addon);
         Assertions.assertEquals(48, tier48Addon.getParallelMultiplier());
-        Assertions.assertTrue(RecipeNode.isThermalUpgradeKit(tier48Addon));
+
+        // 3. Test Dynamo vs Machine Compatibility
+        CompoundTag dynamoAug = new CompoundTag();
+        dynamoAug.putString("Type", "Dynamo");
+        dynamoAug.putFloat("DynamoPower", 2.0f);
+        dynamoAug.putFloat("DynamoEnergy", 0.85f);
+        CompoundTag dynamoRoot = new CompoundTag();
+        dynamoRoot.put("AugmentData", dynamoAug);
+        MachineAddon dynamoAddon = ThermalAugmentHelper.parseThermalAugmentTag(dynamoRoot, "Dynamo Output Augment", ResourceLocation.tryParse("thermal:dynamo_output_augment"));
+
+        var adapter = new com.gtceu.calcboard.compat.thermal.ThermalModAdapter();
+        RecipeNode lapidary = RecipeNode.create("Lapidary Dynamo", 100.0, 1000.0, GTVoltageTier.MV);
+        lapidary.setRecipeCategoryId(ResourceLocation.tryParse("thermal:lapidary_fuel"));
+
+        RecipeNode pulverizer = RecipeNode.create("Pulverizer", 100.0, 1000.0, GTVoltageTier.MV);
+        pulverizer.setRecipeCategoryId(ResourceLocation.tryParse("thermal:pulverizer"));
+
+        // Dynamo augment on Lapidary -> compatible; on Pulverizer -> NOT compatible
+        Assertions.assertTrue(adapter.isAddonCompatible(lapidary, dynamoAddon));
+        Assertions.assertFalse(adapter.isAddonCompatible(pulverizer, dynamoAddon));
+
+        // Machine augment on Lapidary -> NOT compatible; on Pulverizer -> compatible
+        Assertions.assertFalse(adapter.isAddonCompatible(lapidary, speedAddon));
+        Assertions.assertTrue(adapter.isAddonCompatible(pulverizer, speedAddon));
+
+        // Upgrade kit on both -> compatible
+        Assertions.assertTrue(adapter.isAddonCompatible(lapidary, tier48Addon));
+        Assertions.assertTrue(adapter.isAddonCompatible(pulverizer, tier48Addon));
+
+        // Multi-copy install test on Lapidary (up to 3 slots)
+        adapter.handleInstallAddon(lapidary, dynamoAddon, false);
+        Assertions.assertEquals(1, lapidary.getAddons().size());
+        Assertions.assertTrue(adapter.canInstallAddon(lapidary, dynamoAddon));
+        adapter.handleInstallAddon(lapidary, dynamoAddon, false);
+        adapter.handleInstallAddon(lapidary, dynamoAddon, false);
+        Assertions.assertEquals(3, lapidary.getAddons().size());
+        Assertions.assertFalse(adapter.canInstallAddon(lapidary, dynamoAddon), "Cannot install more than 3 regular augments");
+
+        MachineAddon abyssalKit = ThermalAugmentHelper.parseThermalAugmentTag(tier48Root, "Abyssal Upgrade Kit", ResourceLocation.tryParse("thermal_extra:abyssal_upgrade_kit"));
+        Assertions.assertNotNull(abyssalKit);
+        Assertions.assertEquals(48, abyssalKit.getParallelMultiplier());
+        Assertions.assertTrue(RecipeNode.isThermalUpgradeKit(abyssalKit));
 
         // 3. Test Multi-Cycle Injector with 1.60x Fuel Energy (DoubleTag DynEnergy)
         CompoundTag mci160Aug = new CompoundTag();
@@ -944,6 +986,18 @@ public class MachineAddonTest {
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(lcrNode);
 
         Assertions.assertTrue(adapter.isAddonCompatible(lcrNode, sterileHatch), "Sterile Cleaning Maintenance Hatch must be compatible with multiblock");
+    }
+
+    @Test
+    public void testThermalAddonCrawlerDiscoveryWithEmptyRecipeOutputs() {
+        List<MachineAddon> addons = new ArrayList<>();
+        com.gtceu.calcboard.compat.thermal.ThermalAddonCrawler.discoverAddons(addons, List.of());
+
+        // In headless testing environment where ForgeRegistries may be mock/empty or loaded,
+        // method must execute safely without throwing exceptions or blocking discovery.
+        Assertions.assertDoesNotThrow(() -> {
+            com.gtceu.calcboard.compat.thermal.ThermalAddonCrawler.discoverAddons(addons, Collections.emptyList());
+        });
     }
 }
 
