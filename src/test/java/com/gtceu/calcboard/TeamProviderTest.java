@@ -1,6 +1,7 @@
 package com.gtceu.calcboard;
 
 import com.gtceu.calcboard.server.team.FTBTeamsProvider;
+import com.gtceu.calcboard.server.team.PhoenixGuildsProvider;
 import com.gtceu.calcboard.server.team.StandaloneFallbackProvider;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import com.gtceu.calcboard.server.team.VanillaScoreboardProvider;
@@ -37,6 +38,14 @@ public class TeamProviderTest {
         // In unit test environment without Minecraft Forge runtime, FTB Teams should report not available safely without throwing exceptions
         assertFalse(provider.isAvailable());
         assertEquals("ftbteams", provider.getProviderId());
+    }
+
+    @Test
+    public void testPhoenixGuildsProviderSafeDegradation() {
+        PhoenixGuildsProvider provider = new PhoenixGuildsProvider();
+        // In unit test environment without Minecraft Forge runtime, Phoenix Guilds should report not available safely without throwing exceptions
+        assertFalse(provider.isAvailable());
+        assertEquals("phoenix_guilds", provider.getProviderId());
     }
 
     @Test

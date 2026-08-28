@@ -133,6 +133,9 @@ classDiagram
     class FTBTeamsProvider {
         +FTB Teams API 호출
     }
+    class PhoenixGuildsProvider {
+        +Phoenix Guilds API 호출
+    }
     class VanillaScoreboardProvider {
         +Scoreboard Team 호출
     }
@@ -141,6 +144,7 @@ classDiagram
     }
 
     ITeamProvider <|.. FTBTeamsProvider
+    ITeamProvider <|.. PhoenixGuildsProvider
     ITeamProvider <|.. VanillaScoreboardProvider
     ITeamProvider <|.. DummyStandaloneProvider
 ```

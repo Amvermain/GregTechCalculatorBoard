@@ -291,6 +291,15 @@ public class CanvasInteractionHandler {
                             RecipeNode sn = screen.getGraph().findNodeById(selId);
                             if (sn != null) {
                                 dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                                if (sn.isCompoundNode()) {
+                                    for (RecipeNode sib : graph.findCompoundSiblingNodes(sn.getCompoundGroupId())) {
+                                        dragStartPositions.put(sib.getId(), new double[]{sib.getPosX(), sib.getPosY()});
+                                    }
+                                    com.gtceu.calcboard.api.model.CanvasGroupFrame cf = graph.findCompoundFrame(sn.getCompoundGroupId());
+                                    if (cf != null) {
+                                        dragStartPositions.put(cf.getId(), new double[]{cf.getPosX(), cf.getPosY()});
+                                    }
+                                }
                             }
                         }
                         for (String selNoteId : screen.getSelectedNoteIds()) {
@@ -306,7 +315,17 @@ public class CanvasInteractionHandler {
                             }
                         }
                     } else {
-                        dragStartPositions.put(widget.getNode().getId(), new double[]{widget.getNode().getPosX(), widget.getNode().getPosY()});
+                        RecipeNode targetNode = widget.getNode();
+                        dragStartPositions.put(targetNode.getId(), new double[]{targetNode.getPosX(), targetNode.getPosY()});
+                        if (targetNode.isCompoundNode()) {
+                            for (RecipeNode sib : graph.findCompoundSiblingNodes(targetNode.getCompoundGroupId())) {
+                                dragStartPositions.put(sib.getId(), new double[]{sib.getPosX(), sib.getPosY()});
+                            }
+                            com.gtceu.calcboard.api.model.CanvasGroupFrame cf = graph.findCompoundFrame(targetNode.getCompoundGroupId());
+                            if (cf != null) {
+                                dragStartPositions.put(cf.getId(), new double[]{cf.getPosX(), cf.getPosY()});
+                            }
+                        }
                     }
                     return true;
                 }
@@ -381,11 +400,36 @@ public class CanvasInteractionHandler {
                         return true;
                     }
                 } else if (action == CanvasGroupFrameRenderer.FrameAction.DELETE && button == 0) {
-                    graph.removeFrame(frame);
+                    if (frame.isCompoundFrame()) {
+                        List<RecipeNode> siblings = graph.findCompoundSiblingNodes(frame.getCompoundGroupId());
+                        List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
+                        Set<String> siblingIds = new HashSet<>();
+                        for (RecipeNode s : siblings) siblingIds.add(s.getId());
+                        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
+                            if (siblingIds.contains(e.fromNodeId()) || siblingIds.contains(e.toNodeId())) {
+                                removedEdges.add(e);
+                            }
+                        }
+                        graph.deleteCompoundGroup(frame.getCompoundGroupId());
+                        List<com.gtceu.calcboard.api.history.BoardCommand> cmds = new ArrayList<>();
+                        if (!siblings.isEmpty() || !removedEdges.isEmpty()) {
+                            cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.RemoveNodesCommand(siblings, removedEdges, "Delete compound " + frame.getTitle()));
+                        }
+                        cmds.add(new com.gtceu.calcboard.api.history.BoardCommand.RemoveFramesCommand(List.of(frame), "Delete compound frame"));
+                        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(cmds, "Delete " + frame.getTitle()));
+                    } else {
+                        graph.removeFrame(frame);
+                        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.RemoveFramesCommand(List.of(frame), "Delete frame " + frame.getTitle()));
+                    }
+                    screen.rebuildWidgets();
                     screen.markSummaryDirty();
+                    Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.9F)
+                    );
                     return true;
                 } else if (action == CanvasGroupFrameRenderer.FrameAction.COLOR && button == 0) {
                     frame.cycleColor();
+                    screen.markSummaryDirty();
                     return true;
                 } else if (action == CanvasGroupFrameRenderer.FrameAction.COLLAPSE && button == 0) {
                     screen.collapseFrameIntoModule(frame);
@@ -423,11 +467,19 @@ public class CanvasInteractionHandler {
                         com.gtceu.calcboard.api.model.CanvasGroupFrame f = graph.findFrameById(fid);
                         if (f != null) {
                             dragStartPositions.put(f.getId(), new double[]{f.getPosX(), f.getPosY()});
-                            for (RecipeNode sn : f.getEnclosedNodes(graph)) {
-                                dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
-                            }
-                            for (com.gtceu.calcboard.api.model.CanvasStickyNote sn : f.getEnclosedNotes(graph)) {
-                                dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                            if (f.isCompoundFrame()) {
+                                for (RecipeNode sn : graph.findCompoundSiblingNodes(f.getCompoundGroupId())) {
+                                    dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                                }
+                            } else {
+                                for (RecipeNode sn : f.getEnclosedNodes(graph)) {
+                                    if (!sn.isCompoundNode()) {
+                                        dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                                    }
+                                }
+                                for (com.gtceu.calcboard.api.model.CanvasStickyNote sn : f.getEnclosedNotes(graph)) {
+                                    dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                                }
                             }
                         }
                     }
@@ -435,6 +487,15 @@ public class CanvasInteractionHandler {
                         RecipeNode n = graph.findNodeById(nid);
                         if (n != null) {
                             dragStartPositions.put(n.getId(), new double[]{n.getPosX(), n.getPosY()});
+                            if (n.isCompoundNode()) {
+                                for (RecipeNode sib : graph.findCompoundSiblingNodes(n.getCompoundGroupId())) {
+                                    dragStartPositions.put(sib.getId(), new double[]{sib.getPosX(), sib.getPosY()});
+                                }
+                                com.gtceu.calcboard.api.model.CanvasGroupFrame cf = graph.findCompoundFrame(n.getCompoundGroupId());
+                                if (cf != null) {
+                                    dragStartPositions.put(cf.getId(), new double[]{cf.getPosX(), cf.getPosY()});
+                                }
+                            }
                         }
                     }
                     for (String noteId : selNotes) {
@@ -444,13 +505,21 @@ public class CanvasInteractionHandler {
                         }
                     }
                 } else {
-                    for (RecipeNode sn : frame.getEnclosedNodes(graph)) {
-                        dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
-                    }
-                    for (com.gtceu.calcboard.api.model.CanvasStickyNote sn : frame.getEnclosedNotes(graph)) {
-                        dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
-                    }
                     dragStartPositions.put(frame.getId(), new double[]{frame.getPosX(), frame.getPosY()});
+                    if (frame.isCompoundFrame()) {
+                        for (RecipeNode sn : graph.findCompoundSiblingNodes(frame.getCompoundGroupId())) {
+                            dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                        }
+                    } else {
+                        for (RecipeNode sn : frame.getEnclosedNodes(graph)) {
+                            if (!sn.isCompoundNode()) {
+                                dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                            }
+                        }
+                        for (com.gtceu.calcboard.api.model.CanvasStickyNote sn : frame.getEnclosedNotes(graph)) {
+                            dragStartPositions.put(sn.getId(), new double[]{sn.getPosX(), sn.getPosY()});
+                        }
+                    }
                 }
                 return true;
             }
@@ -756,8 +825,8 @@ public class CanvasInteractionHandler {
             }
 
             if (draggingNote != null) {
+                recordDragMoveCommand();
                 draggingNote = null;
-                dragStartPositions.clear();
                 return true;
             }
 
@@ -769,45 +838,13 @@ public class CanvasInteractionHandler {
             }
 
             if (draggingFrame != null) {
-                if (!dragStartPositions.isEmpty()) {
-                    Map<String, double[]> nodeDeltas = new HashMap<>();
-                    for (Map.Entry<String, double[]> entry : dragStartPositions.entrySet()) {
-                        RecipeNode n = screen.getGraph().findNodeById(entry.getKey());
-                        if (n != null) {
-                            double dx = n.getPosX() - entry.getValue()[0];
-                            double dy = n.getPosY() - entry.getValue()[1];
-                            if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
-                                nodeDeltas.put(entry.getKey(), new double[]{dx, dy});
-                            }
-                        }
-                    }
-                    if (!nodeDeltas.isEmpty()) {
-                        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.MoveNodesCommand(nodeDeltas));
-                    }
-                }
+                recordDragMoveCommand();
                 draggingFrame = null;
-                dragStartPositions.clear();
                 return true;
             }
 
             if (draggingNode != null) {
-                if (!dragStartPositions.isEmpty()) {
-                    Map<String, double[]> deltas = new HashMap<>();
-                    for (Map.Entry<String, double[]> entry : dragStartPositions.entrySet()) {
-                        RecipeNode n = screen.getGraph().findNodeById(entry.getKey());
-                        if (n != null) {
-                            double dx = n.getPosX() - entry.getValue()[0];
-                            double dy = n.getPosY() - entry.getValue()[1];
-                            if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
-                                deltas.put(entry.getKey(), new double[]{dx, dy});
-                            }
-                        }
-                    }
-                    if (!deltas.isEmpty()) {
-                        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.MoveNodesCommand(deltas));
-                    }
-                    dragStartPositions.clear();
-                }
+                recordDragMoveCommand();
                 draggingNode = null;
                 return true;
             }
@@ -1087,29 +1124,23 @@ public class CanvasInteractionHandler {
             lastDragCanvasX = curCanvasX;
             lastDragCanvasY = curCanvasY;
 
-            if (screen.isNodeSelected(draggingNode.getNode().getId())) {
-                // Move all selected nodes, notes, and frames together
-                for (String selId : screen.getSelectedNodeIds()) {
-                    RecipeNode sn = screen.getGraph().findNodeById(selId);
-                    if (sn != null) {
-                        sn.setPos(sn.getPosX() + deltaX, sn.getPosY() + deltaY);
-                    }
+            for (String id : dragStartPositions.keySet()) {
+                RecipeNode n = screen.getGraph().findNodeById(id);
+                if (n != null) {
+                    n.setPos(n.getPosX() + deltaX, n.getPosY() + deltaY);
+                    continue;
                 }
-                for (String selNoteId : screen.getSelectedNoteIds()) {
-                    com.gtceu.calcboard.api.model.CanvasStickyNote sn = screen.getGraph().findStickyNoteById(selNoteId);
-                    if (sn != null) {
-                        sn.moveBy(deltaX, deltaY);
-                    }
+                com.gtceu.calcboard.api.model.CanvasGroupFrame f = screen.getGraph().findFrameById(id);
+                if (f != null) {
+                    f.moveBy(deltaX, deltaY);
+                    continue;
                 }
-                for (String selFrameId : screen.getSelectedFrameIds()) {
-                    com.gtceu.calcboard.api.model.CanvasGroupFrame sf = screen.getGraph().findFrameById(selFrameId);
-                    if (sf != null) {
-                        sf.moveBy(deltaX, deltaY);
-                    }
+                com.gtceu.calcboard.api.model.CanvasStickyNote note = screen.getGraph().findStickyNoteById(id);
+                if (note != null) {
+                    note.moveBy(deltaX, deltaY);
                 }
-            } else {
-                draggingNode.getNode().setPos(draggingNode.getNode().getPosX() + deltaX, draggingNode.getNode().getPosY() + deltaY);
             }
+            screen.markSummaryDirty();
             return true;
         }
 
@@ -1121,6 +1152,53 @@ public class CanvasInteractionHandler {
         }
 
         return false;
+    }
+
+    private void recordDragMoveCommand() {
+        if (dragStartPositions.isEmpty()) return;
+        Map<String, double[]> nodeDeltas = new HashMap<>();
+        Map<String, double[]> noteDeltas = new HashMap<>();
+        Map<String, double[]> frameDeltas = new HashMap<>();
+
+        for (Map.Entry<String, double[]> entry : dragStartPositions.entrySet()) {
+            String id = entry.getKey();
+            double origX = entry.getValue()[0];
+            double origY = entry.getValue()[1];
+
+            RecipeNode n = screen.getGraph().findNodeById(id);
+            if (n != null) {
+                double dx = n.getPosX() - origX;
+                double dy = n.getPosY() - origY;
+                if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+                    nodeDeltas.put(id, new double[]{dx, dy});
+                }
+                continue;
+            }
+
+            com.gtceu.calcboard.api.model.CanvasGroupFrame f = screen.getGraph().findFrameById(id);
+            if (f != null) {
+                double dx = f.getPosX() - origX;
+                double dy = f.getPosY() - origY;
+                if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+                    frameDeltas.put(id, new double[]{dx, dy});
+                }
+                continue;
+            }
+
+            com.gtceu.calcboard.api.model.CanvasStickyNote note = screen.getGraph().findStickyNoteById(id);
+            if (note != null) {
+                double dx = note.getPosX() - origX;
+                double dy = note.getPosY() - origY;
+                if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+                    noteDeltas.put(id, new double[]{dx, dy});
+                }
+            }
+        }
+
+        if (!nodeDeltas.isEmpty() || !noteDeltas.isEmpty() || !frameDeltas.isEmpty()) {
+            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.MoveComponentsCommand(nodeDeltas, noteDeltas, frameDeltas));
+        }
+        dragStartPositions.clear();
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {

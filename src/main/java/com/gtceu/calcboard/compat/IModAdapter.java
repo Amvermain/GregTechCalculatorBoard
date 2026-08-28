@@ -47,6 +47,10 @@ public interface IModAdapter {
         return 100;
     }
 
+    default boolean isGenericFallback() {
+        return false;
+    }
+
     /**
      * Checks if the target mod is currently loaded and active in the runtime environment.
      */

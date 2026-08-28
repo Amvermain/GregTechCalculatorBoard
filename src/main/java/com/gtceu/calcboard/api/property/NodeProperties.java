@@ -52,6 +52,25 @@ public final class NodeProperties {
             NodePropertyKey.ofDouble("target_batch_time_sec", 0.0)
     );
 
+    // Generic / Unsupported Recipe Marker (RFC-001)
+    public static final NodePropertyKey<Boolean> IS_GENERIC_UNSUPPORTED = register(
+            NodePropertyKey.ofBoolean("is_generic_unsupported", false)
+    );
+
+    // Compound / Layered Recipe Properties
+    public static final NodePropertyKey<String> COMPOUND_GROUP_ID = register(
+            NodePropertyKey.ofString("compound_group_id", "")
+    );
+    public static final NodePropertyKey<Integer> COMPOUND_LAYER_INDEX = register(
+            NodePropertyKey.ofInt("compound_layer_index", 0)
+    );
+    public static final NodePropertyKey<Integer> COMPOUND_TOTAL_LAYERS = register(
+            NodePropertyKey.ofInt("compound_total_layers", 1)
+    );
+    public static final NodePropertyKey<String> COMPOUND_MASTER_NODE_ID = register(
+            NodePropertyKey.ofString("compound_master_node_id", "")
+    );
+
     private NodeProperties() {}
 
     public static <T> NodePropertyKey<T> register(NodePropertyKey<T> key) {

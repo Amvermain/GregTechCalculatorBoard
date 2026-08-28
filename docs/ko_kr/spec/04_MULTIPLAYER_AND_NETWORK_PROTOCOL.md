@@ -135,6 +135,9 @@ classDiagram
     class FTBTeamsProvider {
         +FTB Teams API 호출 (Soft-Dependency)
     }
+    class PhoenixGuildsProvider {
+        +Phoenix Guilds API 호출 (Soft-Dependency)
+    }
     class VanillaScoreboardProvider {
         +Minecraft Scoreboard Team 매핑
     }
@@ -143,12 +146,14 @@ classDiagram
     }
 
     ITeamProvider <|.. FTBTeamsProvider
+    ITeamProvider <|.. PhoenixGuildsProvider
     ITeamProvider <|.. VanillaScoreboardProvider
     ITeamProvider <|.. StandaloneFallbackProvider
 ```
 
 * **`FTBTeamsProvider`**: `dev.ftb.mods.ftbteams.api.FTBTeamsAPI`를 소프트 디펜던시로 호출. 팀 오피서/소유자 권한을 판별.
-* **`VanillaScoreboardProvider`**: FTB Teams가 없는 바닐라/경량 서버에서 스코어보드 팀을 기반으로 팀 격리 제공.
+* **`PhoenixGuildsProvider`**: `net.phoenixvine.guilds.GuildAPI`를 소프트 디펜던시로 호출. 길드 오피서/소유자 권한 및 멤버십 판별.
+* **`VanillaScoreboardProvider`**: FTB Teams나 Phoenix Guilds가 없는 바닐라/경량 서버에서 스코어보드 팀을 기반으로 팀 격리 제공.
 * **`StandaloneFallbackProvider`**: 싱글플레이 환경에서 플레이어 고유 UUID 기반으로 단독 워크스페이스 제공.
 
 ---

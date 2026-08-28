@@ -9,6 +9,9 @@
 ## [2.0.0-alpha.11] - 2026-08-28
 
 ### 신규 기능 (Added)
+- **Phoenix Guilds (Teams) 모드 연동 지원 (`PhoenixGuildsProvider`, `TeamProviderRegistry`, `TeamProviderTest`)**:
+  - 안전한 리플렉션(Safe Reflection) 기반으로 Phoenix Guilds ([CurseForge 1612085](https://www.curseforge.com/minecraft/mc-mods/phoenix-guilds) / `phoenix_guilds`) 모드와의 팀/길드 프로바이더 소프트 디펜던시 연동 구현.
+  - 길드 소속 플레이어를 자동으로 감지하여 팀 공정 보드를 안전하게 격리하고, 길드 오피서 및 길드장(`GuildRank.OFFICER`, `GuildRank.OWNER`)에게 팀 캔버스 페이지 관리/삭제 권한 부여.
 - **인플레이스 대체 레시피 교체 (In-Place Recipe Switching)**:
   - 머신 설정 다이얼로그의 `[🔄 Switch Recipe]` 버튼 또는 노드 우클릭 컨텍스트 메뉴를 통해 이미 캔버스에 배치된 머신 노드를 삭제하지 않고 동일 기계/동일 주요 산출물의 대체 레시피로 즉시 전환할 수 있는 기능 추가.
   - 레시피 전환 시 동일한 아이템 및 유체 포트의 와이어 연결이 끊어지지 않고 자동으로 유지(Smart Wire Preservation)되며, 단축키 `Ctrl+Z` / `Ctrl+Y`로 언제든 실행 취소 및 다시 실행 가능.

@@ -50,7 +50,7 @@ The mod is fully optional on both client and server:
 #### Multiplayer Team Workspaces
 
 *   **Real-Time Synchronization**: Changes made on team boards are synchronized across connected teammates in real time.
-*   **Team System Integration**: Supports FTB Teams and Vanilla Scoreboard Teams to establish isolated team workspaces.
+*   **Team System Integration**: Supports FTB Teams, Phoenix Guilds, and Vanilla Scoreboard Teams to establish isolated team workspaces.
 *   **Automatic Background Sync**: Modifies and commits changes automatically after 3 seconds of inactivity and upon closing the interface or switching tabs.
 *   **Per-Page Edit Locks**: Automatically claims temporary edit locks upon node interaction to prevent simultaneous write conflicts, with live teammate presence indicators.
 *   **Save History & Forking**: Displays revision history logs and allows forking past team revisions into personal board tabs (`[Personal Board]`).
@@ -109,3 +109,4 @@ The mod is fully optional on both client and server:
     *   [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 *   **Optional Team Synchronization**:
     *   [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (For dedicated server multiplayer team workspaces)
+    *   [Phoenix Guilds](https://curseforge.com/minecraft/mc-mods/phoenix-guilds) (Teams & Guilds integration)

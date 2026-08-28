@@ -512,4 +512,19 @@ public class RecipeSearchEngineTest {
         assertEquals(woodTarId, resCtx.id());
         assertEquals(1, resCtx.index());
     }
+
+    @Test
+    public void testUnsupportedRecipeSupportFlag() {
+        SearchableRecipe supportedRecipe = new SearchableRecipe(
+                null, "Electric Blast Furnace", "gtceu", "electric_blast_furnace",
+                "Electric Blast Furnace", "in", "out", null, null, null, null, true
+        );
+        assertTrue(supportedRecipe.isSupported());
+
+        SearchableRecipe unsupportedRecipe = new SearchableRecipe(
+                null, "Mekanism Crusher", "mekanism", "crusher",
+                "Crusher", "in", "out", null, null, null, null, false
+        );
+        assertFalse(unsupportedRecipe.isSupported());
+    }
 }

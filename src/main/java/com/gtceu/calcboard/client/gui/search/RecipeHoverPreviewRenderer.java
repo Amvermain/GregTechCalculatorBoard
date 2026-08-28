@@ -52,8 +52,9 @@ public class RecipeHoverPreviewRenderer {
             contentH = maxRows * 18 + 4;
         }
 
-        int cardW = Math.max(130, contentW + 16);
-        int cardH = contentH + 34;
+        int extraWarningH = (sr != null && !sr.isSupported()) ? 24 : 0;
+        int cardW = Math.max(140, contentW + 16);
+        int cardH = contentH + 34 + extraWarningH;
 
         int rightSpace = screenW - (dialogX + dialogW + 6);
         int leftSpace = dialogX - 6;
@@ -253,11 +254,21 @@ public class RecipeHoverPreviewRenderer {
         }
 
         // Stats Footer (Duration & EU/t / RF/t / Heat)
-        int footerY = cardY + cardH - 16;
+        int footerY = cardY + cardH - 16 - ((sr != null && !sr.isSupported()) ? 24 : 0);
         graphics.fill(cardX, footerY - 2, cardX + cardW, footerY - 1, 0xFF1E293B);
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(rn);
         String statsStr = String.format("§b⏱ %.2fs  %s", rn.getBaseDurationTicks() / 20.0, adapter.formatEnergyStats(rn, com.gtceu.calcboard.api.storage.BoardManager.getInstance().getPowerDisplayMode()));
         graphics.drawString(font, font.plainSubstrByWidth(statsStr, cardW - 8), cardX + 6, footerY + 2, 0xFF94A3B8, false);
+
+        if (sr != null && !sr.isSupported()) {
+            int warnY = cardY + cardH - 24;
+            graphics.fill(cardX + 2, warnY, cardX + cardW - 2, cardY + cardH - 2, 0xEE3D2C1C);
+            graphics.renderOutline(cardX + 2, warnY, cardW - 4, 22, 0xFFFB923C);
+            String wTitle = "§6⚠ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.search.preview.unsupported_title").getString();
+            String wDesc = "§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.search.preview.unsupported_desc").getString();
+            graphics.drawString(font, font.plainSubstrByWidth(wTitle, cardW - 12), cardX + 6, warnY + 3, 0xFFFB923C, false);
+            graphics.drawString(font, font.plainSubstrByWidth(wDesc, cardW - 12), cardX + 6, warnY + 12, 0xFFAAAAAA, false);
+        }
 
         graphics.pose().popPose();
     }
@@ -389,6 +400,16 @@ public class RecipeHoverPreviewRenderer {
             int originY = cardY + 22;
             var holder = getOrCreateHolder(er);
             holder.render(graphics, originX, originY, mouseX, mouseY, partialTick);
+
+            if (sr != null && !sr.isSupported()) {
+                int warnY = cardY + cardH - 24;
+                graphics.fill(cardX + 2, warnY, cardX + cardW - 2, cardY + cardH - 2, 0xEE3D2C1C);
+                graphics.renderOutline(cardX + 2, warnY, cardW - 4, 22, 0xFFFB923C);
+                String wTitle = "§6⚠ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.search.preview.unsupported_title").getString();
+                String wDesc = "§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.search.preview.unsupported_desc").getString();
+                graphics.drawString(font, font.plainSubstrByWidth(wTitle, cardW - 12), cardX + 6, warnY + 3, 0xFFFB923C, false);
+                graphics.drawString(font, font.plainSubstrByWidth(wDesc, cardW - 12), cardX + 6, warnY + 12, 0xFFAAAAAA, false);
+            }
 
             graphics.pose().popPose();
         }

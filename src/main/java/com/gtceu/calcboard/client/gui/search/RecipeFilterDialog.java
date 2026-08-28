@@ -148,7 +148,7 @@ public class RecipeFilterDialog {
         int listX = x + 8;
         int listY = y + 44;
         int listW = dialogW - 16;
-        int listH = dialogH - 72;
+        int listH = dialogH - 90;
 
         graphics.fill(listX, listY, listX + listW, listY + listH, 0xFF0B0F17);
         graphics.renderOutline(listX, listY, listW, listH, 0xFF1E293B);
@@ -199,15 +199,34 @@ public class RecipeFilterDialog {
             }
         }
 
+        // Include Unsupported Recipes Toggle Checkbox
+        int unsuppY = listY + listH + 4;
+        int unsuppH = 14;
+        boolean unsuppHover = mouseX >= listX && mouseX <= listX + listW && mouseY >= unsuppY && mouseY <= unsuppY + unsuppH;
+        if (unsuppHover) {
+            graphics.fill(listX, unsuppY, listX + listW, unsuppY + unsuppH, 0xFF1E293B);
+            graphics.renderOutline(listX, unsuppY, listW, unsuppH, 0xFF38BDF8);
+        }
+        boolean incUnsupp = config.isIncludeUnsupported();
+        String unsuppChk = incUnsupp ? "§e[✔]" : "§8[  ]";
+        graphics.drawString(font, unsuppChk, listX + 4, unsuppY + 3, 0xFFFFFFFF, false);
+        String unsuppLabel = (incUnsupp ? "§f" : "§7") + Component.translatable("gui.gtcalcboard.filter.include_unsupported").getString();
+        graphics.drawString(font, unsuppLabel, listX + 26, unsuppY + 3, incUnsupp ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+
+        if (unsuppHover) {
+            String desc = Component.translatable("gui.gtcalcboard.filter.include_unsupported.desc").getString();
+            graphics.renderTooltip(font, Component.literal(desc), mouseX, mouseY);
+        }
+
         // Done Footer Button
         int doneW = 60;
-        int doneH = 18;
+        int doneH = 16;
         int doneX = x + (dialogW - doneW) / 2;
-        int doneY = y + dialogH - 22;
+        int doneY = y + dialogH - 20;
         boolean doneHover = mouseX >= doneX && mouseX <= doneX + doneW && mouseY >= doneY && mouseY <= doneY + doneH;
         graphics.fill(doneX, doneY, doneX + doneW, doneY + doneH, doneHover ? 0xFF2563EB : 0xFF1D4ED8);
         graphics.renderOutline(doneX, doneY, doneW, doneH, 0xFF38BDF8);
-        graphics.drawCenteredString(font, Component.translatable("gui.gtcalcboard.filter.done").getString(), doneX + doneW / 2, doneY + 5, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, Component.translatable("gui.gtcalcboard.filter.done").getString(), doneX + doneW / 2, doneY + 4, 0xFFFFFFFF);
 
         graphics.pose().popPose();
     }
@@ -281,7 +300,7 @@ public class RecipeFilterDialog {
         int listX = x + 8;
         int listY = y + 44;
         int listW = dialogW - 16;
-        int listH = dialogH - 72;
+        int listH = dialogH - 90;
 
         if (mouseX >= listX && mouseX <= listX + listW && mouseY >= listY && mouseY <= listY + listH) {
             int clickedRow = (int) ((mouseY - listY) / ROW_HEIGHT);
@@ -295,11 +314,21 @@ public class RecipeFilterDialog {
             }
         }
 
+        // Include Unsupported Recipes Toggle Checkbox
+        int unsuppY = listY + listH + 4;
+        int unsuppH = 14;
+        if (mouseX >= listX && mouseX <= listX + listW && mouseY >= unsuppY && mouseY <= unsuppY + unsuppH) {
+            RecipeFilterConfig cfg = RecipeFilterConfig.getInstance();
+            cfg.setIncludeUnsupported(!cfg.isIncludeUnsupported());
+            if (onFilterChanged != null) onFilterChanged.run();
+            return true;
+        }
+
         // Done Footer Button
         int doneW = 60;
-        int doneH = 18;
+        int doneH = 16;
         int doneX = x + (dialogW - doneW) / 2;
-        int doneY = y + dialogH - 22;
+        int doneY = y + dialogH - 20;
         if (mouseX >= doneX && mouseX <= doneX + doneW && mouseY >= doneY && mouseY <= doneY + doneH) {
             setVisible(false);
             if (onFilterChanged != null) onFilterChanged.run();
@@ -326,7 +355,7 @@ public class RecipeFilterDialog {
         int y = (screenH - dialogH) / 2;
 
         if (mouseX >= x && mouseX <= x + dialogW && mouseY >= y && mouseY <= y + dialogH) {
-            int listH = dialogH - 72;
+            int listH = dialogH - 90;
             int visibleRows = Math.max(1, listH / ROW_HEIGHT);
             int maxScroll = Math.max(0, filteredCategories.size() - visibleRows);
             scrollOffset = Math.max(0, Math.min(maxScroll, (int) (scrollOffset - delta * 2)));

@@ -416,6 +416,31 @@ public final class FlowGraphSolver {
                     consumer.setEfficiency(calculatedEff);
                 }
             }
+
+            // Propagate compound bottleneck sequentially downstream across layers (Layer I -> Layer II -> Layer III)
+            for (RecipeNode node : graph.getNodes()) {
+                if (node.isCompoundNode() && node.getCompoundLayerIndex() > 0) {
+                    String groupId = node.getCompoundGroupId();
+                    int myLayer = node.getCompoundLayerIndex();
+                    RecipeNode prevLayer = null;
+                    for (RecipeNode other : graph.getNodes()) {
+                        if (other.isCompoundNode() && groupId.equals(other.getCompoundGroupId()) && other.getCompoundLayerIndex() == myLayer - 1) {
+                            prevLayer = other;
+                            break;
+                        }
+                    }
+                    if (prevLayer != null) {
+                        double prevEff = effMap.getOrDefault(prevLayer.getId(), 1.0);
+                        double currentEff = effMap.getOrDefault(node.getId(), 1.0);
+                        if (prevEff < currentEff - 0.0001) {
+                            effMap.put(node.getId(), prevEff);
+                            node.setEfficiency(prevEff);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
             if (!changed) break;
         }
 
@@ -526,77 +551,81 @@ public final class FlowGraphSolver {
 
         for (RecipeNode node : graph.getNodes()) {
             if (node.isReroute()) continue;
-            if (node.isModule()) {
-                int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
-                if (node.getSubGraph() != null) {
-                    BalanceSummary subSummary = computeSummary(node.getSubGraph());
-                    int subMachines = subSummary.totalMachineCount() * moduleCount;
-                    totalMachineCount += subMachines;
-                    for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {
-                        machineBreakdown.put(entry.getKey(), machineBreakdown.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
-                    }
-                    totalConsumedSU += subSummary.totalSU() < 0 ? -subSummary.totalSU() * moduleCount : 0;
-                    totalGeneratedSU += subSummary.totalSU() > 0 ? subSummary.totalSU() * moduleCount : 0;
-                    totalConsumedFE += subSummary.totalFE() < 0 ? -subSummary.totalFE() * moduleCount : 0;
-                    totalGeneratedFE += subSummary.totalFE() > 0 ? subSummary.totalFE() * moduleCount : 0;
+            boolean isCompoundSlave = node.isCompoundNode() && !node.isCompoundMaster();
 
-                    if (subSummary.totalFusionStartupEU() > 0) {
-                        long subFusionEU = subSummary.totalFusionStartupEU() * moduleCount;
-                        totalFusionStartupEU += subFusionEU;
-                        for (Map.Entry<Integer, Integer> entry : subSummary.fusionTierCounts().entrySet()) {
-                            fusionTierCounts.put(entry.getKey(), fusionTierCounts.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
+            if (!isCompoundSlave) {
+                if (node.isModule()) {
+                    int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+                    if (node.getSubGraph() != null) {
+                        BalanceSummary subSummary = computeSummary(node.getSubGraph());
+                        int subMachines = subSummary.totalMachineCount() * moduleCount;
+                        totalMachineCount += subMachines;
+                        for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {
+                            machineBreakdown.put(entry.getKey(), machineBreakdown.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
                         }
-                        for (Map.Entry<Integer, Long> entry : subSummary.fusionTierStartupEU().entrySet()) {
-                            fusionTierStartupEU.put(entry.getKey(), fusionTierStartupEU.getOrDefault(entry.getKey(), 0L) + entry.getValue() * moduleCount);
+                        totalConsumedSU += subSummary.totalSU() < 0 ? -subSummary.totalSU() * moduleCount : 0;
+                        totalGeneratedSU += subSummary.totalSU() > 0 ? subSummary.totalSU() * moduleCount : 0;
+                        totalConsumedFE += subSummary.totalFE() < 0 ? -subSummary.totalFE() * moduleCount : 0;
+                        totalGeneratedFE += subSummary.totalFE() > 0 ? subSummary.totalFE() * moduleCount : 0;
+
+                        if (subSummary.totalFusionStartupEU() > 0) {
+                            long subFusionEU = subSummary.totalFusionStartupEU() * moduleCount;
+                            totalFusionStartupEU += subFusionEU;
+                            for (Map.Entry<Integer, Integer> entry : subSummary.fusionTierCounts().entrySet()) {
+                                fusionTierCounts.put(entry.getKey(), fusionTierCounts.getOrDefault(entry.getKey(), 0) + entry.getValue() * moduleCount);
+                            }
+                            for (Map.Entry<Integer, Long> entry : subSummary.fusionTierStartupEU().entrySet()) {
+                                fusionTierStartupEU.put(entry.getKey(), fusionTierStartupEU.getOrDefault(entry.getKey(), 0L) + entry.getValue() * moduleCount);
+                            }
                         }
+                    } else {
+                        int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
+                        totalMachineCount += subMachines;
+                        String machineKey = node.getMachineDisplayName();
+                        machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + subMachines);
                     }
                 } else {
-                    int subMachines = Math.max(1, node.getContainedMachineCount()) * moduleCount;
-                    totalMachineCount += subMachines;
+                    int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
+                    totalMachineCount += nodeMachines;
                     String machineKey = node.getMachineDisplayName();
-                    machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + subMachines);
-                }
-            } else {
-                int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
-                totalMachineCount += nodeMachines;
-                String machineKey = node.getMachineDisplayName();
-                machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + nodeMachines);
+                    machineBreakdown.put(machineKey, machineBreakdown.getOrDefault(machineKey, 0) + nodeMachines);
 
-                if (node.isFusion() && node.getEuToStart() > 0) {
-                    int fTier = node.getFusionTier();
-                    long startEU = node.getEuToStart();
-                    long totalNodeStartEU = startEU * nodeMachines;
-                    totalFusionStartupEU += totalNodeStartEU;
-                    fusionTierCounts.put(fTier, fusionTierCounts.getOrDefault(fTier, 0) + nodeMachines);
-                    fusionTierStartupEU.put(fTier, fusionTierStartupEU.getOrDefault(fTier, 0L) + totalNodeStartEU);
+                    if (node.isFusion() && node.getEuToStart() > 0) {
+                        int fTier = node.getFusionTier();
+                        long startEU = node.getEuToStart();
+                        long totalNodeStartEU = startEU * nodeMachines;
+                        totalFusionStartupEU += totalNodeStartEU;
+                        fusionTierCounts.put(fTier, fusionTierCounts.getOrDefault(fTier, 0) + nodeMachines);
+                        fusionTierStartupEU.put(fTier, fusionTierStartupEU.getOrDefault(fTier, 0L) + totalNodeStartEU);
+                    }
                 }
-            }
 
-            double rawPower = node.getEffectiveTotalEUt();
-            if (node.getEnergyType() == EnergyType.KINETIC_SU) {
-                if (node.isGenerator()) {
-                    totalGeneratedSU += rawPower;
-                } else {
-                    totalConsumedSU += rawPower;
+                double rawPower = node.getEffectiveTotalEUt();
+                if (node.getEnergyType() == EnergyType.KINETIC_SU) {
+                    if (node.isGenerator()) {
+                        totalGeneratedSU += rawPower;
+                    } else {
+                        totalConsumedSU += rawPower;
+                    }
+                } else if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+                    if (node.isGenerator()) {
+                        totalGeneratedFE += rawPower;
+                        totalGeneratedEUt += rawPower / 4.0;
+                    } else {
+                        totalConsumedFE += rawPower;
+                        totalConsumedEUt += rawPower / 4.0;
+                    }
+                } else if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
+                    if (node.isGenerator()) {
+                        totalGeneratedEUt += rawPower;
+                    } else {
+                        totalConsumedEUt += rawPower;
+                    }
                 }
-            } else if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
-                if (node.isGenerator()) {
-                    totalGeneratedFE += rawPower;
-                    totalGeneratedEUt += rawPower / 4.0;
-                } else {
-                    totalConsumedFE += rawPower;
-                    totalConsumedEUt += rawPower / 4.0;
-                }
-            } else if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
-                if (node.isGenerator()) {
-                    totalGeneratedEUt += rawPower;
-                } else {
-                    totalConsumedEUt += rawPower;
-                }
-            }
 
-            if (node.getEnergyType() == EnergyType.ELECTRIC_EU && node.getTargetTier().ordinal() > highestTier.ordinal()) {
-                highestTier = node.getTargetTier();
+                if (node.getEnergyType() == EnergyType.ELECTRIC_EU && node.getTargetTier().ordinal() > highestTier.ordinal()) {
+                    highestTier = node.getTargetTier();
+                }
             }
 
             Map<IngredientStack, Double> outRates = node.calculateEffectiveOutputRates();

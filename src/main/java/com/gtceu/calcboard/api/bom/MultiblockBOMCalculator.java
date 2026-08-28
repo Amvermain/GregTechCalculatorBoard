@@ -23,7 +23,7 @@ public class MultiblockBOMCalculator {
         int totalMultiblocks = 0;
 
         for (RecipeNode node : nodes) {
-            if (node == null || node.isReroute()) continue;
+            if (node == null || node.isReroute() || (node.isCompoundNode() && !node.isCompoundMaster())) continue;
 
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             List<MultiblockStructurePart> resolvedParts = adapter != null

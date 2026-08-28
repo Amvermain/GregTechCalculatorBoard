@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Registry and discovery manager for team providers.
- * Evaluates available providers in priority order: FTB Teams -> Vanilla Scoreboard -> Standalone Fallback.
+ * Evaluates available providers in priority order: FTB Teams -> Phoenix Guilds -> Vanilla Scoreboard -> Standalone Fallback.
  */
 public class TeamProviderRegistry {
 
@@ -21,6 +21,7 @@ public class TeamProviderRegistry {
     private TeamProviderRegistry() {
         // Register in priority order
         providers.add(new FTBTeamsProvider());
+        providers.add(new PhoenixGuildsProvider());
         providers.add(new VanillaScoreboardProvider());
         providers.add(fallbackProvider);
     }

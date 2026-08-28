@@ -212,6 +212,12 @@ public class BoardManager {
         switchPage(index);
     }
 
+    private java.util.function.Consumer<BoardPage> pageRemovalListener = null;
+
+    public void setPageRemovalListener(java.util.function.Consumer<BoardPage> listener) {
+        this.pageRemovalListener = listener;
+    }
+
     public boolean removePage(int index) {
         if (pages.size() <= 1) {
             // Cannot remove last page, just clear it
@@ -219,9 +225,12 @@ public class BoardManager {
             return false;
         }
         if (index >= 0 && index < pages.size()) {
-            pages.remove(index);
+            BoardPage removed = pages.remove(index);
             if (activePageIndex >= pages.size()) {
                 activePageIndex = pages.size() - 1;
+            }
+            if (pageRemovalListener != null) {
+                pageRemovalListener.accept(removed);
             }
             return true;
         }

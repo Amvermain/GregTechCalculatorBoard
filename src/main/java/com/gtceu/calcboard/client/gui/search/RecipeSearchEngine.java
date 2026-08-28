@@ -44,8 +44,25 @@ public class RecipeSearchEngine {
             ResourceLocation[] inputIds,
             ResourceLocation[] outputIds,
             String[] inputNames,
-            String[] outputNames
+            String[] outputNames,
+            boolean isSupported
     ) {
+        public SearchableRecipe(
+                Object recipe,
+                String displayName,
+                String modId,
+                String categoryId,
+                String categoryName,
+                String inputIndex,
+                String outputIndex,
+                ResourceLocation[] inputIds,
+                ResourceLocation[] outputIds,
+                String[] inputNames,
+                String[] outputNames
+        ) {
+            this(recipe, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, inputIds, outputIds, inputNames, outputNames, true);
+        }
+
         public SearchableRecipe(
                 Object recipe,
                 String displayName,
@@ -55,7 +72,7 @@ public class RecipeSearchEngine {
                 String inputIndex,
                 String outputIndex
         ) {
-            this(recipe, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, null, null, null, null);
+            this(recipe, displayName, modId, categoryId, categoryName, inputIndex, outputIndex, null, null, null, null, true);
         }
 
         public boolean hasExactInput(ResourceLocation id) {
@@ -329,6 +346,12 @@ public class RecipeSearchEngine {
             String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
             String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
 
+            ResourceLocation catResId = (cat != null) ? cat.getId() : null;
+            boolean isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catResId);
+            if (!isSupported && modId != null && !modId.isEmpty()) {
+                isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isRecipeSupported(modId, catResId);
+            }
+
             return new SearchableRecipe(
                     er,
                     displayName,
@@ -340,7 +363,8 @@ public class RecipeSearchEngine {
                     inArr,
                     outArr,
                     inNamesArr,
-                    outNamesArr
+                    outNamesArr,
+                    isSupported
             );
         }
 

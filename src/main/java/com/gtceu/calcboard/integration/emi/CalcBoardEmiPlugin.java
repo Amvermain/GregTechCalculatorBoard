@@ -71,17 +71,31 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
 
     public static void addRecipeToBoard(EmiRecipe recipe, boolean openBoard) {
         if (recipe == null) return;
-        RecipeNode node = EmiRecipeConverter.convert(recipe);
 
         Minecraft mc = Minecraft.getInstance();
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
-
         double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
-        node.setPosX(pos[0]);
-        node.setPosY(pos[1]);
 
-        BoardManager.getInstance().getActiveGraph().addNode(node);
+        com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster cluster =
+                EmiStepRecipeDetector.tryDetectAndBuild(recipe, null, pos[0], pos[1]);
+
+        if (cluster != null && !cluster.nodes().isEmpty()) {
+            for (RecipeNode n : cluster.nodes()) {
+                BoardManager.getInstance().getActiveGraph().addNode(n);
+            }
+            if (cluster.frame() != null) {
+                BoardManager.getInstance().getActiveGraph().addFrame(cluster.frame());
+            }
+            for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge edge : cluster.internalEdges()) {
+                BoardManager.getInstance().getActiveGraph().addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
+            }
+        } else {
+            RecipeNode node = EmiRecipeConverter.convert(recipe);
+            node.setPosX(pos[0]);
+            node.setPosY(pos[1]);
+            BoardManager.getInstance().getActiveGraph().addNode(node);
+        }
 
         String name = recipe.getId() != null ? recipe.getId().getPath() : "Recipe";
         if (name.contains("/")) name = name.substring(name.lastIndexOf('/') + 1);

@@ -9,6 +9,9 @@ All notable changes to **GregTech Calculator Board** will be documented in this 
 ## [2.0.0-alpha.11] - 2026-08-28
 
 ### Added
+- **Phoenix Guilds (Teams) Mod Integration (`PhoenixGuildsProvider`, `TeamProviderRegistry`, `TeamProviderTest`)**:
+  - Implemented soft-dependency team provider for Phoenix Guilds ([CurseForge 1612085](https://www.curseforge.com/minecraft/mc-mods/phoenix-guilds) / `phoenix_guilds`) using safe reflection.
+  - Automatically isolates team flowchart workspaces for guild members and grants team page administration privileges to guild officers and owners (`GuildRank.OFFICER`, `GuildRank.OWNER`).
 - **In-Place Alternative Recipe Switching (`RecipeNode`, `AlternativeRecipeFinder`, `MachineConfigDialog`, `RecipeSwitchTest`)**:
   - Switch recipes for existing nodes on the canvas directly without deletion via the `[🔄 Switch Recipe]` header button in `MachineConfigDialog` or the right-click node context menu.
   - Automatically matches and ranks candidate recipes by same machine ID and shared primary outputs.

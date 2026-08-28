@@ -149,24 +149,46 @@ public class BoardSelectionModel {
         List<CanvasStickyNote> removedNotes = new ArrayList<>();
         List<CanvasGroupFrame> removedFrames = new ArrayList<>();
 
+        Set<String> allTargetNodeIds = new HashSet<>(selectedNodeIds);
         for (RecipeNode n : graph.getNodes()) {
-            if (selectedNodeIds.contains(n.getId())) {
+            if (selectedNodeIds.contains(n.getId()) && n.isCompoundNode()) {
+                List<RecipeNode> siblings = graph.findCompoundSiblingNodes(n.getCompoundGroupId());
+                for (RecipeNode sib : siblings) {
+                    allTargetNodeIds.add(sib.getId());
+                }
+                CanvasGroupFrame cFrame = graph.findCompoundFrame(n.getCompoundGroupId());
+                if (cFrame != null && !selectedFrameIds.contains(cFrame.getId())) {
+                    removedFrames.add(cFrame);
+                }
+            }
+        }
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            if (selectedFrameIds.contains(frame.getId())) {
+                if (!removedFrames.contains(frame)) {
+                    removedFrames.add(frame);
+                }
+                if (frame.isCompoundFrame()) {
+                    List<RecipeNode> siblings = graph.findCompoundSiblingNodes(frame.getCompoundGroupId());
+                    for (RecipeNode sib : siblings) {
+                        allTargetNodeIds.add(sib.getId());
+                    }
+                }
+            }
+        }
+
+        for (RecipeNode n : graph.getNodes()) {
+            if (allTargetNodeIds.contains(n.getId())) {
                 removedNodes.add(n);
             }
         }
         for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
-            if (selectedNodeIds.contains(e.fromNodeId()) || selectedNodeIds.contains(e.toNodeId())) {
+            if (allTargetNodeIds.contains(e.fromNodeId()) || allTargetNodeIds.contains(e.toNodeId())) {
                 removedEdges.add(e);
             }
         }
         for (CanvasStickyNote note : graph.getStickyNotes()) {
             if (selectedNoteIds.contains(note.getId())) {
                 removedNotes.add(note);
-            }
-        }
-        for (CanvasGroupFrame frame : graph.getFrames()) {
-            if (selectedFrameIds.contains(frame.getId())) {
-                removedFrames.add(frame);
             }
         }
 

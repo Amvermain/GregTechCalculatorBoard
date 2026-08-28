@@ -285,6 +285,15 @@ public class PageTabBarWidget {
                     lastClickedTabIdx = i;
                     commitRename();
 
+                    if (TutorialManager.getInstance().isActive() && i != activeIdx) {
+                        if (isTeam && teamPages != null && i < teamPages.size()) {
+                            screen.openTutorialExitDialogForTeamPage(teamPages.get(i).getPageId());
+                        } else {
+                            screen.openTutorialExitDialog(i);
+                        }
+                        return true;
+                    }
+
                     if (isTeam) {
                         if (teamPages != null && i < teamPages.size()) {
                             String newPageId = teamPages.get(i).getPageId();
@@ -331,6 +340,10 @@ public class PageTabBarWidget {
         int addW = 18;
         if (virtualMouseX >= curX && virtualMouseX <= curX + addW && button == 0) {
             commitRename();
+            if (TutorialManager.getInstance().isActive()) {
+                screen.openTutorialExitDialogForNewPage();
+                return true;
+            }
             if (isTeam) {
                 if (screen.getExportToTeamDialog() != null) {
                     screen.getExportToTeamDialog().open();

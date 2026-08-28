@@ -108,5 +108,27 @@ public class ModAdapterRegistry {
     public static IModAdapter getFallbackAdapter() {
         return FALLBACK_ADAPTER;
     }
+
+    public static boolean isCategorySupported(ResourceLocation categoryId) {
+        init();
+        if (categoryId == null) return false;
+
+        for (IModAdapter a : ADAPTERS) {
+            if (a.isGenericFallback()) continue;
+            if (a.isLoaded() && a.handlesCategory(categoryId)) {
+                return true;
+            }
+        }
+        return FALLBACK_ADAPTER.handlesCategory(categoryId);
+    }
+
+    public static boolean isRecipeSupported(String modId, ResourceLocation categoryId) {
+        if (categoryId != null && isCategorySupported(categoryId)) {
+            return true;
+        }
+        if (modId == null || modId.isEmpty()) return false;
+        IModAdapter adapter = getAdapterForModId(modId);
+        return adapter != null && !adapter.isGenericFallback() && adapter.isLoaded();
+    }
 }
 

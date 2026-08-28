@@ -51,6 +51,14 @@ public final class BoardHotkeyHandler {
             return screen.getDeletePageDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
+        if (screen.getTutorialExitDialog() != null && screen.getTutorialExitDialog().isVisible()) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                screen.getTutorialExitDialog().close();
+                return true;
+            }
+            return screen.getTutorialExitDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+
         if (screen.getGlobalBalanceDialog() != null && screen.getGlobalBalanceDialog().isVisible()) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 screen.getGlobalBalanceDialog().close();

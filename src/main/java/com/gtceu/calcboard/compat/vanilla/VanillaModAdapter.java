@@ -21,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Generic fallback compatibility adapter for Vanilla Minecraft and non-specialized mods.
@@ -38,13 +39,26 @@ public class VanillaModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean isLoaded() {
+    public boolean isGenericFallback() {
         return true;
     }
 
     @Override
-    public boolean handlesCategory(ResourceLocation categoryId) {
+    public boolean isLoaded() {
         return true;
+    }
+
+    private static final Set<String> VANILLA_CATEGORIES = Set.of(
+            "crafting", "smelting", "blasting", "smoking", "campfire_cooking",
+            "stonecutting", "smithing", "brewing", "composting", "anvil"
+    );
+
+    @Override
+    public boolean handlesCategory(ResourceLocation categoryId) {
+        if (categoryId == null) return false;
+        String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
+        String path = categoryId.getPath().toLowerCase(Locale.ROOT);
+        return ns.equals("minecraft") || VANILLA_CATEGORIES.contains(path);
     }
 
     @Override

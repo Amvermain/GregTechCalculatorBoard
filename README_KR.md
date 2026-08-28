@@ -40,7 +40,7 @@
 
 ### 5. 멀티플레이어 팀 공유 워크스페이스
 - **실시간 협업 공정 설계**: 전용 서버에서 팀원들과 동일한 공정 보드를 실시간으로 공유하고 함께 편집할 수 있습니다.
-- **FTB Teams & 바닐라 스코어보드 팀 연동**: 서버의 팀 생성, 권한 및 멤버십 시스템을 자동으로 인식합니다.
+- **FTB Teams, Phoenix Guilds & 바닐라 스코어보드 팀 연동**: 서버의 팀 생성, 권한 및 멤버십 시스템을 자동으로 인식합니다.
 - **페이지별 편집 락 & 실시간 접속자 표시**: 동시 수정 충돌을 방지하는 임시 편집 락 및 팀원 접속 상태/현재 열람 중인 탭 표시.
 - **무마찰 실시간 자동 저장**: 3초 비활성 디바운스 자동 저장 및 화면 종료 시 즉시 저장, 과거 버전 열람 및 개인 보드로 1클릭 복제(`Personal Board`) 지원.
 
@@ -146,6 +146,7 @@
   - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 - **멀티플레이어 팀 동기화 (선택)**:
   - [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (전용 서버 멀티플레이어 팀 워크스페이스 공유)
+  - [Phoenix Guilds](https://curseforge.com/minecraft/mc-mods/phoenix-guilds) (팀 및 길드 시스템 연동)
 
 ---
 

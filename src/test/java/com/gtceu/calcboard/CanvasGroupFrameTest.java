@@ -333,6 +333,51 @@ public class CanvasGroupFrameTest {
 
         addCmd.undo(graph);
         Assertions.assertEquals(1, graph.getFrames().size());
+
+        // 3. MoveComponentsCommand test (Nodes + StickyNotes + Frames)
+        RecipeNode node = RecipeNode.create("Centrifuge", 100, 30, GTVoltageTier.LV);
+        node.setPos(50, 60);
+        graph.addNode(node);
+
+        CanvasStickyNote note = new CanvasStickyNote("n1", "Note", "Content", CanvasStickyNote.COLOR_CYAN, 70, 80, 100, 80);
+        graph.addStickyNote(note);
+
+        com.gtceu.calcboard.api.history.BoardCommand.MoveComponentsCommand moveCmd =
+                new com.gtceu.calcboard.api.history.BoardCommand.MoveComponentsCommand(
+                        java.util.Map.of(node.getId(), new double[]{20.0, 30.0}),
+                        java.util.Map.of(note.getId(), new double[]{20.0, 30.0}),
+                        java.util.Map.of(frame.getId(), new double[]{20.0, 30.0})
+                );
+
+        // Apply movement
+        node.setPos(node.getPosX() + 20, node.getPosY() + 30);
+        note.moveBy(20, 30);
+        frame.moveBy(20, 30);
+
+        Assertions.assertEquals(70, node.getPosX(), 0.001);
+        Assertions.assertEquals(90, node.getPosY(), 0.001);
+        Assertions.assertEquals(90, note.getPosX(), 0.001);
+        Assertions.assertEquals(110, note.getPosY(), 0.001);
+        Assertions.assertEquals(30, frame.getPosX(), 0.001);
+        Assertions.assertEquals(40, frame.getPosY(), 0.001);
+
+        // Undo
+        moveCmd.undo(graph);
+        Assertions.assertEquals(50, node.getPosX(), 0.001);
+        Assertions.assertEquals(60, node.getPosY(), 0.001);
+        Assertions.assertEquals(70, note.getPosX(), 0.001);
+        Assertions.assertEquals(80, note.getPosY(), 0.001);
+        Assertions.assertEquals(10, frame.getPosX(), 0.001);
+        Assertions.assertEquals(10, frame.getPosY(), 0.001);
+
+        // Redo
+        moveCmd.redo(graph);
+        Assertions.assertEquals(70, node.getPosX(), 0.001);
+        Assertions.assertEquals(90, node.getPosY(), 0.001);
+        Assertions.assertEquals(90, note.getPosX(), 0.001);
+        Assertions.assertEquals(110, note.getPosY(), 0.001);
+        Assertions.assertEquals(30, frame.getPosX(), 0.001);
+        Assertions.assertEquals(40, frame.getPosY(), 0.001);
     }
 }
 

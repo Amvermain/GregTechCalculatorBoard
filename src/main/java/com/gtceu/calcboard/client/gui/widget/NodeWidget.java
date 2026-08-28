@@ -166,6 +166,16 @@ public class NodeWidget {
         return canvasMouseX >= x + 2 && canvasMouseX <= x + 20 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
     }
 
+    public boolean isTargetBatchBadgeHovered(double canvasMouseX, double canvasMouseY) {
+        if (!node.isReroute()) return false;
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        if (node.hasTargetBatch() || targetBatchEditor.isEditing()) {
+            return canvasMouseX >= x - 16 && canvasMouseX <= x + 48 && canvasMouseY >= y + 18 && canvasMouseY <= y + 46;
+        }
+        return false;
+    }
+
     public boolean isHeaderHovered(double canvasMouseX, double canvasMouseY) {
         if (node.isReroute()) {
             return isPointInside(canvasMouseX, canvasMouseY)
@@ -229,6 +239,11 @@ public class NodeWidget {
     public boolean isPointInside(double canvasMouseX, double canvasMouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
+        if (node.isReroute()) {
+            boolean insideBox = canvasMouseX >= x && canvasMouseX <= x + 32 && canvasMouseY >= y && canvasMouseY <= y + 32;
+            if (insideBox) return true;
+            return isTargetBatchBadgeHovered(canvasMouseX, canvasMouseY);
+        }
         return canvasMouseX >= x && canvasMouseX <= x + getWidth() && canvasMouseY >= y && canvasMouseY <= y + getHeight();
     }
 
@@ -513,6 +528,17 @@ public class NodeWidget {
 
         if (node.isReroute()) {
             if (button == 0) {
+                // If clicked explicitly on the Target Batch / ET badge area, start inline editing!
+                if (isTargetBatchBadgeHovered(mouseX, mouseY) && getHoveredInputPortIndex(mouseX, mouseY) < 0 && getHoveredOutputPortIndex(mouseX, mouseY) < 0) {
+                    commitCountEdit();
+                    targetBatchEditor.startEditing();
+                    Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+                    );
+                    return true;
+                }
+            } else if (button == 1) {
+                // Right click on Reroute Node body (Shift+RightClick resets target batch)
                 if (getHoveredInputPortIndex(mouseX, mouseY) < 0 && getHoveredOutputPortIndex(mouseX, mouseY) < 0) {
                     if (Screen.hasShiftDown()) {
                         node.setTargetBatchAmount(0.0);
@@ -522,14 +548,8 @@ public class NodeWidget {
                         Minecraft.getInstance().getSoundManager().play(
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.8F)
                         );
-                    } else {
-                        commitCountEdit();
-                        targetBatchEditor.startEditing();
-                        Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-                        );
+                        return true;
                     }
-                    return true;
                 }
             }
             return false;
@@ -634,6 +654,11 @@ public class NodeWidget {
             if (oldVal != newVal) {
                 node.setMachineCount(newVal);
                 parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
+                if (node.isCompoundNode()) {
+                    parent.getGraph().syncCompoundParameters(node);
+                    parent.rebuildWidgets();
+                    parent.markSummaryDirty();
+                }
             }
             updateCountBuffer();
             invalidateCache();
@@ -656,6 +681,11 @@ public class NodeWidget {
             double newVal = oldVal + 1;
             node.setMachineCount(newVal);
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
+            if (node.isCompoundNode()) {
+                parent.getGraph().syncCompoundParameters(node);
+                parent.rebuildWidgets();
+                parent.markSummaryDirty();
+            }
             updateCountBuffer();
             invalidateCache();
             return true;
@@ -669,6 +699,11 @@ public class NodeWidget {
             if (oldVal != newVal) {
                 node.setMachineCount(newVal);
                 parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
+                if (node.isCompoundNode()) {
+                    parent.getGraph().syncCompoundParameters(node);
+                    parent.rebuildWidgets();
+                    parent.markSummaryDirty();
+                }
             }
             updateCountBuffer();
             invalidateCache();
@@ -682,6 +717,11 @@ public class NodeWidget {
             double newVal = oldVal * 2.0;
             node.setMachineCount(newVal);
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
+            if (node.isCompoundNode()) {
+                parent.getGraph().syncCompoundParameters(node);
+                parent.rebuildWidgets();
+                parent.markSummaryDirty();
+            }
             updateCountBuffer();
             invalidateCache();
             return true;
@@ -691,6 +731,11 @@ public class NodeWidget {
         if (!node.isModule()) {
             com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
             if (adapter.handleControlClick(this, node, mouseX, mouseY, button)) {
+                if (node.isCompoundNode() && parent != null) {
+                    parent.getGraph().syncCompoundParameters(node);
+                    parent.rebuildWidgets();
+                    parent.markSummaryDirty();
+                }
                 return true;
             }
         }
@@ -703,7 +748,14 @@ public class NodeWidget {
             long now = System.currentTimeMillis();
             if (now - lastHeaderClickTime < 350) {
                 commitCountEdit();
-                nameEditor.startEditing();
+                if (node.isReroute()) {
+                    targetBatchEditor.startEditing();
+                    Minecraft.getInstance().getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+                    );
+                } else {
+                    nameEditor.startEditing();
+                }
                 return true;
             }
             lastHeaderClickTime = now;

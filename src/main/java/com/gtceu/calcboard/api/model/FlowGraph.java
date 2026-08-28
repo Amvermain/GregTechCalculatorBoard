@@ -91,7 +91,11 @@ public class FlowGraph {
 
     public void removeFrame(CanvasGroupFrame frame) {
         if (frame != null) {
-            frames.remove(frame);
+            if (frame.isCompoundFrame() && frame.getCompoundGroupId() != null && !frame.getCompoundGroupId().isEmpty()) {
+                deleteCompoundGroup(frame.getCompoundGroupId());
+            } else {
+                frames.remove(frame);
+            }
         }
     }
 
@@ -112,11 +116,82 @@ public class FlowGraph {
 
     public void removeNode(RecipeNode node) {
         if (node != null) {
-            nodes.remove(node);
-            nodeMap.remove(node.getId());
-            connections.removeIf(edge -> edge.fromNodeId.equals(node.getId()) || edge.toNodeId.equals(node.getId()));
-            for (CanvasGroupFrame f : frames) {
-                f.removeNode(node.getId());
+            if (node.isCompoundNode()) {
+                deleteCompoundGroup(node.getCompoundGroupId());
+            } else {
+                nodes.remove(node);
+                nodeMap.remove(node.getId());
+                connections.removeIf(edge -> edge.fromNodeId.equals(node.getId()) || edge.toNodeId.equals(node.getId()));
+                for (CanvasGroupFrame f : frames) {
+                    f.removeNode(node.getId());
+                }
+            }
+        }
+    }
+
+    public List<RecipeNode> findCompoundSiblingNodes(String compoundGroupId) {
+        if (compoundGroupId == null || compoundGroupId.isEmpty()) return Collections.emptyList();
+        List<RecipeNode> siblings = new ArrayList<>();
+        for (RecipeNode n : nodes) {
+            if (compoundGroupId.equals(n.getCompoundGroupId())) {
+                siblings.add(n);
+            }
+        }
+        return siblings;
+    }
+
+    public CanvasGroupFrame findCompoundFrame(String compoundGroupId) {
+        if (compoundGroupId == null || compoundGroupId.isEmpty()) return null;
+        for (CanvasGroupFrame f : frames) {
+            if (f.isCompoundFrame() && compoundGroupId.equals(f.getCompoundGroupId())) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    public void deleteCompoundGroup(String compoundGroupId) {
+        if (compoundGroupId == null || compoundGroupId.isEmpty()) return;
+        List<RecipeNode> siblings = findCompoundSiblingNodes(compoundGroupId);
+        Set<String> siblingIds = new HashSet<>();
+        for (RecipeNode n : siblings) {
+            siblingIds.add(n.getId());
+            nodes.remove(n);
+            nodeMap.remove(n.getId());
+        }
+
+        connections.removeIf(edge -> siblingIds.contains(edge.fromNodeId) || siblingIds.contains(edge.toNodeId));
+
+        frames.removeIf(f -> f.isCompoundFrame() && compoundGroupId.equals(f.getCompoundGroupId()));
+        for (CanvasGroupFrame f : frames) {
+            for (String sId : siblingIds) {
+                f.removeNode(sId);
+            }
+        }
+    }
+
+    public void syncCompoundParameters(RecipeNode sourceNode) {
+        if (sourceNode == null || !sourceNode.isCompoundNode()) return;
+        String groupId = sourceNode.getCompoundGroupId();
+        List<RecipeNode> siblings = findCompoundSiblingNodes(groupId);
+        for (RecipeNode sibling : siblings) {
+            if (sibling.getId().equals(sourceNode.getId())) continue;
+            sibling.setMachineCount(sourceNode.getMachineCount());
+            sibling.setTargetTier(sourceNode.getTargetTier());
+            sibling.setOverclockMode(sourceNode.getOverclockMode());
+            sibling.setParallel(sourceNode.getParallel());
+            sibling.setSteamMode(sourceNode.getSteamMode());
+            sibling.setMultiblock(sourceNode.isMultiblock());
+            sibling.setThreadingConfig(sourceNode.getThreadingConfig());
+            sibling.setGenerator(sourceNode.isGenerator());
+
+            if (sourceNode.getProperties().has(com.gtceu.calcboard.api.property.NodeProperties.KINETIC_RPM)) {
+                sibling.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.KINETIC_RPM,
+                        sourceNode.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.KINETIC_RPM));
+            }
+            if (sourceNode.getProperties().has(com.gtceu.calcboard.api.property.NodeProperties.BOILER_THROTTLE)) {
+                sibling.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.BOILER_THROTTLE,
+                        sourceNode.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.BOILER_THROTTLE));
             }
         }
     }

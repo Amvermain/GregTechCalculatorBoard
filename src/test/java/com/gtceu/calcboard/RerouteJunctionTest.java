@@ -102,6 +102,46 @@ public class RerouteJunctionTest {
         Assertions.assertEquals(new ResourceLocation("minecraft:iron_ingot"), deserialized.getOutputs().get(0).getId());
         Assertions.assertEquals(4.0, deserialized.getInputs().get(0).getAmount(), 0.001);
     }
+
+    @Test
+    public void testTargetBatchAmountAndReset() {
+        RecipeNode reroute = RecipeNode.createReroute(100.0, 100.0);
+        Assertions.assertFalse(reroute.hasTargetBatch());
+        Assertions.assertEquals(0.0, reroute.getTargetBatchAmount(), 0.001);
+
+        reroute.setTargetBatchAmount(64000.0);
+        Assertions.assertTrue(reroute.hasTargetBatch());
+        Assertions.assertEquals(64000.0, reroute.getTargetBatchAmount(), 0.001);
+
+        // Reset (e.g. via Shift+RightClick)
+        reroute.setTargetBatchAmount(0.0);
+        Assertions.assertFalse(reroute.hasTargetBatch());
+        Assertions.assertEquals(0.0, reroute.getTargetBatchAmount(), 0.001);
+    }
+
+    @Test
+    public void testRerouteNodeRemovalInGraph() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode producer = RecipeNode.create("Producer", 20.0, 0.0, GTVoltageTier.LV);
+        RecipeNode reroute = RecipeNode.createReroute(50.0, 50.0);
+        RecipeNode consumer = RecipeNode.create("Consumer", 20.0, 0.0, GTVoltageTier.LV);
+
+        graph.addNode(producer);
+        graph.addNode(reroute);
+        graph.addNode(consumer);
+
+        graph.addConnection(producer.getId(), 0, reroute.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, consumer.getId(), 0);
+
+        Assertions.assertEquals(3, graph.getNodes().size());
+        Assertions.assertEquals(2, graph.getConnections().size());
+
+        // Remove reroute node
+        graph.removeNode(reroute);
+        Assertions.assertEquals(2, graph.getNodes().size());
+        Assertions.assertNull(graph.findNodeById(reroute.getId()));
+        Assertions.assertEquals(0, graph.getConnections().size(), "Connections to/from reroute must be cleaned up");
+    }
 }
 
 

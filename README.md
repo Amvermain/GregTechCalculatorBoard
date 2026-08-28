@@ -40,7 +40,7 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 
 ### 5. Multiplayer Shared Team Workspaces
 - **Real-Time Collaboration**: Share and edit factory flowcharts collaboratively with team members on dedicated servers.
-- **FTB Teams & Vanilla Scoreboard Integration**: Automatically maps team permissions, roles, and memberships.
+- **FTB Teams, Phoenix Guilds & Vanilla Scoreboard Integration**: Automatically maps team permissions, roles, and memberships.
 - **Granular Per-Page Edit Locks & Presence**: Acquires temporary edit locks during node/canvas interaction to prevent concurrent overwrite collisions, with live teammate presence indicators.
 - **Frictionless Auto-Sync**: 3-second inactivity debounced auto-commit and screen exit saving, accompanied by revision history logs and personal forking (`Personal Board`).
 
@@ -146,6 +146,7 @@ GregTech Calculator Board is completely optional on both client and server sides
   - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 - **Optional Team Synchronization**:
   - [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) (For dedicated server multiplayer team workspaces)
+  - [Phoenix Guilds](https://curseforge.com/minecraft/mc-mods/phoenix-guilds) (Teams & Guilds integration)
 
 ---
 

@@ -13,6 +13,14 @@ import com.google.gson.reflect.TypeToken;
 
 public class TutorialStepTest {
 
+    @org.junit.jupiter.api.BeforeAll
+    public static void setupMinecraft() {
+        try {
+            net.minecraft.SharedConstants.tryDetectVersion();
+            net.minecraft.server.Bootstrap.bootStrap();
+        } catch (Throwable ignored) {}
+    }
+
     @Test
     public void testTutorialStepSequence() {
         TutorialStep[] steps = TutorialStep.values();
@@ -54,5 +62,65 @@ public class TutorialStepTest {
             Assertions.assertFalse(enJson.get(step.getTitleKey()).getAsString().isEmpty());
             Assertions.assertFalse(enJson.get(step.getDescKey()).getAsString().isEmpty());
         }
+
+        // Test Exit Dialog keys
+        String[] exitKeys = {
+            "gui.gtcalcboard.tutorial.exit_dialog.title",
+            "gui.gtcalcboard.tutorial.exit_dialog.desc",
+            "gui.gtcalcboard.tutorial.exit_dialog.confirm",
+            "gui.gtcalcboard.tutorial.exit_dialog.cancel"
+        };
+        for (String k : exitKeys) {
+            Assertions.assertTrue(koJson.has(k), "ko_kr missing exit key: " + k);
+            Assertions.assertTrue(enJson.has(k), "en_us missing exit key: " + k);
+            Assertions.assertFalse(koJson.get(k).getAsString().isEmpty());
+            Assertions.assertFalse(enJson.get(k).getAsString().isEmpty());
+        }
+    }
+
+    @Test
+    public void testTutorialManagerLifecycleAndPageIsolation() {
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager mgr = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance();
+        com.gtceu.calcboard.api.storage.BoardManager bm = com.gtceu.calcboard.api.storage.BoardManager.getInstance();
+        bm.resetToDefault();
+
+        // Register removal listener as BoardScreen would
+        bm.setPageRemovalListener(page -> {
+            if (mgr.isTutorialPage(page.getId())) {
+                mgr.stopTutorial();
+            }
+        });
+
+        // Add a dummy user working page
+        com.gtceu.calcboard.api.storage.BoardPage userPage = bm.getActivePage();
+        userPage.setName("My Factory");
+        userPage.getGraph().addNode(com.gtceu.calcboard.api.model.RecipeNode.createReroute(10.0, 10.0));
+        Assertions.assertEquals(1, userPage.getGraph().getNodes().size());
+
+        // Start tutorial
+        mgr.startTutorial(null);
+        Assertions.assertTrue(mgr.isActive());
+        Assertions.assertNotNull(mgr.getTutorialPageId());
+        Assertions.assertEquals(2, bm.getPages().size());
+
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(tutPage);
+        Assertions.assertNotEquals(userPage.getId(), tutPage.getId());
+
+        // Step transition should only modify tutorial page, not userPage
+        mgr.nextStep(); // to STEP_2_DRAG_TO_SEARCH
+        Assertions.assertEquals(1, userPage.getGraph().getNodes().size(), "User working page nodes must remain untouched!");
+        Assertions.assertEquals(1, tutPage.getGraph().getNodes().size(), "Tutorial page should receive Boiler");
+
+        // Remove tutorial page tab -> tutorial should automatically terminate!
+        int tutIdx = bm.getPages().indexOf(tutPage);
+        Assertions.assertTrue(tutIdx >= 0);
+        bm.removePage(tutIdx);
+
+        Assertions.assertFalse(mgr.isActive(), "Tutorial must be stopped when tutorial canvas is deleted");
+        Assertions.assertNull(mgr.getTutorialPageId());
+        Assertions.assertEquals(1, bm.getPages().size());
+        Assertions.assertEquals("My Factory", bm.getActivePage().getName());
+        Assertions.assertEquals(1, bm.getActivePage().getGraph().getNodes().size());
     }
 }

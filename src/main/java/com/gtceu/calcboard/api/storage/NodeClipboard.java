@@ -55,11 +55,22 @@ public class NodeClipboard {
         }
 
         List<RecipeNode> selectedNodes = new ArrayList<>();
+        Set<String> effectiveNodeIds = new HashSet<>();
         if (selectedNodeIds != null) {
+            effectiveNodeIds.addAll(selectedNodeIds);
             for (RecipeNode n : graph.getNodes()) {
-                if (selectedNodeIds.contains(n.getId())) {
-                    selectedNodes.add(n);
+                if (selectedNodeIds.contains(n.getId()) && n.isCompoundNode()) {
+                    List<RecipeNode> siblings = graph.findCompoundSiblingNodes(n.getCompoundGroupId());
+                    for (RecipeNode sib : siblings) {
+                        effectiveNodeIds.add(sib.getId());
+                    }
                 }
+            }
+        }
+
+        for (RecipeNode n : graph.getNodes()) {
+            if (effectiveNodeIds.contains(n.getId())) {
+                selectedNodes.add(n);
             }
         }
 
@@ -73,11 +84,21 @@ public class NodeClipboard {
         }
 
         List<CanvasGroupFrame> selectedFrames = new ArrayList<>();
+        Set<String> effectiveFrameIds = new HashSet<>();
         if (selectedFrameIds != null) {
-            for (CanvasGroupFrame frame : graph.getFrames()) {
-                if (selectedFrameIds.contains(frame.getId())) {
-                    selectedFrames.add(frame);
+            effectiveFrameIds.addAll(selectedFrameIds);
+        }
+        for (RecipeNode n : selectedNodes) {
+            if (n.isCompoundNode()) {
+                CanvasGroupFrame cFrame = graph.findCompoundFrame(n.getCompoundGroupId());
+                if (cFrame != null) {
+                    effectiveFrameIds.add(cFrame.getId());
                 }
+            }
+        }
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            if (effectiveFrameIds.contains(frame.getId())) {
+                selectedFrames.add(frame);
             }
         }
 
@@ -131,9 +152,9 @@ public class NodeClipboard {
         tag.put("frames", frameList);
 
         ListTag edgeList = new ListTag();
-        if (selectedNodeIds != null && !selectedNodeIds.isEmpty()) {
+        if (!effectiveNodeIds.isEmpty()) {
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (selectedNodeIds.contains(edge.fromNodeId()) && selectedNodeIds.contains(edge.toNodeId())) {
+                if (effectiveNodeIds.contains(edge.fromNodeId()) && effectiveNodeIds.contains(edge.toNodeId())) {
                     edgeList.add(edge.serializeNBT());
                 }
             }
@@ -163,6 +184,9 @@ public class NodeClipboard {
         List<CanvasStickyNote> newNotes = new ArrayList<>();
         List<CanvasGroupFrame> newFrames = new ArrayList<>();
 
+        Map<String, String> compoundGroupRemap = new HashMap<>();
+        Map<String, String> compoundMasterRemap = new HashMap<>();
+
         for (int i = 0; i < nodeList.size(); i++) {
             RecipeNode origNode = RecipeNode.deserializeNBT(nodeList.getCompound(i));
             String oldId = origNode.getId();
@@ -172,8 +196,25 @@ public class NodeClipboard {
             newNode.setId(newId);
             newNode.setPos(origNode.getPosX() + offsetX, origNode.getPosY() + offsetY);
 
+            if (origNode.isCompoundNode()) {
+                String oldGroupId = origNode.getCompoundGroupId();
+                String newGroupId = compoundGroupRemap.computeIfAbsent(oldGroupId, k -> UUID.randomUUID().toString());
+                if (origNode.isCompoundMaster()) {
+                    compoundMasterRemap.put(newGroupId, newId);
+                }
+            }
+
             idMap.put(oldId, newNode);
             newNodes.add(newNode);
+        }
+
+        for (RecipeNode newNode : newNodes) {
+            if (newNode.isCompoundNode()) {
+                String oldGroupId = newNode.getCompoundGroupId();
+                String newGroupId = compoundGroupRemap.get(oldGroupId);
+                String newMasterId = compoundMasterRemap.getOrDefault(newGroupId, newNode.getId());
+                newNode.setCompoundMetadata(newGroupId, newNode.getCompoundLayerIndex(), newNode.getCompoundTotalLayers(), newMasterId);
+            }
             graph.addNode(newNode);
         }
 
@@ -204,6 +245,18 @@ public class NodeClipboard {
                 origFrame.getWidth(),
                 origFrame.getHeight()
             );
+            newFrame.setNote(origFrame.getNote());
+            if (origFrame.isCompoundFrame()) {
+                newFrame.setCompoundFrame(true);
+                String newGroupId = compoundGroupRemap.getOrDefault(origFrame.getCompoundGroupId(), origFrame.getCompoundGroupId());
+                newFrame.setCompoundGroupId(newGroupId);
+            }
+            for (String oldNid : origFrame.getContainedNodeIds()) {
+                RecipeNode mapped = idMap.get(oldNid);
+                if (mapped != null) {
+                    newFrame.addNode(mapped.getId());
+                }
+            }
             newFrames.add(newFrame);
             graph.addFrame(newFrame);
         }

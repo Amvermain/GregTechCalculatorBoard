@@ -29,6 +29,7 @@ public class RecipeFilterConfig {
     private static final RecipeFilterConfig INSTANCE = new RecipeFilterConfig();
 
     private final Set<String> excludedCategories = new HashSet<>(DEFAULT_EXCLUSIONS);
+    private boolean includeUnsupported = false;
     private boolean initialized = false;
 
     public static RecipeFilterConfig getInstance() {
@@ -37,6 +38,15 @@ public class RecipeFilterConfig {
             INSTANCE.initialized = true;
         }
         return INSTANCE;
+    }
+
+    public boolean isIncludeUnsupported() {
+        return includeUnsupported;
+    }
+
+    public void setIncludeUnsupported(boolean include) {
+        this.includeUnsupported = include;
+        save();
     }
 
     public boolean isCategoryExcluded(String categoryId) {
@@ -66,6 +76,7 @@ public class RecipeFilterConfig {
     public void resetDefaults() {
         excludedCategories.clear();
         excludedCategories.addAll(DEFAULT_EXCLUSIONS);
+        includeUnsupported = false;
         save();
     }
 
@@ -102,19 +113,38 @@ public class RecipeFilterConfig {
         return new File("config/gtcalcboard_filters.json");
     }
 
+    private static class ConfigData {
+        public Set<String> excludedCategories;
+        public Boolean includeUnsupported;
+    }
+
     public void load() {
         File file = getConfigFile();
         if (!file.exists()) {
             return;
         }
         try (FileReader reader = new FileReader(file)) {
-            Type type = new TypeToken<Set<String>>() {}.getType();
-            Set<String> loaded = GSON.fromJson(reader, type);
-            if (loaded != null) {
-                excludedCategories.clear();
-                for (String s : loaded) {
-                    if (s != null) {
-                        excludedCategories.add(s.toLowerCase(Locale.ROOT));
+            com.google.gson.JsonElement element = com.google.gson.JsonParser.parseReader(reader);
+            if (element.isJsonObject()) {
+                ConfigData data = GSON.fromJson(element, ConfigData.class);
+                if (data != null) {
+                    if (data.excludedCategories != null) {
+                        excludedCategories.clear();
+                        for (String s : data.excludedCategories) {
+                            if (s != null) excludedCategories.add(s.toLowerCase(Locale.ROOT));
+                        }
+                    }
+                    if (data.includeUnsupported != null) {
+                        this.includeUnsupported = data.includeUnsupported;
+                    }
+                }
+            } else if (element.isJsonArray()) {
+                Type type = new TypeToken<Set<String>>() {}.getType();
+                Set<String> loaded = GSON.fromJson(element, type);
+                if (loaded != null) {
+                    excludedCategories.clear();
+                    for (String s : loaded) {
+                        if (s != null) excludedCategories.add(s.toLowerCase(Locale.ROOT));
                     }
                 }
             }
@@ -130,7 +160,10 @@ public class RecipeFilterConfig {
                 file.getParentFile().mkdirs();
             }
             try (FileWriter writer = new FileWriter(file)) {
-                GSON.toJson(excludedCategories, writer);
+                ConfigData data = new ConfigData();
+                data.excludedCategories = new HashSet<>(excludedCategories);
+                data.includeUnsupported = includeUnsupported;
+                GSON.toJson(data, writer);
             }
         } catch (Throwable t) {
             t.printStackTrace();

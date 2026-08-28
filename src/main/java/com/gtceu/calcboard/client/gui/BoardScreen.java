@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.client.gui.dialog.DeletePageConfirmDialog;
+import com.gtceu.calcboard.client.gui.dialog.TutorialExitConfirmDialog;
 import com.gtceu.calcboard.client.gui.dialog.ExportToTeamDialog;
 import com.gtceu.calcboard.client.gui.dialog.FrameEditDialog;
 import com.gtceu.calcboard.client.gui.dialog.GlobalBalanceDashboardDialog;
@@ -99,6 +100,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     private MachineConfigDialog machineConfigDialog;
     private GuideDialog guideDialog;
     private DeletePageConfirmDialog deletePageDialog;
+    private TutorialExitConfirmDialog tutorialExitDialog;
     private GlobalBalanceDashboardDialog globalBalanceDialog;
     private MultiblockBOMDialog multiblockBOMDialog;
     private SaveToTeamDialog saveToTeamDialog;
@@ -332,6 +334,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         this.machineConfigDialog = new MachineConfigDialog(this);
         this.guideDialog = new GuideDialog(this);
         this.deletePageDialog = new DeletePageConfirmDialog(this);
+        this.tutorialExitDialog = new TutorialExitConfirmDialog(this);
         this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
         this.multiblockBOMDialog = new MultiblockBOMDialog(this);
         this.saveToTeamDialog = new SaveToTeamDialog(this);
@@ -339,6 +342,12 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         this.recentSavesDialog = new RecentSavesDialog(this);
         this.frameEditDialog = new FrameEditDialog(this);
         this.noteEditDialog = new NoteEditDialog(this);
+
+        BoardManager.getInstance().setPageRemovalListener(page -> {
+            if (TutorialManager.getInstance().isTutorialPage(page.getId())) {
+                TutorialManager.getInstance().stopTutorial();
+            }
+        });
         rebuildWidgets();
 
         if (com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled()) {
@@ -418,6 +427,28 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     public DeletePageConfirmDialog getDeletePageDialog() {
         return deletePageDialog;
+    }
+
+    public TutorialExitConfirmDialog getTutorialExitDialog() {
+        return tutorialExitDialog;
+    }
+
+    public void openTutorialExitDialog(int targetPageIndex) {
+        if (tutorialExitDialog != null) {
+            tutorialExitDialog.openForSwitch(targetPageIndex);
+        }
+    }
+
+    public void openTutorialExitDialogForNewPage() {
+        if (tutorialExitDialog != null) {
+            tutorialExitDialog.openForCreateNewPage();
+        }
+    }
+
+    public void openTutorialExitDialogForTeamPage(String teamPageId) {
+        if (tutorialExitDialog != null) {
+            tutorialExitDialog.openForTeamPage(teamPageId);
+        }
     }
 
     public WelcomeTutorialDialog getWelcomeDialog() {
@@ -617,18 +648,53 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     public void removeNode(NodeWidget widget) {
         if (widget == null || widget.getNode() == null) return;
         RecipeNode n = widget.getNode();
+        List<RecipeNode> removedNodes = new ArrayList<>();
+        List<CanvasGroupFrame> removedFrames = new ArrayList<>();
+        Set<String> targetNodeIds = new HashSet<>();
+
+        if (n.isCompoundNode()) {
+            List<RecipeNode> siblings = getGraph().findCompoundSiblingNodes(n.getCompoundGroupId());
+            removedNodes.addAll(siblings);
+            for (RecipeNode sib : siblings) {
+                targetNodeIds.add(sib.getId());
+            }
+            CanvasGroupFrame cFrame = getGraph().findCompoundFrame(n.getCompoundGroupId());
+            if (cFrame != null) {
+                removedFrames.add(cFrame);
+            }
+        } else {
+            removedNodes.add(n);
+            targetNodeIds.add(n.getId());
+        }
+
         List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
         for (FlowGraph.ConnectionEdge e : getGraph().getConnections()) {
-            if (e.fromNodeId().equals(n.getId()) || e.toNodeId().equals(n.getId())) {
+            if (targetNodeIds.contains(e.fromNodeId()) || targetNodeIds.contains(e.toNodeId())) {
                 removedEdges.add(e);
             }
         }
+
         getGraph().removeNode(n);
-        recordCommand(new BoardCommand.RemoveNodesCommand(List.of(n), removedEdges, "Delete " + n.getName()));
-        selectionModel.getSelectedNodeIds().remove(n.getId());
+
+        List<BoardCommand> cmds = new ArrayList<>();
+        cmds.add(new BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Delete " + n.getName()));
+        if (!removedFrames.isEmpty()) {
+            cmds.add(new BoardCommand.RemoveFramesCommand(removedFrames, "Delete compound frame"));
+        }
+        if (cmds.size() == 1) {
+            recordCommand(cmds.get(0));
+        } else {
+            recordCommand(new BoardCommand.CompoundCommand(cmds, "Delete compound " + n.getName()));
+        }
+
+        for (String nid : targetNodeIds) {
+            selectionModel.getSelectedNodeIds().remove(nid);
+        }
         rebuildWidgets();
         markSummaryDirty();
-        TutorialManager.getInstance().onNodeRemoved(n);
+        for (RecipeNode rn : removedNodes) {
+            TutorialManager.getInstance().onNodeRemoved(rn);
+        }
     }
 
     public void markSummaryDirty() {
@@ -865,6 +931,8 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             guideDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (deletePageDialog != null && deletePageDialog.isVisible()) {
             deletePageDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (tutorialExitDialog != null && tutorialExitDialog.isVisible()) {
+            tutorialExitDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
             saveToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
@@ -896,6 +964,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             || (searchDialog != null && searchDialog.isVisible())
             || (machineConfigDialog != null && machineConfigDialog.isVisible())
             || (deletePageDialog != null && deletePageDialog.isVisible())
+            || (tutorialExitDialog != null && tutorialExitDialog.isVisible())
             || (saveToTeamDialog != null && saveToTeamDialog.isVisible())
             || (exportToTeamDialog != null && exportToTeamDialog.isVisible())
             || (recentSavesDialog != null && recentSavesDialog.isVisible())
@@ -1077,6 +1146,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
         if (deletePageDialog != null && deletePageDialog.isVisible()) {
             return deletePageDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (tutorialExitDialog != null && tutorialExitDialog.isVisible()) {
+            return tutorialExitDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.mouseClicked(mouseX, mouseY, button, width, height);

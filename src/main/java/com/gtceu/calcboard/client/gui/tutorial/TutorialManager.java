@@ -22,6 +22,7 @@ public class TutorialManager {
     private boolean active = false;
     private TutorialStep currentStep = TutorialStep.STEP_1_ADD_RECIPE;
     private BoardScreen currentScreen = null;
+    private String tutorialPageId = null;
 
     // Track user actions for step transitions
     private boolean pannedOrZoomed = false;
@@ -41,28 +42,49 @@ public class TutorialManager {
         return currentStep;
     }
 
+    public String getTutorialPageId() {
+        return tutorialPageId;
+    }
+
+    public boolean isTutorialPage(String pageId) {
+        return active && tutorialPageId != null && tutorialPageId.equals(pageId);
+    }
+
+    public com.gtceu.calcboard.api.storage.BoardPage getTutorialPage() {
+        if (!active || tutorialPageId == null) return null;
+        for (com.gtceu.calcboard.api.storage.BoardPage p : com.gtceu.calcboard.api.storage.BoardManager.getInstance().getPages()) {
+            if (tutorialPageId.equals(p.getId())) {
+                return p;
+            }
+        }
+        // If tutorial canvas was deleted, safely abort tutorial
+        stopTutorial();
+        return null;
+    }
+
     public void startTutorial(BoardScreen screen) {
         this.currentScreen = screen;
         this.active = true;
         this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
         this.pannedOrZoomed = false;
 
-        // If current page is not empty, create a dedicated new page for tutorial to protect user's existing work!
+        // Always create a dedicated new page for tutorial to protect user's existing work 100%!
+        String pageName = "Tutorial";
+        try {
+            pageName = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tutorial.page_name").getString();
+        } catch (Throwable ignored) {}
+        com.gtceu.calcboard.api.storage.BoardPage newPage = com.gtceu.calcboard.api.storage.BoardManager.getInstance().addPage(pageName);
+        this.tutorialPageId = newPage.getId();
+
         if (screen != null) {
-            if (!screen.getGraph().getNodes().isEmpty()) {
-                String pageName = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tutorial.page_name").getString();
-                com.gtceu.calcboard.api.storage.BoardManager.getInstance().addPage(pageName);
-            }
             screen.getSummaryOverlay().setCollapsed(true);
-            screen.getGraph().getNodes().clear();
-            screen.getGraph().getConnections().clear();
             screen.setPanX(screen.width / 2.0);
             screen.setPanY(screen.height / 2.0);
             screen.setZoom(1.0);
             screen.rebuildWidgets();
         }
 
-        playSound(SoundEvents.UI_TOAST_IN, 1.0f);
+        playUiSound(0, 1.0f);
     }
 
     public void stopTutorial() {
@@ -71,13 +93,14 @@ public class TutorialManager {
         this.practiceNodeId = null;
         this.boilerNodeId = null;
         this.turbineNodeId = null;
+        this.tutorialPageId = null;
     }
 
     public void nextStep() {
         int nextOrdinal = currentStep.ordinal() + 1;
         if (nextOrdinal < TutorialStep.values().length) {
             currentStep = TutorialStep.values()[nextOrdinal];
-            playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2f);
+            playUiSound(1, 1.2f);
             onStepEnter(currentStep);
         } else {
             completeTutorial();
@@ -86,33 +109,43 @@ public class TutorialManager {
 
     public void completeTutorial() {
         currentStep = TutorialStep.COMPLETED;
-        playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f);
+        playUiSound(2, 1.0f);
     }
 
     private void onStepEnter(TutorialStep step) {
-        if (currentScreen == null) return;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null) return;
+
+        // Ensure active page is tutorial page
+        com.gtceu.calcboard.api.storage.BoardManager bm = com.gtceu.calcboard.api.storage.BoardManager.getInstance();
+        if (bm.getActivePage() != tutPage) {
+            int idx = bm.getPages().indexOf(tutPage);
+            if (idx >= 0) {
+                bm.switchPage(idx);
+            }
+        }
 
         if (step == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
-            setupStep2Exercise();
+            setupStep2Exercise(tutPage);
         } else if (step == TutorialStep.STEP_3_JUNCTION) {
-            setupStep3Exercise();
+            setupStep3Exercise(tutPage);
         } else if (step == TutorialStep.STEP_4_SHIFT_WIRING) {
-            setupStep4Exercise();
+            setupStep4Exercise(tutPage);
         } else if (step == TutorialStep.STEP_5_MACHINE_CONFIG) {
-            setupStep5Exercise();
+            setupStep5Exercise(tutPage);
         } else if (step == TutorialStep.STEP_6_GROUP_FRAME) {
-            setupStep6Exercise();
+            setupStep6Exercise(tutPage);
         } else if (step == TutorialStep.STEP_7_COMPOUND_MODULE) {
-            setupStep7Exercise();
+            setupStep7Exercise(tutPage);
         }
     }
 
-    private void setupStep2Exercise() {
-        if (currentScreen == null) return;
+    private void setupStep2Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        currentScreen.getGraph().getNodes().clear();
-        currentScreen.getGraph().getConnections().clear();
-        currentScreen.getGraph().getFrames().clear();
+        tutPage.getGraph().getNodes().clear();
+        tutPage.getGraph().getConnections().clear();
+        tutPage.getGraph().getFrames().clear();
 
         // 1. Boiler: produces Steam 500 mB/s
         RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
@@ -122,84 +155,89 @@ public class TutorialManager {
         boiler.setPosY(-50);
         boiler.setMachineCount(1.0);
         this.boilerNodeId = boiler.getId();
-        currentScreen.getGraph().addNode(boiler);
+        tutPage.getGraph().addNode(boiler);
 
-        currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep3Exercise() {
-        if (currentScreen == null) return;
+    private void setupStep3Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        ensureBoilerAndTurbineExist();
+        ensureBoilerAndTurbineExist(tutPage);
 
         // Ensure a direct connection exists between Boiler and Turbine for user to double-click
-        RecipeNode boiler = currentScreen.getGraph().findNodeById(boilerNodeId);
-        RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+        RecipeNode boiler = tutPage.getGraph().findNodeById(boilerNodeId);
+        RecipeNode turbine = tutPage.getGraph().findNodeById(turbineNodeId);
         if (boiler != null && turbine != null) {
-            boolean hasConn = currentScreen.getGraph().getConnections().stream()
+            boolean hasConn = tutPage.getGraph().getConnections().stream()
                     .anyMatch(c -> c.fromNodeId().equals(boiler.getId()) && c.toNodeId().equals(turbine.getId()));
             if (!hasConn) {
-                currentScreen.getGraph().addConnection(boiler.getId(), 0, turbine.getId(), 0);
+                tutPage.getGraph().addConnection(boiler.getId(), 0, turbine.getId(), 0);
             }
         }
-        currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep4Exercise() {
-        if (currentScreen == null) return;
+    private void setupStep4Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        ensureBoilerAndTurbineExist();
+        ensureBoilerAndTurbineExist(tutPage);
 
         // Reset turbine machine count to 1.0 so user can experience Shift auto-calculation to 5.0
-        RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+        RecipeNode turbine = tutPage.getGraph().findNodeById(turbineNodeId);
         if (turbine != null) {
             turbine.setMachineCount(1.0);
         }
-        currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep5Exercise() {
-        if (currentScreen == null) return;
+    private void setupStep5Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        ensureBoilerAndTurbineExist();
-        RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+        ensureBoilerAndTurbineExist(tutPage);
+        RecipeNode turbine = tutPage.getGraph().findNodeById(turbineNodeId);
         if (turbine != null) {
             turbine.setMachineCount(5.0);
         }
-        currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep6Exercise() {
-        if (currentScreen == null) return;
+    private void setupStep6Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        ensureBoilerAndTurbineExist();
-        currentScreen.getGraph().getFrames().clear();
-        currentScreen.rebuildWidgets();
+        ensureBoilerAndTurbineExist(tutPage);
+        tutPage.getGraph().getFrames().clear();
+        if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep7Exercise() {
-        if (currentScreen == null) return;
+    private void setupStep7Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        ensureBoilerAndTurbineExist();
-        if (currentScreen.getGraph().getFrames().isEmpty()) {
+        ensureBoilerAndTurbineExist(tutPage);
+        if (tutPage.getGraph().getFrames().isEmpty()) {
             // Auto-create a frame if user skipped step 6
-            RecipeNode boiler = currentScreen.getGraph().findNodeById(boilerNodeId);
-            RecipeNode turbine = currentScreen.getGraph().findNodeById(turbineNodeId);
+            RecipeNode boiler = tutPage.getGraph().findNodeById(boilerNodeId);
+            RecipeNode turbine = tutPage.getGraph().findNodeById(turbineNodeId);
             if (boiler != null && turbine != null) {
-                String defaultTitle = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.default_frame_name").getString();
+                String defaultTitle = "Steam Power Group";
+                try {
+                    defaultTitle = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.default_frame_name").getString();
+                } catch (Throwable ignored) {}
                 com.gtceu.calcboard.api.model.CanvasGroupFrame frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromNodes(
                         defaultTitle, java.util.List.of(boiler, turbine), com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE);
-                currentScreen.getGraph().addFrame(frame);
+                tutPage.getGraph().addFrame(frame);
             }
         }
-        currentScreen.getSummaryOverlay().setCollapsed(false);
-        currentScreen.rebuildWidgets();
+        if (currentScreen != null) {
+            currentScreen.getSummaryOverlay().setCollapsed(false);
+            currentScreen.rebuildWidgets();
+        }
     }
 
-    private void ensureBoilerAndTurbineExist() {
-        if (currentScreen == null) return;
+    private void ensureBoilerAndTurbineExist(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
 
-        if (boilerNodeId == null || currentScreen.getGraph().findNodeById(boilerNodeId) == null) {
+        if (boilerNodeId == null || tutPage.getGraph().findNodeById(boilerNodeId) == null) {
             RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);
             boiler.setEnergyType(com.gtceu.calcboard.api.type.EnergyType.HEAT_OR_SELF);
             boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0, 1.0));
@@ -207,10 +245,10 @@ public class TutorialManager {
             boiler.setPosY(-50);
             boiler.setMachineCount(1.0);
             this.boilerNodeId = boiler.getId();
-            currentScreen.getGraph().addNode(boiler);
+            tutPage.getGraph().addNode(boiler);
         }
 
-        if (turbineNodeId == null || currentScreen.getGraph().findNodeById(turbineNodeId) == null) {
+        if (turbineNodeId == null || tutPage.getGraph().findNodeById(turbineNodeId) == null) {
             RecipeNode turbine = RecipeNode.create("Steam Turbine (Tutorial)", 20.0, 64.0, GTVoltageTier.LV);
             turbine.setGenerator(true);
             turbine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0, 1.0));
@@ -218,7 +256,7 @@ public class TutorialManager {
             turbine.setPosY(-50);
             turbine.setMachineCount(1.0);
             this.turbineNodeId = turbine.getId();
-            currentScreen.getGraph().addNode(turbine);
+            tutPage.getGraph().addNode(turbine);
         }
     }
 
@@ -408,10 +446,20 @@ public class TutorialManager {
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
-    private void playSound(net.minecraft.sounds.SoundEvent sound, float pitch) {
-        Minecraft.getInstance().getSoundManager().play(
-            SimpleSoundInstance.forUI(sound, pitch)
-        );
+    private void playUiSound(int soundType, float pitch) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.getSoundManager() != null) {
+                net.minecraft.sounds.SoundEvent sound = switch (soundType) {
+                    case 1 -> SoundEvents.EXPERIENCE_ORB_PICKUP;
+                    case 2 -> SoundEvents.UI_TOAST_CHALLENGE_COMPLETE;
+                    default -> SoundEvents.UI_TOAST_IN;
+                };
+                mc.getSoundManager().play(
+                    SimpleSoundInstance.forUI(sound, pitch)
+                );
+            }
+        } catch (Throwable ignored) {}
     }
 }
 

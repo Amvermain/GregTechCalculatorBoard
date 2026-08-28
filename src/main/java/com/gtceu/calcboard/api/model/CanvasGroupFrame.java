@@ -41,6 +41,8 @@ public class CanvasGroupFrame {
     private double height;
     private String note;
     private final Set<String> containedNodeIds = new LinkedHashSet<>();
+    private boolean isCompoundFrame = false;
+    private String compoundGroupId = "";
 
     public CanvasGroupFrame(String id, String title, int color, double posX, double posY, double width, double height) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -208,6 +210,12 @@ public class CanvasGroupFrame {
         tag.putDouble("width", width);
         tag.putDouble("height", height);
         tag.putString("note", note != null ? note : "");
+        if (isCompoundFrame) {
+            tag.putBoolean("isCompoundFrame", true);
+            if (compoundGroupId != null && !compoundGroupId.isEmpty()) {
+                tag.putString("compoundGroupId", compoundGroupId);
+            }
+        }
 
         ListTag nodesTag = new ListTag();
         for (String nid : containedNodeIds) {
@@ -229,6 +237,10 @@ public class CanvasGroupFrame {
 
         CanvasGroupFrame frame = new CanvasGroupFrame(id, title, color, posX, posY, width, height);
         frame.setNote(note);
+        if (tag.getBoolean("isCompoundFrame")) {
+            frame.setCompoundFrame(true);
+            frame.setCompoundGroupId(tag.getString("compoundGroupId"));
+        }
 
         if (tag.contains("nodes", Tag.TAG_LIST)) {
             ListTag list = tag.getList("nodes", Tag.TAG_STRING);
@@ -310,6 +322,22 @@ public class CanvasGroupFrame {
 
     public Set<String> getContainedNodeIds() {
         return containedNodeIds;
+    }
+
+    public boolean isCompoundFrame() {
+        return isCompoundFrame;
+    }
+
+    public void setCompoundFrame(boolean compoundFrame) {
+        isCompoundFrame = compoundFrame;
+    }
+
+    public String getCompoundGroupId() {
+        return compoundGroupId;
+    }
+
+    public void setCompoundGroupId(String compoundGroupId) {
+        this.compoundGroupId = compoundGroupId != null ? compoundGroupId : "";
     }
 }
 

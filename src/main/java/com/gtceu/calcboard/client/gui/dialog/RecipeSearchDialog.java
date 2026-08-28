@@ -575,6 +575,9 @@ public class RecipeSearchDialog {
                     if (filterConfig.isCategoryExcluded(sr.categoryId())) {
                         return false;
                     }
+                    if (!filterConfig.isIncludeUnsupported() && !sr.isSupported()) {
+                        return false;
+                    }
                     return RecipeSearchEngine.matches(sr, parsedQuery);
                 })
                 .map(sr -> {
@@ -904,7 +907,8 @@ public class RecipeSearchDialog {
 
                 String catText = !sr.categoryName().isEmpty() ? "§7[" + sr.categoryName() + "§7] " : (!sr.categoryId().isEmpty() ? "§7[" + sr.categoryId() + "§7] " : "");
                 String star = isDefault ? "§6★ " : "";
-                String fullRowText = star + catText + (isDefault ? "§b" : "§f") + rName;
+                String genericBadge = !sr.isSupported() ? "§6[" + Component.translatable("gui.gtcalcboard.search.badge.unsupported").getString() + "] " : "";
+                String fullRowText = star + genericBadge + catText + (isDefault ? "§b" : "§f") + rName;
 
                 int textStartX = listX + Math.max(58, renderedIconWidth + 4);
                 int maxTextW = (btnX - 24) - textStartX;
@@ -1204,25 +1208,58 @@ public class RecipeSearchDialog {
 
     public void addRecipeAt(SearchableRecipe sr, int screenWidth, int screenHeight) {
         if (sr == null) return;
+        double spawnX, spawnY;
+        if (contextualWireTarget != null) {
+            if (!contextualWireTarget.sourceIsInput) {
+                spawnX = contextualWireTarget.canvasX;
+                spawnY = contextualWireTarget.canvasY - 30;
+            } else {
+                spawnX = contextualWireTarget.canvasX - 245;
+                spawnY = contextualWireTarget.canvasY - 30;
+            }
+        } else if (hasTargetSpawnPos) {
+            spawnX = targetSpawnCanvasX - 80;
+            spawnY = targetSpawnCanvasY - 30;
+        } else {
+            double[] center = BoardScreen.getNextNodeCenterPosition(screenWidth, screenHeight);
+            spawnX = center[0];
+            spawnY = center[1];
+        }
+
+        com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster cluster = null;
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded() && sr.recipe() instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
+            cluster = com.gtceu.calcboard.integration.emi.EmiStepRecipeDetector.tryDetectAndBuild(er, null, spawnX, spawnY);
+        }
+
+        if (cluster != null && !cluster.nodes().isEmpty()) {
+            for (RecipeNode n : cluster.nodes()) {
+                parent.addNode(n);
+            }
+            if (cluster.frame() != null) {
+                parent.getGraph().addFrame(cluster.frame());
+            }
+            for (FlowGraph.ConnectionEdge edge : cluster.internalEdges()) {
+                parent.getGraph().addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
+            }
+            if (contextualWireTarget != null) {
+                RecipeNode targetConnectNode = !contextualWireTarget.sourceIsInput ? cluster.nodes().get(0) : cluster.nodes().get(cluster.nodes().size() - 1);
+                if (!contextualWireTarget.sourceIsInput) {
+                    connectContextualForwardWire(targetConnectNode, contextualWireTarget.sourceNode, contextualWireTarget.sourceStack);
+                } else {
+                    connectContextualReverseWire(targetConnectNode, contextualWireTarget.sourceNode, contextualWireTarget.sourceStack);
+                }
+                contextualWireTarget = null;
+                parent.rebuildWidgets();
+            }
+            parent.markSummaryDirty();
+            setVisible(false);
+            return;
+        }
+
         RecipeNode node = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
         if (node != null) {
-            if (contextualWireTarget != null) {
-                // Place node near drop position
-                if (!contextualWireTarget.sourceIsInput) {
-                    node.setPosX(contextualWireTarget.canvasX);
-                    node.setPosY(contextualWireTarget.canvasY - 30);
-                } else {
-                    node.setPosX(contextualWireTarget.canvasX - 245);
-                    node.setPosY(contextualWireTarget.canvasY - 30);
-                }
-            } else if (hasTargetSpawnPos) {
-                node.setPosX(targetSpawnCanvasX - 80);
-                node.setPosY(targetSpawnCanvasY - 30);
-            } else {
-                double[] center = BoardScreen.getNextNodeCenterPosition(screenWidth, screenHeight);
-                node.setPosX(center[0]);
-                node.setPosY(center[1]);
-            }
+            node.setPosX(spawnX);
+            node.setPosY(spawnY);
 
             parent.addNode(node);
             com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(

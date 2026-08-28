@@ -168,7 +168,7 @@ public class FavoritesDockWidget {
 
         private void closeFlyout() {
             activeFlyoutFavorite = null;
-            activeFlyoutRecipes.clear();
+            activeFlyoutRecipes = Collections.emptyList();
             subScrollY = 0;
             activePreviewRecipe = null;
             hoveredFavorite = null;
@@ -211,8 +211,9 @@ public class FavoritesDockWidget {
             List<dev.emi.emi.api.recipe.EmiRecipe> list = new ArrayList<>();
             if (fav.getRecipe() != null) {
                 list.add(fav.getRecipe());
-                FAVORITE_RECIPES_CACHE.put(fav, list);
-                return list;
+                List<dev.emi.emi.api.recipe.EmiRecipe> unmodifiable = Collections.unmodifiableList(list);
+                FAVORITE_RECIPES_CACHE.put(fav, unmodifiable);
+                return unmodifiable;
             }
 
             if (!fav.getEmiStacks().isEmpty()) {
@@ -286,8 +287,9 @@ public class FavoritesDockWidget {
                     }
                 }
             }
-            FAVORITE_RECIPES_CACHE.put(fav, list);
-            return list;
+            List<dev.emi.emi.api.recipe.EmiRecipe> unmodifiable = Collections.unmodifiableList(list);
+            FAVORITE_RECIPES_CACHE.put(fav, unmodifiable);
+            return unmodifiable;
         }
 
         private void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
@@ -955,6 +957,28 @@ public class FavoritesDockWidget {
         }
 
         private void spawnRecipeNode(dev.emi.emi.api.recipe.EmiRecipe recipe, double canvasX, double canvasY) {
+            com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster cluster =
+                    com.gtceu.calcboard.integration.emi.EmiStepRecipeDetector.tryDetectAndBuild(recipe, null, canvasX, canvasY);
+            if (cluster != null && !cluster.nodes().isEmpty()) {
+                for (RecipeNode n : cluster.nodes()) {
+                    screen.addNode(n);
+                }
+                if (cluster.frame() != null) {
+                    screen.getGraph().addFrame(cluster.frame());
+                }
+                for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge edge : cluster.internalEdges()) {
+                    screen.getGraph().addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
+                }
+                String name = extractRecipeDisplayName(recipe);
+                BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.recipe_added", name)));
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
+                );
+                screen.rebuildWidgets();
+                screen.markSummaryDirty();
+                return;
+            }
+
             RecipeNode node = EmiRecipeConverter.convert(recipe);
             if (node == null) return;
 

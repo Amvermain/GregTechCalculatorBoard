@@ -112,6 +112,15 @@ public class EmiRecipeConverter {
         CompoundTag recipeDataTag = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractRecipeDataTag(backing);
         com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.extractAll(backing, recipeDataTag, catId, node.getProperties());
 
+        boolean isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catId);
+        String rModId = (recipe.getId() != null) ? recipe.getId().getNamespace() : null;
+        if (!isSupported && rModId != null) {
+            isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isRecipeSupported(rModId, catId);
+        }
+        if (!isSupported) {
+            node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.IS_GENERIC_UNSUPPORTED, true);
+        }
+
         if (details.backingRecipeTemp > 0) {
             node.setRecipeTemperature(details.backingRecipeTemp);
         }
@@ -302,7 +311,7 @@ public class EmiRecipeConverter {
         return false;
     }
 
-    private static ResourceLocation findMachineIcon(EmiRecipe recipe) {
+    public static ResourceLocation findMachineIcon(EmiRecipe recipe) {
         if (recipe == null) return null;
 
         // 1. Try all workstations from recipe and category
@@ -347,7 +356,7 @@ public class EmiRecipeConverter {
         return null;
     }
 
-    private static IngredientStack convertEmiStack(EmiStack stack, long amount, float chance) {
+    public static IngredientStack convertEmiStack(EmiStack stack, long amount, float chance) {
         if (stack.isEmpty()) return null;
 
         ResourceLocation id = stack.getId();
