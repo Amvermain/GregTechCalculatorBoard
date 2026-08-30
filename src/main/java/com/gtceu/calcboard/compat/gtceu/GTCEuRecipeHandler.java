@@ -929,6 +929,37 @@ public class GTCEuRecipeHandler {
                                 }
                             }
                         }
+                    } else if (res instanceof Object[] ldArray && ldArray.length > 0 && hasPublicMethod(ldArray[0].getClass(), "getFluid")) {
+                        Object first = ldArray[0];
+                        net.minecraft.world.level.material.Fluid fluid = (net.minecraft.world.level.material.Fluid)
+                                first.getClass().getMethod("getFluid").invoke(first);
+                        ResourceLocation id = fluid != null ? ForgeRegistries.FLUIDS.getKey(fluid) : null;
+                        long amount = 1;
+                        try {
+                            amount = ((Number) first.getClass().getMethod("getAmount").invoke(first)).longValue();
+                        } catch (Throwable ignored) {}
+                        String name = "";
+                        try {
+                            name = ((net.minecraft.network.chat.Component) first.getClass().getMethod("getDisplayName").invoke(first)).getString();
+                        } catch (Throwable ignored) {}
+                        if (name.isEmpty() && id != null) {
+                            name = formatFallbackName(id);
+                        }
+                        if (id != null) {
+                            is = IngredientStack.fluid(id, name, amount, (float) chance);
+                            for (int i = 1; i < ldArray.length; i++) {
+                                Object alt = ldArray[i];
+                                if (alt == null) continue;
+                                try {
+                                    net.minecraft.world.level.material.Fluid altFluid = (net.minecraft.world.level.material.Fluid)
+                                            alt.getClass().getMethod("getFluid").invoke(alt);
+                                    ResourceLocation altId = altFluid != null ? ForgeRegistries.FLUIDS.getKey(altFluid) : null;
+                                    if (altId != null && !is.getAlternatives().contains(altId)) {
+                                        is.getAlternatives().add(altId);
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                        }
                     }
                 } catch (Throwable ignored) {}
             } else if (inner instanceof IngredientStack existing) {

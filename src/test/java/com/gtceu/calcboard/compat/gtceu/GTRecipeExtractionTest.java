@@ -440,6 +440,79 @@ public class GTRecipeExtractionTest {
         Assertions.assertEquals(1000.0, in.getAmount(), 1e-6);
     }
 
+    public static class MockLdlibFluidStack {
+        private final net.minecraft.world.level.material.Fluid fluid;
+        private final long amount;
+
+        public MockLdlibFluidStack(net.minecraft.world.level.material.Fluid fluid, long amount) {
+            this.fluid = fluid;
+            this.amount = amount;
+        }
+
+        public net.minecraft.world.level.material.Fluid getFluid() {
+            return fluid;
+        }
+
+        public long getAmount() {
+            return amount;
+        }
+
+        public Object getDisplayName() {
+            throw new IllegalStateException("headless");
+        }
+    }
+
+    public static class MockLdlibFluidIngredient {
+        public Object[] getStacks() {
+            return new Object[]{
+                    new MockLdlibFluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000),
+                    new MockLdlibFluidStack(net.minecraft.world.level.material.Fluids.LAVA, 1000)
+            };
+        }
+    }
+
+    public static class MockGT14MixedOutputRecipe {
+        public int duration = 720;
+        public Map<String, List<Object>> inputs = new HashMap<>();
+        public Map<String, List<Object>> outputs = new HashMap<>();
+
+        public static class ContentHolder {
+            public Object content;
+            public int chance = 10000;
+            public int maxChance = 10000;
+            public int tierChanceBoost = 0;
+
+            public ContentHolder(Object content) {
+                this.content = content;
+            }
+        }
+
+        public MockGT14MixedOutputRecipe() {
+            inputs.put("gtceu:fluid", List.of(new ContentHolder(new MockLdlibFluidIngredient())));
+            outputs.put("gtceu:item", List.of(new ContentHolder(
+                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_NUGGET, 3))));
+            outputs.put("gtceu:fluid", List.of(new ContentHolder(new MockLdlibFluidIngredient())));
+        }
+    }
+
+    @Test
+    public void testLDLibFluidIngredientOutputsAreExtracted() {
+        MockGT14MixedOutputRecipe recipe = new MockGT14MixedOutputRecipe();
+
+        List<IngredientStack> outs = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
+        Assertions.assertEquals(2, outs.size(), "item and ldlib fluid outputs must both be extracted");
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:iron_nugget"), outs.get(0).getId());
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:water"), outs.get(1).getId());
+        Assertions.assertTrue(outs.get(1).isFluid());
+        Assertions.assertEquals(1000.0, outs.get(1).getAmount(), 1e-6);
+        Assertions.assertTrue(outs.get(1).hasAlternatives());
+        Assertions.assertTrue(outs.get(1).getAlternatives().contains(net.minecraft.resources.ResourceLocation.tryParse("minecraft:lava")));
+
+        List<IngredientStack> ins = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
+        Assertions.assertEquals(1, ins.size());
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:water"), ins.get(0).getId());
+    }
+
     @Test
     public void testExtractMultipleOutputsSameItemDifferentChances() {
         MockMultipleOutputGTRecipe recipe = new MockMultipleOutputGTRecipe();

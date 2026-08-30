@@ -93,6 +93,10 @@ public class JeiRecipeIntegrationTest {
             } else if (recipe instanceof GTRecipeExtractionTest.GTRecipeWrapperFixture) {
                 builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_INGOT, 1));
                 builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_NUGGET, 1));
+            } else if (recipe instanceof GTRecipeExtractionTest.StructuralGTRecipeFixture) {
+                builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_INGOT, 4));
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_NUGGET, 2));
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addFluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000);
             }
         }
 
@@ -239,6 +243,30 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertEquals(GTVoltageTier.ZPM, node.getRecipeTier());
         Assertions.assertEquals(1, node.getInputs().size());
         Assertions.assertEquals(1, node.getOutputs().size());
+    }
+
+    @Test
+    public void testGTRecipeWithNonFirstFluidOutputIsSearchableByFluid() {
+        GTRecipeExtractionTest.StructuralGTRecipeFixture recipe = new GTRecipeExtractionTest.StructuralGTRecipeFixture();
+        recipe.duration = 100;
+        recipe.outputs.put("gtceu:item", List.of(new GTRecipeExtractionTest.MockMultipleOutputGTRecipe.MockContent(
+                new ItemStack(Items.IRON_NUGGET, 2), 10000, 0)));
+        recipe.outputs.put("gtceu:fluid", List.of(new GTRecipeExtractionTest.MockMultipleOutputGTRecipe.MockContent(
+                new GTRecipeExtractionTest.MockFluidTagInputGTRecipe.MockFluidIngredient(
+                        new FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000)), 10000, 0)));
+
+        RecipeType<GTRecipeExtractionTest.StructuralGTRecipeFixture> recipeType = RecipeType.create(
+                "gtceu", "electrolyzer", GTRecipeExtractionTest.StructuralGTRecipeFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.StructuralGTRecipeFixture> category = new MockRecipeCategory<>(recipeType, "Electrolyzer");
+
+        RecipeSearchEngine.SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndex(category, recipe, null);
+
+        Assertions.assertNotNull(sr);
+        Assertions.assertTrue(sr.hasExactOutput(ResourceLocation.tryParse("minecraft:iron_nugget")),
+                "item output must be indexed");
+        Assertions.assertTrue(sr.hasExactOutput(ResourceLocation.tryParse("minecraft:water")),
+                "non-first fluid output must be indexed for reverse producer search");
+        Assertions.assertTrue(sr.outputSearchIndex().contains("minecraft:water"));
     }
 
     @Test
