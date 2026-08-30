@@ -99,96 +99,27 @@ public class ThermalModAdapter implements IModAdapter {
 
     @Override
     public boolean canInstallAddon(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return false;
-        if (!isAddonCompatible(node, addon)) return false;
-        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
-        if (isKit) {
-            boolean sameKitInstalled = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
-            return !sameKitInstalled;
-        }
-        // General augments limited to 3 slots
-        long nonKitCount = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
-        return nonKitCount < 3;
+        return ThermalAugmentHelper.canInstallThermalAddon(node, addon, this::isAddonCompatible);
     }
 
     @Override
     public void onAddonInstalled(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return;
-        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
-        if (isKit) {
-            node.getAddons().removeIf(a -> (a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || a.getParallelMultiplier() > 1);
-        }
-        node.getAddons().add(addon);
+        ThermalAugmentHelper.onThermalAddonInstalled(node, addon);
     }
 
     @Override
     public void handleInstallAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
-        if (node == null || addon == null) return;
-        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
-        if (isKit) {
-            onAddonInstalled(node, addon.copy());
-        } else {
-            long nonKitCount = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
-            if (shiftClick) {
-                int toAdd = (int) (3 - nonKitCount);
-                for (int k = 0; k < toAdd; k++) {
-                    onAddonInstalled(node, addon.copy());
-                }
-            } else {
-                if (nonKitCount < 3) {
-                    onAddonInstalled(node, addon.copy());
-                }
-            }
-        }
+        ThermalAugmentHelper.handleInstallThermalAddon(node, addon, shiftClick);
     }
 
     @Override
     public void handleUninstallAddon(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return;
-        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
-        if (isKit) {
-            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()) || (a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || a.getParallelMultiplier() > 1);
-            onAddonRemoved(node, addon);
-        } else {
-            node.removeSingleAddon(addon.getId());
-        }
+        ThermalAugmentHelper.handleUninstallThermalAddon(node, addon, this::onAddonRemoved);
     }
 
     @Override
     public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
-        if (addon == null || tooltip == null) return;
-        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
-        if (isKit) {
-            tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.addon.thermal.upgrade_desc", addon.getParallelMultiplier())));
-            if (isActiveAddon) {
-                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
-            } else {
-                boolean isInst = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
-                if (isInst) {
-                    tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
-                } else {
-                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install_kit")));
-                }
-            }
-        } else {
-            long totalRegAugs = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
-            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
-
-            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
-            if (targetCount > 0) {
-                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
-                if (totalRegAugs < 3) {
-                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
-                }
-                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
-            } else {
-                if (totalRegAugs < 3) {
-                    tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install")));
-                } else {
-                    tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
-                }
-            }
-        }
+        ThermalAugmentHelper.buildThermalAddonTooltip(node, addon, isActiveAddon, tooltip);
     }
 
     @Override
@@ -264,10 +195,20 @@ public class ThermalModAdapter implements IModAdapter {
     @Override
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
         if (node == null) return "";
+        if (node.getEnergyType() == EnergyType.HEAT_OR_SELF) {
+            if (node.getEfficiency() < 0.999) {
+                return String.format(java.util.Locale.ROOT, "§e♨%.0f%%", node.getEfficiency() * 100.0);
+            }
+            return "§6♨";
+        }
         double rfRate = node.getEffectiveTotalEUt();
-        return node.isGenerator()
+        String rfStr = node.isGenerator()
                 ? String.format(java.util.Locale.ROOT, "§a+%,.0f RF/t", rfRate)
                 : String.format(java.util.Locale.ROOT, "§e%,.0f RF/t", rfRate);
+        if (node.getEfficiency() < 0.999) {
+            return String.format(java.util.Locale.ROOT, "§e⚡%.0f%% %s", node.getEfficiency() * 100.0, rfStr);
+        }
+        return rfStr;
     }
 
     @Override

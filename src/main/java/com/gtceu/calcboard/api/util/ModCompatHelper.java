@@ -27,6 +27,10 @@ public class ModCompatHelper {
         return isModLoaded("thermal") || isModLoaded("thermal_expansion") || isModLoaded("thermal_foundation");
     }
 
+    public static boolean isSysteamsLoaded() {
+        return isModLoaded("systeams");
+    }
+
     public static boolean isCreateLoaded() {
         return isModLoaded("create");
     }
@@ -117,10 +121,10 @@ public class ModCompatHelper {
             if (list != null) {
                 return list.isLoaded(modId);
             }
-            // In JUnit headless test environment without Forge ModList, return true by default
             return true;
         } catch (Throwable t) {
-            return false;
+            // In JUnit headless test environment without Forge ModList initialized, return true by default
+            return true;
         }
     }
 }

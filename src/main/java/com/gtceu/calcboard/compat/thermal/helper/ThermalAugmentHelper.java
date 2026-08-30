@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
 /**
  * Helper class for parsing Thermal Series and KubeJS augments via deterministic NBT data and runtime reflection.
@@ -438,6 +439,105 @@ public class ThermalAugmentHelper {
         } catch (Throwable ignored) {}
 
         return 20.0;
+    }
+
+    public static boolean isThermalUpgradeKit(MachineAddon addon) {
+        if (addon == null) return false;
+        if (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) return true;
+        if (addon.isUpgradeTierKit()) return true;
+        if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
+            if (addon.getParallelMultiplier() > 1) return true;
+            if (addon.getId() != null) {
+                String lid = addon.getId().toLowerCase(java.util.Locale.ROOT);
+                if (lid.contains("upgrade_kit") || lid.contains("tier_kit")) return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean canInstallThermalAddon(RecipeNode node, MachineAddon addon, java.util.function.BiPredicate<RecipeNode, MachineAddon> compatibilityChecker) {
+        if (node == null || addon == null) return false;
+        if (compatibilityChecker != null && !compatibilityChecker.test(node, addon)) return false;
+        if (isThermalUpgradeKit(addon)) {
+            boolean sameKitInstalled = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+            return !sameKitInstalled;
+        }
+        long nonKitCount = node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count();
+        return nonKitCount < 3;
+    }
+
+    public static void onThermalAddonInstalled(RecipeNode node, MachineAddon addon) {
+        if (node == null || addon == null) return;
+        if (isThermalUpgradeKit(addon)) {
+            node.getAddons().removeIf(ThermalAugmentHelper::isThermalUpgradeKit);
+        }
+        node.getAddons().add(addon);
+    }
+
+    public static void handleInstallThermalAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
+        if (node == null || addon == null) return;
+        if (isThermalUpgradeKit(addon)) {
+            onThermalAddonInstalled(node, addon.copy());
+        } else {
+            long nonKitCount = node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count();
+            if (shiftClick) {
+                int toAdd = (int) (3 - nonKitCount);
+                for (int k = 0; k < toAdd; k++) {
+                    onThermalAddonInstalled(node, addon.copy());
+                }
+            } else {
+                if (nonKitCount < 3) {
+                    onThermalAddonInstalled(node, addon.copy());
+                }
+            }
+        }
+    }
+
+    public static void handleUninstallThermalAddon(RecipeNode node, MachineAddon addon, java.util.function.BiConsumer<RecipeNode, MachineAddon> onRemovedCallback) {
+        if (node == null || addon == null) return;
+        if (isThermalUpgradeKit(addon)) {
+            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()) || isThermalUpgradeKit(a));
+            if (onRemovedCallback != null) {
+                onRemovedCallback.accept(node, addon);
+            }
+        } else {
+            node.removeSingleAddon(addon.getId());
+        }
+    }
+
+    public static void buildThermalAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<net.minecraft.network.chat.Component> tooltip) {
+        if (addon == null || tooltip == null) return;
+        if (isThermalUpgradeKit(addon)) {
+            tooltip.add(net.minecraft.network.chat.Component.literal("§6").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.upgrade_desc", addon.getParallelMultiplier())));
+            if (isActiveAddon) {
+                tooltip.add(net.minecraft.network.chat.Component.literal("§c").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
+            } else {
+                boolean isInst = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+                if (isInst) {
+                    tooltip.add(net.minecraft.network.chat.Component.literal("§c").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
+                } else {
+                    tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.install_kit")));
+                }
+            }
+        } else {
+            long totalRegAugs = node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count();
+            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+
+            tooltip.add(net.minecraft.network.chat.Component.literal("§7").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
+            if (targetCount > 0) {
+                tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
+                if (totalRegAugs < 3) {
+                    tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
+                }
+                tooltip.add(net.minecraft.network.chat.Component.literal("§c").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
+            } else {
+                if (totalRegAugs < 3) {
+                    tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.install")));
+                } else {
+                    tooltip.add(net.minecraft.network.chat.Component.literal("§e").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
+                }
+            }
+        }
     }
 }
 

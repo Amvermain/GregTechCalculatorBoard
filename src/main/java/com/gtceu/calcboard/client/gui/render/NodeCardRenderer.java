@@ -288,8 +288,6 @@ public class NodeCardRenderer {
         String powerStr;
         if (node.getEnergyType() == EnergyType.NONE) {
             powerStr = Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
-        } else if (node.getEnergyType() == EnergyType.HEAT_OR_SELF) {
-            powerStr = "§6♨";
         } else if (!isOperational) {
             GTVoltageTier tier = node.getTargetTier();
             String tierName = tier != null ? tier.getName() : "LV";
@@ -351,7 +349,7 @@ public class NodeCardRenderer {
 
                 IngredientRenderer.render(graphics, in, x + 12, rowY - 1);
                 if (in.hasAlternatives()) {
-                    graphics.drawString(font, "§e⟲", x + 21, rowY + 6, 0xFFFFFFFF, true);
+                    renderAlternativeBadge(graphics, font, x + 12, rowY - 1);
                 }
 
                 String rateStr;
@@ -576,7 +574,7 @@ public class NodeCardRenderer {
 
                 IngredientRenderer.render(graphics, in, x + cardW - 28, rowY - 1);
                 if (in.hasAlternatives()) {
-                    graphics.drawString(font, "§e⟲", x + cardW - 19, rowY + 6, 0xFFFFFFFF, true);
+                    renderAlternativeBadge(graphics, font, x + cardW - 28, rowY - 1);
                 }
             }
         }
@@ -587,6 +585,17 @@ public class NodeCardRenderer {
         boolean handleHover = widget.isResizeHandleHovered(mouseX, mouseY);
         int handleColor = handleHover ? 0xFF55FFFF : 0x88657595;
         graphics.drawString(font, "⤡", handleX - 2, handleY - 3, handleColor, false);
+    }
+
+    public static void renderAlternativeBadge(GuiGraphics graphics, Font font, int itemX, int itemY) {
+        int bx = itemX + 8;
+        int by = itemY + 8;
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 200);
+        graphics.fill(bx, by, bx + 9, by + 9, 0xF00D1626);
+        graphics.renderOutline(bx, by, 9, 9, 0xFFFFD700);
+        graphics.drawString(font, "§e⟲", bx + 2, by, 0xFFFFFFFF, false);
+        graphics.pose().popPose();
     }
 
     public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my) {

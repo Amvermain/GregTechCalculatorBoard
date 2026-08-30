@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 public class SummaryOverlay {
-    public static final int WIDTH = 220;
+    public static final int WIDTH = 240;
     private boolean collapsed = false;
     private double scrollY = 0;
     private double maxScrollY = 0;
@@ -92,17 +92,25 @@ public class SummaryOverlay {
         // EU Power Line
         boolean showEU = Math.abs(summary.totalEUt()) > 0.001 || (summary.totalSU() == 0 && summary.totalFE() == 0);
         int powerY = curHeaderY;
+        int powerH = 13;
         if (showEU) {
-            String pLabel = "§e" + Component.translatable("gui.gtcalcboard.total_power").getString();
+            boolean isGen = summary.totalEUt() < -0.001;
+            String pLabel = (isGen ? "§a" : "§e") + Component.translatable(isGen ? "gui.gtcalcboard.total_gen" : "gui.gtcalcboard.total_power").getString();
             String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
             int pLabelW = font.width(pLabel) + 6;
-            int maxPowerW = Math.max(10, (x + WIDTH - 8) - (x + 8 + pLabelW));
-            if (font.width(eutStr) > maxPowerW) {
-                eutStr = font.plainSubstrByWidth(eutStr, maxPowerW - 6) + "..";
+            int eutW = font.width(eutStr);
+            if (pLabelW + eutW <= WIDTH - 16) {
+                graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
+                graphics.drawString(font, eutStr, x + WIDTH - 8 - eutW, curHeaderY, 0xFFFFFFFF, false);
+                curHeaderY += 13;
+                powerH = 13;
+            } else {
+                graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
+                curHeaderY += 11;
+                graphics.drawString(font, "  " + eutStr, x + 8, curHeaderY, 0xFFFFFFFF, false);
+                curHeaderY += 13;
+                powerH = 24;
             }
-            graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
-            graphics.drawString(font, eutStr, x + 8 + pLabelW, curHeaderY, 0xFFFFFFFF, false);
-            curHeaderY += 13;
         }
 
         // Kinetic Stress (SU) Line
@@ -139,7 +147,7 @@ public class SummaryOverlay {
         graphics.drawString(font, mCountStr, x + 8 + mLabelW, machinesY, 0xFFFFFFFF, false);
 
         hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
-        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12;
+        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + powerH;
         hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
         hoveredFusion = showFusion && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= fusionY - 2 && mouseY <= fusionY + 12;
 
@@ -347,8 +355,7 @@ public class SummaryOverlay {
         }
 
         // Total Power line click -> cycle power display mode (EU/t <-> Amps <-> Both)
-        int powerY = y + 26;
-        if (mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + 12 && button == 0) {
+        if (hoveredPower && button == 0) {
             var newMode = BoardManager.getInstance().cyclePowerDisplayMode();
             Minecraft mc = Minecraft.getInstance();
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));

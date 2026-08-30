@@ -503,52 +503,67 @@ public class ToolbarWidget {
                     if (from == to) continue;
                     for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
                         var in = to.getInputs().get(inIdx);
-                        if (out.equals(in) || in.matchesOrAlternative(out)) {
-                            ResourceLocation itemKey = out.getId() != null ? out.getId() : in.getId();
-                            if (allowedItemIds != null && (itemKey == null || !allowedItemIds.contains(itemKey))) {
+
+                        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
+                        if (inputAlreadyFed) {
+                            if (!out.equals(in) && !Objects.equals(out.getId(), in.getId())) {
                                 continue;
                             }
-
-                            // Check if a path already exists (directly or via intermediate reroute junctions)
-                            if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+                        } else {
+                            if (!out.equals(in) && !in.matchesOrAlternative(out)) {
                                 continue;
                             }
+                        }
 
-                            // If this output is already routed to a junction hub, do not create direct bypass wires to normal nodes
-                            if (fromFeedsReroute && !to.isReroute()) {
-                                continue;
-                            }
+                        ResourceLocation itemKey = out.getId() != null ? out.getId() : in.getId();
+                        if (allowedItemIds != null && (itemKey == null || !allowedItemIds.contains(itemKey))) {
+                            continue;
+                        }
 
-                            // If target input is already fed by a reroute junction, route into that junction instead of bypassing it
-                            RecipeNode targetNode = to;
-                            int targetInIdx = inIdx;
-                            if (!from.isReroute() && !to.isReroute()) {
-                                RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
-                                if (feedingReroute != null) {
-                                    targetNode = feedingReroute;
-                                    targetInIdx = 0;
-                                    if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
-                                        continue;
-                                    }
+                        // Check if a path already exists (directly or via intermediate reroute junctions)
+                        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+                            continue;
+                        }
+
+                        // If this output is already routed to a junction hub, do not create direct bypass wires to normal nodes
+                        if (fromFeedsReroute && !to.isReroute()) {
+                            continue;
+                        }
+
+                        // Prevent creating cyclic dependencies
+                        if (isReachable(graph, to.getId(), from.getId())) {
+                            continue;
+                        }
+
+                        // If target input is already fed by a reroute junction, route into that junction instead of bypassing it
+                        RecipeNode targetNode = to;
+                        int targetInIdx = inIdx;
+                        if (!from.isReroute() && !to.isReroute()) {
+                            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+                            if (feedingReroute != null) {
+                                targetNode = feedingReroute;
+                                targetInIdx = 0;
+                                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                                    continue;
                                 }
                             }
+                        }
 
-                            if (!out.equals(in) && in.hasAlternatives() && subCommands != null) {
-                                ResourceLocation oldAlt = in.getId();
-                                in.selectAlternative(out.getId());
-                                ResourceLocation newAlt = in.getId();
-                                if (!Objects.equals(oldAlt, newAlt)) {
-                                    subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
-                                        to.getId(), inIdx, true, oldAlt, newAlt
-                                    ));
-                                }
+                        if (!inputAlreadyFed && !out.equals(in) && in.hasAlternatives() && subCommands != null) {
+                            ResourceLocation oldAlt = in.getId();
+                            in.selectAlternative(out.getId());
+                            ResourceLocation newAlt = in.getId();
+                            if (!Objects.equals(oldAlt, newAlt)) {
+                                subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
+                                    to.getId(), inIdx, true, oldAlt, newAlt
+                                ));
                             }
+                        }
 
-                            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                            if (!graph.getConnections().contains(edge)) {
-                                graph.addConnection(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                                addedEdges.add(edge);
-                            }
+                        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+                        if (!graph.getConnections().contains(edge)) {
+                            graph.addConnection(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+                            addedEdges.add(edge);
                         }
                     }
                 }
@@ -617,6 +632,38 @@ public class ToolbarWidget {
             }
         }
         return null;
+    }
+
+    private static boolean isInputPortFed(FlowGraph graph, String toNodeId, int inIdx) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isReachable(FlowGraph graph, String startNodeId, String targetNodeId) {
+        if (startNodeId.equals(targetNodeId)) return true;
+        Set<String> visited = new HashSet<>();
+        Queue<String> queue = new ArrayDeque<>();
+        queue.add(startNodeId);
+        visited.add(startNodeId);
+
+        while (!queue.isEmpty()) {
+            String curr = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (edge.fromNodeId().equals(curr)) {
+                    if (edge.toNodeId().equals(targetNodeId)) {
+                        return true;
+                    }
+                    if (visited.add(edge.toNodeId())) {
+                        queue.add(edge.toNodeId());
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public void performAutoRatio() {

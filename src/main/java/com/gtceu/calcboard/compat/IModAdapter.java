@@ -156,8 +156,9 @@ public interface IModAdapter {
             addon.getCategory() == MachineAddon.Category.REFLECTOR ||
             addon.getCategory() == MachineAddon.Category.PARALLEL ||
             addon.getCategory() == MachineAddon.Category.MAINTENANCE ||
-            addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-            node.getAddons().removeIf(a -> a.getCategory() == addon.getCategory() || a.getId().equals(addon.getId()));
+            addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT ||
+            addon.isThermalUpgradeKit()) {
+            node.getAddons().removeIf(a -> a.getCategory() == addon.getCategory() || (addon.isThermalUpgradeKit() && a.isThermalUpgradeKit()) || a.getId().equals(addon.getId()));
         } else if (addon.getCategory() != MachineAddon.Category.ENERGY_HATCH &&
                    addon.getCategory() != MachineAddon.Category.THERMAL_AUGMENT &&
                    !addon.getCategory().equals(AddonCategory.MAGNET)) {
@@ -600,7 +601,9 @@ public interface IModAdapter {
             return net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
         }
         if (node.getEnergyType() == EnergyType.HEAT_OR_SELF) {
-            return "§6♨";
+            return (node.getEfficiency() < 0.999)
+                    ? String.format(java.util.Locale.ROOT, "§e♨%.0f%%", node.getEfficiency() * 100.0)
+                    : "§6♨";
         }
         String eutStr = displayMode.formatNodePower(node);
         return (node.getEfficiency() < 0.999)

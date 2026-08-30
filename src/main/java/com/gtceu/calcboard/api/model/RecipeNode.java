@@ -242,6 +242,9 @@ public class RecipeNode {
                 setMachineIcon(ws);
             }
         }
+        if (isTurbine()) {
+            autoCalculateTurbineParallel();
+        }
     }
 
     public ResourceLocation getWorkstationForTier(GTVoltageTier tier) {
@@ -639,35 +642,15 @@ public class RecipeNode {
     }
 
     public boolean isFusion() {
-        if (getEuToStart() > 0 || getRequiredReflectorTier() > 0) return true;
-        if (recipeCategoryId != null && recipeCategoryId.getPath().contains("fusion")) return true;
-        return machineIcon != null && machineIcon.getPath().contains("fusion");
+        return ModAdapterRegistry.getAdapterForNode(this).isFusion(this);
     }
 
     public int getFusionTier() {
-        long startEU = getEuToStart();
-        if (startEU > 0) {
-            if (startEU <= 160_000_000L) return 1;
-            if (startEU <= 320_000_000L) return 2;
-            if (startEU <= 640_000_000L) return 3;
-            return 4;
-        }
-        if (machineIcon != null) {
-            String path = machineIcon.getPath().toLowerCase(java.util.Locale.ROOT);
-            if (path.contains("mk2") || path.contains("zpm") || path.contains("_ii") || path.endsWith("_2")) return 2;
-            if (path.contains("mk3") || path.contains("uv") || path.contains("_iii") || path.endsWith("_3")) return 3;
-            if (path.contains("mk4") || path.contains("uev") || path.contains("_iv") || path.endsWith("_4")) return 4;
-            if (path.contains("mk5") || path.contains("uxv") || path.contains("_v") || path.endsWith("_5")) return 5;
-        }
-        return 1;
+        return ModAdapterRegistry.getAdapterForNode(this).getFusionTier(this);
     }
 
     public GTVoltageTier getMinFusionVoltageTier() {
-        int fTier = getFusionTier();
-        return fTier == 1 ? GTVoltageTier.LuV
-                : (fTier == 2 ? GTVoltageTier.ZPM
-                : (fTier == 3 ? GTVoltageTier.UV
-                : (fTier == 4 ? GTVoltageTier.UEV : GTVoltageTier.UXV)));
+        return ModAdapterRegistry.getAdapterForNode(this).getMinFusionVoltageTier(this);
     }
 
     public NodeThreadingConfig getThreadingConfig() {

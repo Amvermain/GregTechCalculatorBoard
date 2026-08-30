@@ -108,34 +108,47 @@ public class AutoConnectFilterDialog {
                     if (from == to) continue;
                     for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
                         IngredientStack in = to.getInputs().get(inIdx);
-                        if (out.equals(in) || in.matchesOrAlternative(out)) {
-                            if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+
+                        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
+                        if (inputAlreadyFed) {
+                            if (!out.equals(in) && !Objects.equals(out.getId(), in.getId())) {
                                 continue;
                             }
-                            if (fromFeedsReroute && !to.isReroute()) {
+                        } else {
+                            if (!out.equals(in) && !in.matchesOrAlternative(out)) {
                                 continue;
                             }
+                        }
 
-                            RecipeNode targetNode = to;
-                            int targetInIdx = inIdx;
-                            if (!from.isReroute() && !to.isReroute()) {
-                                RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
-                                if (feedingReroute != null) {
-                                    targetNode = feedingReroute;
-                                    targetInIdx = 0;
-                                    if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
-                                        continue;
-                                    }
+                        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+                            continue;
+                        }
+                        if (fromFeedsReroute && !to.isReroute()) {
+                            continue;
+                        }
+                        if (isReachable(graph, to.getId(), from.getId())) {
+                            continue;
+                        }
+
+                        RecipeNode targetNode = to;
+                        int targetInIdx = inIdx;
+                        if (!from.isReroute() && !to.isReroute()) {
+                            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+                            if (feedingReroute != null) {
+                                targetNode = feedingReroute;
+                                targetInIdx = 0;
+                                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                                    continue;
                                 }
                             }
+                        }
 
-                            FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                            if (!graph.getConnections().contains(edge)) {
-                                ResourceLocation key = out.getId() != null ? out.getId() : in.getId();
-                                if (key != null) {
-                                    sampleStacks.putIfAbsent(key, out.copy());
-                                    wireCounts.put(key, wireCounts.getOrDefault(key, 0) + 1);
-                                }
+                        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+                        if (!graph.getConnections().contains(edge)) {
+                            ResourceLocation key = out.getId() != null ? out.getId() : in.getId();
+                            if (key != null) {
+                                sampleStacks.putIfAbsent(key, out.copy());
+                                wireCounts.put(key, wireCounts.getOrDefault(key, 0) + 1);
                             }
                         }
                     }
@@ -221,6 +234,38 @@ public class AutoConnectFilterDialog {
             }
         }
         return null;
+    }
+
+    private static boolean isInputPortFed(FlowGraph graph, String toNodeId, int inIdx) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isReachable(FlowGraph graph, String startNodeId, String targetNodeId) {
+        if (startNodeId.equals(targetNodeId)) return true;
+        Set<String> visited = new HashSet<>();
+        Queue<String> queue = new ArrayDeque<>();
+        queue.add(startNodeId);
+        visited.add(startNodeId);
+
+        while (!queue.isEmpty()) {
+            String curr = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (edge.fromNodeId().equals(curr)) {
+                    if (edge.toNodeId().equals(targetNodeId)) {
+                        return true;
+                    }
+                    if (visited.add(edge.toNodeId())) {
+                        queue.add(edge.toNodeId());
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {

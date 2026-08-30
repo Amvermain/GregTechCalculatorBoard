@@ -102,6 +102,17 @@ public final class RecipeSearchCacheManager {
         }
     }
 
+    public static void setGlobalRecipesForTesting(List<SearchableRecipe> recipes) {
+        synchronized (GLOBAL_RECIPES) {
+            GLOBAL_RECIPES.clear();
+            if (recipes != null) {
+                GLOBAL_RECIPES.addAll(recipes);
+            }
+            GLOBAL_CACHED = true;
+            GLOBAL_VERSION++;
+        }
+    }
+
     public static RecipeLoadingProgress getCachingProgress() {
         return CACHING_PROGRESS;
     }

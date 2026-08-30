@@ -144,7 +144,7 @@ public class GTCEuModAdapter implements IModAdapter {
         if (node.isCreateMachine()) return false;
         if (com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node)) return false;
         if (node.getEnergyTypeOverride() == EnergyType.KINETIC_SU) return false;
-        if (node.isFusion()) return true;
+        if (GTFusionHelper.isFusion(node)) return true;
         if (node.getRecipeCategoryId() != null && VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId())) {
             return true;
         }
@@ -335,9 +335,7 @@ public class GTCEuModAdapter implements IModAdapter {
             list.add(stdRotor);
         }
 
-        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0
-                || (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion"))
-                || (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("fusion"));
+        boolean isFusion = GTFusionHelper.isFusion(node);
 
         if (isFusion) {
             GTReflectorAddon noRefl = new GTReflectorAddon("gtceu:reflector_none",

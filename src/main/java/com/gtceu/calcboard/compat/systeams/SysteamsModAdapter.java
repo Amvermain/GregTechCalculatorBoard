@@ -90,6 +90,31 @@ public class SysteamsModAdapter implements IModAdapter {
     }
 
     @Override
+    public boolean canInstallAddon(RecipeNode node, MachineAddon addon) {
+        return ThermalAugmentHelper.canInstallThermalAddon(node, addon, this::isAddonCompatible);
+    }
+
+    @Override
+    public void onAddonInstalled(RecipeNode node, MachineAddon addon) {
+        ThermalAugmentHelper.onThermalAddonInstalled(node, addon);
+    }
+
+    @Override
+    public void handleInstallAddon(RecipeNode node, MachineAddon addon, boolean shiftClick) {
+        ThermalAugmentHelper.handleInstallThermalAddon(node, addon, shiftClick);
+    }
+
+    @Override
+    public void handleUninstallAddon(RecipeNode node, MachineAddon addon) {
+        ThermalAugmentHelper.handleUninstallThermalAddon(node, addon, this::onAddonRemoved);
+    }
+
+    @Override
+    public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
+        ThermalAugmentHelper.buildThermalAddonTooltip(node, addon, isActiveAddon, tooltip);
+    }
+
+    @Override
     public void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
         // Systeams uses Thermal Augments
     }
@@ -168,9 +193,16 @@ public class SysteamsModAdapter implements IModAdapter {
         if (node == null) return "";
         if (node.isGenerator() || node.getEnergyType() == EnergyType.ELECTRIC_FE) {
             double rfRate = node.getEffectiveTotalEUt();
-            return node.isGenerator()
+            String rfStr = node.isGenerator()
                     ? String.format(java.util.Locale.ROOT, "§a+%,.0f RF/t", rfRate)
                     : String.format(java.util.Locale.ROOT, "§e%,.0f RF/t", rfRate);
+            if (node.getEfficiency() < 0.999) {
+                return String.format(java.util.Locale.ROOT, "§e⚡%.0f%% %s", node.getEfficiency() * 100.0, rfStr);
+            }
+            return rfStr;
+        }
+        if (node.getEfficiency() < 0.999) {
+            return String.format(java.util.Locale.ROOT, "§e♨%.0f%%", node.getEfficiency() * 100.0);
         }
         double steamRate = 0.0;
         for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
@@ -181,7 +213,7 @@ public class SysteamsModAdapter implements IModAdapter {
         if (steamRate > 0) {
             return String.format(java.util.Locale.ROOT, "§b♨ +%,.1f/s Steam", steamRate);
         }
-        return "§b" + Component.translatable("gui.gtcalcboard.boiler_badge").getString();
+        return "§6♨";
     }
 
     @Override

@@ -45,6 +45,19 @@ public class ThermalModGuiHandler implements IModGuiHandler {
     }
 
     @Override
+    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int ctrlY = y + 20 + 6;
+        int row2Y = ctrlY + 18;
+        String badge = node.isGenerator()
+                ? Component.translatable("gui.gtcalcboard.dynamo_badge").getString()
+                : "⚡ Thermal";
+        int badgeW = Math.max(38, Minecraft.getInstance().font.width(badge) + 6);
+        return mouseX >= x + 6 && mouseX <= x + 6 + badgeW && mouseY >= row2Y && mouseY <= row2Y + 14;
+    }
+
+    @Override
     public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
@@ -60,6 +73,21 @@ public class ThermalModGuiHandler implements IModGuiHandler {
 
     @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+        if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
+            if (com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
+                widget.commitCountEdit();
+                com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.toggleDynamoBoilerMode(node);
+                widget.invalidateCache();
+                if (widget.getParent() != null) {
+                    widget.getParent().rebuildWidgets();
+                    widget.getParent().markSummaryDirty();
+                }
+                Minecraft.getInstance().getSoundManager().play(
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                );
+                return true;
+            }
+        }
         if (isMachineConfigHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             if (widget.getParent() != null) widget.getParent().openMachineConfigDialog(node);

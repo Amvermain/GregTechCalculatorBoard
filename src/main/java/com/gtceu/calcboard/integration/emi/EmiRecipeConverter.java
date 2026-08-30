@@ -16,7 +16,9 @@ import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
@@ -126,6 +128,15 @@ public class EmiRecipeConverter {
             node.setRecipeTemperature(details.backingRecipeTemp);
         }
 
+        if (details.energyType == EnergyType.ELECTRIC_FE || (catId != null && (catId.getNamespace().equals("thermal") || catId.getNamespace().equals("systeams")))) {
+            long energyRF = com.gtceu.calcboard.compat.thermal.ThermalModAdapter.extractEnergyRF(backing);
+            if (energyRF > 0) {
+                node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, (double) energyRF);
+            } else if (details.durationTicks > 0 && details.eut > 0) {
+                node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, details.durationTicks * details.eut);
+            }
+        }
+
         if (node.isFusion()) {
             GTVoltageTier minTier = node.getMinFusionVoltageTier();
             if (node.getTargetTier().ordinal() < minTier.ordinal()) {
@@ -159,6 +170,20 @@ public class EmiRecipeConverter {
             }
 
             if (primaryStack != null) {
+                try {
+                    if (primaryStack.isFluid() && primaryStack.getId() != null) {
+                        var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, primaryStack.getId());
+                        if (ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) {
+                            for (Fluid fluid : ForgeRegistries.FLUIDS.tags().getTag(tagKey)) {
+                                ResourceLocation fId = ForgeRegistries.FLUIDS.getKey(fluid);
+                                if (fId != null && !altIds.contains(fId)) {
+                                    altIds.add(fId);
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
                 primaryStack.setAlternatives(altIds);
                 node.addInput(primaryStack);
             }
@@ -389,21 +414,38 @@ public class EmiRecipeConverter {
         String displayName = stack.getName().getString();
 
         Object key = stack.getKey();
-        if (key instanceof Fluid fluid) {
+        if (key instanceof Fluid fluid && fluid != Fluids.EMPTY) {
             ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
             return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
         } else if (key != null && key.getClass().getName().contains("FluidStack")) {
             try {
                 Method getFluidMethod = key.getClass().getMethod("getFluid");
                 Object fl = getFluidMethod.invoke(key);
-                if (fl instanceof Fluid fluid) {
+                if (fl instanceof Fluid fluid && fluid != Fluids.EMPTY) {
                     ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
                     return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
                 }
             } catch (Throwable ignored) {}
             return IngredientStack.fluid(id, displayName, amount, chance);
-        } else if (id != null && ForgeRegistries.FLUIDS.containsKey(id)) {
-            return IngredientStack.fluid(id, displayName, amount, chance);
+        } else if (id != null) {
+            if (ForgeRegistries.FLUIDS.containsKey(id)) {
+                return IngredientStack.fluid(id, displayName, amount, chance);
+            }
+            try {
+                var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, id);
+                if (ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) {
+                    var it = ForgeRegistries.FLUIDS.tags().getTag(tagKey).iterator();
+                    if (it.hasNext()) {
+                        Fluid firstFluid = it.next();
+                        if (firstFluid != null && firstFluid != Fluids.EMPTY) {
+                            ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(firstFluid);
+                            return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
+                        }
+                    }
+                    return IngredientStack.fluid(id, displayName, amount, chance);
+                }
+            } catch (Throwable ignored) {}
+            return IngredientStack.item(id, displayName, amount, chance);
         } else {
             return IngredientStack.item(id, displayName, amount, chance);
         }

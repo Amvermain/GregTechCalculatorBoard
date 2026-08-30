@@ -157,8 +157,9 @@ public final class FlowBalanceMatrixSolver {
                             }
                         } else if (outEdge.inputIndex() < cNode.getInputs().size()) {
                             double cCount = countsMap != null ? countsMap.getOrDefault(cNode.getId(), cNode.getMachineCount()) : cNode.getMachineCount();
-                            double cCps = cNode.getOverclockResult().getCyclesPerSecond() * cNode.getTotalParallel() * cCount;
-                            double cReq = cNode.getInputs().get(outEdge.inputIndex()).getAmount() * cCps;
+                            IngredientStack inStack = cNode.getInputs().get(outEdge.inputIndex());
+                            double singleInRate = cNode.calculateSingleMachineInputRate(inStack);
+                            double cReq = singleInRate * cCount;
 
                             int inDegree = 0;
                             for (FlowGraph.ConnectionEdge iEdge : graph.getConnections()) {
@@ -379,6 +380,49 @@ public final class FlowBalanceMatrixSolver {
         anchor.setMachineCount(targetAnchorCount);
     }
 
+    public static double getEffectiveProducerOutputRate(FlowGraph graph, RecipeNode producer, int outputIndex, Map<String, Double> effMap) {
+        if (graph == null || producer == null || outputIndex < 0 || outputIndex >= producer.getOutputs().size()) return 0.0;
+        if (!producer.isReroute()) {
+            double prodEff = effMap != null ? effMap.getOrDefault(producer.getId(), producer.getEfficiency()) : producer.getEfficiency();
+            double prodNominalRate = producer.getOutputSlotRate(outputIndex, false);
+            return prodNominalRate * prodEff;
+        }
+
+        boolean hasIncoming = false;
+        double incomingSupply = 0.0;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (inEdge.toNodeId().equals(producer.getId()) && inEdge.inputIndex() == 0) {
+                hasIncoming = true;
+                RecipeNode upProducer = graph.findNodeById(inEdge.fromNodeId());
+                if (upProducer != null) {
+                    double upRate = getEffectiveProducerOutputRate(graph, upProducer, inEdge.outputIndex(), effMap);
+                    int upOutDegree = 0;
+                    for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+                        if (outEdge.fromNodeId().equals(upProducer.getId()) && outEdge.outputIndex() == inEdge.outputIndex()) {
+                            upOutDegree++;
+                        }
+                    }
+                    incomingSupply += upRate / Math.max(1, upOutDegree);
+                }
+            }
+        }
+
+        if (!hasIncoming) {
+            double totalPortDemand = 0.0;
+            for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+                if (outEdge.fromNodeId().equals(producer.getId()) && outEdge.outputIndex() == outputIndex) {
+                    RecipeNode c = graph.findNodeById(outEdge.toNodeId());
+                    if (c != null && outEdge.inputIndex() < c.getInputs().size()) {
+                        totalPortDemand += c.getInputSlotRate(outEdge.inputIndex(), false);
+                    }
+                }
+            }
+            return totalPortDemand;
+        }
+
+        return incomingSupply;
+    }
+
     /**
      * Computes the bottleneck-constrained operating efficiency for every node in the graph.
      */
@@ -417,9 +461,7 @@ public final class FlowBalanceMatrixSolver {
                     for (FlowGraph.ConnectionEdge edge : inEdges) {
                         RecipeNode producer = graph.findNodeById(edge.fromNodeId());
                         if (producer != null && edge.outputIndex() < producer.getOutputs().size()) {
-                            double prodEff = effMap.getOrDefault(producer.getId(), 1.0);
-                            double prodNominalRate = producer.getOutputSlotRate(edge.outputIndex(), false);
-                            double prodActualRate = prodNominalRate * prodEff;
+                            double prodActualRate = getEffectiveProducerOutputRate(graph, producer, edge.outputIndex(), effMap);
 
                             double totalPortDemand = 0.0;
                             for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
@@ -537,10 +579,15 @@ public final class FlowBalanceMatrixSolver {
         if (graph == null || producer == null || consumer == null) return 1.0;
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
-        IngredientStack outStack = producer.getOutputs().get(outPortIdx);
-        double prodEff = producer.getEfficiency();
-        double effFactor = (prodEff > 0.00001) ? prodEff : 1.0;
-        double producedRate = producer.calculateSingleMachineOutputRate(outStack) * producer.getMachineCount() * effFactor;
+        double producedRate;
+        if (producer.isReroute()) {
+            producedRate = getEffectiveProducerOutputRate(graph, producer, outPortIdx, null);
+        } else {
+            IngredientStack outStack = producer.getOutputs().get(outPortIdx);
+            double prodEff = producer.getEfficiency();
+            double effFactor = (prodEff > 0.00001) ? prodEff : 1.0;
+            producedRate = producer.calculateSingleMachineOutputRate(outStack) * producer.getMachineCount() * effFactor;
+        }
 
         IngredientStack inStack = consumer.getInputs().get(inPortIdx);
         double singleInRate = consumer.calculateSingleMachineInputRate(inStack);
@@ -552,9 +599,7 @@ public final class FlowBalanceMatrixSolver {
                 if (!edge.fromNodeId().equals(producer.getId())) {
                     RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
                     if (otherProd != null && edge.outputIndex() < otherProd.getOutputs().size()) {
-                        IngredientStack pOut = otherProd.getOutputs().get(edge.outputIndex());
-                        double oEff = (otherProd.getEfficiency() > 0.00001) ? otherProd.getEfficiency() : 1.0;
-                        double pRate = otherProd.calculateSingleMachineOutputRate(pOut) * otherProd.getMachineCount() * oEff;
+                        double pRate = getEffectiveProducerOutputRate(graph, otherProd, edge.outputIndex(), null);
 
                         int outDegree = 0;
                         for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
@@ -576,8 +621,13 @@ public final class FlowBalanceMatrixSolver {
         if (graph == null || producer == null || consumer == null) return 1.0;
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
-        IngredientStack inStack = consumer.getInputs().get(inPortIdx);
-        double totalDemand = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount();
+        double totalDemand;
+        if (consumer.isReroute()) {
+            totalDemand = calculateTotalConnectedPortDemand(graph, consumer, 0, null);
+        } else {
+            IngredientStack inStack = consumer.getInputs().get(inPortIdx);
+            totalDemand = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount();
+        }
 
         double existingSupply = 0.0;
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
@@ -585,9 +635,7 @@ public final class FlowBalanceMatrixSolver {
                 if (!edge.fromNodeId().equals(producer.getId())) {
                     RecipeNode otherProd = graph.findNodeById(edge.fromNodeId());
                     if (otherProd != null && edge.outputIndex() < otherProd.getOutputs().size()) {
-                        IngredientStack pOut = otherProd.getOutputs().get(edge.outputIndex());
-                        double oEff = (otherProd.getEfficiency() > 0.00001) ? otherProd.getEfficiency() : 1.0;
-                        double pRate = otherProd.calculateSingleMachineOutputRate(pOut) * otherProd.getMachineCount() * oEff;
+                        double pRate = getEffectiveProducerOutputRate(graph, otherProd, edge.outputIndex(), null);
 
                         int outDegree = 0;
                         for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {

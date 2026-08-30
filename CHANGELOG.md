@@ -4,7 +4,31 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
-All notable changes to **GregTech Calculator Board** will be documented in this file.
+## [2.0.0] - 2026-08-30
+
+### Added
+- **Systeams & Steam Boiler Multi-Mode Support (`SysteamsModAdapter`, `SysteamsRecipeHandler`, `SysteamsModGuiHandler`)**:
+  - Added seamless switching between Systeams Steam Boiler mode (steam generation) and Thermal Dynamo mode (RF generation) directly on machine cards.
+  - Implemented exact steam boiler thermodynamics and boiling physics calculations for water, distilled water, and alternative boiling fluids.
+- **Enhanced Thermal Series Augments & Upgrade Kits System (`ThermalAugmentHelper`, `ThermalModAdapter`, `ThermalModGuiHandler`)**:
+  - Distinctly separated tier upgrade kits (LV~EV, 1-kit limit with automatic replacement) and standard augments (up to 3 slots).
+  - Added Shift-click quick installation for multiple copies, clear slot capacity tooltips, and real-time RF/t power draw & cycle time scaling.
+- **Simplified Chinese (zh_cn) Localization**:
+  - Added full Simplified Chinese language support across all UI screens, dialogs, tooltips, and badges.
+
+### Changed & Improved
+- **Reroute Junction Flow Balancing & Supply Tracking (`FlowBalanceMatrixSolver`)**:
+  - Enhanced multi-input and multi-output reroute nodes to accurately track upstream producer operational efficiencies and downstream port demands, preventing flow bottlenecks and ratio calculation distortions.
+- **Fluid Tag Alternative Interpretations in Recipe Conversion (`EmiRecipeConverter`)**:
+  - Fluid input ports defined with fluid tags are now automatically expanded to discover and link all matching alternative fluid identifiers across installed mods.
+- **Canvas Interaction & Dialog Responsiveness**:
+  - Polished rendering and click handling for auto-connect filters, toolbars, summary overlays, and machine cards.
+
+### Fixed
+- **Thermal Dynamo Energy Extraction & Base RF Scaling**:
+  - Fixed an issue where certain Thermal and Systeams recipe categories failed to extract base recipe RF energy values, resulting in zero-duration or inaccurate throughput calculations.
+- **Thermal Augment Multiplier Duplication Glitch**:
+  - Fixed an issue where installing multiple identical augments could erroneously apply compounding multiplier calculations instead of linear additive scaling.
 
 ## [2.0.0-beta.1] - 2026-08-29
 

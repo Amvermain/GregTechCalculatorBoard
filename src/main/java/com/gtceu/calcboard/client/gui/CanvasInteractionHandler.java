@@ -18,6 +18,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
@@ -775,9 +776,40 @@ public class CanvasInteractionHandler {
         if (wireStartPortIdx < fromNode.getOutputs().size() && inPortIdx < toNode.getInputs().size()) {
             IngredientStack outStack = fromNode.getOutputs().get(wireStartPortIdx);
             IngredientStack inStack = toNode.getInputs().get(inPortIdx);
-            if (!outStack.equals(inStack) && inStack.matchesOrAlternative(outStack)) {
+            if (inStack.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(toNode)) {
+                var allFluids = com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.getAllBoilingFluidInputs();
+                inStack.setAlternatives(allFluids);
+            }
+            boolean matched = false;
+            if (outStack.getId().equals(inStack.getId())) {
+                matched = true;
+            } else if (inStack.getAlternatives() != null && inStack.getAlternatives().contains(outStack.getId())) {
                 inStack.selectAlternative(outStack.getId());
+                matched = true;
+            } else if (outStack.getAlternatives() != null && outStack.getAlternatives().contains(inStack.getId())) {
+                outStack.selectAlternative(inStack.getId());
+                matched = true;
+            } else if (inStack.getAlternatives() != null && outStack.getAlternatives() != null) {
+                for (ResourceLocation alt : inStack.getAlternatives()) {
+                    if (outStack.getAlternatives().contains(alt)) {
+                        inStack.selectAlternative(alt);
+                        outStack.selectAlternative(alt);
+                        matched = true;
+                        break;
+                    }
+                }
+            } else if (inStack.isFluid() && outStack.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(toNode)) {
+                inStack.addAlternative(outStack.getId());
+                inStack.selectAlternative(outStack.getId());
+                matched = true;
+            }
+
+            if (matched) {
+                if (inStack.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(toNode)) {
+                    com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(toNode, inStack.getId());
+                }
                 targetWidget.invalidateCache();
+                wireStartNode.invalidateCache();
             }
         }
 
@@ -824,9 +856,40 @@ public class CanvasInteractionHandler {
         if (outPortIdx < fromNode.getOutputs().size() && wireStartPortIdx < toNode.getInputs().size()) {
             IngredientStack outStack = fromNode.getOutputs().get(outPortIdx);
             IngredientStack inStack = toNode.getInputs().get(wireStartPortIdx);
-            if (!outStack.equals(inStack) && inStack.matchesOrAlternative(outStack)) {
+            if (inStack.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(toNode)) {
+                var allFluids = com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.getAllBoilingFluidInputs();
+                inStack.setAlternatives(allFluids);
+            }
+            boolean matched = false;
+            if (outStack.getId().equals(inStack.getId())) {
+                matched = true;
+            } else if (inStack.getAlternatives() != null && inStack.getAlternatives().contains(outStack.getId())) {
                 inStack.selectAlternative(outStack.getId());
+                matched = true;
+            } else if (outStack.getAlternatives() != null && outStack.getAlternatives().contains(inStack.getId())) {
+                outStack.selectAlternative(inStack.getId());
+                matched = true;
+            } else if (inStack.getAlternatives() != null && outStack.getAlternatives() != null) {
+                for (ResourceLocation alt : inStack.getAlternatives()) {
+                    if (outStack.getAlternatives().contains(alt)) {
+                        inStack.selectAlternative(alt);
+                        outStack.selectAlternative(alt);
+                        matched = true;
+                        break;
+                    }
+                }
+            } else if (inStack.isFluid() && outStack.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(toNode)) {
+                inStack.addAlternative(outStack.getId());
+                inStack.selectAlternative(outStack.getId());
+                matched = true;
+            }
+
+            if (matched) {
+                if (inStack.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(toNode)) {
+                    com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(toNode, inStack.getId());
+                }
                 wireStartNode.invalidateCache();
+                targetWidget.invalidateCache();
             }
         }
 

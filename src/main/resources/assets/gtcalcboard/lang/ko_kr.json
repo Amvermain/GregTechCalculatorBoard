@@ -232,6 +232,8 @@
   "gui.gtcalcboard.gen_badge": "발전기",
   "gui.gtcalcboard.boiler_badge": "♨ 보일러",
   "gui.gtcalcboard.dynamo_badge": "⚡ 다이나모",
+  "gui.gtcalcboard.tooltip.systeams_toggle_to_boiler": "[클릭]: Systeams 보일러 모드로 전환 (증기 생산)",
+  "gui.gtcalcboard.tooltip.systeams_toggle_to_dynamo": "[클릭]: 써멀 다이나모 모드로 전환 (RF 발전)",
 
   "gui.gtcalcboard.rotor.title": "⚡ 터빈 로터 선택",
   "gui.gtcalcboard.rotor.count": "✔ %s개 GT 로터",

@@ -93,10 +93,24 @@ public enum GTBoilerTier {
         return isMultiblock;
     }
 
+    private static final java.util.Map<ResourceLocation, GTBoilerTier> EXACT_MAP = new java.util.HashMap<>();
+
+    static {
+        for (GTBoilerTier tier : values()) {
+            if (tier.defaultSolidIcon != null) EXACT_MAP.put(tier.defaultSolidIcon, tier);
+            if (tier.defaultLiquidIcon != null) EXACT_MAP.put(tier.defaultLiquidIcon, tier);
+        }
+        EXACT_MAP.put(ResourceLocation.tryParse("gtceu:lp_steam_solar_boiler"), LP_BRONZE);
+        EXACT_MAP.put(ResourceLocation.tryParse("gtceu:hp_steam_solar_boiler"), HP_STEEL);
+    }
+
     public static GTBoilerTier getBoilerTier(RecipeNode node) {
         if (node == null) return LP_BRONZE;
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
+            GTBoilerTier exact = EXACT_MAP.get(icon);
+            if (exact != null) return exact;
+
             String p = icon.getPath().toLowerCase(java.util.Locale.ROOT);
             if (p.contains("tungstensteel")) return LARGE_TUNGSTENSTEEL;
             if (p.contains("titanium")) return LARGE_TITANIUM;

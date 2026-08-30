@@ -28,7 +28,7 @@ public final class FlowSummaryAggregator {
             if (edge.toNodeId().equals(node.getId()) && edge.inputIndex() == inputIndex) {
                 RecipeNode p = graph.findNodeById(edge.fromNodeId());
                 if (p != null && edge.outputIndex() < p.getOutputs().size()) {
-                    double pRate = p.getOutputSlotRate(edge.outputIndex(), true);
+                    double pRate = FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, p, edge.outputIndex(), null);
 
                     // Total nominal demand from all consumers sharing this producer's output port
                     double totalPortDemand = 0.0;
@@ -56,7 +56,7 @@ public final class FlowSummaryAggregator {
         if (graph == null || node == null || outputIndex < 0 || outputIndex >= node.getOutputs().size()) {
             return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
         }
-        double produced = node.getOutputSlotRate(outputIndex, true);
+        double produced = FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, node, outputIndex, null);
 
         double totalDemanded = 0.0;
         int count = 0;
@@ -72,7 +72,7 @@ public final class FlowSummaryAggregator {
                         if (inEdge.toNodeId().equals(c.getId()) && inEdge.inputIndex() == edge.inputIndex()) {
                             RecipeNode p = graph.findNodeById(inEdge.fromNodeId());
                             if (p != null && inEdge.outputIndex() < p.getOutputs().size()) {
-                                totalProducerSupply += p.getOutputSlotRate(inEdge.outputIndex(), true);
+                                totalProducerSupply += FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, p, inEdge.outputIndex(), null);
                             }
                         }
                     }
@@ -240,7 +240,7 @@ public final class FlowSummaryAggregator {
         for (IngredientStack s : source) {
             boolean exists = false;
             for (IngredientStack u : destination) {
-                if (u.equals(s) || u.matchesOrAlternative(s) || s.matchesOrAlternative(u)) {
+                if (u.equals(s)) {
                     exists = true;
                     break;
                 }
@@ -252,7 +252,7 @@ public final class FlowSummaryAggregator {
     private static void mergeRate(Map<IngredientStack, Double> map, IngredientStack stack, double rate) {
         if (stack == null) return;
         for (Map.Entry<IngredientStack, Double> entry : map.entrySet()) {
-            if (entry.getKey().equals(stack) || entry.getKey().matchesOrAlternative(stack) || stack.matchesOrAlternative(entry.getKey())) {
+            if (entry.getKey().equals(stack)) {
                 entry.setValue(entry.getValue() + rate);
                 return;
             }
@@ -263,7 +263,7 @@ public final class FlowSummaryAggregator {
     private static double findRate(Map<IngredientStack, Double> map, IngredientStack stack) {
         if (stack == null) return 0.0;
         for (Map.Entry<IngredientStack, Double> entry : map.entrySet()) {
-            if (entry.getKey().equals(stack) || entry.getKey().matchesOrAlternative(stack) || stack.matchesOrAlternative(entry.getKey())) {
+            if (entry.getKey().equals(stack)) {
                 return entry.getValue();
             }
         }

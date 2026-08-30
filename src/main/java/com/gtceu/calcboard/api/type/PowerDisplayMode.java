@@ -118,7 +118,7 @@ public enum PowerDisplayMode {
             String formattedEUt = formatEUtVal(posEUt);
             String formattedAmps = formatAmps(amps, tier);
             return switch (this) {
-                case EUT -> String.format("§a+%s §7(%s) §2(%s)", formattedEUt, tier.getName(), genTag);
+                case EUT -> String.format("§a+%s §7(%s) §2(%s)", formattedEUt, formattedAmps, genTag);
                 case AMPS -> String.format("§a+%s §2(%s)", formattedAmps, genTag);
                 case BOTH -> String.format("§a+%s §7(%s) §2(%s)", formattedEUt, formattedAmps, genTag);
             };
@@ -127,7 +127,7 @@ public enum PowerDisplayMode {
             String formattedEUt = formatEUtVal(totalEUt);
             String formattedAmps = formatAmps(amps, tier);
             return switch (this) {
-                case EUT -> String.format("§e%s §7(%s)", formattedEUt, tier.getName());
+                case EUT -> String.format("§e%s §7(%s)", formattedEUt, formattedAmps);
                 case AMPS -> String.format("§e%s", formattedAmps);
                 case BOTH -> String.format("§e%s §7(%s)", formattedEUt, formattedAmps);
             };

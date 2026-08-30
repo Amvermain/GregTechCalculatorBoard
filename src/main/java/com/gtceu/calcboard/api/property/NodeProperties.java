@@ -44,6 +44,11 @@ public final class NodeProperties {
             NodePropertyKey.ofInt("kinetic_rpm", 32)
     );
 
+    // Thermal & Systeams Properties
+    public static final NodePropertyKey<Double> THERMAL_BASE_ENERGY_RF = register(
+            NodePropertyKey.ofDouble("thermal_base_energy_rf", 0.0)
+    );
+
     // Goal & ETA Properties (RFC-005)
     public static final NodePropertyKey<Double> TARGET_BATCH_AMOUNT = register(
             NodePropertyKey.ofDouble("target_batch_amount", 0.0)

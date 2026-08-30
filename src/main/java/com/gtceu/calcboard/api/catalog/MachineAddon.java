@@ -281,7 +281,15 @@ public class MachineAddon {
     }
 
     public boolean isThermalUpgradeKit() {
-        return this.upgradeTierKit || (this.category == Category.THERMAL_AUGMENT && this.parallelMultiplier > 1);
+        if (this.upgradeTierKit) return true;
+        if (this.category == Category.THERMAL_AUGMENT) {
+            if (this.parallelMultiplier > 1) return true;
+            if (this.id != null) {
+                String lid = this.id.toLowerCase(java.util.Locale.ROOT);
+                if (lid.contains("upgrade_kit") || lid.contains("tier_kit")) return true;
+            }
+        }
+        return false;
     }
 
     public void setUpgradeTierKit(boolean upgradeTierKit) {

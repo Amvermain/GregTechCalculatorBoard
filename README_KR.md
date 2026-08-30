@@ -157,7 +157,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-빌드된 파일은 `build/libs/gtcalcboard-1.20.1-2.0.0-beta.1.jar`에 생성됩니다.
+빌드된 파일은 `build/libs/gtcalcboard-1.20.1-2.0.0.jar`에 생성됩니다.
 
 ---
 

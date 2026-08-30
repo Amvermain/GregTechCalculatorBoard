@@ -477,6 +477,7 @@ public final class GTAddonCompatibilityHandler {
             node.setRotorPower(power);
             node.setRotorName(addon.getName());
             node.getAddons().add(addon);
+            GTTurbinePhysics.autoCalculateTurbineParallel(node);
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
@@ -553,6 +554,7 @@ public final class GTAddonCompatibilityHandler {
             node.setRotorEfficiency(100);
             node.setRotorPower(100);
             node.setRotorName("Standard (100%)");
+            GTTurbinePhysics.autoCalculateTurbineParallel(node);
         } else if (addon.getId().equals("gtceu:spt_lubricant_boosting") || addon.getId().equals("gtceu:npt_lubricant_boosting")) {
             node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && in.getId().getPath().contains("tungsten_disulfide"));
         } else if (addon.getId().equals("gtceu:spt_coolant_boosting")) {

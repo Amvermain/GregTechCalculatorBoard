@@ -232,12 +232,12 @@ public final class GTTurbineHelper {
      */
     public static int getEffectiveTurbineParallel(RecipeNode node) {
         if (node == null || !isLargeTurbine(node)) return Math.max(1, node != null ? node.getParallel() : 1);
-        if (node.getParallel() > 1) return node.getParallel();
-        if (!hasRotorAddon(node)) return node.getParallel();
+        if (!hasRotorAddon(node)) return Math.max(1, node.getParallel());
         double cap = getGeneratorMaxEUt(node);
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0 || cap >= Double.MAX_VALUE) return Math.max(1, node.getParallel());
-        return (int) Math.max(1, Math.floor(cap / recipeEUt));
+        int calculated = (int) Math.max(1, Math.ceil(cap / recipeEUt));
+        return Math.max(calculated, node.getParallel());
     }
 
     /**

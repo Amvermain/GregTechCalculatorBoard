@@ -560,10 +560,22 @@ public class NodeWidget {
         if (inIdx >= 0 && inIdx < node.getInputs().size()) {
             if (parent != null && !parent.ensureEditPermission()) return true;
             IngredientStack in = node.getInputs().get(inIdx);
+            if (in.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
+                var allFluids = com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.getAllBoilingFluidInputs();
+                if (in.getAlternatives().size() != allFluids.size() || in.getAlternatives().stream().anyMatch(id -> !allFluids.contains(id))) {
+                    in.setAlternatives(allFluids);
+                }
+            }
             if (in.hasAlternatives()) {
                 in.cycleAlternative(delta > 0 ? -1 : 1);
+                if (in.isFluid()) {
+                    if (com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
+                        com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(node, in.getId());
+                    }
+                }
                 invalidateCache();
                 if (parent != null) {
+                    parent.getGraph().cleanupInvalidConnections();
                     parent.markSummaryDirty();
                 }
                 Minecraft.getInstance().getSoundManager().play(

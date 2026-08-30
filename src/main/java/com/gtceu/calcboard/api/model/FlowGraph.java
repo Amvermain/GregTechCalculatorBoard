@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
 
@@ -287,8 +288,6 @@ public class FlowGraph {
 
             // Resource ID compatibility check
             if (outStack.getId().equals(inStack.getId())) return false;
-            if (inStack.getAlternatives() != null && inStack.getAlternatives().contains(outStack.getId())) return false;
-            if (outStack.getAlternatives() != null && outStack.getAlternatives().contains(inStack.getId())) return false;
 
             return true;
         });

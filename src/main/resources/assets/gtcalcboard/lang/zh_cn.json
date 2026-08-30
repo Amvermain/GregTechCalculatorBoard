@@ -226,6 +226,8 @@
   "gui.gtcalcboard.gen_badge": "发电",
   "gui.gtcalcboard.boiler_badge": "♨ 锅炉",
   "gui.gtcalcboard.dynamo_badge": "⚡ 能源炉",
+  "gui.gtcalcboard.tooltip.systeams_toggle_to_boiler": "[点击]：切换至 Systeams 锅炉模式（产出蒸汽）",
+  "gui.gtcalcboard.tooltip.systeams_toggle_to_dynamo": "[点击]：切换至 Thermal 能源炉模式（发电 RF）",
   "gui.gtcalcboard.rotor.title": "⚡ 选择涡轮转子",
   "gui.gtcalcboard.rotor.count": "✔ %s 个 GT 转子",
   "gui.gtcalcboard.rotor.eff": "效率",
