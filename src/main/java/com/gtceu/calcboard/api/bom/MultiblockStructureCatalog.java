@@ -5,11 +5,12 @@ import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.util.ModCompatHelper;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -70,7 +71,7 @@ public class MultiblockStructureCatalog {
                 initialized = true;
                 initializing = false;
                 try {
-                    net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                    NeoForge.EVENT_BUS.post(
                         new com.gtceu.calcboard.api.event.CatalogLifecycleEvent.MultiblocksReady(STRUCTURES.size())
                     );
                 } catch (Throwable ignored) {}
@@ -223,7 +224,7 @@ public class MultiblockStructureCatalog {
                 if (out != null && out.getItemStack() != null) {
                     ItemStack stack = out.getItemStack();
                     if (!stack.isEmpty()) {
-                        controllerId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                        controllerId = BuiltInRegistries.ITEM.getKey(stack.getItem());
                         controllerName = ITEM_NAME_CACHE.computeIfAbsent(stack.getItem(), itm -> itm.getDescription().getString());
                         if (controllerId != null) aliasIds.add(controllerId);
                     }
@@ -276,7 +277,7 @@ public class MultiblockStructureCatalog {
                     if (stack == null || stack.getItemStack() == null) continue;
                     ItemStack is = stack.getItemStack();
                     if (!is.isEmpty()) {
-                        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
+                        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(is.getItem());
                         if (itemId != null) {
                             int amount = (int) stack.getAmount();
                             if (amount <= 0) amount = 1;

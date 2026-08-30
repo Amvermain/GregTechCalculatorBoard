@@ -2,18 +2,16 @@ package com.gtceu.calcboard.api.event;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import net.minecraftforge.eventbus.ListenerList;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 import java.util.Collections;
 import java.util.Map;
 
 /**
- * Base Forge event for lifecycle hooks and calculation events of RecipeNode instances.
+ * Base NeoForge event for lifecycle hooks and calculation events of RecipeNode instances.
  */
 public abstract class RecipeNodeEvent extends Event {
 
-    private static ListenerList LISTENER_LIST = new ListenerList();
     private final RecipeNode node;
 
     public RecipeNodeEvent() {
@@ -28,24 +26,14 @@ public abstract class RecipeNodeEvent extends Event {
         return node;
     }
 
-    @Override
-    public ListenerList getListenerList() {
-        return LISTENER_LIST;
-    }
-
     public static void clearListeners() {
-        LISTENER_LIST = new ListenerList();
-        Created.LISTENER_LIST = new ListenerList(LISTENER_LIST);
-        PreCalculation.LISTENER_LIST = new ListenerList(LISTENER_LIST);
-        PostCalculation.LISTENER_LIST = new ListenerList(LISTENER_LIST);
+        // No-op in NeoForge event system
     }
 
     /**
      * Fired when a RecipeNode is created or initialized from EMI/Search.
      */
     public static class Created extends RecipeNodeEvent {
-        private static ListenerList LISTENER_LIST = new ListenerList(RecipeNodeEvent.LISTENER_LIST);
-
         public Created() {
             super(null);
         }
@@ -53,30 +41,18 @@ public abstract class RecipeNodeEvent extends Event {
         public Created(RecipeNode node) {
             super(node);
         }
-
-        @Override
-        public ListenerList getListenerList() {
-            return LISTENER_LIST;
-        }
     }
 
     /**
      * Fired before overclocking, duration, and energy calculations are computed.
      */
     public static class PreCalculation extends RecipeNodeEvent {
-        private static ListenerList LISTENER_LIST = new ListenerList(RecipeNodeEvent.LISTENER_LIST);
-
         public PreCalculation() {
             super(null);
         }
 
         public PreCalculation(RecipeNode node) {
             super(node);
-        }
-
-        @Override
-        public ListenerList getListenerList() {
-            return LISTENER_LIST;
         }
     }
 
@@ -85,7 +61,6 @@ public abstract class RecipeNodeEvent extends Event {
      * Listeners can read and modify the effective rate mappings.
      */
     public static class PostCalculation extends RecipeNodeEvent {
-        private static ListenerList LISTENER_LIST = new ListenerList(RecipeNodeEvent.LISTENER_LIST);
         private final Map<IngredientStack, Double> inputRates;
         private final Map<IngredientStack, Double> outputRates;
 
@@ -105,11 +80,6 @@ public abstract class RecipeNodeEvent extends Event {
 
         public Map<IngredientStack, Double> getOutputRates() {
             return outputRates;
-        }
-
-        @Override
-        public ListenerList getListenerList() {
-            return LISTENER_LIST;
         }
     }
 }

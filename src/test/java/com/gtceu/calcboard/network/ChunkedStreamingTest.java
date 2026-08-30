@@ -82,24 +82,24 @@ public class ChunkedStreamingTest {
         S2CSyncWorkspaceMetaPacket packet = new S2CSyncWorkspaceMetaPacket(teamId, "Mega Base Alpha", 15, pages);
 
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
-        packet.encode(buf);
+        S2CSyncWorkspaceMetaPacket.STREAM_CODEC.encode(buf, packet);
 
-        S2CSyncWorkspaceMetaPacket decoded = new S2CSyncWorkspaceMetaPacket(buf);
-        Assertions.assertEquals(teamId, decoded.getTeamId());
-        Assertions.assertEquals("Mega Base Alpha", decoded.getTeamName());
-        Assertions.assertEquals(15, decoded.getGlobalRevision());
-        Assertions.assertEquals(2, decoded.getPages().size());
+        S2CSyncWorkspaceMetaPacket decoded = S2CSyncWorkspaceMetaPacket.STREAM_CODEC.decode(buf);
+        Assertions.assertEquals(teamId, decoded.teamId());
+        Assertions.assertEquals("Mega Base Alpha", decoded.teamName());
+        Assertions.assertEquals(15, decoded.globalRevision());
+        Assertions.assertEquals(2, decoded.pages().size());
 
-        S2CSyncWorkspaceMetaPacket.PageMeta p1 = decoded.getPages().get(0);
-        Assertions.assertEquals("page-1", p1.getPageId());
-        Assertions.assertEquals("Petrochemical Phase 1", p1.getTitle());
-        Assertions.assertEquals(3, p1.getRevision());
-        Assertions.assertEquals(holderUUID, p1.getLockHolderUUID());
-        Assertions.assertEquals("PlayerA", p1.getLockHolderName());
+        S2CSyncWorkspaceMetaPacket.PageMeta p1 = decoded.pages().get(0);
+        Assertions.assertEquals("page-1", p1.pageId());
+        Assertions.assertEquals("Petrochemical Phase 1", p1.title());
+        Assertions.assertEquals(3, p1.revision());
+        Assertions.assertEquals(holderUUID, p1.lockHolderUUID());
+        Assertions.assertEquals("PlayerA", p1.lockHolderName());
 
-        S2CSyncWorkspaceMetaPacket.PageMeta p2 = decoded.getPages().get(1);
-        Assertions.assertEquals("page-2", p2.getPageId());
-        Assertions.assertNull(p2.getLockHolderUUID());
+        S2CSyncWorkspaceMetaPacket.PageMeta p2 = decoded.pages().get(1);
+        Assertions.assertEquals("page-2", p2.pageId());
+        Assertions.assertNull(p2.lockHolderUUID());
     }
 
     @Test
@@ -110,14 +110,14 @@ public class ChunkedStreamingTest {
         S2CChunkedDataPacket packet = new S2CChunkedDataPacket(transferId, "page-test", 4, 1, 3, chunk);
 
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
-        packet.encode(buf);
+        S2CChunkedDataPacket.STREAM_CODEC.encode(buf, packet);
 
-        S2CChunkedDataPacket decoded = new S2CChunkedDataPacket(buf);
-        Assertions.assertEquals(transferId, decoded.getTransferId());
-        Assertions.assertEquals("page-test", decoded.getPageId());
-        Assertions.assertEquals(4, decoded.getRevision());
-        Assertions.assertEquals(1, decoded.getChunkIndex());
-        Assertions.assertEquals(3, decoded.getTotalChunks());
-        Assertions.assertArrayEquals(chunk, decoded.getChunkBytes());
+        S2CChunkedDataPacket decoded = S2CChunkedDataPacket.STREAM_CODEC.decode(buf);
+        Assertions.assertEquals(transferId, decoded.transferId());
+        Assertions.assertEquals("page-test", decoded.pageId());
+        Assertions.assertEquals(4, decoded.revision());
+        Assertions.assertEquals(1, decoded.chunkIndex());
+        Assertions.assertEquals(3, decoded.totalChunks());
+        Assertions.assertArrayEquals(chunk, decoded.chunkBytes());
     }
 }

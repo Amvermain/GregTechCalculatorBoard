@@ -3,7 +3,7 @@ package com.gtceu.calcboard.compat.gtceu.helper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -219,10 +219,10 @@ public final class GTCEuPatternScanner {
     private static void extractBlocksFromObject(Object obj, Set<ResourceLocation> candidateBlocks) {
         if (obj == null) return;
         if (obj instanceof Block b) {
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(b);
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(b);
             if (id != null && !id.getPath().equals("air")) candidateBlocks.add(id);
         } else if (obj instanceof BlockState bs) {
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(bs.getBlock());
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(bs.getBlock());
             if (id != null && !id.getPath().equals("air")) candidateBlocks.add(id);
         } else if (obj instanceof Supplier<?> s) {
             try {
@@ -245,7 +245,7 @@ public final class GTCEuPatternScanner {
                             if (entry instanceof Supplier<?> sup) {
                                 Object b = sup.get();
                                 if (b instanceof Block block) {
-                                    ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
+                                    ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
                                     if (id != null) candidateBlocks.add(id);
                                 }
                             }

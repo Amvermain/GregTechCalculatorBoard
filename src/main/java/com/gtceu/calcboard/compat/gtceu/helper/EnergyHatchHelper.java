@@ -9,7 +9,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -69,10 +69,10 @@ public class EnergyHatchHelper {
             }
         } catch (Throwable ignored) {}
 
-        // 2. Discover from ForgeRegistries.ITEMS (e.g. Star Technology Core, GTCEu addons)
+        // 2. Discover from BuiltInRegistries.ITEM (e.g. Star Technology Core, GTCEu addons)
         try {
-            if (ForgeRegistries.ITEMS != null) {
-                for (Map.Entry<net.minecraft.resources.ResourceKey<Item>, Item> entry : ForgeRegistries.ITEMS.getEntries()) {
+            if (BuiltInRegistries.ITEM != null) {
+                for (Map.Entry<net.minecraft.resources.ResourceKey<Item>, Item> entry : BuiltInRegistries.ITEM.entrySet()) {
                     ResourceLocation id = entry.getKey().location();
                     if (id == null) continue;
                     String path = id.getPath().toLowerCase(Locale.ROOT);
@@ -184,7 +184,7 @@ public class EnergyHatchHelper {
 
     public static EnergyHatchStats getEnergyHatchStats(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (id == null) return null;
         return getEnergyHatchStats(id);
     }
@@ -349,8 +349,8 @@ public class EnergyHatchHelper {
             }
         } catch (Throwable ignored) {}
 
-        if (ForgeRegistries.ITEMS != null) {
-            Item item = ForgeRegistries.ITEMS.getValue(id);
+        if (BuiltInRegistries.ITEM != null) {
+            Item item = BuiltInRegistries.ITEM.get(id);
             if (item != null && item != net.minecraft.world.item.Items.AIR) {
                 return new ItemStack(item);
             }

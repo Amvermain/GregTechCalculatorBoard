@@ -12,6 +12,13 @@ import net.minecraft.resources.ResourceLocation;
  */
 public final class TestFixtures {
 
+    static {
+        try {
+            net.minecraft.SharedConstants.tryDetectVersion();
+            net.minecraft.server.Bootstrap.bootStrap();
+        } catch (Throwable ignored) {}
+    }
+
     private TestFixtures() {}
 
     public static RecipeNode createNode(String name, double durationTicks, double eut, GTVoltageTier tier) {

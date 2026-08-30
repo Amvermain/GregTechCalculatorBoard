@@ -12,7 +12,7 @@ import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -183,7 +183,7 @@ public final class JeiRecipeSearchIndexer {
                                     is = s;
                                 }
                                 if (!is.isEmpty()) {
-                                    ResourceLocation iId = ForgeRegistries.ITEMS.getKey(is.getItem());
+                                    ResourceLocation iId = BuiltInRegistries.ITEM.getKey(is.getItem());
                                     if (iId != null) {
                                         sb.append(' ').append(iId.toString().toLowerCase(Locale.ROOT));
                                         sb.append(' ').append(iId.getPath().toLowerCase(Locale.ROOT));

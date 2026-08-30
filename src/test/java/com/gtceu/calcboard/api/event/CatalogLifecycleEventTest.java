@@ -9,7 +9,7 @@ import com.gtceu.calcboard.api.event.ModAdapterRegisterEvent;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.common.NeoForge;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,15 +22,17 @@ public class CatalogLifecycleEventTest {
 
     @BeforeEach
     public void setUp() {
-        MinecraftForge.EVENT_BUS.start();
+        NeoForge.EVENT_BUS.start();
         cleanupListeners();
         ModAdapterRegistry.reset();
+        ModAdapterRegistry.init();
     }
 
     @AfterEach
     public void tearDown() {
         cleanupListeners();
         ModAdapterRegistry.reset();
+        ModAdapterRegistry.init();
     }
 
     private void cleanupListeners() {
@@ -43,12 +45,12 @@ public class CatalogLifecycleEventTest {
         AtomicBoolean fired = new AtomicBoolean(false);
         AtomicInteger count = new AtomicInteger(0);
 
-        MinecraftForge.EVENT_BUS.addListener((CatalogLifecycleEvent.RecipesReady event) -> {
+        NeoForge.EVENT_BUS.addListener((CatalogLifecycleEvent.RecipesReady event) -> {
             fired.set(true);
             count.set(event.getRecipeCount());
         });
 
-        MinecraftForge.EVENT_BUS.post(new CatalogLifecycleEvent.RecipesReady(420, 150L));
+        NeoForge.EVENT_BUS.post(new CatalogLifecycleEvent.RecipesReady(420, 150L));
 
         Assertions.assertTrue(fired.get(), "RecipesReady event should fire and be caught");
         Assertions.assertEquals(420, count.get(), "Recipe count should match");
@@ -59,16 +61,16 @@ public class CatalogLifecycleEventTest {
         AtomicBoolean addonsFired = new AtomicBoolean(false);
         AtomicBoolean multiblocksFired = new AtomicBoolean(false);
 
-        MinecraftForge.EVENT_BUS.addListener((CatalogLifecycleEvent.AddonsReady event) -> {
+        NeoForge.EVENT_BUS.addListener((CatalogLifecycleEvent.AddonsReady event) -> {
             addonsFired.set(true);
         });
 
-        MinecraftForge.EVENT_BUS.addListener((CatalogLifecycleEvent.MultiblocksReady event) -> {
+        NeoForge.EVENT_BUS.addListener((CatalogLifecycleEvent.MultiblocksReady event) -> {
             multiblocksFired.set(true);
         });
 
-        MinecraftForge.EVENT_BUS.post(new CatalogLifecycleEvent.AddonsReady(50));
-        MinecraftForge.EVENT_BUS.post(new CatalogLifecycleEvent.MultiblocksReady(25));
+        NeoForge.EVENT_BUS.post(new CatalogLifecycleEvent.AddonsReady(50));
+        NeoForge.EVENT_BUS.post(new CatalogLifecycleEvent.MultiblocksReady(25));
 
         Assertions.assertTrue(addonsFired.get(), "AddonsReady event should fire");
         Assertions.assertTrue(multiblocksFired.get(), "MultiblocksReady event should fire");
@@ -112,16 +114,23 @@ public class CatalogLifecycleEventTest {
     @Test
     public void testModAdapterRegisterEventInjection() {
         CustomTestAdapter customAdapter = new CustomTestAdapter();
-
-        MinecraftForge.EVENT_BUS.addListener((ModAdapterRegisterEvent event) -> {
+        java.util.function.Consumer<ModAdapterRegisterEvent> listener = (ModAdapterRegisterEvent event) -> {
             event.register(customAdapter);
-        });
+        };
 
-        ModAdapterRegistry.init();
+        NeoForge.EVENT_BUS.addListener(listener);
+        try {
+            ModAdapterRegistry.reset();
+            ModAdapterRegistry.init();
 
-        IModAdapter found = ModAdapterRegistry.getAdapterForCategory(ResourceLocation.tryParse("custom_mod:crusher"));
-        Assertions.assertEquals(customAdapter, found, "Custom adapter registered via ModAdapterRegisterEvent must handle its category");
-        Assertions.assertEquals("custom_mod", found.getModId());
+            IModAdapter found = ModAdapterRegistry.getAdapterForCategory(ResourceLocation.tryParse("custom_mod:crusher"));
+            Assertions.assertEquals(customAdapter, found, "Custom adapter registered via ModAdapterRegisterEvent must handle its category");
+            Assertions.assertEquals("custom_mod", found.getModId());
+        } finally {
+            NeoForge.EVENT_BUS.unregister(listener);
+            ModAdapterRegistry.reset();
+            ModAdapterRegistry.init();
+        }
     }
 }
 

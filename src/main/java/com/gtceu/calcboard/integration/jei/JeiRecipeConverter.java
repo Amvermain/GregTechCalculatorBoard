@@ -23,7 +23,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -117,9 +117,11 @@ public class JeiRecipeConverter {
             }
         }
 
+        Object rawRecipe = (recipe instanceof net.minecraft.world.item.crafting.RecipeHolder<?> rh) ? rh.value() : recipe;
+
         // Vanilla Recipe Fallback extraction (Smelting, Crafting, Blasting, Stonecutting, etc.)
         if (inputs.isEmpty() || outputs.isEmpty()) {
-            extractVanillaRecipeContents(recipe, inputs, outputs);
+            extractVanillaRecipeContents(rawRecipe, inputs, outputs);
         }
 
         // Details extraction
@@ -142,7 +144,7 @@ public class JeiRecipeConverter {
             }
         }
 
-        if (recipe instanceof net.minecraft.world.item.crafting.AbstractCookingRecipe cr) {
+        if (rawRecipe instanceof net.minecraft.world.item.crafting.AbstractCookingRecipe cr) {
             details.durationTicks = cr.getCookingTime();
             details.eut = 0.0;
             details.energyType = EnergyType.NONE;
@@ -209,7 +211,7 @@ public class JeiRecipeConverter {
                                 is = s;
                             }
                             if (!is.isEmpty()) {
-                                ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(is.getItem());
+                                ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(is.getItem());
                                 if (itemId != null && !node.getAvailableWorkstations().contains(itemId)) {
                                     node.getAvailableWorkstations().add(itemId);
                                 }
@@ -225,7 +227,7 @@ public class JeiRecipeConverter {
             try {
                 ItemStack toast = vanillaRecipe.getToastSymbol();
                 if (toast != null && !toast.isEmpty()) {
-                    ResourceLocation tId = ForgeRegistries.ITEMS.getKey(toast.getItem());
+                    ResourceLocation tId = BuiltInRegistries.ITEM.getKey(toast.getItem());
                     if (tId != null && !node.getAvailableWorkstations().contains(tId)) {
                         node.getAvailableWorkstations().add(tId);
                     }
@@ -238,7 +240,7 @@ public class JeiRecipeConverter {
             icon = node.getAvailableWorkstations().get(0);
         }
         if (icon == null && catId != null) {
-            if (ForgeRegistries.ITEMS.containsKey(catId)) {
+            if (BuiltInRegistries.ITEM.containsKey(catId)) {
                 icon = catId;
             } else {
                 if (catId.getPath().contains("smelt") || catId.getPath().contains("furnace")) {
@@ -312,13 +314,13 @@ public class JeiRecipeConverter {
                         ItemStack[] items = ing.getItems();
                         if (items != null && items.length > 0) {
                             ItemStack primary = items[0];
-                            ResourceLocation iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
+                            ResourceLocation iId = BuiltInRegistries.ITEM.getKey(primary.getItem());
                             if (iId != null) {
                                 String name = primary.getHoverName().getString();
                                 if (name.isEmpty()) name = formatName(iId.getPath());
                                 IngredientStack stack = IngredientStack.item(iId, name, Math.max(1, primary.getCount()));
                                 for (int i = 1; i < items.length; i++) {
-                                    ResourceLocation altId = ForgeRegistries.ITEMS.getKey(items[i].getItem());
+                                    ResourceLocation altId = BuiltInRegistries.ITEM.getKey(items[i].getItem());
                                     if (altId != null && !stack.getAlternatives().contains(altId)) {
                                         stack.getAlternatives().add(altId);
                                     }
@@ -349,7 +351,7 @@ public class JeiRecipeConverter {
                     } catch (Throwable ignored) {}
                 }
                 if (!result.isEmpty()) {
-                    ResourceLocation oId = ForgeRegistries.ITEMS.getKey(result.getItem());
+                    ResourceLocation oId = BuiltInRegistries.ITEM.getKey(result.getItem());
                     if (oId != null) {
                         String name = result.getHoverName().getString();
                         if (name.isEmpty()) name = formatName(oId.getPath());

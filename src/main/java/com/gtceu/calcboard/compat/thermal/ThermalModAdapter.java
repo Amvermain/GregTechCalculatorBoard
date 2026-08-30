@@ -19,7 +19,7 @@ import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import java.util.List;
 
@@ -45,12 +45,7 @@ public class ThermalModAdapter implements IModAdapter {
 
     @Override
     public boolean isLoaded() {
-        try {
-            if (ModList.get() != null) {
-                return ModCompatHelper.isThermalLoaded() || ModList.get().isLoaded("cofh_core");
-            }
-        } catch (Throwable ignored) {}
-        return true;
+        return ModCompatHelper.isThermalLoaded() || ModCompatHelper.isModLoaded("cofh_core");
     }
 
     @Override

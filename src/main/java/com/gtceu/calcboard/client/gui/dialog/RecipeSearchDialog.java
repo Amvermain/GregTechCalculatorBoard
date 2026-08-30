@@ -694,7 +694,7 @@ public class RecipeSearchDialog {
                     searchBox.setFocused(true);
                     searchBox.setCursorPosition(searchBox.getValue().length());
                     Minecraft.getInstance().getSoundManager().play(
-                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F)
                     );
                     return true;
                 }
@@ -741,7 +741,7 @@ public class RecipeSearchDialog {
         // Help button [?] -> Open Chapter 2 of Guidebook
         if (mouseX >= helpBtnX && mouseX <= helpBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
             Minecraft.getInstance().getSoundManager().play(
-                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
             );
             setVisible(false);
             if (parent != null && parent.getGuideDialog() != null) {
@@ -755,7 +755,7 @@ public class RecipeSearchDialog {
             showFavoritesOnly = !showFavoritesOnly;
             updateSearchResultsSynchronously(searchBox.getValue());
             Minecraft.getInstance().getSoundManager().play(
-                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), showFavoritesOnly ? 1.4F : 1.0F)
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), showFavoritesOnly ? 1.4F : 1.0F)
             );
             return true;
         }
@@ -798,7 +798,7 @@ public class RecipeSearchDialog {
                         toggleFavoriteRecipe(sr.recipe());
                         updateSearchResultsSynchronously(searchBox.getValue());
                         Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F)
                         );
                         return true;
                     }
@@ -811,7 +811,7 @@ public class RecipeSearchDialog {
                         if (template != null && parent != null) {
                             parent.switchNodeRecipe(switchTargetNode, template);
                             Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F)
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.1F)
                             );
                         }
                         setVisible(false);

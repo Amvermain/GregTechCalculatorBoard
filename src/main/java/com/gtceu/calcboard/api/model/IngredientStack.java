@@ -3,7 +3,6 @@ package com.gtceu.calcboard.api.model;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Objects;
 
@@ -130,7 +129,7 @@ public class IngredientStack {
         if (id != null) {
             try {
                 if (type == Type.FLUID) {
-                    var fluid = ForgeRegistries.FLUIDS.getValue(id);
+                    var fluid = net.minecraft.core.registries.BuiltInRegistries.FLUID.get(id);
                     if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
                         String name = fluid.getFluidType().getDescription().getString();
                         if (name != null && !name.isEmpty() && !name.equalsIgnoreCase("air") && !name.equalsIgnoreCase("empty")) {
@@ -138,7 +137,7 @@ public class IngredientStack {
                         }
                     }
                 } else {
-                    var item = ForgeRegistries.ITEMS.getValue(id);
+                    var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(id);
                     if (item != null && item != Items.AIR) {
                         String name = item.getDescription().getString();
                         if (name != null && !name.isEmpty() && !name.equalsIgnoreCase("air")) {

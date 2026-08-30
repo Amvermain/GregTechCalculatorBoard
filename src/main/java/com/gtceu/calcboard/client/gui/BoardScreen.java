@@ -705,7 +705,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             }
             BoardToast.show(Component.literal("§e🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
             Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
             );
             return;
         }
@@ -798,7 +798,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
         BoardToast.show(Component.literal("§b🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
         Minecraft.getInstance().getSoundManager().play(
-            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F)
         );
     }
 
@@ -888,7 +888,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         }
 
         // 1. Dark Background and Grid
-        renderBackground(graphics);
+        renderBackground(graphics, mouseX, mouseY, partialTicks);
         BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
 
         // 2. Begin Zoomed / Panned Canvas Space
@@ -1173,7 +1173,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        double delta = scrollY != 0 ? scrollY : scrollX;
         if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
             return diskBlueprintsDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -1222,7 +1223,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         if (canvasHandler.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
@@ -1353,7 +1354,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         openFrameEditDialog(frame);
         TutorialManager.getInstance().onGroupFramed();
         BoardToast.show(Component.literal("§b").append(Component.translatable("message.gtcalcboard.frame_created")));
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.1F));
     }
 
     public void createFrameAt(double canvasX, double canvasY) {
@@ -1371,7 +1372,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         markSummaryDirty();
         openFrameEditDialog(frame);
         TutorialManager.getInstance().onGroupFramed();
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.1F));
     }
 
     public void createNoteAt(double canvasX, double canvasY) {
@@ -1389,7 +1390,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         rebuildWidgets();
         markSummaryDirty();
         openNoteEditDialog(note);
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.1F));
     }
 
     public void openNoteEditDialog(com.gtceu.calcboard.api.model.CanvasStickyNote note) {

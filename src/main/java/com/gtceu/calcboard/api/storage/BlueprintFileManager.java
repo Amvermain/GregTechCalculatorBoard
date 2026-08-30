@@ -69,7 +69,7 @@ public class BlueprintFileManager {
 
             CompoundTag tag = pkg.serializeNBT();
             File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
-            NbtIo.writeCompressed(tag, tempFile);
+            NbtIo.writeCompressed(tag, tempFile.toPath());
 
             try {
                 Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -86,7 +86,7 @@ public class BlueprintFileManager {
     public static BlueprintPackage loadBlueprint(File file) {
         if (file == null || !file.exists() || !file.isFile()) return null;
         try {
-            CompoundTag tag = NbtIo.readCompressed(file);
+            CompoundTag tag = NbtIo.readCompressed(file.toPath(), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
             if (tag != null) {
                 return BlueprintPackage.deserializeNBT(tag);
             }

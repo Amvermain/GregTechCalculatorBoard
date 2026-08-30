@@ -6,7 +6,7 @@ import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.bom.BoM;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.Locale;
 
@@ -37,14 +37,14 @@ public final class EmiSearchHelper {
             ResourceLocation id = sourceStack.getId();
             if (id != null) {
                 if (targetIsFluid) {
-                    var fluid = ForgeRegistries.FLUIDS.getValue(id);
+                    var fluid = BuiltInRegistries.FLUID.get(id);
                     if (fluid != null) {
                         var emiStack = EmiStack.of(fluid);
                         var def = BoM.getRecipe(emiStack);
                         return def != null ? def.getId() : null;
                     }
                 } else {
-                    var item = ForgeRegistries.ITEMS.getValue(id);
+                    var item = BuiltInRegistries.ITEM.get(id);
                     if (item != null) {
                         var emiStack = EmiStack.of(item);
                         var def = BoM.getRecipe(emiStack);

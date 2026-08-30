@@ -9,7 +9,7 @@ import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -187,10 +187,10 @@ public class GTCEuRecipeHandler {
                                     return true;
                                 }
                                 ResourceLocation sId = st.getId();
-                                if (sId != null && net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(sId)) {
+                                if (sId != null && net.minecraft.core.registries.BuiltInRegistries.FLUID.containsKey(sId)) {
                                     return true;
                                 }
-                                if (st.getItemStack() != null && st.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem bi && bi.getFluid() != net.minecraft.world.level.material.Fluids.EMPTY) {
+                                if (st.getItemStack() != null && st.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem bi && bi.content != net.minecraft.world.level.material.Fluids.EMPTY) {
                                     return true;
                                 }
                             }
@@ -780,19 +780,19 @@ public class GTCEuRecipeHandler {
             IngredientStack is = null;
             if (inner instanceof ItemStack stack) {
                 if (stack.isEmpty()) return null;
-                ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
                 String name = stack.getHoverName().getString();
                 is = IngredientStack.item(id, name, stack.getCount(), (float) chance);
-            } else if (inner instanceof net.minecraftforge.fluids.FluidStack fStack) {
+            } else if (inner instanceof net.neoforged.neoforge.fluids.FluidStack fStack) {
                 if (fStack.isEmpty()) return null;
-                ResourceLocation id = ForgeRegistries.FLUIDS.getKey(fStack.getFluid());
+                ResourceLocation id = BuiltInRegistries.FLUID.getKey(fStack.getFluid());
                 String name = fStack.getDisplayName().getString();
                 is = IngredientStack.fluid(id, name, fStack.getAmount(), (float) chance);
             } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
                 var items = ing.getItems();
                 if (items != null && items.length > 0 && !items[0].isEmpty()) {
                     ItemStack first = items[0];
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(first.getItem());
+                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(first.getItem());
                     String name = first.getHoverName().getString();
                     long amount = 1;
                     try {
@@ -805,9 +805,9 @@ public class GTCEuRecipeHandler {
                 try {
                     Method getStacksMethod = inner.getClass().getMethod("getStacks");
                     Object res = getStacksMethod.invoke(inner);
-                    if (res instanceof net.minecraftforge.fluids.FluidStack[] fArray && fArray.length > 0) {
-                        net.minecraftforge.fluids.FluidStack first = fArray[0];
-                        ResourceLocation id = ForgeRegistries.FLUIDS.getKey(first.getFluid());
+                    if (res instanceof net.neoforged.neoforge.fluids.FluidStack[] fArray && fArray.length > 0) {
+                        net.neoforged.neoforge.fluids.FluidStack first = fArray[0];
+                        ResourceLocation id = BuiltInRegistries.FLUID.getKey(first.getFluid());
                         String name = first.getDisplayName().getString();
                         is = IngredientStack.fluid(id, name, first.getAmount(), (float) chance);
                     }

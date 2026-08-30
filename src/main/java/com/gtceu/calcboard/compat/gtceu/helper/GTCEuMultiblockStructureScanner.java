@@ -10,7 +10,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -232,7 +232,7 @@ public class GTCEuMultiblockStructureScanner {
                             String name = "";
 
                             if (itemStack != null && !itemStack.isEmpty()) {
-                                itemId = ITEM_ID_CACHE.computeIfAbsent(itemStack.getItem(), ForgeRegistries.ITEMS::getKey);
+                                itemId = ITEM_ID_CACHE.computeIfAbsent(itemStack.getItem(), BuiltInRegistries.ITEM::getKey);
                                 if (itemId != null) {
                                     name = ITEM_NAME_CACHE.computeIfAbsent(itemStack.getItem(), itm -> itm.getDescription().getString());
                                 }
@@ -240,7 +240,7 @@ public class GTCEuMultiblockStructureScanner {
                                 Object bState = mGetBlockStateCached.invoke(bInfo);
                                 if (bState instanceof BlockState bs) {
                                     Block blk = bs.getBlock();
-                                    itemId = BLOCK_ID_CACHE.computeIfAbsent(blk, ForgeRegistries.BLOCKS::getKey);
+                                    itemId = BLOCK_ID_CACHE.computeIfAbsent(blk, BuiltInRegistries.BLOCK::getKey);
                                     if (itemId != null) {
                                         name = BLOCK_NAME_CACHE.computeIfAbsent(blk, b -> b.getName().getString());
                                     }

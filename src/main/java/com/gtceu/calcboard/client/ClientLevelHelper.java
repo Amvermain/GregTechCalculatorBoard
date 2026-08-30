@@ -32,8 +32,9 @@ public final class ClientLevelHelper {
                 if (recipeManager != null) {
                     RegistryAccess access = mc.level.registryAccess();
                     List<ItemStack> temp = new java.util.ArrayList<>();
-                    for (Recipe<?> r : recipeManager.getRecipes()) {
+                    for (net.minecraft.world.item.crafting.RecipeHolder<?> holder : recipeManager.getRecipes()) {
                         try {
+                            Recipe<?> r = holder.value();
                             temp.clear();
                             com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.extractRecipeOutputs(r, temp);
                             if (temp.isEmpty()) {

@@ -1,43 +1,52 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.server.storage.CommitLogEntry;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * S2C response packet containing paginated commit history.
  */
-public class S2CSyncCommitHistoryPacket {
+public record S2CSyncCommitHistoryPacket(int totalCount, List<CommitLogEntry> commits) implements CustomPacketPayload {
 
-    private final int totalCount;
-    private final List<CommitLogEntry> commits;
-
-    public S2CSyncCommitHistoryPacket(int totalCount, List<CommitLogEntry> commits) {
-        this.totalCount = totalCount;
-        this.commits = commits != null ? commits : new ArrayList<>();
-    }
+    public static final Type<S2CSyncCommitHistoryPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "s2c_sync_commit_history"));
+    public static final StreamCodec<FriendlyByteBuf, S2CSyncCommitHistoryPacket> STREAM_CODEC = CustomPacketPayload.codec(
+            S2CSyncCommitHistoryPacket::write,
+            S2CSyncCommitHistoryPacket::new
+    );
 
     public S2CSyncCommitHistoryPacket(FriendlyByteBuf buf) {
-        this.totalCount = buf.readVarInt();
+        this(buf.readVarInt(), readCommitList(buf));
+    }
+
+    private static List<CommitLogEntry> readCommitList(FriendlyByteBuf buf) {
         int count = buf.readVarInt();
-        this.commits = new ArrayList<>(count);
+        List<CommitLogEntry> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            this.commits.add(new CommitLogEntry(buf));
+            list.add(new CommitLogEntry(buf));
+        }
+        return list;
+    }
+
+    public void write(FriendlyByteBuf buf) {
+        buf.writeVarInt(totalCount);
+        List<CommitLogEntry> list = commits != null ? commits : List.of();
+        buf.writeVarInt(list.size());
+        for (CommitLogEntry entry : list) {
+            entry.encode(buf);
         }
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeVarInt(totalCount);
-        buf.writeVarInt(commits.size());
-        for (CommitLogEntry entry : commits) {
-            entry.encode(buf);
-        }
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
     public int getTotalCount() {
@@ -48,9 +57,7 @@ public class S2CSyncCommitHistoryPacket {
         return commits;
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleSyncCommitHistory(this)));
-        ctx.setPacketHandled(true);
+    public static void handle(S2CSyncCommitHistoryPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandler.handleSyncCommitHistory(packet));
     }
 }

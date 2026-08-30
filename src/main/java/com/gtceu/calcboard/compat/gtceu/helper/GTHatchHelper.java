@@ -6,7 +6,7 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon.HatchType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -396,7 +396,7 @@ public class GTHatchHelper {
     private static ItemStack getItemStackForDef(Object machineDef, ResourceLocation id) {
         if (id == null) return ItemStack.EMPTY;
         try {
-            var item = ForgeRegistries.ITEMS.getValue(id);
+            var item = BuiltInRegistries.ITEM.get(id);
             if (item != null) return new ItemStack(item);
         } catch (Throwable ignored) {}
         return ItemStack.EMPTY;

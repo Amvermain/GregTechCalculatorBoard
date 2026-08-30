@@ -12,7 +12,7 @@ import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,13 +32,10 @@ public class StarTModAdapter extends GTCEuModAdapter {
 
     @Override
     public boolean isLoaded() {
-        try {
-            if (ModList.get() != null) {
-                return ModList.get().isLoaded("start_core") || ModList.get().isLoaded("gtceu_start")
-                        || ModList.get().isLoaded("start") || ModList.get().isLoaded("star_technology");
-            }
-        } catch (Throwable ignored) {}
-        return true;
+        return com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded("start_core")
+                || com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded("gtceu_start")
+                || com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded("start")
+                || com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded("star_technology");
     }
 
     @Override
@@ -170,8 +167,8 @@ public class StarTModAdapter extends GTCEuModAdapter {
             MachineAddon addon = new MachineAddon(id, name, AddonCategory.THREADING, desc.toString().trim(), helix.getId());
             addon.setParallelMultiplier(1);
             try {
-                if (net.minecraftforge.registries.ForgeRegistries.ITEMS != null && helix.getId() != null) {
-                    net.minecraft.world.item.Item item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(helix.getId());
+                if (net.minecraft.core.registries.BuiltInRegistries.ITEM != null && helix.getId() != null) {
+                    net.minecraft.world.item.Item item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(helix.getId());
                     if (item != null) {
                         ItemStack s = new ItemStack(item, count);
                         addon.setItemStackSample(s);

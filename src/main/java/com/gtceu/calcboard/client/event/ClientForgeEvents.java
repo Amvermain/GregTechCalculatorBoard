@@ -1,31 +1,28 @@
 package com.gtceu.calcboard.client.event;
 
-import com.gtceu.calcboard.api.catalog.MultiblockDetector;
-import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.client.gui.BoardHotkeyHandler;
-
 import com.gtceu.calcboard.GregTechCalcBoard;
-import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
-import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.client.gui.BoardHotkeyHandler;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
 import com.gtceu.calcboard.client.key.KeyBindings;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
-import com.gtceu.calcboard.network.NetworkHandler;
-import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.client.event.RecipesUpdatedEvent;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 
-@Mod.EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, value = Dist.CLIENT)
 public class ClientForgeEvents {
 
     @SubscribeEvent
@@ -38,11 +35,11 @@ public class ClientForgeEvents {
         MachineAddonCatalog.getInstance().ensureFastLoaded();
 
         // Eagerly pre-index multiblock capabilities and 3D structures in the background so board opens instantly
-        com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
+        MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
 
         // Eagerly pre-index recipes as soon as recipe viewer is ready
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+        if (ModCompatHelper.isEmiLoaded()) {
             com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> {
                 RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
             });
@@ -65,7 +62,7 @@ public class ClientForgeEvents {
         try { RecipeSearchDialog.clearGlobalCache(); } catch (Throwable ignored) {}
         try { CategoryCapabilityMatrix.getInstance().reset(); } catch (Throwable ignored) {}
         try { MultiblockStructureCatalog.clear(); } catch (Throwable ignored) {}
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+        if (ModCompatHelper.isEmiLoaded()) {
             try { com.gtceu.calcboard.integration.emi.EmiLifecycleHook.reset(); } catch (Throwable ignored) {}
         }
     }
@@ -76,10 +73,10 @@ public class ClientForgeEvents {
         try { MachineAddonCatalog.getInstance().markDirty(); } catch (Throwable ignored) {}
         try { RecipeSearchDialog.clearGlobalCache(); } catch (Throwable ignored) {}
         try { MultiblockStructureCatalog.clear(); } catch (Throwable ignored) {}
-        com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
+        MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
         MachineAddonCatalog.getInstance().ensureFastLoadedAsync();
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+        if (ModCompatHelper.isEmiLoaded()) {
             com.gtceu.calcboard.integration.emi.EmiLifecycleHook.runWhenEmiReady(() -> {
                 RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
             });
@@ -94,7 +91,7 @@ public class ClientForgeEvents {
             "[GTCalcBoard] [Lifecycle] RecipesReady event received ({} recipes in {}ms). Triggering multiblock & addon deep scan...",
             event.getRecipeCount(), event.getElapsedMs()
         );
-        com.gtceu.calcboard.api.catalog.MultiblockDetector.initializeAsync();
+        MultiblockDetector.initializeAsync();
         MultiblockStructureCatalog.initializeAsync();
         MachineAddonCatalog.getInstance().ensureFastLoadedAsync();
     }
@@ -115,8 +112,8 @@ public class ClientForgeEvents {
         net.minecraft.client.gui.screens.Screen screen = event.getScreen();
         // Do not intercept if in pause, options, controls/keybinds, death, or configuration screens
         if (screen instanceof net.minecraft.client.gui.screens.PauseScreen
-                || screen instanceof net.minecraft.client.gui.screens.OptionsScreen
-                || screen instanceof net.minecraft.client.gui.screens.controls.KeyBindsScreen
+                || screen instanceof net.minecraft.client.gui.screens.options.OptionsScreen
+                || screen instanceof net.minecraft.client.gui.screens.options.controls.KeyBindsScreen
                 || screen instanceof net.minecraft.client.gui.screens.DeathScreen
                 || screen.getClass().getName().toLowerCase().contains("config")) {
             return;
@@ -185,19 +182,17 @@ public class ClientForgeEvents {
     }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc == null || mc.player == null || mc.level == null) {
-                while (KeyBindings.OPEN_BOARD.consumeClick()) {
-                    // Drain clicks while outside world
-                }
-                return;
-            }
+    public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.player == null || mc.level == null) {
             while (KeyBindings.OPEN_BOARD.consumeClick()) {
-                if (mc.screen == null) {
-                    mc.setScreen(new BoardScreen());
-                }
+                // Drain clicks while outside world
+            }
+            return;
+        }
+        while (KeyBindings.OPEN_BOARD.consumeClick()) {
+            if (mc.screen == null) {
+                mc.setScreen(new BoardScreen());
             }
         }
     }

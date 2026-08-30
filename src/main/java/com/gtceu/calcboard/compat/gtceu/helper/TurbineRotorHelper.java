@@ -7,7 +7,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -73,8 +73,8 @@ public class TurbineRotorHelper {
             }
         } catch (Throwable ignored) {}
 
-        if (stack.hasTag() && stack.getTag().contains("GT.PartStats")) {
-            String mat = stack.getTag().getCompound("GT.PartStats").getString("Material");
+        if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack) && com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).contains("GT.PartStats")) {
+            String mat = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).getCompound("GT.PartStats").getString("Material");
             if (!mat.isEmpty()) {
                 RotorStats stats = getRotorStats(mat);
                 if (stats != null && stats.efficiency() > 0) {
@@ -88,7 +88,7 @@ public class TurbineRotorHelper {
 
     private static RotorStats computeRotorStats(String matName) {
         try {
-            Item rotorItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+            Item rotorItem = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
 
             Class<?> behaviourCls = Class.forName("com.gregtechceu.gtceu.common.item.TurbineRotorBehaviour");
 
@@ -115,7 +115,7 @@ public class TurbineRotorHelper {
             CompoundTag partStats = new CompoundTag();
             partStats.putString("Material", matName.contains(":") ? matName : "gtceu:" + matName);
             tag.put("GT.PartStats", partStats);
-            stack.setTag(tag);
+            com.gtceu.calcboard.api.util.ItemTagHelper.setTag(stack, tag);
 
             Method getBehaviourMethod = behaviourCls.getMethod("getBehaviour", ItemStack.class);
             Object behaviour = getBehaviourMethod.invoke(null, stack);
@@ -201,8 +201,8 @@ public class TurbineRotorHelper {
         }
 
         String matId = null;
-        if (stack.hasTag() && stack.getTag().contains("GT.PartStats")) {
-            matId = stack.getTag().getCompound("GT.PartStats").getString("Material");
+        if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack) && com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).contains("GT.PartStats")) {
+            matId = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).getCompound("GT.PartStats").getString("Material");
         }
         String cleanMatName = matId;
         if (cleanMatName != null && cleanMatName.contains(":")) {
@@ -234,7 +234,7 @@ public class TurbineRotorHelper {
 
     public static void discoverGTCEuRotors(java.util.List<MachineAddon> list) {
         try {
-            Item rotorItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
+            Item rotorItem = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
 
             Class<?> propertyKeyCls = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey");
             Class<?> materialCls = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.Material");
@@ -302,12 +302,12 @@ public class TurbineRotorHelper {
                             }
                         } catch (Throwable ignored) {}
 
-                        if (!stack.hasTag() || !stack.getTag().contains("GT.PartStats")) {
-                            CompoundTag tag = stack.getOrCreateTag();
+                        if (!com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack) || !com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).contains("GT.PartStats")) {
+                            CompoundTag tag = com.gtceu.calcboard.api.util.ItemTagHelper.getOrCreateTag(stack);
                             CompoundTag partStats = new CompoundTag();
                             partStats.putString("Material", matName.contains(":") ? matName : "gtceu:" + matName);
                             tag.put("GT.PartStats", partStats);
-                            stack.setTag(tag);
+                            com.gtceu.calcboard.api.util.ItemTagHelper.setTag(stack, tag);
                         }
                     }
 
@@ -403,7 +403,7 @@ public class TurbineRotorHelper {
                         if (items != null) {
                             for (ItemStack s : items) {
                                 if (s != null && !s.isEmpty()) {
-                                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
+                                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(s.getItem());
                                     if (id != null && id.getPath().equals("turbine_rotor")) {
                                         GTRotorAddon rotor = parseTurbineRotor(s, id);
                                         if (rotor != null && list.stream().noneMatch(a -> a.getId().equals(rotor.getId()))) {

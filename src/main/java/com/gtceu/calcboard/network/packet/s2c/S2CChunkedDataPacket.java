@@ -1,79 +1,58 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * S2C chunked packet for streaming large payloads (> 512 KB) safely across the Netty pipeline.
  */
-public class S2CChunkedDataPacket {
+public record S2CChunkedDataPacket(
+        UUID transferId,
+        String pageId,
+        int revision,
+        int chunkIndex,
+        int totalChunks,
+        byte[] chunkBytes
+) implements CustomPacketPayload {
 
-    private final UUID transferId;
-    private final String pageId;
-    private final int revision;
-    private final int chunkIndex;
-    private final int totalChunks;
-    private final byte[] chunkBytes;
-
-    public S2CChunkedDataPacket(UUID transferId, String pageId, int revision, int chunkIndex, int totalChunks, byte[] chunkBytes) {
-        this.transferId = transferId != null ? transferId : UUID.randomUUID();
-        this.pageId = pageId != null ? pageId : "default";
-        this.revision = revision;
-        this.chunkIndex = chunkIndex;
-        this.totalChunks = totalChunks;
-        this.chunkBytes = chunkBytes != null ? chunkBytes : new byte[0];
-    }
+    public static final Type<S2CChunkedDataPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "s2c_chunked_data"));
+    public static final StreamCodec<FriendlyByteBuf, S2CChunkedDataPacket> STREAM_CODEC = CustomPacketPayload.codec(
+            S2CChunkedDataPacket::write,
+            S2CChunkedDataPacket::new
+    );
 
     public S2CChunkedDataPacket(FriendlyByteBuf buf) {
-        this.transferId = buf.readUUID();
-        this.pageId = buf.readUtf(256);
-        this.revision = buf.readVarInt();
-        this.chunkIndex = buf.readVarInt();
-        this.totalChunks = buf.readVarInt();
-        this.chunkBytes = buf.readByteArray();
+        this(
+                buf.readUUID(),
+                buf.readUtf(256),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readByteArray()
+        );
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUUID(transferId);
-        buf.writeUtf(pageId);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUUID(transferId != null ? transferId : UUID.randomUUID());
+        buf.writeUtf(pageId != null ? pageId : "default");
         buf.writeVarInt(revision);
         buf.writeVarInt(chunkIndex);
         buf.writeVarInt(totalChunks);
-        buf.writeByteArray(chunkBytes);
+        buf.writeByteArray(chunkBytes != null ? chunkBytes : new byte[0]);
     }
 
-    public UUID getTransferId() {
-        return transferId;
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
-    public String getPageId() {
-        return pageId;
-    }
-
-    public int getRevision() {
-        return revision;
-    }
-
-    public int getChunkIndex() {
-        return chunkIndex;
-    }
-
-    public int getTotalChunks() {
-        return totalChunks;
-    }
-
-    public byte[] getChunkBytes() {
-        return chunkBytes;
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleChunkedData(this)));
-        ctx.setPacketHandled(true);
+    public static void handle(S2CChunkedDataPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandler.handleChunkedData(packet));
     }
 }

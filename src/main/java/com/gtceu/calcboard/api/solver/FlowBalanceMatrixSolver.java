@@ -6,7 +6,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.*;
 
@@ -24,7 +24,7 @@ public final class FlowBalanceMatrixSolver {
     public static void autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
         if (graph == null || anchor == null || graph.getNodes().isEmpty()) return;
         try {
-            MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.PreSolve(graph));
+            NeoForge.EVENT_BUS.post(new FlowGraphEvent.PreSolve(graph));
         } catch (Throwable ignored) {}
         graph.cleanupInvalidConnections();
 
@@ -68,7 +68,7 @@ public final class FlowBalanceMatrixSolver {
         anchor.setMachineCount(targetAnchorCount);
         normalizeNodeCounts(graph, anchor, targetAnchorCount, integerCounts);
         try {
-            MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.PostSolve(graph));
+            NeoForge.EVENT_BUS.post(new FlowGraphEvent.PostSolve(graph));
         } catch (Throwable ignored) {}
     }
 

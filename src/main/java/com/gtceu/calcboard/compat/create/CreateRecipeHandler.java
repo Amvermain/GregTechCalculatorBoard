@@ -13,7 +13,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,7 +91,7 @@ public class CreateRecipeHandler {
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (itemId == null) return null;
         return createKineticGeneratorNode(itemId, stack.getHoverName().getString());
     }
@@ -99,7 +99,7 @@ public class CreateRecipeHandler {
     public static String getItemDisplayName(ResourceLocation itemId, String fallback) {
         if (itemId != null) {
             try {
-                var item = ForgeRegistries.ITEMS.getValue(itemId);
+                var item = BuiltInRegistries.ITEM.get(itemId);
                 if (item != null && item != net.minecraft.world.item.Items.AIR) {
                     String name = new ItemStack(item).getHoverName().getString();
                     if (name != null && !name.isEmpty()) {
@@ -229,7 +229,7 @@ public class CreateRecipeHandler {
             if ("create".equals(itemMod) && !ModCompatHelper.isCreateLoaded()) continue;
             if ("createaddition".equals(itemMod) && !ModCompatHelper.isCreateAdditionsLoaded()) continue;
             try {
-                var regItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(items[i]);
+                var regItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(items[i]);
                 if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {
                     continue;
                 }
@@ -367,7 +367,7 @@ public class CreateRecipeHandler {
 
             for (KineticCandidate c : candidates) {
                 var itemId = ResourceLocation.tryParse(c.modId + ":" + c.path);
-                var item = ForgeRegistries.ITEMS.getValue(itemId);
+                var item = BuiltInRegistries.ITEM.get(itemId);
                 if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
 
                 boolean skip = com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(
@@ -376,7 +376,7 @@ public class CreateRecipeHandler {
                 );
                 if (skip) continue;
 
-                var block = ForgeRegistries.BLOCKS.getValue(itemId);
+                var block = BuiltInRegistries.BLOCK.get(itemId);
                 double amount = getDynamicStressCapacity(block, c.defaultAmount);
 
                 var stack = new ItemStack(item);

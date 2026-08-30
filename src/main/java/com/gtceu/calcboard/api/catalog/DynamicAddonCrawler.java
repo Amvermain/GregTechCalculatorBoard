@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +16,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -44,7 +47,7 @@ public class DynamicAddonCrawler {
         }
         try {
             com.gtceu.calcboard.api.event.MachineAddonRegisterEvent event = new com.gtceu.calcboard.api.event.MachineAddonRegisterEvent();
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
+            NeoForge.EVENT_BUS.post(event);
             for (MachineAddon custom : event.getRegisteredAddons()) {
                 if (custom != null) {
                     list.add(custom);
@@ -55,7 +58,7 @@ public class DynamicAddonCrawler {
     }
 
     public static boolean isRecipeBakingComplete() {
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
             try {
                 return com.gtceu.calcboard.client.ClientLevelHelper.isRecipeBakingComplete();
             } catch (Throwable ignored) {}
@@ -69,7 +72,7 @@ public class DynamicAddonCrawler {
         java.util.function.Consumer<ItemStack> collector = is -> {
             if (is == null || is.isEmpty()) return;
             Item item = is.getItem();
-            ResourceLocation key = ForgeRegistries.ITEMS.getKey(item);
+            ResourceLocation key = BuiltInRegistries.ITEM.getKey(item);
             if (key == null) return;
             String ns = key.getNamespace().toLowerCase(java.util.Locale.ROOT);
             String path = key.getPath().toLowerCase(java.util.Locale.ROOT);
@@ -84,7 +87,7 @@ public class DynamicAddonCrawler {
                     && !path.contains("reflector")) {
                 return;
             }
-            String itemKey = key.toString() + (is.hasTag() ? "@" + is.getTag().toString() : "");
+            String itemKey = key.toString() + "@" + is.getComponents().toString();
             if (seenItemKeys.add(itemKey)) {
                 stacks.add(is);
             }
@@ -128,7 +131,7 @@ public class DynamicAddonCrawler {
         }
 
         // 3. Fallback: Minecraft Level RecipeManager
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+        if (FMLEnvironment.dist == Dist.CLIENT) {
             try {
                 com.gtceu.calcboard.client.ClientLevelHelper.collectClientRecipes(collector);
             } catch (Throwable ignored) {}
@@ -165,7 +168,7 @@ public class DynamicAddonCrawler {
             return;
         }
         if (recipe instanceof net.minecraft.world.item.crafting.Recipe<?> r) {
-            if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+            if (FMLEnvironment.dist == Dist.CLIENT) {
                 try {
                     ItemStack res = com.gtceu.calcboard.client.ClientLevelHelper.getRecipeResultItem(r);
                     if (res != null && !res.isEmpty()) {
@@ -253,12 +256,9 @@ public class DynamicAddonCrawler {
 
         // Check common hidden from recipe viewer tags (c:hidden_from_recipe_viewers, forge:hidden_from_recipe_viewers, c:disabled, etc.)
         try {
-            var holder = ForgeRegistries.ITEMS.getHolder(item);
-            if (holder.isPresent()) {
-                var h = holder.get();
-                for (var tag : getHiddenTags()) {
-                    if (h.containsTag(tag)) return true;
-                }
+            var holder = BuiltInRegistries.ITEM.wrapAsHolder(item);
+            for (var tag : getHiddenTags()) {
+                if (holder.is(tag)) return true;
             }
         } catch (Throwable ignored) {}
 
@@ -405,10 +405,6 @@ public class DynamicAddonCrawler {
                             if (es != null && !es.isEmpty()) {
                                 ItemStack is = es.getItemStack();
                                 if (is != null && !is.isEmpty()) {
-                                    if (!is.hasTag() && es.getNbt() != null) {
-                                        is = is.copy();
-                                        is.setTag(es.getNbt().copy());
-                                    }
                                     collector.accept(is);
                                 }
                             }
@@ -435,10 +431,6 @@ public class DynamicAddonCrawler {
                 if (!emiStack.isEmpty()) {
                     ItemStack is = emiStack.getItemStack();
                     if (is != null && !is.isEmpty()) {
-                        if (!is.hasTag() && emiStack.getNbt() != null) {
-                            is = is.copy();
-                            is.setTag(emiStack.getNbt().copy());
-                        }
                         outputStacks.add(is);
                     }
                 }

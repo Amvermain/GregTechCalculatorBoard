@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.render;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -23,9 +24,7 @@ public class ConnectionRenderer {
         RenderSystem.disableDepthTest();
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
-        Tesselator tesselator = Tesselator.getInstance();
-        ACTIVE_BATCH_BUFFER = tesselator.getBuilder();
-        ACTIVE_BATCH_BUFFER.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        ACTIVE_BATCH_BUFFER = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
     }
 
     public static void computeControlPoints(float x1, float y1, float x2, float y2, float dir1X, float dir2X, float[] out4) {
@@ -91,16 +90,19 @@ public class ConnectionRenderer {
             float nx = -segDy / len * halfThick;
             float ny = segDx / len * halfThick;
 
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i] + nx, py[i] + ny, 0.0f).color(r, g, b, a).endVertex();
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i + 1] + nx, py[i + 1] + ny, 0.0f).color(r, g, b, a).endVertex();
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i + 1] - nx, py[i + 1] - ny, 0.0f).color(r, g, b, a).endVertex();
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i] - nx, py[i] - ny, 0.0f).color(r, g, b, a).endVertex();
+            ACTIVE_BATCH_BUFFER.addVertex(ACTIVE_BATCH_POSE, px[i] + nx, py[i] + ny, 0.0f).setColor(r, g, b, a);
+            ACTIVE_BATCH_BUFFER.addVertex(ACTIVE_BATCH_POSE, px[i + 1] + nx, py[i + 1] + ny, 0.0f).setColor(r, g, b, a);
+            ACTIVE_BATCH_BUFFER.addVertex(ACTIVE_BATCH_POSE, px[i + 1] - nx, py[i + 1] - ny, 0.0f).setColor(r, g, b, a);
+            ACTIVE_BATCH_BUFFER.addVertex(ACTIVE_BATCH_POSE, px[i] - nx, py[i] - ny, 0.0f).setColor(r, g, b, a);
         }
     }
 
     public static void endBatch() {
         if (ACTIVE_BATCH_BUFFER != null) {
-            Tesselator.getInstance().end();
+            var mesh = ACTIVE_BATCH_BUFFER.build();
+            if (mesh != null) {
+                BufferUploader.drawWithShader(mesh);
+            }
             RenderSystem.enableCull();
             RenderSystem.disableBlend();
             ACTIVE_BATCH_BUFFER = null;
@@ -125,9 +127,7 @@ public class ConnectionRenderer {
         RenderSystem.disableDepthTest();
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder buffer = tesselator.getBuilder();
-        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
         float pulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
         float it = 1.0f - pulseTime;
@@ -147,19 +147,22 @@ public class ConnectionRenderer {
             float dotY = it * it * it * y1 + 3 * it * it * pulseTime * cy1 + 3 * it * pulseTime * pulseTime * cy2 + pulseTime * pulseTime * pulseTime * y2;
 
             // Outer glow quad (0x88FFFFFF)
-            buffer.vertex(pose, dotX - 3.5f, dotY - 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-            buffer.vertex(pose, dotX + 3.5f, dotY - 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-            buffer.vertex(pose, dotX + 3.5f, dotY + 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-            buffer.vertex(pose, dotX - 3.5f, dotY + 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
+            buffer.addVertex(pose, dotX - 3.5f, dotY - 3.5f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 0.53f);
+            buffer.addVertex(pose, dotX + 3.5f, dotY - 3.5f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 0.53f);
+            buffer.addVertex(pose, dotX + 3.5f, dotY + 3.5f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 0.53f);
+            buffer.addVertex(pose, dotX - 3.5f, dotY + 3.5f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 0.53f);
 
             // Inner core quad (0xFFFFFFFF)
-            buffer.vertex(pose, dotX - 2.0f, dotY - 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
-            buffer.vertex(pose, dotX + 2.0f, dotY - 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
-            buffer.vertex(pose, dotX + 2.0f, dotY + 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
-            buffer.vertex(pose, dotX - 2.0f, dotY + 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
+            buffer.addVertex(pose, dotX - 2.0f, dotY - 2.0f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 1.0f);
+            buffer.addVertex(pose, dotX + 2.0f, dotY - 2.0f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 1.0f);
+            buffer.addVertex(pose, dotX + 2.0f, dotY + 2.0f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 1.0f);
+            buffer.addVertex(pose, dotX - 2.0f, dotY + 2.0f, 0.0f).setColor(1.0f, 1.0f, 1.0f, 1.0f);
         }
 
-        tesselator.end();
+        var mesh = buffer.build();
+        if (mesh != null) {
+            BufferUploader.drawWithShader(mesh);
+        }
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
     }

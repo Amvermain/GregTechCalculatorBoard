@@ -76,7 +76,7 @@ public class GTRotorAddon extends MachineAddon {
     @Override
     public net.minecraft.world.item.ItemStack getItemStackSample() {
         net.minecraft.world.item.ItemStack sample = super.getItemStackSample();
-        if (sample != null && !sample.isEmpty() && sample.hasTag() && sample.getTag().contains("GT.PartStats")) {
+        if (sample != null && !sample.isEmpty() && com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(sample) && com.gtceu.calcboard.api.util.ItemTagHelper.getTag(sample).contains("GT.PartStats")) {
             return sample;
         }
 
@@ -87,16 +87,16 @@ public class GTRotorAddon extends MachineAddon {
                 matName = matName.substring("gtceu:rotor_".length());
             }
             if (matName != null && !matName.isEmpty()) {
-                net.minecraft.world.item.Item rotorItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(
+                net.minecraft.world.item.Item rotorItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
                         ResourceLocation.tryParse("gtceu:turbine_rotor")
                 );
                 if (rotorItem != null) {
                     net.minecraft.world.item.ItemStack stack = new net.minecraft.world.item.ItemStack(rotorItem);
-                    CompoundTag tag = stack.getOrCreateTag();
+                    CompoundTag tag = com.gtceu.calcboard.api.util.ItemTagHelper.getOrCreateTag(stack);
                     CompoundTag partStats = new CompoundTag();
                     partStats.putString("Material", matName.contains(":") ? matName : "gtceu:" + matName);
                     tag.put("GT.PartStats", partStats);
-                    stack.setTag(tag);
+                    com.gtceu.calcboard.api.util.ItemTagHelper.setTag(stack, tag);
                     setItemStackSample(stack);
                     return stack;
                 }

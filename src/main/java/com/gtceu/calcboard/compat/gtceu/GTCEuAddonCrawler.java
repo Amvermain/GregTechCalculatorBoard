@@ -13,7 +13,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -54,7 +54,7 @@ public class GTCEuAddonCrawler {
         if (recipeOutputStacks != null) {
             for (ItemStack s : recipeOutputStacks) {
                 if (s == null || s.isEmpty()) continue;
-                ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
+                ResourceLocation id = BuiltInRegistries.ITEM.getKey(s.getItem());
                 if (id == null) continue;
 
                 MachineAddon rotor = TurbineRotorHelper.parseTurbineRotor(s, id);
@@ -81,22 +81,22 @@ public class GTCEuAddonCrawler {
         }
 
         // 4. Registry crawl for GT & Addon hatches, coils, reflectors, rotors
-        if (ForgeRegistries.ITEMS != null) {
+        if (BuiltInRegistries.ITEM != null) {
             Map<Item, ItemStack> nbtItemSamples = new HashMap<>();
             java.util.Set<Item> activeRecipeItems = new java.util.HashSet<>();
             if (recipeOutputStacks != null) {
                 for (ItemStack s : recipeOutputStacks) {
                     if (s != null && !s.isEmpty()) {
                         activeRecipeItems.add(s.getItem());
-                        if (s.hasTag()) {
+                        if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(s)) {
                             nbtItemSamples.put(s.getItem(), s);
                         }
                     }
                 }
             }
 
-            for (Item item : ForgeRegistries.ITEMS) {
-                ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+            for (Item item : BuiltInRegistries.ITEM) {
+                ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
                 if (id == null) continue;
                 String ns = id.getNamespace();
                 if (!ns.equals("gtceu") && !ns.equals("kubejs")) continue;

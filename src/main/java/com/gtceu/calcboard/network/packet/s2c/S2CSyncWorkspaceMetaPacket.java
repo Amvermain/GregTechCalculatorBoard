@@ -1,28 +1,28 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Lightweight S2C metadata packet containing workspace summary and page tab headers (< 5 KB).
  */
-public class S2CSyncWorkspaceMetaPacket {
+public record S2CSyncWorkspaceMetaPacket(UUID teamId, String teamName, int globalRevision, List<PageMeta> pages) implements CustomPacketPayload {
 
-    public static class PageMeta {
-        private final String pageId;
-        private final String title;
-        private final int revision;
-        private final UUID lockHolderUUID;
-        private final String lockHolderName;
-        private final long lockExpiresTimestamp;
+    public static final Type<S2CSyncWorkspaceMetaPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "s2c_sync_workspace_meta"));
+    public static final StreamCodec<FriendlyByteBuf, S2CSyncWorkspaceMetaPacket> STREAM_CODEC = CustomPacketPayload.codec(
+            S2CSyncWorkspaceMetaPacket::write,
+            S2CSyncWorkspaceMetaPacket::new
+    );
 
+    public record PageMeta(String pageId, String title, int revision, UUID lockHolderUUID, String lockHolderName, long lockExpiresTimestamp) {
         public PageMeta(String pageId, String title, int revision, UUID lockHolderUUID, String lockHolderName, long lockExpiresTimestamp) {
             this.pageId = pageId != null ? pageId : "default";
             this.title = title != null ? title : "Page";
@@ -33,12 +33,14 @@ public class S2CSyncWorkspaceMetaPacket {
         }
 
         public PageMeta(FriendlyByteBuf buf) {
-            this.pageId = buf.readUtf(256);
-            this.title = buf.readUtf(256);
-            this.revision = buf.readVarInt();
-            this.lockHolderUUID = buf.readBoolean() ? buf.readUUID() : null;
-            this.lockHolderName = buf.readUtf(256);
-            this.lockExpiresTimestamp = buf.readLong();
+            this(
+                    buf.readUtf(256),
+                    buf.readUtf(256),
+                    buf.readVarInt(),
+                    buf.readBoolean() ? buf.readUUID() : null,
+                    buf.readUtf(256),
+                    buf.readLong()
+            );
         }
 
         public void encode(FriendlyByteBuf buf) {
@@ -78,37 +80,33 @@ public class S2CSyncWorkspaceMetaPacket {
         }
     }
 
-    private final UUID teamId;
-    private final String teamName;
-    private final int globalRevision;
-    private final List<PageMeta> pages;
-
-    public S2CSyncWorkspaceMetaPacket(UUID teamId, String teamName, int globalRevision, List<PageMeta> pages) {
-        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
-        this.teamName = teamName != null ? teamName : "Team Workspace";
-        this.globalRevision = globalRevision;
-        this.pages = pages != null ? pages : new ArrayList<>();
-    }
-
     public S2CSyncWorkspaceMetaPacket(FriendlyByteBuf buf) {
-        this.teamId = buf.readUUID();
-        this.teamName = buf.readUtf(256);
-        this.globalRevision = buf.readVarInt();
-        int count = buf.readVarInt();
-        this.pages = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            this.pages.add(new PageMeta(buf));
-        }
+        this(buf.readUUID(), buf.readUtf(256), buf.readVarInt(), readPageMetaList(buf));
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUUID(teamId);
-        buf.writeUtf(teamName);
+    private static List<PageMeta> readPageMetaList(FriendlyByteBuf buf) {
+        int count = buf.readVarInt();
+        List<PageMeta> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            list.add(new PageMeta(buf));
+        }
+        return list;
+    }
+
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUUID(teamId != null ? teamId : new UUID(0L, 0L));
+        buf.writeUtf(teamName != null ? teamName : "Team Workspace");
         buf.writeVarInt(globalRevision);
-        buf.writeVarInt(pages.size());
-        for (PageMeta pm : pages) {
+        List<PageMeta> pageList = pages != null ? pages : List.of();
+        buf.writeVarInt(pageList.size());
+        for (PageMeta pm : pageList) {
             pm.encode(buf);
         }
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
     public UUID getTeamId() {
@@ -127,9 +125,7 @@ public class S2CSyncWorkspaceMetaPacket {
         return pages;
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleSyncWorkspaceMeta(this)));
-        ctx.setPacketHandled(true);
+    public static void handle(S2CSyncWorkspaceMetaPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandler.handleSyncWorkspaceMeta(packet));
     }
 }

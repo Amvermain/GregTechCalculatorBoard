@@ -7,7 +7,7 @@ import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.List;
 
@@ -31,9 +31,9 @@ public class StarTAddonCrawler {
         }
 
         try {
-            if (ForgeRegistries.ITEMS != null) {
-                for (Item item : ForgeRegistries.ITEMS) {
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+            if (BuiltInRegistries.ITEM != null) {
+                for (Item item : BuiltInRegistries.ITEM) {
+                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
                     if (id == null) continue;
                     String ns = id.getNamespace();
                     if (!ns.equals("start_core") && !ns.equals("gtceu_start")) continue;

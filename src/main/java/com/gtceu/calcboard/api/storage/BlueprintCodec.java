@@ -71,7 +71,7 @@ public class BlueprintCodec {
 
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-            CompoundTag tag = NbtIo.readCompressed(bais);
+            CompoundTag tag = NbtIo.readCompressed(bais, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
             if (tag != null) {
                 BlueprintPackage pkg = BlueprintPackage.deserializeNBT(tag);
                 if (pkg != null && prefixTitle != null && !prefixTitle.isEmpty()) {
@@ -116,7 +116,7 @@ public class BlueprintCodec {
         if (bytes == null || bytes.length == 0) return new CompoundTag();
         try {
             ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-            return NbtIo.readCompressed(bais);
+            return NbtIo.readCompressed(bais, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
         } catch (Exception e) {
             e.printStackTrace();
             return new CompoundTag();

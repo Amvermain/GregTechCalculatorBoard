@@ -1,39 +1,39 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
-public class S2CLockResultPacket {
+public record S2CLockResultPacket(
+        String pageId,
+        boolean success,
+        UUID lockHolderUUID,
+        String lockHolderName,
+        long expiresTimestamp
+) implements CustomPacketPayload {
 
-    private final String pageId;
-    private final boolean success;
-    private final UUID lockHolderUUID;
-    private final String lockHolderName;
-    private final long expiresTimestamp;
-
-    public S2CLockResultPacket(String pageId, boolean success, UUID lockHolderUUID, String lockHolderName, long expiresTimestamp) {
-        this.pageId = pageId != null ? pageId : "default";
-        this.success = success;
-        this.lockHolderUUID = lockHolderUUID;
-        this.lockHolderName = lockHolderName != null ? lockHolderName : "";
-        this.expiresTimestamp = expiresTimestamp;
-    }
+    public static final Type<S2CLockResultPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "s2c_lock_result"));
+    public static final StreamCodec<FriendlyByteBuf, S2CLockResultPacket> STREAM_CODEC = CustomPacketPayload.codec(
+            S2CLockResultPacket::write,
+            S2CLockResultPacket::new
+    );
 
     public S2CLockResultPacket(FriendlyByteBuf buf) {
-        this.pageId = buf.readUtf(256);
-        this.success = buf.readBoolean();
-        boolean hasHolder = buf.readBoolean();
-        this.lockHolderUUID = hasHolder ? buf.readUUID() : null;
-        this.lockHolderName = buf.readUtf(256);
-        this.expiresTimestamp = buf.readLong();
+        this(
+                buf.readUtf(256),
+                buf.readBoolean(),
+                buf.readBoolean() ? buf.readUUID() : null,
+                buf.readUtf(256),
+                buf.readLong()
+        );
     }
 
-    public void encode(FriendlyByteBuf buf) {
+    public void write(FriendlyByteBuf buf) {
         buf.writeUtf(pageId != null ? pageId : "default");
         buf.writeBoolean(success);
         boolean hasHolder = lockHolderUUID != null;
@@ -43,6 +43,11 @@ public class S2CLockResultPacket {
         }
         buf.writeUtf(lockHolderName != null ? lockHolderName : "");
         buf.writeLong(expiresTimestamp);
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
     public String getPageId() {
@@ -65,9 +70,7 @@ public class S2CLockResultPacket {
         return expiresTimestamp;
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleLockResult(this)));
-        ctx.setPacketHandled(true);
+    public static void handle(S2CLockResultPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandler.handleLockResult(packet));
     }
 }

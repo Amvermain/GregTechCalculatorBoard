@@ -1,43 +1,35 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.function.Supplier;
+public record S2CWorkspaceErrorPacket(int errorCode, String messageKey) implements CustomPacketPayload {
 
-public class S2CWorkspaceErrorPacket {
-
-    private final int errorCode;
-    private final String messageKey;
-
-    public S2CWorkspaceErrorPacket(int errorCode, String messageKey) {
-        this.errorCode = errorCode;
-        this.messageKey = messageKey != null ? messageKey : "gui.gtcalcboard.error.generic";
-    }
+    public static final Type<S2CWorkspaceErrorPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "s2c_workspace_error"));
+    public static final StreamCodec<FriendlyByteBuf, S2CWorkspaceErrorPacket> STREAM_CODEC = CustomPacketPayload.codec(
+            S2CWorkspaceErrorPacket::write,
+            S2CWorkspaceErrorPacket::new
+    );
 
     public S2CWorkspaceErrorPacket(FriendlyByteBuf buf) {
-        this.errorCode = buf.readVarInt();
-        this.messageKey = buf.readUtf(256);
+        this(buf.readVarInt(), buf.readUtf(256));
     }
 
-    public void encode(FriendlyByteBuf buf) {
+    public void write(FriendlyByteBuf buf) {
         buf.writeVarInt(errorCode);
         buf.writeUtf(messageKey != null ? messageKey : "gui.gtcalcboard.error.generic");
     }
 
-    public int getErrorCode() {
-        return errorCode;
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
-    public String getMessageKey() {
-        return messageKey;
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleError(this)));
-        ctx.setPacketHandled(true);
+    public static void handle(S2CWorkspaceErrorPacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandler.handleError(packet));
     }
 }

@@ -2,7 +2,7 @@ package com.gtceu.calcboard.server.team;
 
 import com.gtceu.calcboard.GregTechCalcBoard;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import java.lang.reflect.Method;
 import java.util.*;

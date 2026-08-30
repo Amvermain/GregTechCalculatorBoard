@@ -674,7 +674,7 @@ public final class GTCEuBOMHelper {
     private static String resolveDisplayName(ResourceLocation id, String fallback) {
         if (id == null) return fallback;
         try {
-            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+            var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(id);
             if (item != null && item != net.minecraft.world.item.Items.AIR) {
                 return new net.minecraft.world.item.ItemStack(item).getHoverName().getString();
             }

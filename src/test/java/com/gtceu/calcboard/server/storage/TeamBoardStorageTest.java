@@ -102,8 +102,8 @@ public class TeamBoardStorageTest {
         ws1.addOrUpdatePage(new TeamWorkspacePage("p1", "Page 1"));
         ws2.addOrUpdatePage(new TeamWorkspacePage("p2", "Page 2"));
 
-        CompoundTag nbt = savedData.save(new CompoundTag());
-        TeamBoardSavedData loaded = TeamBoardSavedData.load(nbt);
+        CompoundTag nbt = savedData.save(new CompoundTag(), null);
+        TeamBoardSavedData loaded = TeamBoardSavedData.load(nbt, null);
 
         assertNotNull(loaded.getWorkspace(team1));
         assertNotNull(loaded.getWorkspace(team2));

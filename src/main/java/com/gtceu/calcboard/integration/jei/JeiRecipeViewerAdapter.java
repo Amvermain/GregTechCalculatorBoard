@@ -11,7 +11,7 @@ import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter;
 import mezz.jei.api.constants.VanillaTypes;
-import mezz.jei.api.forge.ForgeTypes;
+import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.IFocus;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.runtime.IJeiRuntime;
@@ -23,8 +23,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.fluids.FluidStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -154,15 +154,15 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
             var recipesGui = jeiRuntime.getRecipesGui();
 
             if (ingredient.isFluid()) {
-                var fluid = ForgeRegistries.FLUIDS.getValue(ingredient.getId());
+                var fluid = BuiltInRegistries.FLUID.get(ingredient.getId());
                 if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
                     FluidStack fs = new FluidStack(fluid, (int) Math.max(1, ingredient.getAmount()));
-                    var focus = focusFactory.createFocus(role, ForgeTypes.FLUID_STACK, fs);
+                    var focus = focusFactory.createFocus(role, NeoForgeTypes.FLUID_STACK, fs);
                     recipesGui.show(List.of(focus));
                     return true;
                 }
             } else {
-                var item = ForgeRegistries.ITEMS.getValue(ingredient.getId());
+                var item = BuiltInRegistries.ITEM.get(ingredient.getId());
                 if (item != null && item != Items.AIR) {
                     ItemStack is = new ItemStack(item, (int) Math.max(1, Math.round(ingredient.getAmount())));
                     var focus = focusFactory.createFocus(role, VanillaTypes.ITEM_STACK, is);

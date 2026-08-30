@@ -27,15 +27,21 @@ public record JeiRecipeWrapper<T>(
                 if (rName != null) return rName;
             } catch (Throwable ignored) {}
         }
-        if (recipe instanceof Recipe<?> r) {
-            return r.getId();
+        if (recipe instanceof net.minecraft.world.item.crafting.RecipeHolder<?> holder) {
+            return holder.id();
         }
         if (recipe != null) {
             try {
-                var m = recipe.getClass().getMethod("getId");
+                var m = recipe.getClass().getMethod("id");
                 Object res = m.invoke(recipe);
                 if (res instanceof ResourceLocation rl) return rl;
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                try {
+                    var m = recipe.getClass().getMethod("getId");
+                    Object res = m.invoke(recipe);
+                    if (res instanceof ResourceLocation rl) return rl;
+                } catch (Throwable ignored2) {}
+            }
         }
         return null;
     }

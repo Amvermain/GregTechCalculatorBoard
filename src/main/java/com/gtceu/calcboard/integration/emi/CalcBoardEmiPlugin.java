@@ -27,7 +27,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
         registry.addDragDropHandler(BoardScreen.class, new BoardEmiDragDropHandler());
-        if (ModMenus.BOARD_MENU.isPresent()) {
+        if (ModMenus.BOARD_MENU.isBound()) {
             try {
                 registry.addRecipeHandler(ModMenus.BOARD_MENU.get(), new BoardEmiRecipeHandler());
             } catch (Throwable ignored) {}
@@ -38,7 +38,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
     }
 
     private void registerKineticRecipes(EmiRegistry registry) {
-        var iconItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("create:large_water_wheel"));
+        var iconItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("create:large_water_wheel"));
         var iconStack = (iconItem != null && iconItem != net.minecraft.world.item.Items.AIR) ? EmiStack.of(iconItem) : EmiStack.of(net.minecraft.world.item.Items.WATER_BUCKET);
         var category = new dev.emi.emi.api.recipe.EmiRecipeCategory(ResourceLocation.tryParse("gtcalcboard:kinetic_generation"), iconStack);
         registry.addCategory(category);
@@ -49,7 +49,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
             if (rm != null) {
                 for (var r : rm.getRecipes()) {
                     try {
-                        net.minecraft.world.item.ItemStack res = r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
+                        net.minecraft.world.item.ItemStack res = r.value().getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
                         if (res != null && !res.isEmpty() && res.getItem() != net.minecraft.world.item.Items.AIR) {
                             activeRecipeItems.add(res.getItem());
                         }

@@ -177,7 +177,7 @@ public final class RecipeSearchCacheManager {
                 );
 
                 try {
-                    net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                    net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                             new com.gtceu.calcboard.api.event.CatalogLifecycleEvent.RecipesReady(tempList.size(), elapsedMs)
                     );
                 } catch (Throwable ignored) {}

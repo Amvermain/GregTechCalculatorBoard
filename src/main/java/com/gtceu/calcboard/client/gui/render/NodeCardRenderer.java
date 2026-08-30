@@ -27,7 +27,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.List;
 import java.util.Map;
@@ -116,7 +116,7 @@ public class NodeCardRenderer {
         int titleX = x + 6;
         ResourceLocation iconId = node.getMachineIcon();
         if (iconId != null) {
-            var item = ForgeRegistries.ITEMS.getValue(iconId);
+            var item = BuiltInRegistries.ITEM.get(iconId);
             if (item != null && item != Items.AIR) {
                 graphics.renderItem(new ItemStack(item), x + 3, y + 2);
                 titleX = x + 22;

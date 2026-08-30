@@ -6,7 +6,7 @@ import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.util.List;
 import java.util.Set;
@@ -31,10 +31,10 @@ public class ThermalAddonCrawler {
                 try {
                     if (s == null || s.isEmpty()) continue;
                     activeRecipeItems.add(s.getItem());
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
+                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(s.getItem());
                     if (id == null) continue;
 
-                    if (s.hasTag()) {
+                    if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(s)) {
                         nbtItemSamples.put(s.getItem(), s);
                     }
 
@@ -48,10 +48,10 @@ public class ThermalAddonCrawler {
 
         // 2. Scan Forge Item Registry with NBT samples fallback
         try {
-            if (ForgeRegistries.ITEMS != null) {
-                for (Item item : ForgeRegistries.ITEMS) {
+            if (BuiltInRegistries.ITEM != null) {
+                for (Item item : BuiltInRegistries.ITEM) {
                     try {
-                        ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+                        ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
                         if (id == null) continue;
 
                         // When recipes have been scanned, only discover items that actually have an active recipe!

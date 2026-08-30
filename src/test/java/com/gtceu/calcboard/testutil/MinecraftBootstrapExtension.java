@@ -16,13 +16,25 @@ public class MinecraftBootstrapExtension implements BeforeAllCallback {
     public static void ensureBootstrapped() {
         if (BOOTSTRAPPED.compareAndSet(false, true)) {
             try {
+                // Initialize mock LoadingModList so NeoForge's FeatureFlagLoader doesn't NPE during Bootstrap
+                try {
+                    Class<?> lmlClass = Class.forName("net.neoforged.fml.loading.LoadingModList");
+                    java.lang.reflect.Field instanceField = lmlClass.getDeclaredField("INSTANCE");
+                    instanceField.setAccessible(true);
+                    if (instanceField.get(null) == null) {
+                        java.lang.reflect.Constructor<?> ctor = lmlClass.getDeclaredConstructor(
+                                java.util.List.class, java.util.List.class, java.util.List.class, java.util.Map.class);
+                        ctor.setAccessible(true);
+                        Object instance = ctor.newInstance(
+                                new java.util.ArrayList<>(), new java.util.ArrayList<>(), new java.util.ArrayList<>(), new java.util.HashMap<>());
+                        instanceField.set(null, instance);
+                    }
+                } catch (Throwable ignored) {}
+
                 net.minecraft.SharedConstants.tryDetectVersion();
-                java.lang.reflect.Field field = net.minecraft.server.Bootstrap.class.getDeclaredField("isBootstrapped");
-                field.setAccessible(true);
-                if (!field.getBoolean(null)) {
-                    net.minecraft.server.Bootstrap.bootStrap();
-                }
-            } catch (Throwable ignored) {
+                net.minecraft.server.Bootstrap.bootStrap();
+            } catch (Throwable t) {
+                t.printStackTrace();
             }
         }
     }

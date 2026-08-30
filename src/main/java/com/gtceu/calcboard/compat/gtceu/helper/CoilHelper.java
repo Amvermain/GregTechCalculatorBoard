@@ -9,7 +9,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -94,7 +94,7 @@ public class CoilHelper {
         }
 
         try {
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
             if (id != null) {
                 return STATS_CACHE.get(id.toString());
             }
@@ -119,7 +119,7 @@ public class CoilHelper {
         try {
             ResourceLocation id = ResourceLocation.tryParse(key.contains(":") ? key : "gtceu:" + key);
             if (id != null) {
-                Block block = ForgeRegistries.BLOCKS.getValue(id);
+                Block block = BuiltInRegistries.BLOCK.get(id);
                 if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
                     CoilStats stats = extractStatsFromBlockObject(block);
                     if (stats != null) {
@@ -128,7 +128,7 @@ public class CoilHelper {
                     }
                 }
 
-                Item item = ForgeRegistries.ITEMS.getValue(id);
+                Item item = BuiltInRegistries.ITEM.get(id);
                 if (item instanceof BlockItem bi) {
                     CoilStats stats = extractStatsFromBlockObject(bi.getBlock());
                     if (stats != null) {
@@ -277,7 +277,7 @@ public class CoilHelper {
 
     public static void discoverGTCEuCoils(java.util.List<MachineAddon> list) {
         try {
-            for (Map.Entry<net.minecraft.resources.ResourceKey<Block>, Block> entry : ForgeRegistries.BLOCKS.getEntries()) {
+            for (Map.Entry<net.minecraft.resources.ResourceKey<Block>, Block> entry : BuiltInRegistries.BLOCK.entrySet()) {
                 ResourceLocation id = entry.getKey().location();
                 if (id == null) continue;
                 String path = id.getPath().toLowerCase(Locale.ROOT);

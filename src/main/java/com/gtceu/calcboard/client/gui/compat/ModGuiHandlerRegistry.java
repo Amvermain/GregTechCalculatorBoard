@@ -8,8 +8,8 @@ import com.gtceu.calcboard.client.gui.compat.systeams.SysteamsModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.thermal.ThermalModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.vanilla.VanillaModGuiHandler;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.HashMap;
 import java.util.Map;

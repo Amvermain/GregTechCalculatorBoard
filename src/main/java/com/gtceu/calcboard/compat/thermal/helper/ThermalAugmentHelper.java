@@ -21,11 +21,11 @@ public class ThermalAugmentHelper {
         }
 
         CompoundTag augTag = null;
-        if (stack.hasTag()) {
-            if (stack.getTag().contains("AugmentData")) {
-                augTag = stack.getTag().getCompound("AugmentData");
-            } else if (hasAnyAugmentKey(stack.getTag())) {
-                augTag = stack.getTag();
+        if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack)) {
+            if (com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).contains("AugmentData")) {
+                augTag = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack).getCompound("AugmentData");
+            } else if (hasAnyAugmentKey(com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack))) {
+                augTag = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack);
             }
         }
 
@@ -82,7 +82,7 @@ public class ThermalAugmentHelper {
         MachineAddon addon = parseThermalAugmentTag(augTag, stack.getHoverName().getString(), id);
         if (addon != null) {
             addon.setItemStackSample(stack);
-            addon.setDiscoverySource((stack.hasTag() ? "Active Recipe Output NBT (AugmentData)" : "Thermal IAugmentItem Reflection") + " [" + id + "]");
+            addon.setDiscoverySource((com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack) ? "Active Recipe Output NBT (AugmentData)" : "Thermal IAugmentItem Reflection") + " [" + id + "]");
         }
         return addon;
     }

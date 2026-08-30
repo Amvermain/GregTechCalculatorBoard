@@ -24,7 +24,7 @@ import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraftforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 import com.gtceu.calcboard.testutil.MinecraftBootstrapExtension;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Assertions;
@@ -35,6 +35,10 @@ import java.util.List;
 
 @ExtendWith(MinecraftBootstrapExtension.class)
 public class JeiRecipeIntegrationTest {
+
+    static {
+        MinecraftBootstrapExtension.ensureBootstrapped();
+    }
 
     private static class MockRecipeCategory<T> implements IRecipeCategory<T> {
         private final RecipeType<T> recipeType;
@@ -77,14 +81,15 @@ public class JeiRecipeIntegrationTest {
 
         @Override
         public void setRecipe(IRecipeLayoutBuilder builder, T recipe, IFocusGroup focuses) {
-            if (recipe instanceof MockCraftingRecipe cr) {
+            Object raw = (recipe instanceof net.minecraft.world.item.crafting.RecipeHolder<?> rh) ? rh.value() : recipe;
+            if (raw instanceof MockCraftingRecipe cr) {
                 for (ItemStack in : cr.inputs) {
                     builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(in);
                 }
                 for (ItemStack out : cr.outputs) {
                     builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(out);
                 }
-            } else if (recipe instanceof net.minecraft.world.item.crafting.SmeltingRecipe sr) {
+            } else if (raw instanceof net.minecraft.world.item.crafting.SmeltingRecipe sr) {
                 for (ItemStack in : sr.getIngredients().get(0).getItems()) {
                     builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(in);
                 }
@@ -115,16 +120,16 @@ public class JeiRecipeIntegrationTest {
     }
 
     private static ItemStack createItem(String modId, String path, int count) {
-        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(modId + ":" + path));
-        if (item != null) {
+        var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(modId + ":" + path));
+        if (item != null && item != Items.AIR) {
             return new ItemStack(item, count);
         }
         return ItemStack.EMPTY;
     }
 
     private static FluidStack createFluid(String modId, String path, int amount) {
-        var fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(ResourceLocation.tryParse(modId + ":" + path));
-        if (fluid != null) {
+        var fluid = net.minecraft.core.registries.BuiltInRegistries.FLUID.get(ResourceLocation.tryParse(modId + ":" + path));
+        if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
             return new FluidStack(fluid, amount);
         }
         return FluidStack.EMPTY;
@@ -237,7 +242,6 @@ public class JeiRecipeIntegrationTest {
     @Test
     public void testVanillaSmeltingRecipeExtraction() {
         net.minecraft.world.item.crafting.SmeltingRecipe smeltingRecipe = new net.minecraft.world.item.crafting.SmeltingRecipe(
-                ResourceLocation.tryParse("minecraft:iron_ingot_from_smelting_raw_iron"),
                 "",
                 net.minecraft.world.item.crafting.CookingBookCategory.MISC,
                 net.minecraft.world.item.crafting.Ingredient.of(net.minecraft.world.item.Items.RAW_IRON),
@@ -245,10 +249,15 @@ public class JeiRecipeIntegrationTest {
                 0.7f,
                 200
         );
+        net.minecraft.world.item.crafting.RecipeHolder<net.minecraft.world.item.crafting.SmeltingRecipe> recipeHolder =
+                new net.minecraft.world.item.crafting.RecipeHolder<>(
+                        ResourceLocation.tryParse("minecraft:iron_ingot_from_smelting_raw_iron"),
+                        smeltingRecipe
+                );
 
-        RecipeType<net.minecraft.world.item.crafting.SmeltingRecipe> recipeType = RecipeType.create("minecraft", "smelting", net.minecraft.world.item.crafting.SmeltingRecipe.class);
-        MockRecipeCategory<net.minecraft.world.item.crafting.SmeltingRecipe> category = new MockRecipeCategory<>(recipeType, "Smelting");
-        JeiRecipeWrapper<net.minecraft.world.item.crafting.SmeltingRecipe> wrapper = new JeiRecipeWrapper<>(category, smeltingRecipe);
+        RecipeType<net.minecraft.world.item.crafting.RecipeHolder<net.minecraft.world.item.crafting.SmeltingRecipe>> recipeType = RecipeType.create("minecraft", "smelting", (Class) net.minecraft.world.item.crafting.RecipeHolder.class);
+        MockRecipeCategory<net.minecraft.world.item.crafting.RecipeHolder<net.minecraft.world.item.crafting.SmeltingRecipe>> category = new MockRecipeCategory<>(recipeType, "Smelting");
+        JeiRecipeWrapper<net.minecraft.world.item.crafting.RecipeHolder<net.minecraft.world.item.crafting.SmeltingRecipe>> wrapper = new JeiRecipeWrapper<>(category, recipeHolder);
 
         RecipeNode node = JeiRecipeConverter.convert(wrapper);
         Assertions.assertNotNull(node);

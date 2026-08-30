@@ -580,7 +580,7 @@ public class NodeWidget {
                 }
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.4F
+                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 1.4F
                     )
                 );
                 return true;

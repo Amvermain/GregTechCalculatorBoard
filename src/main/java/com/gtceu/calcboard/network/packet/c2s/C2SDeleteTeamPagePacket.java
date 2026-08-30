@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.network.packet.c2s;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.s2c.S2CLockResultPacket;
-import com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspacePacket;
 import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
 import com.gtceu.calcboard.server.storage.CommitLogEntry;
 import com.gtceu.calcboard.server.storage.TeamBoardSavedData;
@@ -11,37 +11,39 @@ import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import com.gtceu.calcboard.server.storage.WorkspaceLockManager;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
-public class C2SDeleteTeamPagePacket {
+public record C2SDeleteTeamPagePacket(UUID teamId, String pageId) implements CustomPacketPayload {
 
-    private final UUID teamId;
-    private final String pageId;
-
-    public C2SDeleteTeamPagePacket(UUID teamId, String pageId) {
-        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
-        this.pageId = pageId != null ? pageId : "default";
-    }
+    public static final Type<C2SDeleteTeamPagePacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "c2s_delete_team_page"));
+    public static final StreamCodec<FriendlyByteBuf, C2SDeleteTeamPagePacket> STREAM_CODEC = CustomPacketPayload.codec(
+            C2SDeleteTeamPagePacket::write,
+            C2SDeleteTeamPagePacket::new
+    );
 
     public C2SDeleteTeamPagePacket(FriendlyByteBuf buf) {
-        this.teamId = buf.readUUID();
-        this.pageId = buf.readUtf(256);
+        this(buf.readUUID(), buf.readUtf(256));
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUUID(teamId);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUUID(teamId != null ? teamId : new UUID(0L, 0L));
         buf.writeUtf(pageId != null ? pageId : "default");
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+
+    public static void handle(C2SDeleteTeamPagePacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            ServerPlayer player = ctx.getSender();
-            if (player == null) return;
+            if (!(ctx.player() instanceof ServerPlayer player)) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
             if (playerTeamId == null) {
@@ -66,10 +68,10 @@ public class C2SDeleteTeamPagePacket {
                 return;
             }
 
-            TeamWorkspacePage removed = ws.removePage(pageId);
+            TeamWorkspacePage removed = ws.removePage(packet.pageId());
             if (removed != null) {
                 // Force release lock if held
-                WorkspaceLockManager.getInstance().forceReleaseLock(playerTeamId, pageId);
+                WorkspaceLockManager.getInstance().forceReleaseLock(playerTeamId, packet.pageId());
 
                 // Commit log entry
                 CommitLogEntry commit = new CommitLogEntry(
@@ -77,7 +79,7 @@ public class C2SDeleteTeamPagePacket {
                         player.getUUID(),
                         player.getGameProfile().getName(),
                         System.currentTimeMillis(),
-                        pageId,
+                        packet.pageId(),
                         "Deleted page: " + removed.getTitle(),
                         0, 0, 0
                 );
@@ -87,9 +89,8 @@ public class C2SDeleteTeamPagePacket {
 
                 // Broadcast updated workspace meta and released lock to all teammates
                 NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, ws.buildMetaPacket(), null);
-                NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
+                NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(packet.pageId(), false, null, "", 0L), null);
             }
         });
-        ctx.setPacketHandled(true);
     }
 }

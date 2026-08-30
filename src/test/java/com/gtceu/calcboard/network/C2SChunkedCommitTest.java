@@ -87,20 +87,20 @@ public class C2SChunkedCommitTest {
         );
 
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
-        packet.encode(buf);
+        C2SChunkedCommitPacket.STREAM_CODEC.encode(buf, packet);
 
-        C2SChunkedCommitPacket decoded = new C2SChunkedCommitPacket(buf);
-        Assertions.assertEquals(transferId, decoded.getTransferId());
-        Assertions.assertEquals(teamId, decoded.getTeamId());
-        Assertions.assertEquals(pageId, decoded.getPageId());
-        Assertions.assertEquals(pageTitle, decoded.getPageTitle());
-        Assertions.assertEquals(revision, decoded.getRevision());
-        Assertions.assertEquals(commitMsg, decoded.getCommitMessage());
-        Assertions.assertEquals(1, decoded.getChunkIndex());
-        Assertions.assertEquals(3, decoded.getTotalChunks());
-        Assertions.assertArrayEquals(chunk, decoded.getChunkData());
-        Assertions.assertEquals(5, decoded.getAddedNodes());
-        Assertions.assertEquals(2, decoded.getModifiedNodes());
-        Assertions.assertEquals(1, decoded.getDeletedNodes());
+        C2SChunkedCommitPacket decoded = C2SChunkedCommitPacket.STREAM_CODEC.decode(buf);
+        Assertions.assertEquals(transferId, decoded.transferId());
+        Assertions.assertEquals(teamId, decoded.teamId());
+        Assertions.assertEquals(pageId, decoded.pageId());
+        Assertions.assertEquals(pageTitle, decoded.pageTitle());
+        Assertions.assertEquals(revision, decoded.revision());
+        Assertions.assertEquals(commitMsg, decoded.commitMessage());
+        Assertions.assertEquals(1, decoded.chunkIndex());
+        Assertions.assertEquals(3, decoded.totalChunks());
+        Assertions.assertArrayEquals(chunk, decoded.chunkData());
+        Assertions.assertEquals(5, decoded.addedNodes());
+        Assertions.assertEquals(2, decoded.modifiedNodes());
+        Assertions.assertEquals(1, decoded.deletedNodes());
     }
 }

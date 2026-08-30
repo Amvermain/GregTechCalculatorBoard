@@ -385,7 +385,7 @@ public class CanvasInteractionHandler {
                     screen.rebuildWidgets();
                     screen.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.9F)
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 0.9F)
                     );
                     return true;
                 } else if (action == CanvasGroupFrameRenderer.FrameAction.COLOR && button == 0) {
@@ -503,12 +503,12 @@ public class CanvasInteractionHandler {
                 } else if (action == CanvasStickyNoteRenderer.NoteAction.DELETE && button == 0) {
                     graph.removeStickyNote(note);
                     screen.markSummaryDirty();
-                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F));
                     return true;
                 } else if (action == CanvasStickyNoteRenderer.NoteAction.COLOR && button == 0) {
                     note.cycleColor();
                     screen.markSummaryDirty();
-                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F));
                     return true;
                 }
             } else if (note.isPointInside(canvasMouseX, canvasMouseY) && button == 0) {

@@ -1,43 +1,45 @@
 package com.gtceu.calcboard.network.packet.c2s;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspacePacket;
-import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
 import com.gtceu.calcboard.server.storage.TeamBoardSavedData;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
-public class C2SRequestWorkspacePacket {
+public record C2SRequestWorkspacePacket(UUID teamId, String requestedPageId) implements CustomPacketPayload {
 
-    private final UUID teamId;
-    private final String requestedPageId;
-
-    public C2SRequestWorkspacePacket(UUID teamId, String requestedPageId) {
-        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
-        this.requestedPageId = requestedPageId != null ? requestedPageId : "";
-    }
+    public static final Type<C2SRequestWorkspacePacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "c2s_request_workspace"));
+    public static final StreamCodec<FriendlyByteBuf, C2SRequestWorkspacePacket> STREAM_CODEC = CustomPacketPayload.codec(
+            C2SRequestWorkspacePacket::write,
+            C2SRequestWorkspacePacket::new
+    );
 
     public C2SRequestWorkspacePacket(FriendlyByteBuf buf) {
-        this.teamId = buf.readUUID();
-        this.requestedPageId = buf.readUtf(256);
+        this(buf.readUUID(), buf.readUtf(256));
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUUID(teamId);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUUID(teamId != null ? teamId : new UUID(0L, 0L));
         buf.writeUtf(requestedPageId != null ? requestedPageId : "");
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+
+    public static void handle(C2SRequestWorkspacePacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            ServerPlayer player = ctx.getSender();
-            if (player == null) return;
+            if (!(ctx.player() instanceof ServerPlayer player)) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
             if (playerTeamId == null) {
@@ -53,6 +55,5 @@ public class C2SRequestWorkspacePacket {
                 NetworkHandler.broadcastPresenceForTeam(player.serverLevel(), playerTeamId);
             }
         });
-        ctx.setPacketHandled(true);
     }
 }

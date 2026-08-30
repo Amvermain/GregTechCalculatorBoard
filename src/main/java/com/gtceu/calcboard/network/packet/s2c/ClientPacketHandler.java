@@ -70,7 +70,7 @@ public class ClientPacketHandler {
 
     public static void handlePresence(S2CBroadcastPresencePacket packet) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        state.updatePresence(packet.getActiveMembers());
+        state.updatePresence(packet.activeMembers());
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof BoardScreen bs) {
@@ -79,7 +79,7 @@ public class ClientPacketHandler {
     }
 
     public static void handleError(S2CWorkspaceErrorPacket packet) {
-        BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.getMessageKey()).getString());
+        BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.messageKey()).getString());
     }
 
     public static void handleSyncWorkspaceMeta(S2CSyncWorkspaceMetaPacket packet) {
@@ -95,25 +95,25 @@ public class ClientPacketHandler {
 
     public static void handleSyncPageData(S2CSyncPageDataPacket packet) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        state.applyPageData(packet.getPageId(), packet.getRevision(), packet.getCompressedNBT());
+        state.applyPageData(packet.pageId(), packet.revision(), packet.compressedNBT());
     }
 
     public static void handleChunkedData(S2CChunkedDataPacket packet) {
         byte[] complete = com.gtceu.calcboard.client.team.ChunkedPayloadAssembler.appendChunk(
-                packet.getTransferId(),
-                packet.getChunkIndex(),
-                packet.getTotalChunks(),
-                packet.getChunkBytes()
+                packet.transferId(),
+                packet.chunkIndex(),
+                packet.totalChunks(),
+                packet.chunkBytes()
         );
         if (complete != null) {
             ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-            state.applyPageData(packet.getPageId(), packet.getRevision(), complete);
+            state.applyPageData(packet.pageId(), packet.revision(), complete);
         }
     }
 
     public static void handleSyncCommitHistory(S2CSyncCommitHistoryPacket packet) {
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
-        state.updateCommitHistory(packet.getCommits());
+        state.updateCommitHistory(packet.commits());
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof BoardScreen bs) {

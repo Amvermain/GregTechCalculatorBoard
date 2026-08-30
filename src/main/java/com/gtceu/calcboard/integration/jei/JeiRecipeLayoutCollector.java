@@ -2,7 +2,7 @@ package com.gtceu.calcboard.integration.jei;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import mezz.jei.api.constants.VanillaTypes;
-import mezz.jei.api.forge.ForgeTypes;
+import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.gui.builder.IIngredientAcceptor;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.IRecipeSlotBuilder;
@@ -19,8 +19,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraftforge.fluids.FluidStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -69,10 +69,11 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
         private final int y;
         private final List<ItemStack> itemStacks = new ArrayList<>();
         private final List<FluidStack> fluidStacks = new ArrayList<>();
+        private final List<Object> customIngredients = new ArrayList<>();
         private String slotName = "";
 
         public CollectedSlot(RecipeIngredientRole role, int x, int y) {
-            this.role = role != null ? role : RecipeIngredientRole.INPUT;
+            this.role = role;
             this.x = x;
             this.y = y;
         }
@@ -93,10 +94,50 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             return slotName;
         }
 
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
         @Override
-        public IRecipeSlotBuilder addItemStack(ItemStack stack) {
-            if (stack != null && !stack.isEmpty()) {
-                this.itemStacks.add(stack);
+        public int getWidth() {
+            return 18;
+        }
+
+        @Override
+        public int getHeight() {
+            return 18;
+        }
+
+        @Override
+        public IRecipeSlotBuilder setPosition(int x, int y) {
+            return this;
+        }
+
+        @Override
+        public <I> IRecipeSlotBuilder addIngredient(IIngredientType<I> ingredientType, I ingredient) {
+            if (ingredient == null) return this;
+            if (ingredientType == VanillaTypes.ITEM_STACK && ingredient instanceof ItemStack is) {
+                if (!is.isEmpty()) {
+                    this.itemStacks.add(is);
+                }
+            } else if (ingredientType == NeoForgeTypes.FLUID_STACK && ingredient instanceof FluidStack fs) {
+                if (!fs.isEmpty()) {
+                    this.fluidStacks.add(fs);
+                }
+            } else {
+                this.customIngredients.add(ingredient);
+            }
+            return this;
+        }
+
+        @Override
+        public IRecipeSlotBuilder addItemStack(ItemStack itemStack) {
+            if (itemStack != null && !itemStack.isEmpty()) {
+                this.itemStacks.add(itemStack);
             }
             return this;
         }
@@ -114,6 +155,11 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
         }
 
         @Override
+        public IRecipeSlotBuilder addFluidStack(Fluid fluid) {
+            return addFluidStack(fluid, 1000);
+        }
+
+        @Override
         public IRecipeSlotBuilder addFluidStack(Fluid fluid, long amount) {
             if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
                 this.fluidStacks.add(new FluidStack(fluid, (int) Math.max(1, amount)));
@@ -121,15 +167,36 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             return this;
         }
 
-        @Override
         public IRecipeSlotBuilder addFluidStack(Fluid fluid, long amount, @Nullable CompoundTag tag) {
             if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
                 FluidStack fs = new FluidStack(fluid, (int) Math.max(1, amount));
-                if (tag != null) {
-                    fs.setTag(tag);
+                if (tag != null && !tag.isEmpty()) {
+                    fs.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
                 }
                 this.fluidStacks.add(fs);
             }
+            return this;
+        }
+
+        @Override
+        public IRecipeSlotBuilder addFluidStack(Fluid fluid, long amount, net.minecraft.core.component.DataComponentPatch patch) {
+            if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
+                FluidStack fs = new FluidStack(fluid, (int) Math.max(1, amount));
+                if (patch != null && !patch.isEmpty()) {
+                    fs.applyComponents(patch);
+                }
+                this.fluidStacks.add(fs);
+            }
+            return this;
+        }
+
+        @Override
+        public IRecipeSlotBuilder setStandardSlotBackground() {
+            return this;
+        }
+
+        @Override
+        public IRecipeSlotBuilder setOutputSlotBackground() {
             return this;
         }
 
@@ -158,7 +225,7 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                         this.itemStacks.add(is);
                     }
                 }
-            } else if (ingredientType == ForgeTypes.FLUID_STACK) {
+            } else if (ingredientType == NeoForgeTypes.FLUID_STACK) {
                 for (Object ing : ingredients) {
                     if (ing instanceof FluidStack fs && !fs.isEmpty()) {
                         this.fluidStacks.add(fs);
@@ -169,24 +236,6 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                     if (ing != null) {
                         addIngredient(ingredientType, ing);
                     }
-                }
-            }
-            return this;
-        }
-
-        @Override
-        public <I> IRecipeSlotBuilder addIngredient(IIngredientType<I> ingredientType, I ingredient) {
-            if (ingredient == null) return this;
-            if (ingredient instanceof ItemStack is && !is.isEmpty()) {
-                this.itemStacks.add(is);
-            } else if (ingredient instanceof FluidStack fs && !fs.isEmpty()) {
-                this.fluidStacks.add(fs);
-            } else if (ingredient instanceof ITypedIngredient<?> typed) {
-                Object obj = typed.getIngredient();
-                if (obj instanceof ItemStack is && !is.isEmpty()) {
-                    this.itemStacks.add(is);
-                } else if (obj instanceof FluidStack fs && !fs.isEmpty()) {
-                    this.fluidStacks.add(fs);
                 }
             }
             return this;
@@ -210,6 +259,53 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                             this.fluidStacks.add(fs);
                         }
                     }
+                }
+            }
+            return this;
+        }
+
+        @Override
+        public IRecipeSlotBuilder addOptionalTypedIngredients(List<java.util.Optional<ITypedIngredient<?>>> ingredients) {
+            if (ingredients != null) {
+                for (var opt : ingredients) {
+                    if (opt != null && opt.isPresent()) {
+                        ITypedIngredient<?> ti = opt.get();
+                        Object obj = ti.getIngredient();
+                        if (obj instanceof ItemStack is && !is.isEmpty()) {
+                            this.itemStacks.add(is);
+                        } else if (obj instanceof FluidStack fs && !fs.isEmpty()) {
+                            this.fluidStacks.add(fs);
+                        }
+                    }
+                }
+            }
+            return this;
+        }
+
+        @Override
+        public IRecipeSlotBuilder addTypedIngredients(List<ITypedIngredient<?>> ingredients) {
+            if (ingredients != null) {
+                for (ITypedIngredient<?> ti : ingredients) {
+                    if (ti != null) {
+                        Object obj = ti.getIngredient();
+                        if (obj instanceof ItemStack is && !is.isEmpty()) {
+                            this.itemStacks.add(is);
+                        } else if (obj instanceof FluidStack fs && !fs.isEmpty()) {
+                            this.fluidStacks.add(fs);
+                        }
+                    }
+                }
+            }
+            return this;
+        }
+
+        public <I> IRecipeSlotBuilder addIngredient(ITypedIngredient<I> typedIngredient) {
+            if (typedIngredient != null) {
+                Object obj = typedIngredient.getIngredient();
+                if (obj instanceof ItemStack is && !is.isEmpty()) {
+                    this.itemStacks.add(is);
+                } else if (obj instanceof FluidStack fs && !fs.isEmpty()) {
+                    this.fluidStacks.add(fs);
                 }
             }
             return this;
@@ -241,6 +337,11 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
         }
 
         @Override
+        public IRecipeSlotBuilder addRichTooltipCallback(mezz.jei.api.gui.ingredient.IRecipeSlotRichTooltipCallback tooltipCallback) {
+            return this;
+        }
+
+        @Override
         public IRecipeSlotBuilder setSlotName(String slotName) {
             this.slotName = slotName != null ? slotName : "";
             return this;
@@ -259,10 +360,20 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
     }
 
     @Override
+    public IRecipeSlotBuilder addSlot(RecipeIngredientRole role) {
+        return addSlot(role, 0, 0);
+    }
+
+    @Override
     public IRecipeSlotBuilder addSlot(RecipeIngredientRole role, int x, int y) {
         CollectedSlot slot = new CollectedSlot(role, x, y);
         this.slots.add(slot);
         return slot;
+    }
+
+    @Override
+    public IRecipeSlotBuilder addSlotToWidget(RecipeIngredientRole role, mezz.jei.api.gui.widgets.ISlottedWidgetFactory<?> factory) {
+        return addSlot(role, 0, 0);
     }
 
     @Override
@@ -318,7 +429,7 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             if (fs != null && !fs.isEmpty()) {
                 ResourceLocation fId = null;
                 try {
-                    fId = ForgeRegistries.FLUIDS.getKey(fs.getFluid());
+                    fId = BuiltInRegistries.FLUID.getKey(fs.getFluid());
                 } catch (Throwable ignored) {}
                 if (fId != null) {
                     String name = "";
@@ -334,7 +445,7 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                         if (altFs != null && !altFs.isEmpty()) {
                             ResourceLocation altId = null;
                             try {
-                                altId = ForgeRegistries.FLUIDS.getKey(altFs.getFluid());
+                                altId = BuiltInRegistries.FLUID.getKey(altFs.getFluid());
                             } catch (Throwable ignored) {}
                             if (altId != null && !is.getAlternatives().contains(altId)) {
                                 is.getAlternatives().add(altId);
@@ -349,7 +460,7 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             if (primary != null && !primary.isEmpty()) {
                 ResourceLocation iId = null;
                 try {
-                    iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
+                    iId = BuiltInRegistries.ITEM.getKey(primary.getItem());
                 } catch (Throwable ignored) {}
                 if (iId != null) {
                     String name = "";
@@ -365,7 +476,7 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                         if (altIs != null && !altIs.isEmpty()) {
                             ResourceLocation altId = null;
                             try {
-                                altId = ForgeRegistries.ITEMS.getKey(altIs.getItem());
+                                altId = BuiltInRegistries.ITEM.getKey(altIs.getItem());
                             } catch (Throwable ignored) {}
                             if (altId != null && !is.getAlternatives().contains(altId)) {
                                 is.getAlternatives().add(altId);

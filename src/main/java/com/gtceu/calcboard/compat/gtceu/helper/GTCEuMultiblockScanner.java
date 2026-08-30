@@ -11,7 +11,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -354,7 +354,7 @@ public class GTCEuMultiblockScanner {
                         if (es != null) {
                             ItemStack stack = es.getItemStack();
                             if (stack != null && !stack.isEmpty()) {
-                                ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
+                                ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
                                 if (itemId != null) {
                                     String p = itemId.getPath();
                                     if (GTThreadingHelix.fromId(itemId.toString()) != null || p.contains("thread_helix") || p.contains("threading_helix")
@@ -380,7 +380,7 @@ public class GTCEuMultiblockScanner {
         if (rt instanceof ResourceLocation rl) return rl;
         try {
             if (rt instanceof RecipeType<?> rType) {
-                ResourceLocation loc = ForgeRegistries.RECIPE_TYPES.getKey(rType);
+                ResourceLocation loc = BuiltInRegistries.RECIPE_TYPE.getKey(rType);
                 if (loc != null && !loc.getPath().equals("air")) return loc;
             }
         } catch (Throwable ignored) {}

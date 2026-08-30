@@ -9,7 +9,7 @@ import net.minecraft.world.item.ItemStack;
 public class BoardMenu extends AbstractContainerMenu {
 
     public BoardMenu(int containerId, Inventory playerInventory) {
-        super(ModMenus.BOARD_MENU.isPresent() ? ModMenus.BOARD_MENU.get() : null, containerId);
+        super(ModMenus.BOARD_MENU.isBound() ? ModMenus.BOARD_MENU.get() : null, containerId);
     }
 
     public BoardMenu() {

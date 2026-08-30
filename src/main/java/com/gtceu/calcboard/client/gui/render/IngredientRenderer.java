@@ -7,7 +7,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 /**
  * Client-side visual renderer for IngredientStack components.
@@ -43,7 +43,7 @@ public final class IngredientRenderer {
                 graphics.fill(x, y, x + 16, y + 16, 0xFF3366CC);
             }
         } else {
-            var item = ForgeRegistries.ITEMS.getValue(id);
+            var item = BuiltInRegistries.ITEM.get(id);
             if (item != null && item != Items.AIR) {
                 graphics.renderItem(new ItemStack(item), x, y);
             } else {
@@ -54,10 +54,10 @@ public final class IngredientRenderer {
 
     private static boolean renderFluid(GuiGraphics graphics, ResourceLocation id, int x, int y) {
         try {
-            var fluid = ForgeRegistries.FLUIDS.getValue(id);
+            var fluid = BuiltInRegistries.FLUID.get(id);
             if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
-                var ext = net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions.of(fluid);
-                net.minecraftforge.fluids.FluidStack fs = new net.minecraftforge.fluids.FluidStack(fluid, 1000);
+                var ext = net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions.of(fluid);
+                net.neoforged.neoforge.fluids.FluidStack fs = new net.neoforged.neoforge.fluids.FluidStack(fluid, 1000);
                 ResourceLocation stillTexture = ext.getStillTexture(fs);
                 if (stillTexture == null) {
                     stillTexture = ext.getStillTexture();

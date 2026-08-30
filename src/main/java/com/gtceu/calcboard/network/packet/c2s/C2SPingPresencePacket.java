@@ -1,59 +1,59 @@
 package com.gtceu.calcboard.network.packet.c2s;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.server.storage.TeamPresenceTracker;
 import com.gtceu.calcboard.server.storage.WorkspaceLockManager;
+import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
-public class C2SPingPresencePacket {
+public record C2SPingPresencePacket(UUID teamId, String activePageId, boolean isOpen) implements CustomPacketPayload {
 
-    private final UUID teamId;
-    private final String activePageId;
-    private final boolean isOpen;
+    public static final Type<C2SPingPresencePacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "c2s_ping_presence"));
+    public static final StreamCodec<FriendlyByteBuf, C2SPingPresencePacket> STREAM_CODEC = CustomPacketPayload.codec(
+            C2SPingPresencePacket::write,
+            C2SPingPresencePacket::new
+    );
 
     public C2SPingPresencePacket(UUID teamId, String activePageId) {
         this(teamId, activePageId, true);
     }
 
-    public C2SPingPresencePacket(UUID teamId, String activePageId, boolean isOpen) {
-        this.teamId = teamId != null ? teamId : new UUID(0L, 0L);
-        this.activePageId = activePageId != null ? activePageId : "default";
-        this.isOpen = isOpen;
-    }
-
     public C2SPingPresencePacket(FriendlyByteBuf buf) {
-        this.teamId = buf.readUUID();
-        this.activePageId = buf.readUtf(256);
-        this.isOpen = buf.readBoolean();
+        this(buf.readUUID(), buf.readUtf(256), buf.readBoolean());
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUUID(teamId);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUUID(teamId != null ? teamId : new UUID(0L, 0L));
         buf.writeUtf(activePageId != null ? activePageId : "default");
         buf.writeBoolean(isOpen);
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> {
-            ServerPlayer player = ctx.getSender();
-            if (player == null) return;
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
 
-            UUID playerTeamId = com.gtceu.calcboard.server.team.TeamProviderRegistry.getInstance().getPlayerTeamId(player);
+    public static void handle(C2SPingPresencePacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            if (!(ctx.player() instanceof ServerPlayer player)) return;
+
+            UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
             if (playerTeamId == null) return;
 
-            if (isOpen) {
+            if (packet.isOpen()) {
                 // Renew heartbeat if player holds the lock
-                WorkspaceLockManager.getInstance().pingHeartbeat(playerTeamId, activePageId, player.getUUID());
+                WorkspaceLockManager.getInstance().pingHeartbeat(playerTeamId, packet.activePageId(), player.getUUID());
             }
 
             // Update presence in TeamPresenceTracker
-            TeamPresenceTracker.getInstance().updatePresence(player, playerTeamId, activePageId, isOpen);
+            TeamPresenceTracker.getInstance().updatePresence(player, playerTeamId, packet.activePageId(), packet.isOpen());
         });
-        ctx.setPacketHandled(true);
     }
 }

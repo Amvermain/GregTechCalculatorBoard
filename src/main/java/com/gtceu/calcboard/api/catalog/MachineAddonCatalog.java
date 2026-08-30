@@ -101,7 +101,7 @@ public class MachineAddonCatalog {
             return;
         }
 
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+        if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.CLIENT) {
             try {
                 String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
                 if (currentLang != null && !currentLang.isEmpty()) {
@@ -164,7 +164,7 @@ public class MachineAddonCatalog {
                     "[GTCalcBoard] [Catalog] 2-Track indexing complete. Total Addons: {}", allAddons.size()
             );
             try {
-                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                     new com.gtceu.calcboard.api.event.CatalogLifecycleEvent.AddonsReady(allAddons.size())
                 );
             } catch (Throwable ignored) {}
@@ -203,7 +203,7 @@ public class MachineAddonCatalog {
     private boolean wasRecipeReady = false;
 
     public List<MachineAddon> getAllAddons() {
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+        if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.CLIENT) {
             try {
                 String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
                 if (currentLang != null && !currentLang.isEmpty()) {

@@ -489,7 +489,7 @@ public class FavoritesDockWidget {
             if (!activeFlyoutFavorite.getEmiStacks().isEmpty()) {
                 var firstStack = activeFlyoutFavorite.getEmiStacks().get(0);
                 if (firstStack.getItemStack() != null) {
-                    preferredWs = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(firstStack.getItemStack().getItem());
+                    preferredWs = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(firstStack.getItemStack().getItem());
                 }
             }
 
@@ -614,7 +614,7 @@ public class FavoritesDockWidget {
                 return;
             }
             if (preferredWs != null) {
-                var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(preferredWs);
+                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(preferredWs);
                 if (item != null) {
                     dev.emi.emi.api.stack.EmiStack.of(item).render(graphics, x, y, 0, dev.emi.emi.api.stack.EmiIngredient.RENDER_ICON);
                     return;
@@ -726,7 +726,7 @@ public class FavoritesDockWidget {
                 if (button == 0 && mouseX >= getDockX() && mouseX <= getDockX() + COLLAPSED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {
                     parent.toggle();
                     Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F)
                     );
                     return true;
                 }
@@ -738,7 +738,7 @@ public class FavoritesDockWidget {
             if (button == 0 && mouseX >= getDockX() && mouseX <= getDockX() + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {
                 parent.toggle();
                 Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                 );
                 return true;
             }
@@ -826,7 +826,7 @@ public class FavoritesDockWidget {
                         clearCache();
                         closeFlyout();
                         Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F)
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 0.8F)
                         );
                         return true;
                     }
@@ -928,7 +928,7 @@ public class FavoritesDockWidget {
                 var stack = fav.getEmiStacks().get(0);
                 if (stack.getItemStack() != null && !stack.getItemStack().isEmpty()) {
                     var item = stack.getItemStack().getItem();
-                    var id = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(item);
+                    var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
                     if (id != null) {
                         fallback.getOutputs().add(IngredientStack.item(id, name, 1.0));
                     }

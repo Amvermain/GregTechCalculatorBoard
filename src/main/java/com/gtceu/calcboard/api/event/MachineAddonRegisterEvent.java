@@ -1,8 +1,7 @@
 package com.gtceu.calcboard.api.event;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
-import net.minecraftforge.eventbus.ListenerList;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,7 +13,6 @@ import java.util.List;
  */
 public class MachineAddonRegisterEvent extends Event {
 
-    private static ListenerList LISTENER_LIST = new ListenerList();
     private final List<MachineAddon> registeredAddons = new ArrayList<>();
 
     public MachineAddonRegisterEvent() {
@@ -36,13 +34,8 @@ public class MachineAddonRegisterEvent extends Event {
         return Collections.unmodifiableList(registeredAddons);
     }
 
-    @Override
-    public ListenerList getListenerList() {
-        return LISTENER_LIST;
-    }
-
     public static void clearListeners() {
-        LISTENER_LIST = new ListenerList();
+        // No-op in NeoForge event system
     }
 }
 

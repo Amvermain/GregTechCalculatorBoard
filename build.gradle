@@ -1,8 +1,9 @@
 plugins {
+    id 'java-library'
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'net.neoforged.moddev' version '2.0.78'
 }
 
 version = "${minecraft_version}-${mod_version}"
@@ -13,51 +14,34 @@ base {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
 }
 
-minecraft {
-    mappings channel: "${mapping_channel}", version: "${mapping_version}"
-    copyIdeResources = true
+neoForge {
+    version = project.neo_version
+    validateAccessTransformers = true
 
     runs {
         client {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-            property 'forge.logging.console.level', 'debug'
-            property 'java.net.preferIPv4Stack', 'true'
-
-            // Mixin refmap remapping in dev environment
-            property 'mixin.env.remapRefMap', 'true'
-            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
-
-            // Dev memory allocation & networking
-            jvmArgs '-XX:+AllowEnhancedClassRedefinition'
-            jvmArgs '-Xmx4G', '-Xms2G', '-Djava.net.preferIPv4Stack=true'
-
-            mods {
-                "${mod_id}" {
-                    source sourceSets.main
-                }
-            }
+            client()
+            systemProperty 'neoforge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            systemProperty 'neoforge.logging.console.level', 'debug'
+            jvmArgument '-Djava.net.preferIPv4Stack=true'
         }
 
         server {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-            property 'forge.logging.console.level', 'debug'
-            property 'java.net.preferIPv4Stack', 'true'
-            property 'mixin.env.remapRefMap', 'true'
-            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
-            jvmArgs '-Djava.net.preferIPv4Stack=true'
-            args 'nogui'
+            server()
+            systemProperty 'neoforge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            systemProperty 'neoforge.logging.console.level', 'debug'
+            jvmArgument '-Djava.net.preferIPv4Stack=true'
+            programArgument 'nogui'
+        }
+    }
 
-            mods {
-                "${mod_id}" {
-                    source sourceSets.main
-                }
-            }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
         }
     }
 }
@@ -70,21 +54,34 @@ if (localPropertiesFile.exists()) {
 
 repositories {
     mavenCentral()
-    maven { url = "https://maven.minecraftforge.net" }
+    maven { url = "https://maven.neoforged.net/releases/" }
     maven { url = "https://maven.terraformersmc.com/" }
     maven { url = "https://maven.blamejared.com" }
     maven { url = "https://www.cursemaven.com" }
     maven { url = "https://api.modrinth.com/maven" }
     maven {
-        name = 'GTCEu Maven'
-        url = 'https://maven.gtceu.com'
-        content {
-            includeGroup 'com.gregtechceu.gtceu'
-        }
+        name = 'Create / Registrate'
+        url = 'https://maven.createmod.net'
     }
     maven {
-        name = 'Curios Maven'
-        url = 'https://maven.theillusivec4.top/'
+        name = 'devOS'
+        url = 'https://mvn.devos.one/snapshots/'
+    }
+    maven {
+        name = 'Configuration Repsy'
+        url = 'https://repo.repsy.io/mvn/toma/public/'
+    }
+    maven {
+        name = 'Registrate'
+        url = 'https://maven.tterrag.com/'
+    }
+    maven {
+        name = 'Toma Configuration'
+        url = 'https://maven.toma.dev/'
+    }
+    maven {
+        name = 'GTCEu Maven'
+        url = 'https://maven.gtceu.com'
     }
     maven {
         name = 'FirstDarkDev Maven'
@@ -93,21 +90,9 @@ repositories {
             includeGroup 'com.lowdragmc.ldlib'
         }
     }
-    maven {
-        name = 'Architectury / Rhino'
-        url = 'https://maven.architectury.dev/'
-    }
-    maven {
-        name = 'Latvian / KubeJS'
-        url = 'https://maven.latvian.dev/react/'
-    }
-    maven {
-        name = 'Toma Configuration'
-        url = 'https://maven.toma.dev/'
-    }
     flatDir {
         def localMods = localProperties.getProperty('target.mods.dir')
-        def dirsList = ['libs', 'instance/mods', "${System.getProperty('user.home')}/AppData/Roaming/PrismLauncher/instances/Star Technology/minecraft/mods"]
+        def dirsList = ['libs', 'instance/mods']
         if (localMods) {
             dirsList.add(localMods)
         }
@@ -116,95 +101,41 @@ repositories {
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-
-    // Recipe Viewer Selection: 'emi' (Default) or 'jei' (Pure GTCEuM + JEI + JEI++ testing environment)
-    def envViewer = System.getenv('recipe_viewer') ?: System.getenv('RECIPE_VIEWER')
-    def propViewer = project.findProperty('recipe_viewer')
-    def recipeViewer = envViewer ?: propViewer ?: 'emi'
-    def jeiPlusPlusFileId = System.getenv('jei_plus_plus_file_id') ?: project.findProperty('jei_plus_plus_file_id') ?: '8659409'
-
-    // Team Integration Mod Selection: 'none', 'phoenix' (Phoenix Guilds), or 'ftbteams' (FTB Teams)
-    def envTeam = System.getenv('team_mod') ?: System.getenv('TEAM_MOD') ?: System.getenv('team_provider') ?: System.getenv('TEAM_PROVIDER')
-    def propTeam = project.findProperty('team_mod') ?: project.findProperty('team_provider')
-    def teamMod = envTeam ?: propTeam ?: 'none'
-    def phoenixGuildsFileId = System.getenv('phoenix_guilds_file_id') ?: System.getenv('PHOENIX_GUILDS_FILE_ID') ?: project.findProperty('phoenix_guilds_file_id') ?: '8743646'
-    def phoenixWikiFileId = System.getenv('phoenix_wiki_file_id') ?: System.getenv('PHOENIX_WIKI_FILE_ID') ?: project.findProperty('phoenix_wiki_file_id') ?: '8735977'
-    def ftbTeamsFileId = System.getenv('ftb_teams_file_id') ?: System.getenv('FTB_TEAMS_FILE_ID') ?: project.findProperty('ftb_teams_file_id') ?: '5610363'
-    def ftbLibFileId = System.getenv('ftb_library_file_id') ?: System.getenv('FTB_LIBRARY_FILE_ID') ?: project.findProperty('ftb_library_file_id') ?: '5623049'
-    def archFileId = System.getenv('architectury_file_id') ?: System.getenv('ARCHITECTURY_FILE_ID') ?: project.findProperty('architectury_file_id') ?: '5137938'
-
-    println ">>> [GTCalcBoard] Active Recipe Viewer Profile: ${recipeViewer}"
-    println ">>> [GTCalcBoard] Active Team Provider Profile: ${teamMod}"
-
-    // Team Provider Runtime Mod Injection
-    if (teamMod == 'phoenix' || teamMod == 'phoenix_guilds') {
-        runtimeOnly fg.deobf("curse.maven:phoenix-guilds-1612085:${phoenixGuildsFileId}")
-        runtimeOnly fg.deobf("curse.maven:phoenixwiki-1647798:${phoenixWikiFileId}")
-    } else if (teamMod == 'ftbteams' || teamMod == 'ftb_teams') {
-        runtimeOnly fg.deobf("curse.maven:ftb-teams-forge-404468:${ftbTeamsFileId}")
-        runtimeOnly fg.deobf("curse.maven:ftb-library-forge-404465:${ftbLibFileId}")
-        runtimeOnly fg.deobf("curse.maven:architectury-api-419699:${archFileId}")
+    // EMI API & Runtime
+    compileOnly "dev.emi:emi-neoforge:${emi_version}"
+    testImplementation "dev.emi:emi-neoforge:${emi_version}"
+    if (project.findProperty('recipe_viewer') != 'jei') {
+        runtimeOnly "dev.emi:emi-neoforge:${emi_version}"
     }
 
-    // EMI API & Runtime (Deobfuscated automatically by ForgeGradle)
-    compileOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
-    testImplementation fg.deobf("curse.maven:emi-580555:${emi_file_id}")
-    if (recipeViewer != 'jei') {
-        runtimeOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
+    // JEI API & Runtime
+    compileOnly "mezz.jei:jei-1.21.1-neoforge-api:${jei_version}"
+    testImplementation "mezz.jei:jei-1.21.1-neoforge-api:${jei_version}"
+    runtimeOnly "mezz.jei:jei-1.21.1-neoforge:${jei_version}"
+
+    // GregTech Modern & LowDragLib
+    compileOnly("com.gregtechceu.gtceu:gtceu-1.21.1:${gtceu_version}") {
+        exclude group: 'dev.toma.configuration'
     }
-
-    // JEI API & Runtime (Required for JEI integration and Thermal Series native JEI plugin)
-    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
-    testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
-    runtimeOnly fg.deobf("local:jei-${minecraft_version}-forge-${jei_runtime_version}:${jei_runtime_version}")
-
-    // JEI++ (JEI Plus) Runtime (Loaded in pure JEI mode or when explicitly requested)
-    if (recipeViewer == 'jei' || project.hasProperty('include_jei_plus')) {
-        runtimeOnly fg.deobf("curse.maven:jei-plus-plus-1645653:${jeiPlusPlusFileId}")
+    testImplementation("com.gregtechceu.gtceu:gtceu-1.21.1:${gtceu_version}") {
+        exclude group: 'dev.toma.configuration'
     }
-
-    // Jade (WAILA / Block Tooltip HUD mod for runClient testing)
-    runtimeOnly fg.deobf("maven.modrinth:jade:11.13.2+forge")
-
-    // GregTech Modern & LowDragLib (Switchable: 'official' or 'start_fork')
-    def gtceuVariant = project.findProperty('gtceu_variant') ?: 'official'
-    if (gtceuVariant == 'start_fork') {
-        compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-        testImplementation fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-        runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-        runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
-    } else {
-        compileOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
-        testImplementation fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
-        runtimeOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
-        runtimeOnly fg.deobf("curse.maven:ldlib-626676:${ldlib_curseforge_file_id}")
+    runtimeOnly("com.gregtechceu.gtceu:gtceu-1.21.1:${gtceu_version}") {
+        exclude group: 'dev.toma.configuration'
     }
+    runtimeOnly "com.lowdragmc.ldlib:ldlib-neoforge-1.21.1:${ldlib_version}"
 
-    // Thermal Series (CoFH Core, Thermal Foundation, Thermal Expansion, Thermal Cultivation)
-    compileOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
-    testImplementation fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
-    compileOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
-    testImplementation fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
-    compileOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
-    testImplementation fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
-    compileOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
-    testImplementation fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
-    if (recipeViewer != 'jei') {
-        runtimeOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
-        runtimeOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
-        runtimeOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
-        runtimeOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
-    }
-
-    // Create & Create New Age (Test classpath support)
-    testImplementation fg.deobf("local:create-${minecraft_version}-${create_version}:${create_version}")
-    testImplementation fg.deobf("local:create-new-age-forge-${minecraft_version}-1.1.4:1.1.4")
-
+    // Testing framework
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+}
+
+sourceSets {
+    test {
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
 }
 
 test {
@@ -214,7 +145,7 @@ test {
 tasks.named('processResources', ProcessResources).configure {
     var replaceProperties = [
         minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
-        forge_version: forge_version, forge_version_range: forge_version_range,
+        neo_version: neo_version, neo_version_range: neo_version_range,
         loader_version_range: loader_version_range,
         mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
         mod_authors: mod_authors, mod_description: mod_description,
@@ -222,7 +153,7 @@ tasks.named('processResources', ProcessResources).configure {
     ]
     inputs.properties replaceProperties
 
-    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
 }
@@ -239,7 +170,6 @@ tasks.named('jar', Jar).configure {
             "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
-    finalizedBy 'reobfJar'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -249,8 +179,8 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.register('deployToInstance', Copy) {
     group = 'deployment'
-    description = 'Builds reobfuscated jar and copies it into local test instance mods directory.'
-    dependsOn 'reobfJar'
+    description = 'Builds jar and copies it into local test instance mods directory.'
+    dependsOn 'jar'
 
     def targetDirStr = localProperties.getProperty('target.mods.dir') ?: System.getenv('MC_TEST_MODS_DIR')
     if (targetDirStr) {
@@ -281,7 +211,6 @@ tasks.register('deployToInstance', Copy) {
 tasks.register('cleanDeploy') {
     group = 'deployment'
     description = 'Cleans, builds, tests, and deploys jar to local test instance.'
-    dependsOn 'clean', 'createSrgToMcp', 'deployToInstance'
+    dependsOn 'clean', 'deployToInstance'
 }
 tasks.named('deployToInstance').configure { mustRunAfter 'clean' }
-tasks.named('createSrgToMcp').configure { mustRunAfter 'clean' }

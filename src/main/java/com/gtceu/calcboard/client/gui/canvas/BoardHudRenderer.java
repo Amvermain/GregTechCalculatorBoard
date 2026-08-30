@@ -5,6 +5,7 @@ import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -37,23 +38,24 @@ public class BoardHudRenderer {
         RenderSystem.disableDepthTest();
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder buffer = tesselator.getBuilder();
-        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
         float a = 0x22 / 255.0f;
         float r = 1.0f, g = 1.0f, b = 1.0f;
 
         for (int x = startX; x < width; x += dotSpacing) {
             for (int y = startY; y < height; y += dotSpacing) {
-                buffer.vertex(pose, x, y, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x + 1, y, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x + 1, y + 1, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x, y + 1, 0.0f).color(r, g, b, a).endVertex();
+                buffer.addVertex(pose, x, y, 0.0f).setColor(r, g, b, a);
+                buffer.addVertex(pose, x + 1, y, 0.0f).setColor(r, g, b, a);
+                buffer.addVertex(pose, x + 1, y + 1, 0.0f).setColor(r, g, b, a);
+                buffer.addVertex(pose, x, y + 1, 0.0f).setColor(r, g, b, a);
             }
         }
 
-        tesselator.end();
+        var mesh = buffer.build();
+        if (mesh != null) {
+            BufferUploader.drawWithShader(mesh);
+        }
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
     }

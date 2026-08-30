@@ -44,7 +44,7 @@ public class ModAdapterRegistry {
         // Fire extension event for third-party adapters & KubeJS
         try {
             var event = new com.gtceu.calcboard.api.event.ModAdapterRegisterEvent();
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(event);
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
             for (IModAdapter customAdapter : event.getRegisteredAdapters()) {
                 register(customAdapter);
             }

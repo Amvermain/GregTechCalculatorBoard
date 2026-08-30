@@ -209,7 +209,7 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
     }
 
     @Override
-    public @Nullable Recipe<?> getBackingRecipe() {
+    public @Nullable net.minecraft.world.item.crafting.RecipeHolder<?> getBackingRecipe() {
         return null;
     }
 }

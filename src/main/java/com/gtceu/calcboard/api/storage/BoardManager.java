@@ -408,7 +408,7 @@ public class BoardManager {
             }
             rootTag.put("pages", pageList);
             File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
-            NbtIo.writeCompressed(rootTag, tempFile);
+            NbtIo.writeCompressed(rootTag, tempFile.toPath());
             try {
                 java.nio.file.Files.move(tempFile.toPath(), file.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             } catch (java.nio.file.AtomicMoveNotSupportedException e) {
@@ -424,7 +424,7 @@ public class BoardManager {
     public boolean loadFromFile(File file) {
         try {
             if (file != null && file.exists()) {
-                CompoundTag rootTag = NbtIo.readCompressed(file);
+                CompoundTag rootTag = NbtIo.readCompressed(file.toPath(), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
                 if (rootTag.contains("hasSeenWelcomePrompt")) {
                     this.hasSeenWelcomePrompt = rootTag.getBoolean("hasSeenWelcomePrompt");
                 }
@@ -526,7 +526,7 @@ public class BoardManager {
     public File getSaveDirectory() {
         File gameDir;
         try {
-            gameDir = net.minecraftforge.fml.loading.FMLPaths.GAMEDIR.get().toFile();
+            gameDir = net.neoforged.fml.loading.FMLPaths.GAMEDIR.get().toFile();
         } catch (Throwable t) {
             gameDir = new File(".");
         }
@@ -542,7 +542,7 @@ public class BoardManager {
     }
 
     public File getDefaultSaveFile() {
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+        if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.CLIENT) {
             try {
                 File clientFile = com.gtceu.calcboard.client.ClientSaveHelper.getClientSaveFile(getSaveDirectory());
                 if (clientFile != null) return clientFile;

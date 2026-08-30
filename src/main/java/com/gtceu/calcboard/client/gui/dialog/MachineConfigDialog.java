@@ -442,8 +442,8 @@ public class MachineConfigDialog {
                 tooltip.add(Component.literal(" §b↳ " + addon.getDiscoverySource()));
             }
             ItemStack sample = addon.getRenderItemStack();
-            if (sample != null && !sample.isEmpty() && sample.hasTag()) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8NBT: §d" + sample.getTag().toString()));
+            if (sample != null && !sample.isEmpty() && com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(sample)) {
+                tooltip.add(Component.literal("§7[F3+H Debug] §8NBT: §d" + com.gtceu.calcboard.api.util.ItemTagHelper.getTag(sample).toString()));
             }
         }
     }

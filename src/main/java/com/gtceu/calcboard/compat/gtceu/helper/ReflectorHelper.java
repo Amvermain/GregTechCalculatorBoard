@@ -10,7 +10,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -38,8 +38,8 @@ public class ReflectorHelper {
     public static ReflectorStats getReflectorStats(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
 
-        if (stack.hasTag()) {
-            var tag = stack.getTag();
+        if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack)) {
+            var tag = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack);
             if (tag != null) {
                 if (tag.contains("ReflectorTier")) return new ReflectorStats(tag.getInt("ReflectorTier"));
                 if (tag.contains("reflector_tier")) return new ReflectorStats(tag.getInt("reflector_tier"));
@@ -157,10 +157,10 @@ public class ReflectorHelper {
             }
         }
 
-        if (ForgeRegistries.ITEMS != null) {
+        if (BuiltInRegistries.ITEM != null) {
             try {
-                for (var item : ForgeRegistries.ITEMS) {
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+                for (var item : BuiltInRegistries.ITEM) {
+                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
                     if (id == null) continue;
 
                     ItemStack stack = new ItemStack(item);

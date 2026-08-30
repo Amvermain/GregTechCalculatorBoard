@@ -11,7 +11,7 @@ import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraftforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -181,7 +181,7 @@ public class SysteamsRecipeHandler {
 
     private static BoiledFluidResult extractBoiledResultFromMod(ResourceLocation inputFluidId) {
         try {
-            net.minecraft.world.level.material.Fluid fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(inputFluidId);
+            net.minecraft.world.level.material.Fluid fluid = net.minecraft.core.registries.BuiltInRegistries.FLUID.get(inputFluidId);
             if (fluid != null && fluid != Fluids.EMPTY) {
                 Class<?> brmCls = Class.forName("chiefarug.mods.systeams.recipe.BoilingRecipeManager");
                 Method instanceM = brmCls.getMethod("instance");
@@ -197,7 +197,7 @@ public class SysteamsRecipeHandler {
                         Method getOutputM = boiled.getClass().getMethod("fluid");
                         Object outFluidObj = getOutputM.invoke(boiled);
                         if (outFluidObj instanceof FluidStack fs && !fs.isEmpty()) {
-                            ResourceLocation outId = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fs.getFluid());
+                            ResourceLocation outId = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fs.getFluid());
                             String outName = fs.getDisplayName().getString();
                             return new BoiledFluidResult(outId, outName, ratio, 1.0);
                         }

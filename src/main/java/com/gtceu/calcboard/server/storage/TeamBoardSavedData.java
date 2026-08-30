@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.server.storage;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -21,7 +22,7 @@ public class TeamBoardSavedData extends SavedData {
 
     public TeamBoardSavedData() {}
 
-    public static TeamBoardSavedData load(CompoundTag tag) {
+    public static TeamBoardSavedData load(CompoundTag tag, HolderLookup.Provider registries) {
         TeamBoardSavedData data = new TeamBoardSavedData();
         if (tag.contains("Workspaces", Tag.TAG_LIST)) {
             ListTag list = tag.getList("Workspaces", Tag.TAG_COMPOUND);
@@ -35,7 +36,7 @@ public class TeamBoardSavedData extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         ListTag list = new ListTag();
         for (TeamWorkspaceData ws : workspaces.values()) {
             list.add(ws.toNBT());
@@ -44,14 +45,14 @@ public class TeamBoardSavedData extends SavedData {
         return tag;
     }
 
+    public static SavedData.Factory<TeamBoardSavedData> factory() {
+        return new SavedData.Factory<>(TeamBoardSavedData::new, TeamBoardSavedData::load, null);
+    }
+
     public static TeamBoardSavedData get(ServerLevel level) {
         if (level == null || level.getServer() == null) return null;
         ServerLevel overworld = level.getServer().overworld();
-        return overworld.getDataStorage().computeIfAbsent(
-                TeamBoardSavedData::load,
-                TeamBoardSavedData::new,
-                DATA_NAME
-        );
+        return overworld.getDataStorage().computeIfAbsent(factory(), DATA_NAME);
     }
 
     public TeamWorkspaceData getOrCreateWorkspace(UUID teamId, String defaultName) {

@@ -50,7 +50,7 @@ public class MultiblockBOMEmiRecipe implements EmiRecipe {
             }
 
             ItemStack projectStack = new ItemStack(Items.COMPASS);
-            projectStack.setHoverName(Component.literal("§6Factory Multiblock BOM (" + summary.totalMultiblockCount() + " Multiblocks, " + summary.totalUniqueItemTypes() + " Items)"));
+            projectStack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.literal("§6Factory Multiblock BOM (" + summary.totalMultiblockCount() + " Multiblocks, " + summary.totalUniqueItemTypes() + " Items)"));
             projectOutputs.add(EmiStack.of(projectStack, 1));
         }
 
@@ -117,7 +117,7 @@ public class MultiblockBOMEmiRecipe implements EmiRecipe {
     }
 
     @Override
-    public @Nullable Recipe<?> getBackingRecipe() {
+    public @Nullable net.minecraft.world.item.crafting.RecipeHolder<?> getBackingRecipe() {
         return null;
     }
 }

@@ -41,7 +41,7 @@ public final class NodeRateCalculator {
             }
         }
         try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, rates, Collections.emptyMap()));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, rates, Collections.emptyMap()));
         } catch (Throwable ignored) {}
         return rates;
     }
@@ -106,7 +106,7 @@ public final class NodeRateCalculator {
             }
         }
         try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, Collections.emptyMap(), rates));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, Collections.emptyMap(), rates));
         } catch (Throwable ignored) {}
         return rates;
     }
@@ -133,7 +133,7 @@ public final class NodeRateCalculator {
             }
         }
         try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, rates, Collections.emptyMap()));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, rates, Collections.emptyMap()));
         } catch (Throwable ignored) {}
         return rates;
     }
@@ -161,7 +161,7 @@ public final class NodeRateCalculator {
             }
         }
         try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, Collections.emptyMap(), rates));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, Collections.emptyMap(), rates));
         } catch (Throwable ignored) {}
         return rates;
     }

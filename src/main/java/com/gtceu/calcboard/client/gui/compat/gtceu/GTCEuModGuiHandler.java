@@ -19,8 +19,8 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -427,7 +427,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
             if (hoveredController != null) {
                 List<Component> tt = new ArrayList<>();
-                var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(hoveredController);
+                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(hoveredController);
                 String fullName = (item != null && item != net.minecraft.world.item.Items.AIR) ? item.getDescription().getString() : hoveredController.getPath();
                 tt.add(Component.literal("§e🏛 " + fullName));
                 tt.add(Component.literal("§8" + hoveredController));
@@ -455,7 +455,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         if (path.contains("large_fluid_distillation") || path.contains("large_distillation")) return "🏛 Large DT";
         if (path.contains("distillation_tower")) return "🏛 Distillation";
         if (path.contains("yielding_exhaustor") || path.contains("yeast")) return "🧬 Yeast";
-        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
+        var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(id);
         if (item != null && item != net.minecraft.world.item.Items.AIR) {
             String name = item.getDescription().getString();
             if (name.startsWith("Advanced ")) name = "Adv. " + name.substring(9);
@@ -499,7 +499,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                         }
                         if (parent != null) parent.markSummaryDirty();
                         Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                         );
                         return true;
                     }
@@ -523,7 +523,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     }
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -547,7 +547,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     }
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -564,7 +564,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     node.setBoilerThrottle(Math.max(25, curThrottle - 5));
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -574,7 +574,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     node.setBoilerThrottle(Math.min(100, curThrottle + 5));
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -586,7 +586,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                         node.setBoilerThrottle(pre);
                         if (parent != null) parent.markSummaryDirty();
                         Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                         );
                         return true;
                     }
@@ -606,7 +606,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     node.setMultiblock(bt.isMultiblock());
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -618,7 +618,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE);
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -627,7 +627,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.HIGH_PRESSURE);
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -636,7 +636,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.NONE);
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -677,7 +677,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     if (mbControllerScroll > 0) {
                         mbControllerScroll--;
                         Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                         );
                     }
                     return true;
@@ -712,7 +712,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     }
                     if (parent != null) parent.markSummaryDirty();
                     Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                     );
                     return true;
                 }
@@ -725,7 +725,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     if (mbControllerScroll < maxScroll) {
                         mbControllerScroll++;
                         Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                         );
                     }
                     return true;
@@ -743,7 +743,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 }
                 if (parent != null) parent.markSummaryDirty();
                 Minecraft.getInstance().getSoundManager().play(
-                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                 );
                 return true;
             }

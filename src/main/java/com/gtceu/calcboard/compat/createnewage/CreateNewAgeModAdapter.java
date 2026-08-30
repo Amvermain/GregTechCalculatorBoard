@@ -20,8 +20,8 @@ import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.loading.FMLLoader;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.loading.FMLLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,14 +51,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
 
     @Override
     public boolean isLoaded() {
-        try {
-            if (ModList.get() != null) {
-                return ModList.get().isLoaded(MOD_ID) || !FMLLoader.isProduction();
-            }
-        } catch (Throwable t) {
-            return true; // Test environment fallback
-        }
-        return true;
+        return com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded(MOD_ID);
     }
 
     @Override
@@ -364,11 +357,18 @@ public class CreateNewAgeModAdapter implements IModAdapter {
             if (common != null) {
                 var field = common.getClass().getField("suToEnergy");
                 Object configValue = field.get(common);
-                if (configValue instanceof net.minecraftforge.common.ForgeConfigSpec.ConfigValue<?> cv) {
+                if (configValue instanceof net.neoforged.neoforge.common.ModConfigSpec.ConfigValue<?> cv) {
                     Object val = cv.get();
                     if (val instanceof Number n) {
                         return n.doubleValue();
                     }
+                } else if (configValue != null) {
+                    try {
+                        Object val = configValue.getClass().getMethod("get").invoke(configValue);
+                        if (val instanceof Number n) {
+                            return n.doubleValue();
+                        }
+                    } catch (Throwable ignored2) {}
                 }
             }
         } catch (Throwable ignored) {}

@@ -15,8 +15,8 @@ import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.loading.FMLLoader;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.loading.FMLLoader;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,16 +42,8 @@ public class CreateModAdapter implements IModAdapter {
 
     @Override
     public boolean isLoaded() {
-        try {
-            if (ModList.get() != null) {
-                return ModList.get().isLoaded(MOD_ID)
-                        || ModList.get().isLoaded(MOD_ID_ADDITION)
-                        || !FMLLoader.isProduction();
-            }
-        } catch (Throwable t) {
-            return true; // Test environment fallback
-        }
-        return true;
+        return com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded(MOD_ID)
+                || com.gtceu.calcboard.api.util.ModCompatHelper.isModLoaded(MOD_ID_ADDITION);
     }
 
     @Override

@@ -943,9 +943,9 @@ public class MachineAddonTest {
 
         // In test environment, getItemStackSample creates ItemStack and attaches GT.PartStats
         ItemStack sample = loadedRotor.getItemStackSample();
-        if (sample != null && !sample.isEmpty() && sample.hasTag()) {
-            Assertions.assertTrue(sample.getTag().contains("GT.PartStats"));
-            Assertions.assertEquals("gtceu:ancient_runicalium", sample.getTag().getCompound("GT.PartStats").getString("Material"));
+        if (sample != null && !sample.isEmpty() && com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(sample)) {
+            Assertions.assertTrue(com.gtceu.calcboard.api.util.ItemTagHelper.getTag(sample).contains("GT.PartStats"));
+            Assertions.assertEquals("gtceu:ancient_runicalium", com.gtceu.calcboard.api.util.ItemTagHelper.getTag(sample).getCompound("GT.PartStats").getString("Material"));
         }
     }
 

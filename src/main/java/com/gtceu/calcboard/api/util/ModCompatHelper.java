@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.api.util;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 /**
  * Utility helper that provides soft dependency checks to isolate optional mod integrations
@@ -118,7 +118,7 @@ public class ModCompatHelper {
         }
         try {
             ModList list = ModList.get();
-            if (list != null) {
+            if (list != null && list.isLoaded("neoforge")) {
                 return list.isLoaded(modId);
             }
             return true;

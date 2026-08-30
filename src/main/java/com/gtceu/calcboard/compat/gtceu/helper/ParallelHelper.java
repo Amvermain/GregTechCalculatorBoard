@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -36,8 +36,8 @@ public class ParallelHelper {
             return null;
         }
 
-        if (stack.hasTag()) {
-            net.minecraft.nbt.CompoundTag tag = stack.getTag();
+        if (com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack)) {
+            net.minecraft.nbt.CompoundTag tag = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack);
             if (tag != null) {
                 if (tag.contains("Parallel")) {
                     int p = tag.getInt("Parallel");
@@ -53,7 +53,7 @@ public class ParallelHelper {
             return getParallelStats(blockItem.getBlock());
         }
 
-        ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (id != null) {
             return getParallelStats(id.toString());
         }
@@ -81,7 +81,7 @@ public class ParallelHelper {
             }
         } catch (Throwable ignored) {}
 
-        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         if (id != null) {
             return getParallelStats(id.toString());
         }
@@ -371,8 +371,8 @@ public class ParallelHelper {
             }
         } catch (Throwable ignored) {}
 
-        if (ForgeRegistries.ITEMS != null) {
-            var item = ForgeRegistries.ITEMS.getValue(id);
+        if (BuiltInRegistries.ITEM != null) {
+            var item = BuiltInRegistries.ITEM.get(id);
             if (item != null && item != net.minecraft.world.item.Items.AIR) {
                 return new ItemStack(item);
             }

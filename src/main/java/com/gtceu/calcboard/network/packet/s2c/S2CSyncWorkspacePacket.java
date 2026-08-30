@@ -1,49 +1,56 @@
 package com.gtceu.calcboard.network.packet.s2c;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.server.storage.CommitLogEntry;
 import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
 import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.network.NetworkEvent;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.function.Supplier;
 
-public class S2CSyncWorkspacePacket {
+public record S2CSyncWorkspacePacket(
+        UUID teamId,
+        String teamName,
+        int globalRevision,
+        List<TeamWorkspacePage> pages,
+        List<CommitLogEntry> commits
+) implements CustomPacketPayload {
 
-    private final UUID teamId;
-    private final String teamName;
-    private final int globalRevision;
-    private final List<TeamWorkspacePage> pages;
-    private final List<CommitLogEntry> commits;
+    public static final Type<S2CSyncWorkspacePacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "s2c_sync_workspace"));
+    public static final StreamCodec<FriendlyByteBuf, S2CSyncWorkspacePacket> STREAM_CODEC = CustomPacketPayload.codec(
+            S2CSyncWorkspacePacket::write,
+            S2CSyncWorkspacePacket::new
+    );
 
     public S2CSyncWorkspacePacket(TeamWorkspaceData workspace) {
-        this.teamId = workspace.getTeamId();
-        this.teamName = workspace.getTeamName();
-        this.globalRevision = workspace.getGlobalRevision();
-        this.pages = new ArrayList<>(workspace.getPages());
-        this.commits = new ArrayList<>(workspace.getCommitHistory());
-    }
-
-    public S2CSyncWorkspacePacket(UUID teamId, String teamName, int globalRevision, List<TeamWorkspacePage> pages, List<CommitLogEntry> commits) {
-        this.teamId = teamId;
-        this.teamName = teamName != null ? teamName : "Team Workspace";
-        this.globalRevision = globalRevision;
-        this.pages = pages != null ? pages : new ArrayList<>();
-        this.commits = commits != null ? commits : new ArrayList<>();
+        this(
+                workspace.getTeamId(),
+                workspace.getTeamName(),
+                workspace.getGlobalRevision(),
+                new ArrayList<>(workspace.getPages()),
+                new ArrayList<>(workspace.getCommitHistory())
+        );
     }
 
     public S2CSyncWorkspacePacket(FriendlyByteBuf buf) {
-        this.teamId = buf.readUUID();
-        this.teamName = buf.readUtf(256);
-        this.globalRevision = buf.readVarInt();
+        this(
+                buf.readUUID(),
+                buf.readUtf(256),
+                buf.readVarInt(),
+                readPagesList(buf),
+                readCommitsList(buf)
+        );
+    }
 
+    private static List<TeamWorkspacePage> readPagesList(FriendlyByteBuf buf) {
         int pageCount = buf.readVarInt();
-        this.pages = new ArrayList<>(pageCount);
+        List<TeamWorkspacePage> pages = new ArrayList<>(pageCount);
         for (int i = 0; i < pageCount; i++) {
             String pageId = buf.readUtf(256);
             String pageTitle = buf.readUtf(256);
@@ -58,11 +65,14 @@ public class S2CSyncWorkspacePacket {
             p.setLockHolderUUID(lockHolder);
             p.setLockHolderName(lockHolderName);
             p.setLockExpiresTimestamp(lockExpires);
-            this.pages.add(p);
+            pages.add(p);
         }
+        return pages;
+    }
 
+    private static List<CommitLogEntry> readCommitsList(FriendlyByteBuf buf) {
         int commitCount = buf.readVarInt();
-        this.commits = new ArrayList<>(commitCount);
+        List<CommitLogEntry> commits = new ArrayList<>(commitCount);
         for (int i = 0; i < commitCount; i++) {
             int rev = buf.readVarInt();
             boolean hasAuthor = buf.readBoolean();
@@ -74,17 +84,19 @@ public class S2CSyncWorkspacePacket {
             int add = buf.readVarInt();
             int mod = buf.readVarInt();
             int del = buf.readVarInt();
-            this.commits.add(new CommitLogEntry(rev, author, authorName, ts, pageId, msg, add, mod, del));
+            commits.add(new CommitLogEntry(rev, author, authorName, ts, pageId, msg, add, mod, del));
         }
+        return commits;
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUUID(teamId);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUUID(teamId != null ? teamId : new UUID(0L, 0L));
         buf.writeUtf(teamName != null ? teamName : "Team Workspace");
         buf.writeVarInt(globalRevision);
 
-        buf.writeVarInt(pages.size());
-        for (TeamWorkspacePage p : pages) {
+        List<TeamWorkspacePage> pageList = pages != null ? pages : List.of();
+        buf.writeVarInt(pageList.size());
+        for (TeamWorkspacePage p : pageList) {
             buf.writeUtf(p.getPageId());
             buf.writeUtf(p.getTitle() != null ? p.getTitle() : "Page");
             buf.writeVarInt(p.getPageRevision());
@@ -99,8 +111,9 @@ public class S2CSyncWorkspacePacket {
             buf.writeByteArray(data != null ? data : new byte[0]);
         }
 
-        buf.writeVarInt(commits.size());
-        for (CommitLogEntry c : commits) {
+        List<CommitLogEntry> commitList = commits != null ? commits : List.of();
+        buf.writeVarInt(commitList.size());
+        for (CommitLogEntry c : commitList) {
             buf.writeVarInt(c.getRevision());
             boolean hasAuthor = c.getAuthorUUID() != null;
             buf.writeBoolean(hasAuthor);
@@ -115,6 +128,11 @@ public class S2CSyncWorkspacePacket {
             buf.writeVarInt(c.getModifiedNodes());
             buf.writeVarInt(c.getDeletedNodes());
         }
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
     public UUID getTeamId() {
@@ -137,9 +155,7 @@ public class S2CSyncWorkspacePacket {
         return commits;
     }
 
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
-        ctx.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleSyncWorkspace(this)));
-        ctx.setPacketHandled(true);
+    public static void handle(S2CSyncWorkspacePacket packet, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPacketHandler.handleSyncWorkspace(packet));
     }
 }

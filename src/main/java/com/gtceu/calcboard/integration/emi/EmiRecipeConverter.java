@@ -14,12 +14,12 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -173,9 +173,10 @@ public class EmiRecipeConverter {
                 try {
                     if (primaryStack.isFluid() && primaryStack.getId() != null) {
                         var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, primaryStack.getId());
-                        if (ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) {
-                            for (Fluid fluid : ForgeRegistries.FLUIDS.tags().getTag(tagKey)) {
-                                ResourceLocation fId = ForgeRegistries.FLUIDS.getKey(fluid);
+                        var optionalTag = BuiltInRegistries.FLUID.getTag(tagKey);
+                        if (optionalTag.isPresent()) {
+                            for (var holder : optionalTag.get()) {
+                                ResourceLocation fId = BuiltInRegistries.FLUID.getKey(holder.value());
                                 if (fId != null && !altIds.contains(fId)) {
                                     altIds.add(fId);
                                 }
@@ -373,33 +374,33 @@ public class EmiRecipeConverter {
             }
         }
 
-        // 2. Try Category ID matching in ForgeRegistries.ITEMS
+        // 2. Try Category ID matching in BuiltInRegistries.ITEM
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             ResourceLocation catId = recipe.getCategory().getId();
             String ns = catId.getNamespace();
             String path = catId.getPath();
 
-            if (ForgeRegistries.ITEMS.containsKey(catId)) {
+            if (BuiltInRegistries.ITEM.containsKey(catId)) {
                 return catId;
             }
 
             ResourceLocation lvId = ResourceLocation.tryParse(ns + ":lv_" + path);
-            if (lvId != null && ForgeRegistries.ITEMS.containsKey(lvId)) {
+            if (lvId != null && BuiltInRegistries.ITEM.containsKey(lvId)) {
                 return lvId;
             }
 
             ResourceLocation lvId2 = ResourceLocation.tryParse(ns + ":" + path + "_lv");
-            if (lvId2 != null && ForgeRegistries.ITEMS.containsKey(lvId2)) {
+            if (lvId2 != null && BuiltInRegistries.ITEM.containsKey(lvId2)) {
                 return lvId2;
             }
 
             ResourceLocation gtLvId = ResourceLocation.tryParse("gtceu:lv_" + path);
-            if (gtLvId != null && ForgeRegistries.ITEMS.containsKey(gtLvId)) {
+            if (gtLvId != null && BuiltInRegistries.ITEM.containsKey(gtLvId)) {
                 return gtLvId;
             }
 
             ResourceLocation gtId = ResourceLocation.tryParse("gtceu:" + path);
-            if (gtId != null && ForgeRegistries.ITEMS.containsKey(gtId)) {
+            if (gtId != null && BuiltInRegistries.ITEM.containsKey(gtId)) {
                 return gtId;
             }
         }
@@ -415,30 +416,31 @@ public class EmiRecipeConverter {
 
         Object key = stack.getKey();
         if (key instanceof Fluid fluid && fluid != Fluids.EMPTY) {
-            ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
+            ResourceLocation fluidId = BuiltInRegistries.FLUID.getKey(fluid);
             return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
         } else if (key != null && key.getClass().getName().contains("FluidStack")) {
             try {
                 Method getFluidMethod = key.getClass().getMethod("getFluid");
                 Object fl = getFluidMethod.invoke(key);
                 if (fl instanceof Fluid fluid && fluid != Fluids.EMPTY) {
-                    ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(fluid);
+                    ResourceLocation fluidId = BuiltInRegistries.FLUID.getKey(fluid);
                     return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
                 }
             } catch (Throwable ignored) {}
             return IngredientStack.fluid(id, displayName, amount, chance);
         } else if (id != null) {
-            if (ForgeRegistries.FLUIDS.containsKey(id)) {
+            if (BuiltInRegistries.FLUID.containsKey(id)) {
                 return IngredientStack.fluid(id, displayName, amount, chance);
             }
             try {
                 var tagKey = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.FLUID, id);
-                if (ForgeRegistries.FLUIDS.tags().isKnownTagName(tagKey)) {
-                    var it = ForgeRegistries.FLUIDS.tags().getTag(tagKey).iterator();
+                var optionalTag = BuiltInRegistries.FLUID.getTag(tagKey);
+                if (optionalTag.isPresent()) {
+                    var it = optionalTag.get().iterator();
                     if (it.hasNext()) {
-                        Fluid firstFluid = it.next();
+                        Fluid firstFluid = it.next().value();
                         if (firstFluid != null && firstFluid != Fluids.EMPTY) {
-                            ResourceLocation fluidId = ForgeRegistries.FLUIDS.getKey(firstFluid);
+                            ResourceLocation fluidId = BuiltInRegistries.FLUID.getKey(firstFluid);
                             return IngredientStack.fluid(fluidId != null ? fluidId : id, displayName, amount, chance);
                         }
                     }
@@ -486,7 +488,7 @@ public class EmiRecipeConverter {
                         Object stackObj = getStackM.invoke(po);
                         Object chanceObj = getChanceM.invoke(po);
                         if (stackObj instanceof net.minecraft.world.item.ItemStack is && chanceObj instanceof Number n) {
-                            ResourceLocation id = ForgeRegistries.ITEMS.getKey(is.getItem());
+                            ResourceLocation id = BuiltInRegistries.ITEM.getKey(is.getItem());
                             if (id != null) {
                                 double ch = Math.max(0.0, Math.min(1.0, n.doubleValue()));
                                 list.add(new OutputSlotChance(id, ch, 0.0));
@@ -583,19 +585,19 @@ public class EmiRecipeConverter {
             Object inner = contentObj;
             for (int depth = 0; depth < 5 && inner != null; depth++) {
                 if (inner instanceof net.minecraft.world.item.ItemStack is) {
-                    return is.isEmpty() ? null : ForgeRegistries.ITEMS.getKey(is.getItem());
+                    return is.isEmpty() ? null : BuiltInRegistries.ITEM.getKey(is.getItem());
                 } else if (inner instanceof net.minecraft.world.item.Item it) {
-                    return ForgeRegistries.ITEMS.getKey(it);
+                    return BuiltInRegistries.ITEM.getKey(it);
                 } else if (inner instanceof net.minecraft.world.item.crafting.Ingredient ing) {
                     net.minecraft.world.item.ItemStack[] items = ing.getItems();
                     if (items != null && items.length > 0 && !items[0].isEmpty()) {
-                        return ForgeRegistries.ITEMS.getKey(items[0].getItem());
+                        return BuiltInRegistries.ITEM.getKey(items[0].getItem());
                     }
                 } else if (inner instanceof Fluid fl) {
-                    return ForgeRegistries.FLUIDS.getKey(fl);
+                    return BuiltInRegistries.FLUID.getKey(fl);
                 } else if (inner instanceof net.minecraft.world.item.ItemStack[] arr) {
                     if (arr.length > 0 && !arr[0].isEmpty()) {
-                        return ForgeRegistries.ITEMS.getKey(arr[0].getItem());
+                        return BuiltInRegistries.ITEM.getKey(arr[0].getItem());
                     }
                 } else if (inner instanceof List<?> list && !list.isEmpty()) {
                     inner = list.get(0);
@@ -609,7 +611,7 @@ public class EmiRecipeConverter {
                         Method gm = inner.getClass().getMethod("getFluid");
                         Object flObj = gm.invoke(inner);
                         if (flObj instanceof Fluid fl) {
-                            return ForgeRegistries.FLUIDS.getKey(fl);
+                            return BuiltInRegistries.FLUID.getKey(fl);
                         }
                     } catch (Throwable ignored) {}
                 }

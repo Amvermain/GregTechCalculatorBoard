@@ -117,7 +117,7 @@ public class RecipeNode {
             node.getAvailableWorkstations().add(machineId);
         }
         try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.Created(node));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.Created(node));
         } catch (Throwable ignored) {}
         return node;
     }
@@ -884,7 +884,7 @@ public class RecipeNode {
 
     public OverclockMode.OverclockResult getOverclockResult() {
         try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PreCalculation(this));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PreCalculation(this));
         } catch (Throwable ignored) {}
         return ModAdapterRegistry.getAdapterForNode(this).computeOverclock(this, targetTier, isGenerator);
     }

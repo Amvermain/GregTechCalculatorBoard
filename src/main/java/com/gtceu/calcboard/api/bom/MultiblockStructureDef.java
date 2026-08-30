@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.api.bom;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
 
@@ -51,8 +51,8 @@ public record MultiblockStructureDef(
     public ItemStack resolveControllerStack() {
         if (controllerId == null) return ItemStack.EMPTY;
         try {
-            var item = ForgeRegistries.ITEMS.getValue(controllerId);
-            if (item != null) {
+            var item = BuiltInRegistries.ITEM.get(controllerId);
+            if (item != null && item != net.minecraft.world.item.Items.AIR) {
                 return new ItemStack(item);
             }
         } catch (Throwable ignored) {}

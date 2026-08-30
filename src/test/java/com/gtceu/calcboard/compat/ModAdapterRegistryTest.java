@@ -16,6 +16,7 @@ import com.gtceu.calcboard.compat.vanilla.VanillaModAdapter;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,8 +26,10 @@ import java.util.List;
  */
 public class ModAdapterRegistryTest {
 
-    @BeforeAll
-    public static void setup() {
+    @BeforeEach
+    public void setup() {
+        com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        ModAdapterRegistry.reset();
         ModAdapterRegistry.init();
     }
 

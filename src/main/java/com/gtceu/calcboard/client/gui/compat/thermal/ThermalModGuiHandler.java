@@ -13,8 +13,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Thermal implementation of {@link IModGuiHandler}.
@@ -83,7 +83,7 @@ public class ThermalModGuiHandler implements IModGuiHandler {
                     widget.getParent().markSummaryDirty();
                 }
                 Minecraft.getInstance().getSoundManager().play(
-                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F)
                 );
                 return true;
             }
@@ -142,7 +142,7 @@ public class ThermalModGuiHandler implements IModGuiHandler {
                 if (parallelBox != null) parallelBox.setValue(String.valueOf(qp));
                 if (parent != null) parent.markSummaryDirty();
                 Minecraft.getInstance().getSoundManager().play(
-                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F)
                 );
                 return true;
             }

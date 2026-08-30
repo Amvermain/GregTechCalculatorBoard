@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.network.packet.c2s;
 
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.s2c.S2CWorkspaceErrorPacket;
 import com.gtceu.calcboard.server.storage.ChunkedStreamHelper;
@@ -8,48 +9,42 @@ import com.gtceu.calcboard.server.storage.TeamWorkspaceData;
 import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import com.gtceu.calcboard.server.team.TeamProviderRegistry;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * C2S request packet to stream specific page data on-demand.
  */
-public class C2SRequestPageDataPacket {
+public record C2SRequestPageDataPacket(String pageId, int currentCachedRevision) implements CustomPacketPayload {
 
-    private final String pageId;
-    private final int currentCachedRevision;
-
-    public C2SRequestPageDataPacket(String pageId, int currentCachedRevision) {
-        this.pageId = pageId != null ? pageId : "default";
-        this.currentCachedRevision = currentCachedRevision;
-    }
+    public static final Type<C2SRequestPageDataPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(GregTechCalcBoard.MOD_ID, "c2s_request_page_data"));
+    public static final StreamCodec<FriendlyByteBuf, C2SRequestPageDataPacket> STREAM_CODEC = CustomPacketPayload.codec(
+            C2SRequestPageDataPacket::write,
+            C2SRequestPageDataPacket::new
+    );
 
     public C2SRequestPageDataPacket(FriendlyByteBuf buf) {
-        this.pageId = buf.readUtf(256);
-        this.currentCachedRevision = buf.readVarInt();
+        this(buf.readUtf(256), buf.readVarInt());
     }
 
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(pageId);
+    public void write(FriendlyByteBuf buf) {
+        buf.writeUtf(pageId != null ? pageId : "default");
         buf.writeVarInt(currentCachedRevision);
     }
 
-    public String getPageId() {
-        return pageId;
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
     }
 
-    public int getCurrentCachedRevision() {
-        return currentCachedRevision;
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
-        NetworkEvent.Context ctx = ctxSupplier.get();
+    public static void handle(C2SRequestPageDataPacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            ServerPlayer player = ctx.getSender();
-            if (player == null) return;
+            if (!(ctx.player() instanceof ServerPlayer player)) return;
 
             UUID playerTeamId = TeamProviderRegistry.getInstance().getPlayerTeamId(player);
             if (playerTeamId == null) {
@@ -63,17 +58,16 @@ public class C2SRequestPageDataPacket {
             TeamWorkspaceData ws = savedData.getWorkspace(playerTeamId);
             if (ws == null) return;
 
-            TeamWorkspacePage page = ws.getPage(pageId);
+            TeamWorkspacePage page = ws.getPage(packet.pageId());
             if (page == null) return;
 
             // Cache Hit check: if client already has the identical revision, skip re-sending full payload
-            if (currentCachedRevision > 0 && currentCachedRevision == page.getPageRevision()) {
+            if (packet.currentCachedRevision() > 0 && packet.currentCachedRevision() == page.getPageRevision()) {
                 return; // Client cache is up to date!
             }
 
             byte[] data = page.getCompressedGraphData();
-            ChunkedStreamHelper.sendPageDataSafely(player, pageId, page.getPageRevision(), data);
+            ChunkedStreamHelper.sendPageDataSafely(player, packet.pageId(), page.getPageRevision(), data);
         });
-        ctx.setPacketHandled(true);
     }
 }

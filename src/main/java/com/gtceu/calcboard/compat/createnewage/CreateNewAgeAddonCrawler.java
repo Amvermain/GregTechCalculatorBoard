@@ -9,7 +9,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -49,10 +49,10 @@ public class CreateNewAgeAddonCrawler {
             TagKey<Item> magnetTag = getMagnetItemTag();
             TagKey<Block> customMagnetTag = getCustomMagnetBlockTag();
 
-            if (ForgeRegistries.ITEMS != null) {
-                for (Item item : ForgeRegistries.ITEMS) {
+            if (BuiltInRegistries.ITEM != null) {
+                for (Item item : BuiltInRegistries.ITEM) {
                     if (item == null) continue;
-                    ResourceLocation id = ForgeRegistries.ITEMS.getKey(item);
+                    ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
                     if (id == null) continue;
 
                     ItemStack stack = new ItemStack(item);
@@ -132,8 +132,8 @@ public class CreateNewAgeAddonCrawler {
         }
 
         // 3. Deterministic NBT inspection
-        if (stack != null && stack.hasTag()) {
-            var tag = stack.getTag();
+        if (stack != null && com.gtceu.calcboard.api.util.ItemTagHelper.hasTag(stack)) {
+            var tag = com.gtceu.calcboard.api.util.ItemTagHelper.getTag(stack);
             if (tag != null) {
                 if (tag.contains("Strength")) return tag.getInt("Strength");
                 if (tag.contains("strength")) return tag.getInt("strength");

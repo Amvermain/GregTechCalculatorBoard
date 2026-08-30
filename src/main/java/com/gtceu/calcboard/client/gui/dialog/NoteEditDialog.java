@@ -163,7 +163,7 @@ public class NoteEditDialog {
             int sx = x + 16 + i * (swatchSize + swatchSpacing);
             if (mouseX >= sx && mouseX <= sx + swatchSize && mouseY >= swatchY && mouseY <= swatchY + swatchSize) {
                 selectedColor = CanvasStickyNote.PALETTE[i];
-                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.2F));
                 return true;
             }
         }
@@ -257,7 +257,7 @@ public class NoteEditDialog {
             targetNote.setContent(contentInput != null ? contentInput.getValue() : "");
             targetNote.setColor(selectedColor);
             parent.markSummaryDirty();
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F));
         }
         close();
     }

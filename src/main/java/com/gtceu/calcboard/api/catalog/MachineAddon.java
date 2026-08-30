@@ -12,7 +12,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -127,7 +126,7 @@ public class MachineAddon {
         }
         if (itemIcon != null) {
             try {
-                var item = ForgeRegistries.ITEMS.getValue(itemIcon);
+                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(itemIcon);
                 if (item != null && item != Items.AIR) {
                     String itemDesc = item.getDescription().getString();
                     if (!itemDesc.contains("%s")) {
@@ -166,7 +165,7 @@ public class MachineAddon {
         }
         if (itemStackSample != null && !itemStackSample.isEmpty()) {
             try {
-                var lines = itemStackSample.getTooltipLines(null, TooltipFlag.Default.NORMAL);
+                var lines = itemStackSample.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL);
                 if (lines != null && lines.size() > 1) {
                     StringBuilder sb = new StringBuilder();
                     for (int i = 1; i < lines.size(); i++) {
@@ -182,10 +181,10 @@ public class MachineAddon {
         }
         if (itemIcon != null && category != Category.ROTOR) {
             try {
-                var item = ForgeRegistries.ITEMS.getValue(itemIcon);
+                var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(itemIcon);
                 if (item != null && item != Items.AIR) {
                     ItemStack stack = new ItemStack(item);
-                    var lines = stack.getTooltipLines(null, TooltipFlag.Default.NORMAL);
+                    var lines = stack.getTooltipLines(Item.TooltipContext.EMPTY, null, TooltipFlag.NORMAL);
                     if (lines != null && lines.size() > 1) {
                         StringBuilder sb = new StringBuilder();
                         for (int i = 1; i < lines.size(); i++) {
@@ -229,7 +228,7 @@ public class MachineAddon {
                 return itemStackSample;
             }
             if (itemIcon != null) {
-                Item item = ForgeRegistries.ITEMS.getValue(itemIcon);
+                Item item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(itemIcon);
                 if (item != null && item != Items.AIR) {
                     return new ItemStack(item);
                 }
@@ -535,7 +534,8 @@ public class MachineAddon {
             tag.putString("discoverySource", discoverySource);
         }
         if (itemStackSample != null && !itemStackSample.isEmpty()) {
-            tag.put("itemStackSample", itemStackSample.serializeNBT());
+            net.minecraft.world.item.ItemStack.OPTIONAL_CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, itemStackSample)
+                    .result().ifPresent(elem -> tag.put("itemStackSample", elem));
         }
         return tag;
     }
@@ -544,7 +544,8 @@ public class MachineAddon {
         if (tag.contains("modId")) setModId(tag.getString("modId"));
         if (tag.contains("itemStackSample")) {
             try {
-                setItemStackSample(ItemStack.of(tag.getCompound("itemStackSample")));
+                net.minecraft.world.item.ItemStack.OPTIONAL_CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag.get("itemStackSample"))
+                        .result().ifPresent(this::setItemStackSample);
             } catch (Throwable ignored) {}
         }
         if (tag.contains("durationMultiplier")) setDurationMultiplier(tag.getDouble("durationMultiplier"));

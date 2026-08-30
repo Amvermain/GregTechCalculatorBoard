@@ -542,7 +542,7 @@ public class CategoryCapabilityMatrix {
                                             is = s;
                                         }
                                         if (!is.isEmpty()) {
-                                            ResourceLocation ws = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(is.getItem());
+                                            ResourceLocation ws = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(is.getItem());
                                             if (ws != null) {
                                                 Object machineDef = null;
                                                 try {
