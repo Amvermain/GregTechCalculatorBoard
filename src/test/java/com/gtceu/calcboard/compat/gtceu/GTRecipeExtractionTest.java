@@ -49,7 +49,7 @@ public class GTRecipeExtractionTest {
         }
     }
 
-    public static class BacterialHarvestingCustomRecipe extends StructuralGTRecipeFixture {
+    public static class BacterialHarvestingCustomRecipe {
         private final int dur = 160;
 
         public int duration() {
@@ -102,6 +102,22 @@ public class GTRecipeExtractionTest {
 
         public long getInputEUt() {
             throw new NoClassDefFoundError("optional/dependency/ShouldNotBeLoaded");
+        }
+    }
+
+    public static class ShadowedBackingBaseFixture {
+        public final Object recipe;
+
+        public ShadowedBackingBaseFixture(Object recipe) {
+            this.recipe = recipe;
+        }
+    }
+
+    public static class ShadowedBackingSubFixture extends ShadowedBackingBaseFixture {
+        public Object recipe = null;
+
+        public ShadowedBackingSubFixture(Object recipe) {
+            super(recipe);
         }
     }
 
@@ -233,6 +249,39 @@ public class GTRecipeExtractionTest {
 
         Assertions.assertFalse(GTCEuRecipeHandler.isGTRecipe(unrelated));
         Assertions.assertSame(unrelated, GTCEuRecipeHandler.unwrapRecipe(unrelated));
+    }
+
+    @Test
+    public void testUnwrapsShadowedBackingFieldFromSuperclass() {
+        StructuralGTRecipeFixture recipe = new StructuralGTRecipeFixture();
+        recipe.duration = 90;
+        recipe.tickInputs.put("gtceu:eu_recipe_capability", List.of(new MockEnergyContent(128L)));
+        ShadowedBackingSubFixture wrapper = new ShadowedBackingSubFixture(recipe);
+
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(wrapper));
+        Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
+
+        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
+
+        Assertions.assertEquals(90.0, details.durationTicks, 1e-6);
+        Assertions.assertEquals(128.0, details.eut, 1e-6);
+        Assertions.assertEquals(GTVoltageTier.MV, details.tier);
+        Assertions.assertEquals(EnergyType.ELECTRIC_EU, details.energyType);
+    }
+
+    @Test
+    public void testGTCategoryNamespaceDetection() {
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("gtceu"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("start_core"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("gtceu_start"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("start"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("star_technology"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("GTCEU"));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace("minecraft"));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace("create"));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace(""));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace(null));
     }
 
     @Test

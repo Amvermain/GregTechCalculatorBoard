@@ -13,6 +13,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -27,9 +28,49 @@ public class GTCEuRecipeHandler {
     private static final String[] RECIPE_BACKING_FIELDS = {
             "recipe", "gtRecipe", "backingRecipe", "backing", "originalRecipe", "delegate", "value"
     };
+    private static final String[] DURATION_METHOD_NAMES = {"getDuration", "duration", "getDurationTicks"};
+    private static final String[] EUt_METHOD_NAMES = {"getInputEUt", "getOutputEUt", "inputEUt", "outputEUt"};
+
+    private static final ClassValue<Boolean> GT_SHAPE_CACHE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            return computeGTRecipeShape(type);
+        }
+    };
+
+    private static final ClassValue<List<Field>> BACKING_FIELDS_CACHE = new ClassValue<>() {
+        @Override
+        protected List<Field> computeValue(Class<?> type) {
+            List<Field> fields = new ArrayList<>();
+            for (String fieldName : RECIPE_BACKING_FIELDS) {
+                Class<?> cur = type;
+                while (cur != null && cur != Object.class) {
+                    try {
+                        Field field = cur.getDeclaredField(fieldName);
+                        if (!Modifier.isStatic(field.getModifiers())) {
+                            field.setAccessible(true);
+                            fields.add(field);
+                        }
+                    } catch (NoSuchFieldException ignored) {
+                    } catch (Throwable ignored) {
+                        break;
+                    }
+                    cur = cur.getSuperclass();
+                }
+            }
+            return fields;
+        }
+    };
+
+    public static boolean isGTCategoryNamespace(String namespace) {
+        if (namespace == null) return false;
+        String ns = namespace.toLowerCase(Locale.ROOT);
+        return ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")
+                || ns.equals("start") || ns.equals("star_technology");
+    }
 
     public static boolean isGTRecipe(Object backing) {
-        return isDirectGTRecipe(unwrapRecipe(backing));
+        return matchesGTRecipeShape(unwrapRecipe(backing));
     }
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
@@ -44,7 +85,7 @@ public class GTCEuRecipeHandler {
             catId = EmiGTCEuHelper.getCategoryId(emiRecipeObj);
         }
 
-        boolean isGT = isGTRecipe(backing) || (catId != null && (catId.getNamespace().equals("gtceu") || catId.getNamespace().equals("start_core") || catId.getNamespace().equals("gtceu_start") || catId.getNamespace().equals("start")));
+        boolean isGT = isGTRecipe(backing) || (catId != null && isGTCategoryNamespace(catId.getNamespace()));
         if (!isGT && backing == null) return false;
 
         boolean isGTBoiler = false;
@@ -210,7 +251,6 @@ public class GTCEuRecipeHandler {
         if (backing == null || details == null) return;
 
         backing = unwrapRecipe(backing);
-        if (backing == null) return;
 
         double duration = extractDuration(backing);
         if (duration > 0.0) {
@@ -520,7 +560,7 @@ public class GTCEuRecipeHandler {
         Object cur = backing;
         java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         for (int i = 0; i < 8 && cur != null && visited.add(cur); i++) {
-            if (isDirectGTRecipe(cur)) return cur;
+            if (matchesGTRecipeShape(cur)) return cur;
 
             Object next = readRecipeBackingField(cur);
             if (next == null || next == cur) break;
@@ -530,22 +570,52 @@ public class GTCEuRecipeHandler {
         return backing;
     }
 
-    private static boolean isDirectGTRecipe(Object candidate) {
+    private static boolean matchesGTRecipeShape(Object candidate) {
         if (candidate == null) return false;
+        return GT_SHAPE_CACHE.get(candidate.getClass());
+    }
 
-        Class<?> type = candidate.getClass();
+    private static boolean computeGTRecipeShape(Class<?> type) {
         Class<?> cur = type;
         while (cur != null && cur != Object.class) {
             if (GT_RECIPE_CLASS_NAME.equals(cur.getName())) return true;
             cur = cur.getSuperclass();
         }
 
-        return hasField(type, "recipeType")
+        if (hasField(type, "recipeType")
                 && hasField(type, "duration")
                 && hasField(type, "inputs")
                 && hasField(type, "outputs")
                 && hasField(type, "tickInputs")
-                && hasField(type, "tickOutputs");
+                && hasField(type, "tickOutputs")) {
+            return true;
+        }
+
+        return hasDurationSignal(type) && hasEUtSignal(type);
+    }
+
+    private static boolean hasDurationSignal(Class<?> type) {
+        if (hasField(type, "duration") || hasField(type, "durationTicks")) return true;
+        for (String mName : DURATION_METHOD_NAMES) {
+            if (hasPublicMethod(type, mName)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasEUtSignal(Class<?> type) {
+        for (String mName : EUt_METHOD_NAMES) {
+            if (hasPublicMethod(type, mName)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasPublicMethod(Class<?> type, String methodName) {
+        try {
+            type.getMethod(methodName);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static boolean hasField(Class<?> type, String fieldName) {
@@ -564,22 +634,11 @@ public class GTCEuRecipeHandler {
     }
 
     private static Object readRecipeBackingField(Object holder) {
-        for (String fieldName : RECIPE_BACKING_FIELDS) {
-            Class<?> cur = holder.getClass();
-            while (cur != null && cur != Object.class) {
-                try {
-                    Field field = cur.getDeclaredField(fieldName);
-                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) break;
-                    field.setAccessible(true);
-                    Object value = field.get(holder);
-                    if (value != null && value != holder) return value;
-                    break;
-                } catch (NoSuchFieldException ignored) {
-                    cur = cur.getSuperclass();
-                } catch (Throwable ignored) {
-                    break;
-                }
-            }
+        for (Field field : BACKING_FIELDS_CACHE.get(holder.getClass())) {
+            try {
+                Object value = field.get(holder);
+                if (value != null && value != holder) return value;
+            } catch (Throwable ignored) {}
         }
         return null;
     }

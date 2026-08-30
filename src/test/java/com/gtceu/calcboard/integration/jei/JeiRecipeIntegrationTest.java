@@ -223,6 +223,25 @@ public class JeiRecipeIntegrationTest {
     }
 
     @Test
+    public void testStarTechnologyCategoryMethodOnlyRecipePreservesDetails() {
+        GTRecipeExtractionTest.BacterialHarvestingCustomRecipe recipe = new GTRecipeExtractionTest.BacterialHarvestingCustomRecipe();
+        GTRecipeExtractionTest.GTRecipeWrapperFixture wrapper = new GTRecipeExtractionTest.GTRecipeWrapperFixture(recipe);
+
+        RecipeType<GTRecipeExtractionTest.GTRecipeWrapperFixture> recipeType = RecipeType.create(
+                "star_technology", "bacterial_harvesting", GTRecipeExtractionTest.GTRecipeWrapperFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.GTRecipeWrapperFixture> category = new MockRecipeCategory<>(recipeType, "Bacterial Harvesting");
+
+        RecipeNode node = JeiRecipeConverter.convert(category, wrapper);
+
+        Assertions.assertNotNull(node);
+        Assertions.assertEquals(160.0, node.getBaseDurationTicks(), 1e-6);
+        Assertions.assertEquals(65536.0, node.getBaseEUt(), 1e-6);
+        Assertions.assertEquals(GTVoltageTier.ZPM, node.getRecipeTier());
+        Assertions.assertEquals(1, node.getInputs().size());
+        Assertions.assertEquals(1, node.getOutputs().size());
+    }
+
+    @Test
     public void testJeiRecipeSearchIndexing() {
         RecipeType<MockCraftingRecipe> recipeType = RecipeType.create("minecraft", "crafting", MockCraftingRecipe.class);
         MockRecipeCategory<MockCraftingRecipe> category = new MockRecipeCategory<>(recipeType, "Crafting");
