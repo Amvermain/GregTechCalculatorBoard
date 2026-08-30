@@ -2,6 +2,7 @@ package com.gtceu.calcboard.integration.jei;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
@@ -518,16 +519,23 @@ public class JeiRecipeIntegrationTest {
 
     @Test
     public void testJeiHelpersSafeWhenNotLoaded() {
-        // JEI++ Helper safety
-        Assertions.assertFalse(JeiPlusPlusHelper.isJeiPlusPlusLoaded());
-        Assertions.assertFalse(JeiPlusPlusHelper.registerBoMGoal(null, null));
+        try {
+            ModCompatHelper.setTestOverride("jei_plus_plus", false);
+            ModCompatHelper.setTestOverride("jei", false);
 
-        // JEI Unofficial Helper safety
-        Assertions.assertFalse(JeiUnofficialHelper.isJeiUnofficialLoaded(null));
-        Assertions.assertFalse(JeiUnofficialHelper.registerBoMGroup(null, null));
+            // JEI++ Helper safety
+            Assertions.assertFalse(JeiPlusPlusHelper.isJeiPlusPlusLoaded());
+            Assertions.assertFalse(JeiPlusPlusHelper.registerBoMGoal(null, null));
 
-        // Adapter BOM support check when neither is loaded
-        JeiRecipeViewerAdapter adapter = new JeiRecipeViewerAdapter();
-        Assertions.assertFalse(adapter.isBoMGoalRegistrationSupported());
+            // JEI Unofficial Helper safety
+            Assertions.assertFalse(JeiUnofficialHelper.isJeiUnofficialLoaded(null));
+            Assertions.assertFalse(JeiUnofficialHelper.registerBoMGroup(null, null));
+
+            // Adapter BOM support check when neither is loaded
+            JeiRecipeViewerAdapter adapter = new JeiRecipeViewerAdapter();
+            Assertions.assertFalse(adapter.isBoMGoalRegistrationSupported());
+        } finally {
+            ModCompatHelper.clearTestOverrides();
+        }
     }
 }

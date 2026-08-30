@@ -209,4 +209,36 @@ Provides smooth horizontal scrolling and clickable navigation when multiple boar
 
 ---
 
+## 5. Unused I/O Port Hiding & Selective Restore (`HiddenPortsPopup`)
+
+Eliminates visual clutter by hiding unwanted inputs or byproduct outputs on complex machine cards.
+
+* **Port Hiding Interaction**: **Right-clicking** any input/output port severs connected wires and hides that specific port.
+* **Hidden Ports Pill Badge**:
+  - Renders a pill badge (`%d Output hidden`, `%d Input hidden`, or `%d Ports hidden`) at the bottom right of the card.
+  - Hovering displays an outline highlight; clicking toggles the dropdown modal below the node card.
+* **Hidden Ports Popup Modal (`HiddenPortsPopup`)**:
+  - Provides a list view containing `[IN]` / `[OUT]` tags, ingredient icons, localized item/fluid names, and an unhide (👁) button.
+  - Clicking any entry restores that port back onto the card and immediately updates the widget layout.
+
+---
+
+## 6. Smart Inline Text Editing Engine (`InlineTextEditor`)
+
+All inline editable text fields (`NodeNameEditor`, `NodeCountEditor`, `NodeParallelEditor`, `NodeTargetBatchEditor`) extend a unified `InlineTextEditor` core engine.
+
+* **Cursor Positioning & Selection**:
+  - Precise character-level cursor positioning and text range selection via mouse click and drag.
+  - Keyboard range selection with `Shift + Left/Right` and `Shift + Home/End`.
+  - `Ctrl + A`: Select all text.
+* **Word-Level Navigation**:
+  - `Ctrl + Left/Right`: Rapid word break jumping.
+  - `Ctrl + Backspace / Delete`: Word-level deletion.
+* **Clipboard Support**:
+  - Supports `Ctrl + C` (Copy), `Ctrl + X` (Cut), and `Ctrl + V` (Paste).
+  - Built-in fallback clipboard buffer for headless test environments.
+* **Shortcut Isolation**: Key presses while editing are fully consumed and prevented from bubbling up to canvas global hotkeys.
+
+---
+
 > ➡️ **Next Sub-Specification**: [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)

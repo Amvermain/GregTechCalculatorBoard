@@ -53,8 +53,22 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `[Aa 1.0x]` button, wheel scroll, and `+`/`-` shortcuts adjust UI scaling from 0.75x to 1.30x.
   - [ ] Click hitboxes align accurately across all scales via Matrix Scaling & Virtual Mouse inversion.
 - [ ] **Global Fluid Unit Mode (FluidUnitMode)**:
-  - [ ] Toolbar button or `Shift+T` cycles between `Auto` ➔ `Always mB` ➔ `Always B`.
-  - [ ] Fluid numbers across all canvas nodes and tooltips unify immediately.
+### 1.5 I/O Port Hiding & Smart Inline Text Editing
+- [ ] **I/O Port Hiding & Selective Restore**:
+  - [ ] Right-clicking any socket port severs connected wires and hides that specific port.
+  - [ ] Cards with hidden ports display pill badges (`N Outputs hidden`, `N Inputs hidden`, `N Ports hidden`) at bottom right.
+  - [ ] Clicking the pill badge opens `HiddenPortsPopup` listing all hidden ports with `[IN]`/`[OUT]` tags and ingredient icons.
+  - [ ] Clicking an entry in the popup unhides that port and updates card height/ports immediately.
+  - [ ] Hidden port sets are persisted across save/load, multiplayer packets, and blueprint exports.
+- [ ] **Smart Inline Text Editing Engine (`InlineTextEditor`)**:
+  - [ ] Clicking text fields (name, machine count, parallel count, target batch) enters inline editing mode.
+  - [ ] Mouse dragging selects text ranges; double-clicking selects all.
+  - [ ] Arrow keys move cursor; `Shift + Arrow` creates selection range.
+  - [ ] `Ctrl + Left/Right` jumps across word boundaries; `Ctrl + Backspace/Delete` deletes words.
+  - [ ] `Ctrl + A` selects all text; `Ctrl + C / X / V` copies, cuts, and pastes clipboard text.
+  - [ ] Global hotkeys are not triggered while typing in inline text editors.
+- [ ] **ArchUnit Architectural Boundary Enforcement**:
+  - [ ] `ArchitectureTest` automated JUnit suite passes 100% without architectural violations.
 
 ---
 

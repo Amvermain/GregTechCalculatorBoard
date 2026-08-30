@@ -24,7 +24,8 @@ graph TD
         CIH["CanvasInteractionHandler (CanvasPanZoomHandler, CanvasSelectionHandler, CanvasQuickAddMarkerHandler)"]
         BATCH["Single-Pass Batch Render (Single Geometry Draw Pass)"]
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E))"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
+        Widgets["widget.* (NodeWidget, HiddenPortsPopup, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
+        Editors["editor.* (InlineTextEditor Engine, NodeCountEditor, NodeNameEditor, NodeParallelEditor, NodeTargetBatchEditor)"]
         Dialogs["dialog.* (MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
     end

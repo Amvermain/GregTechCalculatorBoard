@@ -1,100 +1,102 @@
 package com.gtceu.calcboard.client.gui.editor;
 
+import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Handles inline text editing and interactive manipulation for machine parallel factor in a NodeWidget.
+ * Handles inline text editing and interactive manipulation for machine parallel factor using InlineTextEditor.
  */
 public class NodeParallelEditor {
+
     private final NodeWidget widget;
-    private boolean isEditing = false;
-    private String buffer = "";
+    private final InlineTextEditor editor;
 
     public NodeParallelEditor(NodeWidget widget) {
         this.widget = widget;
-        this.buffer = String.valueOf(widget.getNode().getParallel());
+        this.editor = new InlineTextEditor(8, Character::isDigit);
     }
 
     public boolean isEditing() {
-        return isEditing;
+        return editor.isEditing();
+    }
+
+    public InlineTextEditor getEditor() {
+        return editor;
     }
 
     public void startEditing() {
-        this.isEditing = true;
-        this.buffer = String.valueOf(widget.getNode().getParallel());
+        editor.startEditing(String.valueOf(widget.getNode().getParallel()));
     }
 
     public void commit() {
-        if (!isEditing) return;
-        isEditing = false;
+        if (!editor.isEditing()) return;
         int oldVal = widget.getNode().getParallel();
+        String text = editor.getText().trim();
+        editor.stopEditing();
+
         try {
-            int parsed = Integer.parseInt(buffer.trim());
+            int parsed = Integer.parseInt(text);
             if (parsed >= 1) {
                 int newVal = Math.min(65536, parsed);
                 if (oldVal != newVal) {
                     widget.getNode().setParallel(newVal);
-                    widget.getParent().recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.parallel(
-                        widget.getNode().getId(),
-                        oldVal,
-                        newVal
-                    ));
+                    if (widget.getParent() != null) {
+                        widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.parallel(
+                            widget.getNode().getId(),
+                            oldVal,
+                            newVal
+                        ));
+                    }
                 }
             }
-        } catch (NumberFormatException ignored) {
-        }
-        this.buffer = String.valueOf(widget.getNode().getParallel());
+        } catch (NumberFormatException ignored) {}
+
         widget.invalidateCache();
     }
 
     public void updateBuffer() {
-        if (!isEditing) {
-            this.buffer = String.valueOf(widget.getNode().getParallel());
-        }
         widget.invalidateCache();
     }
 
     public String getDisplayText() {
-        if (isEditing) {
-            String text = buffer;
-            if ((System.currentTimeMillis() / 500) % 2 == 0) {
-                text += "_";
+        if (editor.isEditing()) {
+            String txt = editor.getText();
+            int cursor = editor.getCursorPos();
+            boolean blink = (System.currentTimeMillis() / 500) % 2 == 0;
+            if (blink && !editor.hasSelection()) {
+                if (cursor >= txt.length()) {
+                    return txt + "_";
+                }
+                return txt.substring(0, cursor) + "|" + txt.substring(cursor);
             }
-            return text;
+            return txt;
         }
         return Component.translatable("gui.gtcalcboard.parallel", String.valueOf(widget.getNode().getParallel())).getString();
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
-        if (!isEditing) return false;
-        if (Character.isDigit(codePoint)) {
-            if (buffer.length() < 6) {
-                buffer += codePoint;
-                return true;
-            }
-        }
-        return false;
+        return editor.charTyped(codePoint, modifiers);
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (!isEditing) return false;
+        if (!editor.isEditing()) return false;
 
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_ESCAPE) {
             commit();
             return true;
-        } else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-            if (!buffer.isEmpty()) {
-                buffer = buffer.substring(0, buffer.length() - 1);
-            }
-            return true;
-        } else if (keyCode == GLFW.GLFW_KEY_DELETE) {
-            buffer = "";
-            return true;
         }
-        return true;
+
+        return editor.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    public void onClick(net.minecraft.client.gui.Font font, double mouseX, double textStartX, boolean shiftDown) {
+        editor.onClick(font, mouseX - textStartX, shiftDown);
+    }
+
+    public void onDrag(net.minecraft.client.gui.Font font, double mouseX, double textStartX) {
+        editor.onDrag(font, mouseX - textStartX);
     }
 
     public void stepParallel(int direction, boolean fineStep) {
@@ -110,9 +112,6 @@ public class NodeParallelEditor {
             }
         }
         widget.getNode().setParallel(next);
-        this.buffer = String.valueOf(next);
         widget.invalidateCache();
     }
 }
-
-

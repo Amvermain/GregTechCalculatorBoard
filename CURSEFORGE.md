@@ -79,6 +79,16 @@ The mod is fully optional on both client and server:
 *   **Rich Blueprint Metadata**: Export entire flowcharts or selected node groups with custom titles, descriptions, authors, and tag metadata.
 *   **Interactive Import Preview**: Inspect node count, machines, connections, and major inputs/outputs before choosing to open in a new page or overwrite.
 
+#### I/O Port Hiding & Selective Restore
+
+*   **Hide Unused Ports**: Right-click any input/output port to sever existing wires and hide unwanted ports, keeping complex multi-output machine cards compact and clutter-free.
+*   **Hidden Ports Badge & Dropdown Popup**: Displays a pill badge (e.g. `2 Outputs hidden`, `3 Ports hidden`) on the machine card. Clicking the badge opens a dropdown popup to selectively unhide ports with a single click.
+
+#### Smart Inline Text Editing Engine
+
+*   **Rich Text Control**: All inline editable fields (machine name, machine count, parallel count, target batch quantity) support native cursor positioning, Shift/drag selection, Ctrl+A select all, and Ctrl+C/V/X clipboard operations.
+*   **Word-Level Navigation**: Rapidly jump and delete words using Ctrl + Arrow Keys and Ctrl + Backspace/Delete.
+
 #### Accessibility & Canvas Controls
 
 *   **Fit to View (`Home` / `F`)**: Instantly center and auto-scale the camera to bring all placed factory nodes into view via the toolbar button or hotkeys.

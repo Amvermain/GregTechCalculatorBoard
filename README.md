@@ -54,7 +54,15 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Thermal Series**: Dynamo RF/t generation, augment multipliers, and tier upgrade kits.
 - **Systeams & Steam Boilers**: Steam boiler mB/s output, steam dynamos, and LP/HP steam machine consumption modeling.
 
-### 8. Accessibility & Canvas Controls
+### 8. I/O Port Hiding & Selective Restore
+- **Hide Unused Ports**: Right-click any input/output port to sever existing wires and hide unwanted ports, keeping complex multi-output machine cards compact and clutter-free.
+- **Hidden Ports Badge & Popup**: Displays a pill badge (e.g. `2 Outputs hidden`, `3 Ports hidden`) on the machine card. Clicking the badge opens a dropdown popup to selectively unhide ports with a single click.
+
+### 9. Smart Inline Text Editing Engine
+- **Rich Text Control**: All inline editable fields (machine name, machine count, parallel count, target batch quantity) support native cursor positioning, Shift/drag selection, Ctrl+A select all, and Ctrl+C/V/X clipboard operations.
+- **Word-Level Navigation**: Navigate and delete words rapidly using Ctrl + Arrow Keys and Ctrl + Backspace/Delete.
+
+### 10. Accessibility & Canvas Controls
 - **5-Level UI Font Scale**: Adjust machine configuration dialog size (`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`) via `[Aa 1.0x]`, mouse wheel, or `+`/`-` keys.
 - **Uniform Global Fluid Units**: Toggle canvas fluid rates between `Auto`, `Always mB`, and `Always B` via the toolbar button or `Shift+T`.
 - **Page Tab Overflow Navigation**: Smoothly click `«`, `»` or scroll mouse wheel across multiple board pages without edge clipping.

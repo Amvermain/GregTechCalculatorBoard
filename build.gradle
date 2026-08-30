@@ -219,6 +219,9 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+
+    // ArchUnit (Architectural Rule Verification)
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }
 
 test {

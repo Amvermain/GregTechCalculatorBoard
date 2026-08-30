@@ -74,6 +74,15 @@ classDiagram
         +List~ResourceLocation~ availableWorkstations
         +NodePropertyStore properties
         +double efficiency
+        +Set~Integer~ hiddenInputIndices
+        +Set~Integer~ hiddenOutputIndices
+        +hideInputPort(int) void
+        +unhideInputPort(int) void
+        +hideOutputPort(int) void
+        +unhideOutputPort(int) void
+        +getVisibleInputIndices() List~Integer~
+        +getVisibleOutputIndices() List~Integer~
+        +getTotalHiddenCount() int
         +setMachineIcon(icon) void
         +getEnergyType() EnergyType
         +getOverclockResult() OverclockResult
@@ -86,6 +95,7 @@ classDiagram
 * **Clean Architecture & SPI Delegation (Pure Domain Model)**:
   - `RecipeNode` is a pure calculation domain entity across all supported mods (Create, Thermal, GTCEu, Vanilla, etc.).
   - Contains no hardcoded mod branches; machine icon change handling (`setMachineIcon`), physical energy type resolution (`getEnergyType`), single machine power computation (`computeSingleMachinePower`), node operational validation (`validateNode`), and multiblock BOM calculation (`buildMultiblockBOM`) are delegated dynamically via `ModAdapterRegistry.getAdapterForNode(this)`.
+* **`hiddenInputIndices` / `hiddenOutputIndices`**: Set of integer port indices hidden by the user to reduce visual clutter on cards. Persisted via `RecipeNodeSerializer`. Renderers and wire solvers invoke `getVisibleInputIndices()` / `getVisibleOutputIndices()` to filter rendered and active ports.
 * **`isFlipped`**: Horizontally inverts the input (left) and output (right) socket ports to eliminate wire crossings in complex flowcharts.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: Machine utilization computed by solvers (`FlowGraphSolver`, `MassBalanceSolver`) subject to upstream supply limits and closed-loop cycles.
 * **`calculateEffectiveOutputRates()`**: Computes per-second output flow combining machine count, parallel multiplier, overclocking, sub-tick batching, addon compounding, and byproduct tier chance boosts.

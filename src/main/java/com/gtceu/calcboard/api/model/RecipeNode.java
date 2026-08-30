@@ -42,6 +42,8 @@ public class RecipeNode {
     // Inputs and outputs
     private final List<IngredientStack> inputs = new ArrayList<>();
     private final List<IngredientStack> outputs = new ArrayList<>();
+    private final java.util.Set<Integer> hiddenInputIndices = new java.util.LinkedHashSet<>();
+    private final java.util.Set<Integer> hiddenOutputIndices = new java.util.LinkedHashSet<>();
 
     // Master base node for Auto Ratio
     private boolean isBaseNode = false;
@@ -452,6 +454,79 @@ public class RecipeNode {
 
     public void addOutput(IngredientStack stack) {
         outputs.add(stack);
+    }
+
+    public boolean isInputPortHidden(int index) {
+        return hiddenInputIndices.contains(index);
+    }
+
+    public boolean isOutputPortHidden(int index) {
+        return hiddenOutputIndices.contains(index);
+    }
+
+    public void hideInputPort(int index) {
+        if (index >= 0 && index < inputs.size()) {
+            hiddenInputIndices.add(index);
+        }
+    }
+
+    public void unhideInputPort(int index) {
+        hiddenInputIndices.remove(index);
+    }
+
+    public void hideOutputPort(int index) {
+        if (index >= 0 && index < outputs.size()) {
+            hiddenOutputIndices.add(index);
+        }
+    }
+
+    public void unhideOutputPort(int index) {
+        hiddenOutputIndices.remove(index);
+    }
+
+    public void unhideAllPorts() {
+        hiddenInputIndices.clear();
+        hiddenOutputIndices.clear();
+    }
+
+    public java.util.Set<Integer> getHiddenInputIndices() {
+        return java.util.Collections.unmodifiableSet(hiddenInputIndices);
+    }
+
+    public java.util.Set<Integer> getHiddenOutputIndices() {
+        return java.util.Collections.unmodifiableSet(hiddenOutputIndices);
+    }
+
+    public int getHiddenInputCount() {
+        return hiddenInputIndices.size();
+    }
+
+    public int getHiddenOutputCount() {
+        return hiddenOutputIndices.size();
+    }
+
+    public int getTotalHiddenCount() {
+        return hiddenInputIndices.size() + hiddenOutputIndices.size();
+    }
+
+    public List<Integer> getVisibleInputIndices() {
+        List<Integer> list = new ArrayList<>();
+        for (int i = 0; i < inputs.size(); i++) {
+            if (!hiddenInputIndices.contains(i)) {
+                list.add(i);
+            }
+        }
+        return list;
+    }
+
+    public List<Integer> getVisibleOutputIndices() {
+        List<Integer> list = new ArrayList<>();
+        for (int i = 0; i < outputs.size(); i++) {
+            if (!hiddenOutputIndices.contains(i)) {
+                list.add(i);
+            }
+        }
+        return list;
     }
 
     public List<ResourceLocation> getAvailableWorkstations() {

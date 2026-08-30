@@ -154,6 +154,21 @@ public class CanvasInteractionHandler {
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
         FlowGraph graph = screen.getGraph();
 
+        // 0. Check Open Hidden Ports Popups first (Highest Modal Priority)
+        for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
+            NodeWidget widget = nodeWidgets.get(i);
+            var popup = widget.getHiddenPortsPopup();
+            if (popup != null && popup.isVisible()) {
+                if (popup.isPointInside(canvasMouseX, canvasMouseY)) {
+                    if (popup.mouseClicked(canvasMouseX, canvasMouseY, button)) {
+                        return true;
+                    }
+                } else if (button == 0) {
+                    popup.close();
+                }
+            }
+        }
+
         // 1. Check Node Widgets from top to bottom
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
@@ -162,7 +177,7 @@ public class CanvasInteractionHandler {
                     screen.bringNodeToFront(widget.getNode());
                 }
 
-                // Output Port: Left click to start forward wire, Right click to disconnect
+                // Output Port: Left click to start forward wire, Right click to hide port (and disconnect wires)
                 int outPortIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
                 if (outPortIdx >= 0) {
                     if (!screen.ensureEditPermission()) return true;
@@ -172,24 +187,12 @@ public class CanvasInteractionHandler {
                         wireStartIsInput = false;
                         return true;
                     } else if (button == 1) {
-                        List<FlowGraph.ConnectionEdge> toRemove = new ArrayList<>();
-                        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
-                            if (e.fromNodeId().equals(widget.getNode().getId()) && e.outputIndex() == outPortIdx) {
-                                toRemove.add(e);
-                            }
-                        }
-                        if (!toRemove.isEmpty()) {
-                            graph.getConnections().removeAll(toRemove);
-                            for (FlowGraph.ConnectionEdge e : toRemove) {
-                                screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.DisconnectWireCommand(e));
-                            }
-                            notifyDisconnect("message.gtcalcboard.disconnect_out");
-                        }
+                        widget.hidePortAndDisconnectWires(false, outPortIdx);
                         return true;
                     }
                 }
 
-                // Input Port: Left click to start reverse wire, Right click to disconnect
+                // Input Port: Left click to start reverse wire, Right click to hide port (and disconnect wires)
                 int inPortIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
                 if (inPortIdx >= 0) {
                     if (!screen.ensureEditPermission()) return true;
@@ -199,19 +202,7 @@ public class CanvasInteractionHandler {
                         wireStartIsInput = true;
                         return true;
                     } else if (button == 1) {
-                        List<FlowGraph.ConnectionEdge> toRemove = new ArrayList<>();
-                        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
-                            if (e.toNodeId().equals(widget.getNode().getId()) && e.inputIndex() == inPortIdx) {
-                                toRemove.add(e);
-                            }
-                        }
-                        if (!toRemove.isEmpty()) {
-                            graph.getConnections().removeAll(toRemove);
-                            for (FlowGraph.ConnectionEdge e : toRemove) {
-                                screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.DisconnectWireCommand(e));
-                            }
-                            notifyDisconnect("message.gtcalcboard.disconnect_in");
-                        }
+                        widget.hidePortAndDisconnectWires(true, inPortIdx);
                         return true;
                     }
                 }
@@ -252,7 +243,7 @@ public class CanvasInteractionHandler {
                 }
 
                 // Title bar Header click -> Start node dragging (Single or Multi)
-                if (widget.isHeaderHovered(canvasMouseX, canvasMouseY) && button == 0) {
+                if (widget.isHeaderHovered(canvasMouseX, canvasMouseY) && button == 0 && !widget.getNameEditor().isEditing()) {
                     draggingNode = widget;
                     lastDragCanvasX = canvasMouseX;
                     lastDragCanvasY = canvasMouseY;
@@ -947,6 +938,17 @@ public class CanvasInteractionHandler {
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        double canvasMouseX = screen.toCanvasX(mouseX);
+        double canvasMouseY = screen.toCanvasY(mouseY);
+
+        for (NodeWidget w : screen.getNodeWidgets()) {
+            if (w.isAnyEditorActive()) {
+                if (w.mouseDragged(canvasMouseX, canvasMouseY, button, dragX, dragY)) {
+                    return true;
+                }
+            }
+        }
+
         if (selectionHandler.isBoxSelecting() && button == 0) {
             selectionHandler.updateBoxSelection(screen.toCanvasX(mouseX), screen.toCanvasY(mouseY));
             return true;
@@ -957,8 +959,6 @@ public class CanvasInteractionHandler {
         }
 
         if (resizingNote != null && button == 0) {
-            double canvasMouseX = screen.toCanvasX(mouseX);
-            double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeNoteStartX;
             double deltaY = canvasMouseY - resizeNoteStartY;
             resizingNote.setWidth(Math.max(com.gtceu.calcboard.api.model.CanvasStickyNote.MIN_WIDTH, origNoteWidth + deltaX));
@@ -1002,8 +1002,6 @@ public class CanvasInteractionHandler {
         }
 
         if (resizingFrame != null && button == 0) {
-            double canvasMouseX = screen.toCanvasX(mouseX);
-            double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeFrameStartX;
             double deltaY = canvasMouseY - resizeFrameStartY;
 
@@ -1067,8 +1065,6 @@ public class CanvasInteractionHandler {
         }
 
         if (resizingNode != null && button == 0) {
-            double canvasMouseX = screen.toCanvasX(mouseX);
-            double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeStartCanvasX;
             double deltaY = canvasMouseY - resizeStartCanvasY;
             int newWidth = (int) Math.max(190, Math.min(500, origNodeWidth + deltaX));

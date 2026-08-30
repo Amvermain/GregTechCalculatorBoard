@@ -74,6 +74,15 @@ classDiagram
         +List~ResourceLocation~ availableWorkstations
         +NodePropertyStore properties
         +double efficiency
+        +Set~Integer~ hiddenInputIndices
+        +Set~Integer~ hiddenOutputIndices
+        +hideInputPort(int) void
+        +unhideInputPort(int) void
+        +hideOutputPort(int) void
+        +unhideOutputPort(int) void
+        +getVisibleInputIndices() List~Integer~
+        +getVisibleOutputIndices() List~Integer~
+        +getTotalHiddenCount() int
         +setMachineIcon(icon) void
         +getEnergyType() EnergyType
         +getOverclockResult() OverclockResult
@@ -86,6 +95,7 @@ classDiagram
 * **클린 아키텍처 및 SPI 위임 (Pure Domain Model)**:
   - `RecipeNode`는 모든 모드(Create, Thermal, GTCEu, Vanilla 등)를 아우르는 **순수 계산 도메인 데이터 엔티티**입니다.
   - 특정 모드 전용 필드나 하드코딩된 분기를 일체 보유하지 않으며, 머신 아이콘 변경 이벤트(`setMachineIcon`), 물리적 에너지 형태 결정(`getEnergyType`), 단일 기계 소비/발전량 연산(`computeSingleMachinePower`), 노드 가동 유효성 검증(`validateNode`), 멀티블록 BOM 산출(`buildMultiblockBOM`) 등 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
+* **`hiddenInputIndices` / `hiddenOutputIndices`**: 사용자가 카드의 복잡도를 줄이기 위해 비활성화/숨김 처리한 입출력 포트의 인덱스 집합. `RecipeNodeSerializer`를 통해 직렬화/역직렬화되며, 렌더러와 와이어 솔버는 `getVisibleInputIndices()` / `getVisibleOutputIndices()`를 참조하여 가시 포트만 배선 및 렌더링.
 * **`isFlipped`**: 노드의 입력(좌)/출력(우) 포트 렌더링 방향을 좌우 수평 반전하여 복잡한 플로우차트의 배선 교차 최소화.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`, `MassBalanceSolver`)에 의해 상류 원자재 공급 제약 및 폐루프 순환 밸런스 하에서 계산된 기계의 실제 가동률.
 * **`calculateEffectiveOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.

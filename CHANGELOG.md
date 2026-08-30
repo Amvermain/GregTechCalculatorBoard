@@ -4,9 +4,19 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
-## [2.1.0-alpha.1] - 2026-08-30
+## [2.1.0-alpha.1] - 2026-08-31
 
 ### Added
+- **I/O Port Hiding & Selective Restore**:
+  - Added the ability to hide unwanted input/output ports by right-clicking socket ports, automatically disconnecting attached wires to keep complex multi-product machine cards compact and clean.
+  - Added a status pill badge at the bottom of cards indicating the number of hidden ports (e.g. `2 Outputs hidden`, `1 Input hidden`, `3 Ports hidden`).
+  - Clicking the pill badge opens a dropdown popup modal listing all hidden ports with ingredient previews, allowing individual ports to be restored to the card with a single click.
+  - Hidden port states are fully preserved across local saves, dedicated server multiplayer synchronization, and shareable blueprints.
+- **Smart Inline Text Editing Engine**:
+  - Upgraded all canvas inline editable text fields (machine name, machine count, parallel count, target batch quantity) with rich text manipulation.
+  - Added mouse click/drag cursor positioning, range selection with `Shift + Arrow Keys` / `Shift + Home/End`, and select-all with `Ctrl + A`.
+  - Added fast word-level jumping and deletion via `Ctrl + Arrow Keys` and `Ctrl + Backspace / Delete`.
+  - Added full clipboard integration for copy (`Ctrl + C`), cut (`Ctrl + X`), and paste (`Ctrl + V`).
 - **JEI Unofficial Full Compatibility & Dedicated Integration**:
   - Added full support for the JEI Unofficial recipe viewer fork, including native bookmark groups and crafting mode integration.
   - Separated JEI++ (Just Enough Calculation) and JEI Unofficial integrations into dedicated subsystems for robust independent lifecycle management.
