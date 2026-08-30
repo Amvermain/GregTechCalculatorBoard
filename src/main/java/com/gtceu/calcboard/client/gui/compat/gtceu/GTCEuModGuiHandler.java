@@ -192,7 +192,8 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 String rotorInfo = "§6🌀 §f" + rName + " §7| §b⏱ " + eff + "% §e⚡ " + pwr + "%";
                 int holderBonus = GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
                 if (holderBonus > 0) {
-                    rotorInfo += " §a(+" + holderBonus + "% Holder)";
+                    int totalEff = GTTurbineHelper.getTotalTurbineEfficiency(node);
+                    rotorInfo += " §a(+" + holderBonus + "% Holder -> " + totalEff + "%)";
                 }
                 graphics.drawString(font, rotorInfo, x + 10, y + 30, 0xFFFFFFFF, false);
 
@@ -217,7 +218,8 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 if (node.isLargeTurbine()) {
                     int holderBonus = GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
                     if (holderBonus > 0) {
-                        specStr += String.format(Locale.ROOT, "   §a(+%d%% Holder)", holderBonus);
+                        int totalEff = GTTurbineHelper.getTotalTurbineEfficiency(node);
+                        specStr += String.format(Locale.ROOT, "   §a(+%d%% Holder -> %d%%)", holderBonus, totalEff);
                     }
                 }
                 graphics.drawString(font, specStr, x + 10, y + 46, 0xFFD0D6E4, false);

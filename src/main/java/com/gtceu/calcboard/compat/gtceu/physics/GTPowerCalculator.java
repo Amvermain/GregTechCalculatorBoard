@@ -163,7 +163,7 @@ public final class GTPowerCalculator {
                         break;
                     }
                 }
-                double rotorEffMult = rMult + (holderBonus / 100.0);
+                double rotorEffMult = Math.max(1.0, rMult * (1.0 + (holderBonus / 100.0)));
 
                 double otherMult = 1.0;
                 for (MachineAddon a : node.getAddons()) {

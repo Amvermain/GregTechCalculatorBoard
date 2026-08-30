@@ -27,14 +27,14 @@ test-deploy.bat
 .classpath
 
 # Minecraft Runtime & Local Test Instance
-run/
-instance/
-config/
-crash-reports/
-logs/
-saves/
-screenshots/
-replay_recordings/
+/run/
+/instance/
+/config/
+/crash-reports/
+/logs/
+/saves/
+/screenshots/
+/replay_recordings/
 usernamecache.json
 usercache.json
 *.log

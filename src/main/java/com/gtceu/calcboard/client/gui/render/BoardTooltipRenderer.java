@@ -384,7 +384,8 @@ public final class BoardTooltipRenderer {
                         int holderBonus = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineHolderEfficiencyBonus(n);
                         String effStr = "§b⏱ " + Component.translatable("gui.gtcalcboard.rotor.eff").getString() + ": §f" + eff + "%";
                         if (holderBonus > 0) {
-                            effStr += " §a(+" + holderBonus + "% Holder)";
+                            int totalEff = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTotalTurbineEfficiency(n);
+                            effStr += " §a(+" + holderBonus + "% Holder -> " + totalEff + "%)";
                         }
                         tooltipLines.add(Component.literal(effStr));
                         tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.rotor.power").getString() + ": §f" + pwr + "%"));

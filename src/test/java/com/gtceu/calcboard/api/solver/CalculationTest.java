@@ -115,10 +115,10 @@ public class CalculationTest {
         turbine.autoCalculateTurbineParallel();
         Assertions.assertEquals(1152, turbine.getParallel());
         Assertions.assertEquals(36864.0, turbine.getTotalEUt(), 0.001);
-        Assertions.assertEquals(4.20, turbine.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(4.40, turbine.getEffectiveDurationSeconds(), 0.001);
 
         var scheeliteRates = turbine.calculateInputRates();
-        Assertions.assertEquals(1152.0 / 4.20, scheeliteRates.get(nitrobenzene), 0.01);
+        Assertions.assertEquals(1152.0 / 4.40, scheeliteRates.get(nitrobenzene), 0.01);
 
         // EV Rotor Holder (4,096 EU/t base * 4.5 = 18,432 EU/t -> 576 parallels)
         turbine.setTargetTier(GTVoltageTier.EV);
