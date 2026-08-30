@@ -9,7 +9,7 @@
   "gui.gtcalcboard.single_power": "单机功耗：",
   "gui.gtcalcboard.total_gen": "总发电功率：",
   "gui.gtcalcboard.single_gen": "单机发电功率：",
-  "gui.gtcalcboard.total_stress": "总应力量：",
+  "gui.gtcalcboard.total_stress": "总应力容量：",
   "gui.gtcalcboard.total_machines": "所需机器总数：",
   "gui.gtcalcboard.machine_unit": "台",
   "gui.gtcalcboard.hover_details": "悬停查看详情",
