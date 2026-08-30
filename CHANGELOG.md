@@ -4,6 +4,23 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-alpha.1] - 2026-08-30
+
+### Added
+- **JEI Unofficial Full Compatibility & Dedicated Integration**:
+  - Added full support for the JEI Unofficial recipe viewer fork, including native bookmark groups and crafting mode integration.
+  - Separated JEI++ (Just Enough Calculation) and JEI Unofficial integrations into dedicated subsystems for robust independent lifecycle management.
+- **Multiblock BOM Shopping List Export to JEI / JEI++**:
+  - Direct export of required multiblock construction parts, casings, and hatches to JEI / JEI Unofficial bookmark groups or JEI++ calculation goals via the BOM dialog and `B` hotkey.
+
+### Changed & Improved
+- **JEI Recipe Slot & Layout Extraction Stability**:
+  - Upgraded the recipe parsing layer for JEI 15.20+ and JEI Unofficial to safely capture complex vanilla and modded recipe layouts without crashing or missing item stacks.
+
+### Fixed
+- **JEI Recipe Search Missing Ingredients & Anvil Fallback**:
+  - Fixed an issue where browsing vanilla recipes in JEI Unofficial caused recipes to display as empty `[Anvil] Anvil` entries with missing input and output item previews.
+
 ## [2.0.0] - 2026-08-30
 
 ### Added

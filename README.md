@@ -134,9 +134,9 @@ GregTech Calculator Board is completely optional on both client and server sides
 - **Minecraft**: `1.20.1`
 - **Mod Loader**: `Minecraft Forge (47.2.0+)`
 - **Required Dependencies**: **None** (Fully standalone, 0 hard dependencies required)
-- **Supported Recipe Viewers**:
-  - [EMI](https://curseforge.com/minecraft/mc-mods/emi) (1.1.24+ / Recommended)
-  - [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+)
+- **Supported Recipe Viewers (At least one required)**:
+  - [EMI](https://curseforge.com/minecraft/mc-mods/emi) (1.1.0+ recommended)
+  - [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+) / [JEI Unofficial](https://curseforge.com/minecraft/mc-mods/jei-unofficial)
   - [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM recipe tree integration)
 - **Supported Tech & Factory Mods**:
   - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ or Star Technology forks)
@@ -157,7 +157,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.0.0.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.1.jar`.
 
 ---
 

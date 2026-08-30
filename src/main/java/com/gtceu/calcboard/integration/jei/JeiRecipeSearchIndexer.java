@@ -74,7 +74,8 @@ public final class JeiRecipeSearchIndexer {
         // Layout collection
         JeiRecipeLayoutCollector collector = new JeiRecipeLayoutCollector();
         try {
-            category.setRecipe(collector, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
+            mezz.jei.api.gui.builder.IRecipeLayoutBuilder builder = JeiRecipeLayoutCollector.createProxyBuilder(collector);
+            category.setRecipe(builder, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
         } catch (Throwable ignored) {}
 
         List<IngredientStack> inputs = new ArrayList<>();

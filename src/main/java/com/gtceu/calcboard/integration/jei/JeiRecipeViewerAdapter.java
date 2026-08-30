@@ -99,6 +99,7 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
             var categoryLookup = recipeManager.createRecipeCategoryLookup();
             if (categoryLookup != null) {
                 var categories = categoryLookup.get().toList();
+                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [JEI] Discovered {} recipe categories in JEI.", categories.size());
                 for (var category : categories) {
                     if (category == null || category.getRecipeType() == null) continue;
                     try {
@@ -115,7 +116,7 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
                             }
                         }
                     } catch (Throwable t) {
-                        // Skip category if individual lookup throws
+                        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] [JEI] Failed to collect recipes for category '{}': {}", category.getRecipeType().getUid(), t.getMessage());
                     }
                 }
             }
@@ -301,22 +302,25 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     @Override
     public boolean isBoMGoalRegistrationSupported() {
-        return isAvailable() && JeiPlusPlusHelper.isJeiPlusPlusLoaded();
+        return isAvailable() && (JeiPlusPlusHelper.isJeiPlusPlusLoaded() || JeiUnofficialHelper.isJeiUnofficialLoaded(jeiRuntime));
     }
 
     @Override
     public void registerBoMGoal(MultiblockBOMSummary summary) {
         if (!isAvailable() || summary == null) return;
+        boolean success = false;
         if (JeiPlusPlusHelper.isJeiPlusPlusLoaded()) {
-            boolean success = JeiPlusPlusHelper.registerBoMGoal(jeiRuntime, summary);
-            if (success) {
-                Minecraft mc = Minecraft.getInstance();
-                if (mc.player != null) {
-                    mc.player.displayClientMessage(
-                        Component.translatable("message.gtcalcboard.bom_registered_jei", summary.totalUniqueItemTypes()),
-                        true
-                    );
-                }
+            success = JeiPlusPlusHelper.registerBoMGoal(jeiRuntime, summary);
+        } else if (JeiUnofficialHelper.isJeiUnofficialLoaded(jeiRuntime)) {
+            success = JeiUnofficialHelper.registerBoMGroup(jeiRuntime, summary);
+        }
+        if (success) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                mc.player.displayClientMessage(
+                    Component.translatable("message.gtcalcboard.bom_registered_jei", summary.totalUniqueItemTypes()),
+                    true
+                );
             }
         }
     }

@@ -251,7 +251,7 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
     private boolean shapeless = false;
 
     public List<CollectedSlot> getSlots() {
-        return Collections.unmodifiableList(slots);
+        return slots;
     }
 
     public boolean isShapeless() {
@@ -310,6 +310,92 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             }
         }
         return list;
+    }
+
+    public static IRecipeLayoutBuilder createProxyBuilder(JeiRecipeLayoutCollector collector) {
+        if (collector == null) return null;
+        try {
+            return (IRecipeLayoutBuilder) java.lang.reflect.Proxy.newProxyInstance(
+                    IRecipeLayoutBuilder.class.getClassLoader(),
+                    new Class<?>[]{IRecipeLayoutBuilder.class},
+                    (proxy, method, args) -> {
+                        String name = method.getName();
+                        if ("addSlot".equals(name) || "addInputSlot".equals(name) || "addOutputSlot".equals(name) || "addSlotToWidget".equals(name)) {
+                            RecipeIngredientRole role = RecipeIngredientRole.INPUT;
+                            int x = 0, y = 0;
+                            if ("addOutputSlot".equals(name)) {
+                                role = RecipeIngredientRole.OUTPUT;
+                            }
+                            if (args != null) {
+                                for (Object arg : args) {
+                                    if (arg instanceof RecipeIngredientRole r) role = r;
+                                    else if (arg instanceof Integer i) {
+                                        if (x == 0) x = i;
+                                        else y = i;
+                                    }
+                                }
+                            }
+                            CollectedSlot slot = new CollectedSlot(role, x, y);
+                            collector.slots.add(slot);
+                            return createProxySlot(slot);
+                        }
+                        try {
+                            var m = collector.getClass().getMethod(method.getName(), method.getParameterTypes());
+                            Object res = m.invoke(collector, args);
+                            if (res instanceof CollectedSlot slot) {
+                                return createProxySlot(slot);
+                            }
+                            return res;
+                        } catch (NoSuchMethodException e) {
+                            if (IRecipeSlotBuilder.class.isAssignableFrom(method.getReturnType())) {
+                                CollectedSlot slot = new CollectedSlot(RecipeIngredientRole.INPUT, 0, 0);
+                                collector.slots.add(slot);
+                                return createProxySlot(slot);
+                            }
+                            if (IIngredientAcceptor.class.isAssignableFrom(method.getReturnType())) {
+                                CollectedSlot slot = new CollectedSlot(RecipeIngredientRole.INPUT, 0, 0);
+                                collector.slots.add(slot);
+                                return createProxySlot(slot);
+                            }
+                            if (method.getReturnType() == boolean.class) return false;
+                            if (method.getReturnType() == int.class) return 0;
+                            return null;
+                        }
+                    }
+            );
+        } catch (Throwable t) {
+            return collector;
+        }
+    }
+
+    public static IRecipeSlotBuilder createProxySlot(CollectedSlot slot) {
+        if (slot == null) return null;
+        try {
+            return (IRecipeSlotBuilder) java.lang.reflect.Proxy.newProxyInstance(
+                    IRecipeSlotBuilder.class.getClassLoader(),
+                    new Class<?>[]{IRecipeSlotBuilder.class},
+                    (proxy, method, args) -> {
+                        try {
+                            var m = slot.getClass().getMethod(method.getName(), method.getParameterTypes());
+                            Object res = m.invoke(slot, args);
+                            if (res == slot) return proxy;
+                            return res;
+                        } catch (NoSuchMethodException e) {
+                            if (IRecipeSlotBuilder.class.isAssignableFrom(method.getReturnType())
+                                    || IIngredientAcceptor.class.isAssignableFrom(method.getReturnType())
+                                    || method.getReturnType().getName().endsWith("IPlaceable")
+                                    || method.getReturnType().isAssignableFrom(proxy.getClass())) {
+                                return proxy;
+                            }
+                            if (method.getReturnType() == int.class) return 16;
+                            if (method.getReturnType() == boolean.class) return false;
+                            return null;
+                        }
+                    }
+            );
+        } catch (Throwable t) {
+            return slot;
+        }
     }
 
     private void appendSlotIngredients(CollectedSlot slot, List<IngredientStack> target) {

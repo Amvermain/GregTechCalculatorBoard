@@ -439,4 +439,19 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertEquals(0.50, node.getEffectiveOutputChance(0), 1e-4);
         Assertions.assertEquals(0.45, node.getEffectiveOutputChance(1), 1e-4);
     }
+
+    @Test
+    public void testJeiHelpersSafeWhenNotLoaded() {
+        // JEI++ Helper safety
+        Assertions.assertFalse(JeiPlusPlusHelper.isJeiPlusPlusLoaded());
+        Assertions.assertFalse(JeiPlusPlusHelper.registerBoMGoal(null, null));
+
+        // JEI Unofficial Helper safety
+        Assertions.assertFalse(JeiUnofficialHelper.isJeiUnofficialLoaded(null));
+        Assertions.assertFalse(JeiUnofficialHelper.registerBoMGroup(null, null));
+
+        // Adapter BOM support check when neither is loaded
+        JeiRecipeViewerAdapter adapter = new JeiRecipeViewerAdapter();
+        Assertions.assertFalse(adapter.isBoMGoalRegistrationSupported());
+    }
 }

@@ -4,6 +4,23 @@
   <a href="CHANGELOG.md">English</a> | <b>한국어</b>
 </p>
 
+## [2.1.0-alpha.1] - 2026-08-30
+
+### 신규 기능 (Added)
+- **JEI Unofficial 완전 호환 및 전용 연동 지원**:
+  - JEI Unofficial 레시피 뷰어 포크를 공식 지원하여 북마크 그룹(Bookmark Group) 생성 및 크래프팅 모드 연동을 지원합니다.
+  - JEI++(Just Enough Calculation)와 JEI Unofficial 연동을 독립된 하위 시스템으로 분리하여 각 모드가 독립적으로 원활하게 동작하도록 개선했습니다.
+- **멀티블록 BOM 부품 목록의 JEI / JEI++ 원클릭 전송**:
+  - BOM 다이얼로그(`B` 단축키)에서 멀티블록 구조체에 필요한 본체, 케이싱, 해치 부품 목록을 JEI / JEI Unofficial 북마크 그룹 또는 JEI++ 계산 목표로 원클릭 내보내기할 수 있습니다.
+
+### 개선 및 변경 (Changed & Improved)
+- **JEI 레시피 슬롯 및 레이아웃 추출 안정화**:
+  - JEI 15.20+ 및 JEI Unofficial 환경에서 바닐라 및 모드 레시피의 슬롯 레이아웃과 아이템 목록을 누락 없이 안전하게 파싱하도록 추출 엔진을 개선했습니다.
+
+### 버그 수정 (Fixed)
+- **JEI Unofficial 레시피 검색 창의 재료 누락 및 Anvil 오표시 수정**:
+  - JEI Unofficial 환경에서 레시피 추가 다이얼로그를 열었을 때 슬롯 파싱 오류로 인해 모든 바닐라 레시피가 입력/출력 아이템 없이 `[Anvil] Anvil`로만 표시되던 인덱싱 오류를 해결했습니다.
+
 ## [2.0.0] - 2026-08-30
 
 ### 신규 기능 (Added)

@@ -69,7 +69,8 @@ public class JeiRecipeConverter {
         JeiRecipeLayoutCollector collector = new JeiRecipeLayoutCollector();
         if (category != null) {
             try {
-                category.setRecipe(collector, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
+                mezz.jei.api.gui.builder.IRecipeLayoutBuilder builder = JeiRecipeLayoutCollector.createProxyBuilder(collector);
+                category.setRecipe(builder, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
             } catch (Throwable ignored) {}
         }
 

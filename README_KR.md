@@ -136,7 +136,7 @@
 - **필수 모드**: **없음** (완전 독립 구동 가능, 0 필수 종속성)
 - **지원 레시피 뷰어**:
   - [EMI](https://curseforge.com/minecraft/mc-mods/emi) (1.1.24+ / 권장)
-  - [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+)
+  - [JEI (Just Enough Items)](https://curseforge.com/minecraft/mc-mods/jei) (15.2.0+) / [JEI Unofficial](https://curseforge.com/minecraft/mc-mods/jei-unofficial)
   - [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM 레시피 트리 목표 등록)
 - **지원 산업 및 팩토리 모드**:
   - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ 또는 Star Technology 포크)
@@ -157,7 +157,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-빌드된 파일은 `build/libs/gtcalcboard-1.20.1-2.0.0.jar`에 생성됩니다.
+빌드된 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.1.jar`에 생성됩니다.
 
 ---
 

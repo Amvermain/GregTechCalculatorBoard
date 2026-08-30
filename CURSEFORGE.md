@@ -22,7 +22,7 @@ The mod is fully optional on both client and server:
 
 #### Pluggable Recipe Viewer SPI (EMI, JEI, & Vanilla Support)
 
-*   **Multi-Viewer Ecosystem Compatibility**: Seamlessly integrates with **EMI**, **JEI (Just Enough Items)**, and **JEI++ (Just Enough Calculation / BoM)**. Automatically elects the best available viewer at runtime.
+*   **Multi-Viewer Ecosystem Compatibility**: Seamlessly integrates with **EMI**, **JEI (Just Enough Items)**, **JEI Unofficial**, and **JEI++ (Just Enough Calculation / BoM)**. Automatically elects the best available viewer at runtime.
 *   **Side Favorites Dock Panel**: A collapsible panel on the left of the board screen (`[⭐ Favorites (N) ▶]`) allows placing favorited items onto the canvas via single-click or drag-and-drop.
 *   **Hierarchical Recipe Navigation & Interactive Preview**:
     *   Hovering over a favorite displays a sub-panel listing all producing recipes (Machine / Duration / EU/t).
