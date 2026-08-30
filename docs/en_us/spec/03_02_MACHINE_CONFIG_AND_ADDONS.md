@@ -139,7 +139,10 @@ flowchart TB
 
 Switch recipes for machines directly on the canvas without deleting nodes, preserving ports and wiring connections:
 
-* **Entry Point**: Click `[🔄 Switch Recipe]` in the header of `MachineConfigDialog` or select from the node context menu.
+* **Entry Point**: Click `[🔄 Recipe]` (`74px` compact button) in the header of `MachineConfigDialog` or select from the node context menu.
+* **Header Layout Optimization**:
+  - Compacted header button dimensions (`[🔄 Recipe]` 74px, `[Single/Multiblock Mode]` 84px, `[Aa 1.0x]` 44px) preventing label overlaps across multilingual text lengths.
+  - Added automatic ellipsis truncation (`...`) if dialog title exceeds remaining header width.
 * **Candidate Ranking**:
   1. **Tier 1**: Same Machine ID / Category + Same primary outputs (1st/2nd outputs).
   2. **Tier 2**: All other valid alternative recipes within the same machine category.

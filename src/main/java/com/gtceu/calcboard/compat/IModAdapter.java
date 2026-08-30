@@ -358,6 +358,12 @@ public interface IModAdapter {
             }
             return "Hatch / Bus";
         }
+        if (addon.getCategory().equals(AddonCategory.REFLECTOR)) {
+            return String.format("Tier %d Reflector", addon.getReflectorTier());
+        }
+        if (addon.getCategory().equals(AddonCategory.MAINTENANCE)) {
+            return "Maintenance Hatch";
+        }
         if (addon.getCategory().equals(AddonCategory.COIL)) {
             return String.format("Coil: %d K", addon.getCoilTemperature());
         }
@@ -407,7 +413,7 @@ public interface IModAdapter {
     default String formatAddonBadge(RecipeNode node, MachineAddon addon) {
         if (addon == null) return "";
         if (addon.getCategory() == MachineAddon.Category.REFLECTOR) {
-            return String.format("§b🪞 Tier %d", addon.getReflectorTier());
+            return String.format("§b✦ Tier %d", addon.getReflectorTier());
         }
         if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
             return eh.getAmperage() > 2

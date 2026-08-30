@@ -21,6 +21,32 @@
 - **JEI Recipe Search Missing Ingredients & Anvil Fallback**:
   - Fixed an issue where browsing vanilla recipes in JEI Unofficial caused recipes to display as empty `[Anvil] Anvil` entries with missing input and output item previews.
 
+## [2.0.1] - 2026-08-31
+
+### Added
+- **Automatic Fusion Reactor Controller Matching (`GTCEuModAdapter`, `GTAddonCompatibilityHandler`, `EmiRecipeConverter`, `JeiRecipeConverter`)**:
+  - When importing recipes for Fusion Reactors (Mk1, Mk2, Mk3), the controller workstation matching the recipe's minimum required voltage tier (e.g. 180M EU $\rightarrow$ ZPM Mk2) is now strictly prioritized and assigned as the default machine icon upon creation.
+
+### Changed & Improved
+- **Machine Configuration Dialog Layout & Label Optimization (`MachineConfigDialog`, `GTCEuModGuiHandler`, `AddonCatalogView`)**:
+  - Compacted top header buttons (Recipe Switch, Single/Multiblock Toggle, Font Scale) and added ellipsis truncation for long machine titles to eliminate button overlap across all languages.
+  - Formatted controller buttons in the multiblock selector (e.g. `⚛ Fusion Mk1/Mk2/Mk3`, `⚡ Aux Mk1/Mk2`) by stripping internal bracket tags (such as `[FRC I]`) for clean rendering within constrained widths.
+  - Refined horizontal category scroll bar navigation (◀ / ▶ arrows) and added smart name shortening for long addon titles in the hardware catalog.
+- **Reroute Junction Flow Balancing & Multi-Branch Auto-Ratio (`FlowBalanceMatrixSolver`, `FlowGraphTopologyAnalyzer`, `FlowSummaryAggregator`)**:
+  - Enhanced Auto-Ratio backwards and forward balancing across complex multi-branch network graphs containing reroute/junction nodes, ensuring 100% operational efficiency without artificial flow bottlenecks.
+  - Improved port flow statistics gauges to accurately track pass-through demands on reroute nodes.
+
+### Fixed
+- **Fusion Reactor Node Tier & Badge Synchronization on Creation (`EmiRecipeConverter`, `GTBadgeProvider`, `GTAddonCompatibilityHandler`)**:
+  - Fixed an issue where recipes requiring Fusion Mk2 (ZPM) were overwritten with Mk3 (UV) controllers during multiblock conversion, causing voltage tier and badge mismatch.
+  - Fixed badge evaluation in `GTBadgeProvider` to derive reactor tier from the active controller model rather than purely runtime operating voltage, preserving accurate Mk1/Mk2/Mk3 display when overclocking.
+- **GTCEu Turbine Rotor Holder Efficiency Calculation (`GTPowerCalculator`, `GTTurbinePhysics`, `GTTurbineHelper`)**:
+  - Fixed an issue where the efficiency bonus from higher-tier rotor holders (e.g. EV, IV, ZPM) was incorrectly added rather than scaled multiplicatively with rotor efficiency, causing cycle duration and fuel consumption discrepancies.
+- **GTCEu Recipe Viewer Extraction & Condition Branching (`GTCEuRecipeHandler`, `JeiRecipeConverter`)**:
+  - Fixed an issue where certain complex GTCEu recipes with condition branches, multi-fluid outputs, or specific chance byproducts failed to extract properly or dropped valid output ports during EMI/JEI conversion (thanks to @kairan0 via PR #3, #4, #5).
+- **Reflector Missing Badge & Warning Text Formatting (`GTBadgeProvider`, `GTNodeValidator`, `BoardTooltipRenderer`)**:
+  - Fixed an issue where the missing reflector tier text displayed '(None)' in parentheses instead of a clean 'None' label, and standardized reflector badge symbols to ✦.
+
 ## [2.0.0] - 2026-08-30
 
 ### Added

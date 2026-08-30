@@ -311,7 +311,7 @@ public class GTCEuModAdapter implements IModAdapter {
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.REFLECTOR) {
-            tooltip.add(Component.literal("§b🪞 ").append(Component.translatable("gui.gtcalcboard.addon.reflector.tier", addon.getReflectorTier())));
+            tooltip.add(Component.literal("§b✦ ").append(Component.translatable("gui.gtcalcboard.addon.reflector.tier", addon.getReflectorTier())));
             return;
         }
         IModAdapter.super.buildAddonTooltip(node, addon, isActiveAddon, tooltip);

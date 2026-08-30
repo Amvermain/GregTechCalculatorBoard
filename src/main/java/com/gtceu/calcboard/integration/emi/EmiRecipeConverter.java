@@ -137,14 +137,6 @@ public class EmiRecipeConverter {
             }
         }
 
-        if (node.isFusion()) {
-            GTVoltageTier minTier = node.getMinFusionVoltageTier();
-            if (node.getTargetTier().ordinal() < minTier.ordinal()) {
-                node.setTargetTier(minTier);
-            }
-        }
-
-        // Convert Inputs
         for (EmiIngredient input : recipe.getInputs()) {
             long reqAmount = input.getAmount();
             float reqChance = input.getChance();
@@ -257,7 +249,6 @@ public class EmiRecipeConverter {
             node.setAvailableWorkstations(findAllWorkstations(recipe));
         }
 
-        // If ALL available workstations are multiblock controllers, default to Multiblock mode
         boolean hasAnySingle = false;
         boolean hasAnyMulti = false;
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
@@ -269,6 +260,26 @@ public class EmiRecipeConverter {
         }
         if (hasAnyMulti && !hasAnySingle) {
             node.setMultiblock(true);
+            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+                if (preferredWs != null) {
+                    node.setMachineIcon(preferredWs);
+                }
+            }
+        }
+
+        if (node.isFusion()) {
+            node.setMultiblock(true);
+            GTVoltageTier minTier = node.getMinFusionVoltageTier();
+            node.setTargetTier(minTier);
+            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+                if (preferredWs != null) {
+                    node.setMachineIcon(preferredWs);
+                }
+            }
         }
         node.autoCalculateTurbineParallel();
         return node;

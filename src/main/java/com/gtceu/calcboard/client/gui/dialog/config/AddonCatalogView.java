@@ -132,8 +132,6 @@ public class AddonCatalogView {
         List<AddonCategory> allCats = getAllCategoriesForFilter(node);
         int totalCats = allCats.size();
         int availW = dialogW - 20;
-        int scrollAreaX = startX;
-        int scrollAreaW = availW;
 
         int totalWidth = 0;
         List<Integer> chipWidths = new ArrayList<>();
@@ -144,8 +142,19 @@ public class AddonCatalogView {
         }
         totalWidth = Math.max(0, totalWidth - 4);
 
+        boolean needsScroll = totalWidth > availW;
+        int leftArrowW = (needsScroll && categoryScrollX > 2) ? 10 : 0;
+        int rightArrowW = (needsScroll && categoryScrollX < (totalWidth - availW) - 2) ? 10 : 0;
+
+        int scrollAreaX = startX + (needsScroll ? 8 : 0);
+        int scrollAreaW = availW - (needsScroll ? 16 : 0);
+
         maxCategoryScrollX = Math.max(0, totalWidth - scrollAreaW);
         categoryScrollX = Math.max(0, Math.min(maxCategoryScrollX, categoryScrollX));
+
+        if (maxCategoryScrollX > 0 && categoryScrollX > 2) {
+            graphics.drawString(font, "◀", startX, startY + 4, 0xFFFFAA00, false);
+        }
 
         dialog.enableScaledScissor(graphics, scrollAreaX, startY - 1, scrollAreaX + scrollAreaW, startY + 17);
 
@@ -163,13 +172,8 @@ public class AddonCatalogView {
 
         graphics.disableScissor();
 
-        if (maxCategoryScrollX > 0) {
-            if (categoryScrollX > 2) {
-                graphics.drawString(font, "◀", scrollAreaX - 6, startY + 4, 0xFFFFAA00, false);
-            }
-            if (categoryScrollX < maxCategoryScrollX - 2) {
-                graphics.drawString(font, "▶", scrollAreaX + scrollAreaW - 6, startY + 4, 0xFFFFAA00, false);
-            }
+        if (maxCategoryScrollX > 0 && categoryScrollX < maxCategoryScrollX - 2) {
+            graphics.drawString(font, "▶", startX + availW - 6, startY + 4, 0xFFFFAA00, false);
         }
     }
 
@@ -414,7 +418,15 @@ public class AddonCatalogView {
                 graphics.drawString(font, hover ? "§c✖" : "§a✔", bx + cardW - 11, by + 4, 0xFFFFFFFF, false);
             }
 
-            String aName = font.plainSubstrByWidth(addon.getName(), cardW - 36);
+            String aName = addon.getName();
+            aName = aName.replace("Reflector", "Refl.")
+                    .replace("Maintenance", "Maint.")
+                    .replace("Advanced", "Adv.")
+                    .replace("Borealic", "Boreal.")
+                    .replace("Complex", "Compl.");
+            if (font.width(aName) > cardW - 36) {
+                aName = font.plainSubstrByWidth(aName, Math.max(16, cardW - 36 - font.width("..."))) + "...";
+            }
             graphics.drawString(font, "§f" + aName, bx + 24, by + 5, 0xFFFFFFFF, false);
 
             String statsStr = dialog.formatAddonBadge(addon);

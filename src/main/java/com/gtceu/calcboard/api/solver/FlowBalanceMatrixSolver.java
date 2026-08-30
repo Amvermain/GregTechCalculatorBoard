@@ -42,23 +42,23 @@ public final class FlowBalanceMatrixSolver {
         Map<String, Double> countsMap = new HashMap<>();
         countsMap.put(anchor.getId(), targetAnchorCount);
 
-        // 2. Upstream Pass: Satisfy anchor's input demand from upstream producers
-        solveUpstreamPassRestricted(graph, anchor, countsMap, upstreamNodes, integerCounts);
-
-        for (String upId : upstreamNodes) {
-            RecipeNode n = graph.findNodeById(upId);
-            if (n != null && countsMap.containsKey(upId)) {
-                n.setMachineCount(countsMap.get(upId));
-            }
-        }
-
-        // 3. Downstream Pass: Process anchor's outputs downstream
+        // 2. Downstream Pass: Process anchor's outputs downstream first so core downstream chain counts are fixed
         solveDownstreamPassRestricted(graph, anchor, countsMap, downstreamNodes, integerCounts);
 
         for (String downId : downstreamNodes) {
             RecipeNode n = graph.findNodeById(downId);
             if (n != null && countsMap.containsKey(downId)) {
                 n.setMachineCount(countsMap.get(downId));
+            }
+        }
+
+        // 3. Upstream Pass: Satisfy input demand of anchor AND all downstream consumers from upstream producers
+        solveUpstreamPassRestricted(graph, anchor, countsMap, upstreamNodes, downstreamNodes, integerCounts);
+
+        for (String upId : upstreamNodes) {
+            RecipeNode n = graph.findNodeById(upId);
+            if (n != null && countsMap.containsKey(upId)) {
+                n.setMachineCount(countsMap.get(upId));
             }
         }
 
@@ -73,8 +73,20 @@ public final class FlowBalanceMatrixSolver {
     }
 
     public static void solveUpstreamPassRestricted(FlowGraph graph, RecipeNode anchor, Map<String, Double> countsMap, Set<String> allowedUpstreamNodes, boolean integerCounts) {
+        solveUpstreamPassRestricted(graph, anchor, countsMap, allowedUpstreamNodes, null, integerCounts);
+    }
+
+    public static void solveUpstreamPassRestricted(FlowGraph graph, RecipeNode anchor, Map<String, Double> countsMap, Set<String> allowedUpstreamNodes, Set<String> downstreamNodes, boolean integerCounts) {
         Queue<RecipeNode> upQueue = new ArrayDeque<>();
         upQueue.add(anchor);
+        if (downstreamNodes != null) {
+            for (String downId : downstreamNodes) {
+                RecipeNode dn = graph.findNodeById(downId);
+                if (dn != null && !dn.isReroute()) {
+                    upQueue.add(dn);
+                }
+            }
+        }
 
         int maxUpstreamIterations = Math.max(50, graph.getNodes().size() * 5);
         int upIterations = 0;
@@ -177,6 +189,10 @@ public final class FlowBalanceMatrixSolver {
     }
 
     public static double calculateEffectiveIncomingSupply(FlowGraph graph, RecipeNode consumer, int inIdx, Map<String, Double> countsMap) {
+        return calculateEffectiveIncomingSupply(graph, consumer, inIdx, countsMap, false);
+    }
+
+    public static double calculateEffectiveIncomingSupply(FlowGraph graph, RecipeNode consumer, int inIdx, Map<String, Double> countsMap, boolean demandProportional) {
         if (consumer == null) return 0.0;
 
         record SupplyHop(String nodeId, int inIdx, double weight) {}
@@ -195,13 +211,25 @@ public final class FlowBalanceMatrixSolver {
                     RecipeNode p = graph.findNodeById(edge.fromNodeId());
                     if (p != null) {
                         if (p.isReroute()) {
-                            int outDegree = 0;
-                            for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                                if (outEdge.fromNodeId().equals(p.getId())) {
-                                    outDegree++;
+                            double nextWeight;
+                            if (demandProportional) {
+                                int inDegree = 0;
+                                for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+                                    if (inEdge.toNodeId().equals(p.getId())) {
+                                        inDegree++;
+                                    }
                                 }
+                                nextWeight = hop.weight / Math.max(1, inDegree);
+                            } else {
+                                int outDegree = 0;
+                                for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+                                    if (outEdge.fromNodeId().equals(p.getId())) {
+                                        outDegree++;
+                                    }
+                                }
+                                nextWeight = hop.weight / Math.max(1, outDegree);
                             }
-                            double nextWeight = hop.weight / Math.max(1, outDegree);
+
                             if (visited.add(p.getId() + ":0")) {
                                 queue.add(new SupplyHop(p.getId(), 0, nextWeight));
                             }
@@ -209,6 +237,21 @@ public final class FlowBalanceMatrixSolver {
                             double pC = countsMap != null ? countsMap.getOrDefault(p.getId(), p.getMachineCount()) : p.getMachineCount();
                             IngredientStack outStack = p.getOutputs().get(edge.outputIndex());
                             double pRate = p.calculateSingleMachineOutputRate(outStack) * pC;
+
+                            if (demandProportional && inIdx < consumer.getInputs().size()) {
+                                IngredientStack inStack = consumer.getInputs().get(inIdx);
+                                double cC = countsMap != null ? countsMap.getOrDefault(consumer.getId(), consumer.getMachineCount()) : consumer.getMachineCount();
+                                double consumerDemand = consumer.calculateSingleMachineInputRate(inStack) * cC;
+                                double totalPortDemand = calculateTotalConnectedPortDemand(graph, p, edge.outputIndex(), countsMap);
+
+                                if (totalPortDemand > 0.0001 && consumerDemand > 0.0001) {
+                                    double allocated = (totalPortDemand <= pRate + 0.0001)
+                                            ? consumerDemand
+                                            : (pRate * (consumerDemand / totalPortDemand));
+                                    totalIncomingSupply += allocated * hop.weight;
+                                    continue;
+                                }
+                            }
 
                             int outDegree = 0;
                             for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
@@ -223,6 +266,16 @@ public final class FlowBalanceMatrixSolver {
             }
         }
         return totalIncomingSupply;
+    }
+
+    public static boolean isPortDrivenByDownstreamChain(FlowGraph graph, String consumerId, int inIdx, String anchorId, Map<String, Double> countsMap) {
+        Set<RecipeNode> feedingProducers = new LinkedHashSet<>();
+        FlowGraphTopologyAnalyzer.collectFeedingProducers(graph, consumerId, inIdx, feedingProducers);
+        for (RecipeNode p : feedingProducers) {
+            if (p.getId().equals(anchorId)) return true;
+            if (countsMap != null && countsMap.containsKey(p.getId())) return true;
+        }
+        return false;
     }
 
     public static void solveDownstreamPassRestricted(FlowGraph graph, RecipeNode anchor, Map<String, Double> countsMap, Set<String> allowedDownstreamNodes, boolean integerCounts) {
@@ -257,8 +310,13 @@ public final class FlowBalanceMatrixSolver {
                 }
 
                 double requiredConsumerCount = 0.0;
+                boolean hasDownstreamDrivingInput = false;
 
                 for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
+                    if (!isPortDrivenByDownstreamChain(graph, consumer.getId(), inIdx, anchor.getId(), countsMap)) {
+                        continue;
+                    }
+
                     IngredientStack inStack = consumer.getInputs().get(inIdx);
                     double singleInRate = consumer.calculateSingleMachineInputRate(inStack);
                     if (singleInRate <= 0.0001) continue;
@@ -266,12 +324,13 @@ public final class FlowBalanceMatrixSolver {
                     double totalIncomingSupply = calculateEffectiveIncomingSupply(graph, consumer, inIdx, countsMap);
 
                     if (totalIncomingSupply > 0.0001) {
+                        hasDownstreamDrivingInput = true;
                         double portConsumerCount = totalIncomingSupply / singleInRate;
                         requiredConsumerCount = Math.max(requiredConsumerCount, portConsumerCount);
                     }
                 }
 
-                if (requiredConsumerCount > 0.0001) {
+                if (hasDownstreamDrivingInput && requiredConsumerCount > 0.0001) {
                     double finalConsumerCount = requiredConsumerCount;
                     if (integerCounts) {
                         finalConsumerCount = Math.max(1.0, Math.floor(finalConsumerCount + 0.00001));
@@ -297,7 +356,7 @@ public final class FlowBalanceMatrixSolver {
             boolean changed = false;
 
             for (RecipeNode consumer : graph.getNodes()) {
-                if (consumer.isReroute() || downstreamNodes.contains(consumer.getId())) continue;
+                if (consumer.isReroute()) continue;
 
                 for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
                     boolean hasConnection = false;
@@ -314,7 +373,7 @@ public final class FlowBalanceMatrixSolver {
                     if (singleInRate <= 1e-5) continue;
 
                     double requiredDemand = singleInRate * consumer.getMachineCount();
-                    double incomingSupply = calculateEffectiveIncomingSupply(graph, consumer, inIdx, null);
+                    double incomingSupply = calculateEffectiveIncomingSupply(graph, consumer, inIdx, null, true);
 
                     if (incomingSupply < requiredDemand - 1e-4) {
                         Set<RecipeNode> feedingProducers = new LinkedHashSet<>();
@@ -345,7 +404,7 @@ public final class FlowBalanceMatrixSolver {
 
                                     Map<String, Double> upCounts = new HashMap<>();
                                     upCounts.put(p.getId(), newCount);
-                                    solveUpstreamPassRestricted(graph, p, upCounts, upstreamNodes, integerCounts);
+                                    solveUpstreamPassRestricted(graph, p, upCounts, upstreamNodes, downstreamNodes, integerCounts);
                                     for (Map.Entry<String, Double> e : upCounts.entrySet()) {
                                         RecipeNode un = graph.findNodeById(e.getKey());
                                         if (un != null && !un.getId().equals(anchor.getId())) {

@@ -30,7 +30,7 @@ public final class GTNodeValidator {
             int inst = node.getInstalledReflectorTier();
             if (inst < req) {
                 if (warnings != null) {
-                    warnings.add(Component.translatable("gui.gtcalcboard.reflector_required_warning", req, inst > 0 ? ("T" + inst) : Component.translatable("gui.gtcalcboard.none")));
+                    warnings.add(Component.translatable("gui.gtcalcboard.reflector_required_warning", req, inst > 0 ? ("T" + inst) : Component.translatable("gui.gtcalcboard.none_plain")));
                 }
                 valid = false;
             }

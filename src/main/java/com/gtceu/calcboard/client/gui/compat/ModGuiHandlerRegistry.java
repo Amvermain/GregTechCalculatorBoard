@@ -30,6 +30,14 @@ public final class ModGuiHandlerRegistry {
         register(new SysteamsModGuiHandler());
         register(new ThermalModGuiHandler());
         register(new VanillaModGuiHandler());
+
+        var gtHandler = HANDLERS.get("gtceu");
+        if (gtHandler != null) {
+            HANDLERS.put("start_core", gtHandler);
+            HANDLERS.put("gtceu_start", gtHandler);
+            HANDLERS.put("start", gtHandler);
+            HANDLERS.put("star_technology", gtHandler);
+        }
     }
 
     private ModGuiHandlerRegistry() {}
@@ -52,12 +60,18 @@ public final class ModGuiHandlerRegistry {
         if (adapter != null) {
             IModGuiHandler handler = HANDLERS.get(adapter.getModId());
             if (handler != null) return handler;
+            if (adapter instanceof com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter) {
+                return HANDLERS.getOrDefault("gtceu", FALLBACK_HANDLER);
+            }
         }
 
         if (node.getMachineIcon() != null) {
             String ns = node.getMachineIcon().getNamespace();
             IModGuiHandler handler = HANDLERS.get(ns);
             if (handler != null) return handler;
+            if (ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
+                return HANDLERS.getOrDefault("gtceu", FALLBACK_HANDLER);
+            }
         }
 
         return FALLBACK_HANDLER;

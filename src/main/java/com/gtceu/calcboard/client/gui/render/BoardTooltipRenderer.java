@@ -360,7 +360,7 @@ public final class BoardTooltipRenderer {
                         if (!n.hasValidReflector()) {
                             int req = n.getRequiredReflectorTier();
                             int inst = n.getInstalledReflectorTier();
-                            String instStr = inst > 0 ? ("Tier " + inst) : Component.translatable("gui.gtcalcboard.none").getString();
+                            String instStr = inst > 0 ? ("Tier " + inst) : Component.translatable("gui.gtcalcboard.none_plain").getString();
                             tooltipLines.add(Component.literal("§c❌ " + String.format(java.util.Locale.ROOT, Component.translatable("gui.gtcalcboard.node_warning.reflector_detail").getString(), String.valueOf(req), instStr)));
                         }
                         if (graph != null && com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.hasTurbineFlowDeficit(n, graph)) {

@@ -21,6 +21,32 @@
 - **JEI Unofficial 레시피 검색 창의 재료 누락 및 Anvil 오표시 수정**:
   - JEI Unofficial 환경에서 레시피 추가 다이얼로그를 열었을 때 슬롯 파싱 오류로 인해 모든 바닐라 레시피가 입력/출력 아이템 없이 `[Anvil] Anvil`로만 표시되던 인덱싱 오류를 해결했습니다.
 
+## [2.0.1] - 2026-08-31
+
+### 신규 기능 (Added)
+- **핵융합로 최소 요구 티어 컨트롤러 자동 매칭 (`GTCEuModAdapter`, `GTAddonCompatibilityHandler`, `EmiRecipeConverter`, `JeiRecipeConverter`)**:
+  - 핵융합로(Mk1, Mk2, Mk3) 레시피를 보드에 추가할 때, 레시피의 최소 요구 전압 티어(예: 180M EU $\rightarrow$ ZPM Mk2)와 정확히 일치하는 컨트롤러 머신 아이콘이 기본값으로 우선 선택 및 지정되도록 지원.
+
+### 개선 및 최적화 (Changed & Improved)
+- **기계 설정 다이얼로그 레이아웃 및 라벨 표기 최적화 (`MachineConfigDialog`, `GTCEuModGuiHandler`, `AddonCatalogView`)**:
+  - 상단 헤더의 버튼 크기(레시피 교체, 싱글/멀티블록 모드 전환, 폰트 크기 조절)를 최적화하고 긴 기계 이름에 말줄임표(...)를 적용하여 다국어 환경에서 버튼이 겹치던 현상 개선.
+  - 멀티블록 설정창의 컨트롤러 버튼에서 내부 대괄호 태그(예: `[FRC I]`)를 제거하고 `⚛ Fusion Mk1/Mk2/Mk3`, `⚡ Aux Mk1/Mk2` 등 간결한 라벨로 포맷팅하여 글자 잘림 방지.
+  - 하드웨어 카탈로그의 가로 스크롤 영역 화살표(◀ / ▶) 표시 위치를 정돈하고 긴 애드온 카드 명칭의 스마트 단축어 처리 지원.
+- **분기 노드(Reroute Junction) 다중 경로 유량 밸런싱 및 자동 비율 계산 강화 (`FlowBalanceMatrixSolver`, `FlowGraphTopologyAnalyzer`, `FlowSummaryAggregator`)**:
+  - 분기(Reroute/Junction) 노드가 연결된 복잡한 다중 병렬 및 캐스케이드 공정 그래프에서 Auto-Ratio 실행 시 역방향 및 순방향 공급-수요 균형을 정밀하게 연산하여 불필요한 병목 현상 제거.
+  - 분기 노드 포트의 유량 통계(입/출력 플로우 게이지)에서 하위 노드들의 실제 요구량을 정확히 반영하도록 개선.
+
+### 버그 수정 (Fixed)
+- **핵융합로 노드 생성 시 전압 티어 및 뱃지 불일치 해결 (`EmiRecipeConverter`, `GTBadgeProvider`, `GTAddonCompatibilityHandler`)**:
+  - Fusion Mk2(ZPM)가 필요한 레시피 변환 시 파이프라인 후반부에서 상위 티어(UV Mk3) 컨트롤러로 덮어씌워져 전압과 뱃지가 왜곡되던 문제 해결.
+  - `GTBadgeProvider`에서 퓨전 뱃지 판정 시 단순 작동 전압 대신 활성 컨트롤러 모델을 우선 참조하도록 분리하여 오버클럭 시에도 정직한 `⚛ Mk1/Mk2/Mk3` 뱃지가 유지되도록 수정.
+- **GTCEu 터빈 로터 홀더 효율 및 지속 시간 연산 오류 수정 (`GTPowerCalculator`, `GTTurbinePhysics`, `GTTurbineHelper`)**:
+  - 상위 티어 로터 홀더(EV, IV, ZPM 등) 장착 시 제공되는 효율 보너스가 로터 자체 효율과 곱연산되지 않고 단순 합산되어 사이클 지속 시간 및 연료 소비량이 어긋나던 문제 해결.
+- **GTCEu 레시피 추출 및 조건부 레시피 변환 안정화 (`GTCEuRecipeHandler`, `JeiRecipeConverter`)**:
+  - 다중 유체 출력이나 특정 확률성 부산물 및 조건 분기가 포함된 GTCEu 레시피 변환 시 일부 출력 포트가 누락되거나 변환에 실패하던 문제 해결 (PR #3, #4, #5 @kairan0 기여).
+- **리플렉터 미장착 경고 배지 및 툴팁 텍스트 서식 수정 (`GTBadgeProvider`, `GTNodeValidator`, `BoardTooltipRenderer`)**:
+  - 리플렉터 미장착 시 툴팁 및 경고 문구에 불필요한 괄호 `(없음)` 대신 깔끔한 `없음`으로 표시되도록 수정하고 리플렉터 배지 기호를 `✦`로 통일.
+
 ## [2.0.0] - 2026-08-30
 
 ### 신규 기능 (Added)

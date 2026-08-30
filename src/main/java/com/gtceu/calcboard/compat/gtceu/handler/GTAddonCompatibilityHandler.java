@@ -10,6 +10,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
@@ -414,6 +415,37 @@ public final class GTAddonCompatibilityHandler {
 
     public static ResourceLocation getPreferredMultiblockWorkstation(RecipeNode node, List<ResourceLocation> availableWorkstations) {
         if (node == null || availableWorkstations == null || availableWorkstations.isEmpty()) return null;
+
+        if (com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.isFusion(node)) {
+            GTVoltageTier minTier = com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.getMinFusionVoltageTier(node);
+
+            for (ResourceLocation ws : availableWorkstations) {
+                if (ws != null) {
+                    GTVoltageTier wsTier = GTCEuModAdapter.extractVoltageTierFromIcon(ws);
+                    if (wsTier == minTier) {
+                        return ws;
+                    }
+                }
+            }
+
+            ResourceLocation bestHigher = null;
+            GTVoltageTier bestTier = null;
+            for (ResourceLocation ws : availableWorkstations) {
+                if (ws != null) {
+                    GTVoltageTier wsTier = GTCEuModAdapter.extractVoltageTierFromIcon(ws);
+                    if (wsTier != null && wsTier.ordinal() >= minTier.ordinal()) {
+                        if (bestTier == null || wsTier.ordinal() < bestTier.ordinal()) {
+                            bestTier = wsTier;
+                            bestHigher = ws;
+                        }
+                    }
+                }
+            }
+            if (bestHigher != null) {
+                return bestHigher;
+            }
+        }
+
         ResourceLocation catId = node.getRecipeCategoryId();
         if (catId != null) {
             for (ResourceLocation ws : availableWorkstations) {
@@ -423,7 +455,6 @@ public final class GTAddonCompatibilityHandler {
             }
         }
 
-        // Standard base large multiblocks (e.g. large_chemical_reactor before extreme_/incomprehensible_)
         for (ResourceLocation ws : availableWorkstations) {
             if (MultiblockDetector.isMultiblock(ws)) {
                 String path = ws.getPath().toLowerCase(Locale.ROOT);
@@ -433,7 +464,6 @@ public final class GTAddonCompatibilityHandler {
             }
         }
 
-        // Standard base multiblocks before advanced/special variants
         for (ResourceLocation ws : availableWorkstations) {
             if (MultiblockDetector.isMultiblock(ws)) {
                 String path = ws.getPath().toLowerCase(Locale.ROOT);

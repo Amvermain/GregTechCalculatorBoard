@@ -246,4 +246,185 @@ public class AutoRatioBottleneckTest {
         double scale0 = FlowGraphSolver.findPerfectHarmonizedAnchorCount(graph, formingPress);
         Assertions.assertEquals(7.0, scale0, 1e-4, "Under 0% strict tolerance, anchor must scale up to exactly 7.0 machines!");
     }
+
+    @Test
+    public void testComplexCascadeWithSharedRawMaterialAutoRatio() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation diamondId = ResourceLocation.tryParse("minecraft:diamond");
+        ResourceLocation steam1Id = ResourceLocation.tryParse("gtceu:steam_tier1");
+        ResourceLocation steam2Id = ResourceLocation.tryParse("gtceu:steam_tier2");
+        ResourceLocation steam3Id = ResourceLocation.tryParse("gtceu:steam_tier3");
+        ResourceLocation steam4Id = ResourceLocation.tryParse("gtceu:superhot_steam");
+
+        // Mechanical Sieve: produces Diamond @ 3.2/s
+        RecipeNode sieve = RecipeNode.create(ResourceLocation.tryParse("gtceu:sieve"), "Mechanical Sieve", 20, 30, GTVoltageTier.EV);
+        sieve.getOutputs().add(IngredientStack.item(diamondId, "Diamond", 3.2));
+        sieve.setMachineCount(10.0); // Initial arbitrary count
+        graph.addNode(sieve);
+
+        // Diamond Reroute Junction
+        RecipeNode reroute = RecipeNode.createReroute(0.0, 0.0);
+        reroute.bindRerouteIngredient(IngredientStack.item(diamondId, "Diamond", 1.0));
+        graph.addNode(reroute);
+
+        // Lapidary Stage 1 (Anchor): Diamond @ 1.875/s -> Steam1 @ 562.5/s
+        RecipeNode lap1 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_1"), "Lapidary Fuel 1", 20, 30, GTVoltageTier.EV);
+        lap1.setBaseNode(true);
+        lap1.setMachineCount(1.0);
+        lap1.getInputs().add(IngredientStack.item(diamondId, "Diamond", 1.875));
+        lap1.getOutputs().add(IngredientStack.fluid(steam1Id, "Steam 1", 562.5));
+        graph.addNode(lap1);
+
+        // Lapidary Stage 2: Diamond @ 3.75/s, Steam1 @ 140.625/s -> Steam2 @ 562.5/s
+        RecipeNode lap2 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_2"), "Lapidary Fuel 2", 20, 30, GTVoltageTier.EV);
+        lap2.setMachineCount(1.0);
+        lap2.getInputs().add(IngredientStack.item(diamondId, "Diamond", 3.75));
+        lap2.getInputs().add(IngredientStack.fluid(steam1Id, "Steam 1", 140.625));
+        lap2.getOutputs().add(IngredientStack.fluid(steam2Id, "Steam 2", 562.5));
+        graph.addNode(lap2);
+
+        // Lapidary Stage 3: Diamond @ 1.875/s, Steam2 @ 70.3125/s -> Steam3 @ 576.0/s
+        RecipeNode lap3 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_3"), "Lapidary Fuel 3", 20, 30, GTVoltageTier.EV);
+        lap3.setMachineCount(1.0);
+        lap3.getInputs().add(IngredientStack.item(diamondId, "Diamond", 1.875));
+        lap3.getInputs().add(IngredientStack.fluid(steam2Id, "Steam 2", 70.3125));
+        lap3.getOutputs().add(IngredientStack.fluid(steam3Id, "Steam 3", 576.0));
+        graph.addNode(lap3);
+
+        // Lapidary Stage 4: Diamond @ 1.875/s, Steam3 @ 70.3125/s -> Steam4 @ 576.0/s
+        RecipeNode lap4 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_4"), "Lapidary Fuel 4", 20, 30, GTVoltageTier.EV);
+        lap4.setMachineCount(1.0);
+        lap4.getInputs().add(IngredientStack.item(diamondId, "Diamond", 1.875));
+        lap4.getInputs().add(IngredientStack.fluid(steam3Id, "Steam 3", 70.3125));
+        lap4.getOutputs().add(IngredientStack.fluid(steam4Id, "Superhot Steam", 576.0));
+        graph.addNode(lap4);
+
+        // Steam Turbine: Steam4 @ 95.2126/s
+        RecipeNode turbine = RecipeNode.create(ResourceLocation.tryParse("gtceu:turbine"), "Steam Turbine", 20, 30, GTVoltageTier.EV);
+        turbine.setMachineCount(1.0);
+        turbine.getInputs().add(IngredientStack.fluid(steam4Id, "Superhot Steam", 95.2126));
+        graph.addNode(turbine);
+
+        // Connections
+        graph.addConnection(sieve.getId(), 0, reroute.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap1.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap2.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap3.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap4.getId(), 0);
+
+        graph.addConnection(lap1.getId(), 0, lap2.getId(), 1);
+        graph.addConnection(lap2.getId(), 0, lap3.getId(), 1);
+        graph.addConnection(lap3.getId(), 0, lap4.getId(), 1);
+        graph.addConnection(lap4.getId(), 0, turbine.getId(), 0);
+
+        // Run AutoRatio from Stage 1 (Anchor Count = 1.0)
+        FlowGraphSolver.autoRatioFromAnchor(graph, lap1, true);
+
+        // Stage 1 must remain 1.0
+        Assertions.assertEquals(1.0, lap1.getMachineCount(), 1e-4);
+
+        // Stage 2 must scale to 4.0 machines (562.5 / 140.625 = 4.0)
+        Assertions.assertEquals(4.0, lap2.getMachineCount(), 1e-4, "Lapidary Stage 2 must scale to 4 machines to consume Stage 1 steam!");
+
+        // Stage 3 must scale to 32.0 machines (4 * 562.5 / 70.3125 = 32.0)
+        Assertions.assertEquals(32.0, lap3.getMachineCount(), 1e-4, "Lapidary Stage 3 must scale to 32 machines to consume Stage 2 steam!");
+
+        // Stage 4 must scale to 263.0 machines (Math.ceil(32 * 576.0 / 70.3125) = Math.ceil(262.15) = 263.0)
+        Assertions.assertTrue(lap4.getMachineCount() >= 262.0 && lap4.getMachineCount() <= 263.0,
+                "Lapidary Stage 4 must scale to ~262-263 machines! Actual: " + lap4.getMachineCount());
+
+        // Steam Turbine must scale to ~1585-1592 machines
+        Assertions.assertTrue(turbine.getMachineCount() >= 1585.0 && turbine.getMachineCount() <= 1592.0,
+                "Turbine must scale to ~1585 machines! Actual: " + turbine.getMachineCount());
+
+        // Sieve must scale to satisfy total diamond demand (~568.125 / 3.2 = 178 machines)
+        Assertions.assertEquals(179.0, sieve.getMachineCount(), 1.0,
+                "Sieve machine count should be ~179! Actual: " + sieve.getMachineCount());
+
+        // Check node efficiencies: all nodes must be 100% operational without input deficiency
+        Map<String, Double> eff = FlowGraphSolver.computeNodeEfficiencies(graph);
+        for (RecipeNode n : graph.getNodes()) {
+            if (!n.isReroute()) {
+                Assertions.assertEquals(1.0, eff.getOrDefault(n.getId(), 0.0), 1e-3,
+                        "Node " + n.getName() + " must have 100% efficiency without bottleneck! Actual: " + eff.get(n.getId()));
+            }
+        }
+    }
+
+    @Test
+    public void testComplexCascadeFromTurbineAnchor() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation diamondId = ResourceLocation.tryParse("minecraft:diamond");
+        ResourceLocation steam1Id = ResourceLocation.tryParse("gtceu:steam_tier1");
+        ResourceLocation steam2Id = ResourceLocation.tryParse("gtceu:steam_tier2");
+        ResourceLocation steam3Id = ResourceLocation.tryParse("gtceu:steam_tier3");
+        ResourceLocation steam4Id = ResourceLocation.tryParse("gtceu:superhot_steam");
+
+        RecipeNode sieve = RecipeNode.create(ResourceLocation.tryParse("gtceu:sieve"), "Mechanical Sieve", 20, 30, GTVoltageTier.EV);
+        sieve.getOutputs().add(IngredientStack.item(diamondId, "Diamond", 3.2));
+        graph.addNode(sieve);
+
+        RecipeNode reroute = RecipeNode.createReroute(0.0, 0.0);
+        reroute.bindRerouteIngredient(IngredientStack.item(diamondId, "Diamond", 1.0));
+        graph.addNode(reroute);
+
+        RecipeNode lap1 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_1"), "Lapidary Fuel 1", 20, 30, GTVoltageTier.EV);
+        lap1.getInputs().add(IngredientStack.item(diamondId, "Diamond", 1.875));
+        lap1.getOutputs().add(IngredientStack.fluid(steam1Id, "Steam 1", 562.5));
+        graph.addNode(lap1);
+
+        RecipeNode lap2 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_2"), "Lapidary Fuel 2", 20, 30, GTVoltageTier.EV);
+        lap2.getInputs().add(IngredientStack.item(diamondId, "Diamond", 3.75));
+        lap2.getInputs().add(IngredientStack.fluid(steam1Id, "Steam 1", 140.625));
+        lap2.getOutputs().add(IngredientStack.fluid(steam2Id, "Steam 2", 562.5));
+        graph.addNode(lap2);
+
+        RecipeNode lap3 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_3"), "Lapidary Fuel 3", 20, 30, GTVoltageTier.EV);
+        lap3.getInputs().add(IngredientStack.item(diamondId, "Diamond", 1.875));
+        lap3.getInputs().add(IngredientStack.fluid(steam2Id, "Steam 2", 70.3125));
+        lap3.getOutputs().add(IngredientStack.fluid(steam3Id, "Steam 3", 576.0));
+        graph.addNode(lap3);
+
+        RecipeNode lap4 = RecipeNode.create(ResourceLocation.tryParse("gtceu:lapidary_4"), "Lapidary Fuel 4", 20, 30, GTVoltageTier.EV);
+        lap4.getInputs().add(IngredientStack.item(diamondId, "Diamond", 1.875));
+        lap4.getInputs().add(IngredientStack.fluid(steam3Id, "Steam 3", 70.3125));
+        lap4.getOutputs().add(IngredientStack.fluid(steam4Id, "Superhot Steam", 576.0));
+        graph.addNode(lap4);
+
+        RecipeNode turbine = RecipeNode.create(ResourceLocation.tryParse("gtceu:turbine"), "Steam Turbine", 20, 30, GTVoltageTier.EV);
+        turbine.setBaseNode(true);
+        turbine.setMachineCount(1585.0);
+        turbine.getInputs().add(IngredientStack.fluid(steam4Id, "Superhot Steam", 95.2126));
+        graph.addNode(turbine);
+
+        graph.addConnection(sieve.getId(), 0, reroute.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap1.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap2.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap3.getId(), 0);
+        graph.addConnection(reroute.getId(), 0, lap4.getId(), 0);
+
+        graph.addConnection(lap1.getId(), 0, lap2.getId(), 1);
+        graph.addConnection(lap2.getId(), 0, lap3.getId(), 1);
+        graph.addConnection(lap3.getId(), 0, lap4.getId(), 1);
+        graph.addConnection(lap4.getId(), 0, turbine.getId(), 0);
+
+        // Run AutoRatio from Turbine (Anchor Count = 1585.0)
+        FlowGraphSolver.autoRatioFromAnchor(graph, turbine, true);
+
+        Assertions.assertEquals(1585.0, turbine.getMachineCount(), 1e-4);
+        Assertions.assertTrue(lap4.getMachineCount() >= 262.0 && lap4.getMachineCount() <= 263.0);
+        Assertions.assertEquals(32.0, lap3.getMachineCount(), 1e-4);
+        Assertions.assertEquals(4.0, lap2.getMachineCount(), 1e-4);
+        Assertions.assertEquals(1.0, lap1.getMachineCount(), 1e-4);
+        Assertions.assertEquals(179.0, sieve.getMachineCount(), 1.0);
+
+        Map<String, Double> eff = FlowGraphSolver.computeNodeEfficiencies(graph);
+        for (RecipeNode n : graph.getNodes()) {
+            if (!n.isReroute()) {
+                Assertions.assertEquals(1.0, eff.getOrDefault(n.getId(), 0.0), 1e-3);
+            }
+        }
+    }
 }

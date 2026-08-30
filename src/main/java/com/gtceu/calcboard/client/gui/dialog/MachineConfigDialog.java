@@ -56,7 +56,7 @@ public class MachineConfigDialog {
     private long lastObservedCatalogVersion = -1;
     private List<Component> deferredTooltip = null;
 
-    private static final int DIALOG_WIDTH = 460;
+    private static final int DIALOG_WIDTH = 480;
     private static final int DIALOG_HEIGHT = 295;
 
     public MachineConfigDialog(BoardScreen parent) {
@@ -279,7 +279,7 @@ public class MachineConfigDialog {
         graphics.drawCenteredString(font, "✕", closeBtnX + closeBtnW / 2, closeBtnY + 2, 0xFFFFFFFF);
 
         // Font Scale Toggle Button
-        int fontBtnW = 50;
+        int fontBtnW = 44;
         int fontBtnH = 14;
         int fontBtnX = closeBtnX - fontBtnW - 4;
         int fontBtnY = y + 4;
@@ -296,7 +296,7 @@ public class MachineConfigDialog {
         }
 
         // Multiblock / Singleblock Mode Toggle Button
-        int toggleW = 104;
+        int toggleW = 84;
         int toggleX = fontBtnX - toggleW - 4;
         if (node.hasMultiblockOption()) {
             boolean toggleHover = virtualMouseX >= toggleX && virtualMouseX <= toggleX + toggleW && virtualMouseY >= y + 3 && virtualMouseY <= y + 19;
@@ -305,22 +305,25 @@ public class MachineConfigDialog {
             graphics.renderOutline(toggleX, y + 3, toggleW, 16, isMb ? 0xFF45B074 : 0xFF434E62);
             String toggleText = isMb ? "§a" + Component.translatable("gui.gtcalcboard.config.multiblock_mode").getString()
                     : "§7" + Component.translatable("gui.gtcalcboard.config.singleblock_mode").getString();
-            graphics.drawCenteredString(font, toggleText, toggleX + toggleW / 2, y + 7, 0xFFFFFFFF);
+            graphics.drawCenteredString(font, font.plainSubstrByWidth(toggleText, toggleW - 4), toggleX + toggleW / 2, y + 7, 0xFFFFFFFF);
         }
 
         // Switch Recipe Button
-        int switchBtnW = 90;
+        int switchBtnW = 74;
         int switchBtnH = 16;
         int switchBtnX = node.hasMultiblockOption() ? (toggleX - switchBtnW - 4) : (fontBtnX - switchBtnW - 4);
         boolean switchHover = virtualMouseX >= switchBtnX && virtualMouseX <= switchBtnX + switchBtnW && virtualMouseY >= y + 3 && virtualMouseY <= y + 3 + switchBtnH;
         graphics.fill(switchBtnX, y + 3, switchBtnX + switchBtnW, y + 3 + switchBtnH, switchHover ? 0xFF234B6E : 0xFF19344D);
         graphics.renderOutline(switchBtnX, y + 3, switchBtnW, switchBtnH, switchHover ? 0xFF5B9BD5 : 0xFF35587A);
-        String switchText = "§b🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.button").getString();
-        graphics.drawCenteredString(font, switchText, switchBtnX + switchBtnW / 2, y + 7, 0xFFFFFFFF);
+        String switchText = "§b🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.short_btn").getString();
+        graphics.drawCenteredString(font, font.plainSubstrByWidth(switchText, switchBtnW - 4), switchBtnX + switchBtnW / 2, y + 7, 0xFFFFFFFF);
 
         String title = "⚙ " + Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()).getString();
-        int maxTitleW = switchBtnX - (x + 8) - 4;
-        graphics.drawString(font, font.plainSubstrByWidth(title, maxTitleW), x + 8, y + 7, 0xFFE0E6F0, false);
+        int maxTitleW = switchBtnX - (x + 8) - 6;
+        if (font.width(title) > maxTitleW) {
+            title = font.plainSubstrByWidth(title, Math.max(16, maxTitleW - font.width("..."))) + "...";
+        }
+        graphics.drawString(font, title, x + 8, y + 7, 0xFFE0E6F0, false);
 
         // SECTION 1: Base Parallel Header Area
         graphics.fill(x + 6, y + 26, x + dialogW - 6, y + 66, 0xFF1E222D);
@@ -476,7 +479,7 @@ public class MachineConfigDialog {
             return true;
         }
 
-        int fontBtnW = 50;
+        int fontBtnW = 44;
         int fontBtnH = 14;
         int fontBtnX = closeBtnX - fontBtnW - 4;
         int fontBtnY = y + 4;
@@ -489,7 +492,7 @@ public class MachineConfigDialog {
             return true;
         }
 
-        int toggleW = 104;
+        int toggleW = 84;
         int toggleX = fontBtnX - toggleW - 4;
         if (node.hasMultiblockOption() && mX >= toggleX && mX <= toggleX + toggleW && mY >= y + 3 && mY <= y + 19) {
             boolean nextMb = !node.isMultiblock();
@@ -521,7 +524,7 @@ public class MachineConfigDialog {
             return true;
         }
 
-        int switchBtnW = 90;
+        int switchBtnW = 74;
         int switchBtnH = 16;
         int switchBtnX = node.hasMultiblockOption() ? (toggleX - switchBtnW - 4) : (fontBtnX - switchBtnW - 4);
         if (mX >= switchBtnX && mX <= switchBtnX + switchBtnW && mY >= y + 3 && mY <= y + 3 + switchBtnH) {

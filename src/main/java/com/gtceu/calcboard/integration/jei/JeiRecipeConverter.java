@@ -284,9 +284,15 @@ public class JeiRecipeConverter {
         }
 
         if (node.isFusion()) {
+            node.setMultiblock(true);
             GTVoltageTier minTier = node.getMinFusionVoltageTier();
-            if (node.getTargetTier().ordinal() < minTier.ordinal()) {
-                node.setTargetTier(minTier);
+            node.setTargetTier(minTier);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+                if (preferredWs != null) {
+                    node.setMachineIcon(preferredWs);
+                }
             }
         }
 

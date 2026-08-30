@@ -80,6 +80,13 @@ $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a
 - **Multi Smelter**:
   $$\text{Parallel} = \text{SmelterParallel} \quad (32\text{x}, 64\text{x}, 128\text{x}\dots)$$
 
+#### Large Steam/Gas/Plasma Turbine Rotor & Holder Efficiency Formulas
+- Given rotor efficiency $E_{\text{rotor}}$, rotor power $P_{\text{rotor}}$, and rotor holder tier bonus $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$:
+  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right)\right)$$
+  $$\text{DurationTicks} = \max\left(1.0, \, \text{BaseDurationTicks} \times \text{RotorEffMult} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()\right)$$
+  $$\text{Max EU/t} = \text{HolderBaseEUt} \times \frac{P_{\text{rotor}}}{100.0}$$
+  $$\text{Total Parallel} = \left\lfloor \frac{\text{Max EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+
 ---
 
 ### 1.5 Byproduct Tier Chance Boost
