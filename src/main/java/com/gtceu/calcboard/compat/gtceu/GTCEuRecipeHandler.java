@@ -23,35 +23,21 @@ import java.util.Map;
  */
 public class GTCEuRecipeHandler {
 
+    private static final String GT_RECIPE_CLASS_NAME = "com.gregtechceu.gtceu.api.recipe.GTRecipe";
+    private static final String[] RECIPE_BACKING_FIELDS = {
+            "recipe", "gtRecipe", "backingRecipe", "backing", "originalRecipe", "delegate", "value"
+    };
+
     public static boolean isGTRecipe(Object backing) {
-        if (backing == null) return false;
-        Class<?> cur = backing.getClass();
-        while (cur != null && cur != Object.class) {
-            if (cur.getName().contains("GTRecipe")) return true;
-            for (Class<?> iface : cur.getInterfaces()) {
-                if (iface.getName().contains("GTRecipe")) return true;
-            }
-            cur = cur.getSuperclass();
-        }
-
-        try {
-            backing.getClass().getMethod("getInputEUt");
-            return true;
-        } catch (Throwable ignored) {}
-        try {
-            backing.getClass().getMethod("getOutputEUt");
-            return true;
-        } catch (Throwable ignored) {}
-        try {
-            Field f = backing.getClass().getField("recipeType");
-            if (f != null) return true;
-        } catch (Throwable ignored) {}
-
-        return false;
+        return isDirectGTRecipe(unwrapRecipe(backing));
     }
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
         if (backing == null && emiRecipeObj == null) return false;
+
+        if (backing != null) {
+            backing = unwrapRecipe(backing);
+        }
 
         ResourceLocation catId = null;
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
@@ -222,6 +208,9 @@ public class GTCEuRecipeHandler {
 
     public static void extractGTRecipeDetails(Object backing, EmiRecipeConverter.RecipeDetails details) {
         if (backing == null || details == null) return;
+
+        backing = unwrapRecipe(backing);
+        if (backing == null) return;
 
         double duration = extractDuration(backing);
         if (duration > 0.0) {
@@ -527,36 +516,72 @@ public class GTCEuRecipeHandler {
 
     public static Object unwrapRecipe(Object backing) {
         if (backing == null) return null;
+
         Object cur = backing;
-        for (int i = 0; i < 4 && cur != null; i++) {
-            if (cur.getClass().getName().contains("GTRecipe")) return cur;
-            Object next = null;
-            for (String mName : new String[]{"value", "getRecipe", "getGTRecipe", "recipe", "getBackingRecipe", "backingRecipe"}) {
-                try {
-                    Method m = cur.getClass().getMethod(mName);
-                    next = m.invoke(cur);
-                    if (next != null && next != cur) break;
-                } catch (Throwable ignored) {}
-            }
-            if (next == null) {
-                for (String fName : new String[]{"value", "recipe", "gtRecipe", "backingRecipe", "backing"}) {
-                    try {
-                        Field f = null;
-                        try { f = cur.getClass().getField(fName); } catch (Throwable ignored) {
-                            f = cur.getClass().getDeclaredField(fName);
-                            f.setAccessible(true);
-                        }
-                        if (f != null) {
-                            next = f.get(cur);
-                            if (next != null && next != cur) break;
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
+        java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (int i = 0; i < 8 && cur != null && visited.add(cur); i++) {
+            if (isDirectGTRecipe(cur)) return cur;
+
+            Object next = readRecipeBackingField(cur);
             if (next == null || next == cur) break;
             cur = next;
         }
-        return cur;
+
+        return backing;
+    }
+
+    private static boolean isDirectGTRecipe(Object candidate) {
+        if (candidate == null) return false;
+
+        Class<?> type = candidate.getClass();
+        Class<?> cur = type;
+        while (cur != null && cur != Object.class) {
+            if (GT_RECIPE_CLASS_NAME.equals(cur.getName())) return true;
+            cur = cur.getSuperclass();
+        }
+
+        return hasField(type, "recipeType")
+                && hasField(type, "duration")
+                && hasField(type, "inputs")
+                && hasField(type, "outputs")
+                && hasField(type, "tickInputs")
+                && hasField(type, "tickOutputs");
+    }
+
+    private static boolean hasField(Class<?> type, String fieldName) {
+        Class<?> cur = type;
+        while (cur != null && cur != Object.class) {
+            try {
+                cur.getDeclaredField(fieldName);
+                return true;
+            } catch (NoSuchFieldException ignored) {
+                cur = cur.getSuperclass();
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static Object readRecipeBackingField(Object holder) {
+        for (String fieldName : RECIPE_BACKING_FIELDS) {
+            Class<?> cur = holder.getClass();
+            while (cur != null && cur != Object.class) {
+                try {
+                    Field field = cur.getDeclaredField(fieldName);
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) break;
+                    field.setAccessible(true);
+                    Object value = field.get(holder);
+                    if (value != null && value != holder) return value;
+                    break;
+                } catch (NoSuchFieldException ignored) {
+                    cur = cur.getSuperclass();
+                } catch (Throwable ignored) {
+                    break;
+                }
+            }
+        }
+        return null;
     }
 
     public static List<IngredientStack> extractGTRecipeContents(Object gtRecipe, String fieldName) {
@@ -825,7 +850,6 @@ public class GTCEuRecipeHandler {
         return null;
     }
 }
-
 
 
 
