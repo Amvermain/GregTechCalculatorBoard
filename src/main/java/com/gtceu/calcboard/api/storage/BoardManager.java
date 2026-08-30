@@ -40,6 +40,8 @@ public class BoardManager {
     private boolean showWirePulseAnimation = true;
     private WireColorPreset wireColorPreset = WireColorPreset.CYAN;
     private WireColorPreset matchedWireColorPreset = WireColorPreset.GREEN;
+    private int maxHarmonizeScale = 16;
+    private double harmonizeSurplusTolerance = 0.02;
 
     private boolean autoLoaded = false;
 
@@ -82,6 +84,8 @@ public class BoardManager {
         this.showWirePulseAnimation = true;
         this.wireColorPreset = WireColorPreset.CYAN;
         this.matchedWireColorPreset = WireColorPreset.GREEN;
+        this.maxHarmonizeScale = 16;
+        this.harmonizeSurplusTolerance = 0.02;
         this.autoLoaded = false;
     }
 
@@ -395,14 +399,21 @@ public class BoardManager {
             rootTag.putBoolean("showWirePulseAnimation", showWirePulseAnimation);
             rootTag.putString("wireColorPreset", getWireColorPreset().name());
             rootTag.putString("matchedWireColorPreset", getMatchedWireColorPreset().name());
+            rootTag.putInt("maxHarmonizeScale", getMaxHarmonizeScale());
+            rootTag.putDouble("harmonizeSurplusTolerance", getHarmonizeSurplusTolerance());
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
                 pageList.add(page.serializeNBT());
             }
             rootTag.put("pages", pageList);
-
-            NbtIo.writeCompressed(rootTag, file);
+            File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
+            NbtIo.writeCompressed(rootTag, tempFile);
+            try {
+                java.nio.file.Files.move(tempFile.toPath(), file.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                java.nio.file.Files.move(tempFile.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
             return true;
         } catch (Exception e) {
             e.printStackTrace();
@@ -475,6 +486,12 @@ public class BoardManager {
                         this.matchedWireColorPreset = WireColorPreset.valueOf(rootTag.getString("matchedWireColorPreset"));
                     } catch (Exception ignored) {}
                 }
+                if (rootTag.contains("maxHarmonizeScale")) {
+                    this.maxHarmonizeScale = rootTag.getInt("maxHarmonizeScale");
+                }
+                if (rootTag.contains("harmonizeSurplusTolerance")) {
+                    this.harmonizeSurplusTolerance = rootTag.getDouble("harmonizeSurplusTolerance");
+                }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);
                     this.pages.clear();
@@ -520,6 +537,10 @@ public class BoardManager {
         return dir;
     }
 
+    public File getBlueprintsDirectory() {
+        return BlueprintFileManager.getBlueprintsDirectory();
+    }
+
     public File getDefaultSaveFile() {
         if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
             try {
@@ -528,6 +549,50 @@ public class BoardManager {
             } catch (Throwable ignored) {}
         }
         return new File(getSaveDirectory(), "calcboard_save.nbt");
+    }
+
+    public int getMaxHarmonizeScale() {
+        return maxHarmonizeScale > 0 ? maxHarmonizeScale : 16;
+    }
+
+    public void setMaxHarmonizeScale(int scale) {
+        this.maxHarmonizeScale = Math.max(1, Math.min(256, scale));
+    }
+
+    public int cycleMaxHarmonizeScale() {
+        int[] scales = {4, 8, 16, 32, 64, 128};
+        int current = getMaxHarmonizeScale();
+        int next = scales[0];
+        for (int i = 0; i < scales.length; i++) {
+            if (scales[i] == current) {
+                next = scales[(i + 1) % scales.length];
+                break;
+            }
+        }
+        setMaxHarmonizeScale(next);
+        return next;
+    }
+
+    public double getHarmonizeSurplusTolerance() {
+        return harmonizeSurplusTolerance >= 0 ? harmonizeSurplusTolerance : 0.02;
+    }
+
+    public void setHarmonizeSurplusTolerance(double tolerance) {
+        this.harmonizeSurplusTolerance = Math.max(0.0, Math.min(1.0, tolerance));
+    }
+
+    public double cycleHarmonizeSurplusTolerance() {
+        double[] tolerances = {0.0, 0.01, 0.02, 0.05, 0.10, 0.20};
+        double current = getHarmonizeSurplusTolerance();
+        double next = tolerances[0];
+        for (int i = 0; i < tolerances.length; i++) {
+            if (Math.abs(tolerances[i] - current) < 1e-4) {
+                next = tolerances[(i + 1) % tolerances.length];
+                break;
+            }
+        }
+        setHarmonizeSurplusTolerance(next);
+        return next;
     }
 }
 

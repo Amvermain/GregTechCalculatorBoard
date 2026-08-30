@@ -127,7 +127,7 @@ public final class EmiRecipeSearchIndexer {
             }
         }
 
-        if (cat != null && cat.getId() != null && ("create".equals(cat.getId().getNamespace()) || "createaddition".equals(cat.getId().getNamespace()))) {
+        if (cat != null && cat.getId() != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(cat.getId().getNamespace())) {
             inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
             inputNames.add("stress units");
             inputNames.add("Stress Units");

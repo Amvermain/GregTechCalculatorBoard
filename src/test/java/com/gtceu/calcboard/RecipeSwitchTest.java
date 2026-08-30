@@ -55,30 +55,30 @@ public class RecipeSwitchTest {
         FlowGraph graph = new FlowGraph();
 
         // 1. Setup Source & Consumer nodes
-        RecipeNode waterSource = RecipeNode.create(new ResourceLocation("gtceu:pump"), "Water Pump", 20, 32, GTVoltageTier.LV);
-        waterSource.getOutputs().add(IngredientStack.fluid(new ResourceLocation("minecraft:water"), "Water", 1000.0));
+        RecipeNode waterSource = RecipeNode.create(ResourceLocation.tryParse("gtceu:pump"), "Water Pump", 20, 32, GTVoltageTier.LV);
+        waterSource.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000.0));
         graph.addNode(waterSource);
 
-        RecipeNode nopSupplier = RecipeNode.create(new ResourceLocation("gtceu:chemical_reactor"), "NOP Maker", 20, 32, GTVoltageTier.LV);
-        nopSupplier.getOutputs().add(IngredientStack.item(new ResourceLocation("gtceu:nop_fertilizer"), "NOP Fertilizer", 1.0));
+        RecipeNode nopSupplier = RecipeNode.create(ResourceLocation.tryParse("gtceu:chemical_reactor"), "NOP Maker", 20, 32, GTVoltageTier.LV);
+        nopSupplier.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:nop_fertilizer"), "NOP Fertilizer", 1.0));
         graph.addNode(nopSupplier);
 
-        RecipeNode woodConsumer = RecipeNode.create(new ResourceLocation("gtceu:wood_cutter"), "Wood Cutter", 20, 32, GTVoltageTier.LV);
-        woodConsumer.getInputs().add(IngredientStack.item(new ResourceLocation("minecraft:oak_log"), "Oak Log", 10.0));
+        RecipeNode woodConsumer = RecipeNode.create(ResourceLocation.tryParse("gtceu:wood_cutter"), "Wood Cutter", 20, 32, GTVoltageTier.LV);
+        woodConsumer.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 10.0));
         graph.addNode(woodConsumer);
 
-        RecipeNode tarConsumer = RecipeNode.create(new ResourceLocation("gtceu:distillery"), "Tar Distiller", 20, 32, GTVoltageTier.LV);
-        tarConsumer.getInputs().add(IngredientStack.fluid(new ResourceLocation("gtceu:wood_tar"), "Wood Tar", 500.0));
+        RecipeNode tarConsumer = RecipeNode.create(ResourceLocation.tryParse("gtceu:distillery"), "Tar Distiller", 20, 32, GTVoltageTier.LV);
+        tarConsumer.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 500.0));
         graph.addNode(tarConsumer);
 
         // 2. Setup Greenhouse Node (NOP Recipe)
         // Inputs: [0: Water, 1: NOP Fertilizer]
         // Outputs: [0: Oak Log, 1: Wood Tar]
-        RecipeNode greenhouse = RecipeNode.create(new ResourceLocation("gtceu:greenhouse"), "Greenhouse (NOP)", 400, 128, GTVoltageTier.MV);
-        greenhouse.getInputs().add(IngredientStack.fluid(new ResourceLocation("minecraft:water"), "Water", 1000.0));
-        greenhouse.getInputs().add(IngredientStack.item(new ResourceLocation("gtceu:nop_fertilizer"), "NOP Fertilizer", 1.0));
-        greenhouse.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft:oak_log"), "Oak Log", 16.0));
-        greenhouse.getOutputs().add(IngredientStack.fluid(new ResourceLocation("gtceu:wood_tar"), "Wood Tar", 200.0));
+        RecipeNode greenhouse = RecipeNode.create(ResourceLocation.tryParse("gtceu:greenhouse"), "Greenhouse (NOP)", 400, 128, GTVoltageTier.MV);
+        greenhouse.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000.0));
+        greenhouse.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:nop_fertilizer"), "NOP Fertilizer", 1.0));
+        greenhouse.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 16.0));
+        greenhouse.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 200.0));
         graph.addNode(greenhouse);
 
         // Connect wires:
@@ -96,11 +96,11 @@ public class RecipeSwitchTest {
         // 3. Define New Alternative Recipe Template (Carbon Recipe)
         // Inputs: [0: Carbon Fertilizer, 1: Water] (Note: Water is now index 1!)
         // Outputs: [0: Oak Log, 1: Wood Tar]
-        RecipeNode carbonTemplate = RecipeNode.create(new ResourceLocation("gtceu:greenhouse"), "Greenhouse (Carbon)", 300, 256, GTVoltageTier.HV);
-        carbonTemplate.getInputs().add(IngredientStack.item(new ResourceLocation("gtceu:carbon_fertilizer"), "Carbon Fertilizer", 2.0));
-        carbonTemplate.getInputs().add(IngredientStack.fluid(new ResourceLocation("minecraft:water"), "Water", 1200.0));
-        carbonTemplate.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft:oak_log"), "Oak Log", 24.0));
-        carbonTemplate.getOutputs().add(IngredientStack.fluid(new ResourceLocation("gtceu:wood_tar"), "Wood Tar", 300.0));
+        RecipeNode carbonTemplate = RecipeNode.create(ResourceLocation.tryParse("gtceu:greenhouse"), "Greenhouse (Carbon)", 300, 256, GTVoltageTier.HV);
+        carbonTemplate.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:carbon_fertilizer"), "Carbon Fertilizer", 2.0));
+        carbonTemplate.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1200.0));
+        carbonTemplate.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 24.0));
+        carbonTemplate.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 300.0));
 
         // 4. Perform Switch Recipe
         var cmd = graph.switchNodeRecipe(greenhouse, carbonTemplate);
@@ -111,8 +111,8 @@ public class RecipeSwitchTest {
         Assertions.assertEquals(300, greenhouse.getBaseDurationTicks());
         Assertions.assertEquals(256, greenhouse.getBaseEUt());
         Assertions.assertEquals(2, greenhouse.getInputs().size());
-        Assertions.assertEquals(new ResourceLocation("gtceu:carbon_fertilizer"), greenhouse.getInputs().get(0).getId());
-        Assertions.assertEquals(new ResourceLocation("minecraft:water"), greenhouse.getInputs().get(1).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:carbon_fertilizer"), greenhouse.getInputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:water"), greenhouse.getInputs().get(1).getId());
 
         // 6. Verify Smart Wire Preservation
         // - NOP wire should be severed (3 wires remaining: Water, Oak Log, Wood Tar)
@@ -156,8 +156,8 @@ public class RecipeSwitchTest {
 
     @Test
     public void testFindAlternativeRecipesRanking() {
-        RecipeNode greenhouse = RecipeNode.create(new ResourceLocation("gtceu:greenhouse"), "Greenhouse", 400, 128, GTVoltageTier.MV);
-        greenhouse.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft:oak_log"), "Oak Log", 16.0));
+        RecipeNode greenhouse = RecipeNode.create(ResourceLocation.tryParse("gtceu:greenhouse"), "Greenhouse", 400, 128, GTVoltageTier.MV);
+        greenhouse.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 16.0));
 
         List<SearchableRecipe> pool = new ArrayList<>();
 

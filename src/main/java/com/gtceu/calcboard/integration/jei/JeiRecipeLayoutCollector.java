@@ -318,13 +318,8 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             if (fs != null && !fs.isEmpty()) {
                 ResourceLocation fId = null;
                 try {
-                    fId = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fs.getFluid());
+                    fId = ForgeRegistries.FLUIDS.getKey(fs.getFluid());
                 } catch (Throwable ignored) {}
-                if (fId == null) {
-                    try {
-                        fId = ForgeRegistries.FLUIDS.getKey(fs.getFluid());
-                    } catch (Throwable ignored) {}
-                }
                 if (fId != null) {
                     String name = "";
                     try {
@@ -339,13 +334,8 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                         if (altFs != null && !altFs.isEmpty()) {
                             ResourceLocation altId = null;
                             try {
-                                altId = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(altFs.getFluid());
+                                altId = ForgeRegistries.FLUIDS.getKey(altFs.getFluid());
                             } catch (Throwable ignored) {}
-                            if (altId == null) {
-                                try {
-                                    altId = ForgeRegistries.FLUIDS.getKey(altFs.getFluid());
-                                } catch (Throwable ignored) {}
-                            }
                             if (altId != null && !is.getAlternatives().contains(altId)) {
                                 is.getAlternatives().add(altId);
                             }
@@ -359,13 +349,8 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
             if (primary != null && !primary.isEmpty()) {
                 ResourceLocation iId = null;
                 try {
-                    iId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(primary.getItem());
+                    iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
                 } catch (Throwable ignored) {}
-                if (iId == null) {
-                    try {
-                        iId = ForgeRegistries.ITEMS.getKey(primary.getItem());
-                    } catch (Throwable ignored) {}
-                }
                 if (iId != null) {
                     String name = "";
                     try {
@@ -380,13 +365,8 @@ public class JeiRecipeLayoutCollector implements IRecipeLayoutBuilder {
                         if (altIs != null && !altIs.isEmpty()) {
                             ResourceLocation altId = null;
                             try {
-                                altId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(altIs.getItem());
+                                altId = ForgeRegistries.ITEMS.getKey(altIs.getItem());
                             } catch (Throwable ignored) {}
-                            if (altId == null) {
-                                try {
-                                    altId = ForgeRegistries.ITEMS.getKey(altIs.getItem());
-                                } catch (Throwable ignored) {}
-                            }
                             if (altId != null && !is.getAlternatives().contains(altId)) {
                                 is.getAlternatives().add(altId);
                             }

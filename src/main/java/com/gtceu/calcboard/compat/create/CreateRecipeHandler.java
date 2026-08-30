@@ -32,7 +32,8 @@ public class CreateRecipeHandler {
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             catId = EmiCreateHelper.getCategoryId(emiRecipe);
         }
-        if (catId != null && (catId.getNamespace().equals(MOD_ID) || catId.getNamespace().equals("createaddition"))) {
+        if (catId != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
+            if ("create_new_age".equals(catId.getNamespace())) return false; // Handled by CreateNewAge
             if (catId.getPath().contains("liquid_burning")) return false; // Liquid burner produces FE from fuel
             details.energyType = EnergyType.KINETIC_SU;
             details.tier = GTVoltageTier.ULV;
@@ -46,7 +47,12 @@ public class CreateRecipeHandler {
                     try {
                         var getProcessingTimeMethod = backingRecipe.getClass().getMethod("getProcessingTime");
                         duration = (int) getProcessingTimeMethod.invoke(backingRecipe);
-                    } catch (Throwable ignored2) {}
+                    } catch (Throwable ignored2) {
+                        try {
+                            var getDurationMethod = backingRecipe.getClass().getMethod("getDuration");
+                            duration = (int) getDurationMethod.invoke(backingRecipe);
+                        } catch (Throwable ignored3) {}
+                    }
                 }
             }
 
@@ -54,22 +60,26 @@ public class CreateRecipeHandler {
             if (duration <= 0) {
                 if (path.contains("splashing") || path.contains("washing") || path.contains("haunting") || path.contains("smoking") || path.contains("blasting")) {
                     duration = 150; // Create FanProcessing standard default is 150 ticks (7.5s)
-                } else if (path.contains("pressing") || path.contains("compacting")) {
-                    duration = 200; // Create Press default is 200 ticks (10.0s)
-                } else if (path.contains("crushing") || path.contains("milling")) {
-                    duration = 100; // Create Crushing/Milling default is 100 ticks (5.0s)
+                } else if (path.contains("pressing") || path.contains("compacting") || path.contains("curving")) {
+                    duration = 200; // Create Press / Curving default is 200 ticks (10.0s)
+                } else if (path.contains("crushing") || path.contains("milling") || path.contains("vibrating") || path.contains("centrifugation")) {
+                    duration = 100; // Create Crushing/Milling/Vibrating default is 100 ticks (5.0s)
                 } else {
                     duration = 100;
                 }
             }
             details.durationTicks = duration;
 
-            if (path.contains("crushing") || path.contains("pressing") || path.contains("compacting") || path.contains("rolling")) {
+            if (path.contains("hammering")) {
+                details.eut = 512.0; // 16x RPM at 32 RPM (Helve Hammer)
+            } else if (path.contains("crushing") || path.contains("pressing") || path.contains("compacting") || path.contains("rolling")
+                    || path.contains("curving") || path.contains("lathe") || path.contains("turning") || path.contains("laser_cutting")
+                    || path.contains("centrifugation") || path.contains("pressurizing")) {
                 details.eut = 256.0; // 8x RPM at 32 RPM
             } else if (path.contains("polishing")) {
                 details.eut = 64.0;  // 2x RPM at 32 RPM
             } else {
-                details.eut = 128.0; // 4x RPM at 32 RPM (milling, mixing, cutting, fan washing, etc.)
+                details.eut = 128.0; // 4x RPM at 32 RPM (milling, mixing, cutting, fan washing, vibrating, spring coiling, vacuumizing)
             }
             double durationSec = details.durationTicks / 20.0;
             double suPerBatch = details.eut * durationSec;
@@ -81,7 +91,7 @@ public class CreateRecipeHandler {
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
         if (itemId == null) return null;
         return createKineticGeneratorNode(itemId, stack.getHoverName().getString());
     }
@@ -356,7 +366,7 @@ public class CreateRecipeHandler {
             );
 
             for (KineticCandidate c : candidates) {
-                var itemId = new ResourceLocation(c.modId, c.path);
+                var itemId = ResourceLocation.tryParse(c.modId + ":" + c.path);
                 var item = ForgeRegistries.ITEMS.getValue(itemId);
                 if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
 
@@ -379,7 +389,7 @@ public class CreateRecipeHandler {
                 }
 
                 var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
-                        new ResourceLocation("gtcalcboard", "kinetic_gen/" + c.modId + "/" + c.path),
+                        ResourceLocation.tryParse("gtcalcboard:kinetic_gen/" + c.modId + "/" + c.path),
                         category,
                         itemId,
                         name,

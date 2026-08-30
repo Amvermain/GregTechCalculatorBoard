@@ -12,24 +12,20 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 
-import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.create.CreateGuiHandler;
 import com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Dedicated Mod Adapter for Create: New Age (create_new_age).
@@ -75,12 +71,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
         if (node.getMachineIcon() != null && node.getMachineIcon().getNamespace().equals(MOD_ID)) return true;
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getNamespace().equals(MOD_ID)) return true;
-        if (node.getName() != null) {
-            String nameLower = node.getName().toLowerCase();
-            if (nameLower.contains("carbon brush") || nameLower.contains("generator coil")) return true;
-        }
-        return false;
+        return node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getNamespace().equals(MOD_ID);
     }
 
     @Override
@@ -89,11 +80,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().toString().contains("create_new_age:generator")) return true;
         if (node.getMachineIcon() != null) {
             String path = node.getMachineIcon().getPath();
-            if (path.contains("generator_coil") || path.contains("carbon_brushes")) return true;
-        }
-        if (node.getName() != null) {
-            String nameLower = node.getName().toLowerCase();
-            if (nameLower.contains("carbon brush") || nameLower.contains("generator coil")) return true;
+            return path.contains("generator_coil") || path.contains("carbon_brushes");
         }
         return false;
     }
@@ -305,39 +292,55 @@ public class CreateNewAgeModAdapter implements IModAdapter {
 
     @Override
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        return CreateNewAgeGuiHandler.formatEnergyStats(node, displayMode);
+        if (node == null) return "";
+        if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+            double effectivePower = node.getSingleMachineEUt() * node.getEfficiency();
+            String unit = "FE/t";
+            if (node.isGenerator()) {
+                return String.format(Locale.ROOT, "+%,.2f %s", effectivePower, unit);
+            } else {
+                return String.format(Locale.ROOT, "-%,.2f %s", effectivePower, unit);
+            }
+        } else {
+            double basePower = node.getBaseEUt();
+            double speedFactor = Math.max(0.01, node.getRpm() / 32.0);
+            double effectiveSu = (node.isGenerator() ? basePower : (basePower * speedFactor)) * node.getEfficiency();
+            if (node.isGenerator()) {
+                return String.format(Locale.ROOT, "+%,.0f SU", effectiveSu);
+            } else {
+                return String.format(Locale.ROOT, "-%,.0f SU", effectiveSu);
+            }
+        }
     }
 
     @Override
     public List<Component> buildEnergyTooltip(RecipeNode node) {
-        return CreateNewAgeGuiHandler.buildEnergyTooltip(node);
-    }
-
-    @Override
-    public void renderCardControls(GuiGraphics graphics, Font font,
-                                   RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                   boolean isGlowing) {
-        CreateNewAgeGuiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
-    }
-
-    @Override
-    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        return CreateNewAgeGuiHandler.isTierOrSpeedControlHovered(node, mouseX, mouseY);
-    }
-
-    @Override
-    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        return CreateNewAgeGuiHandler.isMachineConfigHovered(node, mouseX, mouseY);
-    }
-
-    @Override
-    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
-        return CreateNewAgeGuiHandler.handleControlClick(widget, node, mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
-        return CreateNewAgeGuiHandler.handleControlScroll(widget, node, mouseX, mouseY, delta);
+        List<Component> tooltipLines = new ArrayList<>();
+        if (node == null) return tooltipLines;
+        if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+            double singlePower = node.getSingleMachineEUt();
+            double totPower = node.getTotalEUt();
+            if (node.isGenerator()) {
+                tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.single_gen").getString()));
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Generation: §a+%,.2f FE/t §7(§a+%,.2f EU/t eq§7)", singlePower, singlePower / 4.0)));
+            } else {
+                tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.single_power").getString()));
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Consumption: §c%,.2f FE/t §7(§c%,.2f EU/t eq§7)", singlePower, singlePower / 4.0)));
+            }
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        } else {
+            double totSU = node.getEffectiveTotalEUt();
+            if (node.isGenerator()) {
+                tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
+            } else {
+                tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
+                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
+            }
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        }
+        return tooltipLines;
     }
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
@@ -377,20 +380,11 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     }
 
     @Override
-    public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
-        CreateNewAgeGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
-    }
-
-    @Override
-    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
-        return CreateNewAgeGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
-    }
-
-    @Override
     public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
         CreateNewAgeRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
     }
 }
+
 
 
 

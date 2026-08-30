@@ -225,9 +225,9 @@ public class GTHatchHelper {
         if (tier == null) return 1;
         return switch (tier) {
             case ULV -> 1;
-            case LV, MV -> 4;
-            case HV, EV -> 9;
-            default -> 16; // IV ~ MAX
+            case LV -> 4;
+            case MV -> 9;
+            default -> 16; // HV ~ MAX (16 slots)
         };
     }
 

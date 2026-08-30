@@ -141,11 +141,7 @@ public class TutorialManager {
     }
 
     private void setupStep2Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
-        if (tutPage == null) return;
-
-        tutPage.getGraph().getNodes().clear();
-        tutPage.getGraph().getConnections().clear();
-        tutPage.getGraph().getFrames().clear();
+        tutPage.getGraph().clear();
 
         // 1. Boiler: produces Steam 500 mB/s
         RecipeNode boiler = RecipeNode.create("Boiler (Tutorial)", 20.0, 0.0, GTVoltageTier.LV);

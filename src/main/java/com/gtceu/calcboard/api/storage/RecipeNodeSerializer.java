@@ -186,7 +186,16 @@ public final class RecipeNodeSerializer {
         String name = tag.getString("name");
         double baseDuration = tag.getDouble("baseDuration");
         double baseEUt = tag.getDouble("baseEUt");
-        GTVoltageTier recipeTier = GTVoltageTier.valueOf(tag.getString("recipeTier"));
+
+        GTVoltageTier recipeTier = null;
+        if (tag.contains("recipeTier")) {
+            try {
+                recipeTier = GTVoltageTier.valueOf(tag.getString("recipeTier"));
+            } catch (Throwable ignored) {}
+        }
+        if (recipeTier == null) {
+            recipeTier = GTVoltageTier.getTierForVoltage((long) baseEUt);
+        }
 
         RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
         if (tag.contains("properties", Tag.TAG_COMPOUND)) {

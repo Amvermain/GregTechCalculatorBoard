@@ -86,6 +86,25 @@ public class TeamPresenceTracker {
         return list;
     }
 
+    public synchronized Set<UUID> getActiveViewersForPage(UUID teamId, String pageId) {
+        long now = System.currentTimeMillis();
+        activeViewers.entrySet().removeIf(e -> (now - e.getValue().lastPing) > TIMEOUT_MS);
+
+        Set<UUID> viewers = new HashSet<>();
+        for (PresenceRecord r : activeViewers.values()) {
+            if (teamId.equals(r.teamId) && (pageId == null || pageId.equals(r.activePageId))) {
+                viewers.add(r.playerUUID);
+            }
+        }
+        return viewers;
+    }
+
+    public synchronized void removePresence(UUID teamId, UUID playerUUID) {
+        if (playerUUID != null) {
+            activeViewers.remove(playerUUID);
+        }
+    }
+
     public synchronized void broadcastPresence(ServerLevel level, UUID teamId) {
         if (level == null || teamId == null) return;
         List<S2CBroadcastPresencePacket.MemberPresence> list = getActivePresences(teamId);

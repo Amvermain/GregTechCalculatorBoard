@@ -73,24 +73,39 @@ public class C2SCommitWorkspacePacket {
                 return;
             }
 
+            // 1. Lock ownership verification (RFC-003)
+            WorkspaceLockManager lockMgr = WorkspaceLockManager.getInstance();
+            if (!lockMgr.canCommit(playerTeamId, pageId, player.getUUID())) {
+                NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(423, "gui.gtcalcboard.error.locked_by_other"));
+                return;
+            }
+
             TeamBoardSavedData savedData = TeamBoardSavedData.get(player.serverLevel());
             if (savedData == null) return;
 
             String teamName = TeamProviderRegistry.getInstance().getTeamDisplayName(playerTeamId);
             TeamWorkspaceData ws = savedData.getOrCreateWorkspace(playerTeamId, teamName);
 
-            // Update or create page
             TeamWorkspacePage page = ws.getPage(pageId);
+
+            // 2. Optimistic concurrency control / revision conflict check (RFC-003)
+            if (page != null && page.getPageRevision() != this.revision) {
+                NetworkHandler.sendToPlayer(player, new S2CWorkspaceErrorPacket(409, "gui.gtcalcboard.error.revision_conflict"));
+                return;
+            }
+
+            // 3. Update or create page
+            int nextRev = (page == null) ? 1 : page.getPageRevision() + 1;
             if (page == null) {
-                page = new TeamWorkspacePage(pageId, pageTitle, revision + 1, compressedNBT);
+                page = new TeamWorkspacePage(pageId, pageTitle, nextRev, compressedNBT);
             } else {
                 page.setTitle(pageTitle);
-                page.setPageRevision(revision + 1);
+                page.setPageRevision(nextRev);
                 page.setCompressedGraphData(compressedNBT);
             }
             ws.addOrUpdatePage(page);
 
-            // Record commit history
+            // 4. Record commit history
             CommitLogEntry commit = new CommitLogEntry(
                     ws.getGlobalRevision(),
                     player.getUUID(),
@@ -104,15 +119,25 @@ public class C2SCommitWorkspacePacket {
             );
             ws.addCommit(commit);
 
-            // Release lock after committing
-            WorkspaceLockManager.getInstance().releaseLock(playerTeamId, pageId, player.getUUID());
+            // 5. Release lock after committing
+            lockMgr.releaseLock(playerTeamId, pageId, player.getUUID());
 
-            // Save world data
+            // 6. Save world data
             savedData.setDirty();
 
-            // Broadcast synced workspace and released lock to all team members
-            NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CSyncWorkspacePacket(ws), null);
+            // 7. Broadcast lightweight meta packet and released lock to all team members
+            NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, ws.buildMetaPacket(), null);
             NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
+
+            // 8. Targeted Streaming (RFC-003): Stream the committed page data only to active team members viewing this page
+            java.util.Set<UUID> activePageHolders = TeamPresenceTracker.getInstance().getActiveViewersForPage(playerTeamId, pageId);
+            for (ServerPlayer member : player.serverLevel().getServer().getPlayerList().getPlayers()) {
+                if (playerTeamId.equals(TeamProviderRegistry.getInstance().getPlayerTeamId(member))) {
+                    if (activePageHolders.contains(member.getUUID())) {
+                        ChunkedStreamHelper.sendPageDataSafely(member, pageId, nextRev, compressedNBT);
+                    }
+                }
+            }
         });
         ctx.setPacketHandled(true);
     }

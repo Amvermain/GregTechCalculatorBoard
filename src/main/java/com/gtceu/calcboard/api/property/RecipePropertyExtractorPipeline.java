@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Registry and execution pipeline for {@link IRecipePropertyExtractor}.
@@ -53,7 +54,16 @@ public final class RecipePropertyExtractorPipeline {
 
             @Override
             public boolean matches(Object backingRecipe, ResourceLocation categoryId) {
-                if (categoryId != null && "gtceu".equals(categoryId.getNamespace())) return true;
+                if (categoryId != null) {
+                    String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
+                    String path = categoryId.getPath().toLowerCase(Locale.ROOT);
+                    if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("star_technology") || ns.equals("start")) {
+                        return true;
+                    }
+                    if (path.contains("fusion") || path.contains("reflector")) {
+                        return true;
+                    }
+                }
                 return backingRecipe != null && backingRecipe.getClass().getName().contains("GTRecipe");
             }
 
@@ -63,13 +73,18 @@ public final class RecipePropertyExtractorPipeline {
                 int minReflectorTier = 0;
 
                 if (recipeDataTag != null) {
-                    if (recipeDataTag.contains("eu_to_start")) euToStart = recipeDataTag.getLong("eu_to_start");
-                    else if (recipeDataTag.contains("start_eu")) euToStart = recipeDataTag.getLong("start_eu");
-
-                    if (recipeDataTag.contains("min_reflector_tier")) minReflectorTier = recipeDataTag.getInt("min_reflector_tier");
-                    else if (recipeDataTag.contains("reflector_tier")) minReflectorTier = recipeDataTag.getInt("reflector_tier");
-                    else if (recipeDataTag.contains("min_reflector")) minReflectorTier = recipeDataTag.getInt("min_reflector");
-                    else if (recipeDataTag.contains("reflector")) minReflectorTier = recipeDataTag.getInt("reflector");
+                    for (String key : recipeDataTag.getAllKeys()) {
+                        String k = key.toLowerCase(Locale.ROOT);
+                        if (k.contains("start") && (k.contains("eu") || k.contains("energy"))) {
+                            try {
+                                euToStart = recipeDataTag.getLong(key);
+                            } catch (Throwable t) {
+                                euToStart = (long) recipeDataTag.getInt(key);
+                            }
+                        } else if (k.contains("reflector")) {
+                            minReflectorTier = recipeDataTag.getInt(key);
+                        }
+                    }
                 }
 
                 // Also check conditions via reflection if not found in data tag
@@ -81,7 +96,7 @@ public final class RecipePropertyExtractorPipeline {
                             for (Object c : condList) {
                                 if (c != null) {
                                     String cName = c.getClass().getName();
-                                    if (euToStart <= 0 && cName.contains("Fusion")) {
+                                    if (euToStart <= 0 && (cName.contains("Fusion") || cName.contains("Reflector"))) {
                                         try {
                                             Method mEu = c.getClass().getMethod("getEuToStart");
                                             Object res = mEu.invoke(c);
@@ -127,6 +142,16 @@ public final class RecipePropertyExtractorPipeline {
                     } catch (Throwable ignored) {}
                 }
 
+                if (minReflectorTier <= 0 && categoryId != null) {
+                    String path = categoryId.getPath().toLowerCase(Locale.ROOT);
+                    if (path.contains("reflector")) {
+                        if (path.contains("ii") || path.endsWith("_2")) minReflectorTier = 2;
+                        else if (path.contains("iii") || path.endsWith("_3")) minReflectorTier = 3;
+                        else if (path.contains("iv") || path.endsWith("_4")) minReflectorTier = 4;
+                        else minReflectorTier = 1;
+                    }
+                }
+
                 if (euToStart > 0) {
                     store.set(NodeProperties.FUSION_START_EU, euToStart);
                 }
@@ -169,7 +194,7 @@ public final class RecipePropertyExtractorPipeline {
 
             @Override
             public boolean matches(Object backingRecipe, ResourceLocation categoryId) {
-                return categoryId != null && (categoryId.getNamespace().equals("create") || categoryId.getNamespace().equals("createaddition"));
+                return categoryId != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(categoryId.getNamespace());
             }
 
             @Override

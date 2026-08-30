@@ -81,7 +81,7 @@ public class ParallelHelper {
             }
         } catch (Throwable ignored) {}
 
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
         if (id != null) {
             return getParallelStats(id.toString());
         }

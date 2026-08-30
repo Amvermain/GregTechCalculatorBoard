@@ -34,6 +34,7 @@ public final class GTCEuLayeredRecipeExtractor {
         return false;
     }
 
+    @SuppressWarnings("unchecked")
     public static List<Object> extractLayeredSteps(Object backingRecipe) {
         if (backingRecipe == null) return Collections.emptyList();
         try {

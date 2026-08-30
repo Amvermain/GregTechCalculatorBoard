@@ -21,6 +21,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class FusionReactorSimulationTest {
 
+    @org.junit.jupiter.api.BeforeAll
+    public static void setup() {
+        com.gtceu.calcboard.compat.ModAdapterRegistry.init();
+    }
+
     @Test
     @DisplayName("Fusion tier and minimum voltage tier determination based on eu_to_start")
     void testFusionTierDetermination() {
@@ -219,6 +224,46 @@ public class FusionReactorSimulationTest {
         assertEquals(1, loaded.getFusionTier());
         assertEquals(GTVoltageTier.LuV, loaded.getMinFusionVoltageTier());
         assertTrue(loaded.isFusion());
+    }
+
+    @Test
+    @DisplayName("Star Technology Reflector Fusion Reactor extraction and badge determination")
+    void testStarTechnologyReflectorFusionReactor() {
+        RecipeNode node = RecipeNode.create(
+                ResourceLocation.tryParse("start_core:reflector_fusion_reactor_i"),
+                "Reflector Fusion Reactor I",
+                72.0,
+                32768.0,
+                GTVoltageTier.LuV
+        );
+        node.setRecipeCategoryId(ResourceLocation.tryParse("start_core:reflector_fusion_reactor_i"));
+        node.setMachineIcon(ResourceLocation.tryParse("start_core:reflector_fusion_reactor_i"));
+
+        // Must be recognized as Fusion Reactor
+        assertTrue(node.isFusion());
+
+        // Extract properties from Star Technology recipe tag
+        CompoundTag tag = new CompoundTag();
+        tag.putLong("euToStart", 160_000_000L);
+        tag.putInt("min_reflector_tier", 1);
+
+        RecipePropertyExtractorPipeline.extractAll(null, tag, ResourceLocation.tryParse("start_core:reflector_fusion_reactor_i"), node.getProperties());
+
+        assertEquals(160_000_000L, node.getEuToStart());
+        assertEquals(1, node.getRequiredReflectorTier());
+
+        // Verify Badges when reflector not yet installed (warning badge)
+        List<NodeBadge> badgesUninstalled = NodeBadgeRegistry.getBadgesForNode(node);
+        assertNotNull(badgesUninstalled);
+        assertTrue(badgesUninstalled.stream().anyMatch(b -> b.text().contains("Mk1")));
+        assertTrue(badgesUninstalled.stream().anyMatch(b -> b.text().contains("160M")));
+        assertTrue(badgesUninstalled.stream().anyMatch(NodeBadge::isWarning));
+
+        // Verify Badges when reflector T1 installed
+        node.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:iridium_reflector", "Iridium Reflector", "", null, 1));
+        List<NodeBadge> badgesInstalled = NodeBadgeRegistry.getBadgesForNode(node);
+        assertNotNull(badgesInstalled);
+        assertTrue(badgesInstalled.stream().anyMatch(b -> b.text().contains("T1")));
     }
 }
 

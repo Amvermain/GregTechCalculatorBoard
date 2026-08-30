@@ -33,11 +33,14 @@ import java.util.List;
 
 public class JeiRecipeIntegrationTest {
 
-    @org.junit.jupiter.api.BeforeAll
-    public static void setupMinecraft() {
+    static {
         try {
             net.minecraft.SharedConstants.tryDetectVersion();
-            net.minecraft.server.Bootstrap.bootStrap();
+            java.lang.reflect.Field field = net.minecraft.server.Bootstrap.class.getDeclaredField("isBootstrapped");
+            field.setAccessible(true);
+            if (!field.getBoolean(null)) {
+                net.minecraft.server.Bootstrap.bootStrap();
+            }
         } catch (Throwable ignored) {}
     }
 
@@ -61,6 +64,16 @@ public class JeiRecipeIntegrationTest {
         }
 
         @Override
+        public int getWidth() {
+            return 176;
+        }
+
+        @Override
+        public int getHeight() {
+            return 166;
+        }
+
+        @Override
         public IDrawable getBackground() {
             return null;
         }
@@ -72,13 +85,18 @@ public class JeiRecipeIntegrationTest {
 
         @Override
         public void setRecipe(IRecipeLayoutBuilder builder, T recipe, IFocusGroup focuses) {
-            if (recipe instanceof MockCraftingRecipe mcr) {
-                for (ItemStack in : mcr.inputs) {
+            if (recipe instanceof MockCraftingRecipe cr) {
+                for (ItemStack in : cr.inputs) {
                     builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(in);
                 }
-                for (ItemStack out : mcr.outputs) {
+                for (ItemStack out : cr.outputs) {
                     builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(out);
                 }
+            } else if (recipe instanceof net.minecraft.world.item.crafting.SmeltingRecipe sr) {
+                for (ItemStack in : sr.getIngredients().get(0).getItems()) {
+                    builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(in);
+                }
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(sr.getResultItem(null));
             }
         }
 
@@ -92,20 +110,32 @@ public class JeiRecipeIntegrationTest {
         }
     }
 
-    private static class MockCraftingRecipe {
-        final ResourceLocation id;
-        final List<ItemStack> inputs;
-        final List<ItemStack> outputs;
+    public static class MockCraftingRecipe {
+        public final ResourceLocation id;
+        public final List<ItemStack> inputs;
+        public final List<ItemStack> outputs;
 
         public MockCraftingRecipe(ResourceLocation id, List<ItemStack> inputs, List<ItemStack> outputs) {
             this.id = id;
             this.inputs = inputs;
             this.outputs = outputs;
         }
+    }
 
-        public ResourceLocation getId() {
-            return id;
+    private static ItemStack createItem(String modId, String path, int count) {
+        var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(modId + ":" + path));
+        if (item != null) {
+            return new ItemStack(item, count);
         }
+        return ItemStack.EMPTY;
+    }
+
+    private static FluidStack createFluid(String modId, String path, int amount) {
+        var fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(ResourceLocation.tryParse(modId + ":" + path));
+        if (fluid != null) {
+            return new FluidStack(fluid, amount);
+        }
+        return FluidStack.EMPTY;
     }
 
     @Test
@@ -115,7 +145,7 @@ public class JeiRecipeIntegrationTest {
         collector.addSlot(RecipeIngredientRole.INPUT, 10, 20)
                 .addItemStack(new ItemStack(Items.IRON_INGOT, 3));
         collector.addSlot(RecipeIngredientRole.INPUT, 30, 20)
-                .addFluidStack(Fluids.WATER, 1000);
+                .addFluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000);
         collector.addSlot(RecipeIngredientRole.OUTPUT, 50, 20)
                 .addItemStack(new ItemStack(Items.IRON_BLOCK, 1));
 
@@ -150,7 +180,7 @@ public class JeiRecipeIntegrationTest {
         MockRecipeCategory<MockCraftingRecipe> category = new MockRecipeCategory<>(recipeType, "Assembler");
 
         MockCraftingRecipe recipe = new MockCraftingRecipe(
-                new ResourceLocation("gtceu", "assembler_iron_block"),
+                ResourceLocation.tryParse("gtceu:assembler_iron_block"),
                 List.of(new ItemStack(Items.IRON_INGOT, 9)),
                 List.of(new ItemStack(Items.IRON_BLOCK, 1))
         );
@@ -178,7 +208,7 @@ public class JeiRecipeIntegrationTest {
         MockRecipeCategory<MockCraftingRecipe> category = new MockRecipeCategory<>(recipeType, "Crafting");
 
         MockCraftingRecipe recipe = new MockCraftingRecipe(
-                new ResourceLocation("minecraft", "crafting_iron_block"),
+                ResourceLocation.tryParse("minecraft:crafting_iron_block"),
                 List.of(new ItemStack(Items.IRON_INGOT, 9)),
                 List.of(new ItemStack(Items.IRON_BLOCK, 1))
         );
@@ -202,7 +232,7 @@ public class JeiRecipeIntegrationTest {
 
         RecipeType<MockCraftingRecipe> recipeType = RecipeType.create("minecraft", "crafting", MockCraftingRecipe.class);
         MockCraftingRecipe recipe = new MockCraftingRecipe(
-                new ResourceLocation("minecraft", "crafting_iron_block"),
+                ResourceLocation.tryParse("minecraft:crafting_iron_block"),
                 List.of(new ItemStack(Items.IRON_INGOT, 9)),
                 List.of(new ItemStack(Items.IRON_BLOCK, 1))
         );
@@ -215,7 +245,7 @@ public class JeiRecipeIntegrationTest {
     @Test
     public void testVanillaSmeltingRecipeExtraction() {
         net.minecraft.world.item.crafting.SmeltingRecipe smeltingRecipe = new net.minecraft.world.item.crafting.SmeltingRecipe(
-                new ResourceLocation("minecraft", "iron_ingot_from_smelting_raw_iron"),
+                ResourceLocation.tryParse("minecraft:iron_ingot_from_smelting_raw_iron"),
                 "",
                 net.minecraft.world.item.crafting.CookingBookCategory.MISC,
                 net.minecraft.world.item.crafting.Ingredient.of(net.minecraft.world.item.Items.RAW_IRON),
@@ -230,20 +260,20 @@ public class JeiRecipeIntegrationTest {
 
         RecipeNode node = JeiRecipeConverter.convert(wrapper);
         Assertions.assertNotNull(node);
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "lp_steam_furnace"));
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "hp_steam_furnace"));
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "lv_electric_furnace"));
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "mv_electric_furnace"));
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "multi_smelter"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:lp_steam_furnace"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:hp_steam_furnace"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:mv_electric_furnace"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:multi_smelter"));
 
         Assertions.assertEquals("Smelting (Raw Iron)", node.getName());
         Assertions.assertEquals(200.0, node.getBaseDurationTicks());
         Assertions.assertEquals(1, node.getInputs().size());
-        Assertions.assertEquals(new ResourceLocation("minecraft", "raw_iron"), node.getInputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:raw_iron"), node.getInputs().get(0).getId());
         Assertions.assertEquals(1, node.getOutputs().size());
-        Assertions.assertEquals(new ResourceLocation("minecraft", "iron_ingot"), node.getOutputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:iron_ingot"), node.getOutputs().get(0).getId());
         Assertions.assertNotNull(node.getMachineIcon());
-        Assertions.assertEquals(new ResourceLocation("minecraft", "furnace"), node.getMachineIcon());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:furnace"), node.getMachineIcon());
         Assertions.assertFalse(node.getAvailableWorkstations().isEmpty());
 
         var indexed = JeiRecipeSearchIndexer.buildIndex(wrapper, null);
@@ -253,14 +283,14 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertTrue(indexed.outputIndex().contains("iron_ingot"));
 
         // Switch to GTCEu Multi Smelter
-        node.setMachineIcon(new ResourceLocation("gtceu", "multi_smelter"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:multi_smelter"));
         Assertions.assertEquals(4.0, node.getBaseEUt());
         Assertions.assertEquals(128.0, node.getBaseDurationTicks());
         Assertions.assertEquals(com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_EU, node.getEnergyType());
         Assertions.assertTrue(node.isMultiblock());
 
         // Switch back to Vanilla Furnace
-        node.setMachineIcon(new ResourceLocation("minecraft", "furnace"));
+        node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
         Assertions.assertEquals(0.0, node.getBaseEUt());
         Assertions.assertEquals(200.0, node.getBaseDurationTicks());
         Assertions.assertEquals(com.gtceu.calcboard.api.type.EnergyType.NONE, node.getEnergyType());
@@ -312,7 +342,7 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertEquals(com.gtceu.calcboard.api.type.SteamMode.NONE, node.getSteamMode());
         Assertions.assertEquals(com.gtceu.calcboard.api.type.EnergyType.NONE, node.getEnergyType());
         Assertions.assertEquals(0.0, node.getBaseEUt());
-        Assertions.assertEquals(new ResourceLocation("minecraft", "furnace"), node.getMachineIcon());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:furnace"), node.getMachineIcon());
 
         // 9. Test Mouse Click on Passive Banner (row 2 at y + 44)
         node.setPosX(100);
@@ -322,24 +352,24 @@ public class JeiRecipeIntegrationTest {
         boolean clicked = widget.mouseClicked(bannerCenterX, bannerCenterY, 0); // Left Click
         Assertions.assertTrue(clicked, "Click on Passive banner should trigger tier step up to LP Steam");
         Assertions.assertEquals(com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE, node.getSteamMode());
-        Assertions.assertEquals(new ResourceLocation("gtceu", "lp_steam_furnace"), node.getMachineIcon());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_furnace"), node.getMachineIcon());
     }
 
     @Test
     public void testJeiSparseWorkstationTierDeduction() {
         // Simulate a node created from JEI where only a single catalyst workstation (e.g. lv_macerator) was injected
         RecipeNode node = RecipeNode.create("Macerator (Naquadah Ingot)", 400.0, 30.0, GTVoltageTier.LV);
-        node.setRecipeCategoryId(new ResourceLocation("gtceu", "macerator"));
-        node.setMachineIcon(new ResourceLocation("gtceu", "lv_macerator"));
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_macerator"));
         node.getAvailableWorkstations().clear();
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "lv_macerator"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:lv_macerator"));
 
         // 1. Resolve higher tiers (MV, HV, EV, ..., OpV, MAX) - must deductively derive gtceu:<tier>_macerator
-        Assertions.assertEquals(new ResourceLocation("gtceu", "mv_macerator"), node.getWorkstationForTier(GTVoltageTier.MV));
-        Assertions.assertEquals(new ResourceLocation("gtceu", "hv_macerator"), node.getWorkstationForTier(GTVoltageTier.HV));
-        Assertions.assertEquals(new ResourceLocation("gtceu", "ev_macerator"), node.getWorkstationForTier(GTVoltageTier.EV));
-        Assertions.assertEquals(new ResourceLocation("gtceu", "opv_macerator"), node.getWorkstationForTier(GTVoltageTier.OpV));
-        Assertions.assertEquals(new ResourceLocation("gtceu", "max_macerator"), node.getWorkstationForTier(GTVoltageTier.MAX));
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:mv_macerator"), node.getWorkstationForTier(GTVoltageTier.MV));
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:hv_macerator"), node.getWorkstationForTier(GTVoltageTier.HV));
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:ev_macerator"), node.getWorkstationForTier(GTVoltageTier.EV));
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:opv_macerator"), node.getWorkstationForTier(GTVoltageTier.OpV));
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:max_macerator"), node.getWorkstationForTier(GTVoltageTier.MAX));
 
         // 2. NodeWidget step-up all the way to MAX tier and verify machineIcon changes at each step
         com.gtceu.calcboard.client.gui.widget.NodeWidget widget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(node, null);
@@ -349,7 +379,7 @@ public class JeiRecipeIntegrationTest {
             GTVoltageTier expectedTier = GTVoltageTier.getByIndex(i);
             Assertions.assertEquals(expectedTier, node.getTargetTier());
             Assertions.assertEquals(
-                    new ResourceLocation("gtceu", expectedTier.name().toLowerCase(java.util.Locale.ROOT) + "_macerator"),
+                    ResourceLocation.tryParse("gtceu:" + expectedTier.name().toLowerCase(java.util.Locale.ROOT) + "_macerator"),
                     node.getMachineIcon(),
                     "Machine icon must update to " + expectedTier.name() + " macerator"
             );
@@ -359,28 +389,28 @@ public class JeiRecipeIntegrationTest {
     @Test
     public void testJeiSparseMultiblockWorkstationDeduction() {
         RecipeNode node = RecipeNode.create("Macerator (Naquadah Ingot)", 400.0, 30.0, GTVoltageTier.LV);
-        node.setRecipeCategoryId(new ResourceLocation("gtceu", "macerator"));
-        node.setMachineIcon(new ResourceLocation("gtceu", "lv_macerator"));
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_macerator"));
         node.getAvailableWorkstations().clear();
         // JEI catalyst only returned miners or sparse list
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "lv_macerator"));
-        node.getAvailableWorkstations().add(new ResourceLocation("gtceu", "advanced_large_miner_iii"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:lv_macerator"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("gtceu:advanced_large_miner_iii"));
 
         // Multiblock workstations must deductively discover and prioritize large_macerator
         List<ResourceLocation> mbList = node.getMultiblockWorkstations();
         Assertions.assertFalse(mbList.isEmpty());
-        Assertions.assertTrue(mbList.contains(new ResourceLocation("gtceu", "large_macerator")));
-        Assertions.assertEquals(new ResourceLocation("gtceu", "large_macerator"), node.getMultiblockWorkstation(), "Primary multiblock must be large_macerator");
-        Assertions.assertEquals(new ResourceLocation("gtceu", "large_macerator"), mbList.get(0));
+        Assertions.assertTrue(mbList.contains(ResourceLocation.tryParse("gtceu:large_macerator")));
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:large_macerator"), node.getMultiblockWorkstation(), "Primary multiblock must be large_macerator");
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:large_macerator"), mbList.get(0));
     }
 
     @Test
     public void testJeiMaceratorByproductTierGating() {
         RecipeNode node = RecipeNode.create("Macerator (Raw Chicken)", 400.0, 30.0, GTVoltageTier.LV);
-        node.setRecipeCategoryId(new ResourceLocation("gtceu", "macerator"));
-        node.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft", "chicken"), "Raw Chicken", 1, 1.0f));
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:chicken"), "Raw Chicken", 1, 1.0f));
         // Byproduct (slot 1) with 50% base chance and 5% tier boost
-        IngredientStack byproduct = IngredientStack.item(new ResourceLocation("minecraft", "bone_meal"), "Bone Meal", 1, 0.5f);
+        IngredientStack byproduct = IngredientStack.item(ResourceLocation.tryParse("minecraft:bone_meal"), "Bone Meal", 1, 0.5f);
         byproduct.setTierChanceBoost(0.05);
         node.getOutputs().add(byproduct);
 
@@ -401,5 +431,20 @@ public class JeiRecipeIntegrationTest {
         // 3. At EV (HV + 1): 1st byproduct boosted by +5% = 55%
         node.setTargetTier(GTVoltageTier.EV);
         Assertions.assertEquals(0.55, node.getEffectiveOutputChance(1), 0.001, "At EV, 1st byproduct receives tier boost");
+    }
+
+    @Test
+    public void testJeiMultipleOutputsSameItemDifferentChances() {
+        RecipeNode node = RecipeNode.create(ResourceLocation.tryParse("gtceu:autoclave"), "Autoclave", 20, 30, GTVoltageTier.HV);
+        ResourceLocation diamondId = ResourceLocation.tryParse("minecraft:diamond");
+        node.getOutputs().add(IngredientStack.item(diamondId, "Diamond", 1.0, 0.50));
+        node.getOutputs().add(IngredientStack.item(diamondId, "Diamond", 1.0, 0.45));
+
+        Assertions.assertEquals(2, node.getOutputs().size());
+        Assertions.assertEquals(0.50, node.getOutputs().get(0).getChance(), 1e-4, "Slot 0 chance must be 50%");
+        Assertions.assertEquals(0.45, node.getOutputs().get(1).getChance(), 1e-4, "Slot 1 chance must be 45%");
+
+        Assertions.assertEquals(0.50, node.getEffectiveOutputChance(0), 1e-4);
+        Assertions.assertEquals(0.45, node.getEffectiveOutputChance(1), 1e-4);
     }
 }

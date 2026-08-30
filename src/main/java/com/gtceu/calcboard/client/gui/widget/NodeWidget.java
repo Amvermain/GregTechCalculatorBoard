@@ -360,14 +360,14 @@ public class NodeWidget {
 
     public boolean isTierButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-        return adapter.isTierOrSpeedControlHovered(node, mouseX, mouseY);
+        var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+        return handler.isTierOrSpeedControlHovered(node, mouseX, mouseY);
     }
 
     public boolean isOcButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-        return adapter.isSecondaryControlHovered(node, mouseX, mouseY);
+        var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+        return handler.isSecondaryControlHovered(node, mouseX, mouseY);
     }
 
     public boolean isAddonTrayHovered(double mouseX, double mouseY) {
@@ -383,8 +383,8 @@ public class NodeWidget {
     public boolean isMachineConfigButtonHovered(double mouseX, double mouseY) {
         if (node.isModule()) return false;
         if (isAddonTrayHovered(mouseX, mouseY)) return true;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-        return adapter.isMachineConfigHovered(node, mouseX, mouseY);
+        var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+        return handler.isMachineConfigHovered(node, mouseX, mouseY);
     }
 
     public boolean isRotorButtonHovered(double mouseX, double mouseY) {
@@ -550,8 +550,8 @@ public class NodeWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!node.isModule()) {
-            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-            if (adapter.handleControlScroll(this, node, mouseX, mouseY, delta)) {
+            var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+            if (handler.handleControlScroll(this, node, mouseX, mouseY, delta)) {
                 return true;
             }
         }
@@ -798,10 +798,10 @@ public class NodeWidget {
             return true;
         }
 
-        // Delegate row 2 control clicks (Tier/Speed, OC Mode, Machine Config) to IModAdapter
+        // Delegate row 2 control clicks (Tier/Speed, OC Mode, Machine Config) to IModGuiHandler
         if (!node.isModule()) {
-            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-            if (adapter.handleControlClick(this, node, mouseX, mouseY, button)) {
+            var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+            if (handler.handleControlClick(this, node, mouseX, mouseY, button)) {
                 if (node.isCompoundNode() && parent != null) {
                     parent.getGraph().syncCompoundParameters(node);
                     parent.rebuildWidgets();

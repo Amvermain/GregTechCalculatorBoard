@@ -280,6 +280,10 @@ public class MachineAddon {
         return upgradeTierKit;
     }
 
+    public boolean isThermalUpgradeKit() {
+        return this.upgradeTierKit || (this.category == Category.THERMAL_AUGMENT && this.parallelMultiplier > 1);
+    }
+
     public void setUpgradeTierKit(boolean upgradeTierKit) {
         this.upgradeTierKit = upgradeTierKit;
     }

@@ -361,6 +361,64 @@ public class UiFormattingTest {
         }
     }
 
+    @Test
+    public void testCodeKeysAllPresentInLanguageFiles() throws Exception {
+        java.nio.file.Path enPath = java.nio.file.Paths.get("src/main/resources/assets/gtcalcboard/lang/en_us.json");
+        java.nio.file.Path koPath = java.nio.file.Paths.get("src/main/resources/assets/gtcalcboard/lang/ko_kr.json");
+        JsonObject enJson = JsonParser.parseString(java.nio.file.Files.readString(enPath)).getAsJsonObject();
+        JsonObject koJson = JsonParser.parseString(java.nio.file.Files.readString(koPath)).getAsJsonObject();
+
+        Set<String> codeKeys = new TreeSet<>();
+        java.util.regex.Pattern transPattern = java.util.regex.Pattern.compile("translatable\\(\\s*\"(gui\\.gtcalcboard\\.[^\"]+|message\\.gtcalcboard\\.[^\"]+|item\\.gtcalcboard\\.[^\"]+|block\\.gtcalcboard\\.[^\"]+)\"");
+        java.util.regex.Pattern toolbarDefPattern = java.util.regex.Pattern.compile("new\\s+ToolbarButtonDef\\(\\s*\"([a-zA-Z0-9_]+)\"");
+        java.util.regex.Pattern hotkeyHudPattern = java.util.regex.Pattern.compile("\"(gui\\.gtcalcboard\\.hotkey_hud\\.[^\"]+)\"");
+
+        Map<String, String> keyToSource = new TreeMap<>();
+
+        try (var stream = java.nio.file.Files.walk(java.nio.file.Paths.get("src/main/java"))) {
+            stream.filter(p -> p.toString().endsWith(".java")).forEach(p -> {
+                try {
+                    String content = java.nio.file.Files.readString(p);
+                    var m1 = transPattern.matcher(content);
+                    while (m1.find()) {
+                        String k = m1.group(1);
+                        codeKeys.add(k);
+                        keyToSource.put(k, p.toString());
+                    }
+                    var m2 = toolbarDefPattern.matcher(content);
+                    while (m2.find()) {
+                        String k = "gui.gtcalcboard.tooltip.btn_" + m2.group(1);
+                        codeKeys.add(k);
+                        keyToSource.put(k, p.toString());
+                    }
+                    var m3 = hotkeyHudPattern.matcher(content);
+                    while (m3.find()) {
+                        String k = m3.group(1);
+                        codeKeys.add(k);
+                        keyToSource.put(k, p.toString());
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        Set<String> missingInEn = new TreeSet<>();
+        Set<String> missingInKo = new TreeSet<>();
+
+        for (String key : codeKeys) {
+            if (!enJson.has(key)) {
+                missingInEn.add(key + " (from " + keyToSource.get(key) + ")");
+            }
+            if (!koJson.has(key)) {
+                missingInKo.add(key + " (from " + keyToSource.get(key) + ")");
+            }
+        }
+
+        Assertions.assertTrue(missingInEn.isEmpty(), "Code translation keys missing in en_us.json:\n" + String.join("\n", missingInEn));
+        Assertions.assertTrue(missingInKo.isEmpty(), "Code translation keys missing in ko_kr.json:\n" + String.join("\n", missingInKo));
+    }
+
     private int countFormatTokens(String s) {
         if (s == null) return 0;
         int count = 0;

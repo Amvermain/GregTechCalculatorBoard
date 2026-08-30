@@ -48,7 +48,7 @@ public class FlowGraph {
     }
 
     public List<RecipeNode> getNodes() {
-        return nodes;
+        return Collections.unmodifiableList(nodes);
     }
 
     public List<ConnectionEdge> getConnections() {
@@ -114,6 +114,14 @@ public class FlowGraph {
         }
     }
 
+    public void removeNode(String nodeId) {
+        if (nodeId == null) return;
+        RecipeNode node = findNodeById(nodeId);
+        if (node != null) {
+            removeNode(node);
+        }
+    }
+
     public void removeNode(RecipeNode node) {
         if (node != null) {
             if (node.isCompoundNode()) {
@@ -126,6 +134,12 @@ public class FlowGraph {
                     f.removeNode(node.getId());
                 }
             }
+        }
+    }
+
+    public void bringNodeToFront(RecipeNode node) {
+        if (node != null && nodes.remove(node)) {
+            nodes.add(node);
         }
     }
 
@@ -245,6 +259,12 @@ public class FlowGraph {
         connections.add(new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx));
     }
 
+    public void addConnection(ConnectionEdge edge) {
+        if (edge != null) {
+            addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
+        }
+    }
+
     public void removeConnection(ConnectionEdge edge) {
         connections.remove(edge);
     }
@@ -300,6 +320,10 @@ public class FlowGraph {
 
     public void autoRatioFromAnchor(RecipeNode anchor, boolean integerCounts) {
         FlowGraphSolver.autoRatioFromAnchor(this, anchor, integerCounts);
+    }
+
+    public void autoRatioHarmonized(RecipeNode anchor) {
+        FlowGraphSolver.autoRatioHarmonized(this, anchor);
     }
 
     public Map<String, Double> computeNodeEfficiencies() {

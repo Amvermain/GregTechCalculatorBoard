@@ -1,50 +1,34 @@
-package com.gtceu.calcboard.compat.thermal;
+package com.gtceu.calcboard.client.gui.compat.thermal;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-
-import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.compat.IModGuiHandler;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
 /**
- * Handles UI rendering and tooltip generation for Thermal machine and dynamo nodes.
+ * Thermal implementation of {@link IModGuiHandler}.
  */
-public class ThermalGuiHandler {
+@OnlyIn(Dist.CLIENT)
+public class ThermalModGuiHandler implements IModGuiHandler {
 
-    public static String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        double rfRate = node.getEffectiveTotalEUt();
-        return node.isGenerator()
-                ? String.format("§a+%,.0f RF/t", rfRate)
-                : String.format("§e%,.0f RF/t", rfRate);
+    @Override
+    public String getModId() {
+        return "thermal";
     }
 
-    public static List<Component> buildEnergyTooltip(RecipeNode node) {
-        List<Component> tooltipLines = new ArrayList<>();
-        double totPower = node.getEffectiveTotalEUt();
-        if (node.isGenerator()) {
-            tooltipLines.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.dynamo_badge").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Generation: §a+%,.2f RF/t §7(§a+%,.2f EU/t eq§7)", totPower, totPower / 4.0)));
-        } else {
-            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Consumption: §c%,.2f RF/t §7(§c%,.2f EU/t eq§7)", totPower, totPower / 4.0)));
-        }
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-        return tooltipLines;
-    }
-
-    public static void renderCardControls(GuiGraphics graphics, Font font,
-                                          RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                          boolean isGlowing) {
+    @Override
+    public void renderCardControls(GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY, boolean isGlowing) {
         String badge = node.isGenerator()
                 ? Component.translatable("gui.gtcalcboard.dynamo_badge").getString()
                 : "⚡ Thermal";
@@ -60,7 +44,8 @@ public class ThermalGuiHandler {
         NodeCardRenderer.drawBtn(graphics, font, parLabel, nextCtrlX, row2Y, parW, 14, mouseX, mouseY, !node.getAddons().isEmpty() ? 0xFF55FFFF : 0xFF58D3FF, isGlowing);
     }
 
-    public static boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
+    @Override
+    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
@@ -73,7 +58,8 @@ public class ThermalGuiHandler {
         return mouseX >= configStartX && mouseX <= x + node.getCardWidth() - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
-    public static boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+    @Override
+    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         if (isMachineConfigHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             if (widget.getParent() != null) widget.getParent().openMachineConfigDialog(node);
@@ -82,10 +68,10 @@ public class ThermalGuiHandler {
         return false;
     }
 
-    public static void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
-                                           int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
-                                           net.minecraft.client.gui.components.EditBox parallelBox,
-                                           com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    @Override
+    public void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
+                                   int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
+                                   EditBox parallelBox, BoardScreen parent) {
         if (!node.isMultiblock()) {
             int scale = node.getCombinedParallelMultiplier();
             String scaleInfo = scale > 1 ? " §7(§d⚡ " + scale + "x Scale§7)" : "";
@@ -116,11 +102,9 @@ public class ThermalGuiHandler {
         }
     }
 
-    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
-                                                 RecipeNode node, int x, int y, int dialogW,
-                                                 double mouseX, double mouseY, int button,
-                                                 net.minecraft.client.gui.components.EditBox parallelBox,
-                                                 com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    @Override
+    public boolean handleDialogHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                           double mouseX, double mouseY, int button, EditBox parallelBox, BoardScreen parent) {
         if (!node.isMultiblock()) return false;
         int[] quickPars = {1, 4, 16, 64, 256};
         int btnX = x + 64;
@@ -130,7 +114,7 @@ public class ThermalGuiHandler {
                 if (parallelBox != null) parallelBox.setValue(String.valueOf(qp));
                 if (parent != null) parent.markSummaryDirty();
                 Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                 );
                 return true;
             }
@@ -139,6 +123,3 @@ public class ThermalGuiHandler {
         return false;
     }
 }
-
-
-

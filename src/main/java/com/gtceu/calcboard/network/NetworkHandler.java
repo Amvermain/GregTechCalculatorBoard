@@ -21,7 +21,7 @@ import java.util.UUID;
  */
 public class NetworkHandler {
 
-    private static final String PROTOCOL_VERSION = "2.0.0";
+    private static final String PROTOCOL_VERSION = "2.1.0";
     private static int packetId = 0;
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
@@ -37,14 +37,21 @@ public class NetworkHandler {
         registerMessage(C2SAcquireLockPacket.class, C2SAcquireLockPacket::encode, C2SAcquireLockPacket::new, C2SAcquireLockPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SReleaseLockPacket.class, C2SReleaseLockPacket::encode, C2SReleaseLockPacket::new, C2SReleaseLockPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SCommitWorkspacePacket.class, C2SCommitWorkspacePacket::encode, C2SCommitWorkspacePacket::new, C2SCommitWorkspacePacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        registerMessage(C2SChunkedCommitPacket.class, C2SChunkedCommitPacket::encode, C2SChunkedCommitPacket::new, C2SChunkedCommitPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SDeleteTeamPagePacket.class, C2SDeleteTeamPagePacket::encode, C2SDeleteTeamPagePacket::new, C2SDeleteTeamPagePacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
         registerMessage(C2SPingPresencePacket.class, C2SPingPresencePacket::encode, C2SPingPresencePacket::new, C2SPingPresencePacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        registerMessage(C2SRequestPageDataPacket.class, C2SRequestPageDataPacket::encode, C2SRequestPageDataPacket::new, C2SRequestPageDataPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        registerMessage(C2SRequestCommitHistoryPacket.class, C2SRequestCommitHistoryPacket::encode, C2SRequestCommitHistoryPacket::new, C2SRequestCommitHistoryPacket::handle, Optional.of(NetworkDirection.PLAY_TO_SERVER));
 
         // S2C Packets
         registerMessage(S2CSyncWorkspacePacket.class, S2CSyncWorkspacePacket::encode, S2CSyncWorkspacePacket::new, S2CSyncWorkspacePacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         registerMessage(S2CLockResultPacket.class, S2CLockResultPacket::encode, S2CLockResultPacket::new, S2CLockResultPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         registerMessage(S2CBroadcastPresencePacket.class, S2CBroadcastPresencePacket::encode, S2CBroadcastPresencePacket::new, S2CBroadcastPresencePacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         registerMessage(S2CWorkspaceErrorPacket.class, S2CWorkspaceErrorPacket::encode, S2CWorkspaceErrorPacket::new, S2CWorkspaceErrorPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        registerMessage(S2CSyncWorkspaceMetaPacket.class, S2CSyncWorkspaceMetaPacket::encode, S2CSyncWorkspaceMetaPacket::new, S2CSyncWorkspaceMetaPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        registerMessage(S2CSyncPageDataPacket.class, S2CSyncPageDataPacket::encode, S2CSyncPageDataPacket::new, S2CSyncPageDataPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        registerMessage(S2CChunkedDataPacket.class, S2CChunkedDataPacket::encode, S2CChunkedDataPacket::new, S2CChunkedDataPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        registerMessage(S2CSyncCommitHistoryPacket.class, S2CSyncCommitHistoryPacket::encode, S2CSyncCommitHistoryPacket::new, S2CSyncCommitHistoryPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 
     private static <MSG> void registerMessage(Class<MSG> msgClass,

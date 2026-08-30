@@ -38,8 +38,8 @@ public class NodeFlipTest {
         RecipeNode node = RecipeNode.create("Assembler", 20.0, 32.0, GTVoltageTier.LV);
         node.setPos(100.0, 200.0);
         node.setCardWidth(250);
-        node.getInputs().add(IngredientStack.item(new ResourceLocation("minecraft:iron_ingot"), "Iron Ingot", 1.0));
-        node.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft:iron_plate"), "Iron Plate", 1.0));
+        node.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 1.0));
+        node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_plate"), "Iron Plate", 1.0));
 
         NodeWidget widget = new NodeWidget(node);
 

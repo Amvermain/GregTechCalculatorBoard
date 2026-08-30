@@ -162,7 +162,7 @@ public class ExportToTeamDialog {
         int nodeCount = screen.getGraph().getNodes().size();
 
         String commitMsg = "Exported from personal board: " + pageTitle;
-        NetworkHandler.sendToServer(new C2SCommitWorkspacePacket(teamId, pageId, pageTitle, rev, commitMsg, compressed, nodeCount, 0, 0));
+        com.gtceu.calcboard.client.team.ClientChunkedStreamHelper.commitPageSafely(teamId, pageId, pageTitle, rev, commitMsg, compressed, nodeCount, 0, 0);
         BoardToast.show("gui.gtcalcboard.toast.exported_to_team", pageTitle);
     }
 }

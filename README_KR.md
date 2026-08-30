@@ -157,7 +157,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-빌드된 파일은 `build/libs/gtcalcboard-1.20.1-2.0.0-alpha.12.jar`에 생성됩니다.
+빌드된 파일은 `build/libs/gtcalcboard-1.20.1-2.0.0-beta.1.jar`에 생성됩니다.
 
 ---
 
@@ -167,7 +167,7 @@ cd GregTechCalculatorBoard
 - **[아키텍처 및 개발자 가이드 (한국어)](docs/ARCHITECTURE_KR.md)**: 내부 엔진 구조, 4계층 아키텍처, 멀티 모드 물리 모델 및 렌더링 파이프라인.
 - **[Detailed Code Specification (English)](docs/en_us/CODE_SPECIFICATION.md)**: Full system architecture, 5 graph algorithms, overclocking formulas, `CategoryCapabilityMatrix`, multiplayer concurrency lock protocol, and SavedData persistence schemas.
 - **[세부 코드 명세서 (한국어)](docs/ko_kr/CODE_SPECIFICATION.md)**: 전체 시스템 아키텍처, 5대 그래프 알고리즘, 오버클럭 연산 공식, `CategoryCapabilityMatrix`, 멀티플레이 동시성 락 프로토콜 및 영속화 스키마.
-- **[v2.0 개발 계획서 (Development Plan)](docs/DEVELOPMENT_PLAN_V2.md)**: 멀티플레이어 및 FTB Teams 연동 로드맵.
+- **[아키텍처 결정 기록 (ADR)](docs/adr/README.md)**: 시스템 아키텍처 결정 내역 및 변경 기록.
 
 ---
 

@@ -89,9 +89,6 @@ public class TurbineRotorHelper {
     private static RotorStats computeRotorStats(String matName) {
         try {
             Item rotorItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
-            if (rotorItem == null) {
-                rotorItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
-            }
 
             Class<?> behaviourCls = Class.forName("com.gregtechceu.gtceu.common.item.TurbineRotorBehaviour");
 
@@ -238,9 +235,6 @@ public class TurbineRotorHelper {
     public static void discoverGTCEuRotors(java.util.List<MachineAddon> list) {
         try {
             Item rotorItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("gtceu:turbine_rotor"));
-            if (rotorItem == null) {
-                rotorItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(ResourceLocation.tryParse("gtceu:turbine_rotor"));
-            }
 
             Class<?> propertyKeyCls = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey");
             Class<?> materialCls = Class.forName("com.gregtechceu.gtceu.api.data.chemical.material.Material");

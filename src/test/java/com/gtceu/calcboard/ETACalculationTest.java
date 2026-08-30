@@ -27,8 +27,8 @@ public class ETACalculationTest {
 
         // Chemical Reactor: 15.00s per cycle (300 ticks), 1 output per cycle -> 1/15 = 0.066666... /s
         RecipeNode reactor = RecipeNode.create("Chemical Reactor", 300.0, 30.0, GTVoltageTier.LV);
-        IngredientStack woodPlate = IngredientStack.item(new ResourceLocation("gtceu:wood_plate"), "Wood Plate", 1.0);
-        IngredientStack sulfuricAcid = IngredientStack.fluid(new ResourceLocation("gtceu:sulfuric_acid"), "Sulfuric Acid", 100.0);
+        IngredientStack woodPlate = IngredientStack.item(ResourceLocation.tryParse("gtceu:wood_plate"), "Wood Plate", 1.0);
+        IngredientStack sulfuricAcid = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:sulfuric_acid"), "Sulfuric Acid", 100.0);
         reactor.getInputs().add(sulfuricAcid);
         reactor.getOutputs().add(woodPlate);
         reactor.setMachineCount(1.0);
@@ -144,8 +144,8 @@ public class ETACalculationTest {
 
         // 30 EU/t machine, 20 ticks (1s) cycle, produces 1 item/s, consumes 100 mB water/s
         RecipeNode machine = RecipeNode.create("Extractor", 20.0, 30.0, GTVoltageTier.LV);
-        IngredientStack water = IngredientStack.fluid(new ResourceLocation("minecraft:water"), "Water", 100.0);
-        IngredientStack rubber = IngredientStack.item(new ResourceLocation("gtceu:rubber_bar"), "Rubber", 1.0);
+        IngredientStack water = IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 100.0);
+        IngredientStack rubber = IngredientStack.item(ResourceLocation.tryParse("gtceu:rubber_bar"), "Rubber", 1.0);
         machine.getInputs().add(water);
         machine.getOutputs().add(rubber);
         machine.setMachineCount(1.0);

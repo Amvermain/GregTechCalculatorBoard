@@ -31,11 +31,28 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 * **균형 (Balanced)**: `0xFF38BDF8` (시안), 유량 흐름 펄스 애니메이션
 * **결손 (Deficit)**: `0xFFEF4444` (레드), 원자재 부족 경고 점멸
 * **초과 (Surplus)**: `0xFF10B981` (에메랄드), 안전 잉여
-* **히트 판정**: 24개 선분 분할 후 거리 $\le 6.0\text{px} / \text{Zoom}$ 검출 시 선택/우클릭 삭제 활성화
 
 ---
 
-## 3. 노드 카드 UI 와이어프레임 (`NodeCardRenderer`)
+## 3. 고성능 렌더링 파이프라인 및 공간 분할 색인
+
+### 3.1 Single-Pass Batch Rendering
+프레임당 다수의 개별 드로우콜 및 `glClear`를 배제하고, 화면에 보이는 뷰포트 영역(Culling Box) 내의 노드와 와이어만을 선별하여 단일 지오메트리 패스로 일괄 렌더링합니다.
+
+### 3.2 $128 \times 128$ AABB 균일 그리드 공간 분할 와이어 색인 (`WireSpatialIndex`)
+1,000개 이상의 복잡한 와이어 네트워크에서 마우스 호버 및 클릭 감지를 $O(E)$ 전수 검사에서 **$O(\log E)$ 공간 분할 색인**으로 최적화합니다.
+
+```mermaid
+flowchart LR
+    CUR["마우스 커서 (CanvasX, CanvasY)"] --> GRID["WireSpatialIndex (128x128 Grid Cell 해시)"]
+    GRID --> CANDIDATES["반경 내 인접 셀의 후보 와이어 3~5개 선별"]
+    CANDIDATES --> HIT["24분할 베지어 정밀 히트 테스팅 (<= 6.0px / Zoom)"]
+    HIT --> ACTION["선택/삭제/툴팁 팝업 즉시 반응"]
+```
+
+---
+
+## 4. 노드 카드 UI 와이어프레임 (`NodeCardRenderer`)
 
 ### 3.1 표준 기계 노드 카드 (Standard Recipe Node Card)
 

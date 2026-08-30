@@ -81,5 +81,44 @@ public class ClientPacketHandler {
     public static void handleError(S2CWorkspaceErrorPacket packet) {
         BoardToast.show("gui.gtcalcboard.toast.error", Component.translatable(packet.getMessageKey()).getString());
     }
+
+    public static void handleSyncWorkspaceMeta(S2CSyncWorkspaceMetaPacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.updateWorkspaceMeta(packet);
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof BoardScreen bs) {
+            bs.rebuildWidgets();
+            bs.markSummaryDirty();
+        }
+    }
+
+    public static void handleSyncPageData(S2CSyncPageDataPacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.applyPageData(packet.getPageId(), packet.getRevision(), packet.getCompressedNBT());
+    }
+
+    public static void handleChunkedData(S2CChunkedDataPacket packet) {
+        byte[] complete = com.gtceu.calcboard.client.team.ChunkedPayloadAssembler.appendChunk(
+                packet.getTransferId(),
+                packet.getChunkIndex(),
+                packet.getTotalChunks(),
+                packet.getChunkBytes()
+        );
+        if (complete != null) {
+            ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+            state.applyPageData(packet.getPageId(), packet.getRevision(), complete);
+        }
+    }
+
+    public static void handleSyncCommitHistory(S2CSyncCommitHistoryPacket packet) {
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        state.updateCommitHistory(packet.getCommits());
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof BoardScreen bs) {
+            bs.markSummaryDirty();
+        }
+    }
 }
 

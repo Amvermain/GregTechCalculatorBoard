@@ -1,6 +1,6 @@
 # GregTech Calculator Board (GTCalcBoard) 세부 기술 명세서 시리즈
 
-본 문서는 **GregTech Calculator Board (GTCalcBoard)**의 내부 아키텍처, 핵심 수학 엔진, 5대 그래프 알고리즘, 렌더링 파이프라인, UI 컴포넌트 와이어프레임, 멀티플레이어 동시성 락 프로토콜 및 영속화 스키마를 체계적으로 정리한 공식 개발자 기술 명세서(Master Index)입니다.
+본 문서는 **GregTech Calculator Board (GTCalcBoard)**의 내부 아키텍처, 핵심 수학 엔진, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, 렌더링 파이프라인, UI 컴포넌트 와이어프레임, 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜 및 영속화 스키마를 체계적으로 정리한 공식 개발자 기술 명세서(Master Index)입니다.
 
 ---
 
@@ -15,10 +15,10 @@
 
 | 항목 | 내용 |
 | :--- | :--- |
-| **문서 버전** | `2.0.0` (기준 커밋: `6c63984`) |
+| **문서 버전** | `v2.0.0` (ADR-001 ~ ADR-004 정합 완료) |
 | **대상 플랫폼** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
-| **의존성** | Java 17+, GregTech CEu Modern, EMI (Recipe Viewer) |
-| **소프트 의존성** | FTB Teams (멀티플레이 팀 연동) |
+| **의존성** | Java 17+, GregTech CEu Modern, EMI / JEI (Recipe Viewer) |
+| **소프트 의존성** | FTB Teams, Phoenix Guilds (멀티플레이 팀 연동) |
 | **지원 언어** | 한국어 (`ko_kr`), 영어 (`en_us`) |
 
 ---
@@ -27,8 +27,15 @@
 
 ```
 docs/
+├── adr/                                     # 🏛️ [아키텍처 결정 기록 (ADR) 보관소]
+│   ├── README.md                            # 📋 ADR 색인 및 생명주기 가이드
+│   ├── ADR_001_COMPAT_GUI_HANDLER_ISOLATION_AND_SERVER_SAFETY.md
+│   ├── ADR_002_ARCHITECTURE_DOCS_RESTRUCTURING_AND_SPEC_MODERNIZATION.md
+│   ├── ADR_003_MULTIPLAYER_NETWORK_INTEGRITY_AND_SYSTEM_STABILIZATION.md
+│   └── ADR_004_CLEAN_ARCHITECTURE_AND_DOMAIN_DECOMPOSITION.md
 ├── ko_kr/ (한국어 문서)
 │   ├── CODE_SPECIFICATION.md                # 📑 [한국어 마스터 인덱스]
+│   ├── TEST_CHECKLIST.md                    # 🧪 [한국어 종합 QA 체크리스트]
 │   └── spec/
 │       ├── 00_OVERVIEW.md                   # 🏛️ [00] 시스템 아키텍처 개요 및 설계 원칙
 │       ├── 01_CORE_DOMAIN_AND_MODELS.md     # 📦 [01] 코어 도메인 모델 및 수용능력 매트릭스
@@ -42,6 +49,7 @@ docs/
 │       └── 05_INTEGRATION_AND_I18N.md       # 🔌 [05] 외부 모드 연동 및 다국어 단위 시스템
 └── en_us/ (English Edition)
     ├── CODE_SPECIFICATION.md                # 📑 [English Master Index]
+    ├── TEST_CHECKLIST.md                    # 🧪 [English QA Test Checklist]
     └── spec/
         ├── 00_OVERVIEW.md                   # 🏛️ [00] System Architecture & Design Principles
         ├── 01_CORE_DOMAIN_AND_MODELS.md     # 📦 [01] Core Domain Models & Capability Matrix
@@ -54,6 +62,11 @@ docs/
         ├── 04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md # 🌐 [04] Multiplayer Concurrency & Network
         └── 05_INTEGRATION_AND_I18N.md       # 🔌 [05] External Mod Integrations & i18n Units
 ```
+
+---
+
+## 🏛️ [아키텍처 결정 기록 색인 (ADR Index)](adr/README.md)
+- 시스템의 모든 주요 아키텍처 결정 배경, 제안서, 채택 이유 및 기술 스펙은 **[`docs/adr/`](adr/README.md)**에 영구히 보존됩니다.
 
 ---
 

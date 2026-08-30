@@ -183,8 +183,7 @@ public class SaveToTeamDialog {
         CompoundTag tag = screen.getGraph().serializeNBT();
         byte[] compressed = BlueprintCodec.compressTag(tag);
         int nodeCount = screen.getGraph().getNodes().size();
-
-        NetworkHandler.sendToServer(new C2SCommitWorkspacePacket(teamId, pageId, pageTitle, rev, msg, compressed, nodeCount, 0, 0));
+        com.gtceu.calcboard.client.team.ClientChunkedStreamHelper.commitPageSafely(teamId, pageId, pageTitle, rev, msg, compressed, nodeCount, 0, 0);
         BoardToast.show("gui.gtcalcboard.toast.saved_to_team", pageTitle);
     }
 }

@@ -8,15 +8,10 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 
-import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -63,7 +58,8 @@ public class CreateModAdapter implements IModAdapter {
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace();
-        if (ns.equals(MOD_ID) || ns.equals(MOD_ID_ADDITION)) return true;
+        if (ns.equals("create_new_age")) return false; // Dedicated CreateNewAgeModAdapter handles this
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(ns)) return true;
         return "gtcalcboard".equals(ns) && "kinetic_generation".equals(categoryId.getPath());
     }
 
@@ -118,8 +114,7 @@ public class CreateModAdapter implements IModAdapter {
                 return true;
             }
         }
-        String name = node.getName().toLowerCase(Locale.ROOT);
-        return name.contains("fan blasting") || name.contains("fan washing") || name.contains("fan splashing") || name.contains("fan smoking") || name.contains("fan haunting");
+        return false;
     }
 
     @Override
@@ -158,54 +153,36 @@ public class CreateModAdapter implements IModAdapter {
 
     @Override
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        return CreateGuiHandler.formatEnergyStats(node, displayMode);
+        if (node == null) return "";
+        double suRate = node.getEffectiveTotalEUt();
+        return node.isGenerator()
+                ? String.format(Locale.ROOT, "§6+%,.0f SU", suRate)
+                : String.format(Locale.ROOT, "§e%,.0f SU", suRate);
     }
 
     @Override
     public List<Component> buildEnergyTooltip(RecipeNode node) {
-        return CreateGuiHandler.buildEnergyTooltip(node);
-    }
-
-    @Override
-    public void renderCardControls(GuiGraphics graphics, Font font,
-                                   RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                   boolean isGlowing) {
-        CreateGuiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
-    }
-
-    @Override
-    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        return CreateGuiHandler.isTierOrSpeedControlHovered(node, mouseX, mouseY);
-    }
-
-    @Override
-    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        return CreateGuiHandler.isMachineConfigHovered(node, mouseX, mouseY);
-    }
-
-    @Override
-    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
-        return CreateGuiHandler.handleControlClick(widget, node, mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
-        return CreateGuiHandler.handleControlScroll(widget, node, mouseX, mouseY, delta);
-    }
-
-    @Override
-    public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
-        CreateGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+        List<Component> tooltipLines = new ArrayList<>();
+        if (node == null) return tooltipLines;
+        double totSU = node.getEffectiveTotalEUt();
+        if (node.isGenerator()) {
+            tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
+        } else {
+            tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
+        }
+        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
+        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        if (isFanProcessingRecipe(node)) {
+            tooltipLines.add(Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint"));
+        }
+        return tooltipLines;
     }
 
     @Override
     public EnergyType getEnergyType(RecipeNode node) {
         return EnergyType.KINETIC_SU;
-    }
-
-    @Override
-    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
-        return CreateGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
     @Override

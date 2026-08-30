@@ -380,7 +380,7 @@ public class GTCEuMultiblockScanner {
         if (rt instanceof ResourceLocation rl) return rl;
         try {
             if (rt instanceof RecipeType<?> rType) {
-                ResourceLocation loc = BuiltInRegistries.RECIPE_TYPE.getKey(rType);
+                ResourceLocation loc = ForgeRegistries.RECIPE_TYPES.getKey(rType);
                 if (loc != null && !loc.getPath().equals("air")) return loc;
             }
         } catch (Throwable ignored) {}

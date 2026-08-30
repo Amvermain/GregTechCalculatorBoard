@@ -28,6 +28,29 @@ public class ConnectionRenderer {
         ACTIVE_BATCH_BUFFER.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
     }
 
+    public static void computeControlPoints(float x1, float y1, float x2, float y2, float dir1X, float dir2X, float[] out4) {
+        float proj1 = (x2 - x1) * dir1X;
+        float offset1;
+        if (proj1 >= 0.0f) {
+            offset1 = Math.max(30.0f, proj1 * 0.5f);
+        } else {
+            offset1 = Math.min(65.0f, Math.max(30.0f, 20.0f + (float) Math.sqrt(-proj1) * 2.2f));
+        }
+
+        float proj2 = (x1 - x2) * dir2X;
+        float offset2;
+        if (proj2 >= 0.0f) {
+            offset2 = Math.max(30.0f, proj2 * 0.5f);
+        } else {
+            offset2 = Math.min(65.0f, Math.max(30.0f, 20.0f + (float) Math.sqrt(-proj2) * 2.2f));
+        }
+
+        out4[0] = x1 + offset1 * dir1X;
+        out4[1] = y1;
+        out4[2] = x2 + offset2 * dir2X;
+        out4[3] = y2;
+    }
+
     public static void addBezierToBatch(float x1, float y1, float x2, float y2, int color, float thickness) {
         addBezierToBatch(x1, y1, x2, y2, 1.0f, -1.0f, color, thickness);
     }
@@ -35,13 +58,9 @@ public class ConnectionRenderer {
     public static void addBezierToBatch(float x1, float y1, float x2, float y2, float dir1X, float dir2X, int color, float thickness) {
         if (ACTIVE_BATCH_BUFFER == null || ACTIVE_BATCH_POSE == null) return;
 
-        float dx = Math.abs(x2 - x1) * 0.5f;
-        dx = Math.max(dx, 40f);
-
-        float cx1 = x1 + dx * dir1X;
-        float cy1 = y1;
-        float cx2 = x2 + dx * dir2X;
-        float cy2 = y2;
+        float[] cp = new float[4];
+        computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, cp);
+        float cx1 = cp[0], cy1 = cp[1], cx2 = cp[2], cy2 = cp[3];
 
         float chord = (float) Math.hypot(x2 - x1, y2 - y1);
         float net = (float) (Math.hypot(cx1 - x1, cy1 - y1) + Math.hypot(cx2 - cx1, cy2 - cy1) + Math.hypot(x2 - cx2, y2 - cy2));
@@ -113,17 +132,16 @@ public class ConnectionRenderer {
         float pulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
         float it = 1.0f - pulseTime;
 
+        float[] cp = new float[4];
         int count = Math.min(wires.size(), 80);
         for (int w = 0; w < count; w++) {
             float[] wire = wires.get(w);
             float x1 = wire[0], y1 = wire[1], x2 = wire[2], y2 = wire[3];
             float dir1X = wire.length >= 6 ? wire[4] : 1.0f;
             float dir2X = wire.length >= 6 ? wire[5] : -1.0f;
-            float dx = Math.max(Math.abs(x2 - x1) * 0.5f, 40f);
-            float cx1 = x1 + dx * dir1X;
-            float cy1 = y1;
-            float cx2 = x2 + dx * dir2X;
-            float cy2 = y2;
+
+            computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, cp);
+            float cx1 = cp[0], cy1 = cp[1], cx2 = cp[2], cy2 = cp[3];
 
             float dotX = it * it * it * x1 + 3 * it * it * pulseTime * cx1 + 3 * it * pulseTime * pulseTime * cx2 + pulseTime * pulseTime * pulseTime * x2;
             float dotY = it * it * it * y1 + 3 * it * it * pulseTime * cy1 + 3 * it * pulseTime * pulseTime * cy2 + pulseTime * pulseTime * pulseTime * y2;
@@ -151,21 +169,18 @@ public class ConnectionRenderer {
     }
 
     public static boolean isPointNearBezier(float x1, float y1, float x2, float y2, float dir1X, float dir2X, double px, double py, double maxDist) {
-        float minX = Math.min(x1, x2) - (float) maxDist - 40f;
-        float maxX = Math.max(x1, x2) + (float) maxDist + 40f;
-        float minY = Math.min(y1, y2) - (float) maxDist - 20f;
-        float maxY = Math.max(y1, y2) + (float) maxDist + 20f;
+        float[] cp = new float[4];
+        computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, cp);
+        float cx1 = cp[0], cy1 = cp[1], cx2 = cp[2], cy2 = cp[3];
+
+        float minX = Math.min(Math.min(x1, x2), Math.min(cx1, cx2)) - (float) maxDist - 8f;
+        float maxX = Math.max(Math.max(x1, x2), Math.max(cx1, cx2)) + (float) maxDist + 8f;
+        float minY = Math.min(Math.min(y1, y2), Math.min(cy1, cy2)) - (float) maxDist - 8f;
+        float maxY = Math.max(Math.max(y1, y2), Math.max(cy1, cy2)) + (float) maxDist + 8f;
 
         if (px < minX || px > maxX || py < minY || py > maxY) {
             return false;
         }
-
-        float dx = Math.abs(x2 - x1) * 0.5f;
-        dx = Math.max(dx, 40f);
-        float cx1 = x1 + dx * dir1X;
-        float cy1 = y1;
-        float cx2 = x2 + dx * dir2X;
-        float cy2 = y2;
 
         float chord = (float) Math.hypot(x2 - x1, y2 - y1);
         float net = (float) (Math.hypot(cx1 - x1, cy1 - y1) + Math.hypot(cx2 - cx1, cy2 - cy1) + Math.hypot(x2 - cx2, y2 - cy2));

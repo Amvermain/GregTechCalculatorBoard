@@ -1,34 +1,36 @@
-package com.gtceu.calcboard.compat.gtceu;
+package com.gtceu.calcboard.client.gui.compat.gtceu;
 
-import com.gtceu.calcboard.api.catalog.AddonCategory;
-import com.gtceu.calcboard.api.type.EnergyType;
-import com.gtceu.calcboard.api.type.GTBoilerTier;
-import com.gtceu.calcboard.api.type.SteamMode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-import com.gtceu.calcboard.client.gui.util.FormatUtil;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
-
-import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
-import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.compat.GenericModGuiHandler;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
+import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Handles UI rendering and tooltip generation for GTCEu machine nodes.
+ * GTCEu implementation of {@link com.gtceu.calcboard.client.gui.compat.IModGuiHandler}.
  */
-public class GTCEuGuiHandler {
+@OnlyIn(Dist.CLIENT)
+public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
     private static int mbControllerScroll = 0;
 
@@ -43,9 +45,15 @@ public class GTCEuGuiHandler {
         return adapter != null && adapter.isBoilerRecipe(node);
     }
 
-    public static void renderCardControls(GuiGraphics graphics, Font font,
-                                          RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                          boolean isGlowing) {
+    @Override
+    public String getModId() {
+        return "gtceu";
+    }
+
+    @Override
+    public void renderCardControls(GuiGraphics graphics, Font font,
+                                  RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
+                                  boolean isGlowing) {
         boolean isOperational = node.isOperational();
         int tierBtnW = 32;
         int nextCtrlX = x + 42;
@@ -154,85 +162,10 @@ public class GTCEuGuiHandler {
         }
     }
 
-    public static List<Component> buildEnergyTooltip(RecipeNode node) {
-        List<Component> tooltipLines = new ArrayList<>();
-        if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
-            tooltipLines.add(Component.literal("§7- " + Component.translatable("gui.gtcalcboard.energy_passive").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.2fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-            return tooltipLines;
-        }
-
-        if (isBoiler(node)) {
-            com.gtceu.calcboard.api.type.GTBoilerTier boilerTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
-            tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_title").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Boiler Type: %s%s", boilerTier.getFormatCode(), boilerTier.getDisplayName())));
-            if (boilerTier.isMultiblock()) {
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Throttle: §b%d%%", node.getBoilerThrottle())));
-            }
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Speed Multiplier: §e%.2fx", GTCEuModAdapter.getBoilerSpeedMultiplier(node))));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.2fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-            return tooltipLines;
-        }
-
-        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.steam_machine_title").getString()));
-            double steamRate = node.getBaseEUt() * 2.0 * 20.0 * node.getMachineCount();
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Steam Consumption: §b♨ %,.1f L/s", steamRate)));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Operating Mode: %s%s", node.getSteamMode().getFormatCode(), node.getSteamMode().getDisplayName())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§8* Steam Ratio: 1 EU = 2 mB Steam (Speed: %s)", node.getSteamMode() == com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE ? "0.5x" : "1.0x")));
-            return tooltipLines;
-        }
-
-        if (node.isFusion()) {
-            int fTier = node.getFusionTier();
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§d⚛ Fusion Reactor Mk%d", fTier)));
-            long startEU = node.getEuToStart();
-            if (startEU > 0) {
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Start Ignition Energy: §e%,d EU §7(§f%s EU§7)", startEU, com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(startEU))));
-            }
-            double totEUt = node.getEffectiveTotalEUt();
-            var tier = node.getTargetTier();
-            if (tier == null) tier = node.getMinFusionVoltageTier();
-            double amps = totEUt / (double) tier.getVoltage();
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Running Power: §c%,.2f EU/t", totEUt)));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Current: §e%,.4fA %s", amps, tier.getName())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Minimum Voltage Tier: §f%s", node.getMinFusionVoltageTier().getName())));
-            if (node.getEfficiency() < 0.999) {
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§c⚠ %s: %.1f%%", Component.translatable("gui.gtcalcboard.tooltip.bottleneck_eff").getString(), node.getEfficiency() * 100.0)));
-            }
-            return tooltipLines;
-        }
-
-        if (node.isGenerator()) {
-            tooltipLines.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
-            double totEUt = node.getEffectiveTotalEUt();
-            var tier = node.getTargetTier();
-            if (tier == null) tier = GTVoltageTier.LV;
-            double amps = totEUt / (double) tier.getVoltage();
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Generation: §a+%,.2f EU/t", totEUt)));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Current: §a+%,.4fA %s", amps, tier.getName())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-            if (node.getEfficiency() < 0.999) {
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§e⚡ Rotor Efficiency: §f%.1f%%", node.getEfficiency() * 100.0)));
-            }
-        } else {
-            double singleEUt = node.getSingleMachineEUt();
-            double totEUt = node.getEffectiveTotalEUt();
-            var tier = node.getTargetTier();
-            if (tier == null) tier = GTVoltageTier.LV;
-            double amps = totEUt / (double) tier.getVoltage();
-            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-        }
-        return tooltipLines;
-    }
-
-    public static void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
-                                           int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
-                                           net.minecraft.client.gui.components.EditBox parallelBox,
-                                           com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    @Override
+    public void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
+                                   int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
+                                   EditBox parallelBox, BoardScreen parent) {
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
             if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
                 com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel curModel = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(node);
@@ -250,7 +183,6 @@ public class GTCEuGuiHandler {
                     graphics.drawCenteredString(font, m.getFormatCode() + m.getShortName() + " §7(" + m.getParallelMultiplier() + "x)", btnX + btnW / 2, btnY + 4, 0xFFFFFFFF);
                 }
 
-                // Rotor & Holder Info string on line 1 (y + 30)
                 String rName = node.getRotorName();
                 if (rName == null || rName.isEmpty() || rName.startsWith("Standard")) {
                     rName = Component.translatable("gui.gtcalcboard.rotor.standard").getString();
@@ -264,7 +196,6 @@ public class GTCEuGuiHandler {
                 }
                 graphics.drawString(font, rotorInfo, x + 10, y + 30, 0xFFFFFFFF, false);
 
-                // Reset Rotor Button [↺ Standard] (y + 44, right side)
                 int resetBtnX = x + dialogW - 90;
                 boolean resetHover = mouseX >= resetBtnX && mouseX <= resetBtnX + 82 && mouseY >= y + 44 && mouseY <= y + 60;
                 graphics.fill(resetBtnX, y + 44, resetBtnX + 82, y + 60, resetHover ? 0xFF3E485A : 0xFF242A35);
@@ -291,7 +222,6 @@ public class GTCEuGuiHandler {
                 }
                 graphics.drawString(font, specStr, x + 10, y + 46, 0xFFD0D6E4, false);
 
-                // Reset Rotor Button [↺ Standard 100%]
                 int resetBtnX = x + dialogW - 118;
                 boolean resetHover = mouseX >= resetBtnX && mouseX <= resetBtnX + 110 && mouseY >= y + 38 && mouseY <= y + 54;
                 graphics.fill(resetBtnX, y + 38, resetBtnX + 110, y + 54, resetHover ? 0xFF3E485A : 0xFF242A35);
@@ -302,7 +232,6 @@ public class GTCEuGuiHandler {
             graphics.drawString(font, "§6♨ " + Component.translatable("gui.gtcalcboard.boiler_type_title").getString(), x + 10, y + 30, 0xFFFFFFFF, false);
             com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
 
-            // Multiblock Boiler Throttle Control Bar (Top-Right)
             if (curTier.isMultiblock()) {
                 int curThrottle = node.getBoilerThrottle();
                 int thrX = x + dialogW - 250;
@@ -310,27 +239,23 @@ public class GTCEuGuiHandler {
                 graphics.drawString(font, thrTitle, thrX, y + 30, 0xFFFFFFFF, false);
                 int titleW = font.width(thrTitle);
 
-                // [-]
                 int minusX = thrX + titleW + 6;
                 boolean minusHover = mouseX >= minusX && mouseX <= minusX + 14 && mouseY >= y + 28 && mouseY <= y + 40;
                 graphics.fill(minusX, y + 28, minusX + 14, y + 40, minusHover ? 0xFF3D4558 : 0xFF242A35);
                 graphics.renderOutline(minusX, y + 28, 14, 12, minusHover ? 0xFF58D3FF : 0xFF3F4658);
                 graphics.drawCenteredString(font, "-", minusX + 7, y + 30, 0xFFFFFFFF);
 
-                // Value Display [ 100% ]
                 int valX = minusX + 16;
                 graphics.fill(valX, y + 28, valX + 32, y + 40, 0xFF1B202A);
                 graphics.renderOutline(valX, y + 28, 32, 12, 0xFF3F4658);
                 graphics.drawCenteredString(font, curThrottle + "%", valX + 16, y + 30, 0xFF58D3FF);
 
-                // [+]
                 int plusX = valX + 34;
                 boolean plusHover = mouseX >= plusX && mouseX <= plusX + 14 && mouseY >= y + 28 && mouseY <= y + 40;
                 graphics.fill(plusX, y + 28, plusX + 14, y + 40, plusHover ? 0xFF3D4558 : 0xFF242A35);
                 graphics.renderOutline(plusX, y + 28, 14, 12, plusHover ? 0xFF58D3FF : 0xFF3F4658);
                 graphics.drawCenteredString(font, "+", plusX + 7, y + 30, 0xFFFFFFFF);
 
-                // Presets: [25%] [50%] [75%] [100%]
                 int[] presets = {25, 50, 75, 100};
                 int curPreX = plusX + 18;
                 for (int pre : presets) {
@@ -408,7 +333,6 @@ public class GTCEuGuiHandler {
                 mbWorkstations = List.of(node.getMachineIcon());
             }
 
-            // Find equipped parallel addon
             MachineAddon equippedParallel = null;
             for (MachineAddon a : node.getAddons()) {
                 if (a != null && a.getCategory() == MachineAddon.Category.PARALLEL) {
@@ -432,12 +356,10 @@ public class GTCEuGuiHandler {
             int maxScroll = Math.max(0, totalCount - visibleCount);
             if (mbControllerScroll > maxScroll) mbControllerScroll = maxScroll;
 
-            // Header line (y + 30)
             String navIndicator = showNav ? " (" + (mbControllerScroll + 1) + "-" + Math.min(totalCount, mbControllerScroll + visibleCount) + "/" + totalCount + ")" : "";
             String mbHeader = "§b🏛 " + Component.translatable("gui.gtcalcboard.config.multiblock_controller_title").getString() + "§7" + navIndicator;
             graphics.drawString(font, mbHeader, x + 10, y + 30, 0xFFFFFFFF, false);
 
-            // Right side parallel summary badge on line 1 (y + 30)
             String parSummary = "§7⚡ " + node.getTotalParallel() + "x Par" + (defPar > 1 ? " (Default " + defPar + "x)" : (node.getTotalParallel() > 1 ? " (Base " + node.getParallel() + "x)" : " (Default 1x)"));
             int parSummaryW = font.width(parSummary);
             graphics.drawString(font, parSummary, x + dialogW - 10 - parSummaryW, y + 30, 0xFFFFFFFF, false);
@@ -447,7 +369,6 @@ public class GTCEuGuiHandler {
 
             if (showNav) {
                 int navBtnW = 16;
-                // Left Nav Arrow ◀
                 boolean leftHov = mouseX >= curX && mouseX <= curX + navBtnW && mouseY >= y + 44 && mouseY <= y + 60;
                 graphics.fill(curX, y + 44, curX + navBtnW, y + 60, leftHov ? 0xFF3D4558 : 0xFF282D3B);
                 graphics.renderOutline(curX, y + 44, navBtnW, 16, leftHov ? 0xFF58D3FF : 0xFF3F4658);
@@ -482,14 +403,12 @@ public class GTCEuGuiHandler {
 
             if (showNav) {
                 int navBtnW = 16;
-                // Right Nav Arrow ▶
                 boolean rightHov = mouseX >= curX && mouseX <= curX + navBtnW && mouseY >= y + 44 && mouseY <= y + 60;
                 graphics.fill(curX, y + 44, curX + navBtnW, y + 60, rightHov ? 0xFF3D4558 : 0xFF282D3B);
                 graphics.renderOutline(curX, y + 44, navBtnW, 16, rightHov ? 0xFF58D3FF : 0xFF3F4658);
                 graphics.drawCenteredString(font, "▶", curX + navBtnW / 2, y + 48, mbControllerScroll < maxScroll ? 0xFFFFFFFF : 0xFF666666);
             }
 
-            // Right side: + Parallel Hatch / Installed Parallel Badge (only if supported)
             if (supportsParHatch) {
                 boolean parHov = mouseX >= parBtnX && mouseX <= parBtnX + parBtnW && mouseY >= y + 44 && mouseY <= y + 60;
                 if (equippedParallel != null) {
@@ -548,11 +467,9 @@ public class GTCEuGuiHandler {
         return "🏛 " + id.getPath();
     }
 
-    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
-                                                 RecipeNode node, int x, int y, int dialogW,
-                                                 double mouseX, double mouseY, int button,
-                                                 net.minecraft.client.gui.components.EditBox parallelBox,
-                                                 com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    @Override
+    public boolean handleDialogHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                           double mouseX, double mouseY, int button, EditBox parallelBox, BoardScreen parent) {
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
             if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
                 com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel[] models = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.values();
@@ -564,7 +481,6 @@ public class GTCEuGuiHandler {
                     int btnX = x + 10 + i * (btnW + gap);
                     if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 16) {
                         node.setMachineIcon(m.getMachineIcon());
-                        // Remove incompatible traits if switching models
                         List<MachineAddon> toRemove = new ArrayList<>();
                         for (MachineAddon a : node.getAddons()) {
                             if (a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
@@ -582,8 +498,8 @@ public class GTCEuGuiHandler {
                             dialog.invalidateFilteredCatalog();
                         }
                         if (parent != null) parent.markSummaryDirty();
-                        net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        Minecraft.getInstance().getSoundManager().play(
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                         );
                         return true;
                     }
@@ -602,9 +518,12 @@ public class GTCEuGuiHandler {
                     node.setRotorEfficiency(100);
                     node.setRotorPower(100);
                     node.setRotorName(null);
+                    if (dialog != null) {
+                        dialog.invalidateFilteredCatalog();
+                    }
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
@@ -623,50 +542,42 @@ public class GTCEuGuiHandler {
                     node.setRotorEfficiency(100);
                     node.setRotorPower(100);
                     node.setRotorName(null);
+                    if (dialog != null) {
+                        dialog.invalidateFilteredCatalog();
+                    }
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
             }
         } else if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
             com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
-
-            // Multiblock Boiler Throttle Click Handling
             if (curTier.isMultiblock()) {
                 int curThrottle = node.getBoilerThrottle();
                 int thrX = x + dialogW - 250;
-                Font font = net.minecraft.client.Minecraft.getInstance().font;
                 String thrTitle = "§e⚡ " + Component.translatable("gui.gtcalcboard.boiler_throttle").getString() + ":";
-                int titleW = font.width(thrTitle);
-                boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
-                int step = shift ? 25 : 5;
-
-                // [-]
+                int titleW = Minecraft.getInstance().font.width(thrTitle);
                 int minusX = thrX + titleW + 6;
                 if (mouseX >= minusX && mouseX <= minusX + 14 && mouseY >= y + 28 && mouseY <= y + 40) {
-                    node.setBoilerThrottle(Math.max(25, curThrottle - step));
+                    node.setBoilerThrottle(Math.max(25, curThrottle - 5));
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
-
-                // [+]
                 int valX = minusX + 16;
                 int plusX = valX + 34;
                 if (mouseX >= plusX && mouseX <= plusX + 14 && mouseY >= y + 28 && mouseY <= y + 40) {
-                    node.setBoilerThrottle(Math.min(100, curThrottle + step));
+                    node.setBoilerThrottle(Math.min(100, curThrottle + 5));
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
-
-                // Presets: [25%] [50%] [75%] [100%]
                 int[] presets = {25, 50, 75, 100};
                 int curPreX = plusX + 18;
                 for (int pre : presets) {
@@ -674,8 +585,8 @@ public class GTCEuGuiHandler {
                     if (mouseX >= curPreX && mouseX <= curPreX + preW && mouseY >= y + 28 && mouseY <= y + 40) {
                         node.setBoilerThrottle(pre);
                         if (parent != null) parent.markSummaryDirty();
-                        net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        Minecraft.getInstance().getSoundManager().play(
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                         );
                         return true;
                     }
@@ -691,12 +602,11 @@ public class GTCEuGuiHandler {
                 com.gtceu.calcboard.api.type.GTBoilerTier bt = bTiers[i];
                 int btnX = x + 10 + i * (btnW + gap);
                 if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 16) {
-                    boolean isLiquid = node.isLiquidBoilerRecipe();
-                    node.setMachineIcon(bt.getDefaultIcon(isLiquid));
+                    node.setMachineIcon(bt.getDefaultIcon(node.isLiquidBoilerRecipe()));
                     node.setMultiblock(bt.isMultiblock());
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
@@ -707,8 +617,8 @@ public class GTCEuGuiHandler {
                 if (mouseX >= btnX && mouseX <= btnX + 110 && mouseY >= y + 44 && mouseY <= y + 60) {
                     node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE);
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
@@ -716,8 +626,8 @@ public class GTCEuGuiHandler {
                 if (mouseX >= btnX && mouseX <= btnX + 110 && mouseY >= y + 44 && mouseY <= y + 60) {
                     node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.HIGH_PRESSURE);
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
@@ -725,8 +635,8 @@ public class GTCEuGuiHandler {
                 if (mouseX >= btnX && mouseX <= btnX + 90 && mouseY >= y + 44 && mouseY <= y + 60) {
                     node.setSteamMode(com.gtceu.calcboard.api.type.SteamMode.NONE);
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
@@ -737,7 +647,6 @@ public class GTCEuGuiHandler {
                 mbWorkstations = List.of(node.getMachineIcon());
             }
 
-            // Find equipped parallel addon
             MachineAddon equippedParallel = null;
             for (MachineAddon a : node.getAddons()) {
                 if (a != null && a.getCategory() == MachineAddon.Category.PARALLEL) {
@@ -764,12 +673,11 @@ public class GTCEuGuiHandler {
 
             if (showNav) {
                 int navBtnW = 16;
-                // Click Left Nav Arrow ◀
                 if (mouseX >= curX && mouseX <= curX + navBtnW && mouseY >= y + 44 && mouseY <= y + 60) {
                     if (mbControllerScroll > 0) {
                         mbControllerScroll--;
-                        net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        Minecraft.getInstance().getSoundManager().play(
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                         );
                     }
                     return true;
@@ -783,7 +691,6 @@ public class GTCEuGuiHandler {
             int startIdx = showNav ? mbControllerScroll : 0;
             int endIdx = showNav ? Math.min(totalCount, mbControllerScroll + visibleCount) : totalCount;
 
-            // 1. Controller selection click
             for (int i = startIdx; i < endIdx; i++) {
                 ResourceLocation mbWs = mbWorkstations.get(i);
                 if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= y + 44 && mouseY <= y + 60) {
@@ -804,8 +711,8 @@ public class GTCEuGuiHandler {
                         dialog.invalidateFilteredCatalog();
                     }
                     if (parent != null) parent.markSummaryDirty();
-                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                    Minecraft.getInstance().getSoundManager().play(
+                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                     );
                     return true;
                 }
@@ -814,19 +721,17 @@ public class GTCEuGuiHandler {
 
             if (showNav) {
                 int navBtnW = 16;
-                // Click Right Nav Arrow ▶
                 if (mouseX >= curX && mouseX <= curX + navBtnW && mouseY >= y + 44 && mouseY <= y + 60) {
                     if (mbControllerScroll < maxScroll) {
                         mbControllerScroll++;
-                        net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                        Minecraft.getInstance().getSoundManager().play(
+                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                         );
                     }
                     return true;
                 }
             }
 
-            // 2. Parallel hatch action click (only if supported)
             if (supportsParHatch && mouseX >= parBtnX && mouseX <= parBtnX + parBtnW && mouseY >= y + 44 && mouseY <= y + 60) {
                 if (equippedParallel != null) {
                     com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).handleUninstallAddon(node, equippedParallel);
@@ -837,13 +742,19 @@ public class GTCEuGuiHandler {
                     dialog.invalidateFilteredCatalog();
                 }
                 if (parent != null) parent.markSummaryDirty();
-                net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+                Minecraft.getInstance().getSoundManager().play(
+                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
                 );
                 return true;
             }
         }
         return false;
+    }
+
+    @Override
+    public boolean handleDialogHeaderScroll(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                            double mouseX, double mouseY, double delta) {
+        return handleControllerScroll(node, delta);
     }
 
     public static boolean handleControllerScroll(RecipeNode node, double delta) {
@@ -878,6 +789,3 @@ public class GTCEuGuiHandler {
         return false;
     }
 }
-
-
-

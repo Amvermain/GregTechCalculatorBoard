@@ -162,6 +162,15 @@ public class DeletePageConfirmDialog {
             com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SDeleteTeamPagePacket(teamId, targetPageId));
         } else if (targetPageIndex >= 0) {
             BoardManager.getInstance().removePage(targetPageIndex);
+            com.gtceu.calcboard.api.storage.BoardPage active = BoardManager.getInstance().getActivePage();
+            if (active != null) {
+                parent.setPanX(active.getPanX());
+                parent.setPanY(active.getPanY());
+                parent.setZoom(active.getZoom());
+                BoardScreen.lastPanX = active.getPanX();
+                BoardScreen.lastPanY = active.getPanY();
+                BoardScreen.lastZoom = active.getZoom();
+            }
             parent.rebuildWidgets();
         }
         close();

@@ -331,13 +331,16 @@ public final class GTCEuBOMHelper {
             } else if (path.contains("input_bus") || path.contains("import_bus") || path.contains("item_import")) {
                 handledItemIn = true;
                 boolean isSteamBus = path.contains("steam") || def.supportsAbility("STEAM_IMPORT_ITEMS");
+                int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
                 if (hasCustomItemIn) {
-                    if (neededItemIn > 0) {
+                    int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
+                    if (neededBuses > 0) {
                         ResourceLocation busId = isSteamBus ? part.itemId() : resolveInputBusId(tier);
-                        list.add(new MultiblockStructurePart(busId != null ? busId : part.itemId(), formatDisplayName(busId != null ? busId : part.itemId()), neededItemIn, PartCategory.HATCH_BUS));
+                        list.add(new MultiblockStructurePart(busId != null ? busId : part.itemId(), formatDisplayName(busId != null ? busId : part.itemId()), neededBuses, PartCategory.HATCH_BUS));
                     }
                 } else {
-                    int count = Math.max(part.amount(), itemInCount);
+                    int baseRequiredBuses = (int) Math.ceil((double) itemInCount / (double) Math.max(1, slotsPerBus));
+                    int count = Math.max(part.amount(), baseRequiredBuses);
                     ResourceLocation busId = isSteamBus ? part.itemId() : resolveInputBusId(tier);
                     if (busId != null) {
                         list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), count, PartCategory.HATCH_BUS));
@@ -348,13 +351,16 @@ public final class GTCEuBOMHelper {
             } else if (path.contains("output_bus") || path.contains("export_bus") || path.contains("item_export")) {
                 handledItemOut = true;
                 boolean isSteamBus = path.contains("steam") || def.supportsAbility("STEAM_EXPORT_ITEMS");
+                int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
                 if (hasCustomItemOut) {
-                    if (neededItemOut > 0) {
+                    int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
+                    if (neededBuses > 0) {
                         ResourceLocation busId = isSteamBus ? part.itemId() : resolveOutputBusId(tier);
-                        list.add(new MultiblockStructurePart(busId != null ? busId : part.itemId(), formatDisplayName(busId != null ? busId : part.itemId()), neededItemOut, PartCategory.HATCH_BUS));
+                        list.add(new MultiblockStructurePart(busId != null ? busId : part.itemId(), formatDisplayName(busId != null ? busId : part.itemId()), neededBuses, PartCategory.HATCH_BUS));
                     }
                 } else {
-                    int count = Math.max(part.amount(), itemOutCount);
+                    int baseRequiredBuses = (int) Math.ceil((double) itemOutCount / (double) Math.max(1, slotsPerBus));
+                    int count = Math.max(part.amount(), baseRequiredBuses);
                     ResourceLocation busId = isSteamBus ? part.itemId() : resolveOutputBusId(tier);
                     if (busId != null) {
                         list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), count, PartCategory.HATCH_BUS));
@@ -514,18 +520,22 @@ public final class GTCEuBOMHelper {
         // Automatic fallback: Add missing required Input Bus if not already handled
         if (!handledItemIn && neededItemIn > 0 && !hasCustomItemIn) {
             boolean isSteamBus = def.supportsAbility("STEAM_IMPORT_ITEMS");
+            int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
+            int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
             ResourceLocation busId = isSteamBus ? ResourceLocation.tryParse("gtceu:lp_steam_input_bus") : resolveInputBusId(tier);
-            if (busId != null) {
-                list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), neededItemIn, PartCategory.HATCH_BUS));
+            if (busId != null && neededBuses > 0) {
+                list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), neededBuses, PartCategory.HATCH_BUS));
             }
         }
 
         // Automatic fallback: Add missing required Output Bus if not already handled
         if (!handledItemOut && neededItemOut > 0 && !hasCustomItemOut) {
             boolean isSteamBus = def.supportsAbility("STEAM_EXPORT_ITEMS");
+            int slotsPerBus = isSteamBus ? 4 : GTHatchHelper.getBusSlotCount(tier);
+            int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
             ResourceLocation busId = isSteamBus ? ResourceLocation.tryParse("gtceu:lp_steam_output_bus") : resolveOutputBusId(tier);
-            if (busId != null) {
-                list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), neededItemOut, PartCategory.HATCH_BUS));
+            if (busId != null && neededBuses > 0) {
+                list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), neededBuses, PartCategory.HATCH_BUS));
             }
         }
 

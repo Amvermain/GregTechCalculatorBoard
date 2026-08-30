@@ -95,17 +95,20 @@ public class JeiRecipeConverter {
         if (isGT && !outputs.isEmpty()) {
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
             if (gtOuts != null && !gtOuts.isEmpty()) {
+                boolean[] used = new boolean[gtOuts.size()];
                 for (int i = 0; i < outputs.size(); i++) {
                     IngredientStack out = outputs.get(i);
                     if (out == null || out.getId() == null) continue;
-                    if (i < gtOuts.size() && gtOuts.get(i) != null && out.getId().equals(gtOuts.get(i).getId())) {
+                    if (i < gtOuts.size() && !used[i] && gtOuts.get(i) != null && out.getId().equals(gtOuts.get(i).getId())) {
                         out.setChance(gtOuts.get(i).getChance());
                         out.setTierChanceBoost(gtOuts.get(i).getTierChanceBoost());
+                        used[i] = true;
                     } else {
-                        for (IngredientStack gtOut : gtOuts) {
-                            if (gtOut != null && out.getId().equals(gtOut.getId())) {
-                                out.setChance(gtOut.getChance());
-                                out.setTierChanceBoost(gtOut.getTierChanceBoost());
+                        for (int j = 0; j < gtOuts.size(); j++) {
+                            if (!used[j] && gtOuts.get(j) != null && out.getId().equals(gtOuts.get(j).getId())) {
+                                out.setChance(gtOuts.get(j).getChance());
+                                out.setTierChanceBoost(gtOuts.get(j).getTierChanceBoost());
+                                used[j] = true;
                                 break;
                             }
                         }
@@ -126,7 +129,7 @@ public class JeiRecipeConverter {
             GTCEuRecipeHandler.adaptRecipeDetails(null, recipe, details);
         } else if (ModCompatHelper.isThermalLoaded() && catId != null && "thermal".equals(catId.getNamespace())) {
             ThermalRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isCreateLoaded() && catId != null && ("create".equals(catId.getNamespace()) || "createaddition".equals(catId.getNamespace()))) {
+        } else if (ModCompatHelper.isCreateLoaded() && catId != null && !"create_new_age".equals(catId.getNamespace()) && ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
             CreateRecipeHandler.adaptRecipeDetails(null, recipe, details);
         } else if (ModCompatHelper.isCreateNewAgeLoaded() && catId != null && CreateNewAgeRecipeHandler.MOD_ID.equals(catId.getNamespace())) {
             CreateNewAgeRecipeHandler.adaptRecipeDetails(null, recipe, details);
@@ -161,20 +164,20 @@ public class JeiRecipeConverter {
             inputs.addAll(details.extraInputs);
         }
 
-        String primaryOutputName = !outputs.isEmpty() ? outputs.get(0).getDisplayName() : null;
+        String inputItemName = !inputs.isEmpty() ? inputs.get(0).getDisplayName() : (!outputs.isEmpty() ? outputs.get(0).getDisplayName() : null);
         String name;
         if (preferredWorkstation != null) {
             String wsName = formatName(preferredWorkstation.getPath());
-            name = (primaryOutputName != null) ? wsName + " (" + primaryOutputName + ")" : wsName;
+            name = (inputItemName != null) ? wsName + " (" + inputItemName + ")" : wsName;
         } else if (!catName.isEmpty()) {
-            name = (primaryOutputName != null) ? catName + " (" + primaryOutputName + ")" : catName;
-        } else if (primaryOutputName != null) {
-            name = primaryOutputName + " Recipe";
+            name = (inputItemName != null) ? catName + " (" + inputItemName + ")" : catName;
+        } else if (inputItemName != null) {
+            name = inputItemName + " Recipe";
         } else {
             name = "Recipe";
         }
 
-        RecipeNode node = RecipeNode.create(name, details.durationTicks, details.eut, details.tier);
+        RecipeNode node = RecipeNode.create(preferredWorkstation != null ? preferredWorkstation : catId, name, details.durationTicks, details.eut, details.tier);
         node.setGenerator(details.isGenerator);
         if (details.energyType != null && details.energyType != EnergyType.ELECTRIC_EU) {
             node.setEnergyType(details.energyType);

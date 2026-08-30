@@ -77,7 +77,7 @@ public class CreateNewAgeRecipeHandler {
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return null;
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
         if (itemId == null) return null;
         return createKineticGeneratorNode(itemId, stack.getHoverName().getString());
     }
@@ -331,7 +331,7 @@ public class CreateNewAgeRecipeHandler {
             );
 
             for (CNACandidate c : candidates) {
-                var itemId = new ResourceLocation(MOD_ID, c.path);
+                var itemId = ResourceLocation.tryParse(MOD_ID + ":" + c.path);
                 var item = ForgeRegistries.ITEMS.getValue(itemId);
                 if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
 
@@ -353,7 +353,7 @@ public class CreateNewAgeRecipeHandler {
                 }
 
                 var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
-                        new ResourceLocation("gtcalcboard", "kinetic_gen/" + MOD_ID + "/" + c.path),
+                        ResourceLocation.tryParse("gtcalcboard:kinetic_gen/" + MOD_ID + "/" + c.path),
                         category,
                         itemId,
                         name,

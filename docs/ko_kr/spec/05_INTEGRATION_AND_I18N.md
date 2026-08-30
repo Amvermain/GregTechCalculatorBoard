@@ -42,82 +42,82 @@ flowchart TB
 * `registerBomToRecipeTree(bomSummary, warnings)`: BoM 쇼핑 리스트를 레시피 뷰어의 트리/목표로 1클릭 등록.
 * `lookupRecipe(stack)` / `lookupUsage(stack)`: `[R]`, `[U]` 단축키 호버 시 레시피/용도 조회 창 호출.
 
-### 1.2 어댑터 구현체별 특성
-* **`EmiRecipeViewerAdapter` (`integration.emi`)**:
-  - EMI 공식 `EmiRecipeHandler`를 등록하여 보드가 열려 있을 때 `[+]` 버튼으로 캔버스에 직접 노드 배치.
-  - `EmiFavorites.favorites` 동기화 및 `EmiRecipeTree` BoM 목표 등록.
-* **`JeiRecipeViewerAdapter` (`integration.jei`)**:
-  - JEI 레시피 카탈로그 인덱싱, `[R]`/`[U]` 조회, JEI 북마크 바 연동.
-  - JEI++ (Just Enough Calculation) 환경에서 BoM 쇼핑 리스트 클립보드 및 트리 등록 연동.
-* **`VanillaRecipeViewerAdapter` (`integration.vanilla`)**:
-  - 레시피 뷰어 모드가 없는 순수 바닐라 또는 헤드리스 환경용 폴백. `RecipeManager` 기본 레시피 인덱싱 지원.
-
 ---
 
 ## 2. 모드 호환성 어댑터 시스템 (`com.gtceu.calcboard.compat`)
 
-GTCalcBoard는 특정 모드에 종속되지 않는 독립적 확장성을 위해 **우선순위 기반 SPI(Service Provider Interface)** 라우팅 시스템을 채택하고 있으며, 단일 책임 원칙(SRP)에 따라 모드별 전용 서브패키지로 모듈화되어 있습니다.
+GTCalcBoard는 특정 모드에 종속되지 않는 독립적 확장성을 위해 **우선순위 기반 SPI(Service Provider Interface)** 라우팅 시스템을 채택하고 있으며, 전용 서버 크래시를 원천 차단하기 위해 **공용 연산 계층(`compat.*`)과 클라이언트 GUI 계층(`client.gui.compat.*`)을 완벽히 분리**하였습니다.
 
 ```mermaid
 graph LR
-    subgraph Registry["ModAdapterRegistry"]
+    subgraph Registry["ModAdapterRegistry (Server & Client 공용)"]
         direction TB
         R_SYS["systeams (Priority 110)"]
+        R_START["start (Priority 105)"]
+        R_NA["createnewage (Priority 105)"]
         R_TH["thermal (Priority 100)"]
         R_GT["gtceu (Priority 100)"]
         R_CR["create (Priority 90)"]
         R_VAN["minecraft (Priority 0 Fallback)"]
     end
 
-    subgraph ModPackage["모드 전용 서브패키지 구조 (3단 분리)"]
-        Facade["*ModAdapter (경량 파사드 SPI 진입점)"]
-        Crawler["*AddonCrawler (하드웨어/NBT 크롤링)"]
-        Gui["*GuiHandler (UI 패널/툴팁 렌더링)"]
-        Recipe["*RecipeHandler (레시피 리플렉션/변환)"]
-        Facade --> Crawler
-        Facade --> Gui
-        Facade --> Recipe
+    subgraph CoreAdapters["순수 공용 어댑터 계층 (헤드리스 100% 안전)"]
+        GT_AD["GTCEuModAdapter<br/>- physics.GTBoilerPhysics<br/>- physics.GTTurbinePhysics<br/>- physics.GTMultiblockBOMResolver"]
+        CR_AD["CreateModAdapter"]
+        CNA_AD["CreateNewAgeModAdapter"]
+        TH_AD["ThermalModAdapter"]
+        SYS_AD["SysteamsModAdapter"]
+        STR_AD["StarTModAdapter"]
+        VAN_AD["VanillaModAdapter"]
     end
 
-    Registry --> ModPackage
+    subgraph ClientGui["클라이언트 전용 GUI 계층 (@OnlyIn Dist.CLIENT)"]
+        GUI_REG["ModGuiHandlerRegistry"]
+        GT_GUI["GTCEuModGuiHandler"]
+        CR_GUI["CreateModGuiHandler"]
+        CNA_GUI["CreateNewAgeModGuiHandler"]
+        TH_GUI["ThermalModGuiHandler"]
+        SYS_GUI["SysteamsModGuiHandler"]
+    end
+
+    Registry --> CoreAdapters
+    CoreAdapters -.-> ClientGui
 ```
 
-### 2.1 패키지별 세부 구조
+### 2.1 7대 모드 어댑터 명세
 
 | 서브패키지 | 주요 컴포넌트 | 전담 역할 및 기능 |
 | :--- | :--- | :--- |
-| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT 다중블록 특성 및 가열 코일/터빈 로터/병렬·유지보수 해치 크롤링<br/>• 전압 티어 및 EU/t 툴팁/미리보기 렌더링<br/>• GTRecipe 리플렉션 및 발전기/소비기 스펙 변환<br/>• 스팀 모드(LP/HP) 및 스팀 멀티블록 자동 구성 및 검증 |
-| `compat.create` | `CreateModAdapter`<br/>`CreateGuiHandler`<br/>`CreateRecipeHandler` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• RPM 속도 제어 버튼 및 Stress Unit (SU) 툴팁 렌더링<br/>• Create 가공 레시피 소요 시간 및 부하 변환 |
-| `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeGuiHandler`<br/>`CreateNewAgeRecipeHandler` | • 전기 모터(FE ➔ SU) 및 발전기(SU ➔ FE) 가상 레시피 생성<br/>• 회전력과 전력 간 변환 효율 및 전압 단계 제어 |
-| `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAddonCrawler`<br/>`ThermalGuiHandler`<br/>`ThermalRecipeHandler` | • 서멀 증강 및 KubeJS 커스텀 키트(`AugmentData` NBT) 크롤링<br/>• 다이내모 발전량(RF/t) 툴팁 렌더링<br/>• 서멀 다이내모 및 기계 레시피 변환 |
-| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsGuiHandler`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁 렌더링<br/>• SysteamsConfig 리플렉션 기반 증기 열효율 및 생산량 변환 |
-| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper`<br/>`StarTAddonCrawler` | • Star Technology 특수 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 다중 블록 제약 검증 |
-| `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 타 모드 기본 폴백 처리 |
-
-### 2.2 `IModAdapter` 생명주기 및 핵심 책임 명세
-
-* `onMachineIconChanged(node, oldIcon, newIcon)`: 머신 아이콘 전환 시 멀티블록 플래그, 스팀 모드, 기본 병렬 수치(8x 등) 자동 조정 및 슬롯 동기화.
-* `getEnergyType(node)`: 노드의 에너지 형태(`ELECTRIC_EU`, `KINETIC_SU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `NONE`) 결정.
-* `computeOverclock(node, targetTier, isGenerator)`: 전압 오버클럭, 서브틱 CPS, 로터 효율, 코일 온도 할인, 증강 장치 배수 연산.
-* `validateNode(node, graph, warnings)`: 반사판 요구 티어, 터빈 유량 결손, 해치/버스 슬롯 및 용량 제약 연역 검증.
-* `buildMultiblockBOM(node, warnings)`: 멀티블록 청사진 기반 필요 블록 수량 및 오버라이드 해치 BOM 산출.
-
-### 2.3 연역적 분석 원칙 (Rule 5: Deductive Analysis Policy)
-
-* **휴리스틱 금지**: 아이템 이름, 툴팁 텍스트, 아이템 ID 경로 문자열 매칭(`id.getPath().contains(...)`)을 통한 스펙 추론을 엄격히 배제.
-* **결정론적 데이터 획득**:
-  1. 공식 모드 API 및 런타임 Java 리플렉션을 통한 기능적 연역.
-  2. 모드 내부 시뮬레이션 및 동작 파라미터 직접 추출.
-  3. 결정론적 NBT 수치 데이터 구조(예: `AugmentData` 내 순수 Float/Int 태그) 및 공식 `TagKey` 직접 검사.
-
-### 2.4 크롤러 오케스트레이션 및 비활성 아이템 자동 정리 (`DynamicAddonCrawler`)
-* **활성 스택 일괄 수집**: EMI 인덱스(`EmiApi.getIndexStacks()`) 및 인게임 레시피 매니저(`mc.level.getRecipeManager()`)를 순회하여 현재 게임 내에 실제로 활성화된 모든 `ItemStack`과 커스텀 NBT를 수집.
-* **어댑터 위임**: 수집된 활성 스택을 각 모드 어댑터의 `discoverAddons(collector, activeStacks)`로 전달하여 모듈별로 크롤링.
-* **비활성 아이템 자동 제거 (Pruning)**: 모드팩에서 레시피를 삭제하거나 EMI에서 숨긴 아이템(예: 기본 서멀 업그레이드 키트 등)은 카탈로그에서 자동으로 제외되어 깨끗한 설정창을 보장.
+| `compat.gtceu` | `GTCEuModAdapter`<br/>`physics.GTBoilerPhysics`<br/>`physics.GTTurbinePhysics`<br/>`physics.GTMultiblockBOMResolver`<br/>`helper.* (Coil, Parallel, Reflector, Hatch)` | • GT 멀티블록 물리, 발열 코일/터빈 로터/병렬·유지보수 해치 연역<br/>• 전압 티어 오버클럭 및 순수 헤드리스 툴팁 데이터 생성<br/>• 스팀 모드(LP/HP) 및 멀티블록 자동 구성 및 제약 검증<br/>• 멀티블록 청사진 기반 BOM 및 해치 오버라이드 산출 |
+| `compat.create` | `CreateModAdapter`<br/>`CreateRecipeHandler` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• RPM 속도 제어 및 Stress Unit (SU) 물리 연산 |
+| `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeRecipeHandler` | • 전기 모터(FE ➔ SU) 및 발전기(SU ➔ FE) 가상 레시피 생성<br/>• 자석 강도 합성 및 회전력/전력 상호 변환 효율 연산 |
+| `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • 써멀 증강 및 커스텀 키트(`AugmentData` NBT) 연역 추출<br/>• 다이내모 발전량(RF/t) 및 기계 소요 시간 계수 합성 |
+| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁/수지 연산<br/>• 복합 연료 증기 열효율 및 생산량 변환 |
+| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper` | • Star Technology 초고압 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 멀티블록 제약 검증 |
+| `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 비특화 모드 기본 폴백 처리 |
 
 ---
 
-## 3. 시간 단위 환산 시스템 (`RateTimeUnit`)
+## 3. 연역적 분석 원칙 (Rule 5: Deductive Analysis Policy)
+
+GTCalcBoard는 모드팩 커스텀 환경에서의 안정성을 위해 3단계 결정론적 연역 체계를 엄격히 준수합니다.
+
+```mermaid
+flowchart TD
+    subgraph ThreeStep["3단계 결정론적 연역 체계"]
+        STEP1["1단계: 공식 API 및 런타임 리플렉션<br/>(MachineDefinition, ICoilType, SysteamsConfig 등)"]
+        STEP2["2단계: 모드 내부 객체/물리 시뮬레이션<br/>(OverclockingLogic, Kinetic Stress, Magnet Formula)"]
+        STEP3["3단계: 결정론적 NBT 수치 & 공식 TagKey<br/>(AugmentData Float/Int 태그, Forge/Thermal 태그)"]
+    end
+
+    PROHIBIT["❌ 문자열 contains, 아이템 이름, 툴팁 파싱 휴리스틱 전면 금지"]
+    
+    STEP1 & STEP2 & STEP3 --> RESULT["100% 결정론적 스펙 획득"]
+```
+
+---
+
+## 4. 시간 단위 환산 시스템 (`RateTimeUnit`)
 
 아이템 및 유체 흐름률을 다양한 시간 단위로 스케일링하여 표기할 수 있습니다.
 
@@ -129,32 +129,24 @@ graph LR
 | `PER_HOUR` | `/h` | $3600.0$ | `gui.gtcalcboard.unit.per_hour` | 시간당 유량 |
 | `PER_DAY` | `/d` | $86400.0$ | `gui.gtcalcboard.unit.per_day` | 일단위 유량 |
 
-### 3.1 단위 변환 공식
-$$\text{Displayed Rate} = \text{Base Rate (per second)} \times \text{RateTimeUnit.getFactor}()$$
+---
+
+## 5. 수치 포맷팅 규격 및 전역 유체 단위 (`FormatUtil`, `NumberFormatUtil`)
+
+### 5.1 전력 표기 접두사
+- $0 \dots 999$: 소수점 1자리 (`120.0 EU/t`)
+- $1,000 \dots 999,999$: `k` 접두사 (`1.25k EU/t`)
+- $1,000,000 \dots 999,999,999$: `M` 접두사 (`4.50M EU/t`)
+- $1,000,000,000$ 이상: `G` 접두사 (`12.00G EU/t`)
+
+### 5.2 전역 유체 단위 모드 (`FluidUnitMode`)
+- `AUTO` (기본값): 수치에 따라 자동 변환 ($< 1,000\text{ mB}$는 $\text{mB/s}$, $\ge 1,000\text{ mB}$는 $\text{B/s}$).
+- `ALWAYS_MB`: 모든 유체를 밀리버킷 단위로 일괄 통일 (`500 mB/s`, `2500 mB/s`).
+- `ALWAYS_B`: 모든 유체를 버킷 단위로 일괄 통일 (`0.50 B/s`, `2.50 B/s`).
 
 ---
 
-## 4. 수치 포맷팅 규격 (`FormatUtil`)
-
-사용자 친화적인 수치 가독성을 위해 다음과 같은 접두사 규칙을 적용합니다:
-
-### 4.1 EU/t 전력 표기 규칙
-* $0 \dots 999$: 소수점 1자리 (`120.0 EU/t`)
-* $1,000 \dots 999,999$: `k` 접두사 (`1.25k EU/t`)
-* $1,000,000 \dots 999,999,999$: `M` 접두사 (`4.50M EU/t`)
-* $1,000,000,000$ 이상: `G` 접두사 (`12.00G EU/t`)
-
-### 4.2 흐름률(Flow Rate) 및 전역 유체 단위 (`FluidUnitMode`)
-* **아이템**: 정수 또는 소수점 2자리 (`2.50 /s`)
-* **전역 유체 단위 모드 (`FluidUnitMode`)**:
-  - `AUTO` (기본값): 유량 수치에 따라 자동 단위 변환 ($< 1,000\text{ mB}$는 $\text{mB/s}$, $\ge 1,000\text{ mB}$는 $\text{B/s}$).
-  - `ALWAYS_MB`: 모든 유체를 밀리버킷 단위로 일괄 통일 표기 (`500 mB/s`, `2500 mB/s`, `0.10 mB/s`).
-  - `ALWAYS_B`: 모든 유체를 버킷 단위로 일괄 통일 표기 (`0.50 B/s`, `2.50 B/s`, `0.0001 B/s`).
-* **조작 및 영속화**: 상단 툴바의 유체 단위 버튼(`Shift+T`)으로 실시간 순환 전환되며 클라이언트 설정에 자동 영속화.
-
----
-
-## 5. 다국어(i18n) 키 명명 규칙 및 동기화
+## 6. 다국어(i18n) 키 명명 규칙 및 동기화
 
 모든 UI 텍스트는 `ko_kr.json` 및 `en_us.json` 언어 리소스 파일에 상호 1:1로 동기화되어 관리됩니다.
 

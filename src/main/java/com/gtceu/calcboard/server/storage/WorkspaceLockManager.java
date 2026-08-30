@@ -1,5 +1,8 @@
 package com.gtceu.calcboard.server.storage;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -104,6 +107,20 @@ public class WorkspaceLockManager {
         return false;
     }
 
+    public synchronized List<String> releaseAllLocksForPlayer(UUID teamId, UUID playerUUID) {
+        if (playerUUID == null) return Collections.emptyList();
+        List<String> releasedPages = new ArrayList<>();
+        activeLocks.entrySet().removeIf(entry -> {
+            LockInfo info = entry.getValue();
+            if (info.getHolderUUID().equals(playerUUID) && (teamId == null || info.getTeamId().equals(teamId))) {
+                releasedPages.add(info.getPageId());
+                return true;
+            }
+            return false;
+        });
+        return releasedPages;
+    }
+
     public synchronized boolean forceReleaseLock(UUID teamId, String pageId) {
         if (teamId == null) return false;
         String key = getLockKey(teamId, pageId);
@@ -141,7 +158,28 @@ public class WorkspaceLockManager {
         activeLocks.entrySet().removeIf(e -> e.getValue().isExpired());
     }
 
-    public void clearAll() {
+    /**
+     * Checks if a player has legitimate lock ownership to commit changes to a page,
+     * or if the page is currently unlocked.
+     */
+    public synchronized boolean canCommit(UUID teamId, String pageId, UUID playerUUID) {
+        if (teamId == null || playerUUID == null) return false;
+        cleanExpiredLocks();
+        LockInfo lock = getLock(teamId, pageId);
+        if (lock == null) {
+            return true; // Unlocked page allows single-commit
+        }
+        return lock.getHolderUUID().equals(playerUUID);
+    }
+
+    /**
+     * Resets all active locks (called on world/server unload).
+     */
+    public synchronized void reset() {
         activeLocks.clear();
+    }
+
+    public void clearAll() {
+        reset();
     }
 }

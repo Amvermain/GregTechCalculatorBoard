@@ -13,12 +13,12 @@ GTCalcBoard의 UI 계층은 마인크래프트의 렌더링 파이프라인과 �
 flowchart TB
     subgraph Viewport["1. 뷰포트 & 캔버스 코어"]
         direction LR
-        BS["BoardScreen<br/>(2D 카메라, 줌/팬)"] ~~~ CIH["CanvasInteractionHandler<br/>(선택, 드래그, 스냅)"] ~~~ CR["ConnectionRenderer<br/>(베지어 와이어)"] ~~~ NCR["NodeCardRenderer<br/>(노드 카드 & 게이지)"]
+        BS["BoardScreen<br/>(2D 카메라, 줌/팬, 화면 맞춤)"] ~~~ CIH["CanvasInteractionHandler<br/>(PanZoom / Selection / QuickAdd)"] ~~~ CR["ConnectionRenderer<br/>(베지어 와이어 & WireSpatialIndex)"] ~~~ NCR["NodeCardRenderer<br/>(노드 카드 & 게이지)"]
     end
 
     subgraph Dialogs["2. 대화상자 & 설정 모달"]
         direction LR
-        MCD["MachineConfigDialog<br/>(병렬 제어, 애드온 랙)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(전역 밸런스 대시보드)"] ~~~ ICP["ItemContributionPopup<br/>(원자재/부산물 세부 기여도)"] ~~~ SO["SummaryOverlay<br/>(현재 페이지 실시간 결산)"] ~~~ RSD["RecipeSearch & Filter<br/>(비동기 검색 & 카테고리 필터)"]
+        MCD["MachineConfigDialog<br/>(병렬 제어, 애드온 랙)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(전역 밸런스 대시보드)"] ~~~ BSD["BoardSettingsDialog<br/>(환경설정 & 비율 한도)"] ~~~ BPD["BlueprintDialogs<br/>(가져오기/내보내기)"] ~~~ RSD["RecipeSearch & Filter<br/>(CacheManager & QueryEngine)"]
     end
 
     subgraph Nav["3. 네비게이션 & 도구"]

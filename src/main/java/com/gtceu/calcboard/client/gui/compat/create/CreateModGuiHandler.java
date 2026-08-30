@@ -1,63 +1,40 @@
-package com.gtceu.calcboard.compat.create;
+package com.gtceu.calcboard.client.gui.compat.create;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-
-import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.compat.IModGuiHandler;
+import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 
 /**
- * Handles UI rendering and mouse interactions for Create kinetic nodes.
+ * Create implementation of {@link IModGuiHandler}.
  */
-public class CreateGuiHandler {
+@OnlyIn(Dist.CLIENT)
+public class CreateModGuiHandler implements IModGuiHandler {
 
-    public static String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        double suRate = node.getEffectiveTotalEUt();
-        return node.isGenerator()
-                ? String.format("§6+%,.0f SU", suRate)
-                : String.format("§e%,.0f SU", suRate);
+    @Override
+    public String getModId() {
+        return "create";
     }
 
-    public static List<Component> buildEnergyTooltip(RecipeNode node) {
-        List<Component> tooltipLines = new ArrayList<>();
-        double totSU = node.getEffectiveTotalEUt();
+    @Override
+    public void renderCardControls(GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY, boolean isGlowing) {
         if (node.isGenerator()) {
-            tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
-        } else {
-            tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
-        }
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-        if (CreateModAdapter.isFanProcessingRecipe(node)) {
-            tooltipLines.add(Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint"));
-        }
-        return tooltipLines;
-    }
-
-    public static void renderCardControls(GuiGraphics graphics, Font font,
-                                          RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                          boolean isGlowing) {
-        if (node.isGenerator()) {
-            // Generators have fixed generation output (no variable RPM control, no addon slots)
             String genBadge = "⚡ " + Component.translatable("gui.gtcalcboard.kinetic_generator").getString();
             int badgeW = cardW - 12;
             NodeCardRenderer.drawBtn(graphics, font, genBadge, x + 6, row2Y, badgeW, 14, mouseX, mouseY, 0xFF55FF88);
         } else {
-            // Consumers have RPM speed control via Rotation Speed Controller (RSC) (no addon slots)
             int rpm = node.getRpm();
             String rpmText = rpm + " RPM";
             int rpmW = Math.max(50, font.width(rpmText) + 10);
@@ -73,8 +50,9 @@ public class CreateGuiHandler {
         }
     }
 
-    public static boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node.isGenerator()) return false; // Generator has fixed output speed and cannot cycle RPM
+    @Override
+    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
+        if (node.isGenerator()) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
@@ -83,11 +61,13 @@ public class CreateGuiHandler {
         return mouseX >= x + 6 && mouseX <= x + 6 + rpmW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
-    public static boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        return false; // Create machines do not have addon slots
+    @Override
+    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
+        return false;
     }
 
-    public static boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+    @Override
+    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             node.cycleRpm(button == 1 ? -1 : 1);
@@ -101,7 +81,8 @@ public class CreateGuiHandler {
         return false;
     }
 
-    public static boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
+    @Override
+    public boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             node.cycleRpm(delta > 0 ? 1 : -1);
@@ -115,10 +96,9 @@ public class CreateGuiHandler {
         return false;
     }
 
-    public static void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
-                                           int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
-                                           net.minecraft.client.gui.components.EditBox parallelBox,
-                                           com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    @Override
+    public void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int dialogW,
+                                   int mouseX, int mouseY, float partialTicks, EditBox parallelBox, BoardScreen parent) {
         if (CreateModAdapter.isFanProcessingRecipe(node)) {
             graphics.drawString(font, "§6⚙ " + Component.translatable("gui.gtcalcboard.encased_fan").getString(), x + 10, y + 32, 0xFFFFFFFF, false);
             graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint").getString(), x + 10, y + 48, 0xFF888888, false);
@@ -140,11 +120,9 @@ public class CreateGuiHandler {
         }
     }
 
-    public static boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog,
-                                                 RecipeNode node, int x, int y, int dialogW,
-                                                 double mouseX, double mouseY, int button,
-                                                 net.minecraft.client.gui.components.EditBox parallelBox,
-                                                 com.gtceu.calcboard.client.gui.BoardScreen parent) {
+    @Override
+    public boolean handleDialogHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                           double mouseX, double mouseY, int button, EditBox parallelBox, BoardScreen parent) {
         if (!CreateModAdapter.isFanProcessingRecipe(node) && !node.isGenerator()) {
             int[] rpmPresets = {16, 32, 64, 128, 256};
             int btnX = x + 10;
@@ -163,6 +141,3 @@ public class CreateGuiHandler {
         return false;
     }
 }
-
-
-

@@ -58,8 +58,8 @@ public class NodeCardRenderer {
         FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
         boolean isOperational = node.isOperational(graph);
 
-        // 1. Card Background & Golden/Metallic/Module Outlines
-        int cardBg = !isOperational ? 0xF0251417 : (node.isModule() ? 0xF01D172E : (node.isFusion() ? 0xF022132D : (node.isGenerator() ? 0xF0122218 : 0xF01E222B)));
+        // 1. Card Background & Golden/Metallic/Module Outlines (100% Opaque 0xFF to prevent background bleed-through)
+        int cardBg = !isOperational ? 0xFF251417 : (node.isModule() ? 0xFF1D172E : (node.isFusion() ? 0xFF22132D : (node.isGenerator() ? 0xFF122218 : 0xFF1E222B)));
         graphics.fill(x, y, x + cardW, y + height, cardBg);
 
         int headerColor = !isOperational
@@ -262,9 +262,9 @@ public class NodeCardRenderer {
         }
 
         if (!node.isModule()) {
-            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            var guiHandler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
             boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
-            adapter.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
+            guiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
         }
 
         // 8. Recipe Energy & Duration Info

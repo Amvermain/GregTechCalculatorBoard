@@ -9,7 +9,8 @@ This document is the official QA verification checklist for testing all core fea
 ### 1.1 Canvas Base Controls
 - [ ] **Pan**: Right-click drag moves the canvas smoothly across all directions.
 - [ ] **Zoom**: Mouse wheel scroll zooms between $25\% \sim 200\%$.
-- [ ] **Reset Origin**: Pressing `Space` or clicking the origin reset button centers the viewport at $(0, 0)$.
+- [ ] **Reset Origin**: Pressing `Space` centers the viewport at $(0, 0)$.
+- [ ] **Fit to View (`Home` / `F`)**: Pressing `Home` or `F` automatically centers and scales the camera to encompass all placed nodes.
 - [ ] **Selection & Manipulation**:
   - [ ] Single node click selection and dragging.
   - [ ] Drag-box multi-node selection and batch movement.
@@ -161,6 +162,9 @@ This document is the official QA verification checklist for testing all core fea
 
 - [ ] **Interactive Tutorial**: 15-second guided walkthrough from Step 1 (Adding node) to Step 7 (Packaging module).
 - [ ] **Global Balance Dashboard (`B`)**: Checks net input/output raw material balance across the factory.
+- [ ] **Board Settings Modal (`[⚙ Settings]`)**: Configures fluid rate units (Auto/mB/B), singleplayer pause, and harmonization ratio limits.
+- [ ] **Smart Auto-Connect Filter Dialog**: Interactively select ports via checkboxes when auto-wiring machines.
+- [ ] **Blueprint Metadata Import/Export Preview (`[📥] / [📤]`)**: Displays node count, machine summary, and title/tag metadata before importing or exporting.
 - [ ] **i18n Consistency**: `en_us.json` and `ko_kr.json` are 100% synchronized with matching tokens (`%s`, `%d`).
 
 ---

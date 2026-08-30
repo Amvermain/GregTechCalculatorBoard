@@ -26,13 +26,17 @@ import java.util.List;
 
 public class CalculationTest {
 
-    @org.junit.jupiter.api.BeforeAll
-    public static void setupMinecraft() {
+    static {
         try {
             net.minecraft.SharedConstants.tryDetectVersion();
-            net.minecraft.server.Bootstrap.bootStrap();
+            java.lang.reflect.Field field = net.minecraft.server.Bootstrap.class.getDeclaredField("isBootstrapped");
+            field.setAccessible(true);
+            if (!field.getBoolean(null)) {
+                net.minecraft.server.Bootstrap.bootStrap();
+            }
         } catch (Throwable ignored) {}
     }
+    @Test
     public void testHierarchicalMaterialTreeResolution() {
         Assertions.assertDoesNotThrow(() -> {
             Class<?> matNodeCls = Class.forName("dev.emi.emi.bom.MaterialNode");

@@ -1,13 +1,13 @@
-# [05] External Mod Integrations & i18n Units (Integration & i18n)
+# [05] External Mod Integration & Internationalization (Integration & i18n)
 
 > 📍 **GTCalcBoard Technical Specification Series**
-> [[00] System Overview](00_OVERVIEW.md) ➔ [[01] Core Domain](01_CORE_DOMAIN_AND_MODELS.md) ➔ [[02] Math Engine](02_MATH_AND_ALGORITHMS.md) ➔ [[03] UI Pipeline](03_UI_AND_RENDERING_PIPELINE.md) ➔ [[04] Multiplayer](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) ➔ **[05] External Integration**
+> [[00] System Overview](00_OVERVIEW.md) ➔ [[01] Core Domain & Models](01_CORE_DOMAIN_AND_MODELS.md) ➔ [[02] Math & Algorithms](02_MATH_AND_ALGORITHMS.md) ➔ [[03] UI & Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md) ➔ [[04] Multiplayer & Network](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) ➔ **[05] External Integration & i18n**
 
 ---
 
 ## 1. Unified Recipe Viewer SPI System (`com.gtceu.calcboard.integration.spi`)
 
-Following Clean Architecture principles, GTCalcBoard does not hardcode dependencies on any specific recipe viewer. It provides a pluggable **Recipe Viewer SPI (`IRecipeViewerAdapter`)** that dynamically elects the optimal viewer at runtime:
+Adheres to Clean Architecture by decoupling core calculation models from specific recipe viewers, dynamically electing the optimal viewer via the **`IRecipeViewerAdapter` SPI**.
 
 ```mermaid
 flowchart TB
@@ -18,7 +18,7 @@ flowchart TB
 
     subgraph SPI["Unified SPI Layer (com.gtceu.calcboard.integration.spi)"]
         direction LR
-        RVR["RecipeViewerRegistry<br/>(Priority-Based Auto Election)"] --- IVA["IRecipeViewerAdapter<br/>(Common SPI Interface)"]
+        RVR["RecipeViewerRegistry<br/>(Priority-Based Runtime Election)"] --- IVA["IRecipeViewerAdapter<br/>(Common SPI Interface)"]
     end
 
     subgraph Adapters["Adapter Implementations"]
@@ -26,130 +26,140 @@ flowchart TB
         E_AD["EmiRecipeViewerAdapter"] ~~~ J_AD["JeiRecipeViewerAdapter"] ~~~ V_AD["VanillaRecipeViewerAdapter"]
     end
 
-    subgraph Features["Board Integrations"]
+    subgraph Features["Integrated Features"]
         direction LR
-        SRCH["Recipe Index & Search"] ~~~ HOV["[R]/[U] Hotkey Lookup"] ~~~ FAV_B["Favorites Bar Sync"] ~~~ BOM_T["BoM Tree Target Sync"]
+        SRCH["Recipe Index & Search"] ~~~ HOV["[R]/[U] Keybinding Hooks"] ~~~ FAV_B["Bookmark Sync"] ~~~ BOM_T["BoM Tree Targets"]
     end
 
     Viewers --> SPI --> Adapters --> Features
 ```
 
 ### 1.1 `IRecipeViewerAdapter` Core Contract
-* `getName()` / `getPriority()`: Adapter identifier and priority weighting.
-* `isAvailable()`: Mod loading verification and runtime environment check.
-* `getAllRecipes()`: Harvests all valid recipes instantiable as canvas nodes.
-* `getFavorites()`: Real-time synchronization with player pinned/bookmarked recipes.
-* `registerBomToRecipeTree(bomSummary, warnings)`: 1-click registration of BoM shopping lists into the recipe tree / calculation goals.
-* `lookupRecipe(stack)` / `lookupUsage(stack)`: Triggers recipe or usage views on `[R]` / `[U]` hover.
-
-### 1.2 Pluggable Adapter Implementations
-* **`EmiRecipeViewerAdapter` (`integration.emi`)**:
-  - Registers official `EmiRecipeHandler` to place nodes directly from EMI `[+]` buttons when the board is open.
-  - Syncs `EmiFavorites.favorites` and integrates with `EmiRecipeTree` BoM targets.
-* **`JeiRecipeViewerAdapter` (`integration.jei`)**:
-  - Indexes JEI recipe catalogs, handles `[R]`/`[U]` lookups, and synchronizes JEI bookmarks.
-  - Integrates with JEI++ (Just Enough Calculation) for BoM recipe tree target registration.
-* **`VanillaRecipeViewerAdapter` (`integration.vanilla`)**:
-  - Fallback adapter for pure vanilla or headless environments without recipe viewer mods. Indexes base Minecraft `RecipeManager` recipes.
+* `getName()` / `getPriority()`: Adapter identifier and priority rating.
+* `isAvailable()`: Runtime availability check.
+* `getAllRecipes()`: Extracts all usable recipes into canvas nodes.
+* `getFavorites()`: Syncs bookmarked recipe lists.
+* `registerBomToRecipeTree(bomSummary, warnings)`: 1-click BoM shopping list registration.
+* `lookupRecipe(stack)` / `lookupUsage(stack)`: Triggers recipe/usage viewers on `[R]` and `[U]` hover.
 
 ---
 
 ## 2. Mod Compatibility Adapter System (`com.gtceu.calcboard.compat`)
 
-GTCalcBoard implements a **Priority-Based SPI (Service Provider Interface)** router to support multi-mod ecosystems with clean Single Responsibility Principle (SRP) decomposition across dedicated sub-packages.
+GTCalcBoard implements priority-based SPI routing with strict separation between **Common Headless Adapters (`compat.*`)** and **Client-Only GUI Handlers (`client.gui.compat.*`)**.
 
 ```mermaid
 graph LR
-    subgraph Registry["ModAdapterRegistry"]
+    subgraph Registry["ModAdapterRegistry (Server & Client Common)"]
         direction TB
         R_SYS["systeams (Priority 110)"]
+        R_START["start (Priority 105)"]
+        R_NA["createnewage (Priority 105)"]
         R_TH["thermal (Priority 100)"]
         R_GT["gtceu (Priority 100)"]
         R_CR["create (Priority 90)"]
         R_VAN["minecraft (Priority 0 Fallback)"]
     end
 
-    subgraph ModPackage["Sub-package 3-Tier Architecture"]
-        Facade["*ModAdapter (Lightweight Facade SPI)"]
-        Crawler["*AddonCrawler (Hardware & NBT Discovery)"]
-        Gui["*GuiHandler (UI Controls & Energy Tooltips)"]
-        Recipe["*RecipeHandler (Recipe Reflection & Details)"]
-        Facade --> Crawler
-        Facade --> Gui
-        Facade --> Recipe
+    subgraph CoreAdapters["Pure Common Adapters (100% Headless Safe)"]
+        GT_AD["GTCEuModAdapter<br/>- physics.GTBoilerPhysics<br/>- physics.GTTurbinePhysics<br/>- physics.GTMultiblockBOMResolver"]
+        CR_AD["CreateModAdapter"]
+        CNA_AD["CreateNewAgeModAdapter"]
+        TH_AD["ThermalModAdapter"]
+        SYS_AD["SysteamsModAdapter"]
+        STR_AD["StarTModAdapter"]
+        VAN_AD["VanillaModAdapter"]
     end
 
-    Registry --> ModPackage
+    subgraph ClientGui["Client-Only GUI Layer (@OnlyIn Dist.CLIENT)"]
+        GUI_REG["ModGuiHandlerRegistry"]
+        GT_GUI["GTCEuModGuiHandler"]
+        CR_GUI["CreateModGuiHandler"]
+        CNA_GUI["CreateNewAgeModGuiHandler"]
+        TH_GUI["ThermalModGuiHandler"]
+        SYS_GUI["SysteamsModGuiHandler"]
+    end
+
+    Registry --> CoreAdapters
+    CoreAdapters -.-> ClientGui
 ```
 
-### 2.1 Sub-Package Architecture Breakdown
+### 2.1 7 Mod Adapter Specifications
 
-| Sub-Package | Core Components | Assigned Responsibilities |
+| Subpackage | Primary Components | Roles & Features |
 | :--- | :--- | :--- |
-| `compat.gtceu` | `GTCEuModAdapter`<br/>`GTCEuAddonCrawler`<br/>`GTCEuGuiHandler`<br/>`GTCEuRecipeHandler` | • GT multiblock traits, heating coils, turbine rotors, parallel/maintenance hatches discovery<br/>• Voltage tier badges and EU/t tooltip rendering<br/>• GTRecipe reflection and generator/consumer conversion<br/>• Steam mode (LP/HP) and steam multiblock auto-configuration and validation |
-| `compat.create` | `CreateModAdapter`<br/>`CreateGuiHandler`<br/>`CreateRecipeHandler` | • Virtual kinetic generator recipes (Large Water Wheel, Windmill, Steam Engine, etc.)<br/>• RPM control buttons and Stress Unit (SU) tooltip rendering<br/>• Create processing recipe duration and stress load adaptation |
-| `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeGuiHandler`<br/>`CreateNewAgeRecipeHandler` | • Electric motor (FE ➔ SU) and generator (SU ➔ FE) virtual recipes<br/>• Torque/power conversion efficiency and voltage step regulation |
-| `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAddonCrawler`<br/>`ThermalGuiHandler`<br/>`ThermalRecipeHandler` | • Thermal augments and KubeJS custom kits (`AugmentData` NBT) crawling<br/>• Dynamo generation (RF/t) tooltip rendering<br/>• Thermal dynamo and machine recipe detail extraction |
-| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsGuiHandler`<br/>`SysteamsRecipeHandler` | • Steam boiler (Steam mB/s) and Steam Dynamo tooltip rendering<br/>• SysteamsConfig reflection for boiling heat efficiency and steam production |
-| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper`<br/>`StarTAddonCrawler` | • Star Technology custom plasma turbines (SPT/NPT) and multi-helix multiblock support<br/>• SPT/NPT trait addon compatibility and structure constraints validation |
-| `compat.vanilla` | `VanillaModAdapter` | • Universal singleblock fallback for standard Minecraft recipes |
-
-### 2.2 `IModAdapter` Lifecycle & Core Responsibilities
-
-* `onMachineIconChanged(node, oldIcon, newIcon)`: Automatically adjusts multiblock flag, steam mode, default parallel (8x etc.), and slot synchronization upon icon change.
-* `getEnergyType(node)`: Resolves the node's physical energy model (`ELECTRIC_EU`, `KINETIC_SU`, `ELECTRIC_FE`, `HEAT_OR_SELF`, `NONE`).
-* `computeOverclock(node, targetTier, isGenerator)`: Calculates voltage overclocking, sub-tick batches, rotor efficiency, coil temperature discounts, and augment multipliers.
-* `validateNode(node, graph, warnings)`: Deterministically validates reflector requirements, turbine flow deficits, and hatch/bus slot constraints.
-* `buildMultiblockBOM(node, warnings)`: Solves multiblock structure bill of materials from controller pattern recipes with hybrid hatch overrides.
-
-### 2.3 Addon & Spec Deductive Analysis Policy (Rule 5)
-
-* **Strict Anti-Heuristic Rule**: String matching on tooltips, item display names, or raw item paths (`id.getPath().contains(...)`) to deduce machine specs or addon properties is strictly forbidden.
-* **Deterministic Deduction**:
-  1. Official mod APIs and runtime Java reflection (`Functional Deduction`).
-  2. In-game object / simulation state execution.
-  3. Pure NBT numeric tags (e.g. `AugmentData` float/int compound tags) and official Forge `TagKey` registries.
-
-### 2.4 Dynamic Crawler Orchestration & Dead Item Pruning (`DynamicAddonCrawler`)
-* **Active Stack Harvesting**: Gathers all live `ItemStack` instances with NBT directly from EMI index (`EmiApi.getIndexStacks()`) and game level recipes (`mc.level.getRecipeManager()`).
-* **Adapter Delegation**: Dispatches active stacks to `adapter.discoverAddons(collector, activeStacks)` without hardcoding mod-specific logic in the central crawler.
-* **Dead Item Pruning**: Automatically filters out disabled items (items hidden from EMI and with no recipes) to ensure a clean addon configuration catalog.
+| `compat.gtceu` | `GTCEuModAdapter`<br/>`physics.GTBoilerPhysics`<br/>`physics.GTTurbinePhysics`<br/>`physics.GTMultiblockBOMResolver`<br/>`helper.*` | • GT multiblock physics, coil/rotor/hatch deduction<br/>• Overclocking, headless energy tooltips<br/>• Steam modes & multiblock validation<br/>• Multiblock BOM and hatch overrides |
+| `compat.create` | `CreateModAdapter`<br/>`CreateRecipeHandler` | • Kinetic generator virtual recipes (Water Wheel, Windmill)<br/>• RPM speed control & Stress Unit (SU) math |
+| `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeRecipeHandler` | • Electric Motor (FE ➔ SU) and Generator (SU ➔ FE) recipes<br/>• Magnet strength compounding & conversion efficiency |
+| `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • Thermal augments & custom kits (`AugmentData` NBT)<br/>• Dynamo RF/t generation and machine speed multipliers |
+| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • Steam boiler (Steam mB/s) and dynamo tooltips<br/>• Composite fuel thermal efficiency scaling |
+| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper` | • Star Technology plasma turbines (SPT/NPT) and multi-helix structures<br/>• SPT/NPT trait compatibility and multiblock validation |
+| `compat.vanilla` | `VanillaModAdapter` | • Standard singleblock and unspecialized mod fallbacks |
 
 ---
 
-## 3. Rate Time Units & Numerical Formatting
+## 3. Deductive Analysis Policy (Rule 5)
 
-### 2.1 Time Unit Enumeration (`RateTimeUnit`)
+```mermaid
+flowchart TD
+    subgraph ThreeStep["3-Step Deterministic Deduction"]
+        STEP1["Step 1: Official APIs & Java Reflection<br/>(MachineDefinition, ICoilType, SysteamsConfig)"]
+        STEP2["Step 2: Physics Simulations & Internal Objects<br/>(OverclockingLogic, Kinetic Stress, Magnet Math)"]
+        STEP3["Step 3: Deterministic NBT & Official TagKeys<br/>(AugmentData Float/Int tags, Forge/Thermal tags)"]
+    end
 
-Configurable via hotkey `T` or settings dialog:
-
-$$\text{Displayed Rate} = \text{RatePerSecond} \times \text{Multiplier}$$
-
-| Unit | ID | Multiplier | Suffix |
-| :--- | :--- | :--- | :--- |
-| **Tick** | `TICK` | $\frac{1}{20} = 0.05$ | `/t`, `mB/t` |
-| **Second** (Default) | `SECOND` | $1.0$ | `/s`, `mB/s` |
-| **Minute** | `MINUTE` | $60.0$ | `/min`, `mB/min` |
-| **Hour** | `HOUR` | $3,600.0$ | `/h`, `B/h` |
-| **Day** | `DAY` | $86,400.0$ | `/d`, `B/d` |
-
-### 3.2 Energy & Flow Formatting (`FormatUtil`)
-
-* **Energy**: `formatEU(4800)` $\rightarrow$ `"4.80k EU/t"`, `formatEU(125000000)` $\rightarrow$ `"125.0M EU/t"`
-* **Flows**: `formatFluid(1200)` $\rightarrow$ `"1.20k mB/s"`, `formatFluid(0.5)` $\rightarrow$ `"0.50 mB/s"`
-* **Global Fluid Unit Formatting (`FluidUnitMode`)**:
-  - `AUTO` (Default): Smart scaling ($< 1,000\text{ mB}$ in $\text{mB/s}$, $\ge 1,000\text{ mB}$ in $\text{B/s}$).
-  - `ALWAYS_MB`: Force all fluids to millibuckets (`500 mB/s`, `2500 mB/s`, `0.10 mB/s`).
-  - `ALWAYS_B`: Force all fluids to buckets (`0.50 B/s`, `2.50 B/s`, `0.0001 B/s`).
-  - Toggled via the toolbar button (`Shift+T`) and persisted in client configuration.
+    PROHIBIT["❌ String contains, item names, and tooltip parsing strictly banned"]
+    
+    STEP1 & STEP2 & STEP3 --> RESULT["100% Deterministic Spec Extraction"]
+```
 
 ---
 
-## 4. Localization & i18n Synchronization (`assets/gtcalcboard/lang`)
+## 4. Time Unit System (`RateTimeUnit`)
 
-UI text is strictly managed via language translation files with 100% key synchronization between `en_us.json` and `ko_kr.json`.
+| Constant | Suffix | Scaling Factor ($F$) | Localization Key | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `PER_TICK` | `/t` | $0.05$ | `gui.gtcalcboard.unit.per_tick` | Per-tick flow (20 ticks/sec) |
+| `PER_SECOND` | `/s` | $1.0$ | `gui.gtcalcboard.unit.per_second` | Per-second flow (Default base) |
+| `PER_MINUTE` | `/min` | $60.0$ | `gui.gtcalcboard.unit.per_minute` | Per-minute flow |
+| `PER_HOUR` | `/h` | $3600.0$ | `gui.gtcalcboard.unit.per_hour` | Per-hour flow |
+| `PER_DAY` | `/d` | $86400.0$ | `gui.gtcalcboard.unit.per_day` | Per-day flow |
 
 ---
 
-> 🏁 **End of Technical Specification Series**
-> Return to [[Master Index]](CODE_SPECIFICATION.md)
+## 5. Numerical Formatting & Global Fluid Units (`FormatUtil`, `NumberFormatUtil`)
+
+### 5.1 Power Formatting Prefixes
+- $0 \dots 999$: 1 decimal (`120.0 EU/t`)
+- $1,000 \dots 999,999$: `k` prefix (`1.25k EU/t`)
+- $1,000,000 \dots 999,999,999$: `M` prefix (`4.50M EU/t`)
+- $\ge 1,000,000,000$: `G` prefix (`12.00G EU/t`)
+
+### 5.2 Global Fluid Unit Modes (`FluidUnitMode`)
+- `AUTO` (Default): Auto-formats ($< 1,000\text{ mB}$ as $\text{mB/s}$, $\ge 1,000\text{ mB}$ as $\text{B/s}$).
+- `ALWAYS_MB`: Unifies all fluids to millibuckets (`500 mB/s`, `2500 mB/s`).
+- `ALWAYS_B`: Unifies all fluids to buckets (`0.50 B/s`, `2.50 B/s`).
+
+---
+
+## 6. Internationalization (i18n) Synchronization
+
+All user-facing strings are synchronized 1:1 between `en_us.json` and `ko_kr.json`.
+
+```json
+{
+  "gui.gtcalcboard.title": "GT Calculator Board",
+  "gui.gtcalcboard.tab.personal": "Personal Board",
+  "gui.gtcalcboard.tab.team": "Team Board",
+  "gui.gtcalcboard.unit.per_second": "Per Second (/s)",
+  "gui.gtcalcboard.dialog.machine_config.title": "Machine Configuration",
+  "gui.gtcalcboard.dialog.dashboard.title": "Global Balance Dashboard",
+  "gui.gtcalcboard.toast.lock_acquired": "Acquired edit lock.",
+  "gui.gtcalcboard.toast.conflict": "Board was modified by another teammate."
+}
+```
+
+---
+
+> 🏠 **Return to Overview**: [[00] System Overview & Architecture](00_OVERVIEW.md)  
+> 📑 **Master Specification Index**: [CODE_SPECIFICATION.md](../CODE_SPECIFICATION.md)

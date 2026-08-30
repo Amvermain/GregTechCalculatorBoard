@@ -46,7 +46,7 @@ public class IngredientStack {
 
 ---
 
-### 1.3 `RecipeNode` (노드 도메인 모델)
+### 1.3 `RecipeNode` (순수 도메인 노드 모델)
 캔버스에 배치되는 기계 카드, 발전기, 또는 복합 모듈의 전체 상태를 보유하며, 모드 특화 규칙은 `IModAdapter`로 위임합니다.
 
 ```mermaid
@@ -83,17 +83,17 @@ classDiagram
     }
 ```
 
-* **클린 아키텍처 및 SPI 위임**:
-  - `RecipeNode`는 순수 계산 도메인 엔티티로서, 특정 모드(GTCEu, Create, Thermal 등)의 내부 코드를 직접 참조하지 않습니다.
-  - 머신 아이콘 변경 이벤트(`setMachineIcon`), 에너지 타입 해소(`getEnergyType`), 단일 기계 전력량 계산(`getSingleMachineEUt`), 노드 운영 유효성 검증(`isOperational`)은 모두 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
+* **클린 아키텍처 및 SPI 위임 (Pure Domain Model)**:
+  - `RecipeNode`는 모든 모드(Create, Thermal, GTCEu, Vanilla 등)를 아우르는 **순수 계산 도메인 데이터 엔티티**입니다.
+  - 특정 모드 전용 필드나 하드코딩된 분기를 일체 보유하지 않으며, 머신 아이콘 변경 이벤트(`setMachineIcon`), 물리적 에너지 형태 결정(`getEnergyType`), 단일 기계 소비/발전량 연산(`computeSingleMachinePower`), 노드 가동 유효성 검증(`validateNode`), 멀티블록 BOM 산출(`buildMultiblockBOM`) 등 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
 * **`isFlipped`**: 노드의 입력(좌)/출력(우) 포트 렌더링 방향을 좌우 수평 반전하여 복잡한 플로우차트의 배선 교차 최소화.
-* **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`)에 의해 상류 원자재 공급 제약 하에서 계산된 기계의 실제 가동률.
-* **`calculateOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
+* **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`, `MassBalanceSolver`)에 의해 상류 원자재 공급 제약 및 폐루프 순환 밸런스 하에서 계산된 기계의 실제 가동률.
+* **`calculateEffectiveOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
 
 ---
 
 ### 1.4 `NodePropertyStore` 및 `NodeProperties` (타입 세이프 확장 속성)
-기존 클래스 필드를 비대화하지 않고, 모드별/기능별 특화 속성을 동적이고 안전하게 관리하는 속성 저장소입니다.
+기존 클래스 필드를 비대화하지 않고, 모드별/기능별 특화 속성을 동적이고 타입 안전하게 관리하는 속성 저장소입니다.
 
 ```java
 public class NodePropertyStore {
@@ -116,13 +116,42 @@ public class NodePropertyStore {
   - `TURBINE_ROTOR_NAME` (`String`, 기본값 `""`): 장착된 터빈 로터 이름
   - `TURBINE_HOLDER_BONUS` (`Integer`, 기본값 `0`): 로터 홀더 추가 효율 보너스 (%)
   - `CLEANROOM_TIER` (`Integer`, 기본값 `0`): 클린룸 요구 레벨
-  - `THROTTLE_PERCENT` (`Integer`, 기본값 `100`): 대형 보일러 가동 쓰로틀 비율 (25% ~ 100%)
-  - `TARGET_BATCH_AMOUNT` (`Double`, 기본값 `0.0`): RFC-005 단말/리라우트 노드 목표 배치 생산 수량
-  - `TARGET_BATCH_TIME_SEC` (`Double`, 기본값 `0.0`): RFC-005 희망 완료 제한 시간 (초 단위 역산 기준)
+  - `EBF_TEMPERATURE` (`Integer`, 기본값 `0`): 전기로 작동 요구 온도 ($K$)
+  - `BOILER_THROTTLE` (`Integer`, 기본값 `100`): 대형 보일러 가동 쓰로틀 비율 (25% ~ 100%)
+  - `TARGET_BATCH_AMOUNT` (`Double`, 기본값 `0.0`): 단말/리라우트 노드 목표 배치 생산 수량
+  - `TARGET_BATCH_TIME_SEC` (`Double`, 기본값 `0.0`): 희망 완료 제한 시간 (초 단위 역산 기준)
 
 ---
 
-### 1.5 `EnergyType` 및 `SteamMode` (다중 에너지 & 물리 모델)
+### 1.5 전담 계산 및 워크스테이션 해석 컴포넌트 (SRP 분해)
+
+`RecipeNode`의 비대화를 방지하고 순수 POJO 엔티티 책임을 유지하기 위해, 유량 계산 및 워크스테이션 결정 로직을 독립 컴포넌트로 분해하였습니다:
+
+* **`NodeRateCalculator`**:
+  - 기계 대수, 병렬치, 오버클럭, 가동 주기, 서브틱 CPS, 애드온 승수 및 티어별 부산물 확률 부스트를 결합하여 초당 투입/산출 유량(`IngredientStack` Flow Rates)을 적분 연산합니다.
+  - 단일 기계 수율(`getSingleMachineYieldPerSecond`) 및 실제 소비/생산량 계산 전담.
+* **`NodeWorkstationResolver`**:
+  - 전압 티어 변경 시 해당 티어에 대응하는 머신 워크스테이션(`ResourceLocation`)을 공식 레지스트리 및 캐시 매트릭스로부터 연역적 매칭.
+  - 멀티블록 컨트롤러 유효성 및 티어별 기계 목록 필터링 전담.
+
+---
+
+### 1.6 `FlowGraph` 및 불변 컬렉션 캡슐화
+
+`FlowGraph`는 캔버스 상의 전체 노드망 토폴로지를 캡슐화하며, 외부 수정에 의한 상태 불일치를 원천 차단합니다.
+
+* **불변 뷰 캡슐화 (`Collections.unmodifiableList`)**:
+  - `getNodes()` 및 `getEdges()`는 불변 뷰를 반환하여 외부에서의 임의 조작(`graph.getNodes().add(...)`)을 금지하고, 반드시 전용 메서드(`addNode`, `removeNode`, `connect`, `disconnect`)를 통해서만 변경되도록 강제합니다.
+* **$O(1)$ 빠른 노드 색인 동기화 (`nodeMap`)**:
+  - 노드 추가/삭제/클리어 시 내부 `Map<String, RecipeNode> nodeMap`이 완벽히 동기화되어 `getNode(id)` 질의를 $O(1)$ 시간에 보장합니다.
+* **`ConnectionEdge` 불변 레코드**:
+  ```java
+  public record ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex)
+  ```
+
+---
+
+### 1.7 `EnergyType` 및 `SteamMode` (다중 에너지 & 물리 모델)
 다양한 기술 모드의 동력 및 에너지 시스템을 통합 관리합니다.
 
 * **`EnergyType`**:
@@ -138,18 +167,9 @@ public class NodePropertyStore {
 
 ---
 
-### 1.6 `FlowGraph` 및 `ConnectionEdge`
-* **`ConnectionEdge`**: 노드 간의 유향 연결선 불변 레코드
-  ```java
-  public record ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex)
-  ```
-* **`FlowGraph`**: 노드 목록(`List<RecipeNode>`)과 엣지 목록(`List<ConnectionEdge>`)을 관리하며, 하위 그래프(Subgraph)를 중첩 보관할 수 있습니다.
-
----
-
 ## 2. 결정론적 수용 능력 매트릭스 (`CategoryCapabilityMatrix`)
 
-RFC-V2-005에 따라 불안정한 텍스트 툴팁 파싱 휴리스틱을 전면 배제하고, 게임 로딩 시 연역적 분석을 통해 빌드된 $O(1)$ 글로벌 캐시 시스템입니다.
+불안정한 텍스트 툴팁 파싱 휴리스틱을 전면 배제하고, 게임 로딩 시 연역적 분석을 통해 빌드된 $O(1)$ 글로벌 불변 캐시 시스템입니다.
 
 ```mermaid
 flowchart LR
@@ -172,36 +192,9 @@ flowchart LR
     end
 ```
 
-### 2.1 `CategoryCapability` 레코드 명세
-```java
-public record CategoryCapability(
-    ResourceLocation categoryId,                    // 레시피 카테고리 식별자
-    List<ResourceLocation> availableWorkstations,   // 선택 가능한 워크스테이션 블록 목록
-    ResourceLocation defaultWorkstation,            // 기본 추천 워크스테이션
-    boolean hasSingleblockOption,                   // 단일블록 기계 존재 여부
-    boolean hasMultiblockOption,                    // 멀티블록 구조체 존재 여부
-    boolean canUseCoils,                            // 발열 코일 블록 장착 가능 여부
-    boolean isTurbine,                              // 대형 터빈 발전기 여부
-    boolean isThermal,                              // 써멀 시리즈 기계/다이나모 여부
-    GTVoltageTier turbineBaseTier,                  // 터빈 기준 전압 티어
-    double turbineBaseProduction,                   // 터빈 기준 발전량 (EU/t)
-    Set<MachineAddon.Category> supportedAddonCategories // 장착 가능한 애드온 탭 카테고리 목록
-)
-```
-
 ---
 
-## 3. 도메인 헬퍼 시스템 (Domain Helpers)
-
-* **`CoilHelper`**: `ICoilType` 리플렉션 및 레지스트리 조회를 통해 코일 티어, 최고 작동 온도($K$), EBF 전력 할인율, LCR/Pyrolyse 가열 속도 보너스를 결정론적으로 추출.
-* **`TurbineRotorHelper`**: 대형 터빈의 로터 재질별 효율 승수, 최적 유량 배수, 내구도를 추출.
-* **`ThermalAugmentHelper`**: 써멀 시리즈 기계의 증강(Augment) 슬롯 수와 에너지/속도 계수를 NBT 태그 기반으로 분석.
-* **`ParallelHelper`**: 병렬 제어 해치(Parallel Control Hatch)의 최대 병렬 배수를 티어별로 매핑.
-* **`MachineAddonCatalog`**: 게임 내 등록된 모든 코일, 로터, 써멀 증강, 병렬 해치 블록을 인덱싱하여 다이얼로그의 랙(Rack)에 칩 형태로 제공.
-
----
-
-## 4. 복합 모듈 시스템 (`FlowGraphModuleHandler`)
+## 3. 복합 모듈 시스템 (`FlowGraphModuleHandler`)
 
 다수의 복잡한 노드 그래프를 단일 복합 모듈 카드(`RecipeNode`)로 패키징(`Ctrl+G`)하거나 원래 서브그래프로 복원(`펼치기`)합니다.
 
@@ -221,39 +214,35 @@ flowchart LR
     Collapsed -- "펼치기 (Ctrl+G)" --> Expanded
 ```
 
-1. **경계 I/O 자동 승격 (Boundary I/O Promotion)**:
-   - 모듈 내부 노드 간의 중간 연결선(Intermediate Wires)은 완전히 캡슐화되어 은닉됩니다.
-   - 외부 소스로부터 공급받는 원자재와 외부로 배출되는 최종 제품만 집계되어 모듈 카드의 외곽 포트 소켓으로 승격됩니다.
-2. **와이어 리매핑 (Wire Remapping)**:
-   - 외부에서 모듈 내부 노드로 연결되어 있던 와이어들의 `ConnectionEdge`가 새로 생성된 모듈 카드의 포트로 안전하게 재배선됩니다.
-3. **비례 스케일링 (Proportional Scaling)**:
-   - 모듈 카드의 기계 대수를 변경하면 내부 하위 그래프의 모든 기계 대수와 유량 속도가 동일 비율로 연동 스케일링됩니다.
+1. **경계 I/O 자동 승격 (Boundary I/O Promotion)**: 내부 노드 간의 중간 연결선은 은닉되고, 외부와 연결된 원자재/최종 제품만 모듈 외곽 포트로 자동 승격.
+2. **와이어 리매핑 (Wire Remapping)**: 외부에서 연결되어 있던 와이어의 `ConnectionEdge`가 신규 모듈 카드 포트로 재배선.
+3. **비례 스케일링 (Proportional Scaling)**: 모듈 카드의 기계 대수를 변경하면 내부 하위 그래프의 모든 기계 대수와 유량이 동일 비율로 연동 스케일링.
 
 ---
 
-## 5. 직렬화 및 클립보드 시스템 (`BlueprintCodec`, `NodeClipboard`)
+## 4. 직렬화, 클립보드 및 디스크 관리 (`BlueprintCodec`, `BlueprintFileManager`, `NodeClipboard`)
 
-### 5.1 `BlueprintCodec` (블루프린트 직렬화 코덱)
-그래프의 토폴로지, 노드 좌표, 장착 애드온, 전압 티어, 연결선을 NBT로 변환한 후 GZIP 압축 및 Base64 인코딩을 수행합니다.
+### 4.1 `BlueprintCodec` (블루프린트 직렬화 코덱)
+그래프의 토폴로지, 노드 좌표, 장착 애드온, 전압 티어, 뷰포트 및 메타데이터를 NBT로 변환한 후 GZIP 압축 및 Base64 인코딩을 수행합니다. 공유 및 채팅 식별성을 위해 제목 프리픽스가 포함된 포맷을 지원하며, 레거시 코드와 완벽히 상호 호환됩니다.
 
-$$\text{Blueprint String} = \text{"GTBOARD:"} + \text{Base64}\Big(\text{GZIP}\big(\text{FlowGraph.toNBT()}\big)\Big)$$
+$$\text{Blueprint String} = \text{"GTBOARD:"} + [\text{Title} + \text{":"}] + \text{Base64}\Big(\text{GZIP}\big(\text{BlueprintPackage.serializeNBT()}\big)\Big)$$
 
-### 5.2 `NodeClipboard` (클립보드 관리자)
+### 4.2 `BlueprintFileManager` (디스크 블루프린트 파일 관리자)
+* **저장 위치**: `<gameDir>/gtcalcboard/blueprints/`
+* **파일 형식**: `.gtcb` (원자적 쓰기 `Atomic Move`를 통한 손상 방지 압축 NBT)
+* **주요 기능**: 개별 블루프린트 저장, 로컬 블루프린트 목록 스캔 및 메타데이터 추출, 파일 삭제 및 운영체제 폴더 탐색기 연동.
+
+### 4.3 `NodeClipboard` (클립보드 관리자)
 * 선택된 노드군 및 노드 간의 내부 연결선을 클립보드에 복사(`Ctrl+C`) / 잘라내기(`Ctrl+X`).
 * 붙여넣기(`Ctrl+V`) 시 새로운 고유 ID(UUID)를 발급하고, 마우스 커서 또는 캔버스 중심 기준 $+20\text{px}$ 오프셋을 적용하여 배치.
 
 ---
 
-## 6. 실행 취소 / 다시 실행 (`HistoryManager`, `BoardCommand`)
+## 5. 실행 취소 / 다시 실행 (`HistoryManager`, `BoardCommand`)
 
 커맨드 패턴(Command Pattern) 기반으로 모든 캔버스 조작을 단위 델타(Delta)로 기록합니다.
 
-* **지원 커맨드 목록**:
-  - `MoveNodesCommand`: 노드 드래그 이동 좌표 델타
-  - `AddConnectionCommand` / `RemoveConnectionCommand`: 와이어 연결/해제 델타
-  - `AddNodesCommand` / `RemoveNodesCommand`: 노드 추가/삭제 델타
-  - `ModifyPropertyCommand`: 티어, 오버클럭 모드, 기계 대수, 애드온 변경
-  - `GroupModuleCommand` / `ExpandModuleCommand`: 모듈 그룹화 및 전개 델타
+* **지원 커맨드 목록**: `MoveNodesCommand`, `AddConnectionCommand` / `RemoveConnectionCommand`, `AddNodesCommand` / `RemoveNodesCommand`, `ModifyPropertyCommand`, `GroupModuleCommand` / `ExpandModuleCommand`.
 * **성능 최적화**: 1,000단계 이상의 Undo/Redo 스택을 유지하면서도 2MB 미만의 메모리 사용.
 
 ---

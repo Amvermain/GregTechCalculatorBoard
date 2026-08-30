@@ -812,6 +812,9 @@ public class GTCEuRecipeHandler {
                         is = IngredientStack.fluid(id, name, first.getAmount(), (float) chance);
                     }
                 } catch (Throwable ignored) {}
+            } else if (inner instanceof IngredientStack existing) {
+                is = existing.copy();
+                is.setChance((float) chance);
             }
 
             if (is != null && tierChanceBoost > 0.0) {

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import com.gtceu.calcboard.compat.systeams.SysteamsGuiHandler;
 import java.util.List;
 import java.util.Map;
 
@@ -154,10 +153,11 @@ public class SysteamsBoilerTest {
         }
 
         // 4. Verify GUI Header and Tooltip match the in-game display
-        String formattedStats = SysteamsGuiHandler.formatEnergyStats(evBoiler, PowerDisplayMode.EUT);
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(evBoiler);
+        String formattedStats = adapter.formatEnergyStats(evBoiler, PowerDisplayMode.EUT);
         Assertions.assertTrue(formattedStats.contains("576") && formattedStats.contains("Steam"), "Header should format 576k/s Steam: " + formattedStats);
 
-        List<net.minecraft.network.chat.Component> tooltip = SysteamsGuiHandler.buildEnergyTooltip(evBoiler);
+        List<net.minecraft.network.chat.Component> tooltip = adapter.buildEnergyTooltip(evBoiler);
         String tooltipFullText = tooltip.stream().map(net.minecraft.network.chat.Component::getString).reduce("", (a, b) -> a + "\n" + b);
         Assertions.assertTrue(tooltipFullText.contains("28,800.00 mB/t"), "Tooltip should contain exact 28,800.00 mB/t: " + tooltipFullText);
         Assertions.assertTrue(tooltipFullText.contains("576,000.00 mB/s"), "Tooltip should contain exact 576,000.00 mB/s: " + tooltipFullText);

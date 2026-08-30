@@ -38,9 +38,9 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
     }
 
     private void registerKineticRecipes(EmiRegistry registry) {
-        var iconItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(new ResourceLocation("create", "large_water_wheel"));
+        var iconItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("create:large_water_wheel"));
         var iconStack = (iconItem != null && iconItem != net.minecraft.world.item.Items.AIR) ? EmiStack.of(iconItem) : EmiStack.of(net.minecraft.world.item.Items.WATER_BUCKET);
-        var category = new dev.emi.emi.api.recipe.EmiRecipeCategory(new ResourceLocation("gtcalcboard", "kinetic_generation"), iconStack);
+        var category = new dev.emi.emi.api.recipe.EmiRecipeCategory(ResourceLocation.tryParse("gtcalcboard:kinetic_generation"), iconStack);
         registry.addCategory(category);
 
         java.util.Set<net.minecraft.world.item.Item> activeRecipeItems = new java.util.HashSet<>();

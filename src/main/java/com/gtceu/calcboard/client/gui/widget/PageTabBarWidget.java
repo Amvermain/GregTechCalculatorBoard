@@ -256,6 +256,15 @@ public class PageTabBarWidget {
                         BoardManager bm = BoardManager.getInstance();
                         if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
                             bm.removePage(i);
+                            BoardPage active = bm.getActivePage();
+                            if (active != null) {
+                                screen.setPanX(active.getPanX());
+                                screen.setPanY(active.getPanY());
+                                screen.setZoom(active.getZoom());
+                                BoardScreen.lastPanX = active.getPanX();
+                                BoardScreen.lastPanY = active.getPanY();
+                                BoardScreen.lastZoom = active.getZoom();
+                            }
                             screen.rebuildWidgets();
                             Minecraft.getInstance().getSoundManager().play(
                                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
@@ -350,7 +359,21 @@ public class PageTabBarWidget {
                 }
             } else {
                 BoardManager bm = BoardManager.getInstance();
-                bm.addPage("Page " + (pageTitles.size() + 1));
+                BoardPage cur = bm.getActivePage();
+                if (cur != null) {
+                    cur.setPanX(screen.getPanX());
+                    cur.setPanY(screen.getPanY());
+                    cur.setZoom(screen.getZoom());
+                }
+                BoardPage newPage = bm.addPage("Page " + (pageTitles.size() + 1));
+                if (newPage != null) {
+                    screen.setPanX(newPage.getPanX());
+                    screen.setPanY(newPage.getPanY());
+                    screen.setZoom(newPage.getZoom());
+                    BoardScreen.lastPanX = newPage.getPanX();
+                    BoardScreen.lastPanY = newPage.getPanY();
+                    BoardScreen.lastZoom = newPage.getZoom();
+                }
                 this.scrollX = this.maxScrollX + 100;
                 screen.rebuildWidgets();
                 playClickSound();

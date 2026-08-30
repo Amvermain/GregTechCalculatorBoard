@@ -119,7 +119,7 @@ public final class JeiRecipeSearchIndexer {
             inSb.append(getCategoryCatalystText(category, jeiRuntime));
         }
 
-        if (catResId != null && ("create".equals(catResId.getNamespace()) || "createaddition".equals(catResId.getNamespace()))) {
+        if (catResId != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(catResId.getNamespace())) {
             inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
             inputNames.add("stress units");
             inputNames.add("Stress Units");

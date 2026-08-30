@@ -4,9 +4,16 @@ import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.client.gui.canvas.BoardHudRenderer;
+import com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher;
+import com.gtceu.calcboard.client.gui.canvas.CanvasWireRenderer;
+import com.gtceu.calcboard.client.gui.dialog.AutoConnectFilterDialog;
 import com.gtceu.calcboard.client.gui.dialog.BoardSettingsDialog;
 import com.gtceu.calcboard.client.gui.dialog.DeletePageConfirmDialog;
 import com.gtceu.calcboard.client.gui.dialog.TutorialExitConfirmDialog;
+import com.gtceu.calcboard.client.gui.dialog.ExportBlueprintDialog;
+import com.gtceu.calcboard.client.gui.dialog.ImportBlueprintDialog;
+import com.gtceu.calcboard.client.gui.dialog.DiskBlueprintsDialog;
 import com.gtceu.calcboard.client.gui.dialog.ExportToTeamDialog;
 import com.gtceu.calcboard.client.gui.dialog.FrameEditDialog;
 import com.gtceu.calcboard.client.gui.dialog.GlobalBalanceDashboardDialog;
@@ -38,6 +45,7 @@ import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay;
 import com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog;
@@ -50,29 +58,23 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import org.joml.Matrix4f;
+import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Main GUI Screen for GregTech Calculator Board.
  * Acts as the master orchestrator coordinating canvas rendering, node widgets, and sub-components.
  */
-public class BoardScreen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<com.gtceu.calcboard.integration.emi.BoardMenu> {
+public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.integration.emi.BoardMenu> {
     public static final int LEFT_MARGIN = 48;
-    public static double lastPanX = 40.0;
-    public static double lastPanY = 40.0;
-    public static double lastZoom = 1.0;
     private static long lastBoardScreenActiveTime = 0;
 
     public static boolean isBoardContext() {
@@ -85,6 +87,14 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         return false;
     }
 
+    // Viewport Coordinates
+    public static double lastPanX = 0, lastPanY = 0;
+    public static double lastZoom = 1.0;
+
+    private double panX = lastPanX;
+    private double panY = lastPanY;
+    private double zoom = lastZoom;
+
     private final List<NodeWidget> nodeWidgets = new ArrayList<>();
 
     // Sub-components & Handlers
@@ -96,7 +106,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
     private final FavoritesDockWidget favoritesDockWidget = new FavoritesDockWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
-    private WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
+    private final WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
     private MachineConfigDialog machineConfigDialog;
     private GuideDialog guideDialog;
@@ -106,22 +116,35 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
     private MultiblockBOMDialog multiblockBOMDialog;
     private SaveToTeamDialog saveToTeamDialog;
     private ExportToTeamDialog exportToTeamDialog;
+    private ExportBlueprintDialog exportBlueprintDialog;
+    private ImportBlueprintDialog importBlueprintDialog;
+    private DiskBlueprintsDialog diskBlueprintsDialog;
     private RecentSavesDialog recentSavesDialog;
     private FrameEditDialog frameEditDialog;
     private NoteEditDialog noteEditDialog;
     private BoardSettingsDialog settingsDialog;
+    private AutoConnectFilterDialog autoConnectDialog;
 
-    // Viewport Coordinates
-    private double panX = lastPanX;
-    private double panY = lastPanY;
-    private double zoom = lastZoom;
-
-    // Cached Summary
     private BalanceSummary cachedSummary = null;
     private boolean summaryDirty = true;
 
     // Mouse tracking for hotkeys
     private double lastMouseX, lastMouseY;
+
+    // Canvas Wire Renderer (Spatial Index & Bezier batching)
+    private final CanvasWireRenderer wireRenderer = new CanvasWireRenderer();
+
+    public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
+        return wireRenderer.findHoveredWire(canvasMouseX, canvasMouseY, maxDist);
+    }
+
+    public WireSpatialIndex getWireSpatialIndex() {
+        return wireRenderer.getWireSpatialIndex();
+    }
+
+    public CanvasWireRenderer getWireRenderer() {
+        return wireRenderer;
+    }
 
     public BoardScreen() {
         this(new com.gtceu.calcboard.integration.emi.BoardMenu(0, Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
@@ -310,10 +333,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     public void bringNodeToFront(RecipeNode node) {
         if (node == null) return;
-        List<RecipeNode> nodes = getGraph().getNodes();
-        if (nodes.remove(node)) {
-            nodes.add(node);
-        }
+        getGraph().bringNodeToFront(node);
         for (int i = 0; i < nodeWidgets.size(); i++) {
             if (nodeWidgets.get(i).getNode() == node) {
                 NodeWidget w = nodeWidgets.remove(i);
@@ -332,19 +352,23 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             return;
         }
         super.init();
-        this.searchDialog = new RecipeSearchDialog(this);
-        this.machineConfigDialog = new MachineConfigDialog(this);
-        this.guideDialog = new GuideDialog(this);
-        this.deletePageDialog = new DeletePageConfirmDialog(this);
-        this.tutorialExitDialog = new TutorialExitConfirmDialog(this);
-        this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
-        this.multiblockBOMDialog = new MultiblockBOMDialog(this);
-        this.saveToTeamDialog = new SaveToTeamDialog(this);
-        this.exportToTeamDialog = new ExportToTeamDialog(this);
-        this.recentSavesDialog = new RecentSavesDialog(this);
-        this.frameEditDialog = new FrameEditDialog(this);
-        this.noteEditDialog = new NoteEditDialog(this);
-        this.settingsDialog = new BoardSettingsDialog(this);
+        if (this.searchDialog == null) this.searchDialog = new RecipeSearchDialog(this);
+        if (this.machineConfigDialog == null) this.machineConfigDialog = new MachineConfigDialog(this);
+        if (this.guideDialog == null) this.guideDialog = new GuideDialog(this);
+        if (this.deletePageDialog == null) this.deletePageDialog = new DeletePageConfirmDialog(this);
+        if (this.tutorialExitDialog == null) this.tutorialExitDialog = new TutorialExitConfirmDialog(this);
+        if (this.globalBalanceDialog == null) this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
+        if (this.multiblockBOMDialog == null) this.multiblockBOMDialog = new MultiblockBOMDialog(this);
+        if (this.saveToTeamDialog == null) this.saveToTeamDialog = new SaveToTeamDialog(this);
+        if (this.exportToTeamDialog == null) this.exportToTeamDialog = new ExportToTeamDialog(this);
+        if (this.exportBlueprintDialog == null) this.exportBlueprintDialog = new ExportBlueprintDialog(this);
+        if (this.importBlueprintDialog == null) this.importBlueprintDialog = new ImportBlueprintDialog(this);
+        if (this.diskBlueprintsDialog == null) this.diskBlueprintsDialog = new DiskBlueprintsDialog(this);
+        if (this.recentSavesDialog == null) this.recentSavesDialog = new RecentSavesDialog(this);
+        if (this.frameEditDialog == null) this.frameEditDialog = new FrameEditDialog(this);
+        if (this.noteEditDialog == null) this.noteEditDialog = new NoteEditDialog(this);
+        if (this.settingsDialog == null) this.settingsDialog = new BoardSettingsDialog(this);
+        if (this.autoConnectDialog == null) this.autoConnectDialog = new AutoConnectFilterDialog(this);
 
         BoardManager.getInstance().setPageRemovalListener(page -> {
             if (TutorialManager.getInstance().isTutorialPage(page.getId())) {
@@ -402,6 +426,18 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     public ExportToTeamDialog getExportToTeamDialog() {
         return exportToTeamDialog;
+    }
+
+    public ExportBlueprintDialog getExportBlueprintDialog() {
+        return exportBlueprintDialog;
+    }
+
+    public ImportBlueprintDialog getImportBlueprintDialog() {
+        return importBlueprintDialog;
+    }
+
+    public DiskBlueprintsDialog getDiskBlueprintsDialog() {
+        return diskBlueprintsDialog;
     }
 
     public RecentSavesDialog getRecentSavesDialog() {
@@ -646,6 +682,126 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         return new double[]{candX, candY};
     }
 
+    public void fitToView() {
+        FlowGraph graph = getGraph();
+        if (graph == null) return;
+
+        List<RecipeNode> nodes = graph.getNodes();
+        List<CanvasGroupFrame> frames = graph.getFrames();
+        List<CanvasStickyNote> notes = graph.getStickyNotes();
+
+        if (nodes.isEmpty() && frames.isEmpty() && notes.isEmpty()) {
+            this.panX = 40.0;
+            this.panY = 40.0;
+            this.zoom = 1.0;
+            lastPanX = this.panX;
+            lastPanY = this.panY;
+            lastZoom = this.zoom;
+            var active = BoardManager.getInstance().getActivePage();
+            if (active != null) {
+                active.setPanX(this.panX);
+                active.setPanY(this.panY);
+                active.setZoom(this.zoom);
+            }
+            BoardToast.show(Component.literal("§e🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+            );
+            return;
+        }
+
+        Set<String> selNodes = getSelectedNodeIds();
+        Set<String> selFrames = getSelectedFrameIds();
+        Set<String> selNotes = getSelectedNoteIds();
+        boolean hasSelection = !selNodes.isEmpty() || !selFrames.isEmpty() || !selNotes.isEmpty();
+
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
+
+        for (RecipeNode n : nodes) {
+            if (hasSelection && !selNodes.contains(n.getId())) continue;
+            double x = n.getPosX();
+            double y = n.getPosY();
+            double w = n.getCardWidth();
+            double h = n.getCardHeight();
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+        }
+
+        for (CanvasGroupFrame f : frames) {
+            if (hasSelection && !selFrames.contains(f.getId())) continue;
+            double x = f.getPosX();
+            double y = f.getPosY();
+            double w = f.getWidth();
+            double h = f.getHeight();
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+        }
+
+        for (CanvasStickyNote note : notes) {
+            if (hasSelection && !selNotes.contains(note.getId())) continue;
+            double x = note.getPosX();
+            double y = note.getPosY();
+            double w = note.getWidth();
+            double h = note.getHeight();
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+        }
+
+        if (minX == Double.MAX_VALUE) {
+            for (RecipeNode n : nodes) {
+                minX = Math.min(minX, n.getPosX());
+                minY = Math.min(minY, n.getPosY());
+                maxX = Math.max(maxX, n.getPosX() + n.getCardWidth());
+                maxY = Math.max(maxY, n.getPosY() + n.getCardHeight());
+            }
+        }
+
+        if (minX == Double.MAX_VALUE) return;
+
+        double contentW = Math.max(60.0, maxX - minX);
+        double contentH = Math.max(60.0, maxY - minY);
+        double centerCanvasX = minX + contentW / 2.0;
+        double centerCanvasY = minY + contentH / 2.0;
+
+        double padding = 80.0;
+        double availableW = Math.max(150.0, this.width - padding * 2);
+        double availableH = Math.max(150.0, this.height - padding * 2);
+
+        double targetZoom = Math.min(1.0, Math.min(availableW / contentW, availableH / contentH));
+        targetZoom = Math.max(0.25, Math.min(1.5, targetZoom));
+
+        double targetPanX = (this.width / 2.0) - (centerCanvasX * targetZoom);
+        double targetPanY = (this.height / 2.0) - (centerCanvasY * targetZoom);
+
+        this.setPanX(targetPanX);
+        this.setPanY(targetPanY);
+        this.setZoom(targetZoom);
+        lastPanX = targetPanX;
+        lastPanY = targetPanY;
+        lastZoom = targetZoom;
+
+        var active = BoardManager.getInstance().getActivePage();
+        if (active != null) {
+            active.setPanX(targetPanX);
+            active.setPanY(targetPanY);
+            active.setZoom(targetZoom);
+        }
+
+        BoardToast.show(Component.literal("§b🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
+        Minecraft.getInstance().getSoundManager().play(
+            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+        );
+    }
+
     private static boolean isNodeAt(FlowGraph graph, double x, double y) {
         if (graph == null) return false;
         for (RecipeNode n : graph.getNodes()) {
@@ -733,7 +889,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
         // 1. Dark Background and Grid
         renderBackground(graphics);
-        renderGridBackground(graphics);
+        BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
 
         // 2. Begin Zoomed / Panned Canvas Space
         graphics.pose().pushPose();
@@ -747,83 +903,16 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         CanvasGroupFrameRenderer.renderFrames(graphics, getGraph(), canvasMouseX, canvasMouseY, null, getSelectedFrameIds());
         CanvasStickyNoteRenderer.renderNotes(graphics, getGraph(), canvasMouseX, canvasMouseY, getSelectedNoteIds());
 
-        // 5. Render Node Widgets with Viewport Culling
+        // 3. Viewport Culling & Static Connection Lines with Batching and Particle Animation
         double screenLeft = -panX / zoom - 100;
         double screenRight = (-panX + width) / zoom + 100;
         double screenTop = -panY / zoom - 100;
         double screenBottom = (-panY + height) / zoom + 100;
 
-        // 3. Render Static Connection Lines with Batching and Viewport Culling
-        ConnectionRenderer.beginBatch(graphics);
-        List<float[]> visibleWires = new ArrayList<>();
-        for (FlowGraph.ConnectionEdge edge : getGraph().getConnections()) {
-            RecipeNode fromNode = getGraph().findNodeById(edge.fromNodeId());
-            RecipeNode toNode = getGraph().findNodeById(edge.toNodeId());
-            if (fromNode != null && toNode != null) {
-                NodeWidget fromWidget = findWidgetForNode(fromNode);
-                NodeWidget toWidget = findWidgetForNode(toNode);
-                if (fromWidget != null && toWidget != null) {
-                    float x1 = fromWidget.getOutputPortX(edge.outputIndex());
-                    float y1 = fromWidget.getOutputPortY(edge.outputIndex());
-                    float x2 = toWidget.getInputPortX(edge.inputIndex());
-                    float y2 = toWidget.getInputPortY(edge.inputIndex());
+        wireRenderer.renderWires(graphics, this, getGraph(), canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, zoom);
 
-                    float minX = Math.min(x1, x2) - 40;
-                    float maxX = Math.max(x1, x2) + 40;
-                    float minY = Math.min(y1, y2) - 20;
-                    float maxY = Math.max(y1, y2) + 20;
-                    if (maxX < screenLeft || minX > screenRight || maxY < screenTop || minY > screenBottom) {
-                        continue;
-                    }
-
-                    float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
-                    float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
-
-                    boolean isHovered = ConnectionRenderer.isPointNearBezier(x1, y1, x2, y2, fromDirX, toDirX, canvasMouseX, canvasMouseY, 6.0);
-                    boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
-                    int defWireColor = BoardManager.getInstance().getWireColor();
-                    int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : defWireColor);
-                    float wireThick = isWireGlowing ? 3.5f : 2.0f;
-                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
-                    visibleWires.add(new float[]{x1, y1, x2, y2, fromDirX, toDirX});
-                }
-            }
-        }
-
-        // 4. Render Active Wire Dragging
-        NodeWidget wireStart = canvasHandler.getWireStartNode();
-        if (wireStart != null) {
-            float x1, y1;
-            int matchedColor = BoardManager.getInstance().getMatchedWireColor();
-            int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
-            if (canvasHandler.isWireStartInput()) {
-                x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
-                y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-                float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
-                ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
-            } else {
-                x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
-                y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-                float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
-                ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
-            }
-        }
-        ConnectionRenderer.endBatch();
-
-        // Draw animated flow pulse dots (Single-batch GPU rendering)
-        if (zoom >= 0.28 && BoardManager.getInstance().isShowWirePulseAnimation()) {
-            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWires);
-        }
-
-        // 5. Render Node Widgets with Viewport Culling & Isolated Layering
+        // 4. Render Node Widgets with Viewport Culling & Per-Node Isolated Flushing for Z-Order Integrity
         boolean isLOD = (zoom < 0.28);
-        if (!isLOD) {
-            graphics.flush();
-            Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
-            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-            RenderSystem.disableDepthTest();
-        }
-
         for (int i = 0; i < nodeWidgets.size(); i++) {
             NodeWidget widget = nodeWidgets.get(i);
             double nx = widget.getNode().getPosX();
@@ -832,65 +921,22 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             int nh = widget.getHeight();
 
             if (nx + nw >= screenLeft && nx <= screenRight && ny + nh >= screenTop && ny <= screenBottom) {
+                RenderSystem.disableDepthTest();
+                RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
                 widget.render(graphics, (int) canvasMouseX, (int) canvasMouseY, partialTicks);
+                graphics.flush();
                 if (!isLOD) {
-                    graphics.flush();
                     Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
-                    RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-                    RenderSystem.disableDepthTest();
                 }
             }
         }
-        if (isLOD) {
-            graphics.flush();
-        }
+        RenderSystem.disableDepthTest();
+        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
 
         // 4.5 Render Quick Action Marker
         canvasHandler.checkMarkerCursorDistance(canvasMouseX, canvasMouseY);
         if (canvasHandler.hasQuickAddMarker()) {
-            double qx = canvasHandler.getQuickAddMarkerCanvasX();
-            double qy = canvasHandler.getQuickAddMarkerCanvasY();
-
-            boolean searchHovered = canvasMouseX >= qx - 44 && canvasMouseX <= qx - 24 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-            boolean junctionHovered = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-            boolean frameHovered = canvasMouseX >= qx + 2 && canvasMouseX <= qx + 22 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-            boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-
-            // Outer capsule background
-            graphics.fill((int)(qx - 47), (int)(qy - 13), (int)(qx + 48), (int)(qy + 13), 0xDD0F172A);
-            graphics.renderOutline((int)(qx - 47), (int)(qy - 13), 95, 26, 0x88334155);
-
-            // 1. [🔍] Search Recipe (Emerald)
-            int searchBg = searchHovered ? 0xEE10B981 : 0xBB059669;
-            int searchBorder = searchHovered ? 0xFF6EE7B7 : 0xCC10B981;
-            graphics.fill((int)(qx - 44), (int)(qy - 10), (int)(qx - 24), (int)(qy + 10), searchBg);
-            graphics.renderOutline((int)(qx - 44), (int)(qy - 10), 20, 20, searchBorder);
-            String searchIcon = "🔍";
-            graphics.drawString(font, searchIcon, (int)(qx - 34 - font.width(searchIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
-
-            // 2. [🔀] Insert Junction (Sky/Cyan)
-            int juncBg = junctionHovered ? 0xEE0284C7 : 0xBB0369A1;
-            int juncBorder = junctionHovered ? 0xFF7DD3FC : 0xCC0284C7;
-            graphics.fill((int)(qx - 21), (int)(qy - 10), (int)(qx - 1), (int)(qy + 10), juncBg);
-            graphics.renderOutline((int)(qx - 21), (int)(qy - 10), 20, 20, juncBorder);
-            String juncIcon = "🔀";
-            graphics.drawString(font, juncIcon, (int)(qx - 11 - font.width(juncIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
-
-            // 3. [🖼] Group Frame (Purple/Violet)
-            int frameBg = frameHovered ? 0xEE8B5CF6 : 0xBB6D28D9;
-            int frameBorder = frameHovered ? 0xFFC4B5FD : 0xCC7C3AED;
-            graphics.fill((int)(qx + 2), (int)(qy - 10), (int)(qx + 22), (int)(qy + 10), frameBg);
-            graphics.renderOutline((int)(qx + 2), (int)(qy - 10), 20, 20, frameBorder);
-            String frameIcon = "🖼";
-            graphics.drawString(font, frameIcon, (int)(qx + 12 - font.width(frameIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
-
-            // 4. [📝] Sticky Note / Memo (Amber/Gold)
-            int noteBg = noteHovered ? 0xEEF59E0B : 0xBBB45309;
-            int noteBorder = noteHovered ? 0xFFFDE68A : 0xCCD97706;
-            graphics.fill((int)(qx + 25), (int)(qy - 10), (int)(qx + 45), (int)(qy + 10), noteBg);
-            graphics.renderOutline((int)(qx + 25), (int)(qy - 10), 20, 20, noteBorder);
-            String noteIcon = "📝";
-            graphics.drawString(font, noteIcon, (int)(qx + 35 - font.width(noteIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
+            BoardHudRenderer.renderQuickAddMarker(graphics, font, canvasHandler.getQuickAddMarkerCanvasX(), canvasHandler.getQuickAddMarkerCanvasY(), canvasMouseX, canvasMouseY);
         }
 
         // Render Active Marquee Box Selection
@@ -902,7 +948,7 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         RenderSystem.disableDepthTest();
 
-        // 6. Render Workspace Mode Tab Bar, Page Tab Bar, Top Toolbar, Hotkey HUD, Favorites Dock and Summary Overlay
+        // 5. Render Workspace Mode Tab Bar, Page Tab Bar, Top Toolbar, Hotkey HUD, Favorites Dock and Summary Overlay
         workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
@@ -917,8 +963,8 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
 
-        // 6.5 Render bottom-center background loading status HUD (disappears when 100% complete)
-        renderCentralLoadingCard(graphics, font, width, height);
+        // 5.5 Render bottom-center background loading status HUD
+        BoardHudRenderer.renderCentralLoadingCard(graphics, font, width, height, isAnyModalOpen(), favoritesDockWidget);
 
         // 7. Render Tooltips only if no modal dialog is open
         if (!isAnyModalOpen()) {
@@ -954,6 +1000,12 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             saveToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
             exportToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (exportBlueprintDialog != null && exportBlueprintDialog.isVisible()) {
+            exportBlueprintDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (importBlueprintDialog != null && importBlueprintDialog.isVisible()) {
+            importBlueprintDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
+            diskBlueprintsDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
             recentSavesDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (searchDialog != null && searchDialog.isVisible()) {
@@ -964,6 +1016,8 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             frameEditDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (noteEditDialog != null && noteEditDialog.isVisible()) {
             noteEditDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
+            autoConnectDialog.render(graphics, width, height, mouseX, mouseY);
         }
 
         // 9. Interactive Tutorial Overlay
@@ -985,157 +1039,13 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
             || (tutorialExitDialog != null && tutorialExitDialog.isVisible())
             || (saveToTeamDialog != null && saveToTeamDialog.isVisible())
             || (exportToTeamDialog != null && exportToTeamDialog.isVisible())
+            || (exportBlueprintDialog != null && exportBlueprintDialog.isVisible())
+            || (importBlueprintDialog != null && importBlueprintDialog.isVisible())
+            || (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible())
             || (recentSavesDialog != null && recentSavesDialog.isVisible())
             || (frameEditDialog != null && frameEditDialog.isVisible())
-            || (noteEditDialog != null && noteEditDialog.isVisible());
-    }
-
-    public record BackgroundLoadingTask(String title, int percent, boolean indeterminate, String statusText, String subtitle) {}
-
-    private void renderCentralLoadingCard(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
-        if (isAnyModalOpen()) return;
-
-        List<BackgroundLoadingTask> tasks = new ArrayList<>();
-
-        if (RecipeSearchDialog.isCaching()) {
-            var prog = RecipeSearchDialog.getCachingProgress();
-            int pct = (prog != null && prog.totalPhases() > 0) ? (int) (prog.currentPhase() * 100.0 / prog.totalPhases()) : 0;
-            String sub = (prog != null && prog.phaseKey() != null) ? Component.translatable(prog.phaseKey()).getString() : "";
-            tasks.add(new BackgroundLoadingTask(
-                Component.translatable("gui.gtcalcboard.status.task_recipes").getString(),
-                pct,
-                false,
-                pct + "%",
-                sub
-            ));
-        } else if (favoritesDockWidget != null && favoritesDockWidget.isEmiLoading()) {
-            tasks.add(new BackgroundLoadingTask(
-                Component.translatable("gui.gtcalcboard.status.task_recipes").getString(),
-                30,
-                true,
-                Component.translatable("gui.gtcalcboard.status.in_progress").getString(),
-                Component.translatable("gui.gtcalcboard.favorites_dock.loading_emi").getString()
-            ));
-        }
-
-        if (MachineAddonCatalog.getInstance().isExhaustiveScanRunning()) {
-            double prog = MachineAddonCatalog.getInstance().getExhaustiveProgress();
-            int pct = (int) Math.round(prog * 100.0);
-            tasks.add(new BackgroundLoadingTask(
-                Component.translatable("gui.gtcalcboard.status.task_addons").getString(),
-                pct,
-                false,
-                pct + "%",
-                Component.translatable("gui.gtcalcboard.status.indexing_addons", pct).getString()
-            ));
-        }
-
-        if (!com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.isInitialized()) {
-            tasks.add(new BackgroundLoadingTask(
-                Component.translatable("gui.gtcalcboard.status.task_multiblocks").getString(),
-                50,
-                true,
-                Component.translatable("gui.gtcalcboard.status.in_progress").getString(),
-                Component.translatable("gui.gtcalcboard.status.indexing_multiblocks").getString()
-            ));
-        }
-
-        if (tasks.isEmpty()) return;
-
-        int cardW = 340;
-        int rowH = 34;
-        int cardH = 26 + (tasks.size() * rowH) + 4;
-        int cardX = (screenWidth - cardW) / 2;
-        int cardY = screenHeight - cardH - 24;
-
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, 450);
-
-        // Container Background & Border
-        graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0xF0101520);
-        graphics.renderOutline(cardX, cardY, cardW, cardH, 0xFF35445E);
-
-        // Title Header
-        graphics.fill(cardX, cardY, cardX + cardW, cardY + 20, 0xEE182232);
-        graphics.fill(cardX, cardY + 19, cardX + cardW, cardY + 20, 0xFF2A364D);
-        String headerTitle = "§e⏳ " + Component.translatable("gui.gtcalcboard.status.loading_header").getString();
-        graphics.drawString(font, headerTitle, cardX + 8, cardY + 6, 0xFFFFFFFF, false);
-
-        int curY = cardY + 24;
-        for (BackgroundLoadingTask task : tasks) {
-            // Line 1: Title (Left) & Status (Right)
-            graphics.drawString(font, "§f" + task.title, cardX + 10, curY, 0xFFE0E0E0, false);
-            String status = "§7" + task.statusText;
-            int statusW = font.width(status);
-            graphics.drawString(font, status, cardX + cardW - 10 - statusW, curY, 0xFFAAAAAA, false);
-
-            // Line 2: Subtitle
-            if (task.subtitle != null && !task.subtitle.isEmpty()) {
-                String sub = font.plainSubstrByWidth("§8" + task.subtitle, cardW - 20);
-                graphics.drawString(font, sub, cardX + 10, curY + 10, 0xFF888888, false);
-            }
-
-            // Line 3: Progress Bar
-            int barX = cardX + 10;
-            int barY = curY + 22;
-            int barW = cardW - 20;
-            int barH = 3;
-
-            graphics.fill(barX, barY, barX + barW, barY + barH, 0xFF222733);
-            graphics.renderOutline(barX, barY, barW, barH, 0xFF3D4659);
-
-            if (task.indeterminate) {
-                long time = System.currentTimeMillis() % 1500;
-                float pos = (time / 1500.0f);
-                int segW = 45;
-                int segX = barX + (int) (pos * (barW - segW));
-                graphics.fill(segX, barY, segX + segW, barY + barH, 0xFF4A90E2);
-            } else {
-                float fillRatio = Math.max(0.05f, Math.min(1.0f, task.percent / 100.0f));
-                int fillW = (int) (barW * fillRatio);
-                graphics.fill(barX, barY, barX + fillW, barY + barH, 0xFF4A90E2);
-            }
-
-            curY += rowH;
-        }
-
-        graphics.pose().popPose();
-    }
-
-    private void renderGridBackground(GuiGraphics graphics) {
-        int dotSpacing = (int) (24 * zoom);
-        if (dotSpacing < 10) return;
-
-        int startX = (int) (panX % dotSpacing);
-        int startY = (int) (panY % dotSpacing);
-
-        Matrix4f pose = graphics.pose().last().pose();
-        graphics.flush();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-
-        Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder buffer = tesselator.getBuilder();
-        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-
-        float a = 0x22 / 255.0f;
-        float r = 1.0f, g = 1.0f, b = 1.0f;
-
-        for (int x = startX; x < width; x += dotSpacing) {
-            for (int y = startY; y < height; y += dotSpacing) {
-                buffer.vertex(pose, x, y, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x + 1, y, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x + 1, y + 1, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x, y + 1, 0.0f).color(r, g, b, a).endVertex();
-            }
-        }
-
-        tesselator.end();
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
+            || (noteEditDialog != null && noteEditDialog.isVisible())
+            || (autoConnectDialog != null && autoConnectDialog.isVisible());
     }
 
     public NodeWidget findWidgetForNode(RecipeNode node) {
@@ -1152,6 +1062,15 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
         if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
             return exportToTeamDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (exportBlueprintDialog != null && exportBlueprintDialog.isVisible()) {
+            return exportBlueprintDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (importBlueprintDialog != null && importBlueprintDialog.isVisible()) {
+            return importBlueprintDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
+            return diskBlueprintsDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
             return recentSavesDialog.mouseClicked(mouseX, mouseY, button);
@@ -1191,6 +1110,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
         if (noteEditDialog != null && noteEditDialog.isVisible()) {
             return noteEditDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
+            return autoConnectDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (workspaceTabBar.mouseClicked(mouseX, mouseY, button)) {
             return true;
@@ -1252,6 +1174,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
+            return diskBlueprintsDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
             return recentSavesDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -1269,6 +1194,9 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         }
         if (searchDialog != null && searchDialog.isVisible()) {
             return searchDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
+            return autoConnectDialog.mouseScrolled(mouseX, mouseY, delta);
         }
         if (favoritesDockWidget.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
@@ -1299,70 +1227,16 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
-        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
-            return saveToTeamDialog.charTyped(codePoint, modifiers);
-        }
-        if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
-            return globalBalanceDialog.charTyped(codePoint, modifiers);
-        }
-        if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
-            return multiblockBOMDialog.charTyped(codePoint, modifiers);
-        }
-        if (pageTabBar.charTyped(codePoint, modifiers)) {
+        if (BoardKeybindDispatcher.handleCharTyped(this, codePoint, modifiers)) {
             return true;
-        }
-        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            return machineConfigDialog.charTyped(codePoint, modifiers);
-        }
-        if (searchDialog != null && searchDialog.isVisible()) {
-            return searchDialog.charTyped(codePoint, modifiers);
-        }
-        if (frameEditDialog != null && frameEditDialog.isVisible()) {
-            return frameEditDialog.charTyped(codePoint, modifiers);
-        }
-        if (noteEditDialog != null && noteEditDialog.isVisible()) {
-            return noteEditDialog.charTyped(codePoint, modifiers);
-        }
-
-        for (NodeWidget w : nodeWidgets) {
-            if (w.charTyped(codePoint, modifiers)) {
-                return true;
-            }
         }
         return super.charTyped(codePoint, modifiers);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
-            return saveToTeamDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (settingsDialog != null && settingsDialog.isVisible()) {
-            return settingsDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
-            return exportToTeamDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
-            return recentSavesDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (frameEditDialog != null && frameEditDialog.isVisible()) {
-            return frameEditDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (noteEditDialog != null && noteEditDialog.isVisible()) {
-            return noteEditDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            return machineConfigDialog.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (pageTabBar.keyPressed(keyCode, scanCode, modifiers)) {
+        if (BoardKeybindDispatcher.handleKeyPressed(this, keyCode, scanCode, modifiers, (int) lastMouseX, (int) lastMouseY)) {
             return true;
-        }
-        if (BoardHotkeyHandler.handleKeyPressed(this, keyCode, scanCode, modifiers, lastMouseX, lastMouseY)) {
-            return true;
-        }
-        if (this.minecraft != null && this.minecraft.options.keyInventory.matches(keyCode, scanCode)) {
-            return false;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
@@ -1375,10 +1249,27 @@ public class BoardScreen extends net.minecraft.client.gui.screens.inventory.Abst
         return (screenY - panY) / zoom;
     }
 
+    public double toScreenX(double canvasX) {
+        return canvasX * zoom + panX;
+    }
+
+    public double toScreenY(double canvasY) {
+        return canvasY * zoom + panY;
+    }
+
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
     public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
+    public AutoConnectFilterDialog getAutoConnectDialog() { return autoConnectDialog; }
+
+    public void openAutoConnectDialog() {
+        if (!ensureEditPermission()) return;
+        if (autoConnectDialog == null) {
+            autoConnectDialog = new AutoConnectFilterDialog(this);
+        }
+        autoConnectDialog.open();
+    }
 
     public void openRecipeSwitchDialog(RecipeNode node) {
         if (!ensureEditPermission()) return;

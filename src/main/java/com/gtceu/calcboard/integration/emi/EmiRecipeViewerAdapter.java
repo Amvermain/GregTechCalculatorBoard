@@ -367,6 +367,7 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void registerBoMGoal(MultiblockBOMSummary summary) {
         if (!isAvailable() || summary == null) return;
         try {

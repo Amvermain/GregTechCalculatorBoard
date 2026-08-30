@@ -164,30 +164,40 @@ public class EmiRecipeConverter {
             }
         }
 
-        Map<ResourceLocation, Double> baseChances = extractOutputChances(recipe);
-        Map<ResourceLocation, Double> tierBoosts = extractTierChanceBoosts(recipe);
-        boolean isGT = ModCompatHelper.isGTLoaded() && (recipe.getBackingRecipe() != null && recipe.getBackingRecipe().getClass().getName().contains("GTRecipe"));
+        List<OutputSlotChance> extractedChances = extractOutputSlotChances(recipe);
+        boolean[] usedChances = new boolean[extractedChances.size()];
 
         // Convert Outputs
-        for (EmiStack outStack : recipe.getOutputs()) {
+        for (int i = 0; i < recipe.getOutputs().size(); i++) {
+            EmiStack outStack = recipe.getOutputs().get(i);
             if (outStack == null || outStack.isEmpty()) continue;
             if (isDummyConditionMarker(outStack.getId())) continue;
 
             float chance = outStack.getChance();
+            double tierBoost = 0.0;
             ResourceLocation outId = outStack.getId();
-            if (outId != null && baseChances.containsKey(outId)) {
-                chance = baseChances.get(outId).floatValue();
+
+            // 1. Try exact index matching first
+            if (i < extractedChances.size() && !usedChances[i] && outId != null && outId.equals(extractedChances.get(i).id())) {
+                chance = (float) extractedChances.get(i).chance();
+                tierBoost = extractedChances.get(i).tierChanceBoost();
+                usedChances[i] = true;
+            } else if (outId != null) {
+                // 2. Consume first unused matching ID in order
+                for (int j = 0; j < extractedChances.size(); j++) {
+                    if (!usedChances[j] && outId.equals(extractedChances.get(j).id())) {
+                        chance = (float) extractedChances.get(j).chance();
+                        tierBoost = extractedChances.get(j).tierChanceBoost();
+                        usedChances[j] = true;
+                        break;
+                    }
+                }
             }
 
             IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), chance);
             if (os != null && !isDummyConditionMarker(os.getId())) {
                 if (os.getChance() < 1.0) {
-                    if (tierBoosts.containsKey(os.getId())) {
-                        os.setTierChanceBoost(tierBoosts.get(os.getId()));
-                    } else {
-                        // Deductive default: If recipe does not specify a tier chance boost, it does not increase with tier
-                        os.setTierChanceBoost(0.0);
-                    }
+                    os.setTierChanceBoost(tierBoost);
                 }
                 node.addOutput(os);
             }
@@ -399,19 +409,35 @@ public class EmiRecipeConverter {
         }
     }
 
-    private static Map<ResourceLocation, Double> extractOutputChances(EmiRecipe recipe) {
-        Map<ResourceLocation, Double> map = new HashMap<>();
-        if (recipe == null) return map;
+    public record OutputSlotChance(ResourceLocation id, double chance, double tierChanceBoost) {}
+ 
+    private static List<OutputSlotChance> extractOutputSlotChances(EmiRecipe recipe) {
+        List<OutputSlotChance> list = new ArrayList<>();
+        if (recipe == null) return list;
         try {
-            Object backing = recipe.getBackingRecipe();
-            if (backing == null) return map;
+            Object backing = unwrapBackingRecipe(recipe);
+            if (backing == null) backing = recipe.getBackingRecipe();
+            if (backing == null) return list;
 
-            // 1. Create ProcessingRecipe (e.g. Fan Washing, Crushing, Milling, Cutting, etc.)
+            // 1. GTCEu GTRecipe
+            if (ModCompatHelper.isGTLoaded() && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
+                List<IngredientStack> gtOuts = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeContents(backing, "outputs");
+                if (gtOuts != null && !gtOuts.isEmpty()) {
+                    for (IngredientStack is : gtOuts) {
+                        if (is != null && is.getId() != null) {
+                            list.add(new OutputSlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
+                        }
+                    }
+                    return list;
+                }
+            }
+
+            // 2. Create ProcessingRecipe (e.g. Fan Washing, Crushing, Milling, Cutting, etc.)
             try {
                 Method m = backing.getClass().getMethod("getRollableResults");
                 Object res = m.invoke(backing);
-                if (res instanceof List<?> list) {
-                    for (Object po : list) {
+                if (res instanceof List<?> rollableList) {
+                    for (Object po : rollableList) {
                         if (po == null) continue;
                         Method getStackM = po.getClass().getMethod("getStack");
                         Method getChanceM = po.getClass().getMethod("getChance");
@@ -420,14 +446,18 @@ public class EmiRecipeConverter {
                         if (stackObj instanceof net.minecraft.world.item.ItemStack is && chanceObj instanceof Number n) {
                             ResourceLocation id = ForgeRegistries.ITEMS.getKey(is.getItem());
                             if (id != null) {
-                                map.put(id, n.doubleValue());
+                                double ch = Math.max(0.0, Math.min(1.0, n.doubleValue()));
+                                list.add(new OutputSlotChance(id, ch, 0.0));
                             }
                         }
+                    }
+                    if (!list.isEmpty()) {
+                        return list;
                     }
                 }
             } catch (Throwable ignored) {}
 
-            // 2. GTCEu GTRecipe output chances
+            // 3. GTCEu GTRecipe reflection fallback
             if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
                 Field outputsField = null;
                 try {
@@ -442,8 +472,8 @@ public class EmiRecipeConverter {
                     Object outputsObj = outputsField.get(backing);
                     if (outputsObj instanceof Map<?, ?> outMap) {
                         for (Object listObj : outMap.values()) {
-                            if (listObj instanceof List<?> list) {
-                                for (Object contentObj : list) {
+                            if (listObj instanceof List<?> contentList) {
+                                for (Object contentObj : contentList) {
                                     if (contentObj == null) continue;
                                     double chance = 1.0;
                                     try {
@@ -466,42 +496,8 @@ public class EmiRecipeConverter {
                                     if (chance > 1.0) {
                                         chance = chance / 10000.0; // GTCEu uses 10000 = 100%
                                     }
-                                    ResourceLocation resId = extractContentResourceId(contentObj);
-                                    if (resId != null) {
-                                        map.put(resId, Math.max(0.0, Math.min(1.0, chance)));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return map;
-    }
+                                    chance = Math.max(0.0, Math.min(1.0, chance));
 
-    private static Map<ResourceLocation, Double> extractTierChanceBoosts(EmiRecipe recipe) {
-        Map<ResourceLocation, Double> map = new HashMap<>();
-        if (recipe == null) return map;
-        try {
-            Object backing = recipe.getBackingRecipe();
-            if (backing != null && ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
-                Field outputsField = null;
-                try {
-                    outputsField = backing.getClass().getField("outputs");
-                } catch (Throwable ignored) {
-                    try {
-                        outputsField = backing.getClass().getDeclaredField("outputs");
-                        outputsField.setAccessible(true);
-                    } catch (Throwable ignored2) {}
-                }
-                if (outputsField != null) {
-                    Object outputsObj = outputsField.get(backing);
-                    if (outputsObj instanceof Map<?, ?> outMap) {
-                        for (Object listObj : outMap.values()) {
-                            if (listObj instanceof List<?> list) {
-                                for (Object contentObj : list) {
-                                    if (contentObj == null) continue;
                                     double boost = 0.0;
                                     try {
                                         Field f = contentObj.getClass().getField("tierChanceBoost");
@@ -523,9 +519,11 @@ public class EmiRecipeConverter {
                                     if (boost > 1.0) {
                                         boost = boost / 10000.0; // e.g. 500 = 5% = 0.05
                                     }
+                                    boost = Math.max(0.0, boost);
+
                                     ResourceLocation resId = extractContentResourceId(contentObj);
                                     if (resId != null) {
-                                        map.put(resId, Math.max(0.0, boost));
+                                        list.add(new OutputSlotChance(resId, chance, boost));
                                     }
                                 }
                             }
@@ -534,7 +532,7 @@ public class EmiRecipeConverter {
                 }
             }
         } catch (Throwable ignored) {}
-        return map;
+        return list;
     }
 
     private static ResourceLocation extractContentResourceId(Object contentObj) {

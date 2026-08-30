@@ -5,16 +5,14 @@ import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
-import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -167,34 +165,48 @@ public class SysteamsModAdapter implements IModAdapter {
 
     @Override
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        return SysteamsGuiHandler.formatEnergyStats(node, displayMode);
+        if (node == null) return "";
+        if (node.isGenerator() || node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+            double rfRate = node.getEffectiveTotalEUt();
+            return node.isGenerator()
+                    ? String.format(java.util.Locale.ROOT, "§a+%,.0f RF/t", rfRate)
+                    : String.format(java.util.Locale.ROOT, "§e%,.0f RF/t", rfRate);
+        }
+        double steamRate = 0.0;
+        for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
+            if (entry.getKey().isFluid() && entry.getKey().getId() != null && entry.getKey().getId().getPath().contains("steam")) {
+                steamRate += entry.getValue();
+            }
+        }
+        if (steamRate > 0) {
+            return String.format(java.util.Locale.ROOT, "§b♨ +%,.1f/s Steam", steamRate);
+        }
+        return "§b" + Component.translatable("gui.gtcalcboard.boiler_badge").getString();
     }
 
     @Override
     public List<Component> buildEnergyTooltip(RecipeNode node) {
-        return SysteamsGuiHandler.buildEnergyTooltip(node);
-    }
-
-    @Override
-    public void renderCardControls(GuiGraphics graphics, Font font,
-                                   RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                   boolean isGlowing) {
-        SysteamsGuiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
-    }
-
-    @Override
-    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        return false;
-    }
-
-    @Override
-    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        return SysteamsGuiHandler.isMachineConfigHovered(node, mouseX, mouseY);
-    }
-
-    @Override
-    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
-        return SysteamsGuiHandler.handleControlClick(widget, node, mouseX, mouseY, button);
+        List<Component> tooltipLines = new java.util.ArrayList<>();
+        if (node == null) return tooltipLines;
+        if (node.isGenerator() || node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+            double totPower = node.getEffectiveTotalEUt();
+            tooltipLines.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.dynamo_badge").getString()));
+            tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Generation: §a+%,.2f RF/t §7(§a+%,.2f EU/t eq§7)", totPower, totPower / 4.0)));
+            tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+            return tooltipLines;
+        }
+        tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_badge").getString()));
+        double steamRate = 0.0;
+        for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
+            if (entry.getKey().isFluid() && entry.getKey().getId() != null && entry.getKey().getId().getPath().contains("steam")) {
+                steamRate += entry.getValue();
+            }
+        }
+        if (steamRate > 0) {
+            tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Steam: §b+%,.2f mB/s §7(§b+%,.2f mB/t§7)", steamRate, steamRate / 20.0)));
+        }
+        tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        return tooltipLines;
     }
 
     @Override

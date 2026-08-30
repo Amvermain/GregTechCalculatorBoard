@@ -13,17 +13,20 @@ import org.junit.jupiter.api.Test;
 
 public class CoilModifierDeductionTest {
 
-    @org.junit.jupiter.api.BeforeAll
-    public static void setupMinecraft() {
+    static {
         try {
             net.minecraft.SharedConstants.tryDetectVersion();
-            net.minecraft.server.Bootstrap.bootStrap();
+            java.lang.reflect.Field field = net.minecraft.server.Bootstrap.class.getDeclaredField("isBootstrapped");
+            field.setAccessible(true);
+            if (!field.getBoolean(null)) {
+                net.minecraft.server.Bootstrap.bootStrap();
+            }
         } catch (Throwable ignored) {}
     }
     @DisplayName("Test EBF Excess Temperature Discount (5% per 900K)")
     public void testEbfExcessTemperatureDiscount() {
         RecipeNode node = new RecipeNode("node-ebf", "EBF Node", 10.0, 120.0, GTVoltageTier.MV);
-        node.setMachineIcon(new ResourceLocation("gtceu", "electric_blast_furnace"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
         node.setRecipeTemperature(1800);
 
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(3600, 150, 70, 125, 80, 64);
@@ -39,7 +42,7 @@ public class CoilModifierDeductionTest {
     @DisplayName("Test Pyrolyse Oven Speed Bonus")
     public void testPyrolyseOvenSpeedBonus() {
         RecipeNode node = new RecipeNode("node-pyro", "Pyro Node", 10.0, 120.0, GTVoltageTier.MV);
-        node.setMachineIcon(new ResourceLocation("gtceu", "pyrolyse_oven"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:pyrolyse_oven"));
 
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(2700, 200, 80, 125, 80, 32);
         GTCoilAddon coil = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, stats);
@@ -53,7 +56,7 @@ public class CoilModifierDeductionTest {
     @DisplayName("Test Cracking Unit Energy Discount")
     public void testCrackingUnitEnergyDiscount() {
         RecipeNode node = new RecipeNode("node-crack", "Crack Node", 10.0, 120.0, GTVoltageTier.MV);
-        node.setMachineIcon(new ResourceLocation("gtceu", "cracking_unit"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:cracking_unit"));
 
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(2700, 200, 80, 125, 80, 32);
         GTCoilAddon coil = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, stats);
@@ -67,7 +70,7 @@ public class CoilModifierDeductionTest {
     @DisplayName("Test Chemical Reactor Speed and Energy Multipliers")
     public void testChemicalReactorMultipliers() {
         RecipeNode node = new RecipeNode("node-chem", "Chem Node", 10.0, 120.0, GTVoltageTier.MV);
-        node.setMachineIcon(new ResourceLocation("gtceu", "large_chemical_reactor"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
 
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(2700, 200, 80, 125, 80, 32);
         GTCoilAddon coil = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, stats);
@@ -81,7 +84,7 @@ public class CoilModifierDeductionTest {
     @DisplayName("Test Multi Smelter Parallel Multiplier and Node Total Parallel")
     public void testMultiSmelterParallelMultiplier() {
         RecipeNode node = new RecipeNode("node-smelt", "Smelt Node", 10.0, 120.0, GTVoltageTier.MV);
-        node.setMachineIcon(new ResourceLocation("gtceu", "multi_smelter"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:multi_smelter"));
         node.setMultiblock(true);
 
         // 1. Without coil: default parallel is 1

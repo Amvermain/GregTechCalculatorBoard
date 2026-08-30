@@ -107,10 +107,8 @@ public class ClientWorkspaceState {
             byte[] compressed = com.gtceu.calcboard.api.storage.BlueprintCodec.compressTag(tag);
             int nodeCount = graph.getNodes().size();
 
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                new com.gtceu.calcboard.network.packet.c2s.C2SCommitWorkspacePacket(
-                    teamId, pageId, pageTitle, rev, "Auto-saved changes", compressed, nodeCount, 0, 0
-                )
+            ClientChunkedStreamHelper.commitPageSafely(
+                teamId, pageId, pageTitle, rev, "Auto-saved changes", compressed, nodeCount, 0, 0
             );
             clearPageDirty(pageId);
             setLockHeld(pageId, false);
@@ -164,6 +162,7 @@ public class ClientWorkspaceState {
         if (activeTeamPageId != null && !activeTeamPageId.equals(this.activeTeamPageId)) {
             releaseCurrentLockIfHeld();
             this.activeTeamPageId = activeTeamPageId;
+            requestPageDataIfNeeded(activeTeamPageId);
         }
     }
 
@@ -204,9 +203,124 @@ public class ClientWorkspaceState {
         return g;
     }
 
+    private final Set<String> loadingPages = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Map<String, Integer> cachedRevisions = new ConcurrentHashMap<>();
+
+    public boolean isPageLoading(String pageId) {
+        return pageId != null && loadingPages.contains(pageId);
+    }
+
+    public boolean isPageLoaded(String pageId) {
+        if (pageId == null) return false;
+        TeamWorkspacePage page = remotePages.get(pageId);
+        if (page == null) return false;
+        Integer cachedRev = cachedRevisions.get(pageId);
+        return teamGraphs.containsKey(pageId) && cachedRev != null && cachedRev == page.getPageRevision();
+    }
+
+    public void requestPageDataIfNeeded(String pageId) {
+        if (pageId == null || !isCollaborationEnabled()) return;
+        TeamWorkspacePage page = remotePages.get(pageId);
+        int serverRev = (page != null) ? page.getPageRevision() : 0;
+        Integer cachedRev = cachedRevisions.get(pageId);
+
+        // Cache-Hit: if we already have the exact revision deserialized, skip network request
+        if (cachedRev != null && cachedRev == serverRev && teamGraphs.containsKey(pageId)) {
+            return;
+        }
+
+        loadingPages.add(pageId);
+        com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SRequestPageDataPacket(pageId, cachedRev != null ? cachedRev : 0)
+        );
+    }
+
+    public void applyPageData(String pageId, int revision, byte[] compressedNBT) {
+        if (pageId == null) return;
+        loadingPages.remove(pageId);
+
+        TeamWorkspacePage page = remotePages.get(pageId);
+        if (page != null) {
+            page.setPageRevision(revision);
+            page.setCompressedGraphData(compressedNBT);
+        }
+
+        if (compressedNBT != null && compressedNBT.length > 0) {
+            try {
+                CompoundTag tag = BlueprintCodec.decompressTag(compressedNBT);
+                teamGraphs.put(pageId, FlowGraph.deserializeNBT(tag));
+                cachedRevisions.put(pageId, revision);
+            } catch (Exception e) {
+                teamGraphs.put(pageId, new FlowGraph());
+                cachedRevisions.put(pageId, revision);
+            }
+        } else {
+            teamGraphs.put(pageId, new FlowGraph());
+            cachedRevisions.put(pageId, revision);
+        }
+
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc != null && mc.screen instanceof BoardScreen bs) {
+            if (pageId.equals(activeTeamPageId)) {
+                bs.rebuildWidgets();
+                bs.markSummaryDirty();
+            }
+        }
+    }
+
+    public void updateWorkspaceMeta(com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspaceMetaPacket packet) {
+        serverSupported = true;
+        UUID teamId = packet.getTeamId();
+        if (teamId == null || (teamId.getMostSignificantBits() == 0L && teamId.getLeastSignificantBits() == 0L)) {
+            setCurrentTeamId(null);
+            setCurrentTeamName("Team Workspace");
+            remotePages.clear();
+            teamGraphs.clear();
+            cachedRevisions.clear();
+        } else {
+            setCurrentTeamId(teamId);
+            setCurrentTeamName(packet.getTeamName());
+            setGlobalRevision(packet.getGlobalRevision());
+
+            Set<String> newPageIds = new HashSet<>();
+            for (var pm : packet.getPages()) {
+                newPageIds.add(pm.getPageId());
+                TeamWorkspacePage page = remotePages.get(pm.getPageId());
+                if (page == null) {
+                    page = new TeamWorkspacePage(pm.getPageId(), pm.getTitle(), pm.getRevision(), new byte[0]);
+                    remotePages.put(pm.getPageId(), page);
+                } else {
+                    page.setTitle(pm.getTitle());
+                    if (page.getPageRevision() != pm.getRevision()) {
+                        // Invalidate cache when revision changed
+                        teamGraphs.remove(pm.getPageId());
+                        cachedRevisions.remove(pm.getPageId());
+                    }
+                    page.setPageRevision(pm.getRevision());
+                }
+                page.setLockHolderUUID(pm.getLockHolderUUID());
+                page.setLockHolderName(pm.getLockHolderName());
+                page.setLockExpiresTimestamp(pm.getLockExpiresTimestamp());
+            }
+
+            // Remove deleted pages
+            remotePages.keySet().removeIf(pid -> !newPageIds.contains(pid));
+            teamGraphs.keySet().removeIf(pid -> !newPageIds.contains(pid));
+            cachedRevisions.keySet().removeIf(pid -> !newPageIds.contains(pid));
+
+            if (!remotePages.containsKey(activeTeamPageId) && !remotePages.isEmpty()) {
+                activeTeamPageId = remotePages.keySet().iterator().next();
+            }
+
+            // Auto fetch active page data if not cached
+            requestPageDataIfNeeded(activeTeamPageId);
+        }
+    }
+
     public void updateRemotePages(List<TeamWorkspacePage> pages) {
         remotePages.clear();
         teamGraphs.clear();
+        cachedRevisions.clear();
         if (pages != null && !pages.isEmpty()) {
             for (TeamWorkspacePage p : pages) {
                 remotePages.put(p.getPageId(), p);
@@ -214,6 +328,7 @@ public class ClientWorkspaceState {
                     try {
                         CompoundTag tag = BlueprintCodec.decompressTag(p.getCompressedGraphData());
                         teamGraphs.put(p.getPageId(), FlowGraph.deserializeNBT(tag));
+                        cachedRevisions.put(p.getPageId(), p.getPageRevision());
                     } catch (Exception e) {
                         teamGraphs.put(p.getPageId(), new FlowGraph());
                     }
@@ -288,6 +403,9 @@ public class ClientWorkspaceState {
         activePresence.clear();
         myHeldLocks.clear();
         dirtyPages.clear();
+        loadingPages.clear();
+        cachedRevisions.clear();
+        ChunkedPayloadAssembler.clear();
     }
 }
 

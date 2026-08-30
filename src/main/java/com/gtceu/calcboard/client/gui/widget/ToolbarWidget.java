@@ -17,6 +17,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -84,18 +85,33 @@ public class ToolbarWidget {
             }));
         }
 
-        // 1. Connect
-        String connTxt = "⚡ " + Component.translatable("gui.gtcalcboard.auto_connect").getString();
-        list.add(new ToolbarButtonDef("auto_connect", connTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(connTxt) + 12, btn -> performAutoConnect()));
+        boolean isShift = Screen.hasShiftDown();
 
-        // 2. Ratio
-        String ratioTxt = "⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString();
-        list.add(new ToolbarButtonDef("auto_ratio", ratioTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(ratioTxt) + 12, btn -> performAutoRatio()));
+        // 1. Connect (Shift -> Quick Connect)
+        if (isShift) {
+            String quickConnTxt = "§e⚡ " + Component.translatable("gui.gtcalcboard.quick_connect").getString();
+            list.add(new ToolbarButtonDef("auto_connect", quickConnTxt, 0xFFFFF176, 0xFF3A351C, 0xFF5C5228, 0xFF887733, font.width(quickConnTxt) + 12, btn -> performAutoConnect()));
+        } else {
+            String connTxt = "🔗 " + Component.translatable("gui.gtcalcboard.auto_connect").getString();
+            list.add(new ToolbarButtonDef("auto_connect", connTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(connTxt) + 12, btn -> performAutoConnect()));
+        }
+
+        // 2. Ratio (Shift -> Harmonize)
+        if (isShift) {
+            String harmonizeTxt = "§6✨ " + Component.translatable("gui.gtcalcboard.harmonize_ratio").getString();
+            list.add(new ToolbarButtonDef("auto_ratio", harmonizeTxt, 0xFFFFD700, 0xFF3D2A1C, 0xFF634226, 0xFFA66D38, font.width(harmonizeTxt) + 12, btn -> performAutoRatio(true)));
+        } else {
+            String ratioTxt = "⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString();
+            list.add(new ToolbarButtonDef("auto_ratio", ratioTxt, 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(ratioTxt) + 12, btn -> performAutoRatio(false)));
+        }
 
         // 3. Flow
         String flowTxt = "🚀 " + Component.translatable("gui.gtcalcboard.max_flow").getString();
         list.add(new ToolbarButtonDef("max_flow", flowTxt, 0xFFFFAA00, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(flowTxt) + 12, btn -> performMaxThroughputOptimization()));
 
+        // 3.1 Fit View / Center Content
+        String fitTxt = "🎯 " + Component.translatable("gui.gtcalcboard.fit_view").getString();
+        list.add(new ToolbarButtonDef("fit_view", fitTxt, 0xFF38BDF8, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(fitTxt) + 12, btn -> screen.fitToView()));
 
         // 3.5 Global Balance Dashboard
         String balanceTxt = "§b📊 " + Component.translatable("gui.gtcalcboard.global_balance").getString();
@@ -434,9 +450,18 @@ public class ToolbarWidget {
 
     public void performAutoConnect() {
         if (!screen.ensureEditPermission()) return;
+        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+            performAutoConnectWithFilter(screen, null);
+        } else {
+            screen.openAutoConnectDialog();
+        }
+    }
+
+    public static void performAutoConnectWithFilter(BoardScreen screen, Set<ResourceLocation> allowedItemIds) {
+        if (screen == null || !screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
         List<com.gtceu.calcboard.api.history.BoardCommand> subCommands = new ArrayList<>();
-        List<FlowGraph.ConnectionEdge> addedEdges = autoConnect(graph, subCommands);
+        List<FlowGraph.ConnectionEdge> addedEdges = autoConnect(graph, subCommands, allowedItemIds);
 
         if (!addedEdges.isEmpty()) {
             subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(
@@ -451,11 +476,21 @@ public class ToolbarWidget {
                     subCommands, "Auto Connect " + addedEdges.size() + " wires"
                 ));
             }
+            BoardToast.show(Component.literal("§a⚡ ").append(Component.translatable("gui.gtcalcboard.toast.auto_connected", String.valueOf(addedEdges.size()))));
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
+            );
+        } else {
+            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("gui.gtcalcboard.dialog.auto_connect.no_connections")));
         }
         screen.markSummaryDirty();
     }
 
     public static List<FlowGraph.ConnectionEdge> autoConnect(FlowGraph graph, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands) {
+        return autoConnect(graph, subCommands, null);
+    }
+
+    public static List<FlowGraph.ConnectionEdge> autoConnect(FlowGraph graph, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands, Set<ResourceLocation> allowedItemIds) {
         List<FlowGraph.ConnectionEdge> addedEdges = new ArrayList<>();
         if (graph == null) return addedEdges;
 
@@ -469,6 +504,11 @@ public class ToolbarWidget {
                     for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
                         var in = to.getInputs().get(inIdx);
                         if (out.equals(in) || in.matchesOrAlternative(out)) {
+                            ResourceLocation itemKey = out.getId() != null ? out.getId() : in.getId();
+                            if (allowedItemIds != null && (itemKey == null || !allowedItemIds.contains(itemKey))) {
+                                continue;
+                            }
+
                             // Check if a path already exists (directly or via intermediate reroute junctions)
                             if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
                                 continue;
@@ -580,6 +620,10 @@ public class ToolbarWidget {
     }
 
     public void performAutoRatio() {
+        performAutoRatio(Screen.hasShiftDown());
+    }
+
+    public void performAutoRatio(boolean harmonized) {
         if (!screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
         RecipeNode baseNode = graph.findBaseNode();
@@ -593,7 +637,11 @@ public class ToolbarWidget {
         }
 
         if (baseNode != null) {
-            graph.autoRatioFromAnchor(baseNode);
+            if (harmonized) {
+                graph.autoRatioHarmonized(baseNode);
+            } else {
+                graph.autoRatioFromAnchor(baseNode);
+            }
         }
 
         List<com.gtceu.calcboard.api.history.BoardCommand> subCmds = new ArrayList<>();
@@ -610,7 +658,8 @@ public class ToolbarWidget {
         }
         if (!subCmds.isEmpty()) {
             String baseName = baseNode != null ? baseNode.getName() : "Graph";
-            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(subCmds, "Auto Ratio (" + baseName + ")"));
+            String actionName = harmonized ? "Harmonized Auto Ratio (" + baseName + ")" : "Auto Ratio (" + baseName + ")";
+            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(subCmds, actionName));
         }
 
         for (NodeWidget w : screen.getNodeWidgets()) {
@@ -621,8 +670,13 @@ public class ToolbarWidget {
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onAutoRatioTriggered();
 
         String baseName = baseNode != null ? baseNode.getName() : "Graph";
-        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)));
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+        if (harmonized && baseNode != null) {
+            BoardToast.show(Component.literal("§6✨ ").append(Component.translatable("message.gtcalcboard.auto_ratio_harmonized", baseName, (int) baseNode.getMachineCount())));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+        } else {
+            BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+        }
     }
 
     public void performMaxThroughputOptimization() {
@@ -731,37 +785,26 @@ public class ToolbarWidget {
     }
 
     public void copyBlueprintToClipboard() {
-        FlowGraph graph = screen.getGraph();
-        String code = BlueprintCodec.exportToString(graph, screen.getPanX(), screen.getPanY(), screen.getZoom());
-        Minecraft mc = Minecraft.getInstance();
-        mc.keyboardHandler.setClipboard(code);
-        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copy_success")));
-        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.3F));
+        if (screen.getExportBlueprintDialog() != null) {
+            screen.getExportBlueprintDialog().open();
+        }
     }
 
     public void importBlueprintFromClipboard() {
         Minecraft mc = Minecraft.getInstance();
         String clip = mc.keyboardHandler.getClipboard();
-        if (clip == null || clip.trim().isEmpty()) {
-            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.clipboard_empty")));
-            return;
+        if (clip != null && !clip.trim().isEmpty()) {
+            com.gtceu.calcboard.api.storage.BlueprintPackage pkg = BlueprintCodec.importPackageFromString(clip);
+            if (pkg != null && screen.getImportBlueprintDialog() != null) {
+                screen.getImportBlueprintDialog().open(pkg);
+                return;
+            }
         }
 
-        double[] viewport = new double[3];
-        FlowGraph imported = BlueprintCodec.importFromString(clip, viewport);
-        if (imported != null) {
-            screen.getGraph().copyFrom(imported);
-            screen.setPanX(viewport[0]);
-            screen.setPanY(viewport[1]);
-            screen.setZoom(viewport[2]);
-            BoardScreen.lastPanX = screen.getPanX();
-            BoardScreen.lastPanY = screen.getPanY();
-            BoardScreen.lastZoom = screen.getZoom();
-            screen.rebuildWidgets();
-            BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.import_success", String.valueOf(screen.getGraph().getNodes().size()))));
-            mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.1F));
+        if (screen.getDiskBlueprintsDialog() != null) {
+            screen.getDiskBlueprintsDialog().open();
         } else {
-            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.import_fail")));
+            BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.clipboard_empty")));
         }
     }
 }

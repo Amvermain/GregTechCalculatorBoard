@@ -8,12 +8,8 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
-import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
-import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -115,44 +111,6 @@ public class VanillaModAdapter implements IModAdapter {
         tooltipLines.add(Component.literal("§a🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_stat").getString()));
         tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.2fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         return tooltipLines;
-    }
-
-    @Override
-    public void renderCardControls(GuiGraphics graphics, Font font,
-                                   RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                   boolean isGlowing) {
-        String bannerText = "🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
-        int bannerW = cardW - 12;
-        NodeCardRenderer.drawBtn(graphics, font, bannerText, x + 6, row2Y, bannerW, 14, mouseX, mouseY, 0xFF88D49E, false, false);
-    }
-
-    @Override
-    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node == null || node.isModule()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + NodeWidget.HEADER_HEIGHT + 6;
-        int row2Y = ctrlY + 18;
-        int cardW = node.getCardWidth();
-        return mouseX >= x + 6 && mouseX <= x + cardW - 6 && mouseY >= row2Y && mouseY <= row2Y + 14;
-    }
-
-    @Override
-    public boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        return false;
-    }
-
-    @Override
-    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        return false;
-    }
-
-    @Override
-    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
-        if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
-            return widget.changeTier(button == 1 ? -1 : 1);
-        }
-        return false;
     }
 }
 

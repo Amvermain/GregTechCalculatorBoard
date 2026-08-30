@@ -370,7 +370,10 @@ public class RecipeFilterDialog {
             if (onFilterChanged != null) onFilterChanged.run();
             return true;
         }
-        return searchBox.keyPressed(keyCode, scanCode, modifiers);
+        if (searchBox != null) {
+            searchBox.keyPressed(keyCode, scanCode, modifiers);
+        }
+        return true;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {

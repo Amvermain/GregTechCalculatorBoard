@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.util;
 
+import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraftforge.fml.ModList;
 
 /**
@@ -36,6 +37,55 @@ public class ModCompatHelper {
 
     public static boolean isCreateAdditionsLoaded() {
         return isModLoaded("createaddition");
+    }
+
+    public static boolean isCreateVintageImprovementsLoaded() {
+        return isModLoaded("vintageimprovements") || isModLoaded("vintage_improvements") || isModLoaded("create_vintage_improvements") || isModLoaded("vintage");
+    }
+
+    public static boolean isCreateFamilyNamespace(String namespace) {
+        if (namespace == null) return false;
+        String lower = namespace.toLowerCase(java.util.Locale.ROOT);
+        return lower.equals("create")
+                || lower.equals("createaddition")
+                || lower.equals("create_new_age")
+                || lower.equals("vintageimprovements")
+                || lower.equals("vintage_improvements")
+                || lower.equals("create_vintage_improvements")
+                || lower.equals("vintage")
+                || lower.equals("create_enchantment_industry")
+                || lower.equals("create_dd")
+                || lower.equals("createbigcannons")
+                || lower.equals("create_sa")
+                || lower.equals("create_connected")
+                || lower.equals("createsifter")
+                || lower.equals("sliceanddice")
+                || lower.startsWith("create_")
+                || lower.startsWith("create-");
+    }
+
+    public static boolean isCreateMachine(RecipeNode node) {
+        if (node == null) return false;
+        if (node.getEnergyTypeOverride() == com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU) return true;
+        if (node.getMachineIcon() != null) {
+            String ns = node.getMachineIcon().getNamespace().toLowerCase(java.util.Locale.ROOT);
+            if (ns.equals("minecraft") || ns.equals("emi") || ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+                return false;
+            }
+            if (isCreateFamilyNamespace(ns)) {
+                return true;
+            }
+        }
+        if (node.getRecipeCategoryId() != null) {
+            String ns = node.getRecipeCategoryId().getNamespace().toLowerCase(java.util.Locale.ROOT);
+            if (ns.equals("minecraft") || ns.equals("emi") || ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
+                return false;
+            }
+            if (isCreateFamilyNamespace(ns)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isEmiLoaded() {

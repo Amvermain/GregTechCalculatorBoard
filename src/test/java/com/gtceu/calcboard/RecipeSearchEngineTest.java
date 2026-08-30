@@ -449,9 +449,9 @@ public class RecipeSearchEngineTest {
 
     @Test
     public void testStressUnitsProducerConsumerMatch() {
-        var stressId = new net.minecraft.resources.ResourceLocation("create", "stress_units");
-        var waterWheelId = new net.minecraft.resources.ResourceLocation("create", "large_water_wheel");
-        var mixerId = new net.minecraft.resources.ResourceLocation("create", "mechanical_mixer");
+        var stressId = net.minecraft.resources.ResourceLocation.tryParse("create:stress_units");
+        var waterWheelId = net.minecraft.resources.ResourceLocation.tryParse("create:large_water_wheel");
+        var mixerId = net.minecraft.resources.ResourceLocation.tryParse("create:mechanical_mixer");
 
         // Create virtual kinetic recipes
         List<SearchableRecipe> kineticRecipes = com.gtceu.calcboard.compat.create.CreateRecipeHandler.getVirtualKineticSearchRecipes();

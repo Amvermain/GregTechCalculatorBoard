@@ -1,20 +1,17 @@
 package com.gtceu.calcboard.api.model;
 
 import com.gtceu.calcboard.api.catalog.AddonCategory;
-import com.gtceu.calcboard.api.catalog.CategoryCapability;
-import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.property.NodeProperties;
+import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.api.storage.RecipeNodeSerializer;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.NodeThreadingConfig;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
-
-import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
-import com.gtceu.calcboard.api.property.NodeProperties;
-import com.gtceu.calcboard.api.property.NodePropertyStore;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.nbt.CompoundTag;
@@ -23,9 +20,9 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.*;
 
 /**
- * Core domain model representing a recipe node on the calculator canvas.
+ * Pure domain model representing a recipe node on the calculator canvas.
  * Encapsulates graph attributes, I/O ingredient streams, and delegates mod-specific
- * physics, overclocking, and hardware calculations to registered {@link IModAdapter} instances.
+ * physics, rate integration, and hardware resolutions to registered SPI adapters and calculators.
  */
 public class RecipeNode {
     private String id;
@@ -100,8 +97,8 @@ public class RecipeNode {
     public RecipeNode(String id, String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
         this.id = id != null ? id : UUID.randomUUID().toString();
         this.name = name;
-        this.baseDurationTicks = Math.max(1.0, baseDurationTicks);
-        this.baseEUt = Math.max(1.0, baseEUt);
+        this.baseDurationTicks = Math.max(0.0, baseDurationTicks);
+        this.baseEUt = Math.max(0.0, baseEUt);
         this.recipeTier = recipeTier != null ? recipeTier : GTVoltageTier.getTierForVoltage((long) baseEUt);
         this.targetTier = this.recipeTier;
         this.machineCount = 1.0;
@@ -149,14 +146,20 @@ public class RecipeNode {
     }
 
     public RecipeNode copy() {
-        CompoundTag tag = this.serializeNBT();
-        tag.putString("id", UUID.randomUUID().toString());
-        return RecipeNode.deserializeNBT(tag);
+        return deserializeNBT(serializeNBT());
     }
 
-    // =========================================================================
-    // Core Identity & Attributes
-    // =========================================================================
+    public boolean isFlipped() {
+        return isFlipped;
+    }
+
+    public void setFlipped(boolean flipped) {
+        this.isFlipped = flipped;
+    }
+
+    public void toggleFlipped() {
+        this.isFlipped = !this.isFlipped;
+    }
 
     public String getId() {
         return id;
@@ -167,27 +170,6 @@ public class RecipeNode {
     }
 
     public String getName() {
-        if (name != null && name.contains(" (") && name.endsWith(")")) {
-            if (!inputs.isEmpty() && inputs.get(0) != null) {
-                int openParen = name.indexOf(" (");
-                String prefix = name.substring(0, openParen);
-                String currentIngredientName = inputs.get(0).getDisplayName();
-                if (currentIngredientName != null && !currentIngredientName.isEmpty()) {
-                    return prefix + " (" + currentIngredientName + ")";
-                }
-            } else if (!outputs.isEmpty() && outputs.get(0) != null) {
-                int openParen = name.indexOf(" (");
-                String prefix = name.substring(0, openParen);
-                String currentIngredientName = outputs.get(0).getDisplayName();
-                if (currentIngredientName != null && !currentIngredientName.isEmpty()) {
-                    return prefix + " (" + currentIngredientName + ")";
-                }
-            }
-        }
-        return name != null ? name : "";
-    }
-
-    public String getRawName() {
         return name;
     }
 
@@ -195,81 +177,48 @@ public class RecipeNode {
         this.name = name;
     }
 
+    public String getRawName() {
+        return name != null ? name : "";
+    }
+
+    public String getMachineDisplayName() {
+        if (name != null && !name.isEmpty()) {
+            return name;
+        }
+        if (machineIcon != null) {
+            return machineIcon.getPath();
+        }
+        return "Unknown Machine";
+    }
+
     public ResourceLocation getMachineIcon() {
         return machineIcon;
     }
 
     public void setMachineIcon(ResourceLocation machineIcon) {
-        if (java.util.Objects.equals(this.machineIcon, machineIcon)) return;
+        if (Objects.equals(this.machineIcon, machineIcon)) return;
         ResourceLocation oldIcon = this.machineIcon;
-        IModAdapter oldAdapter = ModAdapterRegistry.getAdapterForNode(this);
-
         this.machineIcon = machineIcon;
-        if (machineIcon != null) {
-            if (MultiblockDetector.isThreadingMultiblock(machineIcon)) {
-                getThreadingConfig().setActive(true);
-            } else if (threadingConfig != null) {
-                threadingConfig.setActive(false);
-                addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING || a.getId().startsWith("start_core:helix_") || a.getId().contains("helix"));
-            }
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        if (adapter != null) {
+            adapter.onMachineIconChanged(this, oldIcon, machineIcon);
         }
-        IModAdapter newAdapter = ModAdapterRegistry.getAdapterForNode(this);
-        if (oldAdapter != null && oldAdapter != newAdapter) {
-            oldAdapter.onMachineIconChanged(this, oldIcon, machineIcon);
-        }
-        if (newAdapter != null) {
-            newAdapter.onMachineIconChanged(this, oldIcon, machineIcon);
-        }
-    }
-
-    public String getMachineDisplayName() {
-        if (isModule) {
-            return name != null && !name.isBlank() ? name : "Module";
-        }
-        if (isReroute) {
-            return "Junction";
-        }
-
-        ResourceLocation icon = getMachineIcon();
-        if (icon == null && !availableWorkstations.isEmpty()) {
-            icon = availableWorkstations.get(0);
-        }
-
-        if (icon != null) {
-            try {
-                var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(icon);
-                if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                    return item.getDescription().getString();
-                }
-                var block = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(icon);
-                if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
-                    return block.getName().getString();
-                }
-            } catch (Throwable ignored) {}
-            return MultiblockStructureCatalog.formatMachineName(icon.getPath());
-        }
-
-        if (recipeCategoryId != null) {
-            return MultiblockStructureCatalog.formatMachineName(recipeCategoryId.getPath());
-        }
-
-        return name != null && !name.isBlank() ? name : "Machine";
     }
 
     public double getBaseDurationTicks() {
-        return isReroute ? 0.0 : baseDurationTicks;
+        return baseDurationTicks;
     }
 
     public void setBaseDurationTicks(double baseDurationTicks) {
-        this.baseDurationTicks = isReroute ? 0.0 : Math.max(1.0, baseDurationTicks);
+        this.baseDurationTicks = Math.max(0.0, baseDurationTicks);
     }
 
     public double getBaseEUt() {
-        return isReroute ? 0.0 : baseEUt;
+        return baseEUt;
     }
 
     public void setBaseEUt(double baseEUt) {
-        this.baseEUt = isReroute ? 0.0 : Math.max(0.0, baseEUt);
+        this.baseEUt = Math.max(0.0, baseEUt);
     }
 
     public GTVoltageTier getRecipeTier() {
@@ -277,7 +226,7 @@ public class RecipeNode {
     }
 
     public void setRecipeTier(GTVoltageTier recipeTier) {
-        this.recipeTier = recipeTier;
+        this.recipeTier = recipeTier != null ? recipeTier : GTVoltageTier.ULV;
     }
 
     public GTVoltageTier getTargetTier() {
@@ -285,51 +234,22 @@ public class RecipeNode {
     }
 
     public void setTargetTier(GTVoltageTier targetTier) {
-        GTVoltageTier minTier = recipeTier;
-        if (isFusion()) {
-            GTVoltageTier minFusionTier = getMinFusionVoltageTier();
-            if (minFusionTier.ordinal() > minTier.ordinal()) {
-                minTier = minFusionTier;
-            }
-        }
-        this.targetTier = (targetTier.ordinal() >= minTier.ordinal()) ? targetTier : minTier;
-        if (!isMultiblock() && (steamMode == null || !steamMode.isSteam())) {
-            ResourceLocation tierWs = getWorkstationForTier(this.targetTier);
-            if (tierWs != null) {
-                setMachineIcon(tierWs);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        this.targetTier = adapter.sanitizeTargetTier(this, targetTier);
+        if (!isMultiblock && (steamMode == null || !steamMode.isSteam()) && (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon))) {
+            ResourceLocation ws = getWorkstationForTier(this.targetTier);
+            if (ws != null) {
+                setMachineIcon(ws);
             }
         }
     }
 
     public ResourceLocation getWorkstationForTier(GTVoltageTier tier) {
-        if (tier == null) return null;
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
-        if (adapter != null) {
-            ResourceLocation ws = adapter.getWorkstationForTier(this, tier);
-            if (ws != null) return ws;
-        }
-        return getWorkstationForTierFromList(tier);
+        return NodeWorkstationResolver.getWorkstationForTier(this, tier);
     }
 
     public ResourceLocation getWorkstationForTierFromList(GTVoltageTier tier) {
-        if (tier == null) return null;
-        String prefix = tier.name().toLowerCase(java.util.Locale.ROOT) + "_";
-        String catName = recipeCategoryId != null ? recipeCategoryId.getPath().toLowerCase(java.util.Locale.ROOT) : null;
-        ResourceLocation bestMatch = null;
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
-                String path = ws.getPath().toLowerCase(java.util.Locale.ROOT);
-                if (path.startsWith(prefix) || path.contains("_" + prefix)) {
-                    if (catName != null && path.contains(catName)) {
-                        return ws;
-                    }
-                    if (bestMatch == null) {
-                        bestMatch = ws;
-                    }
-                }
-            }
-        }
-        return bestMatch;
+        return NodeWorkstationResolver.getWorkstationForTierFromList(this, tier);
     }
 
     public double getMachineCount() {
@@ -392,10 +312,6 @@ public class RecipeNode {
         this.energyType = energyType;
     }
 
-    // =========================================================================
-    // Canvas & UI Geometry
-    // =========================================================================
-
     public double getPosX() {
         return posX;
     }
@@ -443,48 +359,28 @@ public class RecipeNode {
         this.efficiency = Math.max(0.0, Math.min(1.0, efficiency));
     }
 
-    // =========================================================================
-    // Reroute & Subgraph Abstractions
-    // =========================================================================
-
     public boolean isReroute() {
         return isReroute;
     }
 
     public void setReroute(boolean reroute) {
         this.isReroute = reroute;
-        if (reroute) {
-            this.cardWidth = 32;
-            this.cardHeight = 32;
-        }
-    }
-
-    public boolean isFlipped() {
-        return isFlipped;
-    }
-
-    public void setFlipped(boolean flipped) {
-        this.isFlipped = flipped;
-    }
-
-    public void toggleFlipped() {
-        this.isFlipped = !this.isFlipped;
     }
 
     public void bindRerouteIngredient(IngredientStack stack) {
-        if (isReroute && stack != null) {
-            inputs.clear();
-            outputs.clear();
-            inputs.add(stack.copy());
-            outputs.add(stack.copy());
-        }
+        if (!isReroute || stack == null) return;
+        inputs.clear();
+        outputs.clear();
+        inputs.add(stack.copy());
+        outputs.add(stack.copy());
+        this.name = stack.getDisplayName();
     }
 
     public void unbindRerouteIngredient() {
-        if (isReroute) {
-            inputs.clear();
-            outputs.clear();
-        }
+        if (!isReroute) return;
+        inputs.clear();
+        outputs.clear();
+        this.name = "Reroute";
     }
 
     public double getTargetBatchAmount() {
@@ -496,7 +392,7 @@ public class RecipeNode {
     }
 
     public boolean hasTargetBatch() {
-        return getTargetBatchAmount() > 0.00001;
+        return getTargetBatchAmount() > 0.0001;
     }
 
     public double getTargetBatchTimeSec() {
@@ -539,10 +435,6 @@ public class RecipeNode {
         return moduleOutputOrigins;
     }
 
-    // =========================================================================
-    // Streams & Workstations
-    // =========================================================================
-
     public List<IngredientStack> getInputs() {
         return inputs;
     }
@@ -561,7 +453,7 @@ public class RecipeNode {
 
     public List<ResourceLocation> getAvailableWorkstations() {
         if (availableWorkstations.isEmpty() && recipeCategoryId != null) {
-            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
+            com.gtceu.calcboard.api.catalog.CategoryCapability cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
             if (cap != null && cap.availableWorkstations() != null && !cap.availableWorkstations().isEmpty()) {
                 for (ResourceLocation ws : cap.availableWorkstations()) {
                     if (ws != null && !availableWorkstations.contains(ws)) {
@@ -588,18 +480,13 @@ public class RecipeNode {
         this.recipeCategoryId = recipeCategoryId;
     }
 
-    // =========================================================================
-    // Hardware Addons, Augments & Upgrades
-    // =========================================================================
-
     public static boolean isThermalUpgradeKit(MachineAddon addon) {
         if (addon == null) return false;
-        return addon.isUpgradeTierKit() || (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && addon.getParallelMultiplier() > 1);
+        return addon.isThermalUpgradeKit();
     }
 
     public static boolean isMultiblockWorkstation(ResourceLocation ws) {
-        if (ws == null) return false;
-        return MultiblockDetector.isMultiblock(ws);
+        return NodeWorkstationResolver.isMultiblockWorkstation(ws);
     }
 
     public List<MachineAddon> getAddons() {
@@ -683,10 +570,6 @@ public class RecipeNode {
         return false;
     }
 
-    // =========================================================================
-    // Operating Modes & Capabilities (Delegated to IModAdapter)
-    // =========================================================================
-
     public SteamMode getSteamMode() {
         return steamMode != null ? steamMode : SteamMode.NONE;
     }
@@ -702,9 +585,10 @@ public class RecipeNode {
         if (adapter != null && !adapter.isGenericFallback()) {
             return adapter.supportsSteamMode(this);
         }
-        IModAdapter gtAdapter = ModAdapterRegistry.getAdapterForModId("gtceu");
-        if (gtAdapter != null && gtAdapter.supportsSteamMode(this)) {
-            return true;
+        for (IModAdapter a : ModAdapterRegistry.getAllLoadedAdapters()) {
+            if (!a.isGenericFallback() && a.supportsSteamMode(this)) {
+                return true;
+            }
         }
         return false;
     }
@@ -718,9 +602,11 @@ public class RecipeNode {
         if (adapter != null && !adapter.isGenericFallback()) {
             adapter.onSteamModeChanged(this, oldMode, newMode);
         } else {
-            IModAdapter gtAdapter = ModAdapterRegistry.getAdapterForModId("gtceu");
-            if (gtAdapter != null) {
-                gtAdapter.onSteamModeChanged(this, oldMode, newMode);
+            for (IModAdapter a : ModAdapterRegistry.getAllLoadedAdapters()) {
+                if (!a.isGenericFallback() && a.supportsSteamMode(this)) {
+                    a.onSteamModeChanged(this, oldMode, newMode);
+                    break;
+                }
             }
         }
     }
@@ -748,28 +634,40 @@ public class RecipeNode {
 
     public void setEuToStart(long euToStart) {
         properties.set(NodeProperties.FUSION_START_EU, Math.max(0L, euToStart));
-        if (isFusion()) {
-            GTVoltageTier minFusionTier = getMinFusionVoltageTier();
-            if (targetTier.ordinal() < minFusionTier.ordinal()) {
-                targetTier = minFusionTier;
-            }
-        }
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
+        this.targetTier = adapter.sanitizeTargetTier(this, this.targetTier);
     }
 
     public boolean isFusion() {
-        return getEuToStart() > 0 || getRequiredReflectorTier() > 0;
+        if (getEuToStart() > 0 || getRequiredReflectorTier() > 0) return true;
+        if (recipeCategoryId != null && recipeCategoryId.getPath().contains("fusion")) return true;
+        return machineIcon != null && machineIcon.getPath().contains("fusion");
     }
 
     public int getFusionTier() {
         long startEU = getEuToStart();
-        if (startEU <= 160_000_000L) return 1;
-        if (startEU <= 320_000_000L) return 2;
-        return 3;
+        if (startEU > 0) {
+            if (startEU <= 160_000_000L) return 1;
+            if (startEU <= 320_000_000L) return 2;
+            if (startEU <= 640_000_000L) return 3;
+            return 4;
+        }
+        if (machineIcon != null) {
+            String path = machineIcon.getPath().toLowerCase(java.util.Locale.ROOT);
+            if (path.contains("mk2") || path.contains("zpm") || path.contains("_ii") || path.endsWith("_2")) return 2;
+            if (path.contains("mk3") || path.contains("uv") || path.contains("_iii") || path.endsWith("_3")) return 3;
+            if (path.contains("mk4") || path.contains("uev") || path.contains("_iv") || path.endsWith("_4")) return 4;
+            if (path.contains("mk5") || path.contains("uxv") || path.contains("_v") || path.endsWith("_5")) return 5;
+        }
+        return 1;
     }
 
     public GTVoltageTier getMinFusionVoltageTier() {
         int fTier = getFusionTier();
-        return fTier == 1 ? GTVoltageTier.LuV : (fTier == 2 ? GTVoltageTier.ZPM : GTVoltageTier.UV);
+        return fTier == 1 ? GTVoltageTier.LuV
+                : (fTier == 2 ? GTVoltageTier.ZPM
+                : (fTier == 3 ? GTVoltageTier.UV
+                : (fTier == 4 ? GTVoltageTier.UEV : GTVoltageTier.UXV)));
     }
 
     public NodeThreadingConfig getThreadingConfig() {
@@ -821,7 +719,7 @@ public class RecipeNode {
                 threadingConfig.reset();
                 threadingConfig.setActive(false);
             }
-            addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING || a.getId().startsWith("start_core:helix_") || a.getId().contains("helix"));
+            addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING);
             if (machineIcon != null && MultiblockDetector.isThreadingMultiblock(machineIcon)) {
                 ResourceLocation mbWs = getMultiblockWorkstation();
                 if (mbWs != null && !MultiblockDetector.isThreadingMultiblock(mbWs)) {
@@ -881,7 +779,7 @@ public class RecipeNode {
             }
             if (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon)) {
                 ResourceLocation mbWs = getMultiblockWorkstation();
-                if (mbWs != null && !java.util.Objects.equals(machineIcon, mbWs)) {
+                if (mbWs != null && !Objects.equals(machineIcon, mbWs)) {
                     setMachineIcon(mbWs);
                 }
             }
@@ -891,7 +789,7 @@ public class RecipeNode {
                 if (sbWs == null) {
                     sbWs = getSingleblockWorkstation();
                 }
-                if (sbWs != null && !java.util.Objects.equals(machineIcon, sbWs)) {
+                if (sbWs != null && !Objects.equals(machineIcon, sbWs)) {
                     setMachineIcon(sbWs);
                 }
             }
@@ -904,93 +802,28 @@ public class RecipeNode {
     }
 
     public boolean hasMultiblockOption() {
-        if (isModule()) return false;
-        if (isMultiblock() || canUseCoils()) return true;
-        if (recipeCategoryId != null && CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId).hasMultiblockOption()) {
-            return true;
-        }
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws)) {
-                return true;
-            }
-        }
-        return false;
+        return NodeWorkstationResolver.hasMultiblockOption(this);
     }
 
     public List<ResourceLocation> getMultiblockWorkstations() {
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
-        if (adapter != null) {
-            List<ResourceLocation> list = adapter.getMultiblockWorkstations(this);
-            if (list != null && !list.isEmpty()) return list;
-        }
-        List<ResourceLocation> list = new ArrayList<>();
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && MultiblockDetector.isMultiblock(ws) && !list.contains(ws)) {
-                list.add(ws);
-            }
-        }
-        return list;
+        return NodeWorkstationResolver.getMultiblockWorkstations(this);
     }
 
     public ResourceLocation getMultiblockWorkstation() {
-        List<ResourceLocation> mbList = getMultiblockWorkstations();
-        if (!mbList.isEmpty()) {
-            return mbList.get(0);
-        }
-        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
-        if (adapter != null) {
-            ResourceLocation preferred = adapter.getPreferredMultiblockWorkstation(this, getAvailableWorkstations());
-            if (preferred != null) return preferred;
-        }
-        return null;
+        return NodeWorkstationResolver.getMultiblockWorkstation(this);
     }
 
     public ResourceLocation getSingleblockWorkstation() {
-        String catName = recipeCategoryId != null ? recipeCategoryId.getPath().toLowerCase(java.util.Locale.ROOT) : null;
-        ResourceLocation bestMatch = null;
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
-                if (catName != null && ws.getPath().toLowerCase(java.util.Locale.ROOT).contains(catName)) {
-                    return ws;
-                }
-                if (bestMatch == null) {
-                    bestMatch = ws;
-                }
-            }
-        }
-        if (bestMatch != null) return bestMatch;
-        if (recipeCategoryId != null && !MultiblockDetector.isMultiblock(recipeCategoryId)) {
-            return recipeCategoryId;
-        }
-        CategoryCapability cap = recipeCategoryId != null ? CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId) : null;
-        if (cap != null && cap.defaultWorkstation() != null && !MultiblockDetector.isMultiblock(cap.defaultWorkstation())) {
-            return cap.defaultWorkstation();
-        }
-        return (machineIcon != null && !MultiblockDetector.isMultiblock(machineIcon)) ? machineIcon : null;
+        return NodeWorkstationResolver.getSingleblockWorkstation(this);
     }
 
     public boolean canUseCoils() {
-        if (getRecipeTemperature() > 0) return true;
-        if (recipeCategoryId != null && CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId).canUseCoils()) return true;
-        if (machineIcon != null && MultiblockDetector.isCoilMultiblock(machineIcon)) return true;
-        if (recipeCategoryId != null && MultiblockDetector.isCoilRecipeCategory(recipeCategoryId)) return true;
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isCoilMultiblock(ws)) return true;
-        }
-        return false;
+        return NodeWorkstationResolver.canUseCoils(this);
     }
 
     public boolean canUseMultiblockTraits() {
-        if (isMultiblock() || hasMultiblockOption() || canUseCoils()) return true;
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws)) return true;
-        }
-        return false;
+        return NodeWorkstationResolver.canUseMultiblockTraits(this);
     }
-
-    // =========================================================================
-    // Create Kinetic Machine Properties
-    // =========================================================================
 
     public int getRpm() {
         int cur = properties.get(NodeProperties.KINETIC_RPM);
@@ -1019,31 +852,8 @@ public class RecipeNode {
     }
 
     public boolean isCreateMachine() {
-        if (energyType == EnergyType.KINETIC_SU) return true;
-        if (machineIcon != null) {
-            String ns = machineIcon.getNamespace().toLowerCase(Locale.ROOT);
-            if (ns.equals("minecraft") || ns.equals("emi") || ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
-                return false;
-            }
-            if (ns.equals("create") || ns.equals("createaddition") || ns.equals("create_new_age")) {
-                return true;
-            }
-        }
-        if (recipeCategoryId != null) {
-            String ns = recipeCategoryId.getNamespace().toLowerCase(Locale.ROOT);
-            if (ns.equals("minecraft") || ns.equals("emi") || ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")) {
-                return false;
-            }
-            if (ns.equals("create") || ns.equals("createaddition") || ns.equals("create_new_age")) {
-                return true;
-            }
-        }
-        return false;
+        return ModCompatHelper.isCreateMachine(this);
     }
-
-    // =========================================================================
-    // GT Turbine Properties & Delegations
-    // =========================================================================
 
     public int getRotorEfficiency() {
         return properties.get(NodeProperties.TURBINE_ROTOR_EFFICIENCY);
@@ -1084,10 +894,6 @@ public class RecipeNode {
     public void autoCalculateTurbineParallel() {
         ModAdapterRegistry.getAdapterForNode(this).autoTuneParallel(this);
     }
-
-    // =========================================================================
-    // Recipe Calculations & Flow Analysis (Delegated to IModAdapter)
-    // =========================================================================
 
     public int getTierDelta() {
         return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
@@ -1134,172 +940,45 @@ public class RecipeNode {
         return getCyclesPerSecond() * efficiency;
     }
 
-    // =========================================================================
-    // I/O Slot Flow Rates
-    // =========================================================================
-
     public Map<IngredientStack, Double> calculateInputRates() {
-        Map<IngredientStack, Double> rates = new LinkedHashMap<>();
-        double cps = getCyclesPerSecond();
-        for (IngredientStack in : inputs) {
-            double r;
-            if (in.isStressUnit()) {
-                r = isGenerator() ? (in.getAmount() * cps) : getTotalEUt();
-            } else {
-                double amount = in.getAmount();
-                r = amount * cps;
-                r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, in, true, r);
-            }
-            boolean merged = false;
-            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
-                if (entry.getKey().equals(in)) {
-                    entry.setValue(entry.getValue() + r);
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                rates.put(in, r);
-            }
-        }
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, rates, Collections.emptyMap()));
-        } catch (Throwable ignored) {}
-        return rates;
+        return NodeRateCalculator.calculateInputRates(this);
     }
 
     public double getInputSlotRate(int index, boolean effective) {
-        if (index < 0 || index >= inputs.size()) return 0.0;
-        IngredientStack in = inputs.get(index);
-        if (in.isStressUnit()) {
-            return isGenerator() ? (in.getAmount() * (effective ? getEffectiveCyclesPerSecond() : getNominalCyclesPerSecond())) : (getTotalEUt() * (effective ? getEfficiency() : 1.0));
-        }
-        double amount = in.getAmount();
-        double cps = effective ? getEffectiveCyclesPerSecond() : getNominalCyclesPerSecond();
-        double r = amount * cps;
-        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, in, true, r);
+        return NodeRateCalculator.getInputSlotRate(this, index, effective);
     }
 
     public double getEffectiveOutputChance(int outputIndex) {
-        if (outputIndex < 0 || outputIndex >= outputs.size()) return 0.0;
-        IngredientStack out = outputs.get(outputIndex);
-        if (out.getChance() >= 1.0) return 1.0;
-
-        double baseChance = out.getEffectiveChance(getTierDelta());
-        return ModAdapterRegistry.getAdapterForNode(this).computeEffectiveOutputChance(this, outputIndex, baseChance);
+        return NodeRateCalculator.getEffectiveOutputChance(this, outputIndex);
     }
 
     public double getOutputSlotRate(int index, boolean effective) {
-        if (index < 0 || index >= outputs.size()) return 0.0;
-        IngredientStack out = outputs.get(index);
-        double amount = out.getAmount() * getEffectiveOutputChance(index);
-        double cps = effective ? getEffectiveCyclesPerSecond() : getCyclesPerSecond();
-        double r = amount * cps;
-        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, out, false, r);
+        return NodeRateCalculator.getOutputSlotRate(this, index, effective);
     }
 
     public double getSingleOutputExpectedAmount(int index) {
-        if (index < 0 || index >= outputs.size()) return 0.0;
-        return outputs.get(index).getAmount() * getEffectiveOutputChance(index);
+        return NodeRateCalculator.getSingleOutputExpectedAmount(this, index);
     }
 
     public Map<IngredientStack, Double> calculateOutputRates() {
-        Map<IngredientStack, Double> rates = new LinkedHashMap<>();
-        double cps = getCyclesPerSecond();
-        for (int i = 0; i < outputs.size(); i++) {
-            IngredientStack out = outputs.get(i);
-            double amount = out.getAmount() * getEffectiveOutputChance(i);
-            double r = amount * cps;
-            r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, out, false, r);
-            boolean merged = false;
-            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
-                if (entry.getKey().equals(out)) {
-                    entry.setValue(entry.getValue() + r);
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                rates.put(out, r);
-            }
-        }
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, java.util.Collections.emptyMap(), rates));
-        } catch (Throwable ignored) {}
-        return rates;
+        return NodeRateCalculator.calculateOutputRates(this);
     }
 
     public Map<IngredientStack, Double> calculateEffectiveInputRates() {
-        Map<IngredientStack, Double> rates = new LinkedHashMap<>();
-        double cps = getEffectiveCyclesPerSecond();
-        for (IngredientStack in : inputs) {
-            double amount = in.getAmount();
-            double r = amount * cps;
-            r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, in, true, r);
-            boolean merged = false;
-            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
-                if (entry.getKey().equals(in)) {
-                    entry.setValue(entry.getValue() + r);
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                rates.put(in, r);
-            }
-        }
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, rates, java.util.Collections.emptyMap()));
-        } catch (Throwable ignored) {}
-        return rates;
+        return NodeRateCalculator.calculateEffectiveInputRates(this);
     }
 
     public Map<IngredientStack, Double> calculateEffectiveOutputRates() {
-        Map<IngredientStack, Double> rates = new LinkedHashMap<>();
-        double cps = getEffectiveCyclesPerSecond();
-        int tierDelta = getTierDelta();
-        for (IngredientStack out : outputs) {
-            double amount = out.getExpectedAmount(tierDelta);
-            double r = amount * cps;
-            r = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeEffectiveIngredientRate(this, out, false, r);
-            boolean merged = false;
-            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
-                if (entry.getKey().equals(out)) {
-                    entry.setValue(entry.getValue() + r);
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                rates.put(out, r);
-            }
-        }
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(this, java.util.Collections.emptyMap(), rates));
-        } catch (Throwable ignored) {}
-        return rates;
+        return NodeRateCalculator.calculateEffectiveOutputRates(this);
     }
 
     public double calculateSingleMachineOutputRate(IngredientStack out) {
-        if (out == null || !isOperational()) return 0.0;
-        double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
-        double baseRate = out.getExpectedAmount(getTierDelta()) * singleCps;
-        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeSingleMachineIngredientRate(this, out, false, baseRate);
+        return NodeRateCalculator.calculateSingleMachineOutputRate(this, out);
     }
 
     public double calculateSingleMachineInputRate(IngredientStack in) {
-        if (in == null) return 0.0;
-        if (in.isStressUnit()) {
-            return isGenerator() ? in.getAmount() : getSingleMachineEUt();
-        }
-        double singleCps = getOverclockResult().getCyclesPerSecond() * getTotalParallel();
-        double baseRate = in.getAmount() * singleCps;
-        return com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(this).computeSingleMachineIngredientRate(this, in, true, baseRate);
+        return NodeRateCalculator.calculateSingleMachineInputRate(this, in);
     }
-
-    // =========================================================================
-    // Compound / Layered Recipe Helpers
-    // =========================================================================
 
     public boolean isCompoundNode() {
         return properties.has(NodeProperties.COMPOUND_GROUP_ID) && !properties.get(NodeProperties.COMPOUND_GROUP_ID).isEmpty();
@@ -1339,10 +1018,6 @@ public class RecipeNode {
         }
     }
 
-    // =========================================================================
-    // NBT Serialization (Delegated to RecipeNodeSerializer)
-    // =========================================================================
-
     public CompoundTag serializeNBT() {
         return RecipeNodeSerializer.serialize(this);
     }
@@ -1351,5 +1026,3 @@ public class RecipeNode {
         return RecipeNodeSerializer.deserialize(tag);
     }
 }
-
-

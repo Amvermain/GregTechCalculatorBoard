@@ -55,6 +55,8 @@ public class BoardSettingsTest {
         manager.setFluidUnitMode(FluidUnitMode.ALWAYS_B);
         manager.setPowerDisplayMode(PowerDisplayMode.AMPS);
         manager.setPauseGameInSingleplayer(true);
+        manager.setMaxHarmonizeScale(32);
+        manager.setHarmonizeSurplusTolerance(0.05);
 
         boolean saved = manager.saveToFile(tempFile);
         Assertions.assertTrue(saved);
@@ -63,6 +65,8 @@ public class BoardSettingsTest {
         manager.resetToDefault();
         Assertions.assertTrue(manager.isShowGuideButton());
         Assertions.assertEquals(WireColorPreset.CYAN, manager.getWireColorPreset());
+        Assertions.assertEquals(16, manager.getMaxHarmonizeScale());
+        Assertions.assertEquals(0.02, manager.getHarmonizeSurplusTolerance(), 1e-4);
 
         boolean loaded = manager.loadFromFile(tempFile);
         Assertions.assertTrue(loaded);
@@ -82,5 +86,7 @@ public class BoardSettingsTest {
         Assertions.assertEquals(FluidUnitMode.ALWAYS_B, manager.getFluidUnitMode());
         Assertions.assertEquals(PowerDisplayMode.AMPS, manager.getPowerDisplayMode());
         Assertions.assertTrue(manager.isPauseGameInSingleplayer());
+        Assertions.assertEquals(32, manager.getMaxHarmonizeScale());
+        Assertions.assertEquals(0.05, manager.getHarmonizeSurplusTolerance(), 1e-4);
     }
 }

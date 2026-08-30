@@ -75,13 +75,19 @@ The mod is fully optional on both client and server:
 *   **Thermal Series**: Dynamo RF/t generation, augment multipliers, and tier upgrade kits.
 *   **Systeams & Steam Boilers**: Steam boiler mB/s output, steam dynamos, and LP/HP steam machine consumption modeling.
 
+#### Blueprint Packaging & Shareable Imports
+*   **Rich Blueprint Metadata**: Export entire flowcharts or selected node groups with custom titles, descriptions, authors, and tag metadata.
+*   **Interactive Import Preview**: Inspect node count, machines, connections, and major inputs/outputs before choosing to open in a new page or overwrite.
+
 #### Accessibility & Canvas Controls
 
+*   **Fit to View (`Home` / `F`)**: Instantly center and auto-scale the camera to bring all placed factory nodes into view via the toolbar button or hotkeys.
+*   **Smart Auto-Connect Filter**: Interactively select and filter matching items/fluids via checkboxes when dragging wires or auto-connecting machines.
+*   **Integrated Board Settings Modal**: Dedicated settings dialog (`[⚙ Settings]`) to configure fluid units, time units, singleplayer pause, and harmonization ratio limits.
 *   **5-Level UI Font Scale**: Adjust machine configuration dialog size (`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`) via the `[Aa 1.0x]` button, mouse wheel, or `+`/`-` keys.
-*   **Uniform Global Fluid Units**: Toggle canvas fluid rates between `Auto`, `Always mB`, and `Always B` via the toolbar button or `Shift+T`.
+*   **Uniform Global Fluid Units**: Toggle canvas fluid rates between `Auto`, `Always mB`, and `Always B` via toolbar or `Shift+T`.
 *   **Page Tab Overflow Navigation**: Smoothly click `«`, `»` or scroll mouse wheel across multiple board pages without edge clipping.
 *   **Infinite Canvas & LOD**: Pan with right-click or middle-click drag, zoom with mouse wheel, and render large graphs efficiently using Level of Detail (LOD) mode.
-*   **Singleplayer Pause Control**: A toggle button on the toolbar (`[Pause: ON]` / `[Pause: OFF]`) controls whether opening the board pauses the singleplayer world.
 *   **Undo & Redo**: Delta-based history stack (`Ctrl + Z` / `Ctrl + Y`) for all canvas actions.
 
 #### Compound Modules (Subgraphs)

@@ -192,10 +192,18 @@ public class BoardSelectionModel {
             }
         }
 
-        graph.getNodes().removeAll(removedNodes);
-        graph.getConnections().removeAll(removedEdges);
-        graph.getStickyNotes().removeAll(removedNotes);
-        graph.getFrames().removeAll(removedFrames);
+        for (RecipeNode n : removedNodes) {
+            graph.removeNode(n.getId());
+        }
+        for (FlowGraph.ConnectionEdge e : removedEdges) {
+            graph.removeConnection(e);
+        }
+        for (CanvasStickyNote note : removedNotes) {
+            graph.removeStickyNote(note);
+        }
+        for (CanvasGroupFrame frame : removedFrames) {
+            graph.removeFrame(frame);
+        }
 
         List<BoardCommand> commands = new ArrayList<>();
         if (!removedNodes.isEmpty() || !removedEdges.isEmpty()) {
@@ -323,10 +331,18 @@ public class BoardSelectionModel {
             }
         }
 
-        graph.getNodes().removeAll(removedNodes);
-        graph.getConnections().removeAll(removedEdges);
-        graph.getStickyNotes().removeAll(removedNotes);
-        graph.getFrames().removeAll(removedFrames);
+        for (RecipeNode n : removedNodes) {
+            graph.removeNode(n.getId());
+        }
+        for (FlowGraph.ConnectionEdge e : removedEdges) {
+            graph.removeConnection(e);
+        }
+        for (CanvasStickyNote note : removedNotes) {
+            graph.removeStickyNote(note);
+        }
+        for (CanvasGroupFrame frame : removedFrames) {
+            graph.removeFrame(frame);
+        }
 
         List<BoardCommand> commands = new ArrayList<>();
         if (!removedNodes.isEmpty() || !removedEdges.isEmpty()) {

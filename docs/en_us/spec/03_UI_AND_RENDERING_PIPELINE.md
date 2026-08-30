@@ -1,29 +1,29 @@
-# [03] UI & Rendering Pipeline Overview (UI & Rendering)
+# [03] UI & Canvas Rendering Pipeline Overview (UI & Rendering Pipeline)
 
 > 📍 **GTCalcBoard Technical Specification Series**
-> [[00] System Overview](00_OVERVIEW.md) ➔ [[01] Core Domain](01_CORE_DOMAIN_AND_MODELS.md) ➔ [[02] Math Engine](02_MATH_AND_ALGORITHMS.md) ➔ **[03] UI Pipeline** ➔ [[04] Multiplayer](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) ➔ [[05] External Integration](05_INTEGRATION_AND_I18N.md)
+> [[00] System Overview](00_OVERVIEW.md) ➔ [[01] Core Domain & Models](01_CORE_DOMAIN_AND_MODELS.md) ➔ [[02] Math & Algorithms](02_MATH_AND_ALGORITHMS.md) ➔ **[03] UI & Rendering Pipeline** ➔ [[04] Multiplayer & Network](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) ➔ [[05] External Integration & i18n](05_INTEGRATION_AND_I18N.md)
 
 ---
 
-## 1. Presentation Layer Architecture (`com.gtceu.calcboard.client.gui`)
+## 1. Presentation & UI Layer Architecture (`com.gtceu.calcboard.client.gui`)
 
-GTCalcBoard integrates cleanly into Minecraft's GUI rendering pipeline, maintaining smooth 60fps interaction even with 1,200+ node graphs.
+GTCalcBoard integrates seamlessly with Minecraft's rendering pipeline to guarantee smooth 60fps interaction across massive graphs exceeding 1,200 nodes.
 
 ```mermaid
 flowchart TB
     subgraph Viewport["1. Viewport & Canvas Core"]
         direction LR
-        BS["BoardScreen<br/>(2D Cam, Pan/Zoom)"] ~~~ CIH["CanvasInteractionHandler<br/>(Selection, Drag, Snap)"] ~~~ CR["ConnectionRenderer<br/>(Bézier Splines)"] ~~~ NCR["NodeCardRenderer<br/>(Cards & Meters)"]
+        BS["BoardScreen<br/>(2D Camera, Zoom/Pan, Fit to View)"] ~~~ CIH["CanvasInteractionHandler<br/>(PanZoom / Selection / QuickAdd)"] ~~~ CR["ConnectionRenderer<br/>(Bézier & WireSpatialIndex)"] ~~~ NCR["NodeCardRenderer<br/>(Node Cards & Gauges)"]
     end
 
-    subgraph Dialogs["2. Modals & Overlays"]
+    subgraph Dialogs["2. Dialogs & Modals"]
         direction LR
-        MCD["MachineConfigDialog<br/>(Parallel, Addon Rack)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(Cross-Page Balance)"] ~~~ ICP["ItemContributionPopup<br/>(Source/Sink Drill-down)"] ~~~ SO["SummaryOverlay<br/>(Current Page Live Totals)"] ~~~ RSD["RecipeSearch & Filter<br/>(Async Search & Blacklist)"]
+        MCD["MachineConfigDialog<br/>(Parallel, Addon Rack)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(Global Dashboard)"] ~~~ BSD["BoardSettingsDialog<br/>(Settings & Ratio Limits)"] ~~~ BPD["BlueprintDialogs<br/>(Import/Export Preview)"] ~~~ RSD["RecipeSearch & Filter<br/>(CacheManager & QueryEngine)"]
     end
 
-    subgraph Nav["3. Navigation, Tools & Onboarding"]
+    subgraph Nav["3. Navigation & Utilities"]
         direction LR
-        TBW["ToolbarWidget<br/>(Quick Action Buttons)"] ~~~ PTB["PageTabBarWidget<br/>(Workspace & Tabs)"] ~~~ HUD["HotkeyHudWidget<br/>(Shortcut HUD)"] ~~~ GD["GuideDialog & BoardToast<br/>(In-Game Manual & Toast)"] ~~~ TUT["TutorialManager & Overlay<br/>(Interactive Tutorial)"]
+        TBW["ToolbarWidget<br/>(Quick Action Toolbar)"] ~~~ PTB["PageTabBarWidget<br/>(Personal/Team Tabs)"] ~~~ HUD["HotkeyHudWidget<br/>(Keybinding HUD)"] ~~~ GD["GuideDialog & BoardToast<br/>(In-game Guide & Toasts)"] ~~~ TUT["TutorialManager & Overlay<br/>(Interactive Onboarding)"]
     end
 
     Viewport --> Dialogs
@@ -32,32 +32,30 @@ flowchart TB
 
 ---
 
-## 📑 UI Detailed Specification Index
+## 📑 UI Detailed Specification Series
 
-Detailed behavioral specs and clean HTML wireframes are divided across 4 specialized chapters:
+Detailed component behavior, interaction flows, and high-fidelity wireframes are cataloged in the following sub-specifications:
 
 ### 1. [[03-01] 2D Canvas Viewport & Node Card Rendering](03_01_CANVAS_AND_NODE_CARDS.md)
-* **2D Viewport Math**: Screen $\leftrightarrow$ Canvas coordinate transformation matrices, exponential zooming, dot grid.
-* **Cubic Bézier Wire Renderer (`ConnectionRenderer`)**: Control point math, flow pulse animations, 24-segment hit testing.
-* **Node Card Wireframes (`NodeCardRenderer`)**: Standard machine and compound module card layouts.
+* **2D Viewport Math**: Screen $\leftrightarrow$ Canvas coordinate transformation, exponential zoom scaling, dot grid rendering.
+* **Single-Pass Batch Rendering & `WireSpatialIndex`**: Single geometry draw pass, $128 \times 128$ AABB uniform grid spatial index ($O(E) \rightarrow O(\log E)$).
+* **Cubic Bézier Splines (`ConnectionRenderer`)**: Control point formulation, pulse flow animation, 24-segment segment hit testing.
 
 ### 2. [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)
-* **Parallel Controls**: Numerical input, quick presets (`1x ~ 256x`), `⚡ Auto Max Parallel`.
-* **Active Addon Tray**: Inline stat badges, removal buttons, pagination.
-* **Addon Catalog Browser**: Capability matrix integration, coils, parallel/maintenance hatches, rotor 3D grid, thermal augments, custom builder.
+* **Parallel Multiplier Input**: Direct input field, quick presets (`1x ~ 256x`), `⚡ Auto-Max Parallel`.
+* **Installed Addons Tray**: Inline badges, removal buttons, pagination.
+* **Addon Catalog Browser**: Capability matrix integration, coils, hatches, turbine rotors, and thermal augments.
 
-### 3. [[03-03] Page Summary & Global Balance Dashboard UI](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)
-* **Current Page Summary (`SummaryOverlay`)**: Right-side collapsible panel, total EU/t, active machine counts, raw inputs & net products.
-* **Global Balance Dashboard (`GlobalBalanceDashboardDialog`)**: Multi-page selector, deficit/surplus/balanced tabs, global energy balance.
-* **Item Contribution Drill-down (`ItemContributionPopup`)**: Per-item source and sink analysis across pages.
+### 3. [[03-03] Page Balance Summary & Global Dashboard UI](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)
+* **Real-time Page Overlay (`SummaryOverlay`)**: Net power balance, active machines, external raw inputs, and net products.
+* **Global Dashboard (`GlobalBalanceDashboardDialog`)**: Cross-page balance aggregation, `[Deficit/Surplus/Balanced]` tab filters.
+* **Material Contribution Popup (`ItemContributionPopup`)**: Item per-page breakdown.
 
-### 4. [[03-04] Recipe Search, Filters, Hotkey HUD, Guide & Toast UI](03_04_RECIPE_SEARCH_AND_TOOLS.md)
-* **Async Recipe Search & Filters (`RecipeSearchDialog` / `RecipeFilterDialog`)**: Parametric multi-token search, category blacklist toggles.
-* **Navigation & Hotkey HUD (`ToolbarWidget`, `HotkeyHudWidget`)**: Workspace tabs, bottom toolbar, collapsible shortcut HUD.
-* **In-Game Guidebook (`GuideDialog`)**: 8-category manual with keycap highlights.
-* **Global Action Toast (`BoardToast`)**: Floating bottom-center fade notifications.
-* **Interactive Onboarding (`tutorial/*`)**: Glow highlights and step-by-step guidance.
+### 4. [[03-04] Recipe Search, Filters, Keybinding HUD, Guidebook & Toasts](03_04_RECIPE_SEARCH_AND_TOOLS.md)
+* **Async Recipe Search (`RecipeSearchDialog`)**: Multi-token tag search, category filtering, and blacklisting.
+* **Navigation Widgets (`PageTabBarWidget`, `ToolbarWidget`)**: Personal and team workspace tabs, quick tool actions.
+* **Interactive Tutorial (`TutorialManager`)**: Step-by-step onboarding walkthroughs with glow highlights.
 
 ---
 
-> ➡️ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocols](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+> ➡️ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocol](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

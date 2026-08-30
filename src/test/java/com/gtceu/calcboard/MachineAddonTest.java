@@ -999,6 +999,83 @@ public class MachineAddonTest {
             com.gtceu.calcboard.compat.thermal.ThermalAddonCrawler.discoverAddons(addons, Collections.emptyList());
         });
     }
+
+    @Test
+    public void testThermalDynamoSlotCapacityAndMultiCopyAugmentManagement() {
+        RecipeNode dynamo = RecipeNode.create("Lapidary Fuel (Diamond)", 1500.0, -50.0, GTVoltageTier.LV);
+        dynamo.setRecipeCategoryId(ResourceLocation.tryParse("thermal:lapidary_fuel"));
+        dynamo.setMachineIcon(ResourceLocation.tryParse("thermal:dynamo_lapidary"));
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(dynamo);
+        Assertions.assertNotNull(adapter);
+
+        // 1. Parse an LV Upgrade Kit (Scale 6) and an MV Upgrade Kit (Scale 12)
+        CompoundTag lvKitTag = new CompoundTag();
+        CompoundTag lvKitAug = new CompoundTag();
+        lvKitAug.putInt("Scale", 6);
+        lvKitTag.put("AugmentData", lvKitAug);
+        MachineAddon lvKit = ThermalAugmentHelper.parseThermalAugmentTag(lvKitTag, "LV Upgrade Kit", ResourceLocation.tryParse("kubejs:lv_upgrade_kit"));
+
+        CompoundTag mvKitTag = new CompoundTag();
+        CompoundTag mvKitAug = new CompoundTag();
+        mvKitAug.putInt("Scale", 12);
+        mvKitTag.put("AugmentData", mvKitAug);
+        MachineAddon mvKit = ThermalAugmentHelper.parseThermalAugmentTag(mvKitTag, "MV Upgrade Kit", ResourceLocation.tryParse("kubejs:mv_upgrade_kit"));
+
+        // 2. Parse a regular Dynamo Augment: Auxiliary Reaction Chamber (ARC)
+        CompoundTag arcTag = new CompoundTag();
+        CompoundTag arcAug = new CompoundTag();
+        arcAug.putString("Type", "Dynamo");
+        arcAug.putFloat("DynamoEnergy", 0.9f);
+        arcAug.putFloat("DynamoPower", 0.5f); // 1.5x power
+        arcTag.put("AugmentData", arcAug);
+        MachineAddon arc = ThermalAugmentHelper.parseThermalAugmentTag(arcTag, "LV Auxiliary Reaction Chamber", ResourceLocation.tryParse("kubejs:lv_arc_kit"));
+
+        // 3. Parse another regular Dynamo Augment: Multi-Cycle Injectors (MCI)
+        CompoundTag mciTag = new CompoundTag();
+        CompoundTag mciAug = new CompoundTag();
+        mciAug.putString("Type", "Dynamo");
+        mciAug.putFloat("DynamoEnergy", 1.1f);
+        mciTag.put("AugmentData", mciAug);
+        MachineAddon mci = ThermalAugmentHelper.parseThermalAugmentTag(mciTag, "LV Multi-Cycle Injectors", ResourceLocation.tryParse("kubejs:lv_mci_kit"));
+
+        // Install LV Kit -> 1 addon
+        adapter.handleInstallAddon(dynamo, lvKit, false);
+        Assertions.assertEquals(1, dynamo.getAddons().size());
+        Assertions.assertEquals(6, dynamo.getCombinedParallelMultiplier());
+
+        // Install 1 ARC -> 2 addons (1 kit + 1 augment)
+        adapter.handleInstallAddon(dynamo, arc, false);
+        Assertions.assertEquals(2, dynamo.getAddons().size());
+
+        // Install 1 MCI -> 3 addons (1 kit + 2 augments)
+        adapter.handleInstallAddon(dynamo, mci, false);
+        Assertions.assertEquals(3, dynamo.getAddons().size());
+
+        // Install 2nd MCI -> 4 addons (1 kit + 3 augments: 1 ARC + 2 MCI)
+        Assertions.assertTrue(adapter.canInstallAddon(dynamo, mci), "Can install 3rd regular augment (total 4 addons)");
+        adapter.handleInstallAddon(dynamo, mci, false);
+        Assertions.assertEquals(4, dynamo.getAddons().size());
+
+        // 4th regular augment must be rejected (max 3 regular augments)
+        Assertions.assertFalse(adapter.canInstallAddon(dynamo, mci), "Cannot exceed 3 regular augments");
+        Assertions.assertFalse(adapter.canInstallAddon(dynamo, arc), "Cannot exceed 3 regular augments");
+
+        // Replacing LV Kit with MV Kit replaces the kit without affecting the 3 augments
+        Assertions.assertTrue(adapter.canInstallAddon(dynamo, mvKit), "Can replace upgrade kit with different tier");
+        adapter.handleInstallAddon(dynamo, mvKit, false);
+        Assertions.assertEquals(4, dynamo.getAddons().size());
+        Assertions.assertEquals(12, dynamo.getCombinedParallelMultiplier());
+
+        // Right-click uninstall on MCI removes 1 copy -> now 3 addons (1 kit + 1 ARC + 1 MCI)
+        adapter.handleUninstallAddon(dynamo, mci);
+        Assertions.assertEquals(3, dynamo.getAddons().size());
+        Assertions.assertEquals(1, dynamo.getAddons().stream().filter(a -> a.getId().equals(mci.getId())).count());
+
+        // Shift-click install on ARC fills remaining slot -> now 4 addons (1 kit + 2 ARC + 1 MCI)
+        adapter.handleInstallAddon(dynamo, arc, true);
+        Assertions.assertEquals(4, dynamo.getAddons().size());
+        Assertions.assertEquals(2, dynamo.getAddons().stream().filter(a -> a.getId().equals(arc.getId())).count());
+    }
 }
 
 

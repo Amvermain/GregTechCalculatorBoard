@@ -186,6 +186,9 @@ public class TutorialExitConfirmDialog {
                 parent.setPanX(next.getPanX());
                 parent.setPanY(next.getPanY());
                 parent.setZoom(next.getZoom());
+                BoardScreen.lastPanX = next.getPanX();
+                BoardScreen.lastPanY = next.getPanY();
+                BoardScreen.lastZoom = next.getZoom();
             }
             parent.rebuildWidgets();
         }

@@ -85,8 +85,8 @@ public class C2SDeleteTeamPagePacket {
 
                 savedData.setDirty();
 
-                // Broadcast updated workspace and released lock to all teammates
-                NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CSyncWorkspacePacket(ws), null);
+                // Broadcast updated workspace meta and released lock to all teammates
+                NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, ws.buildMetaPacket(), null);
                 NetworkHandler.broadcastToTeam(player.serverLevel(), playerTeamId, new S2CLockResultPacket(pageId, false, null, "", 0L), null);
             }
         });

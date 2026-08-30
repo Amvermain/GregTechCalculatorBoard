@@ -11,16 +11,11 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 
-import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -106,11 +101,10 @@ public class ThermalModAdapter implements IModAdapter {
     public boolean canInstallAddon(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return false;
         if (!isAddonCompatible(node, addon)) return false;
-        if (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) {
-            return true; // Replaces existing kit
-        }
-        if (addon.getParallelMultiplier() > 1) {
-            return true; // Kit scale replacement
+        boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            boolean sameKitInstalled = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+            return !sameKitInstalled;
         }
         // General augments limited to 3 slots
         long nonKitCount = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
@@ -132,21 +126,17 @@ public class ThermalModAdapter implements IModAdapter {
         if (node == null || addon == null) return;
         boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
         if (isKit) {
-            node.getAddons().removeIf(a -> (a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || a.getParallelMultiplier() > 1);
-            node.addAddon(addon.copy());
+            onAddonInstalled(node, addon.copy());
         } else {
             long nonKitCount = node.getAddons().stream().filter(a -> !(a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) && a.getParallelMultiplier() <= 1).count();
-            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
             if (shiftClick) {
                 int toAdd = (int) (3 - nonKitCount);
                 for (int k = 0; k < toAdd; k++) {
-                    node.addAddon(addon.copy());
+                    onAddonInstalled(node, addon.copy());
                 }
             } else {
                 if (nonKitCount < 3) {
-                    node.addAddon(addon.copy());
-                } else if (targetCount > 0) {
-                    node.removeSingleAddon(addon.getId());
+                    onAddonInstalled(node, addon.copy());
                 }
             }
         }
@@ -157,7 +147,8 @@ public class ThermalModAdapter implements IModAdapter {
         if (node == null || addon == null) return;
         boolean isKit = (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
         if (isKit) {
-            node.removeAddon(addon.getId());
+            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()) || (a instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) || a.getParallelMultiplier() > 1);
+            onAddonRemoved(node, addon);
         } else {
             node.removeSingleAddon(addon.getId());
         }
@@ -272,49 +263,32 @@ public class ThermalModAdapter implements IModAdapter {
 
     @Override
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        return ThermalGuiHandler.formatEnergyStats(node, displayMode);
+        if (node == null) return "";
+        double rfRate = node.getEffectiveTotalEUt();
+        return node.isGenerator()
+                ? String.format(java.util.Locale.ROOT, "§a+%,.0f RF/t", rfRate)
+                : String.format(java.util.Locale.ROOT, "§e%,.0f RF/t", rfRate);
     }
 
     @Override
     public List<Component> buildEnergyTooltip(RecipeNode node) {
-        return ThermalGuiHandler.buildEnergyTooltip(node);
-    }
-
-    @Override
-    public void renderCardControls(GuiGraphics graphics, Font font,
-                                   RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY,
-                                   boolean isGlowing) {
-        ThermalGuiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
-    }
-
-    @Override
-    public boolean isTierOrSpeedControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        return false;
-    }
-
-    @Override
-    public boolean isMachineConfigHovered(RecipeNode node, double mouseX, double mouseY) {
-        return ThermalGuiHandler.isMachineConfigHovered(node, mouseX, mouseY);
-    }
-
-    @Override
-    public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
-        return ThermalGuiHandler.handleControlClick(widget, node, mouseX, mouseY, button);
-    }
-
-    @Override
-    public void renderDialogHeader(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeNode node, int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
-        ThermalGuiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+        List<Component> tooltipLines = new java.util.ArrayList<>();
+        if (node == null) return tooltipLines;
+        double totPower = node.getEffectiveTotalEUt();
+        if (node.isGenerator()) {
+            tooltipLines.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.dynamo_badge").getString()));
+            tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Generation: §a+%,.2f RF/t §7(§a+%,.2f EU/t eq§7)", totPower, totPower / 4.0)));
+        } else {
+            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
+            tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Consumption: §c%,.2f RF/t §7(§c%,.2f EU/t eq§7)", totPower, totPower / 4.0)));
+        }
+        tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+        return tooltipLines;
     }
 
     @Override
     public EnergyType getEnergyType(RecipeNode node) {
         return EnergyType.ELECTRIC_FE;
-    }
-
-    @Override
-    public boolean handleDialogHeaderClick(com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW, double mouseX, double mouseY, int button, net.minecraft.client.gui.components.EditBox parallelBox, com.gtceu.calcboard.client.gui.BoardScreen parent) {
-        return ThermalGuiHandler.handleDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
     }
 
     @Override

@@ -11,6 +11,7 @@ import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
@@ -26,15 +27,17 @@ public class BoardSettingsDialog {
     private final BoardScreen parent;
     private boolean visible = false;
     private int activeTab = 0;
+    private EditBox maxScaleInput;
 
-    private static final int DIALOG_WIDTH = 480;
-    private static final int DIALOG_HEIGHT = 270;
-    private static final int SIDEBAR_WIDTH = 135;
+    private static final int DIALOG_WIDTH = 510;
+    private static final int DIALOG_HEIGHT = 275;
+    private static final int SIDEBAR_WIDTH = 125;
 
     public enum SettingsTab {
         TOOLBAR("gui.gtcalcboard.settings.tab_toolbar"),
         HUD("gui.gtcalcboard.settings.tab_hud"),
         UNITS("gui.gtcalcboard.settings.tab_units"),
+        RATIO("gui.gtcalcboard.settings.tab_ratio"),
         WIRES("gui.gtcalcboard.settings.tab_wires");
 
         private final String nameKey;
@@ -62,10 +65,34 @@ public class BoardSettingsDialog {
 
     public void open() {
         this.visible = true;
+        initInputs();
+    }
+
+    private void initInputs() {
+        if (maxScaleInput == null) {
+            Font font = Minecraft.getInstance().font;
+            maxScaleInput = new EditBox(font, 0, 0, 48, 18, Component.literal("Max Scale"));
+            maxScaleInput.setFilter(s -> s.isEmpty() || (s.matches("\\d+") && s.length() <= 4));
+            maxScaleInput.setResponder(s -> {
+                if (!s.isEmpty()) {
+                    try {
+                        int val = Integer.parseInt(s);
+                        if (val > 0) {
+                            BoardManager.getInstance().setMaxHarmonizeScale(val);
+                            BoardManager.getInstance().saveForCurrentContext();
+                        }
+                    } catch (NumberFormatException ignored) {}
+                }
+            });
+        }
+        maxScaleInput.setValue(String.valueOf(BoardManager.getInstance().getMaxHarmonizeScale()));
     }
 
     public void close() {
         this.visible = false;
+        if (maxScaleInput != null) {
+            maxScaleInput.setFocused(false);
+        }
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -130,7 +157,7 @@ public class BoardSettingsDialog {
 
             int textColor = isSelected ? 0xFFFFFFFF : (tabHover ? 0xFFDDDDDD : 0xFF99AABF);
             String tabText = tabs[i].getDisplayName();
-            graphics.drawString(font, tabText, dialogX + 10, tabY + 8, textColor, false);
+            graphics.drawString(font, tabText, dialogX + 8, tabY + 8, textColor, false);
         }
 
         // 5. Main Content Area
@@ -145,6 +172,7 @@ public class BoardSettingsDialog {
             case TOOLBAR -> renderToolbarTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
             case HUD -> renderHudTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
             case UNITS -> renderUnitsTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
+            case RATIO -> renderRatioTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
             case WIRES -> renderWiresTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
         }
 
@@ -209,13 +237,13 @@ public class BoardSettingsDialog {
         graphics.drawString(font, "§e" + Component.translatable("gui.gtcalcboard.settings.units_desc").getString(), x, y, 0xFFFFFFFF, false);
 
         int rowY = y + 20;
+        int btnW = 150;
+        int btnX = x + w - btnW - 4;
 
         // 1. Time Unit
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.settings.time_unit_label").getString(), x, rowY + 5, 0xFFCCCCCC, false);
         RateTimeUnit curUnit = bm.getTimeUnit();
         String timeBtnTxt = curUnit.getSuffix() + " (" + Component.translatable(curUnit.getTranslationKey()).getString() + ") ▼";
-        int btnW = 160;
-        int btnX = x + w - btnW - 4;
         drawButton(graphics, font, timeBtnTxt, btnX, rowY, btnW, 20, mouseX, mouseY, 0xFFFFF176, 0xFF222834, 0xFF35445E);
         rowY += 26;
 
@@ -240,6 +268,67 @@ public class BoardSettingsDialog {
                     Component.translatable("gui.gtcalcboard.settings.singleplayer_pause").getString(),
                     bm.isPauseGameInSingleplayer());
         }
+    }
+
+    private void renderRatioTab(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, BoardManager bm) {
+        graphics.drawString(font, "§6" + Component.translatable("gui.gtcalcboard.settings.ratio_desc").getString(), x, y, 0xFFFFFFFF, false);
+
+        int rowY = y + 16;
+
+        // 1. Max Harmonize Anchor Scale (Editable Input + Steppers + Presets)
+        graphics.drawString(font, Component.translatable("gui.gtcalcboard.settings.max_harmonize_scale_label").getString(), x, rowY + 4, 0xFFCCCCCC, false);
+
+        int inputW = 44;
+        int stepW = 16;
+        int rightX = x + w - 4;
+        int plusBtnX = rightX - stepW;
+        int inputX = plusBtnX - inputW - 2;
+        int minusBtnX = inputX - stepW - 2;
+
+        drawButton(graphics, font, "-", minusBtnX, rowY, stepW, 16, mouseX, mouseY, 0xFFFFFFFF, 0xFF222834, 0xFF35445E);
+
+        if (maxScaleInput != null) {
+            maxScaleInput.setX(inputX);
+            maxScaleInput.setY(rowY);
+            maxScaleInput.setWidth(inputW);
+            maxScaleInput.render(graphics, mouseX, mouseY, 0);
+        }
+
+        drawButton(graphics, font, "+", plusBtnX, rowY, stepW, 16, mouseX, mouseY, 0xFFFFFFFF, 0xFF222834, 0xFF35445E);
+
+        // Quick Presets: 4x, 8x, 16x, 32x, 64x, 128x
+        rowY += 20;
+        int[] presets = {4, 8, 16, 32, 64, 128};
+        int presetW = 28;
+        int curScale = bm.getMaxHarmonizeScale();
+        int preX = x + w - (presets.length * (presetW + 3)) - 4;
+        for (int p : presets) {
+            boolean isCur = (p == curScale);
+            int textCol = isCur ? 0xFF55FF88 : 0xFFCCCCCC;
+            int bgCol = isCur ? 0xFF1C3524 : 0xFF1F2533;
+            int borderCol = isCur ? 0xFF3B774E : 0xFF35445E;
+            drawButton(graphics, font, p + "x", preX, rowY, presetW, 14, mouseX, mouseY, textCol, bgCol, borderCol);
+            preX += presetW + 3;
+        }
+        rowY += 22;
+
+        // 2. Harmonize Surplus Tolerance (Presets / Stepper)
+        graphics.drawString(font, Component.translatable("gui.gtcalcboard.settings.surplus_tolerance_label").getString(), x, rowY + 4, 0xFFCCCCCC, false);
+        double curTol = bm.getHarmonizeSurplusTolerance();
+        String tolPercent = String.format(java.util.Locale.ROOT, "%.0f%%", curTol * 100.0);
+        String tolBtnTxt = tolPercent + " (" + (curTol <= 0.0001 ? Component.translatable("gui.gtcalcboard.settings.exact_match_only").getString() : Component.translatable("gui.gtcalcboard.settings.tolerance_allowed").getString()) + ") ▼";
+        int btnW = 150;
+        int btnX = x + w - btnW - 4;
+        drawButton(graphics, font, tolBtnTxt, btnX, rowY, btnW, 18, mouseX, mouseY, 0xFF66E5FF, 0xFF222834, 0xFF35445E);
+        rowY += 26;
+
+        // Helpful Explanatory Text Box
+        graphics.fill(x, rowY, x + w - 4, rowY + 68, 0x55111822);
+        graphics.renderOutline(x, rowY, w - 4, 68, 0xFF2C394F);
+        graphics.drawString(font, "§e💡 " + Component.translatable("gui.gtcalcboard.settings.ratio_hint_title").getString(), x + 8, rowY + 6, 0xFFFFF176, false);
+        graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.ratio_hint_line1").getString(), x + 8, rowY + 20, 0xFFAABBCC, false);
+        graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.ratio_hint_line2").getString(), x + 8, rowY + 34, 0xFFAABBCC, false);
+        graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.ratio_hint_line3").getString(), x + 8, rowY + 48, 0xFFAABBCC, false);
     }
 
     private void renderWiresTab(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, BoardManager bm) {
@@ -403,6 +492,7 @@ public class BoardSettingsDialog {
             case TOOLBAR -> handleToolbarClick(mouseX, mouseY, mainX, mainY, mainW, bm);
             case HUD -> handleHudClick(mouseX, mouseY, mainX, mainY, mainW, bm);
             case UNITS -> handleUnitsClick(mouseX, mouseY, mainX, mainY, mainW, bm);
+            case RATIO -> handleRatioClick(mouseX, mouseY, mainX, mainY, mainW, bm);
             case WIRES -> handleWiresClick(mouseX, mouseY, mainX, mainY, mainW, bm);
         }
 
@@ -473,7 +563,7 @@ public class BoardSettingsDialog {
 
     private void handleUnitsClick(double mouseX, double mouseY, int x, int y, int w, BoardManager bm) {
         int rowY = y + 20;
-        int btnW = 160;
+        int btnW = 150;
         int btnX = x + w - btnW - 4;
 
         // 1. Time Unit
@@ -508,6 +598,92 @@ public class BoardSettingsDialog {
             bm.setPauseGameInSingleplayer(!bm.isPauseGameInSingleplayer());
             onSettingsChanged();
         }
+    }
+
+    private void handleRatioClick(double mouseX, double mouseY, int x, int y, int w, BoardManager bm) {
+        int rowY = y + 16;
+        int inputW = 44;
+        int stepW = 16;
+        int rightX = x + w - 4;
+        int plusBtnX = rightX - stepW;
+        int inputX = plusBtnX - inputW - 2;
+        int minusBtnX = inputX - stepW - 2;
+
+        // Minus Step [-]
+        if (mouseX >= minusBtnX && mouseX <= minusBtnX + stepW && mouseY >= rowY && mouseY <= rowY + 16) {
+            int next = Math.max(1, bm.getMaxHarmonizeScale() - 1);
+            bm.setMaxHarmonizeScale(next);
+            if (maxScaleInput != null) maxScaleInput.setValue(String.valueOf(next));
+            onSettingsChanged();
+            return;
+        }
+
+        // EditBox click focus
+        if (maxScaleInput != null && mouseX >= inputX && mouseX <= inputX + inputW && mouseY >= rowY && mouseY <= rowY + 16) {
+            maxScaleInput.mouseClicked(mouseX, mouseY, 0);
+            return;
+        }
+
+        // Plus Step [+]
+        if (mouseX >= plusBtnX && mouseX <= plusBtnX + stepW && mouseY >= rowY && mouseY <= rowY + 16) {
+            int next = Math.min(256, bm.getMaxHarmonizeScale() + 1);
+            bm.setMaxHarmonizeScale(next);
+            if (maxScaleInput != null) maxScaleInput.setValue(String.valueOf(next));
+            onSettingsChanged();
+            return;
+        }
+
+        // Quick Presets
+        rowY += 20;
+        int[] presets = {4, 8, 16, 32, 64, 128};
+        int presetW = 28;
+        int preX = x + w - (presets.length * (presetW + 3)) - 4;
+        for (int p : presets) {
+            if (mouseX >= preX && mouseX <= preX + presetW && mouseY >= rowY && mouseY <= rowY + 14) {
+                bm.setMaxHarmonizeScale(p);
+                if (maxScaleInput != null) maxScaleInput.setValue(String.valueOf(p));
+                onSettingsChanged();
+                return;
+            }
+            preX += presetW + 3;
+        }
+        rowY += 22;
+
+        // 2. Cycle Harmonize Surplus Tolerance
+        int btnW = 150;
+        int btnX = x + w - btnW - 4;
+        if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= rowY && mouseY <= rowY + 18) {
+            bm.cycleHarmonizeSurplusTolerance();
+            onSettingsChanged();
+        }
+    }
+
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (!visible) return false;
+        SettingsTab[] tabs = SettingsTab.values();
+        if (activeTab >= 0 && activeTab < tabs.length && tabs[activeTab] == SettingsTab.RATIO) {
+            if (maxScaleInput != null && maxScaleInput.isFocused()) {
+                return maxScaleInput.charTyped(codePoint, modifiers);
+            }
+        }
+        return false;
+    }
+
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (!visible) return false;
+        SettingsTab[] tabs = SettingsTab.values();
+        if (activeTab >= 0 && activeTab < tabs.length && tabs[activeTab] == SettingsTab.RATIO) {
+            if (maxScaleInput != null && maxScaleInput.isFocused()) {
+                maxScaleInput.keyPressed(keyCode, scanCode, modifiers);
+                return true;
+            }
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            close();
+            playClickSound();
+            return true;
+        }
+        return true;
     }
 
     private void handleWiresClick(double mouseX, double mouseY, int x, int y, int w, BoardManager bm) {
@@ -555,14 +731,5 @@ public class BoardSettingsDialog {
         Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
-    }
-
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (!visible) return false;
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            close();
-            return true;
-        }
-        return false;
     }
 }

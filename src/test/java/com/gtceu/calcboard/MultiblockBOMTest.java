@@ -875,12 +875,12 @@ public class MultiblockBOMTest {
         Assertions.assertNotNull(inputBus, "Input Bus should be automatically added");
         Assertions.assertEquals(1, inputBus.totalAmount());
 
-        // 3. Check Output Bus (2 item outputs -> 2 EV output buses)
+        // 3. Check Output Bus (2 item outputs fit in 1 EV output bus of 16 slots)
         MultiblockBOMSummary.BOMItemEntry outputBus = summary.aggregatedItems().stream()
             .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:ev_output_bus")))
             .findFirst().orElse(null);
         Assertions.assertNotNull(outputBus, "Output Bus should be automatically added");
-        Assertions.assertEquals(2, outputBus.totalAmount());
+        Assertions.assertEquals(1, outputBus.totalAmount());
 
         // 4. Check Input Hatch (1 fluid input -> 1 EV input hatch)
         MultiblockBOMSummary.BOMItemEntry inputHatch = summary.aggregatedItems().stream()
@@ -904,13 +904,13 @@ public class MultiblockBOMTest {
         Assertions.assertEquals(1, maintHatch.totalAmount());
 
         // 7. Check Casing Reduction:
-        // Total extra hatches = 1 (energy) + 1 (in bus) + 2 (out bus) + 1 (in hatch) + 1 (out hatch) + 1 (maint) = 7 hatches.
-        // Solid Machine Casing was 48, reduced by 7 -> 41 casings!
+        // Total extra hatches = 1 (energy) + 1 (in bus) + 1 (out bus) + 1 (in hatch) + 1 (out hatch) + 1 (maint) = 6 hatches.
+        // Solid Machine Casing was 48, reduced by 6 -> 42 casings!
         MultiblockBOMSummary.BOMItemEntry casing = summary.aggregatedItems().stream()
             .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:solid_machine_casing")))
             .findFirst().orElse(null);
         Assertions.assertNotNull(casing);
-        Assertions.assertEquals(41, casing.totalAmount(), "Solid Machine Casing should be reduced by 7 (48 - 7 = 41)");
+        Assertions.assertEquals(42, casing.totalAmount(), "Solid Machine Casing should be reduced by 6 (48 - 6 = 42)");
 
         // 8. Non-replaceable casings (Glass, Dirt) remain unchanged
         MultiblockBOMSummary.BOMItemEntry glass = summary.aggregatedItems().stream()
@@ -1013,6 +1013,48 @@ public class MultiblockBOMTest {
         // Total blocks must still equal 78
         int totalBlocks2 = summary2.aggregatedItems().stream().mapToInt(MultiblockBOMSummary.BOMItemEntry::totalAmount).sum();
         Assertions.assertEquals(78, totalBlocks2, "Total structure block count must be perfectly preserved");
+    }
+
+    @Test
+    public void testOutputBusSlotCapacityScaling() {
+        ResourceLocation controllerId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
+        List<MultiblockStructurePart> parts = List.of(
+            new MultiblockStructurePart(controllerId, "Electric Blast Furnace", 1, PartCategory.CONTROLLER),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:heatproof_machine_casing"), "Heat Proof Casing", 10, PartCategory.CASING),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:cupronickel_coil_block"), "Cupronickel Coil", 16, PartCategory.COIL),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:lv_energy_input_hatch"), "LV Energy Hatch", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:lv_input_bus"), "LV Input Bus", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:lv_output_bus"), "LV Output Bus", 1, PartCategory.HATCH_BUS)
+        );
+        MultiblockStructureCatalog.registerManualStructure(new MultiblockStructureDef(controllerId, "Electric Blast Furnace", parts, 16, 1, 1, 1, 1, 1, 1));
+
+        RecipeNode node = new RecipeNode("ebf_5_outputs", "Electric Blast Furnace", 100, 100, GTVoltageTier.LV);
+        node.setMachineIcon(controllerId);
+        node.setMultiblock(true);
+        node.setMachineCount(1.0);
+        node.setTargetTier(GTVoltageTier.LV);
+
+        // 5 distinct item outputs
+        for (int i = 1; i <= 5; i++) {
+            node.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:item_" + i), "Item " + i, 1.0));
+        }
+
+        // At LV tier (4 slots per LV output bus): ceil(5 / 4) = 2 LV Output Buses required (not 5!)
+        MultiblockBOMSummary summaryLV = MultiblockBOMCalculator.calculateBOM(List.of(node), false);
+        MultiblockBOMSummary.BOMItemEntry lvBusEntry = summaryLV.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:lv_output_bus")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(lvBusEntry);
+        Assertions.assertEquals(2, lvBusEntry.totalAmount(), "5 output items require 2 LV Output Buses (4 slots each = 8 slots)");
+
+        // At MV tier (9 slots per MV output bus): ceil(5 / 9) = 1 MV Output Bus required
+        node.setTargetTier(GTVoltageTier.MV);
+        MultiblockBOMSummary summaryMV = MultiblockBOMCalculator.calculateBOM(List.of(node), false);
+        MultiblockBOMSummary.BOMItemEntry mvBusEntry = summaryMV.aggregatedItems().stream()
+            .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:mv_output_bus")))
+            .findFirst().orElse(null);
+        Assertions.assertNotNull(mvBusEntry);
+        Assertions.assertEquals(1, mvBusEntry.totalAmount(), "5 output items require 1 MV Output Bus (9 slots)");
     }
 }
 

@@ -1,0 +1,132 @@
+package com.gtceu.calcboard.client.gui.canvas;
+
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Handles spatial indexing, Bezier wire batch rendering, viewport culling, and animated pulse dots on the canvas.
+ */
+public class CanvasWireRenderer {
+
+    private final WireSpatialIndex wireSpatialIndex = new WireSpatialIndex();
+
+    public WireSpatialIndex getWireSpatialIndex() {
+        return wireSpatialIndex;
+    }
+
+    public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
+        List<WireSpatialIndex.IndexedWire> candidates = wireSpatialIndex.queryCandidates(canvasMouseX, canvasMouseY, maxDist);
+        for (WireSpatialIndex.IndexedWire iw : candidates) {
+            if (ConnectionRenderer.isPointNearBezier(iw.x1(), iw.y1(), iw.x2(), iw.y2(), iw.fromDirX(), iw.toDirX(), canvasMouseX, canvasMouseY, maxDist)) {
+                return iw.edge();
+            }
+        }
+        return null;
+    }
+
+    public void updateSpatialIndex(BoardScreen screen, FlowGraph graph) {
+        wireSpatialIndex.clear();
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+            RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+            if (fromNode != null && toNode != null) {
+                NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
+                NodeWidget toWidget = screen.findWidgetForNode(toNode);
+                if (fromWidget != null && toWidget != null) {
+                    float x1 = fromWidget.getOutputPortX(edge.outputIndex());
+                    float y1 = fromWidget.getOutputPortY(edge.outputIndex());
+                    float x2 = toWidget.getInputPortX(edge.inputIndex());
+                    float y2 = toWidget.getInputPortY(edge.inputIndex());
+                    float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
+                    float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
+                    wireSpatialIndex.insert(edge, x1, y1, x2, y2, fromDirX, toDirX);
+                }
+            }
+        }
+    }
+
+    public void renderWires(GuiGraphics graphics, BoardScreen screen, FlowGraph graph,
+                            double canvasMouseX, double canvasMouseY,
+                            double screenLeft, double screenRight, double screenTop, double screenBottom,
+                            double zoom) {
+        updateSpatialIndex(screen, graph);
+
+        FlowGraph.ConnectionEdge hoveredEdge = findHoveredWire(canvasMouseX, canvasMouseY, 6.0);
+
+        ConnectionRenderer.beginBatch(graphics);
+        List<float[]> visibleWires = new ArrayList<>();
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+            RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+            if (fromNode != null && toNode != null) {
+                NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
+                NodeWidget toWidget = screen.findWidgetForNode(toNode);
+                if (fromWidget != null && toWidget != null) {
+                    float x1 = fromWidget.getOutputPortX(edge.outputIndex());
+                    float y1 = fromWidget.getOutputPortY(edge.outputIndex());
+                    float x2 = toWidget.getInputPortX(edge.inputIndex());
+                    float y2 = toWidget.getInputPortY(edge.inputIndex());
+
+                    float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
+                    float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
+
+                    float[] cp = new float[4];
+                    ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, cp);
+
+                    float minX = Math.min(Math.min(x1, x2), Math.min(cp[0], cp[2])) - 16.0f;
+                    float maxX = Math.max(Math.max(x1, x2), Math.max(cp[0], cp[2])) + 16.0f;
+                    float minY = Math.min(Math.min(y1, y2), Math.min(cp[1], cp[3])) - 16.0f;
+                    float maxY = Math.max(Math.max(y1, y2), Math.max(cp[1], cp[3])) + 16.0f;
+                    if (maxX < screenLeft || minX > screenRight || maxY < screenTop || minY > screenBottom) {
+                        continue;
+                    }
+
+                    boolean isHovered = edge.equals(hoveredEdge);
+                    boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
+                    int defWireColor = BoardManager.getInstance().getWireColor();
+                    int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : defWireColor);
+                    float wireThick = isWireGlowing ? 3.5f : 2.0f;
+                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
+                    visibleWires.add(new float[]{x1, y1, x2, y2, fromDirX, toDirX});
+                }
+            }
+        }
+
+        // Render Active Wire Dragging
+        var canvasHandler = screen.getCanvasHandler();
+        NodeWidget wireStart = canvasHandler.getWireStartNode();
+        if (wireStart != null) {
+            float x1, y1;
+            int matchedColor = BoardManager.getInstance().getMatchedWireColor();
+            int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
+            if (canvasHandler.isWireStartInput()) {
+                x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
+                y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
+                float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
+                ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
+            } else {
+                x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
+                y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
+                float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
+                ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
+            }
+        }
+        ConnectionRenderer.endBatch();
+
+        // Draw animated flow pulse dots (Single-batch GPU rendering)
+        if (zoom >= 0.28 && BoardManager.getInstance().isShowWirePulseAnimation()) {
+            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWires);
+        }
+    }
+}

@@ -104,7 +104,7 @@ public class HotkeyHudWidget {
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + C / V / X", "gui.gtcalcboard.hotkey_hud.clipboard");
         curY += 12;
-        renderKeyLine(graphics, font, panelX + 6, curY, "F", "gui.gtcalcboard.hotkey_hud.flip");
+        renderKeyLine(graphics, font, panelX + 6, curY, "Home / F", "gui.gtcalcboard.hotkey_hud.fit_view");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Right-Click Wire", "gui.gtcalcboard.hotkey_hud.sever");
         curY += 12;

@@ -94,7 +94,7 @@ public class CoilHelper {
         }
 
         try {
-            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
             if (id != null) {
                 return STATS_CACHE.get(id.toString());
             }
@@ -119,7 +119,7 @@ public class CoilHelper {
         try {
             ResourceLocation id = ResourceLocation.tryParse(key.contains(":") ? key : "gtceu:" + key);
             if (id != null) {
-                Block block = BuiltInRegistries.BLOCK.get(id);
+                Block block = ForgeRegistries.BLOCKS.getValue(id);
                 if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
                     CoilStats stats = extractStatsFromBlockObject(block);
                     if (stats != null) {
@@ -277,7 +277,7 @@ public class CoilHelper {
 
     public static void discoverGTCEuCoils(java.util.List<MachineAddon> list) {
         try {
-            for (Map.Entry<net.minecraft.resources.ResourceKey<Block>, Block> entry : BuiltInRegistries.BLOCK.entrySet()) {
+            for (Map.Entry<net.minecraft.resources.ResourceKey<Block>, Block> entry : ForgeRegistries.BLOCKS.getEntries()) {
                 ResourceLocation id = entry.getKey().location();
                 if (id == null) continue;
                 String path = id.getPath().toLowerCase(Locale.ROOT);

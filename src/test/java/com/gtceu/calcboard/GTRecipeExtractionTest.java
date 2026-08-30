@@ -1,5 +1,6 @@
 package com.gtceu.calcboard;
 
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
@@ -162,6 +163,40 @@ public class GTRecipeExtractionTest {
 
         double dur = GTCEuRecipeHandler.extractDuration(recipe);
         Assertions.assertEquals(240.0, dur, 1e-6);
+    }
+
+    public static class MockMultipleOutputGTRecipe {
+        public int duration = 100;
+        public Map<String, List<Object>> outputs = new HashMap<>();
+
+        public static class MockContent {
+            public Object content;
+            public int chance;
+            public int tierChanceBoost;
+
+            public MockContent(Object content, int chance, int tierChanceBoost) {
+                this.content = content;
+                this.chance = chance;
+                this.tierChanceBoost = tierChanceBoost;
+            }
+        }
+
+        public MockMultipleOutputGTRecipe() {
+            outputs.put("gtceu:item", List.of(
+                    new MockContent(IngredientStack.item(net.minecraft.resources.ResourceLocation.tryParse("minecraft:diamond"), "Diamond", 1.0), 5000, 0),
+                    new MockContent(IngredientStack.item(net.minecraft.resources.ResourceLocation.tryParse("minecraft:diamond"), "Diamond", 1.0), 4500, 0)
+            ));
+        }
+    }
+
+    @Test
+    public void testExtractMultipleOutputsSameItemDifferentChances() {
+        MockMultipleOutputGTRecipe recipe = new MockMultipleOutputGTRecipe();
+        List<com.gtceu.calcboard.api.model.IngredientStack> extracted = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
+
+        Assertions.assertEquals(2, extracted.size());
+        Assertions.assertEquals(0.50, extracted.get(0).getChance(), 1e-4, "First slot must be 50%");
+        Assertions.assertEquals(0.45, extracted.get(1).getChance(), 1e-4, "Second slot must be 45%");
     }
 }
 

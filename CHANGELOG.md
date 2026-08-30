@@ -6,6 +6,36 @@
 
 All notable changes to **GregTech Calculator Board** will be documented in this file.
 
+## [2.0.0-beta.1] - 2026-08-29
+
+### Added
+- **Blueprint Metadata & Preview Import/Export Dialog (`ExportBlueprintDialog`, `ImportBlueprintDialog`)**:
+  - Added dedicated modal dialogs for exporting blueprints with custom titles, descriptions, and tags.
+  - Added an interactive blueprint preview dialog when importing, showing total nodes, machines, wire counts, and major inputs/outputs before choosing to "Open in New Page" or "Overwrite Current Page".
+- **Smart Auto-Connect Resource Selection Filter Dialog (`AutoConnectFilterDialog`)**:
+  - When auto-connecting nodes or dragging wires, a resource selection dialog now allows players to preview and selectively check/uncheck matching items and fluids to connect.
+- **Canvas Fit-to-View Feature & Hotkey (`Home` / `F`) (`ToolbarWidget`, `HotkeyHudWidget`)**:
+  - Added a "Fit to View" button on the toolbar and hotkey shortcuts (`Home` / `F`) to instantly center the canvas and scale the zoom level to encompass all placed nodes.
+- **Ratio & Mass Balance Settings Tab in Board Settings Dialog (`BoardSettingsDialog`)**:
+  - Added a dedicated "Ratio & Balance" configuration tab to customize the maximum machine count limit for perfect integer harmonization and adjust surplus tolerance thresholds.
+
+### Changed & Improved
+- **Large Workspace Streaming & On-Demand Page Loading**:
+  - Implemented chunked packet streaming for multiplayer team workspaces, preventing network payload overflows during large factory commits.
+  - Optimized multiplayer connection speed by synchronizing page metadata first and loading full page canvas data on-demand during tab switching.
+- **Wire Hover & Click Detection Performance Optimization**:
+  - Implemented spatial partitioning indexing for canvas wires, ensuring smooth, lag-free wire selection, hovering, and rerouting even in massive factory flowcharts with hundreds of connections.
+- **Multiplayer Edit Lock Instant Cleanup on Disconnect**:
+  - Teammate canvas edit locks are now immediately released when a player closes the board or disconnects from the server, eliminating wait times for other team members.
+
+### Fixed
+- **JEI Mode Inactive Probability Byproduct Output Ports**:
+  - Fixed an issue where 0% chance byproducts that should be inactive at lower voltage tiers (e.g. bone meal and feathers from raw chicken maceration in LV/MV) were incorrectly instantiated as output ports when imported via JEI.
+- **Tier Switching Internal State Desynchronization**:
+  - Fixed an issue where machine voltage tier adjustments temporarily displayed desynchronized power consumption figures until the node was moved or reopened.
+- **Team Page Deletion Permission Validation Conflict**:
+  - Fixed a client-server state desynchronization issue when non-admin team members attempted to delete shared team pages.
+
 ## [2.0.0-alpha.12] - 2026-08-29
 
 ### Added

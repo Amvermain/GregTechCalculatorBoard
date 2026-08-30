@@ -320,6 +320,48 @@ public class CreateKineticTest {
                 .toList();
         Assertions.assertTrue(matchesLww.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
     }
+
+    @Test
+    public void testVintageImprovementsKineticProcessing() {
+        RecipeNode node = RecipeNode.create(
+                ResourceLocation.tryParse("vintageimprovements:vibrating_table"),
+                "Vibrating Table (Purified Sphalerite)",
+                100.0,
+                128.0,
+                GTVoltageTier.ULV
+        );
+        node.setRecipeCategoryId(ResourceLocation.tryParse("vintageimprovements:vibrating"));
+        node.setMachineIcon(ResourceLocation.tryParse("vintageimprovements:vibrating_table"));
+
+        // 1. Must be recognized as Create Kinetic Machine
+        Assertions.assertTrue(node.isCreateMachine(), "Vintage Improvements must be recognized as Create kinetic machine");
+        Assertions.assertEquals(EnergyType.KINETIC_SU, node.getEnergyType());
+
+        // 2. Default RPM is 32 RPM (speedFactor 1.0x) -> 128 SU Impact, 5.0s duration
+        Assertions.assertEquals(32, node.getRpm());
+        Assertions.assertEquals(5.0, node.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(128.0, node.getSingleMachineEUt(), 0.001);
+
+        // 3. Overclock / RPM scaling: 64 RPM (2.0x speed) -> 256 SU Impact, 2.5s duration
+        node.setRpm(64);
+        Assertions.assertEquals(2.5, node.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(256.0, node.getSingleMachineEUt(), 0.001);
+
+        // 4. Lathe / Turning machine: 256 SU at 32 RPM
+        RecipeNode lathe = RecipeNode.create(
+                ResourceLocation.tryParse("vintageimprovements:lathe"),
+                "Lathe (Iron Rod)",
+                100.0,
+                256.0,
+                GTVoltageTier.ULV
+        );
+        lathe.setRecipeCategoryId(ResourceLocation.tryParse("vintageimprovements:lathe"));
+        lathe.setMachineIcon(ResourceLocation.tryParse("vintageimprovements:lathe"));
+
+        Assertions.assertTrue(lathe.isCreateMachine());
+        Assertions.assertEquals(EnergyType.KINETIC_SU, lathe.getEnergyType());
+        Assertions.assertEquals(256.0, lathe.getSingleMachineEUt(), 0.001);
+    }
 }
 
 

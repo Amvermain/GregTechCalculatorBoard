@@ -157,7 +157,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.0.0-alpha.12.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.0.0-beta.1.jar`.
 
 ---
 
@@ -167,7 +167,7 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.0.0-alpha.1
 - **[Architecture & Developer Guide (Korean)](docs/ARCHITECTURE_KR.md)**: 내부 엔진 구조, 4계층 아키텍처, 멀티 모드 물리 모델 및 렌더링 파이프라인.
 - **[Detailed Code Specification (English)](docs/en_us/CODE_SPECIFICATION.md)**: Full system architecture, 5 graph algorithms, overclocking formulas, `CategoryCapabilityMatrix`, multiplayer concurrency lock protocol, and SavedData persistence schemas.
 - **[Detailed Code Specification (Korean)](docs/ko_kr/CODE_SPECIFICATION.md)**: 전체 시스템 아키텍처, 5대 그래프 알고리즘, 오버클럭 연산 공식, `CategoryCapabilityMatrix`, 멀티플레이 동시성 락 프로토콜 및 영속화 스키마.
-- **[v2.0 Development Plan](docs/DEVELOPMENT_PLAN_V2.md)**: Multiplayer and FTB Teams roadmap.
+- **[Architecture Decision Records (ADR)](docs/adr/README.md)**: System design decisions and evolution records.
 
 ---
 

@@ -264,9 +264,20 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
-        // 11. Flip Selected Nodes Horizontally: F
+        // 11. Fit to View / Focus Content: Home / Shift+F / Ctrl+0
+        if (keyCode == GLFW.GLFW_KEY_HOME || (keyCode == GLFW.GLFW_KEY_0 && (modifiers & GLFW.GLFW_MOD_CONTROL) != 0)) {
+            screen.fitToView();
+            return true;
+        }
+
+        // 12. F key: Flip Selected Nodes (if selection exists) or Fit to View (if Shift is held or no selection)
         if (keyCode == GLFW.GLFW_KEY_F && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
-            screen.flipSelectedNodes();
+            boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
+            if (shift || screen.getSelectionModel().isEmpty()) {
+                screen.fitToView();
+            } else {
+                screen.flipSelectedNodes();
+            }
             return true;
         }
 

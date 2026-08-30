@@ -91,26 +91,26 @@ public class CanvasGroupFrameTest {
 
         // 1. External Source: Produces Iron
         RecipeNode extSource = RecipeNode.create("Miner", 100, 30, GTVoltageTier.LV);
-        extSource.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft:iron_ore"), "Iron Ore", 1.0));
+        extSource.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0));
         graph.addNode(extSource);
 
         // 2. Internal Node 1 (Macerator)
         RecipeNode internal1 = RecipeNode.create("Macerator", 100, 30, GTVoltageTier.LV);
         internal1.setPos(200, 100);
-        internal1.getInputs().add(IngredientStack.item(new ResourceLocation("minecraft:iron_ore"), "Iron Ore", 1.0));
-        internal1.getOutputs().add(IngredientStack.item(new ResourceLocation("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2.0));
+        internal1.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0));
+        internal1.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2.0));
         graph.addNode(internal1);
 
         // 3. Internal Node 2 (Furnace)
         RecipeNode internal2 = RecipeNode.create("Furnace", 100, 30, GTVoltageTier.LV);
         internal2.setPos(500, 100);
-        internal2.getInputs().add(IngredientStack.item(new ResourceLocation("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2.0));
-        internal2.getOutputs().add(IngredientStack.item(new ResourceLocation("minecraft:iron_ingot"), "Iron Ingot", 2.0));
+        internal2.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:crushed_iron_ore"), "Crushed Iron Ore", 2.0));
+        internal2.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 2.0));
         graph.addNode(internal2);
 
         // 4. External Sink
         RecipeNode extSink = RecipeNode.create("Assembler", 100, 30, GTVoltageTier.LV);
-        extSink.getInputs().add(IngredientStack.item(new ResourceLocation("minecraft:iron_ingot"), "Iron Ingot", 2.0));
+        extSink.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 2.0));
         graph.addNode(extSink);
 
         // Connections: extSource -> internal1 -> internal2 -> extSink

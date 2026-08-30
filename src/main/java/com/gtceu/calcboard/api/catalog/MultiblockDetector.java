@@ -743,7 +743,7 @@ public class MultiblockDetector {
         if (rt instanceof ResourceLocation rl) return rl;
         try {
             if (rt instanceof net.minecraft.world.item.crafting.RecipeType<?> rType) {
-                ResourceLocation loc = net.minecraft.core.registries.BuiltInRegistries.RECIPE_TYPE.getKey(rType);
+                ResourceLocation loc = net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES.getKey(rType);
                 if (loc != null && !loc.getPath().equals("air")) return loc;
             }
         } catch (Throwable ignored) {}

@@ -108,6 +108,34 @@ public class TeamWorkspaceData {
         }
     }
 
+    public com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspaceMetaPacket buildMetaPacket() {
+        List<com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspaceMetaPacket.PageMeta> metaList = new ArrayList<>();
+        WorkspaceLockManager lockMgr = WorkspaceLockManager.getInstance();
+
+        for (TeamWorkspacePage p : pages.values()) {
+            var lock = lockMgr.getLock(teamId, p.getPageId());
+            UUID lockUUID = lock != null ? lock.getHolderUUID() : null;
+            String lockName = lock != null ? lock.getHolderName() : "";
+            long lockExpires = lock != null ? lock.getExpiresTimestamp() : 0L;
+
+            metaList.add(new com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspaceMetaPacket.PageMeta(
+                    p.getPageId(),
+                    p.getTitle(),
+                    p.getPageRevision(),
+                    lockUUID,
+                    lockName,
+                    lockExpires
+            ));
+        }
+
+        return new com.gtceu.calcboard.network.packet.s2c.S2CSyncWorkspaceMetaPacket(
+                teamId,
+                teamName,
+                globalRevision,
+                metaList
+        );
+    }
+
     public CompoundTag toNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putInt("FormatVersion", formatVersion);

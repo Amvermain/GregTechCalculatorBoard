@@ -36,13 +36,13 @@ public class RerouteJunctionTest {
     @Test
     public void testRerouteDynamicIngredientBinding() {
         RecipeNode reroute = RecipeNode.createReroute(50.0, 50.0);
-        IngredientStack dummySteam = IngredientStack.fluid(new ResourceLocation("gtceu:steam"), "Steam", 500.0);
+        IngredientStack dummySteam = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0);
 
         reroute.bindRerouteIngredient(dummySteam);
         Assertions.assertEquals(1, reroute.getInputs().size());
         Assertions.assertEquals(1, reroute.getOutputs().size());
-        Assertions.assertEquals(new ResourceLocation("gtceu:steam"), reroute.getInputs().get(0).getId());
-        Assertions.assertEquals(new ResourceLocation("gtceu:steam"), reroute.getOutputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:steam"), reroute.getInputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:steam"), reroute.getOutputs().get(0).getId());
         Assertions.assertEquals("Steam", reroute.getInputs().get(0).getDisplayName());
         Assertions.assertEquals(500.0, reroute.getInputs().get(0).getAmount(), 0.001);
 
@@ -57,18 +57,18 @@ public class RerouteJunctionTest {
 
         // 1. Producer: Produces 100 Steam/s at count = 1.0 (20 ticks per cycle -> 1 cycle/s = 100 Steam/s)
         RecipeNode producer = RecipeNode.create("Boiler", 20.0, 0.0, GTVoltageTier.LV);
-        producer.getOutputs().add(IngredientStack.fluid(new ResourceLocation("gtceu:steam"), "Steam", 100.0));
+        producer.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0));
         producer.setMachineCount(1.0);
         graph.addNode(producer);
 
         // 2. Reroute Junction
         RecipeNode reroute = RecipeNode.createReroute(100.0, 100.0);
-        reroute.bindRerouteIngredient(IngredientStack.fluid(new ResourceLocation("gtceu:steam"), "Steam", 100.0));
+        reroute.bindRerouteIngredient(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 100.0));
         graph.addNode(reroute);
 
         // 3. Consumer: Consumes 500 Steam/s at count = 1.0 (20 ticks per cycle -> 1 cycle/s = 500 Steam/s)
         RecipeNode consumer = RecipeNode.create("Steam Turbine", 20.0, 32.0, GTVoltageTier.LV);
-        consumer.getInputs().add(IngredientStack.fluid(new ResourceLocation("gtceu:steam"), "Steam", 500.0));
+        consumer.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 500.0));
         consumer.setMachineCount(1.0);
         graph.addNode(consumer);
 
@@ -89,7 +89,7 @@ public class RerouteJunctionTest {
     @Test
     public void testRerouteNbtSerialization() {
         RecipeNode reroute = RecipeNode.createReroute(120.0, 240.0);
-        reroute.bindRerouteIngredient(IngredientStack.item(new ResourceLocation("minecraft:iron_ingot"), "Iron Ingot", 4.0));
+        reroute.bindRerouteIngredient(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 4.0));
 
         CompoundTag tag = reroute.serializeNBT();
         Assertions.assertTrue(tag.getBoolean("isReroute"));
@@ -98,8 +98,8 @@ public class RerouteJunctionTest {
         Assertions.assertTrue(deserialized.isReroute());
         Assertions.assertEquals(120.0, deserialized.getPosX(), 0.001);
         Assertions.assertEquals(240.0, deserialized.getPosY(), 0.001);
-        Assertions.assertEquals(new ResourceLocation("minecraft:iron_ingot"), deserialized.getInputs().get(0).getId());
-        Assertions.assertEquals(new ResourceLocation("minecraft:iron_ingot"), deserialized.getOutputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:iron_ingot"), deserialized.getInputs().get(0).getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("minecraft:iron_ingot"), deserialized.getOutputs().get(0).getId());
         Assertions.assertEquals(4.0, deserialized.getInputs().get(0).getAmount(), 0.001);
     }
 
