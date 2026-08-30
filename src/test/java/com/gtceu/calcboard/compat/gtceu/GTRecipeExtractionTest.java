@@ -331,6 +331,115 @@ public class GTRecipeExtractionTest {
         }
     }
 
+    public static class MockTagInputGTRecipe {
+        public int duration = 100;
+        public Map<String, List<Object>> inputs = new HashMap<>();
+
+        public static class SizedTagIngredient extends net.minecraft.world.item.crafting.Ingredient {
+            private final net.minecraft.world.item.ItemStack[] stacks;
+            private final long amount;
+
+            public SizedTagIngredient(long amount, net.minecraft.world.item.ItemStack... stacks) {
+                super(java.util.stream.Stream.empty());
+                this.stacks = stacks;
+                this.amount = amount;
+            }
+
+            @Override
+            public net.minecraft.world.item.ItemStack[] getItems() {
+                return stacks;
+            }
+
+            public long getAmount() {
+                return amount;
+            }
+        }
+
+        public static class SizedTagContent {
+            public Object content;
+
+            public SizedTagContent(Object content) {
+                this.content = content;
+            }
+        }
+
+        public MockTagInputGTRecipe() {
+            inputs.put("gtceu:item", List.of(new SizedTagContent(new SizedTagIngredient(4,
+                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT),
+                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COPPER_INGOT),
+                    new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.GOLD_INGOT)))));
+        }
+    }
+
+    public static class MockFluidTagInputGTRecipe {
+        public int duration = 100;
+        public Map<String, List<Object>> inputs = new HashMap<>();
+
+        public static class MockFluidIngredient {
+            private final net.minecraftforge.fluids.FluidStack[] stacks;
+
+            public MockFluidIngredient(net.minecraftforge.fluids.FluidStack... stacks) {
+                this.stacks = stacks;
+            }
+
+            public net.minecraftforge.fluids.FluidStack[] getStacks() {
+                return stacks;
+            }
+        }
+
+        public static class FluidContent {
+            public Object content;
+
+            public FluidContent(Object content) {
+                this.content = content;
+            }
+        }
+
+        public MockFluidTagInputGTRecipe() {
+            inputs.put("gtceu:fluid", List.of(new FluidContent(new MockFluidIngredient(
+                    new net.minecraftforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000),
+                    new net.minecraftforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.LAVA, 1000)))));
+        }
+    }
+
+    @Test
+    public void testTagItemInputPreservesAllAlternatives() {
+        MockTagInputGTRecipe recipe = new MockTagInputGTRecipe();
+        List<IngredientStack> extracted = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
+
+        Assertions.assertEquals(1, extracted.size());
+        IngredientStack in = extracted.get(0);
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:iron_ingot"), in.getId());
+        Assertions.assertEquals(4.0, in.getAmount(), 1e-6);
+        Assertions.assertTrue(in.hasAlternatives());
+        Assertions.assertEquals(3, in.getAlternatives().size());
+        Assertions.assertTrue(in.getAlternatives().contains(net.minecraft.resources.ResourceLocation.tryParse("minecraft:copper_ingot")));
+        Assertions.assertTrue(in.getAlternatives().contains(net.minecraft.resources.ResourceLocation.tryParse("minecraft:gold_ingot")));
+
+        in.cycleAlternative(1);
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:copper_ingot"), in.getId());
+        Assertions.assertTrue(in.selectAlternative(net.minecraft.resources.ResourceLocation.tryParse("minecraft:gold_ingot")));
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:gold_ingot"), in.getId());
+
+        IngredientStack copied = in.copy();
+        Assertions.assertEquals(3, copied.getAlternatives().size());
+        Assertions.assertEquals(in.getId(), copied.getId());
+    }
+
+    @Test
+    public void testFluidTagInputPreservesAllAlternatives() {
+        MockFluidTagInputGTRecipe recipe = new MockFluidTagInputGTRecipe();
+        List<IngredientStack> extracted = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
+
+        Assertions.assertEquals(1, extracted.size());
+        IngredientStack in = extracted.get(0);
+        Assertions.assertEquals(net.minecraft.resources.ResourceLocation.tryParse("minecraft:water"), in.getId());
+        Assertions.assertTrue(in.hasAlternatives());
+        Assertions.assertEquals(2, in.getAlternatives().size());
+        Assertions.assertTrue(in.getAlternatives().contains(net.minecraft.resources.ResourceLocation.tryParse("minecraft:lava")));
+        Assertions.assertEquals(1000.0, in.getAmount(), 1e-6);
+    }
+
     @Test
     public void testExtractMultipleOutputsSameItemDifferentChances() {
         MockMultipleOutputGTRecipe recipe = new MockMultipleOutputGTRecipe();
