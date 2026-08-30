@@ -81,7 +81,7 @@ public final class JeiRecipeSearchIndexer {
         List<IngredientStack> inputs = new ArrayList<>();
         List<IngredientStack> outputs = new ArrayList<>();
 
-        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catResId != null && ("gtceu".equals(catResId.getNamespace()) || "start_core".equals(catResId.getNamespace())));
+        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catResId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catResId.getNamespace()));
         if (isGT) {
             List<IngredientStack> gtIns = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");

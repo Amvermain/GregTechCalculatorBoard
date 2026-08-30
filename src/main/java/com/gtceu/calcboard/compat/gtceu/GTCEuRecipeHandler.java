@@ -13,6 +13,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -23,42 +24,68 @@ import java.util.Map;
  */
 public class GTCEuRecipeHandler {
 
-    public static boolean isGTRecipe(Object backing) {
-        if (backing == null) return false;
-        Class<?> cur = backing.getClass();
-        while (cur != null && cur != Object.class) {
-            if (cur.getName().contains("GTRecipe")) return true;
-            for (Class<?> iface : cur.getInterfaces()) {
-                if (iface.getName().contains("GTRecipe")) return true;
-            }
-            cur = cur.getSuperclass();
+    private static final String GT_RECIPE_CLASS_NAME = "com.gregtechceu.gtceu.api.recipe.GTRecipe";
+    private static final String[] RECIPE_BACKING_FIELDS = {
+            "recipe", "gtRecipe", "backingRecipe", "backing", "originalRecipe", "delegate", "value"
+    };
+    private static final String[] DURATION_METHOD_NAMES = {"getDuration", "duration", "getDurationTicks"};
+    private static final String[] EUt_METHOD_NAMES = {"getInputEUt", "getOutputEUt", "inputEUt", "outputEUt"};
+
+    private static final ClassValue<Boolean> GT_SHAPE_CACHE = new ClassValue<>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            return computeGTRecipeShape(type);
         }
+    };
 
-        try {
-            backing.getClass().getMethod("getInputEUt");
-            return true;
-        } catch (Throwable ignored) {}
-        try {
-            backing.getClass().getMethod("getOutputEUt");
-            return true;
-        } catch (Throwable ignored) {}
-        try {
-            Field f = backing.getClass().getField("recipeType");
-            if (f != null) return true;
-        } catch (Throwable ignored) {}
+    private static final ClassValue<List<Field>> BACKING_FIELDS_CACHE = new ClassValue<>() {
+        @Override
+        protected List<Field> computeValue(Class<?> type) {
+            List<Field> fields = new ArrayList<>();
+            for (String fieldName : RECIPE_BACKING_FIELDS) {
+                Class<?> cur = type;
+                while (cur != null && cur != Object.class) {
+                    try {
+                        Field field = cur.getDeclaredField(fieldName);
+                        if (!Modifier.isStatic(field.getModifiers())) {
+                            field.setAccessible(true);
+                            fields.add(field);
+                        }
+                    } catch (NoSuchFieldException ignored) {
+                    } catch (Throwable ignored) {
+                        break;
+                    }
+                    cur = cur.getSuperclass();
+                }
+            }
+            return fields;
+        }
+    };
 
-        return false;
+    public static boolean isGTCategoryNamespace(String namespace) {
+        if (namespace == null) return false;
+        String ns = namespace.toLowerCase(Locale.ROOT);
+        return ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start")
+                || ns.equals("start") || ns.equals("star_technology");
+    }
+
+    public static boolean isGTRecipe(Object backing) {
+        return matchesGTRecipeShape(unwrapRecipe(backing));
     }
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
         if (backing == null && emiRecipeObj == null) return false;
+
+        if (backing != null) {
+            backing = unwrapRecipe(backing);
+        }
 
         ResourceLocation catId = null;
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             catId = EmiGTCEuHelper.getCategoryId(emiRecipeObj);
         }
 
-        boolean isGT = isGTRecipe(backing) || (catId != null && (catId.getNamespace().equals("gtceu") || catId.getNamespace().equals("start_core") || catId.getNamespace().equals("gtceu_start") || catId.getNamespace().equals("start")));
+        boolean isGT = isGTRecipe(backing) || (catId != null && isGTCategoryNamespace(catId.getNamespace()));
         if (!isGT && backing == null) return false;
 
         boolean isGTBoiler = false;
@@ -222,6 +249,8 @@ public class GTCEuRecipeHandler {
 
     public static void extractGTRecipeDetails(Object backing, EmiRecipeConverter.RecipeDetails details) {
         if (backing == null || details == null) return;
+
+        backing = unwrapRecipe(backing);
 
         double duration = extractDuration(backing);
         if (duration > 0.0) {
@@ -527,36 +556,91 @@ public class GTCEuRecipeHandler {
 
     public static Object unwrapRecipe(Object backing) {
         if (backing == null) return null;
+
         Object cur = backing;
-        for (int i = 0; i < 4 && cur != null; i++) {
-            if (cur.getClass().getName().contains("GTRecipe")) return cur;
-            Object next = null;
-            for (String mName : new String[]{"value", "getRecipe", "getGTRecipe", "recipe", "getBackingRecipe", "backingRecipe"}) {
-                try {
-                    Method m = cur.getClass().getMethod(mName);
-                    next = m.invoke(cur);
-                    if (next != null && next != cur) break;
-                } catch (Throwable ignored) {}
-            }
-            if (next == null) {
-                for (String fName : new String[]{"value", "recipe", "gtRecipe", "backingRecipe", "backing"}) {
-                    try {
-                        Field f = null;
-                        try { f = cur.getClass().getField(fName); } catch (Throwable ignored) {
-                            f = cur.getClass().getDeclaredField(fName);
-                            f.setAccessible(true);
-                        }
-                        if (f != null) {
-                            next = f.get(cur);
-                            if (next != null && next != cur) break;
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
+        java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (int i = 0; i < 8 && cur != null && visited.add(cur); i++) {
+            if (matchesGTRecipeShape(cur)) return cur;
+
+            Object next = readRecipeBackingField(cur);
             if (next == null || next == cur) break;
             cur = next;
         }
-        return cur;
+
+        return backing;
+    }
+
+    private static boolean matchesGTRecipeShape(Object candidate) {
+        if (candidate == null) return false;
+        return GT_SHAPE_CACHE.get(candidate.getClass());
+    }
+
+    private static boolean computeGTRecipeShape(Class<?> type) {
+        Class<?> cur = type;
+        while (cur != null && cur != Object.class) {
+            if (GT_RECIPE_CLASS_NAME.equals(cur.getName())) return true;
+            cur = cur.getSuperclass();
+        }
+
+        if (hasField(type, "recipeType")
+                && hasField(type, "duration")
+                && hasField(type, "inputs")
+                && hasField(type, "outputs")
+                && hasField(type, "tickInputs")
+                && hasField(type, "tickOutputs")) {
+            return true;
+        }
+
+        return hasDurationSignal(type) && hasEUtSignal(type);
+    }
+
+    private static boolean hasDurationSignal(Class<?> type) {
+        if (hasField(type, "duration") || hasField(type, "durationTicks")) return true;
+        for (String mName : DURATION_METHOD_NAMES) {
+            if (hasPublicMethod(type, mName)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasEUtSignal(Class<?> type) {
+        for (String mName : EUt_METHOD_NAMES) {
+            if (hasPublicMethod(type, mName)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasPublicMethod(Class<?> type, String methodName) {
+        try {
+            type.getMethod(methodName);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasField(Class<?> type, String fieldName) {
+        Class<?> cur = type;
+        while (cur != null && cur != Object.class) {
+            try {
+                cur.getDeclaredField(fieldName);
+                return true;
+            } catch (NoSuchFieldException ignored) {
+            } catch (Throwable ignored) {
+                break;
+            }
+            cur = cur.getSuperclass();
+        }
+        return false;
+    }
+
+    private static Object readRecipeBackingField(Object holder) {
+        for (Field field : BACKING_FIELDS_CACHE.get(holder.getClass())) {
+            try {
+                Object value = field.get(holder);
+                if (value != null && value != holder) return value;
+            } catch (Throwable ignored) {}
+        }
+        return null;
     }
 
     public static List<IngredientStack> extractGTRecipeContents(Object gtRecipe, String fieldName) {

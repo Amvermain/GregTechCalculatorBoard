@@ -77,7 +77,7 @@ public class JeiRecipeConverter {
         List<IngredientStack> inputs = new ArrayList<>();
         List<IngredientStack> outputs = new ArrayList<>();
 
-        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && ("gtceu".equals(catId.getNamespace()) || "start_core".equals(catId.getNamespace())));
+        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catId.getNamespace()));
         if (isGT) {
             List<IngredientStack> gtIns = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");

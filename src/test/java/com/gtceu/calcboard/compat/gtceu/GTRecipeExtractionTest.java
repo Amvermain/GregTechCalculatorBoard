@@ -15,7 +15,16 @@ import java.util.Map;
 
 public class GTRecipeExtractionTest {
 
-    public static class MockGTRecipe {
+    public static class StructuralGTRecipeFixture {
+        public final Object recipeType = new Object();
+        public final Map<Object, List<Object>> inputs = new HashMap<>();
+        public final Map<Object, List<Object>> outputs = new HashMap<>();
+        public final Map<Object, List<Object>> tickInputs = new HashMap<>();
+        public final Map<Object, List<Object>> tickOutputs = new HashMap<>();
+        public int duration;
+    }
+
+    public static class MockGTRecipe extends StructuralGTRecipeFixture {
         public int duration = 160;
         public CompoundTag data = new CompoundTag();
 
@@ -28,7 +37,7 @@ public class GTRecipeExtractionTest {
         }
     }
 
-    public static class MockGTGeneratorRecipe {
+    public static class MockGTGeneratorRecipe extends StructuralGTRecipeFixture {
         public long duration = 40L;
 
         public long getInputEUt() {
@@ -52,12 +61,63 @@ public class GTRecipeExtractionTest {
         }
     }
 
-    public static class MockMapEnergyRecipe {
-        public int duration = 100;
-        public Map<String, List<Object>> tickInputs = new HashMap<>();
+    public static class MockMapEnergyRecipe extends StructuralGTRecipeFixture {
 
         public MockMapEnergyRecipe() {
+            duration = 100;
             tickInputs.put("gtceu:eur_capability", List.of(65536L));
+        }
+    }
+
+    public static class MockEnergyContent {
+        private final Long content;
+
+        public MockEnergyContent(long content) {
+            this.content = content;
+        }
+
+        public Object getContent() {
+            return content;
+        }
+    }
+
+    public static class GTRecipeWrapperFixture {
+        public final Object recipe;
+
+        public GTRecipeWrapperFixture(Object recipe) {
+            this.recipe = recipe;
+        }
+    }
+
+    public static class PrivateBackingRecipeWrapperFixture {
+        private final Object backing;
+
+        public PrivateBackingRecipeWrapperFixture(Object backing) {
+            this.backing = backing;
+        }
+    }
+
+    public static class UnrelatedGTRecipeWrapperFixture {
+        public final Object recipe = new Object();
+
+        public long getInputEUt() {
+            throw new NoClassDefFoundError("optional/dependency/ShouldNotBeLoaded");
+        }
+    }
+
+    public static class ShadowedBackingBaseFixture {
+        public final Object recipe;
+
+        public ShadowedBackingBaseFixture(Object recipe) {
+            this.recipe = recipe;
+        }
+    }
+
+    public static class ShadowedBackingSubFixture extends ShadowedBackingBaseFixture {
+        public Object recipe = null;
+
+        public ShadowedBackingSubFixture(Object recipe) {
+            super(recipe);
         }
     }
 
@@ -140,6 +200,88 @@ public class GTRecipeExtractionTest {
         Assertions.assertEquals(65536.0, details.eut, 1e-6);
         Assertions.assertEquals(GTVoltageTier.ZPM, details.tier);
         Assertions.assertEquals(EnergyType.ELECTRIC_EU, details.energyType);
+    }
+
+    @Test
+    public void testUnwrapsJeiWrapperBeforeExtractingInputDetails() {
+        StructuralGTRecipeFixture recipe = new StructuralGTRecipeFixture();
+        recipe.duration = 120;
+        recipe.tickInputs.put("gtceu:eu_recipe_capability", List.of(new MockEnergyContent(8192L)));
+        GTRecipeWrapperFixture wrapper = new GTRecipeWrapperFixture(recipe);
+
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(recipe));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(wrapper));
+        Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
+        Assertions.assertNotSame(wrapper, GTCEuRecipeHandler.unwrapRecipe(wrapper), "JEI wrapper must not be treated as the recipe body");
+
+        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
+
+        Assertions.assertEquals(120.0, details.durationTicks, 1e-6);
+        Assertions.assertEquals(8192.0, details.eut, 1e-6);
+        Assertions.assertEquals(GTVoltageTier.IV, details.tier);
+        Assertions.assertEquals(EnergyType.ELECTRIC_EU, details.energyType);
+        Assertions.assertFalse(details.isGenerator);
+    }
+
+    @Test
+    public void testUnwrapsPrivateBackingFieldAndExtractsOutputDetails() {
+        StructuralGTRecipeFixture recipe = new StructuralGTRecipeFixture();
+        recipe.duration = 40;
+        recipe.tickOutputs.put("gtceu:eu_recipe_capability", List.of(new MockEnergyContent(2048L)));
+        PrivateBackingRecipeWrapperFixture wrapper = new PrivateBackingRecipeWrapperFixture(recipe);
+
+        Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
+
+        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
+
+        Assertions.assertEquals(40.0, details.durationTicks, 1e-6);
+        Assertions.assertEquals(2048.0, details.eut, 1e-6);
+        Assertions.assertEquals(GTVoltageTier.EV, details.tier);
+        Assertions.assertEquals(EnergyType.ELECTRIC_EU, details.energyType);
+        Assertions.assertTrue(details.isGenerator);
+    }
+
+    @Test
+    public void testUnrelatedRecipeIsNotAcceptedByNameOrEnergyMethod() {
+        UnrelatedGTRecipeWrapperFixture unrelated = new UnrelatedGTRecipeWrapperFixture();
+
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTRecipe(unrelated));
+        Assertions.assertSame(unrelated, GTCEuRecipeHandler.unwrapRecipe(unrelated));
+    }
+
+    @Test
+    public void testUnwrapsShadowedBackingFieldFromSuperclass() {
+        StructuralGTRecipeFixture recipe = new StructuralGTRecipeFixture();
+        recipe.duration = 90;
+        recipe.tickInputs.put("gtceu:eu_recipe_capability", List.of(new MockEnergyContent(128L)));
+        ShadowedBackingSubFixture wrapper = new ShadowedBackingSubFixture(recipe);
+
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(wrapper));
+        Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
+
+        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
+
+        Assertions.assertEquals(90.0, details.durationTicks, 1e-6);
+        Assertions.assertEquals(128.0, details.eut, 1e-6);
+        Assertions.assertEquals(GTVoltageTier.MV, details.tier);
+        Assertions.assertEquals(EnergyType.ELECTRIC_EU, details.energyType);
+    }
+
+    @Test
+    public void testGTCategoryNamespaceDetection() {
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("gtceu"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("start_core"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("gtceu_start"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("start"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("star_technology"));
+        Assertions.assertTrue(GTCEuRecipeHandler.isGTCategoryNamespace("GTCEU"));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace("minecraft"));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace("create"));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace(""));
+        Assertions.assertFalse(GTCEuRecipeHandler.isGTCategoryNamespace(null));
     }
 
     @Test

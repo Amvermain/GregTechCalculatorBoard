@@ -251,7 +251,7 @@ public class AddonCatalogView {
         if (catalogScroll > maxScroll) catalogScroll = maxScroll;
 
         int totalPages = Math.max(1, (int) Math.ceil((double) totalCards / (double) cardsPerPage));
-        int currentPage = (catalogScroll / visibleRows) + 1;
+        int currentPage = Math.min(totalPages, (int) Math.ceil((double) (catalogScroll + visibleRows) / (double) visibleRows));
 
         int navW = (totalPages > 1) ? 76 : 0;
         int pillSpace = 100;
@@ -355,11 +355,11 @@ public class AddonCatalogView {
 
             boolean hover = mouseX >= bx && mouseX <= bx + cardW && mouseY >= by && mouseY <= by + cardH;
             MachineAddon addon = filtered.get(cardIndex);
-            boolean isResetCard = "gtceu:standard_rotor".equals(addon.getId()) || "gtceu:reflector_none".equals(addon.getId());
+            boolean isResetCard = "gtceu:rotor_standard".equals(addon.getId()) || "gtceu:reflector_none".equals(addon.getId());
             int installedCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
             boolean isInstalled = !isResetCard && installedCount > 0;
             if (isResetCard) {
-                if ("gtceu:standard_rotor".equals(addon.getId()) && node.getAddons().stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)) {
+                if ("gtceu:rotor_standard".equals(addon.getId()) && node.getAddons().stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)) {
                     isInstalled = true;
                 } else if ("gtceu:reflector_none".equals(addon.getId()) && node.getAddons().stream().noneMatch(a -> a.getCategory() == MachineAddon.Category.REFLECTOR)) {
                     isInstalled = true;
@@ -434,7 +434,7 @@ public class AddonCatalogView {
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             adapter.buildAddonTooltip(node, hoveredAddon, false, tooltip);
 
-            boolean isReset = "gtceu:standard_rotor".equals(hoveredAddon.getId()) || "gtceu:reflector_none".equals(hoveredAddon.getId());
+            boolean isReset = "gtceu:rotor_standard".equals(hoveredAddon.getId()) || "gtceu:reflector_none".equals(hoveredAddon.getId());
             boolean isInst = !isReset && adapter.isAddonInstalled(node, hoveredAddon);
             if (hoveredAddon.getCategory() == MachineAddon.Category.HATCH_BUS) {
                 int maxSlots = getMaxHatchSlotsAllowed(node, hoveredAddon);
@@ -592,6 +592,7 @@ public class AddonCatalogView {
                         if (Screen.hasShiftDown()) {
                             int toAdd = Math.max(1, maxSlots - sameTypeTotal);
                             for (int k = 0; k < toAdd; k++) {
+                                if (!adapter.canInstallAddon(node, addon)) break;
                                 adapter.handleInstallAddon(node, addon, false);
                             }
                         } else if (sameTypeTotal < maxSlots) {

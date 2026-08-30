@@ -134,8 +134,7 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
-        String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
-        return ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
+        return GTCEuRecipeHandler.isGTCategoryNamespace(categoryId.getNamespace());
     }
 
     @Override
@@ -154,7 +153,7 @@ public class GTCEuModAdapter implements IModAdapter {
             if (ns.equals("minecraft") || ns.equals("emi")) {
                 return false;
             }
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
+            if (GTCEuRecipeHandler.isGTCategoryNamespace(ns)) {
                 return true;
             }
         }
@@ -163,16 +162,13 @@ public class GTCEuModAdapter implements IModAdapter {
             if (ns.equals("minecraft") || ns.equals("emi")) {
                 return false;
             }
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
+            if (GTCEuRecipeHandler.isGTCategoryNamespace(ns)) {
                 return true;
             }
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                String ns = ws.getNamespace().toLowerCase(Locale.ROOT);
-                if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
-                    return true;
-                }
+            if (ws != null && GTCEuRecipeHandler.isGTCategoryNamespace(ws.getNamespace())) {
+                return true;
             }
         }
         return node.getEnergyTypeOverride() == EnergyType.ELECTRIC_EU || (node.getEnergyTypeOverride() == null && node.getBaseEUt() > 0 && (node.getMachineIcon() == null || !node.getMachineIcon().getNamespace().equals("minecraft")));

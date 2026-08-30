@@ -264,7 +264,7 @@ public class ThreadingHelixView {
             statRowY += 22;
             if (mouseY >= statRowY + 2 && mouseY <= statRowY + 16) {
                 if (mouseX >= btnX && mouseX <= btnX + 16) {
-                    cfg.setAssignedThreading(Math.max(0, cfg.getAssignedThreading() - 5));
+                    cfg.setAssignedThreading(Math.max(0, cfg.getAssignedThreading() - 10));
                     return true;
                 }
                 if (mouseX >= btnX + 18 && mouseX <= btnX + 32) {
@@ -277,7 +277,7 @@ public class ThreadingHelixView {
                     return true;
                 }
                 if (mouseX >= btnX + 50 && mouseX <= btnX + 70) {
-                    int add = Math.min(5, cfg.getRemainingGeneral());
+                    int add = Math.min(10, cfg.getRemainingGeneral());
                     cfg.setAssignedThreading(cfg.getAssignedThreading() + add);
                     return true;
                 }

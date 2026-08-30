@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.compat.gtceu.GTRecipeExtractionTest;
 import com.gtceu.calcboard.integration.jei.JeiRecipeConverter;
 import com.gtceu.calcboard.integration.jei.JeiRecipeLayoutCollector;
 import com.gtceu.calcboard.integration.jei.JeiRecipeSearchIndexer;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @ExtendWith(MinecraftBootstrapExtension.class)
@@ -38,11 +40,11 @@ public class JeiRecipeIntegrationTest {
 
     private static class MockRecipeCategory<T> implements IRecipeCategory<T> {
         private final RecipeType<T> recipeType;
-        private final Component title;
+        private final String title;
 
         public MockRecipeCategory(RecipeType<T> recipeType, String title) {
             this.recipeType = recipeType;
-            this.title = Component.literal(title);
+            this.title = title;
         }
 
         @Override
@@ -52,7 +54,7 @@ public class JeiRecipeIntegrationTest {
 
         @Override
         public Component getTitle() {
-            return title;
+            return Component.literal(title);
         }
 
         @Override
@@ -89,6 +91,9 @@ public class JeiRecipeIntegrationTest {
                     builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(in);
                 }
                 builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(sr.getResultItem(null));
+            } else if (recipe instanceof GTRecipeExtractionTest.GTRecipeWrapperFixture) {
+                builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_INGOT, 1));
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_NUGGET, 1));
             }
         }
 
@@ -192,6 +197,49 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertEquals(9.0, node.getInputs().get(0).getAmount(), 0.001);
         Assertions.assertEquals("minecraft:iron_block", node.getOutputs().get(0).getId().toString());
         Assertions.assertEquals(1.0, node.getOutputs().get(0).getAmount(), 0.001);
+    }
+
+    @Test
+    public void testGTCEuJeiWrapperPreservesDetailsAndDerivedSpeed() {
+        GTRecipeExtractionTest.StructuralGTRecipeFixture recipe = new GTRecipeExtractionTest.StructuralGTRecipeFixture();
+        recipe.duration = 100;
+        recipe.tickInputs.put("gtceu:eu_recipe_capability", List.of(new GTRecipeExtractionTest.MockEnergyContent(128L)));
+        GTRecipeExtractionTest.GTRecipeWrapperFixture wrapper = new GTRecipeExtractionTest.GTRecipeWrapperFixture(recipe);
+
+        RecipeType<GTRecipeExtractionTest.GTRecipeWrapperFixture> recipeType = RecipeType.create(
+                "gtceu", "assembler", GTRecipeExtractionTest.GTRecipeWrapperFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.GTRecipeWrapperFixture> category = new MockRecipeCategory<>(recipeType, "Assembler");
+
+        RecipeNode node = JeiRecipeConverter.convert(category, wrapper);
+
+        Assertions.assertNotNull(node);
+        Assertions.assertEquals(100.0, node.getBaseDurationTicks(), 1e-6);
+        Assertions.assertEquals(128.0, node.getBaseEUt(), 1e-6);
+        Assertions.assertEquals(GTVoltageTier.MV, node.getRecipeTier());
+        Assertions.assertEquals(GTVoltageTier.MV, node.getTargetTier());
+        Assertions.assertEquals(5.0, node.getEffectiveDurationSeconds(), 1e-6);
+        Assertions.assertEquals(0.2, node.getCyclesPerSecond(), 1e-6);
+        Assertions.assertEquals(1, node.getInputs().size());
+        Assertions.assertEquals(1, node.getOutputs().size());
+    }
+
+    @Test
+    public void testStarTechnologyCategoryMethodOnlyRecipePreservesDetails() {
+        GTRecipeExtractionTest.BacterialHarvestingCustomRecipe recipe = new GTRecipeExtractionTest.BacterialHarvestingCustomRecipe();
+        GTRecipeExtractionTest.GTRecipeWrapperFixture wrapper = new GTRecipeExtractionTest.GTRecipeWrapperFixture(recipe);
+
+        RecipeType<GTRecipeExtractionTest.GTRecipeWrapperFixture> recipeType = RecipeType.create(
+                "star_technology", "bacterial_harvesting", GTRecipeExtractionTest.GTRecipeWrapperFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.GTRecipeWrapperFixture> category = new MockRecipeCategory<>(recipeType, "Bacterial Harvesting");
+
+        RecipeNode node = JeiRecipeConverter.convert(category, wrapper);
+
+        Assertions.assertNotNull(node);
+        Assertions.assertEquals(160.0, node.getBaseDurationTicks(), 1e-6);
+        Assertions.assertEquals(65536.0, node.getBaseEUt(), 1e-6);
+        Assertions.assertEquals(GTVoltageTier.ZPM, node.getRecipeTier());
+        Assertions.assertEquals(1, node.getInputs().size());
+        Assertions.assertEquals(1, node.getOutputs().size());
     }
 
     @Test
