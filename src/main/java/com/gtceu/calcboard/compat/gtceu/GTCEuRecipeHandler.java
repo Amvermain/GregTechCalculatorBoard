@@ -772,6 +772,17 @@ public class GTCEuRecipeHandler {
         return result;
     }
 
+    private static String formatFallbackName(ResourceLocation id) {
+        String path = id.getPath();
+        StringBuilder sb = new StringBuilder();
+        for (String part : path.split("_")) {
+            if (part.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return sb.length() > 0 ? sb.toString() : path;
+    }
+
     private static IngredientStack parseGTContent(Object contentObj, boolean isFluid) {
         if (contentObj == null) return null;
         try {
@@ -817,7 +828,7 @@ public class GTCEuRecipeHandler {
                     if (val instanceof Number n) chance = n.doubleValue();
                 }
             } catch (Throwable ignored) {
-                for (String mName : new String[]{"chance", "getChance", "chancePercent"}) {
+                for (String mName : new String[]{"chance", "getChance"}) {
                     try {
                         Method m = contentObj.getClass().getMethod(mName);
                         Object val = m.invoke(contentObj);
@@ -884,6 +895,15 @@ public class GTCEuRecipeHandler {
                         amount = ((Number) getAmountMethod.invoke(inner)).longValue();
                     } catch (Throwable ignored) {}
                     is = IngredientStack.item(id, name, amount, (float) chance);
+                    for (int i = 1; i < items.length; i++) {
+                        ItemStack alt = items[i];
+                        if (alt != null && !alt.isEmpty()) {
+                            ResourceLocation altId = ForgeRegistries.ITEMS.getKey(alt.getItem());
+                            if (altId != null && !is.getAlternatives().contains(altId)) {
+                                is.getAlternatives().add(altId);
+                            }
+                        }
+                    }
                 }
             } else if (inner != null && inner.getClass().getName().contains("FluidIngredient")) {
                 try {
@@ -892,8 +912,54 @@ public class GTCEuRecipeHandler {
                     if (res instanceof net.minecraftforge.fluids.FluidStack[] fArray && fArray.length > 0) {
                         net.minecraftforge.fluids.FluidStack first = fArray[0];
                         ResourceLocation id = ForgeRegistries.FLUIDS.getKey(first.getFluid());
-                        String name = first.getDisplayName().getString();
+                        String name = "";
+                        try {
+                            name = first.getDisplayName().getString();
+                        } catch (Throwable ignored) {}
+                        if (name.isEmpty() && id != null) {
+                            name = formatFallbackName(id);
+                        }
                         is = IngredientStack.fluid(id, name, first.getAmount(), (float) chance);
+                        for (int i = 1; i < fArray.length; i++) {
+                            net.minecraftforge.fluids.FluidStack alt = fArray[i];
+                            if (alt != null && !alt.isEmpty()) {
+                                ResourceLocation altId = ForgeRegistries.FLUIDS.getKey(alt.getFluid());
+                                if (altId != null && !is.getAlternatives().contains(altId)) {
+                                    is.getAlternatives().add(altId);
+                                }
+                            }
+                        }
+                    } else if (res instanceof Object[] ldArray && ldArray.length > 0 && hasPublicMethod(ldArray[0].getClass(), "getFluid")) {
+                        Object first = ldArray[0];
+                        net.minecraft.world.level.material.Fluid fluid = (net.minecraft.world.level.material.Fluid)
+                                first.getClass().getMethod("getFluid").invoke(first);
+                        ResourceLocation id = fluid != null ? ForgeRegistries.FLUIDS.getKey(fluid) : null;
+                        long amount = 1;
+                        try {
+                            amount = ((Number) first.getClass().getMethod("getAmount").invoke(first)).longValue();
+                        } catch (Throwable ignored) {}
+                        String name = "";
+                        try {
+                            name = ((net.minecraft.network.chat.Component) first.getClass().getMethod("getDisplayName").invoke(first)).getString();
+                        } catch (Throwable ignored) {}
+                        if (name.isEmpty() && id != null) {
+                            name = formatFallbackName(id);
+                        }
+                        if (id != null) {
+                            is = IngredientStack.fluid(id, name, amount, (float) chance);
+                            for (int i = 1; i < ldArray.length; i++) {
+                                Object alt = ldArray[i];
+                                if (alt == null) continue;
+                                try {
+                                    net.minecraft.world.level.material.Fluid altFluid = (net.minecraft.world.level.material.Fluid)
+                                            alt.getClass().getMethod("getFluid").invoke(alt);
+                                    ResourceLocation altId = altFluid != null ? ForgeRegistries.FLUIDS.getKey(altFluid) : null;
+                                    if (altId != null && !is.getAlternatives().contains(altId)) {
+                                        is.getAlternatives().add(altId);
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                        }
                     }
                 } catch (Throwable ignored) {}
             } else if (inner instanceof IngredientStack existing) {

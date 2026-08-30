@@ -567,6 +567,7 @@ public class NodeWidget {
                 }
             }
             if (in.hasAlternatives()) {
+                net.minecraft.resources.ResourceLocation oldAlt = in.getId();
                 in.cycleAlternative(delta > 0 ? -1 : 1);
                 if (in.isFluid()) {
                     if (com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
@@ -575,6 +576,11 @@ public class NodeWidget {
                 }
                 invalidateCache();
                 if (parent != null) {
+                    net.minecraft.resources.ResourceLocation newAlt = in.getId();
+                    if (oldAlt != null && !oldAlt.equals(newAlt)) {
+                        parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
+                                node.getId(), inIdx, true, oldAlt, newAlt));
+                    }
                     parent.getGraph().cleanupInvalidConnections();
                     parent.markSummaryDirty();
                 }
