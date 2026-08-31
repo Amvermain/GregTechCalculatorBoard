@@ -319,6 +319,50 @@ public class NodeWidget {
         return -1;
     }
 
+    public double[] getPortBounds(boolean isInput, int index) {
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int cardW = getWidth();
+        if (node.isReroute()) {
+            boolean isFlipped = node.isFlipped();
+            if (isInput) {
+                int minX = isFlipped ? (x + 22) : (x - 4);
+                int maxX = isFlipped ? (x + 36) : (x + 10);
+                return new double[]{minX, y + 6, maxX, y + 26};
+            } else {
+                int minX = isFlipped ? (x - 4) : (x + 22);
+                int maxX = isFlipped ? (x + 10) : (x + 36);
+                return new double[]{minX, y + 6, maxX, y + 26};
+            }
+        }
+        int contentY = getContentStartY();
+        boolean isFlipped = node.isFlipped();
+        boolean hasBoth = !node.getInputs().isEmpty() && !node.getOutputs().isEmpty();
+        int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
+
+        if (isInput) {
+            List<Integer> visInputs = node.getVisibleInputIndices();
+            int r = visInputs.indexOf(index);
+            if (r < 0) return null;
+            int rowY = contentY + r * 18;
+            int startX = (!isFlipped || !hasBoth) ? (x + 2) : (x + (cardW / 2) + 2);
+            return new double[]{startX, rowY - 2, startX + slotW, rowY + 16};
+        } else {
+            List<Integer> visOutputs = node.getVisibleOutputIndices();
+            int r = visOutputs.indexOf(index);
+            if (r < 0) return null;
+            int rowY = contentY + r * 18;
+            int startX = (isFlipped || !hasBoth) ? (x + 2) : (x + (cardW / 2) + 2);
+            return new double[]{startX, rowY - 2, startX + slotW, rowY + 16};
+        }
+    }
+
+    public boolean isPortOverlapping(boolean isInput, int index, double minX, double minY, double maxX, double maxY) {
+        double[] b = getPortBounds(isInput, index);
+        if (b == null) return false;
+        return (b[0] < maxX && b[2] > minX && b[1] < maxY && b[3] > minY);
+    }
+
     public boolean isHiddenPortsBadgeHovered(double canvasMouseX, double canvasMouseY) {
         if (node.isReroute() || node.getTotalHiddenCount() <= 0) return false;
         int x = (int) node.getPosX();
@@ -492,6 +536,7 @@ public class NodeWidget {
                     if (isVanillaCooking) {
                         node.setSteamMode(SteamMode.NONE);
                         node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
+                        syncSharedFrameHardware(node);
                         if (parent != null) parent.markSummaryDirty();
                         invalidateCache();
                         return true;
@@ -509,11 +554,13 @@ public class NodeWidget {
                     } else if (isVanillaCooking) {
                         node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
                     }
+                    syncSharedFrameHardware(node);
                     if (parent != null) parent.markSummaryDirty();
                     invalidateCache();
                     return true;
                 } else if (direction < 0) {
                     node.setSteamMode(SteamMode.LOW_PRESSURE);
+                    syncSharedFrameHardware(node);
                     if (parent != null) parent.markSummaryDirty();
                     invalidateCache();
                     return true;
@@ -533,6 +580,7 @@ public class NodeWidget {
                                 node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
                             }
                         }
+                        syncSharedFrameHardware(node);
                         if (parent != null) parent.markSummaryDirty();
                         invalidateCache();
                         return true;
@@ -546,11 +594,13 @@ public class NodeWidget {
                     if (curIdx <= lowestAllowedElectric) {
                         if (node.supportsSteamMode()) {
                             node.setSteamMode(SteamMode.HIGH_PRESSURE);
+                            syncSharedFrameHardware(node);
                             if (parent != null) parent.markSummaryDirty();
                             invalidateCache();
                             return true;
                         } else if (isVanillaCooking) {
                             node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
+                            syncSharedFrameHardware(node);
                             if (parent != null) parent.markSummaryDirty();
                             invalidateCache();
                             return true;
@@ -567,6 +617,7 @@ public class NodeWidget {
                 if (sbWs != null) {
                     node.setMachineIcon(sbWs);
                 }
+                syncSharedFrameHardware(node);
                 if (parent != null) parent.markSummaryDirty();
                 invalidateCache();
                 return true;
@@ -580,6 +631,7 @@ public class NodeWidget {
         if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
             if (node.hasMultiblockOption()) {
                 node.setMultiblock(true);
+                syncSharedFrameHardware(node);
                 if (parent != null) parent.markSummaryDirty();
                 invalidateCache();
                 return true;
@@ -601,12 +653,23 @@ public class NodeWidget {
             }
         }
         com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
+        syncSharedFrameHardware(node);
         if (parent != null) {
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
             parent.markSummaryDirty();
         }
         invalidateCache();
         return true;
+    }
+
+    private void syncSharedFrameHardware(RecipeNode node) {
+        if (parent != null && parent.getGraph() != null) {
+            var frame = parent.getGraph().findFrameEnclosingNode(node);
+            if (frame != null && frame.isSharedMachineFrame()) {
+                frame.syncHardwareConfig(node, parent.getGraph());
+                parent.rebuildWidgets();
+            }
+        }
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
@@ -818,7 +881,8 @@ public class NodeWidget {
         if (mouseX >= countMinusX && mouseX <= countMinusX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
-            double newVal = Math.max(1.0, oldVal - 1);
+            double step = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0.1 : (oldVal <= 1.0 ? 0.05 : 1.0);
+            double newVal = Math.max(0.01, Math.round((oldVal - step) * 1000.0) / 1000.0);
             if (oldVal != newVal) {
                 node.setMachineCount(newVal);
                 parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
@@ -871,7 +935,8 @@ public class NodeWidget {
         if (mouseX >= afterCountX && mouseX <= afterCountX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
-            double newVal = oldVal + 1;
+            double step = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0.1 : (oldVal < 1.0 ? 0.05 : 1.0);
+            double newVal = Math.round((oldVal + step) * 1000.0) / 1000.0;
             node.setMachineCount(newVal);
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
             if (node.isCompoundNode()) {
@@ -888,7 +953,7 @@ public class NodeWidget {
         if (mouseX >= afterCountX + 16 && mouseX <= afterCountX + 32 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
-            double newVal = Math.max(1.0, Math.floor(oldVal / 2.0));
+            double newVal = Math.max(0.01, Math.round((oldVal / 2.0) * 1000.0) / 1000.0);
             if (oldVal != newVal) {
                 node.setMachineCount(newVal);
                 parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
@@ -907,7 +972,7 @@ public class NodeWidget {
         if (mouseX >= afterCountX + 34 && mouseX <= afterCountX + 50 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
-            double newVal = oldVal * 2.0;
+            double newVal = Math.round((oldVal * 2.0) * 1000.0) / 1000.0;
             node.setMachineCount(newVal);
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
             if (node.isCompoundNode()) {

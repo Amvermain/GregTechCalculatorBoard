@@ -154,6 +154,9 @@ public final class BoardHotkeyHandler {
                     screen.createFrameFromSelection();
                 }
                 return true;
+            } else if (keyCode == GLFW.GLFW_KEY_S && shift) {
+                screen.createSharedMachineFrameFromSelection();
+                return true;
             }
         }
 

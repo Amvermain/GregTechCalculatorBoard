@@ -57,7 +57,9 @@ public class VanillaRecipeViewerAdapter implements IRecipeViewerAdapter {
     @Override
     public RecipeNode convertToNode(Object viewerRecipe) {
         if (viewerRecipe instanceof RecipeNode rn) {
-            return rn.copy();
+            RecipeNode copy = rn.copy();
+            com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(copy);
+            return copy;
         }
         return null;
     }

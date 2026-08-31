@@ -6,6 +6,7 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.NodeRateCalculator;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTBoilerTier;
@@ -461,6 +462,61 @@ public class GTCEuSteamProcessingTest {
         macerator.setSteamMode(SteamMode.HIGH_PRESSURE);
         assertEquals(0.0, macerator.getEffectiveOutputChance(1), 0.001);
         assertEquals(0.0, macerator.getOutputSlotRate(1, false), 0.001);
+    }
+
+    @Test
+    void testMultiProductMaceratorByproductTierGating() {
+        // Recipe: 2 Plant Ball -> 1 Bio Chaff (100%), 1 Bio Chaff (100%), 1 Bio Chaff (50%, +5%/tier), 1 Bio Chaff (25%, +2.5%/tier), 1 Stone Dust (10%, +1%/tier)
+        RecipeNode macerator = RecipeNode.create("Plant Ball Macerating", 200.0, 4.0, GTVoltageTier.ULV);
+        macerator.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:macerator"));
+        macerator.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:plant_ball"), "Plant Ball", 2.0));
+
+        IngredientStack bioChaff1 = IngredientStack.item(ResourceLocation.tryParse("gtceu:bio_chaff"), "Bio Chaff", 1.0, 1.0);
+        IngredientStack bioChaff2 = IngredientStack.item(ResourceLocation.tryParse("gtceu:bio_chaff"), "Bio Chaff", 1.0, 1.0);
+        IngredientStack bioChaff3 = IngredientStack.item(ResourceLocation.tryParse("gtceu:bio_chaff"), "Bio Chaff", 1.0, 0.50);
+        bioChaff3.setTierChanceBoost(0.05);
+        IngredientStack bioChaff4 = IngredientStack.item(ResourceLocation.tryParse("gtceu:bio_chaff"), "Bio Chaff", 1.0, 0.25);
+        bioChaff4.setTierChanceBoost(0.025);
+        IngredientStack stoneDust = IngredientStack.item(ResourceLocation.tryParse("gtceu:stone_dust"), "Stone Dust", 1.0, 0.10);
+        stoneDust.setTierChanceBoost(0.01);
+
+        macerator.getOutputs().add(bioChaff1);
+        macerator.getOutputs().add(bioChaff2);
+        macerator.getOutputs().add(bioChaff3);
+        macerator.getOutputs().add(bioChaff4);
+        macerator.getOutputs().add(stoneDust);
+
+        // 1. At MV (below HV): only the primary output (Slot 0) is active (1.0). ALL secondary outputs (Slot 1..4) are 0% (Requires HV+)
+        macerator.setTargetTier(GTVoltageTier.MV);
+        assertEquals(1.0, macerator.getEffectiveOutputChance(0), 0.001, "Slot 0 (primary output) must be 1.0 at MV");
+        assertEquals(0.0, macerator.getEffectiveOutputChance(1), 0.001, "Slot 1 (1st byproduct) must be 0.0 at MV (Requires HV+)");
+        assertEquals(0.0, macerator.getEffectiveOutputChance(2), 0.001, "Slot 2 (2nd byproduct) must be 0.0 at MV (Requires HV+)");
+        assertEquals(0.0, macerator.getEffectiveOutputChance(3), 0.001, "Slot 3 (3rd byproduct) must be 0.0 at MV (Requires HV+)");
+        assertEquals(0.0, macerator.getEffectiveOutputChance(4), 0.001, "Slot 4 (4th byproduct) must be 0.0 at MV (Requires HV+)");
+
+        // 2. At HV: all byproducts (Slot 1..4) unlock at their base chances
+        macerator.setTargetTier(GTVoltageTier.HV);
+        assertEquals(1.0, macerator.getEffectiveOutputChance(0), 0.001);
+        assertEquals(1.0, macerator.getEffectiveOutputChance(1), 0.001, "Slot 1 unlocks at 100% at HV");
+        assertEquals(0.50, macerator.getEffectiveOutputChance(2), 0.001, "Slot 2 unlocks at base 50% at HV");
+        assertEquals(0.25, macerator.getEffectiveOutputChance(3), 0.001, "Slot 3 unlocks at base 25% at HV");
+        assertEquals(0.10, macerator.getEffectiveOutputChance(4), 0.001, "Slot 4 unlocks at base 10% at HV");
+
+        // 3. At EV (HV + 1): all byproducts get boosted
+        macerator.setTargetTier(GTVoltageTier.EV);
+        assertEquals(1.0, macerator.getEffectiveOutputChance(0), 0.001);
+        assertEquals(1.0, macerator.getEffectiveOutputChance(1), 0.001);
+        assertEquals(0.55, macerator.getEffectiveOutputChance(2), 0.001, "Slot 2 boosted to 55% at EV");
+        assertEquals(0.275, macerator.getEffectiveOutputChance(3), 0.001, "Slot 3 boosted to 27.5% at EV");
+        assertEquals(0.11, macerator.getEffectiveOutputChance(4), 0.001, "Slot 4 boosted to 11% at EV");
+
+        // 4. Effective output rates integration check
+        var rates = NodeRateCalculator.calculateEffectiveOutputRates(macerator);
+        double totalBioChaffRate = rates.entrySet().stream()
+                .filter(e -> e.getKey().getDisplayName().equals("Bio Chaff"))
+                .mapToDouble(java.util.Map.Entry::getValue)
+                .sum();
+        assertTrue(totalBioChaffRate > 0.0);
     }
 
     @Test

@@ -388,6 +388,30 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
+    public com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster buildCompoundRecipe(
+            Object recipeObj,
+            Object backingRecipe,
+            ResourceLocation preferredWorkstation,
+            double startX,
+            double startY
+    ) {
+        if (backingRecipe == null) return null;
+
+        String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Machine";
+        ResourceLocation icon = preferredWorkstation;
+
+        if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backingRecipe)) {
+            EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+            GTCEuRecipeHandler.extractGTRecipeDetails(backingRecipe, details);
+            return GTCEuLayeredRecipeExtractor.buildCompoundCluster(
+                    backingRecipe, machineName, icon, details.tier, startX, startY
+            );
+        }
+
+        return null;
+    }
+
+    @Override
     public double computeSingleMachinePower(RecipeNode node) {
         return GTPowerCalculator.computeSingleMachinePower(node);
     }
@@ -619,7 +643,15 @@ public class GTCEuModAdapter implements IModAdapter {
         }
 
         if (catId != null && "gtceu".equals(catId.getNamespace())) {
-            return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + catId.getPath());
+            String cPath = catId.getPath();
+            for (GTVoltageTier t : GTVoltageTier.values()) {
+                String prefix = t.name().toLowerCase(Locale.ROOT) + "_";
+                if (cPath.startsWith(prefix)) {
+                    cPath = cPath.substring(prefix.length());
+                    break;
+                }
+            }
+            return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + cPath);
         }
 
         return null;

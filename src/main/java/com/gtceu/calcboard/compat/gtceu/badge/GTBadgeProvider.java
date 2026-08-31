@@ -8,7 +8,7 @@ import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.api.util.NumberFormatUtil;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.network.chat.Component;
@@ -55,11 +55,11 @@ public final class GTBadgeProvider {
             NodeBadge tierBadge = new NodeBadge(tierBadgeText, 0xFFFFFFFF, 0xEE3D1B5E, 0xFFCC44FF, tierTooltip);
 
             if (startEU > 0) {
-                String startText = "⚡ " + FormatUtil.formatCompactNumber(startEU) + " EU";
+                String startText = "⚡ " + NumberFormatUtil.formatCompactNumber(startEU) + " EU";
                 List<Component> startTooltip = List.of(
                         Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()),
                         Component.literal(String.format(Locale.ROOT, "§7Required Ignition Energy: §e%,d EU", startEU)),
-                        Component.literal(String.format(Locale.ROOT, "§7Formatted: §f%s EU", FormatUtil.formatCompactNumber(startEU)))
+                        Component.literal(String.format(Locale.ROOT, "§7Formatted: §f%s EU", NumberFormatUtil.formatCompactNumber(startEU)))
                 );
                 NodeBadge startBadge = new NodeBadge(startText, 0xFFFFAA00, 0xEE3D2B1E, 0xFFFFAA00, startTooltip);
                 return List.of(tierBadge, startBadge);

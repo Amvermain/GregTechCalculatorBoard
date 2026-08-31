@@ -282,6 +282,9 @@ public class EmiRecipeConverter {
             }
         }
         node.autoCalculateTurbineParallel();
+        if (preferredWorkstation == null) {
+            com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
+        }
         return node;
     }
 

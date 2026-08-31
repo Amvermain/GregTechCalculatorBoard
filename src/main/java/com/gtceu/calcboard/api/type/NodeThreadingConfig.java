@@ -5,6 +5,9 @@ import com.google.gson.JsonObject;
 import java.util.EnumMap;
 import java.util.Map;
 
+/**
+ * Configuration model for Star Technology threading helices and stats assignment on multiblock nodes.
+ */
 public class NodeThreadingConfig {
     private final Map<GTThreadingHelix, Integer> helixCounts = new EnumMap<>(GTThreadingHelix.class);
     private int maxHelixCapacity = 0;

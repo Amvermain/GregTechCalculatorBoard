@@ -14,6 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -427,5 +428,65 @@ public class CompoundNodeTest {
         Assertions.assertEquals(origN2Y + dy, n2.getPosY(), 0.001);
         Assertions.assertEquals(origFrameX + dx, frame.getPosX(), 0.001);
         Assertions.assertEquals(origFrameY + dy, frame.getPosY(), 0.001);
+    }
+
+    @Test
+    public void testStargateComponentAssemblyCluster() {
+        // 7 slices corresponding to Columns I to VII from Star Technology
+        List<CompoundRecipeBuilder.LayerSpec> layers = new ArrayList<>();
+        for (int i = 1; i <= 7; i++) {
+            String roman = CompoundRecipeBuilder.formatRoman(i);
+            List<IngredientStack> layerInputs = List.of(
+                    IngredientStack.item(ResourceLocation.tryParse("gtceu:rune_" + i), "Rune " + i, 6.0),
+                    IngredientStack.item(ResourceLocation.tryParse("gtceu:sub_rune_" + i), "Sub Rune " + i, 4.0),
+                    IngredientStack.item(ResourceLocation.tryParse("gtceu:ingot_" + i), "Ingot " + i, 4.0),
+                    IngredientStack.item(ResourceLocation.tryParse("gtceu:plate_" + i), "Plate " + i, 2.0),
+                    IngredientStack.fluid(ResourceLocation.tryParse(i % 2 == 1 ? "gtceu:dark_fluid" : "gtceu:pink_fluid"), "Fluid " + i, 100000.0)
+            );
+            List<IngredientStack> layerOutputs = (i == 7)
+                    ? List.of(IngredientStack.item(ResourceLocation.tryParse("sgjourney:stargate_ring_block"), "Stargate Ring Block", 1.0))
+                    : List.of();
+
+            layers.add(new CompoundRecipeBuilder.LayerSpec(
+                    "Layer " + roman,
+                    8400.0, // 420s
+                    62914560.0, // 62.91M EU/t
+                    layerInputs,
+                    layerOutputs
+            ));
+        }
+
+        CompoundRecipeBuilder.CompoundCluster cluster = CompoundRecipeBuilder.build(
+                "Stargate Component Assembly",
+                ResourceLocation.tryParse("sgjourney:stargate_ring_block"),
+                8400.0,
+                62914560.0,
+                GTVoltageTier.UXV,
+                layers,
+                100,
+                100
+        );
+
+        Assertions.assertEquals(7, cluster.nodes().size(), "Must generate exactly 7 Layer nodes");
+        Assertions.assertNotNull(cluster.frame(), "Must generate a compound frame");
+        Assertions.assertTrue(cluster.frame().isCompoundFrame());
+        Assertions.assertEquals("🧩 Stargate Component Assembly (7-Layer)", cluster.frame().getTitle());
+
+        for (int i = 0; i < 7; i++) {
+            RecipeNode node = cluster.nodes().get(i);
+            String roman = CompoundRecipeBuilder.formatRoman(i + 1);
+            Assertions.assertEquals("Stargate Component Assembly (Layer " + roman + ")", node.getName());
+            Assertions.assertEquals(i, node.getCompoundLayerIndex());
+            Assertions.assertEquals(7, node.getCompoundTotalLayers());
+            Assertions.assertEquals(GTVoltageTier.UXV, node.getRecipeTier());
+            Assertions.assertEquals(8400.0, node.getBaseDurationTicks());
+            Assertions.assertEquals(62914560.0, node.getBaseEUt());
+            Assertions.assertEquals(5, node.getInputs().size());
+            if (i < 6) {
+                Assertions.assertTrue(node.getOutputs().isEmpty());
+            } else {
+                Assertions.assertEquals(1, node.getOutputs().size());
+            }
+        }
     }
 }

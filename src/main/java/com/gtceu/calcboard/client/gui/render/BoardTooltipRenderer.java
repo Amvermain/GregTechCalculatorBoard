@@ -222,15 +222,17 @@ public final class BoardTooltipRenderer {
                         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_final").getString()));
                     }
 
-                    if (out.getChance() < 1.0) {
-                        RecipeNode node = widget.getNode();
-                        double effChance = node != null ? node.getEffectiveOutputChance(outIdx) : out.getChance();
+                    RecipeNode node = widget.getNode();
+                    double effChance = node != null ? node.getEffectiveOutputChance(outIdx) : out.getChance();
+                    if (effChance < 1.0 || out.getChance() < 1.0) {
                         if (effChance <= 0.0) {
                             if (node != null && node.getSteamMode().isSteam()) {
                                 tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Steam Mode: No Byproducts)"));
                             } else if (node != null && node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
-                                String reqTierName = outIdx == 1 ? "HV" : (outIdx == 2 ? "EV" : "IV");
-                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Requires " + reqTierName + "+)"));
+                                com.gtceu.calcboard.api.type.GTVoltageTier reqTier = (node.getRecipeTier() != null && node.getRecipeTier().ordinal() > com.gtceu.calcboard.api.type.GTVoltageTier.HV.ordinal())
+                                        ? node.getRecipeTier()
+                                        : com.gtceu.calcboard.api.type.GTVoltageTier.HV;
+                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Requires " + reqTier.getName() + "+)"));
                             } else {
                                 tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0%"));
                             }

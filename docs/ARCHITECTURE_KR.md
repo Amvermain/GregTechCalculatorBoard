@@ -26,16 +26,17 @@ graph TD
         WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E))"]
         Widgets["widget.* (NodeWidget, HiddenPortsPopup, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
         Editors["editor.* (InlineTextEditor 엔진, NodeCountEditor, NodeNameEditor, NodeParallelEditor, NodeTargetBatchEditor)"]
-        Dialogs["dialog.* (MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
     end
 
     subgraph Core["2. 코어 수학 & 도메인 엔진 (com.gtceu.calcboard.api)"]
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec)"]
+        Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
         Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, NodeRateCalculator, NodeWorkstationResolver)"]
         Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset)"]
         Prop["property.* (NodeProperties, NodePropertyStore)"]
     end
 

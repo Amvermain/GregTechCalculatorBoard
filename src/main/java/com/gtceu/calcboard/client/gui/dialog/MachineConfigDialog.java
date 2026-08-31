@@ -11,13 +11,20 @@ import com.gtceu.calcboard.client.gui.dialog.config.ActiveAddonsView;
 import com.gtceu.calcboard.client.gui.dialog.config.AddonCatalogView;
 import com.gtceu.calcboard.client.gui.dialog.config.CustomAddonBuilderView;
 import com.gtceu.calcboard.client.gui.dialog.config.ThreadingHelixView;
+import com.gtceu.calcboard.api.preset.CategoryMachinePreset;
+import com.gtceu.calcboard.api.preset.CategoryMachinePresetManager;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
@@ -106,12 +113,19 @@ public class MachineConfigDialog {
         this.deferredTooltip = tooltip;
     }
 
+    private Runnable onCloseCallback = null;
+
     public void open(RecipeNode node) {
-        open(node, null);
+        open(node, null, null);
     }
 
     public void open(RecipeNode node, AddonCategory initialCategory) {
+        open(node, initialCategory, null);
+    }
+
+    public void open(RecipeNode node, AddonCategory initialCategory, Runnable onCloseCallback) {
         this.node = node;
+        this.onCloseCallback = onCloseCallback;
         this.visible = true;
         if (initialCategory != null) {
             this.selectedCategory = initialCategory;
@@ -152,6 +166,12 @@ public class MachineConfigDialog {
 
     public void close() {
         this.visible = false;
+        if (onCloseCallback != null) {
+            try {
+                onCloseCallback.run();
+            } catch (Throwable ignored) {}
+            this.onCloseCallback = null;
+        }
         if (parent != null) {
             parent.markSummaryDirty();
         }
@@ -318,8 +338,47 @@ public class MachineConfigDialog {
         String switchText = "§b🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.short_btn").getString();
         graphics.drawCenteredString(font, font.plainSubstrByWidth(switchText, switchBtnW - 4), switchBtnX + switchBtnW / 2, y + 7, 0xFFFFFFFF);
 
+        // Category Machine Default Preset Button
+        ResourceLocation catId = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId() : node.getMachineIcon();
+        boolean hasPreset = (catId != null && CategoryMachinePresetManager.getInstance().hasPreset(catId));
+        int presetBtnW = 68;
+        int presetBtnH = 16;
+        int presetBtnX = switchBtnX - presetBtnW - 4;
+        boolean presetHover = virtualMouseX >= presetBtnX && virtualMouseX <= presetBtnX + presetBtnW && virtualMouseY >= y + 3 && virtualMouseY <= y + 3 + presetBtnH;
+
+        if (hasPreset) {
+            graphics.fill(presetBtnX, y + 3, presetBtnX + presetBtnW, y + 3 + presetBtnH, presetHover ? 0xFF554415 : 0xFF382C0E);
+            graphics.renderOutline(presetBtnX, y + 3, presetBtnW, presetBtnH, presetHover ? 0xFFFFD700 : 0xFFB8860B);
+            String presetText = "§e★ " + Component.translatable("gui.gtcalcboard.config.preset.active").getString();
+            graphics.drawCenteredString(font, font.plainSubstrByWidth(presetText, presetBtnW - 4), presetBtnX + presetBtnW / 2, y + 7, 0xFFFFFFFF);
+            if (presetHover) {
+                this.deferredTooltip = List.of(
+                        Component.literal("§6★ ").append(Component.translatable("gui.gtcalcboard.config.preset.tooltip_active_title")),
+                        Component.translatable("gui.gtcalcboard.config.preset.category", "§b" + (catId != null ? catId.toString() : "Unknown")),
+                        Component.literal("§8§m------------------------"),
+                        Component.translatable("gui.gtcalcboard.config.preset.tooltip_update"),
+                        Component.translatable("gui.gtcalcboard.config.preset.tooltip_reapply"),
+                        Component.translatable("gui.gtcalcboard.config.preset.tooltip_clear")
+                );
+            }
+        } else {
+            graphics.fill(presetBtnX, y + 3, presetBtnX + presetBtnW, y + 3 + presetBtnH, presetHover ? 0xFF2F3746 : 0xFF202632);
+            graphics.renderOutline(presetBtnX, y + 3, presetBtnW, presetBtnH, presetHover ? 0xFF6B7F9E : 0xFF3D4A5E);
+            String presetText = "§7📌 " + Component.translatable("gui.gtcalcboard.config.preset.set").getString();
+            graphics.drawCenteredString(font, font.plainSubstrByWidth(presetText, presetBtnW - 4), presetBtnX + presetBtnW / 2, y + 7, 0xFFB0C0D8);
+            if (presetHover) {
+                this.deferredTooltip = List.of(
+                        Component.literal("§f📌 ").append(Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_title")),
+                        Component.translatable("gui.gtcalcboard.config.preset.category", "§b" + (catId != null ? catId.toString() : "Unknown")),
+                        Component.literal("§8§m------------------------"),
+                        Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_desc"),
+                        Component.translatable("gui.gtcalcboard.config.preset.tooltip_click_save")
+                );
+            }
+        }
+
         String title = "⚙ " + Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()).getString();
-        int maxTitleW = switchBtnX - (x + 8) - 6;
+        int maxTitleW = presetBtnX - (x + 8) - 6;
         if (font.width(title) > maxTitleW) {
             title = font.plainSubstrByWidth(title, Math.max(16, maxTitleW - font.width("..."))) + "...";
         }
@@ -530,6 +589,53 @@ public class MachineConfigDialog {
         if (mX >= switchBtnX && mX <= switchBtnX + switchBtnW && mY >= y + 3 && mY <= y + 3 + switchBtnH) {
             if (parent != null) {
                 parent.openRecipeSwitchDialog(node);
+            }
+            return true;
+        }
+
+        // Category Machine Default Preset Button Click
+        int presetBtnW = 68;
+        int presetBtnH = 16;
+        int presetBtnX = switchBtnX - presetBtnW - 4;
+        if (mX >= presetBtnX && mX <= presetBtnX + presetBtnW && mY >= y + 3 && mY <= y + 3 + presetBtnH) {
+            ResourceLocation catId = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId() : node.getMachineIcon();
+            if (catId != null) {
+                boolean hasPreset = CategoryMachinePresetManager.getInstance().hasPreset(catId);
+                String catDisplayName = catId.getPath();
+                if (button == 1) {
+                    // Right-Click: Clear Default
+                    if (hasPreset) {
+                        CategoryMachinePresetManager.getInstance().removePreset(catId);
+                        BoardManager.getInstance().saveForCurrentContext();
+                        BoardToast.show(Component.literal("§e↺ ").append(Component.translatable("message.gtcalcboard.preset_cleared", catDisplayName)));
+                        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.9F));
+                    }
+                } else if (Screen.hasAltDown() || Screen.hasShiftDown()) {
+                    // Alt / Shift Click: If preset exists, reapply to this node. If not, set default.
+                    if (hasPreset) {
+                        CategoryMachinePresetManager.getInstance().getPreset(catId).applyTo(node);
+                        if (parallelBox != null) {
+                            parallelBox.setValue(String.valueOf(node.getParallel()));
+                        }
+                        invalidateFilteredCatalog();
+                        if (parent != null) parent.markSummaryDirty();
+                        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_reapplied", catDisplayName)));
+                        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                    } else {
+                        CategoryMachinePreset preset = CategoryMachinePreset.fromNode(node);
+                        CategoryMachinePresetManager.getInstance().setPreset(preset);
+                        BoardManager.getInstance().saveForCurrentContext();
+                        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_saved", catDisplayName)));
+                        mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                    }
+                } else {
+                    // Left-Click: Save current settings as default
+                    CategoryMachinePreset preset = CategoryMachinePreset.fromNode(node);
+                    CategoryMachinePresetManager.getInstance().setPreset(preset);
+                    BoardManager.getInstance().saveForCurrentContext();
+                    BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.preset_saved", catDisplayName)));
+                    mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+                }
             }
             return true;
         }

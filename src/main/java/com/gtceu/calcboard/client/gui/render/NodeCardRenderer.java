@@ -357,8 +357,16 @@ public class NodeCardRenderer {
                 boolean isDeficit = stats != null && stats.isInputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), true, inOrigIdx);
+                boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), true, inOrigIdx));
+                if (isPortSelected) {
+                    boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
+                    int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
+                    graphics.fill(x + 2, rowY - 2, x + 2 + slotW, rowY + 16, 0x4438BDF8);
+                }
                 int portColor;
-                if (!isOperational) {
+                if (isPortSelected) {
+                    portColor = 0xFF38BDF8;
+                } else if (!isOperational) {
                     portColor = 0xFF77333B;
                 } else if (isPortGlowing) {
                     portColor = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF);
@@ -373,8 +381,8 @@ public class NodeCardRenderer {
                 }
                 boolean portHover = mouseX >= x && mouseX <= x + 28 && mouseY >= rowY - 2 && mouseY <= rowY + 16;
                 graphics.fill(inPortX, inPortY, inPortX + 6, inPortY + 6, portHover ? 0xFFFFFFFF : portColor);
-                if (isPortGlowing) {
-                    graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, portColor);
+                if (isPortGlowing || isPortSelected) {
+                    graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
                 }
 
                 IngredientRenderer.render(graphics, in, x + 12, rowY - 1);
@@ -420,9 +428,17 @@ public class NodeCardRenderer {
                 boolean isDeficit = stats != null && stats.isOutputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), false, outOrigIdx);
+                boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), false, outOrigIdx));
+                if (isPortSelected) {
+                    boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
+                    int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
+                    graphics.fill(x + 2, rowY - 2, x + 2 + slotW, rowY + 16, 0x4438BDF8);
+                }
                 boolean isInactive = rate <= 0.00001;
                 int portColor;
-                if (!isOperational) {
+                if (isPortSelected) {
+                    portColor = 0xFF38BDF8;
+                } else if (!isOperational) {
                     portColor = 0xFF77333B;
                 } else if (isPortGlowing) {
                     portColor = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88);
@@ -437,8 +453,8 @@ public class NodeCardRenderer {
                 }
                 boolean portHover = mouseX >= x && mouseX <= x + 28 && mouseY >= rowY - 2 && mouseY <= rowY + 16;
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
-                if (isPortGlowing) {
-                    graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, portColor);
+                if (isPortGlowing || isPortSelected) {
+                    graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
                 }
 
                 IngredientRenderer.render(graphics, out, x + 12, rowY - 1);
@@ -489,9 +505,18 @@ public class NodeCardRenderer {
                 boolean isDeficit = stats != null && stats.isOutputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), false, outOrigIdx);
+                boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), false, outOrigIdx));
+                if (isPortSelected) {
+                    boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
+                    int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
+                    int startSlotX = hasBoth ? (x + (cardW / 2) + 2) : (x + 2);
+                    graphics.fill(startSlotX, rowY - 2, startSlotX + slotW, rowY + 16, 0x4438BDF8);
+                }
                 boolean isInactive = rate <= 0.00001;
                 int portColor;
-                if (!isOperational) {
+                if (isPortSelected) {
+                    portColor = 0xFF38BDF8;
+                } else if (!isOperational) {
                     portColor = 0xFF77333B;
                 } else if (isPortGlowing) {
                     portColor = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88);
@@ -506,8 +531,8 @@ public class NodeCardRenderer {
                 }
                 boolean portHover = mouseX >= x + cardW - 28 && mouseX <= x + cardW && mouseY >= rowY - 2 && mouseY <= rowY + 16;
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
-                if (isPortGlowing) {
-                    graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, portColor);
+                if (isPortGlowing || isPortSelected) {
+                    graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
                 }
 
                 String rateStr;
@@ -555,8 +580,17 @@ public class NodeCardRenderer {
                 boolean isDeficit = stats != null && stats.isInputDeficit();
 
                 boolean isPortGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isPortGlowing(node.getId(), true, inOrigIdx);
+                boolean isPortSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs && bs.isPortSelected(node.getId(), true, inOrigIdx));
+                if (isPortSelected) {
+                    boolean hasBoth = !inputs.isEmpty() && !outputs.isEmpty();
+                    int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
+                    int startSlotX = hasBoth ? (x + (cardW / 2) + 2) : (x + 2);
+                    graphics.fill(startSlotX, rowY - 2, startSlotX + slotW, rowY + 16, 0x4438BDF8);
+                }
                 int portColor;
-                if (!isOperational) {
+                if (isPortSelected) {
+                    portColor = 0xFF38BDF8;
+                } else if (!isOperational) {
                     portColor = 0xFF77333B;
                 } else if (isPortGlowing) {
                     portColor = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF);
@@ -571,8 +605,8 @@ public class NodeCardRenderer {
                 }
                 boolean portHover = mouseX >= x + cardW - 28 && mouseX <= x + cardW && mouseY >= rowY - 2 && mouseY <= rowY + 16;
                 graphics.fill(inPortX, inPortY, inPortX + 6, inPortY + 6, portHover ? 0xFFFFFFFF : portColor);
-                if (isPortGlowing) {
-                    graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, portColor);
+                if (isPortGlowing || isPortSelected) {
+                    graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
                 }
 
                 String rateStr;

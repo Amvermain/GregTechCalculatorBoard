@@ -76,6 +76,10 @@ public class ModAdapterRegistry {
         return Collections.unmodifiableList(loaded);
     }
 
+    public static List<IModAdapter> getAdapters() {
+        return getAllLoadedAdapters();
+    }
+
     public static IModAdapter getAdapterForModId(String modId) {
         init();
         return ADAPTER_MAP.getOrDefault(modId, FALLBACK_ADAPTER);

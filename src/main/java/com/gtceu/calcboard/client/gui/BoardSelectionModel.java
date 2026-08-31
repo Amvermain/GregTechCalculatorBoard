@@ -11,9 +11,12 @@ import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.client.gui.model.PortRef;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -24,6 +27,8 @@ public class BoardSelectionModel {
     private final Set<String> selectedNodeIds = new HashSet<>();
     private final Set<String> selectedNoteIds = new HashSet<>();
     private final Set<String> selectedFrameIds = new HashSet<>();
+    private final Set<PortRef> selectedPorts = new HashSet<>();
+    private PortRef lastSelectedPort = null;
 
     public Set<String> getSelectedNodeIds() {
         return selectedNodeIds;
@@ -35,6 +40,10 @@ public class BoardSelectionModel {
 
     public Set<String> getSelectedFrameIds() {
         return selectedFrameIds;
+    }
+
+    public Set<PortRef> getSelectedPorts() {
+        return selectedPorts;
     }
 
     public boolean isSelected(String id) {
@@ -53,12 +62,24 @@ public class BoardSelectionModel {
         return id != null && selectedFrameIds.contains(id);
     }
 
+    public boolean isPortSelected(String nodeId, boolean isInput, int portIndex) {
+        return nodeId != null && selectedPorts.contains(PortRef.of(nodeId, isInput, portIndex));
+    }
+
+    public boolean isPortSelected(PortRef port) {
+        return port != null && selectedPorts.contains(port);
+    }
+
+    public boolean hasSelectedPorts() {
+        return !selectedPorts.isEmpty();
+    }
+
     public boolean isEmpty() {
-        return selectedNodeIds.isEmpty() && selectedNoteIds.isEmpty() && selectedFrameIds.isEmpty();
+        return selectedNodeIds.isEmpty() && selectedNoteIds.isEmpty() && selectedFrameIds.isEmpty() && selectedPorts.isEmpty();
     }
 
     public int size() {
-        return selectedNodeIds.size() + selectedNoteIds.size() + selectedFrameIds.size();
+        return selectedNodeIds.size() + selectedNoteIds.size() + selectedFrameIds.size() + selectedPorts.size();
     }
 
     public void select(String id, boolean multi) {
@@ -115,10 +136,55 @@ public class BoardSelectionModel {
         }
     }
 
+    public void selectPort(String nodeId, boolean isInput, int portIndex, boolean multi) {
+        if (!multi) {
+            clear();
+        }
+        if (nodeId != null) {
+            PortRef ref = PortRef.of(nodeId, isInput, portIndex);
+            selectedPorts.add(ref);
+            lastSelectedPort = ref;
+        }
+    }
+
+    public void togglePort(String nodeId, boolean isInput, int portIndex) {
+        if (nodeId == null) return;
+        PortRef ref = PortRef.of(nodeId, isInput, portIndex);
+        if (selectedPorts.contains(ref)) {
+            selectedPorts.remove(ref);
+            if (Objects.equals(lastSelectedPort, ref)) {
+                lastSelectedPort = null;
+            }
+        } else {
+            selectedPorts.add(ref);
+            lastSelectedPort = ref;
+        }
+    }
+
+    public void selectPortRange(String nodeId, boolean isInput, int targetPortIndex) {
+        if (nodeId == null) return;
+        if (lastSelectedPort != null && lastSelectedPort.nodeId().equals(nodeId) && lastSelectedPort.isInput() == isInput) {
+            int start = Math.min(lastSelectedPort.portIndex(), targetPortIndex);
+            int end = Math.max(lastSelectedPort.portIndex(), targetPortIndex);
+            for (int i = start; i <= end; i++) {
+                selectedPorts.add(PortRef.of(nodeId, isInput, i));
+            }
+        } else {
+            selectPort(nodeId, isInput, targetPortIndex, true);
+        }
+    }
+
+    public void clearPorts() {
+        selectedPorts.clear();
+        lastSelectedPort = null;
+    }
+
     public void clear() {
         selectedNodeIds.clear();
         selectedNoteIds.clear();
         selectedFrameIds.clear();
+        selectedPorts.clear();
+        lastSelectedPort = null;
     }
 
     public void selectAll(BoardScreen screen) {

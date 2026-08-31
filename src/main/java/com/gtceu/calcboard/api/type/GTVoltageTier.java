@@ -1,5 +1,8 @@
 package com.gtceu.calcboard.api.type;
 
+/**
+ * GregTech voltage tiers (ULV to MAX) with exact EU/t voltage ratings, badge colors, and text formatting codes.
+ */
 public enum GTVoltageTier {
     ULV("ULV", 8L, 0xFF8C8C8C, "§7"),
     LV("LV", 32L, 0xFFFFFFFF, "§f"),

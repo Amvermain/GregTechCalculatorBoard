@@ -307,6 +307,10 @@ public class JeiRecipeConverter {
             }
         }
 
+        if (preferredWorkstation == null) {
+            com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
+        }
+
         return node;
     }
 

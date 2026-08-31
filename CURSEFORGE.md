@@ -79,6 +79,20 @@ The mod is fully optional on both client and server:
 *   **Rich Blueprint Metadata**: Export entire flowcharts or selected node groups with custom titles, descriptions, authors, and tag metadata.
 *   **Interactive Import Preview**: Inspect node count, machines, connections, and major inputs/outputs before choosing to open in a new page or overwrite.
 
+#### Shared Machine Pool (Time-Sharing Frame)
+*   **Time-Shared Machine Pooling**: Group multiple recipes into a shared machine pool frame to model a single physical machine executing multiple recipes across time.
+*   **Duty Cycle & Required Machine Solving**: Computes cumulative duty (`Total Duty %`) and quantized required machines (`Ceil`), rendering live header badges and comprehensive breakdown tooltips.
+*   **Hardware Config Synchronization**: Synchronize voltage tiers, overclock modes, parallel counts, and addons across all enclosed machines from the frame header.
+*   **De-duplicated Multiblock BOM**: Accurately accounts shared multiblock structures once in the BOM calculation.
+
+#### Port Multi-Selection & Bundle Batch Wiring UX
+*   **Marquee Port Selection**: Drag a selection box over machine cards to selectively grab multiple input or output ports without selecting entire cards.
+*   **Explorer-Style Multi-Select**: `Ctrl + Click` to toggle individual ports, `Shift + Click` to select port ranges.
+*   **Multi-Wire Bundle Dragging**: Drag from multiple selected ports to bundle wires with real-time multi-bezier curve rendering.
+*   **Junction Node Generation & Frame Auto-Wiring**: Drop on empty canvas to spawn vertical aligned junction nodes, or drop onto a Shared Machine Pool to automatically wire matching machines and spawn missing recipe cards with hardware sync and auto-expanding bounds.
+*   **Secondary Input Preference Matching**: Intelligently prioritizes matching secondary inputs/fluids (e.g. Lubricant vs Water) when auto-spawning recipes in machine pools.
+*   **One-Click Auto-Fit Frame**: Header `[⛶]` button and double-click to instantly auto-fit frame bounds to enclosed contents.
+
 #### I/O Port Hiding & Selective Restore
 
 *   **Hide Unused Ports**: Right-click any input/output port to sever existing wires and hide unwanted ports, keeping complex multi-output machine cards compact and clutter-free.

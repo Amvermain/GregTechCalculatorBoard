@@ -54,34 +54,48 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Thermal Series**: Dynamo RF/t generation, augment multipliers, and tier upgrade kits.
 - **Systeams & Steam Boilers**: Steam boiler mB/s output, steam dynamos, and LP/HP steam machine consumption modeling.
 
-### 8. I/O Port Hiding & Selective Restore
+### 8. Shared Machine Pool (Time-Sharing Frame)
+- **Time-Shared Machine Pooling**: Group multiple recipes into a shared machine pool (`CanvasGroupFrame.isSharedMachineFrame`) to model a single physical machine executing multiple recipes across time.
+- **Duty Cycle & Required Machine Solving**: Computes cumulative duty (`Total Duty %`) and quantized required machines (`Ceil`), rendering live header badges and comprehensive breakdown tooltips.
+- **Hardware Config Synchronization**: Synchronize voltage tiers, overclock modes, parallel counts, and addons across all enclosed machines from the frame header.
+- **De-duplicated Multiblock BOM**: Accurately accounts shared multiblock structures once in the BOM calculation.
+
+### 9. Port Multi-Selection & Bundle Batch Wiring UX
+- **Marquee Port Selection**: Drag a selection box over machine cards to selectively grab multiple input or output ports without selecting entire cards.
+- **Explorer-Style Multi-Select**: `Ctrl + Click` to toggle individual ports, `Shift + Click` to select port ranges.
+- **Multi-Wire Bundle Dragging**: Drag from multiple selected ports to bundle wires with real-time multi-bezier curve rendering.
+- **Junction Node Generation & Frame Auto-Wiring**: Drop on empty canvas to spawn vertical aligned junction nodes, or drop onto a Shared Machine Pool to automatically wire matching machines and spawn missing recipe cards with hardware sync and auto-expanding bounds.
+- **Secondary Input Preference Matching**: Intelligently prioritizes matching secondary inputs/fluids (e.g. Lubricant vs Water) when auto-spawning recipes in machine pools.
+- **One-Click Auto-Fit Frame**: Header `[⛶]` button and double-click to instantly auto-fit frame bounds to enclosed contents.
+
+### 10. I/O Port Hiding & Selective Restore
 - **Hide Unused Ports**: Right-click any input/output port to sever existing wires and hide unwanted ports, keeping complex multi-output machine cards compact and clutter-free.
 - **Hidden Ports Badge & Popup**: Displays a pill badge (e.g. `2 Outputs hidden`, `3 Ports hidden`) on the machine card. Clicking the badge opens a dropdown popup to selectively unhide ports with a single click.
 
-### 9. Smart Inline Text Editing Engine
+### 11. Smart Inline Text Editing Engine
 - **Rich Text Control**: All inline editable fields (machine name, machine count, parallel count, target batch quantity) support native cursor positioning, Shift/drag selection, Ctrl+A select all, and Ctrl+C/V/X clipboard operations.
 - **Word-Level Navigation**: Navigate and delete words rapidly using Ctrl + Arrow Keys and Ctrl + Backspace/Delete.
 
-### 10. Accessibility & Canvas Controls
+### 12. Accessibility & Canvas Controls
 - **5-Level UI Font Scale**: Adjust machine configuration dialog size (`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`) via `[Aa 1.0x]`, mouse wheel, or `+`/`-` keys.
 - **Uniform Global Fluid Units**: Toggle canvas fluid rates between `Auto`, `Always mB`, and `Always B` via the toolbar button or `Shift+T`.
 - **Page Tab Overflow Navigation**: Smoothly click `«`, `»` or scroll mouse wheel across multiple board pages without edge clipping.
 - **Level of Detail (LOD) Rendering**: Lightweight 2D rendering when zoomed out maintains high performance on large graphs with 1,200+ nodes.
 - **Singleplayer Pause Toggle**: Switch between `Pause: ON` and `Pause: OFF` to choose whether the game world freezes while planning lines.
 
-### 9. Multi-Tab Presets & Compound Modules
+### 13. Multi-Tab Presets & Compound Modules
 - **Multi-Tab Pages**: Create, switch, rename, and manage independent calculation flowcharts per production branch.
 - **Compound Modules (`Ctrl + G`)**: Collapse sub-graphs into a single module card with automatic internal byproduct encapsulation, proportional scaling, and 1-click restoration (`Expand`).
 
-### 10. Undo, Redo, & Clipboard System
+### 14. Undo, Redo, & Clipboard System
 - **History Stack**: Full `Ctrl + Z` (Undo) and `Ctrl + Y` / `Ctrl + Shift + Z` (Redo) support across node, wire, grouping, and property modifications.
 - **Clipboard & Box Selection**: Marquee box selection, batch dragging, Cut (`Ctrl + X`), Copy (`Ctrl + C`), Paste (`Ctrl + V`), and Duplicate (`Ctrl + D`).
 
-### 11. Base Anchor & Auto Ratio Sizing
+### 15. Base Anchor & Auto Ratio Sizing
 - Designate any bottleneck or target machine as the Base Anchor (`Anchor`).
 - **Auto Ratio**: Scales all upstream machines backwards to satisfy the anchor's input requirement using integer ceiling ($1, 2, 3...$), ensuring $\text{Supply} \ge \text{Demand}$.
 
-### 12. Dynamic Addon & Hardware Optimization
+### 16. Dynamic Addon & Hardware Optimization
 - **Dynamic Runtime Indexing**: Automatically discovers coils, rotors, hatches, and machines from any installed GTCEu addon or modpack at runtime without hardcoding.
 - **Heating Coils**: Accounts for coil temperatures (Cupronickel 1800K to Trinium 9000K+), duration modifiers, and speed penalties.
 - **Parallel Hatches**: Supports standard and constant-power (Absolute) parallel hatches with direct numeric input and mouse wheel scaling.
@@ -165,7 +179,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.1.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.2.jar`.
 
 ---
 
@@ -182,6 +196,7 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.1
 ## Special Thanks
 
 - **The Reel One** - For providing UX/UI feedback, design suggestions, and community testing.
+- **rafa** - For providing UX/UI feedback, design suggestions, and community testing.
 
 ---
 

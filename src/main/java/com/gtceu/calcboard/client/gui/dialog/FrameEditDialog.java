@@ -21,6 +21,7 @@ public class FrameEditDialog {
 
     private EditBox titleInput;
     private int selectedColor;
+    private boolean sharedMachineMode;
 
     public FrameEditDialog(BoardScreen parent) {
         this.parent = parent;
@@ -30,11 +31,12 @@ public class FrameEditDialog {
         if (frame == null) return;
         this.targetFrame = frame;
         this.selectedColor = frame.getColor();
+        this.sharedMachineMode = frame.isSharedMachineFrame();
         this.visible = true;
 
         Font font = Minecraft.getInstance().font;
         int dialogW = 280;
-        int dialogH = 130;
+        int dialogH = 158;
         int x = (parent.width - dialogW) / 2;
         int y = (parent.height - dialogH) / 2;
 
@@ -60,7 +62,7 @@ public class FrameEditDialog {
 
         Font font = Minecraft.getInstance().font;
         int dialogW = 280;
-        int dialogH = 130;
+        int dialogH = 158;
         int x = (screenW - dialogW) / 2;
         int y = (screenH - dialogH) / 2;
 
@@ -95,6 +97,20 @@ public class FrameEditDialog {
                 graphics.renderOutline(sx - 1, swatchY - 1, swatchSize + 2, swatchSize + 2, 0xFF00FFFF);
             }
         }
+
+        // Shared Machine Pool Checkbox Option
+        int cbY = y + 104;
+        int cbSize = 12;
+        int cbX = x + 16;
+        boolean cbHover = mouseX >= cbX && mouseX <= x + dialogW - 16 && mouseY >= cbY - 2 && mouseY <= cbY + cbSize + 2;
+
+        graphics.fill(cbX, cbY, cbX + cbSize, cbY + cbSize, sharedMachineMode ? 0xFF10B981 : 0xFF1E293B);
+        graphics.renderOutline(cbX, cbY, cbSize, cbSize, cbHover ? 0xFFFFFFFF : 0xFF64748B);
+        if (sharedMachineMode) {
+            graphics.drawString(font, "✔", cbX + 2, cbY + 2, 0xFFFFFFFF, false);
+        }
+        String cbLabel = Component.translatable("gui.gtcalcboard.frame_label_shared_machine").getString();
+        graphics.drawString(font, cbLabel, cbX + cbSize + 6, cbY + 2, cbHover ? 0xFFFFFFFF : 0xFFCBD5E1, false);
 
         // Render Inputs
         if (titleInput != null) {
@@ -131,7 +147,7 @@ public class FrameEditDialog {
         if (!visible || targetFrame == null) return false;
 
         int dialogW = 280;
-        int dialogH = 130;
+        int dialogH = 158;
         int x = (parent.width - dialogW) / 2;
         int y = (parent.height - dialogH) / 2;
 
@@ -152,6 +168,16 @@ public class FrameEditDialog {
                 Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
                 return true;
             }
+        }
+
+        // Shared Machine Pool Checkbox Click
+        int cbY = y + 104;
+        int cbSize = 12;
+        int cbX = x + 16;
+        if (mouseX >= cbX && mouseX <= x + dialogW - 16 && mouseY >= cbY - 2 && mouseY <= cbY + cbSize + 2) {
+            sharedMachineMode = !sharedMachineMode;
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+            return true;
         }
 
         if (titleInput != null) {
@@ -218,6 +244,7 @@ public class FrameEditDialog {
                 targetFrame.setTitle(newTitle);
             }
             targetFrame.setColor(selectedColor);
+            targetFrame.setSharedMachineFrame(sharedMachineMode);
             parent.markSummaryDirty();
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
         }

@@ -16,7 +16,38 @@ import java.util.*;
  */
 public final class FlowBalanceMatrixSolver {
 
+    public enum CountRoundingMode {
+        FLOOR,
+        CEIL,
+        ROUND
+    }
+
     private FlowBalanceMatrixSolver() {}
+
+    /**
+     * Single source of truth for node machine count quantization.
+     * Encapsulates Reroute isolation, Shared Machine Pool decimals, epsilon tolerance, and integer modes.
+     */
+    public static double quantizeMachineCount(
+            FlowGraph graph,
+            RecipeNode node,
+            double rawCount,
+            CountRoundingMode mode,
+            boolean integerCounts) {
+        if (node == null) return 1.0;
+        if (node.isReroute()) return 1.0;
+
+        boolean isShared = (graph != null && graph.isNodeInSharedMachineFrame(node));
+        if (isShared || !integerCounts) {
+            return Math.max(0.0001, Math.round(rawCount * 10000.0) / 10000.0);
+        }
+
+        return switch (mode) {
+            case FLOOR -> Math.max(1.0, Math.floor(rawCount + 0.00001));
+            case CEIL -> Math.max(1.0, Math.ceil(rawCount - 0.00001));
+            case ROUND -> Math.max(1.0, (double) Math.round(rawCount));
+        };
+    }
 
     /**
      * Propagates machine counts across the graph starting from the anchor node.
@@ -28,10 +59,7 @@ public final class FlowBalanceMatrixSolver {
         } catch (Throwable ignored) {}
         graph.cleanupInvalidConnections();
 
-        double targetAnchorCount = anchor.getMachineCount();
-        if (integerCounts) {
-            targetAnchorCount = Math.max(1.0, Math.ceil(targetAnchorCount - 0.00001));
-        }
+        double targetAnchorCount = quantizeMachineCount(graph, anchor, anchor.getMachineCount(), CountRoundingMode.CEIL, integerCounts);
         anchor.setMachineCount(targetAnchorCount);
 
         // 1. Identify direct anchor suppliers (upstream boundary) and downstream chain from anchor
@@ -122,12 +150,7 @@ public final class FlowBalanceMatrixSolver {
 
                         if (singleRate > 0.0001) {
                             double totalPortDemand = calculateTotalConnectedPortDemand(graph, producer, edge.outputIndex(), countsMap);
-                            double neededCount = totalPortDemand / singleRate;
-                            if (integerCounts) {
-                                neededCount = Math.max(1.0, Math.ceil(neededCount - 0.00001));
-                            } else {
-                                neededCount = Math.max(0.0001, neededCount);
-                            }
+                            double neededCount = quantizeMachineCount(graph, producer, totalPortDemand / singleRate, CountRoundingMode.CEIL, integerCounts);
 
                             double prevCount = countsMap.getOrDefault(producer.getId(), 0.0);
                             int visits = upVisitCounts.getOrDefault(producer.getId(), 0);
@@ -331,12 +354,7 @@ public final class FlowBalanceMatrixSolver {
                 }
 
                 if (hasDownstreamDrivingInput && requiredConsumerCount > 0.0001) {
-                    double finalConsumerCount = requiredConsumerCount;
-                    if (integerCounts) {
-                        finalConsumerCount = Math.max(1.0, Math.floor(finalConsumerCount + 0.00001));
-                    } else {
-                        finalConsumerCount = Math.max(0.0001, finalConsumerCount);
-                    }
+                    double finalConsumerCount = quantizeMachineCount(graph, consumer, requiredConsumerCount, CountRoundingMode.FLOOR, integerCounts);
                     countsMap.put(consumer.getId(), finalConsumerCount);
                     consumer.setMachineCount(finalConsumerCount);
 
@@ -391,12 +409,7 @@ public final class FlowBalanceMatrixSolver {
 
                             for (RecipeNode p : validProducers) {
                                 double currentCount = p.getMachineCount();
-                                double newCount = currentCount * scaleRatio;
-                                if (integerCounts) {
-                                    newCount = Math.max(1.0, Math.ceil(newCount - 0.00001));
-                                } else {
-                                    newCount = Math.max(0.0001, newCount);
-                                }
+                                double newCount = quantizeMachineCount(graph, p, currentCount * scaleRatio, CountRoundingMode.CEIL, integerCounts);
 
                                 if (newCount > currentCount + 1e-4) {
                                     p.setMachineCount(newCount);
@@ -430,11 +443,7 @@ public final class FlowBalanceMatrixSolver {
                 n.setMachineCount(targetAnchorCount);
                 continue;
             }
-            if (integerCounts) {
-                n.setMachineCount(Math.max(1.0, Math.ceil(n.getMachineCount() - 0.00001)));
-            } else {
-                n.setMachineCount(Math.max(0.0001, n.getMachineCount()));
-            }
+            n.setMachineCount(quantizeMachineCount(graph, n, n.getMachineCount(), CountRoundingMode.CEIL, integerCounts));
         }
         anchor.setMachineCount(targetAnchorCount);
     }
@@ -627,15 +636,14 @@ public final class FlowBalanceMatrixSolver {
                     }
                 }
 
-                if (integerCounts) {
-                    n.setMachineCount(Math.max(1.0, Math.ceil(n.getMachineCount())));
-                }
+                n.setMachineCount(quantizeMachineCount(graph, n, n.getMachineCount(), CountRoundingMode.CEIL, integerCounts));
             }
         }
     }
 
     public static double calculateConsumerMatchCount(FlowGraph graph, RecipeNode producer, int outPortIdx, RecipeNode consumer, int inPortIdx) {
         if (graph == null || producer == null || consumer == null) return 1.0;
+        if (consumer.isReroute()) return 1.0;
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         double producedRate;
@@ -673,11 +681,13 @@ public final class FlowBalanceMatrixSolver {
         }
 
         double totalAvailableSupply = producedRate + existingSupply;
-        return Math.max(1.0, Math.floor((totalAvailableSupply / singleInRate) + 0.00001));
+        boolean isShared = (graph != null && graph.isNodeInSharedMachineFrame(consumer));
+        return quantizeMachineCount(graph, consumer, totalAvailableSupply / singleInRate, CountRoundingMode.FLOOR, !isShared);
     }
 
     public static double calculateProducerMatchCount(FlowGraph graph, RecipeNode producer, int outPortIdx, RecipeNode consumer, int inPortIdx) {
         if (graph == null || producer == null || consumer == null) return 1.0;
+        if (producer.isReroute()) return 1.0;
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         double totalDemand;
@@ -714,7 +724,8 @@ public final class FlowBalanceMatrixSolver {
         double singleOutRate = producer.calculateSingleMachineOutputRate(outStack) * prodEff;
         if (singleOutRate <= 0.0001) return 1.0;
 
-        return Math.max(1.0, Math.ceil((remainingDemand / singleOutRate) - 0.00001));
+        boolean isShared = (graph != null && graph.isNodeInSharedMachineFrame(producer));
+        return quantizeMachineCount(graph, producer, remainingDemand / singleOutRate, CountRoundingMode.CEIL, !isShared);
     }
 
     public static double findPerfectHarmonizedAnchorCount(FlowGraph graph, RecipeNode anchor) {

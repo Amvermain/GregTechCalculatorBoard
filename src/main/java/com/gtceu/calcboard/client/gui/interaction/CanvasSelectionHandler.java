@@ -90,15 +90,46 @@ public class CanvasSelectionHandler {
             screen.clearSelection();
         }
 
-        // Select overlapping Nodes
+        // Select overlapping Nodes or Ports based on coverage threshold
         for (NodeWidget w : screen.getNodeWidgets()) {
             RecipeNode n = w.getNode();
-            double nw = n.getCardWidth();
-            double nh = n.getCardHeight();
-            boolean overlaps = (n.getPosX() < maxX && n.getPosX() + nw > minX &&
-                    n.getPosY() < maxY && n.getPosY() + nh > minY);
-            if (overlaps) {
-                screen.selectNode(n.getId(), true);
+            double nw = w.getWidth();
+            double nh = w.getHeight();
+            double nx1 = n.getPosX();
+            double ny1 = n.getPosY();
+            double nx2 = nx1 + nw;
+            double ny2 = ny1 + nh;
+
+            double interX1 = Math.max(minX, nx1);
+            double interX2 = Math.min(maxX, nx2);
+            double interY1 = Math.max(minY, ny1);
+            double interY2 = Math.min(maxY, ny2);
+
+            if (interX2 > interX1 && interY2 > interY1) {
+                double interArea = (interX2 - interX1) * (interY2 - interY1);
+                double nodeArea = nw * nh;
+                double ratio = nodeArea > 0 ? (interArea / nodeArea) : 1.0;
+
+                if (ratio >= 0.35 || n.isReroute()) {
+                    screen.selectNode(n.getId(), true);
+                } else {
+                    boolean portMatched = false;
+                    for (int inIdx : n.getVisibleInputIndices()) {
+                        if (w.isPortOverlapping(true, inIdx, minX, minY, maxX, maxY)) {
+                            screen.selectPort(n.getId(), true, inIdx, true);
+                            portMatched = true;
+                        }
+                    }
+                    for (int outIdx : n.getVisibleOutputIndices()) {
+                        if (w.isPortOverlapping(false, outIdx, minX, minY, maxX, maxY)) {
+                            screen.selectPort(n.getId(), false, outIdx, true);
+                            portMatched = true;
+                        }
+                    }
+                    if (!portMatched && ratio > 0.15) {
+                        screen.selectNode(n.getId(), true);
+                    }
+                }
             }
         }
 

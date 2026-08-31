@@ -63,7 +63,7 @@ public final class NodeRateCalculator {
     public static double getEffectiveOutputChance(RecipeNode node, int outputIndex) {
         if (node == null || outputIndex < 0 || outputIndex >= node.getOutputs().size()) return 0.0;
         IngredientStack out = node.getOutputs().get(outputIndex);
-        if (out.getChance() >= 1.0) return 1.0;
+        if (outputIndex == 0 && out.getChance() >= 1.0) return 1.0;
 
         double baseChance = out.getEffectiveChance(node.getTierDelta());
         return ModAdapterRegistry.getAdapterForNode(node).computeEffectiveOutputChance(node, outputIndex, baseChance);
@@ -143,9 +143,9 @@ public final class NodeRateCalculator {
         if (node == null) return rates;
 
         double cps = node.getEffectiveCyclesPerSecond();
-        int tierDelta = node.getTierDelta();
-        for (IngredientStack out : node.getOutputs()) {
-            double amount = out.getExpectedAmount(tierDelta);
+        for (int i = 0; i < node.getOutputs().size(); i++) {
+            IngredientStack out = node.getOutputs().get(i);
+            double amount = out.getAmount() * getEffectiveOutputChance(node, i);
             double r = amount * cps;
             r = ModAdapterRegistry.getAdapterForNode(node).computeEffectiveIngredientRate(node, out, false, r);
             boolean merged = false;
@@ -169,7 +169,9 @@ public final class NodeRateCalculator {
     public static double calculateSingleMachineOutputRate(RecipeNode node, IngredientStack out) {
         if (node == null || out == null || !node.isOperational()) return 0.0;
         double singleCps = node.getOverclockResult().getCyclesPerSecond() * node.getTotalParallel();
-        double baseRate = out.getExpectedAmount(node.getTierDelta()) * singleCps;
+        int idx = node.getOutputs().indexOf(out);
+        double effChance = idx >= 0 ? getEffectiveOutputChance(node, idx) : out.getEffectiveChance(node.getTierDelta());
+        double baseRate = out.getAmount() * effChance * singleCps;
         return ModAdapterRegistry.getAdapterForNode(node).computeSingleMachineIngredientRate(node, out, false, baseRate);
     }
 

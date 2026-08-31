@@ -231,6 +231,38 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         selectionModel.toggleFrame(id);
     }
 
+    public Set<com.gtceu.calcboard.client.gui.model.PortRef> getSelectedPorts() {
+        return selectionModel.getSelectedPorts();
+    }
+
+    public boolean isPortSelected(String nodeId, boolean isInput, int portIndex) {
+        return selectionModel.isPortSelected(nodeId, isInput, portIndex);
+    }
+
+    public boolean isPortSelected(com.gtceu.calcboard.client.gui.model.PortRef port) {
+        return selectionModel.isPortSelected(port);
+    }
+
+    public boolean hasSelectedPorts() {
+        return selectionModel.hasSelectedPorts();
+    }
+
+    public void selectPort(String nodeId, boolean isInput, int portIndex, boolean multi) {
+        selectionModel.selectPort(nodeId, isInput, portIndex, multi);
+    }
+
+    public void toggleSelectPort(String nodeId, boolean isInput, int portIndex) {
+        selectionModel.togglePort(nodeId, isInput, portIndex);
+    }
+
+    public void selectPortRange(String nodeId, boolean isInput, int targetPortIndex) {
+        selectionModel.selectPortRange(nodeId, isInput, targetPortIndex);
+    }
+
+    public void clearPortSelection() {
+        selectionModel.clearPorts();
+    }
+
     public void clearSelection() {
         selectionModel.clear();
     }
@@ -1174,6 +1206,9 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (settingsDialog != null && settingsDialog.isVisible()) {
+            return settingsDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
             return diskBlueprintsDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -1300,11 +1335,40 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     }
 
     public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.catalog.AddonCategory initialCategory) {
+        openMachineConfigDialog(node, initialCategory, null);
+    }
+
+    public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.catalog.AddonCategory initialCategory, Runnable onCloseCallback) {
         if (machineConfigDialog == null) {
             machineConfigDialog = new MachineConfigDialog(this);
         }
         TutorialManager.getInstance().onMachineConfigOpened();
-        machineConfigDialog.open(node, initialCategory);
+        FlowGraph graph = getGraph();
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = graph != null ? graph.findFrameEnclosingNode(node) : null;
+        Runnable chainedCallback = () -> {
+            if (frame != null && frame.isSharedMachineFrame()) {
+                frame.syncHardwareConfig(node, graph);
+                markSummaryDirty();
+                rebuildWidgets();
+            }
+            if (onCloseCallback != null) {
+                onCloseCallback.run();
+            }
+        };
+        machineConfigDialog.open(node, initialCategory, chainedCallback);
+    }
+
+    public void openSharedFrameConfigDialog(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
+        if (!ensureEditPermission() || frame == null) return;
+        FlowGraph graph = getGraph();
+        RecipeNode master = frame.getFirstOperationalNode(graph);
+        if (master != null) {
+            openMachineConfigDialog(master, null, () -> {
+                frame.syncHardwareConfig(master, graph);
+                markSummaryDirty();
+                rebuildWidgets();
+            });
+        }
     }
 
     public void openFrameEditDialog(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
@@ -1354,6 +1418,39 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         TutorialManager.getInstance().onGroupFramed();
         BoardToast.show(Component.literal("§b").append(Component.translatable("message.gtcalcboard.frame_created")));
         Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
+    }
+
+    public void createSharedMachineFrameFromSelection() {
+        if (!ensureEditPermission()) return;
+        FlowGraph graph = getGraph();
+        Set<String> selectedNodeIds = getSelectedNodeIds();
+
+        List<RecipeNode> selectedNodes = new ArrayList<>();
+        if (selectedNodeIds != null && !selectedNodeIds.isEmpty()) {
+            for (RecipeNode n : graph.getNodes()) {
+                if (selectedNodeIds.contains(n.getId())) {
+                    selectedNodes.add(n);
+                }
+            }
+        }
+
+        String defaultTitle = Component.translatable("gui.gtcalcboard.default_shared_frame_name").getString();
+        com.gtceu.calcboard.api.model.CanvasGroupFrame frame;
+        if (!selectedNodes.isEmpty()) {
+            frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromNodes(defaultTitle, selectedNodes, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_EMERALD);
+        } else {
+            double cx = toCanvasX(width / 2.0) - 100;
+            double cy = toCanvasY(height / 2.0) - 60;
+            frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_EMERALD, cx, cy, 200, 120);
+        }
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+        clearSelection();
+        rebuildWidgets();
+        markSummaryDirty();
+        TutorialManager.getInstance().onSharedMachineFramed();
+        BoardToast.show(Component.literal("§a🔗 ").append(Component.translatable("message.gtcalcboard.shared_frame_created")));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
     }
 
     public void createFrameAt(double canvasX, double canvasY) {

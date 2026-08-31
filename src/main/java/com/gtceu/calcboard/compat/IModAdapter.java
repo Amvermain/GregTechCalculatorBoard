@@ -117,6 +117,20 @@ public interface IModAdapter {
     }
 
     /**
+     * Attempts to build a compound/layered/multi-step recipe cluster for this mod.
+     * Returns a {@link com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster} if confirmed via official APIs/objects, or {@code null}.
+     */
+    default com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster buildCompoundRecipe(
+            Object recipeObj,
+            Object backingRecipe,
+            ResourceLocation preferredWorkstation,
+            double startX,
+            double startY
+    ) {
+        return null;
+    }
+
+    /**
      * Checks if the specified machine node supports installing hardware addons.
      */
     default boolean supportsAddons(RecipeNode node) {

@@ -2,6 +2,10 @@ package com.gtceu.calcboard.api.type;
 
 import net.minecraft.network.chat.Component;
 
+/**
+ * Color preset palette for customizable canvas wires and connection themes.
+ * Provides ARGB color codes and localization keys.
+ */
 public enum WireColorPreset {
     CYAN("cyan", 0xFF00E5FF, "gui.gtcalcboard.color.cyan"),
     GREEN("green", 0xFF00E676, "gui.gtcalcboard.color.green"),

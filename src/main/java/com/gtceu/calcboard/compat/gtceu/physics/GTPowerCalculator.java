@@ -305,7 +305,9 @@ public final class GTPowerCalculator {
     public static double computeEffectiveOutputChance(RecipeNode node, int outputIndex, double defaultChance) {
         if (node == null || outputIndex < 0 || outputIndex >= node.getOutputs().size()) return defaultChance;
         IngredientStack out = node.getOutputs().get(outputIndex);
-        if (out.getChance() >= 1.0) return 1.0;
+        if (outputIndex == 0) {
+            return out.getChance() >= 1.0 ? 1.0 : out.getEffectiveChance(node.getTierDelta());
+        }
 
         if (node.isMultiblock() && node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("steam_ore_factory")) {
             return out.getEffectiveChance(node.getTierDelta());
@@ -315,15 +317,14 @@ public final class GTPowerCalculator {
             return 0.0;
         }
 
-        if (outputIndex >= 1 && out.getChance() > 0.0 && node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
+        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
             GTVoltageTier curTier = node.getTargetTier();
             if (curTier == null) curTier = GTVoltageTier.LV;
             int curTierIdx = curTier.ordinal();
 
-            GTVoltageTier reqTier;
-            if (outputIndex == 1) reqTier = GTVoltageTier.HV;
-            else if (outputIndex == 2) reqTier = GTVoltageTier.EV;
-            else reqTier = GTVoltageTier.IV;
+            GTVoltageTier reqTier = (node.getRecipeTier() != null && node.getRecipeTier().ordinal() > GTVoltageTier.HV.ordinal())
+                    ? node.getRecipeTier()
+                    : GTVoltageTier.HV;
 
             if (curTierIdx < reqTier.ordinal()) {
                 return 0.0;
@@ -333,6 +334,8 @@ public final class GTPowerCalculator {
             double boost = out.getTierChanceBoost();
             return Math.min(1.0, Math.max(0.0, out.getChance() + extraTiers * boost));
         }
+
+        if (out.getChance() >= 1.0) return 1.0;
 
         return defaultChance;
     }

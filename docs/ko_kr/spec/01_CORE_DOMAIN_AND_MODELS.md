@@ -252,8 +252,45 @@ $$\text{Blueprint String} = \text{"GTBOARD:"} + [\text{Title} + \text{":"}] + \t
 
 커맨드 패턴(Command Pattern) 기반으로 모든 캔버스 조작을 단위 델타(Delta)로 기록합니다.
 
-* **지원 커맨드 목록**: `MoveNodesCommand`, `AddConnectionCommand` / `RemoveConnectionCommand`, `AddNodesCommand` / `RemoveNodesCommand`, `ModifyPropertyCommand`, `GroupModuleCommand` / `ExpandModuleCommand`.
+* **지원 커맨드 목록**: `MoveNodesCommand`, `AddConnectionCommand` / `RemoveConnectionCommand`, `AddNodesCommand` / `RemoveNodesCommand`, `ModifyPropertyCommand`, `GroupModuleCommand` / `ExpandModuleCommand`, `ResizeFrameCommand`.
 * **성능 최적화**: 1,000단계 이상의 Undo/Redo 스택을 유지하면서도 2MB 미만의 메모리 사용.
+
+---
+
+## 6. 캔버스 그룹 프레임 및 공유 기계 풀 (`CanvasGroupFrame`)
+
+시각적 그룹화 영역 및 복수 레시피 시간 분할 공유(Time-Sharing Machine Pool)를 관리합니다.
+
+* **`isSharedMachineFrame`**: 프레임 내부의 모든 기계 레시피가 단일 물리 기계를 시간 분할하여 가동하는 모드.
+* **가동 분담률 계산**: $\text{Total Duty} = \sum \text{machineCount}_i$, 필요 기계 대수 = $\lceil \text{Total Duty} \rceil$.
+* **하드웨어 일괄 동기화 (`syncHardwareConfig`)**: 프레임 헤더 설정창을 통해 내부 모든 기계의 전압 티어, 오버클럭 모드, 병렬 수, 장착 애드온을 일괄 전파.
+* **프레임 크기 자동 맞춤 (`autoFit`)**: 프레임 내에 속하거나 걸쳐 있는 모든 노드를 감싸도록 패딩 24px 기준으로 바운딩 박스 자동 계산.
+
+---
+
+## 7. 포트 식별 불변 레코드 (`PortRef`)
+
+캔버스 상의 개별 입출력 슬롯/포트 위치를 특정하는 경량 불변 레코드입니다.
+
+```java
+public record PortRef(String nodeId, boolean isInput, int portIndex) {}
+```
+
+* **다중 포트 선택 및 범위 선택**: Windows 탐색기 방식의 `Ctrl + 클릭` 개별 토글, `Shift + 클릭` 연속 포트 범위 선택 지원.
+* **번들 와이어 일괄 배선**: 다중 선택된 포트들로부터 단일 드래그로 다중 베지어 번들 곡선 생성 및 정션/머신 풀 일괄 배선 연동.
+
+---
+
+## 8. 카테고리별 기본 기계 프리셋 시스템 (`CategoryMachinePreset`, `CategoryMachinePresetManager`)
+
+레시피 유형 및 카테고리(`categoryId`)별로 선호하는 기계 모델, 전압 티어, 병렬 수, 오버클럭 모드 및 장착 애드온 설정을 기억하고, 해당 카테고리의 신규 노드 배치 시 자동으로 설정을 적용합니다.
+
+* **도메인 엔티티 (`CategoryMachinePreset`)**:
+  - 특정 레시피 카테고리에 바인딩된 머신 아이콘, 멀티블록 여부, 목표 전압 티어, 병렬 수, 오버클럭 모드, 증기 모드, 하드웨어 애드온 목록, 노드 프로퍼티, 쓰레딩 설정을 캡슐화.
+  - `applyTo(RecipeNode node)`: 신규 노드 생성 시 레시피의 최소 요구 전압 티어를 안전하게 보존하며 프리셋 설정을 주입.
+* **프리셋 매니저 (`CategoryMachinePresetManager`)**:
+  - 싱글톤 패턴 기반의 인메모리 레지스트리 및 NBT 영속화 관리 (`serializeNBT` / `deserializeNBT`).
+  - 보드 설정 다이얼로그(`BoardSettingsDialog`) 및 머신 설정 다이얼로그(`MachineConfigDialog`)를 통한 CRUD 인터페이스 제공.
 
 ---
 

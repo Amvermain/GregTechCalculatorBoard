@@ -77,15 +77,22 @@ public class ToolbarWidget {
             }));
         }
 
-        // 0.05 Tutorial
-        if (bm.isShowTutorialButton()) {
-            String tutTxt = "§a🎓 " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
-            list.add(new ToolbarButtonDef("tutorial", tutTxt, 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38, 0xFF3B774E, font.width(tutTxt) + 12, btn -> {
-                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
-            }));
-        }
-
         boolean isShift = Screen.hasShiftDown();
+
+        // 0.05 Tutorial (Shift -> Advanced Tutorial)
+        if (bm.isShowTutorialButton()) {
+            if (isShift) {
+                String advTutTxt = "§b🔬 " + Component.translatable("gui.gtcalcboard.advanced_tutorial_btn").getString();
+                list.add(new ToolbarButtonDef("tutorial", advTutTxt, 0xFF38BDF8, 0xFF0C4A6E, 0xFF075985, 0xFF0284C7, font.width(advTutTxt) + 12, btn -> {
+                    com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startAdvancedTutorial(screen);
+                }));
+            } else {
+                String tutTxt = "§a🎓 " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
+                list.add(new ToolbarButtonDef("tutorial", tutTxt, 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38, 0xFF3B774E, font.width(tutTxt) + 12, btn -> {
+                    com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
+                }));
+            }
+        }
 
         // 1. Connect (Shift -> Quick Connect)
         if (isShift) {

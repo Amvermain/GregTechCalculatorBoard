@@ -4,6 +4,38 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-alpha.2] - 2026-08-31
+
+### Added
+- **Shared Machine Pool (Time-Sharing Frame)**:
+  - Added dedicated Shared Machine Pool frames allowing multiple recipe cards to share a single physical machine pool across time.
+  - Computes cumulative duty (`Total Duty %`) and quantized required machines (`Ceil`), displaying real-time header badges and comprehensive breakdown tooltips.
+  - Added `[⚙ Config]` button in the frame header to synchronize voltage tiers, overclock modes, parallel limits, and equipped addons across all enclosed machines.
+  - Accurately de-duplicates shared multiblock structures in the Bill of Materials (BOM) calculation.
+- **Port Multi-Selection & Bundle Batch Wiring UX**:
+  - Added marquee port selection: dragging a box over machine cards selectively grabs input or output ports without selecting entire cards.
+  - Added Windows Explorer-style selection: `Ctrl + Click` to toggle individual ports, `Shift + Click` to select continuous port ranges.
+  - Added multi-wire bundle dragging with real-time multi-bezier curve rendering.
+  - Dropping on empty canvas automatically creates vertically aligned Junction nodes with 1:1 wiring.
+  - Dropping onto a Shared Machine Pool automatically wires matching machines, spawns missing recipe cards from the search index, synchronizes hardware configs, and expands frame bounds.
+  - Intelligent secondary input preference matching: prioritizes recipes sharing the same secondary fluids/items (e.g. Lubricant vs Water) as the template machine.
+  - Holding `Shift` while dropping performs 1:1 Auto-Ratio matching with exact fractional machine counts (Duty).
+  - Added `[⛶ Auto-Fit]` action button in frame headers and double-click to instantly auto-fit frame bounds to enclosed contents.
+- **Interactive Tutorial Step 11**:
+  - Added interactive tutorial step introducing Shared Machine Pools, hardware synchronization, and bundle wiring.
+
+### Changed & Improved
+- **Two-Column Machine Card Port Highlight Precision**:
+  - Refined slot selection highlights and hit-test bounding boxes on 2-column cards so port highlights remain strictly confined to their respective left/right halves even on rows with empty inputs or outputs.
+- **Frame Auto-Expansion on Node Spawning**:
+  - Frame bounds automatically expand downward when auto-spawning multiple recipe cards from bundle drops, fully integrated with `ResizeFrameCommand` for instant Undo/Redo (`Ctrl + Z`).
+
+### Fixed
+- **Fractional Auto-Ratio Machine Count Truncation**:
+  - Fixed an issue where performing 1:1 Auto-Ratio on newly spawned machines in a Shared Machine Pool truncated fractional counts (e.g. `0.22`, `0.47`) into integer `1`.
+- **Junction Node Bundle Spawn Rendering Sync**:
+  - Fixed a UI widget list synchronization issue where junction nodes created from bundle drops did not appear on the canvas until another node was modified.
+
 ## [2.1.0-alpha.1] - 2026-08-31
 
 ### Added
@@ -30,6 +62,17 @@
 ### Fixed
 - **JEI Recipe Search Missing Ingredients & Anvil Fallback**:
   - Fixed an issue where browsing vanilla recipes in JEI Unofficial caused recipes to display as empty `[Anvil] Anvil` entries with missing input and output item previews.
+
+## [2.0.2] - 2026-08-31
+
+### Added
+- **Multi-Column & Progressive Assembly Compound Cluster Generation (`EmiStepRecipeDetector`, `CompoundRecipeBuilder`)**:
+  - Multi-step, multi-slice, and progressive assembly recipes (such as `Stargate Component Assembly` and GTCEu `Assembly Line` with up to 16 columns) imported from recipe viewers are now automatically partitioned across sequential layer nodes (`Layer I` through `Layer XVI`) grouped inside a purple Compound Module frame (`🧩 ...`).
+
+### Fixed
+- **GTCEu Macerator Byproduct Tier Gating Logic (`GTPowerCalculator`, `NodeRateCalculator`, `BoardTooltipRenderer`)**:
+  - Fixed an issue where secondary outputs (slot 1 onward) in Macerator recipes with 100% base chance or multi-product definitions (such as Plant Ball processing) were incorrectly calculated and displayed as active on ULV/LV/MV tiers or labeled with inaccurate tier requirements.
+  - Gated all secondary outputs from slot 1 onward behind the HV+ voltage tier requirement (`Byproducts from HV+`), matching in-game singleblock and multiblock Macerator behavior, with inactive outputs properly displaying `0% (Requires HV+)`.
 
 ## [2.0.1] - 2026-08-31
 

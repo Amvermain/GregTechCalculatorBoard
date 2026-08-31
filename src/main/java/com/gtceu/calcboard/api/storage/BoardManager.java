@@ -86,6 +86,7 @@ public class BoardManager {
         this.matchedWireColorPreset = WireColorPreset.GREEN;
         this.maxHarmonizeScale = 16;
         this.harmonizeSurplusTolerance = 0.02;
+        com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
         this.autoLoaded = false;
     }
 
@@ -401,6 +402,7 @@ public class BoardManager {
             rootTag.putString("matchedWireColorPreset", getMatchedWireColorPreset().name());
             rootTag.putInt("maxHarmonizeScale", getMaxHarmonizeScale());
             rootTag.putDouble("harmonizeSurplusTolerance", getHarmonizeSurplusTolerance());
+            rootTag.put("categoryPresets", com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().serializeNBT());
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
@@ -491,6 +493,11 @@ public class BoardManager {
                 }
                 if (rootTag.contains("harmonizeSurplusTolerance")) {
                     this.harmonizeSurplusTolerance = rootTag.getDouble("harmonizeSurplusTolerance");
+                }
+                if (rootTag.contains("categoryPresets", Tag.TAG_COMPOUND)) {
+                    com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().deserializeNBT(rootTag.getCompound("categoryPresets"));
+                } else {
+                    com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);

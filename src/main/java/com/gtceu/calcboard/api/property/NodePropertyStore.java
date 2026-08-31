@@ -75,6 +75,13 @@ public class NodePropertyStore {
         values.clear();
     }
 
+    public void copyFrom(NodePropertyStore other) {
+        values.clear();
+        if (other != null) {
+            values.putAll(other.values);
+        }
+    }
+
     public boolean isEmpty() {
         return values.isEmpty();
     }

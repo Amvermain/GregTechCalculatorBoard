@@ -105,6 +105,12 @@ public final class CompoundRecipeBuilder {
             case 8 -> "VIII";
             case 9 -> "IX";
             case 10 -> "X";
+            case 11 -> "XI";
+            case 12 -> "XII";
+            case 13 -> "XIII";
+            case 14 -> "XIV";
+            case 15 -> "XV";
+            case 16 -> "XVI";
             default -> String.valueOf(num);
         };
     }
