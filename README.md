@@ -200,6 +200,14 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.2
 
 ---
 
+## Inspirations
+
+- [SatisFlow](https://satisflow.app/) - Interactive node-graph factory calculator and flowchart planner for Satisfactory.
+- [Foreman 2](https://github.com/DanielKote/Foreman2) - Node-based visual flowchart production line calculator for Factorio.
+- [Helmod](https://mods.factorio.com/mod/helmod) - Feature-rich in-game factory calculation and recipe matrix solver mod for Factorio.
+
+---
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

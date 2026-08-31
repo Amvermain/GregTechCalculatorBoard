@@ -200,6 +200,14 @@ cd GregTechCalculatorBoard
 
 ---
 
+## Inspirations (영감을 받은 프로젝트)
+
+- [SatisFlow](https://satisflow.app/) - 노드 그래프 기반의 Satisfactory 웹 공정 계산기 및 플로우차트 플래너.
+- [Foreman 2](https://github.com/DanielKote/Foreman2) - Factorio의 노드 기반 시각적 플로우차트 생산 라인 계산기.
+- [Helmod](https://mods.factorio.com/mod/helmod) - Factorio의 대표적인 인게임 공정 계산 및 레시피 매트릭스 솔버 모드.
+
+---
+
 ## 라이선스
 
 MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참고하세요.
