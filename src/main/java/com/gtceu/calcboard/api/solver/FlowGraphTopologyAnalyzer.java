@@ -63,13 +63,16 @@ public final class FlowGraphTopologyAnalyzer {
         Set<String> upstream = new LinkedHashSet<>();
         Queue<String> queue = new ArrayDeque<>();
         queue.add(anchorId);
+        if (downstreamNodes != null) {
+            queue.addAll(downstreamNodes);
+        }
 
         while (!queue.isEmpty()) {
             String currId = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
                 if (edge.toNodeId().equals(currId)) {
                     String prevId = edge.fromNodeId();
-                    if (!prevId.equals(anchorId) && !downstreamNodes.contains(prevId)) {
+                    if (!prevId.equals(anchorId) && (downstreamNodes == null || !downstreamNodes.contains(prevId))) {
                         if (upstream.add(prevId)) {
                             queue.add(prevId);
                         }

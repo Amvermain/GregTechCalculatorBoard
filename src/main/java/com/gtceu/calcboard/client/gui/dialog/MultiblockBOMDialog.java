@@ -85,6 +85,7 @@ public class MultiblockBOMDialog {
             this.searchQuery = text.toLowerCase(Locale.ROOT).trim();
             this.itemScrollY = 0.0;
         });
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onBOMOpened();
     }
 
     public void close() {
@@ -102,12 +103,14 @@ public class MultiblockBOMDialog {
         if (dirty || cachedSummary == null) {
             List<BoardPage> allPages = BoardManager.getInstance().getPages();
             List<RecipeNode> targetNodes = new ArrayList<>();
+            List<com.gtceu.calcboard.api.model.CanvasGroupFrame> targetFrames = new ArrayList<>();
             for (BoardPage p : allPages) {
                 if (selectedPageIds.contains(p.getId()) && p.getGraph() != null) {
                     targetNodes.addAll(p.getGraph().getNodes());
+                    targetFrames.addAll(p.getGraph().getFrames());
                 }
             }
-            cachedSummary = MultiblockBOMCalculator.calculateBOM(targetNodes, dualLowerTierEnergyHatches);
+            cachedSummary = MultiblockBOMCalculator.calculateBOM(targetNodes, targetFrames, dualLowerTierEnergyHatches);
             dirty = false;
         }
     }

@@ -118,11 +118,16 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // Recipe Viewer Selection: 'emi' (Default) or 'jei' (Pure GTCEuM + JEI + JEI++ testing environment)
+    // Recipe Viewer Selection: 'emi' (Default), 'jei' (Pure GTCEuM + Official JEI + JEI++), or 'jeiu' / 'jei_unofficial' (JEI Unofficial)
     def envViewer = System.getenv('recipe_viewer') ?: System.getenv('RECIPE_VIEWER')
     def propViewer = project.findProperty('recipe_viewer')
-    def recipeViewer = envViewer ?: propViewer ?: 'emi'
+    def rawRecipeViewer = (envViewer ?: propViewer ?: 'emi').toString().trim()
+    def recipeViewer = rawRecipeViewer.toLowerCase(Locale.ROOT)
+    def isJeiUnofficial = recipeViewer == 'jeiu' || recipeViewer == 'jei_unofficial' || recipeViewer == 'jeiunofficial'
+    def isJeiOfficial = recipeViewer == 'jei' || recipeViewer == 'jei_plus_plus' || recipeViewer == 'jeiplusplus'
+    def isEmi = !isJeiUnofficial && !isJeiOfficial
     def jeiPlusPlusFileId = System.getenv('jei_plus_plus_file_id') ?: project.findProperty('jei_plus_plus_file_id') ?: '8659409'
+    def jeiUnofficialFileId = System.getenv('jei_unofficial_file_id') ?: System.getenv('JEI_UNOFFICIAL_FILE_ID') ?: project.findProperty('jei_unofficial_file_id') ?: '8723054'
 
     // Team Integration Mod Selection: 'none', 'phoenix' (Phoenix Guilds), or 'ftbteams' (FTB Teams)
     def envTeam = System.getenv('team_mod') ?: System.getenv('TEAM_MOD') ?: System.getenv('team_provider') ?: System.getenv('TEAM_PROVIDER')
@@ -134,7 +139,7 @@ dependencies {
     def ftbLibFileId = System.getenv('ftb_library_file_id') ?: System.getenv('FTB_LIBRARY_FILE_ID') ?: project.findProperty('ftb_library_file_id') ?: '5623049'
     def archFileId = System.getenv('architectury_file_id') ?: System.getenv('ARCHITECTURY_FILE_ID') ?: project.findProperty('architectury_file_id') ?: '5137938'
 
-    println ">>> [GTCalcBoard] Active Recipe Viewer Profile: ${recipeViewer}"
+    println ">>> [GTCalcBoard] Active Recipe Viewer Profile: ${isJeiUnofficial ? 'jei_unofficial (JEIu)' : (isJeiOfficial ? 'jei (Official JEI + JEI++)' : 'emi')}"
     println ">>> [GTCalcBoard] Active Team Provider Profile: ${teamMod}"
 
     // Team Provider Runtime Mod Injection
@@ -150,20 +155,25 @@ dependencies {
     // EMI API & Runtime (Deobfuscated automatically by ForgeGradle)
     compileOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
     testImplementation fg.deobf("curse.maven:emi-580555:${emi_file_id}")
-    if (recipeViewer != 'jei') {
+    if (isEmi) {
         runtimeOnly fg.deobf("curse.maven:emi-580555:${emi_file_id}")
     }
 
-    // JEI API & Runtime (Required for JEI integration and Thermal Series native JEI plugin)
+    // JEI API & Runtime
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     testImplementation fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
-    runtimeOnly fg.deobf("local:jei-${minecraft_version}-forge-${jei_runtime_version}:${jei_runtime_version}")
 
-    // JEI++ (JEI Plus) Runtime (Loaded in pure JEI mode or when explicitly requested)
-    if (recipeViewer == 'jei' || project.hasProperty('include_jei_plus')) {
-        runtimeOnly fg.deobf("curse.maven:jei-plus-plus-1645653:${jeiPlusPlusFileId}")
+    if (isJeiUnofficial) {
+        // JEI Unofficial Runtime (StardustMINUS fork for Stellar Remnants)
+        runtimeOnly fg.deobf("curse.maven:jei-unofficial-1642978:${jeiUnofficialFileId}")
+    } else {
+        runtimeOnly fg.deobf("local:jei-${minecraft_version}-forge-${jei_runtime_version}:${jei_runtime_version}")
+        // JEI++ (JEI Plus) Runtime (Loaded in pure JEI mode or when explicitly requested)
+        if (isJeiOfficial || project.hasProperty('include_jei_plus')) {
+            runtimeOnly fg.deobf("curse.maven:jei-plus-plus-1645653:${jeiPlusPlusFileId}")
+        }
     }
 
     // Jade (WAILA / Block Tooltip HUD mod for runClient testing)
@@ -174,13 +184,17 @@ dependencies {
     if (gtceuVariant == 'start_fork') {
         compileOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
         testImplementation fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-        runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
-        runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
+        if (!isJeiUnofficial) {
+            runtimeOnly fg.deobf("local:gtceu-st-${minecraft_version}-${gtceu_st_version}:${gtceu_st_version}")
+            runtimeOnly fg.deobf("local:ldlib-forge-${minecraft_version}-${ldlib_version}:${ldlib_version}")
+        }
     } else {
         compileOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
         testImplementation fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
-        runtimeOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
-        runtimeOnly fg.deobf("curse.maven:ldlib-626676:${ldlib_curseforge_file_id}")
+        if (!isJeiUnofficial) {
+            runtimeOnly fg.deobf("curse.maven:gregtechceu-modern-890405:${gtceu_curseforge_file_id}")
+            runtimeOnly fg.deobf("curse.maven:ldlib-626676:${ldlib_curseforge_file_id}")
+        }
     }
 
     // Thermal Series (CoFH Core, Thermal Foundation, Thermal Expansion, Thermal Cultivation)
@@ -192,7 +206,7 @@ dependencies {
     testImplementation fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
     compileOnly fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
     testImplementation fg.deobf("local:thermal_cultivation-${minecraft_version}-${thermal_cultivation_version}:${thermal_cultivation_version}")
-    if (recipeViewer != 'jei') {
+    if (isEmi) {
         runtimeOnly fg.deobf("local:cofh_core-${minecraft_version}-${cofh_core_version}:${cofh_core_version}")
         runtimeOnly fg.deobf("local:thermal_foundation-${minecraft_version}-${thermal_foundation_version}:${thermal_foundation_version}")
         runtimeOnly fg.deobf("local:thermal_expansion-${minecraft_version}-${thermal_expansion_version}:${thermal_expansion_version}")
@@ -205,6 +219,9 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+
+    // ArchUnit (Architectural Rule Verification)
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }
 
 test {

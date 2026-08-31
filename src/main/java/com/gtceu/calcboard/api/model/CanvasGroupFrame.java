@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
 
@@ -43,6 +44,7 @@ public class CanvasGroupFrame {
     private final Set<String> containedNodeIds = new LinkedHashSet<>();
     private boolean isCompoundFrame = false;
     private String compoundGroupId = "";
+    private boolean isSharedMachineFrame = false;
 
     public CanvasGroupFrame(String id, String title, int color, double posX, double posY, double width, double height) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -73,9 +75,10 @@ public class CanvasGroupFrame {
                 frame.addNode(n.getId());
                 minX = Math.min(minX, n.getPosX());
                 minY = Math.min(minY, n.getPosY());
-                maxX = Math.max(maxX, n.getPosX() + n.getCardWidth());
-                int h = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
-                maxY = Math.max(maxY, n.getPosY() + h);
+                int nw = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
+                int nh = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
+                maxX = Math.max(maxX, n.getPosX() + nw);
+                maxY = Math.max(maxY, n.getPosY() + nh);
                 count++;
             }
         }
@@ -103,8 +106,10 @@ public class CanvasGroupFrame {
         List<RecipeNode> result = new ArrayList<>();
         if (graph == null) return result;
         for (RecipeNode n : graph.getNodes()) {
-            double cx = n.getPosX() + n.getCardWidth() / 2.0;
-            double cy = n.getPosY() + (n.getCardHeight() > 0 ? n.getCardHeight() / 2.0 : 40.0);
+            double nw = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
+            double nh = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
+            double cx = n.getPosX() + nw / 2.0;
+            double cy = n.getPosY() + nh / 2.0;
             if (isPointInside(cx, cy)) {
                 result.add(n);
             }
@@ -135,14 +140,14 @@ public class CanvasGroupFrame {
 
         int count = 0;
         for (RecipeNode n : nodes) {
-            if (containedNodeIds.contains(n.getId())) {
-                minX = Math.min(minX, n.getPosX());
-                minY = Math.min(minY, n.getPosY());
-                maxX = Math.max(maxX, n.getPosX() + n.getCardWidth());
-                int h = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
-                maxY = Math.max(maxY, n.getPosY() + h);
-                count++;
-            }
+            if (n == null) continue;
+            minX = Math.min(minX, n.getPosX());
+            minY = Math.min(minY, n.getPosY());
+            int w = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
+            int h = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
+            maxX = Math.max(maxX, n.getPosX() + w);
+            maxY = Math.max(maxY, n.getPosY() + h);
+            count++;
         }
 
         if (count > 0) {
@@ -151,6 +156,34 @@ public class CanvasGroupFrame {
             this.width = Math.max(MIN_WIDTH, (maxX - minX) + padding * 2);
             this.height = Math.max(MIN_HEIGHT, (maxY - minY) + padding * 2 + HEADER_HEIGHT);
         }
+    }
+
+    public boolean autoFit(FlowGraph graph, double padding) {
+        if (graph == null) return false;
+        List<RecipeNode> targets = new ArrayList<>();
+        // 1. Check contained nodes
+        for (String nid : containedNodeIds) {
+            RecipeNode n = graph.findNodeById(nid);
+            if (n != null && !targets.contains(n)) targets.add(n);
+        }
+        // 2. Also check spatially intersecting/enclosed nodes
+        for (RecipeNode n : graph.getNodes()) {
+            if (!targets.contains(n)) {
+                int w = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
+                int h = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
+                double cx = n.getPosX() + w / 2.0;
+                double cy = n.getPosY() + h / 2.0;
+                if (isPointInside(cx, cy) || (n.getPosX() < posX + width && n.getPosX() + w > posX && n.getPosY() < posY + height && n.getPosY() + h > posY)) {
+                    targets.add(n);
+                }
+            }
+        }
+        if (targets.isEmpty()) return false;
+        recomputeBounds(targets, padding);
+        for (RecipeNode n : targets) {
+            containedNodeIds.add(n.getId());
+        }
+        return true;
     }
 
     public void moveBy(double dx, double dy) {
@@ -216,6 +249,9 @@ public class CanvasGroupFrame {
                 tag.putString("compoundGroupId", compoundGroupId);
             }
         }
+        if (isSharedMachineFrame) {
+            tag.putBoolean("isSharedMachineFrame", true);
+        }
 
         ListTag nodesTag = new ListTag();
         for (String nid : containedNodeIds) {
@@ -240,6 +276,9 @@ public class CanvasGroupFrame {
         if (tag.getBoolean("isCompoundFrame")) {
             frame.setCompoundFrame(true);
             frame.setCompoundGroupId(tag.getString("compoundGroupId"));
+        }
+        if (tag.getBoolean("isSharedMachineFrame")) {
+            frame.setSharedMachineFrame(true);
         }
 
         if (tag.contains("nodes", Tag.TAG_LIST)) {
@@ -338,6 +377,141 @@ public class CanvasGroupFrame {
 
     public void setCompoundGroupId(String compoundGroupId) {
         this.compoundGroupId = compoundGroupId != null ? compoundGroupId : "";
+    }
+
+    public boolean isSharedMachineFrame() {
+        return isSharedMachineFrame;
+    }
+
+    public void setSharedMachineFrame(boolean sharedMachineFrame) {
+        this.isSharedMachineFrame = sharedMachineFrame;
+    }
+
+    /**
+     * Computes the aggregated duty cycle (total machine load) for all operational recipe nodes
+     * enclosed within this shared machine frame.
+     */
+    public double computeTotalMachineDuty(FlowGraph graph) {
+        if (graph == null) return 0.0;
+        double totalDuty = 0.0;
+        for (RecipeNode node : getEnclosedNodes(graph)) {
+            if (node != null && !node.isReroute() && node.isOperational()) {
+                totalDuty += node.getMachineCount();
+            }
+        }
+        return totalDuty;
+    }
+
+    /**
+     * Computes the physical integer machine count required to sustain the aggregated duty cycle.
+     */
+    public int computeRequiredMachines(FlowGraph graph) {
+        double totalDuty = computeTotalMachineDuty(graph);
+        return Math.max(1, (int) Math.ceil(totalDuty - 0.00001));
+    }
+
+    /**
+     * Checks whether all recipe nodes in this frame share the same machine icon / machine type AND the same voltage tier.
+     */
+    public boolean isMachineCompatible(FlowGraph graph) {
+        if (graph == null) return true;
+        List<RecipeNode> nodes = getEnclosedNodes(graph);
+        if (nodes.size() <= 1) return true;
+
+        ResourceLocation firstIcon = null;
+        com.gtceu.calcboard.api.type.GTVoltageTier firstTier = null;
+        for (RecipeNode node : nodes) {
+            if (node == null || node.isReroute()) continue;
+            ResourceLocation icon = node.getMachineIcon();
+            if (icon == null && !node.getAvailableWorkstations().isEmpty()) {
+                icon = node.getAvailableWorkstations().get(0);
+            }
+            com.gtceu.calcboard.api.type.GTVoltageTier tier = node.getTargetTier();
+
+            if (firstIcon == null) {
+                firstIcon = icon;
+                firstTier = tier;
+            } else {
+                if (icon != null && !firstIcon.equals(icon)) {
+                    return false;
+                }
+                if (firstTier != null && tier != null && !firstTier.equals(tier)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public RecipeNode getFirstOperationalNode(FlowGraph graph) {
+        if (graph == null) return null;
+        for (RecipeNode node : getEnclosedNodes(graph)) {
+            if (node != null && !node.isReroute()) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    public void syncHardwareConfig(RecipeNode sourceNode, FlowGraph graph) {
+        if (sourceNode == null || graph == null) return;
+        for (RecipeNode target : getEnclosedNodes(graph)) {
+            if (target == null || target.isReroute() || target == sourceNode) continue;
+            if (sourceNode.getMachineIcon() != null) {
+                target.setMachineIcon(sourceNode.getMachineIcon());
+            }
+            target.setMultiblock(sourceNode.isMultiblock());
+            target.setTargetTier(sourceNode.getTargetTier());
+            target.setSteamMode(sourceNode.getSteamMode());
+            target.setOverclockMode(sourceNode.getOverclockMode());
+            target.setParallel(sourceNode.getParallel());
+
+            // Addons
+            target.getAddons().clear();
+            for (com.gtceu.calcboard.api.catalog.MachineAddon addon : sourceNode.getAddons()) {
+                if (addon != null) {
+                    target.getAddons().add(addon.copy());
+                }
+            }
+
+            // Node Property Store
+            target.getProperties().copyFrom(sourceNode.getProperties());
+
+            // Threading Config
+            if (sourceNode.getThreadingConfig() != null) {
+                target.setThreadingConfig(sourceNode.getThreadingConfig().copy());
+            } else {
+                target.setThreadingConfig(null);
+            }
+
+            // Turbine & Boiler Specifics
+            target.setRotorName(sourceNode.getRotorName());
+            target.setRotorEfficiency(sourceNode.getRotorEfficiency());
+            target.setRotorPower(sourceNode.getRotorPower());
+            target.setBoilerThrottle(sourceNode.getBoilerThrottle());
+        }
+    }
+
+    public ResourceLocation getSharedMachineIcon(FlowGraph graph) {
+        if (graph == null) return null;
+        for (RecipeNode node : getEnclosedNodes(graph)) {
+            if (node == null || node.isReroute()) continue;
+            ResourceLocation icon = node.getMachineIcon();
+            if (icon != null) return icon;
+            if (!node.getAvailableWorkstations().isEmpty()) {
+                return node.getAvailableWorkstations().get(0);
+            }
+        }
+        return null;
+    }
+
+    public String getSharedMachineName(FlowGraph graph) {
+        if (graph == null) return "";
+        for (RecipeNode node : getEnclosedNodes(graph)) {
+            if (node == null || node.isReroute()) continue;
+            return node.getMachineDisplayName();
+        }
+        return "";
     }
 }
 

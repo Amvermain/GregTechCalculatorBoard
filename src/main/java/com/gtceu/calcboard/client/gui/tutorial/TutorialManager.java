@@ -62,16 +62,37 @@ public class TutorialManager {
         return null;
     }
 
+    public enum TutorialMode {
+        BASIC,
+        ADVANCED
+    }
+
+    private TutorialMode mode = TutorialMode.BASIC;
+
+    public TutorialMode getMode() {
+        return mode;
+    }
+
     public void startTutorial(BoardScreen screen) {
+        startTutorial(screen, TutorialMode.BASIC);
+    }
+
+    public void startAdvancedTutorial(BoardScreen screen) {
+        startTutorial(screen, TutorialMode.ADVANCED);
+    }
+
+    public void startTutorial(BoardScreen screen, TutorialMode mode) {
         this.currentScreen = screen;
         this.active = true;
-        this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
+        this.mode = mode;
+        this.currentStep = (mode == TutorialMode.ADVANCED) ? TutorialStep.STEP_8_SHARED_MACHINE : TutorialStep.STEP_1_ADD_RECIPE;
         this.pannedOrZoomed = false;
 
         // Always create a dedicated new page for tutorial to protect user's existing work 100%!
-        String pageName = "Tutorial";
+        String pageName = (mode == TutorialMode.ADVANCED) ? "Advanced Tutorial" : "Tutorial";
+        String langKey = (mode == TutorialMode.ADVANCED) ? "gui.gtcalcboard.tutorial.advanced_page_name" : "gui.gtcalcboard.tutorial.page_name";
         try {
-            pageName = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tutorial.page_name").getString();
+            pageName = net.minecraft.network.chat.Component.translatable(langKey).getString();
         } catch (Throwable ignored) {}
         com.gtceu.calcboard.api.storage.BoardPage newPage = com.gtceu.calcboard.api.storage.BoardManager.getInstance().addPage(pageName);
         this.tutorialPageId = newPage.getId();
@@ -85,10 +106,12 @@ public class TutorialManager {
         }
 
         playUiSound(0, 1.0f);
+        onStepEnter(this.currentStep);
     }
 
     public void stopTutorial() {
         this.active = false;
+        this.mode = TutorialMode.BASIC;
         this.currentStep = TutorialStep.STEP_1_ADD_RECIPE;
         this.practiceNodeId = null;
         this.boilerNodeId = null;
@@ -97,6 +120,15 @@ public class TutorialManager {
     }
 
     public void nextStep() {
+        if (mode == TutorialMode.BASIC && currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
+            completeTutorial();
+            return;
+        }
+        if (mode == TutorialMode.ADVANCED && currentStep == TutorialStep.STEP_9_BOM_INSPECTION) {
+            completeTutorial();
+            return;
+        }
+
         int nextOrdinal = currentStep.ordinal() + 1;
         if (nextOrdinal < TutorialStep.values().length) {
             currentStep = TutorialStep.values()[nextOrdinal];
@@ -137,6 +169,10 @@ public class TutorialManager {
             setupStep6Exercise(tutPage);
         } else if (step == TutorialStep.STEP_7_COMPOUND_MODULE) {
             setupStep7Exercise(tutPage);
+        } else if (step == TutorialStep.STEP_8_SHARED_MACHINE) {
+            setupStep8Exercise(tutPage);
+        } else if (step == TutorialStep.STEP_9_BOM_INSPECTION) {
+            setupStep9Exercise(tutPage);
         }
     }
 
@@ -226,6 +262,51 @@ public class TutorialManager {
         }
         if (currentScreen != null) {
             currentScreen.getSummaryOverlay().setCollapsed(false);
+            currentScreen.rebuildWidgets();
+        }
+    }
+
+    private void setupStep8Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
+        tutPage.getGraph().clear();
+
+        ResourceLocation cutterIcon = ResourceLocation.tryParse("gtceu:lv_cutter");
+        RecipeNode cutter1 = RecipeNode.create(cutterIcon, "Quartz Slicing (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
+        cutter1.setMachineCount(0.15);
+        cutter1.setPos(-200, -40);
+        cutter1.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:quartz_block"), "Quartz Block", 1.0));
+        cutter1.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:quartz"), "Quartz", 4.0));
+
+        RecipeNode cutter2 = RecipeNode.create(cutterIcon, "Amethyst Slicing (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
+        cutter2.setMachineCount(0.20);
+        cutter2.setPos(60, -40);
+        cutter2.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:amethyst_block"), "Amethyst Block", 1.0));
+        cutter2.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:amethyst_shard"), "Amethyst Shard", 4.0));
+
+        RecipeNode cutter3 = RecipeNode.create(cutterIcon, "Echo Slicing (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
+        cutter3.setMachineCount(0.10);
+        cutter3.setPos(320, -40);
+        cutter3.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:echo_shard"), "Echo Shard", 1.0));
+        cutter3.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:sculk"), "Sculk", 2.0));
+
+        tutPage.getGraph().addNode(cutter1);
+        tutPage.getGraph().addNode(cutter2);
+        tutPage.getGraph().addNode(cutter3);
+
+        if (currentScreen != null) {
+            currentScreen.rebuildWidgets();
+        }
+    }
+
+    private void setupStep9Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
+        boolean hasSharedFrame = tutPage.getGraph().getFrames().stream().anyMatch(CanvasGroupFrame::isSharedMachineFrame);
+        if (!hasSharedFrame && tutPage.getGraph().getNodes().size() >= 2) {
+            CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes("Shared LV Cutter", tutPage.getGraph().getNodes(), CanvasGroupFrame.COLOR_EMERALD);
+            frame.setSharedMachineFrame(true);
+            tutPage.getGraph().addFrame(frame);
+        }
+        if (currentScreen != null) {
             currentScreen.rebuildWidgets();
         }
     }
@@ -344,13 +425,27 @@ public class TutorialManager {
     public void onModuleGrouped() {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
-            completeTutorial();
+            nextStep();
         }
     }
 
     public void onModuleExpanded() {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
+            nextStep();
+        }
+    }
+
+    public void onSharedMachineFramed() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_8_SHARED_MACHINE) {
+            nextStep();
+        }
+    }
+
+    public void onBOMOpened() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_9_BOM_INSPECTION) {
             completeTutorial();
         }
     }

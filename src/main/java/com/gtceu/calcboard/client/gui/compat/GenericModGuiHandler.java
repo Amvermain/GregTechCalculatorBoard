@@ -146,6 +146,12 @@ public class GenericModGuiHandler implements IModGuiHandler {
             node.setOverclockMode(newOc);
             if (widget.getParent() != null) {
                 widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.overclockMode(node.getId(), oldOc, newOc));
+                var frame = widget.getParent().getGraph().findFrameEnclosingNode(node);
+                if (frame != null && frame.isSharedMachineFrame()) {
+                    frame.syncHardwareConfig(node, widget.getParent().getGraph());
+                    widget.getParent().rebuildWidgets();
+                }
+                widget.getParent().markSummaryDirty();
             }
             widget.invalidateCache();
             return true;

@@ -9,6 +9,7 @@ import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
 import com.gtceu.calcboard.client.gui.render.CanvasStickyNoteRenderer;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.model.PortRef;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 
@@ -154,6 +155,21 @@ public class CanvasInteractionHandler {
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
         FlowGraph graph = screen.getGraph();
 
+        // 0. Check Open Hidden Ports Popups first (Highest Modal Priority)
+        for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
+            NodeWidget widget = nodeWidgets.get(i);
+            var popup = widget.getHiddenPortsPopup();
+            if (popup != null && popup.isVisible()) {
+                if (popup.isPointInside(canvasMouseX, canvasMouseY)) {
+                    if (popup.mouseClicked(canvasMouseX, canvasMouseY, button)) {
+                        return true;
+                    }
+                } else if (button == 0) {
+                    popup.close();
+                }
+            }
+        }
+
         // 1. Check Node Widgets from top to bottom
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
@@ -162,56 +178,60 @@ public class CanvasInteractionHandler {
                     screen.bringNodeToFront(widget.getNode());
                 }
 
-                // Output Port: Left click to start forward wire, Right click to disconnect
+                // Output Port: Left click to start forward wire / select, Right click to hide port (and disconnect wires)
                 int outPortIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
                 if (outPortIdx >= 0) {
                     if (!screen.ensureEditPermission()) return true;
                     if (button == 0) {
-                        wireStartNode = widget;
-                        wireStartPortIdx = outPortIdx;
-                        wireStartIsInput = false;
-                        return true;
+                        boolean ctrl = net.minecraft.client.gui.screens.Screen.hasControlDown();
+                        boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                        if (ctrl) {
+                            screen.toggleSelectPort(widget.getNode().getId(), false, outPortIdx);
+                            return true;
+                        } else if (shift) {
+                            screen.selectPortRange(widget.getNode().getId(), false, outPortIdx);
+                            return true;
+                        } else {
+                            if (!screen.isPortSelected(widget.getNode().getId(), false, outPortIdx) || screen.getSelectedPorts().size() <= 1) {
+                                screen.clearPortSelection();
+                                screen.selectPort(widget.getNode().getId(), false, outPortIdx, false);
+                            }
+                            wireStartNode = widget;
+                            wireStartPortIdx = outPortIdx;
+                            wireStartIsInput = false;
+                            return true;
+                        }
                     } else if (button == 1) {
-                        List<FlowGraph.ConnectionEdge> toRemove = new ArrayList<>();
-                        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
-                            if (e.fromNodeId().equals(widget.getNode().getId()) && e.outputIndex() == outPortIdx) {
-                                toRemove.add(e);
-                            }
-                        }
-                        if (!toRemove.isEmpty()) {
-                            graph.getConnections().removeAll(toRemove);
-                            for (FlowGraph.ConnectionEdge e : toRemove) {
-                                screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.DisconnectWireCommand(e));
-                            }
-                            notifyDisconnect("message.gtcalcboard.disconnect_out");
-                        }
+                        widget.hidePortAndDisconnectWires(false, outPortIdx);
                         return true;
                     }
                 }
 
-                // Input Port: Left click to start reverse wire, Right click to disconnect
+                // Input Port: Left click to start reverse wire / select, Right click to hide port (and disconnect wires)
                 int inPortIdx = widget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
                 if (inPortIdx >= 0) {
                     if (!screen.ensureEditPermission()) return true;
                     if (button == 0) {
-                        wireStartNode = widget;
-                        wireStartPortIdx = inPortIdx;
-                        wireStartIsInput = true;
-                        return true;
+                        boolean ctrl = net.minecraft.client.gui.screens.Screen.hasControlDown();
+                        boolean shift = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                        if (ctrl) {
+                            screen.toggleSelectPort(widget.getNode().getId(), true, inPortIdx);
+                            return true;
+                        } else if (shift) {
+                            screen.selectPortRange(widget.getNode().getId(), true, inPortIdx);
+                            return true;
+                        } else {
+                            if (!screen.isPortSelected(widget.getNode().getId(), true, inPortIdx) || screen.getSelectedPorts().size() <= 1) {
+                                screen.clearPortSelection();
+                                screen.selectPort(widget.getNode().getId(), true, inPortIdx, false);
+                            }
+                            wireStartNode = widget;
+                            wireStartPortIdx = inPortIdx;
+                            wireStartIsInput = true;
+                            return true;
+                        }
                     } else if (button == 1) {
-                        List<FlowGraph.ConnectionEdge> toRemove = new ArrayList<>();
-                        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
-                            if (e.toNodeId().equals(widget.getNode().getId()) && e.inputIndex() == inPortIdx) {
-                                toRemove.add(e);
-                            }
-                        }
-                        if (!toRemove.isEmpty()) {
-                            graph.getConnections().removeAll(toRemove);
-                            for (FlowGraph.ConnectionEdge e : toRemove) {
-                                screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.DisconnectWireCommand(e));
-                            }
-                            notifyDisconnect("message.gtcalcboard.disconnect_in");
-                        }
+                        widget.hidePortAndDisconnectWires(true, inPortIdx);
                         return true;
                     }
                 }
@@ -252,7 +272,7 @@ public class CanvasInteractionHandler {
                 }
 
                 // Title bar Header click -> Start node dragging (Single or Multi)
-                if (widget.isHeaderHovered(canvasMouseX, canvasMouseY) && button == 0) {
+                if (widget.isHeaderHovered(canvasMouseX, canvasMouseY) && button == 0 && !widget.getNameEditor().isEditing()) {
                     draggingNode = widget;
                     lastDragCanvasX = canvasMouseX;
                     lastDragCanvasY = canvasMouseY;
@@ -394,6 +414,29 @@ public class CanvasInteractionHandler {
                     return true;
                 } else if (action == CanvasGroupFrameRenderer.FrameAction.COLLAPSE && button == 0) {
                     screen.collapseFrameIntoModule(frame);
+                    return true;
+                } else if (action == CanvasGroupFrameRenderer.FrameAction.AUTOFIT && button == 0) {
+                    double oldX = frame.getPosX();
+                    double oldY = frame.getPosY();
+                    double oldW = frame.getWidth();
+                    double oldH = frame.getHeight();
+                    boolean fitted = frame.autoFit(graph, com.gtceu.calcboard.api.model.CanvasGroupFrame.DEFAULT_PADDING);
+                    if (fitted) {
+                        double newX = frame.getPosX();
+                        double newY = frame.getPosY();
+                        double newW = frame.getWidth();
+                        double newH = frame.getHeight();
+                        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ResizeFrameCommand(
+                                frame.getId(), oldX, oldY, oldW, oldH, newX, newY, newW, newH, "Auto-fit frame " + frame.getTitle()
+                        ));
+                        screen.markSummaryDirty();
+                        Minecraft.getInstance().getSoundManager().play(
+                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+                        );
+                    }
+                    return true;
+                } else if (action == CanvasGroupFrameRenderer.FrameAction.CONFIG && button == 0) {
+                    screen.openSharedFrameConfigDialog(frame);
                     return true;
                 }
             } else if (frame.isPointInHeader(canvasMouseX, canvasMouseY) && button == 0) {
@@ -673,28 +716,71 @@ public class CanvasInteractionHandler {
                 FlowGraph graph = screen.getGraph();
                 boolean connected = false;
 
-                for (NodeWidget targetWidget : nodeWidgets) {
-                    if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
-                        if (!wireStartIsInput) {
-                            int inPortIdx = targetWidget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
-                            if (inPortIdx >= 0) {
-                                handleForwardWireConnect(targetWidget, graph, inPortIdx);
-                                connected = true;
+                boolean isBundle = screen.hasSelectedPorts()
+                        && screen.isPortSelected(wireStartNode.getNode().getId(), wireStartIsInput, wireStartPortIdx)
+                        && screen.getSelectedPorts().size() > 1;
+
+                if (isBundle) {
+                    Set<PortRef> bundlePorts = new HashSet<>(screen.getSelectedPorts());
+                    // 1. Check if dropped onto a Group Frame (Machine Pool)
+                    CanvasGroupFrame targetFrame = null;
+                    if (graph != null) {
+                        for (CanvasGroupFrame f : graph.getFrames()) {
+                            if (canvasMouseX >= f.getPosX() && canvasMouseX <= f.getPosX() + f.getWidth() &&
+                                    canvasMouseY >= f.getPosY() && canvasMouseY <= f.getPosY() + f.getHeight()) {
+                                targetFrame = f;
                                 break;
                             }
-                        } else {
-                            int outPortIdx = targetWidget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
-                            if (outPortIdx >= 0) {
-                                handleReverseWireConnect(targetWidget, graph, outPortIdx);
+                        }
+                    }
+                    if (targetFrame != null) {
+                        handleBundleConnectToFrame(targetFrame, bundlePorts);
+                        connected = true;
+                    }
+
+                    // 2. Check if dropped onto a Node
+                    if (!connected) {
+                        for (NodeWidget targetWidget : nodeWidgets) {
+                            if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
+                                handleBundleConnectToNode(targetWidget, bundlePorts);
                                 connected = true;
                                 break;
                             }
                         }
                     }
-                }
 
-                if (!connected && screen.getSearchDialog() != null) {
-                    handleContextualWireDrag(canvasMouseX, canvasMouseY);
+                    // 3. Dropped onto empty canvas -> Create vertical stack of Junction Nodes
+                    if (!connected) {
+                        handleBundleCreateJunctions(canvasMouseX, canvasMouseY, bundlePorts);
+                        connected = true;
+                    }
+
+                    screen.clearPortSelection();
+                } else {
+                    for (NodeWidget targetWidget : nodeWidgets) {
+                        if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
+                            if (!wireStartIsInput) {
+                                int inPortIdx = targetWidget.getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
+                                if (inPortIdx >= 0) {
+                                    handleForwardWireConnect(targetWidget, graph, inPortIdx);
+                                    connected = true;
+                                    break;
+                                }
+                            } else {
+                                int outPortIdx = targetWidget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
+                                if (outPortIdx >= 0) {
+                                    handleReverseWireConnect(targetWidget, graph, outPortIdx);
+                                    connected = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!connected && screen.getSearchDialog() != null) {
+                        handleContextualWireDrag(canvasMouseX, canvasMouseY);
+                    }
+                    screen.clearPortSelection();
                 }
 
                 wireStartNode = null;
@@ -828,7 +914,7 @@ public class CanvasInteractionHandler {
             targetWidget.invalidateCache();
 
             BoardToast.show(Component.literal("§a✔ ").append(
-                Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), String.format("%.0f", matchedCount))
+                Component.translatable("message.gtcalcboard.shift_connect_matched", toNode.getName(), com.gtceu.calcboard.client.gui.editor.NodeCountEditor.formatCount(matchedCount))
             ));
             Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F)
@@ -908,7 +994,7 @@ public class CanvasInteractionHandler {
             targetWidget.invalidateCache();
 
             BoardToast.show(Component.literal("§a✔ ").append(
-                Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), String.format("%.0f", matchedCount))
+                Component.translatable("message.gtcalcboard.shift_connect_matched", fromNode.getName(), com.gtceu.calcboard.client.gui.editor.NodeCountEditor.formatCount(matchedCount))
             ));
             Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F)
@@ -947,6 +1033,17 @@ public class CanvasInteractionHandler {
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        double canvasMouseX = screen.toCanvasX(mouseX);
+        double canvasMouseY = screen.toCanvasY(mouseY);
+
+        for (NodeWidget w : screen.getNodeWidgets()) {
+            if (w.isAnyEditorActive()) {
+                if (w.mouseDragged(canvasMouseX, canvasMouseY, button, dragX, dragY)) {
+                    return true;
+                }
+            }
+        }
+
         if (selectionHandler.isBoxSelecting() && button == 0) {
             selectionHandler.updateBoxSelection(screen.toCanvasX(mouseX), screen.toCanvasY(mouseY));
             return true;
@@ -957,8 +1054,6 @@ public class CanvasInteractionHandler {
         }
 
         if (resizingNote != null && button == 0) {
-            double canvasMouseX = screen.toCanvasX(mouseX);
-            double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeNoteStartX;
             double deltaY = canvasMouseY - resizeNoteStartY;
             resizingNote.setWidth(Math.max(com.gtceu.calcboard.api.model.CanvasStickyNote.MIN_WIDTH, origNoteWidth + deltaX));
@@ -1002,8 +1097,6 @@ public class CanvasInteractionHandler {
         }
 
         if (resizingFrame != null && button == 0) {
-            double canvasMouseX = screen.toCanvasX(mouseX);
-            double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeFrameStartX;
             double deltaY = canvasMouseY - resizeFrameStartY;
 
@@ -1067,8 +1160,6 @@ public class CanvasInteractionHandler {
         }
 
         if (resizingNode != null && button == 0) {
-            double canvasMouseX = screen.toCanvasX(mouseX);
-            double canvasMouseY = screen.toCanvasY(mouseY);
             double deltaX = canvasMouseX - resizeStartCanvasX;
             double deltaY = canvasMouseY - resizeStartCanvasY;
             int newWidth = (int) Math.max(190, Math.min(500, origNodeWidth + deltaX));
@@ -1176,6 +1267,405 @@ public class CanvasInteractionHandler {
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onWireDisconnected();
         BoardToast.show(Component.literal("§c✕ ").append(Component.translatable(translatableKey)));
         Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+    }
+
+    private boolean matchesIngredient(IngredientStack out, IngredientStack in) {
+        if (out == null || in == null) return false;
+        if (out.getId().equals(in.getId())) return true;
+        if (in.getAlternatives() != null && in.getAlternatives().contains(out.getId())) return true;
+        if (out.getAlternatives() != null && out.getAlternatives().contains(in.getId())) return true;
+        if (in.getAlternatives() != null && out.getAlternatives() != null) {
+            for (ResourceLocation alt : in.getAlternatives()) {
+                if (out.getAlternatives().contains(alt)) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAlreadyConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
+            if (e.fromNodeId().equals(fromNodeId) && e.outputIndex() == outIdx &&
+                    e.toNodeId().equals(toNodeId) && e.inputIndex() == inIdx) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void handleBundleCreateJunctions(double canvasX, double canvasY, Set<PortRef> ports) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || ports == null || ports.isEmpty()) return;
+
+        List<RecipeNode> createdNodes = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> createdEdges = new ArrayList<>();
+
+        List<PortRef> sortedPorts = new ArrayList<>(ports);
+        sortedPorts.sort((p1, p2) -> {
+            RecipeNode n1 = graph.findNodeById(p1.nodeId());
+            RecipeNode n2 = graph.findNodeById(p2.nodeId());
+            if (n1 != null && n2 != null && !n1.getId().equals(n2.getId())) {
+                int cmpY = Double.compare(n1.getPosY(), n2.getPosY());
+                if (cmpY != 0) return cmpY;
+            }
+            return Integer.compare(p1.portIndex(), p2.portIndex());
+        });
+
+        int count = sortedPorts.size();
+        double startY = canvasY - ((count - 1) * 36.0 / 2.0);
+        screen.clearSelection();
+
+        for (int i = 0; i < sortedPorts.size(); i++) {
+            PortRef pref = sortedPorts.get(i);
+            RecipeNode srcNode = graph.findNodeById(pref.nodeId());
+            if (srcNode == null) continue;
+
+            double jy = startY + (i * 36.0);
+            RecipeNode junction = RecipeNode.createReroute(canvasX - 16, jy - 16);
+
+            if (pref.isInput()) {
+                if (pref.portIndex() < srcNode.getInputs().size()) {
+                    IngredientStack stack = srcNode.getInputs().get(pref.portIndex());
+                    junction.bindRerouteIngredient(stack);
+                    graph.addNode(junction);
+                    graph.addConnection(junction.getId(), 0, srcNode.getId(), pref.portIndex());
+                    FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(junction.getId(), 0, srcNode.getId(), pref.portIndex());
+                    createdNodes.add(junction);
+                    createdEdges.add(edge);
+                }
+            } else {
+                if (pref.portIndex() < srcNode.getOutputs().size()) {
+                    IngredientStack stack = srcNode.getOutputs().get(pref.portIndex());
+                    junction.bindRerouteIngredient(stack);
+                    graph.addNode(junction);
+                    graph.addConnection(srcNode.getId(), pref.portIndex(), junction.getId(), 0);
+                    FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(srcNode.getId(), pref.portIndex(), junction.getId(), 0);
+                    createdNodes.add(junction);
+                    createdEdges.add(edge);
+                }
+            }
+            screen.selectNode(junction.getId(), true);
+        }
+
+        if (!createdNodes.isEmpty()) {
+            screen.rebuildWidgets();
+            for (RecipeNode junction : createdNodes) {
+                screen.selectNode(junction.getId(), true);
+            }
+            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(createdNodes, createdEdges, "Create " + count + " Junction Hubs"));
+            screen.markSummaryDirty();
+            BoardToast.show(Component.literal("§a🔀 ").append(
+                    Component.translatable("gui.gtcalcboard.toast.bundle_junctions_created", count)
+            ));
+            Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
+            );
+        }
+    }
+
+    private void handleBundleConnectToFrame(CanvasGroupFrame frame, Set<PortRef> ports) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || frame == null || ports == null || ports.isEmpty()) return;
+
+        List<RecipeNode> frameNodes = new ArrayList<>(frame.getEnclosedNodes(graph));
+        if (frameNodes.isEmpty()) {
+            for (String nid : frame.getContainedNodeIds()) {
+                RecipeNode n = graph.findNodeById(nid);
+                if (n != null && !n.isReroute()) frameNodes.add(n);
+            }
+        }
+        if (frameNodes.isEmpty()) return;
+
+        RecipeNode templateNode = frame.getFirstOperationalNode(graph);
+        if (templateNode == null) {
+            templateNode = frameNodes.get(0);
+        }
+
+        double origFrameX = frame.getPosX();
+        double origFrameY = frame.getPosY();
+        double origFrameW = frame.getWidth();
+        double origFrameH = frame.getHeight();
+
+        double curMaxY = -Double.MAX_VALUE;
+        double targetPosX = frame.getPosX() + CanvasGroupFrame.DEFAULT_PADDING;
+        for (RecipeNode n : frameNodes) {
+            double nh = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
+            curMaxY = Math.max(curMaxY, n.getPosY() + nh);
+            targetPosX = n.getPosX();
+        }
+        if (curMaxY <= -100000) {
+            curMaxY = frame.getPosY() + CanvasGroupFrame.HEADER_HEIGHT + 16;
+        } else {
+            curMaxY += 16;
+        }
+
+        List<RecipeNode> createdNodes = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> createdEdges = new ArrayList<>();
+        List<com.gtceu.calcboard.api.history.BoardCommand> subCmds = new ArrayList<>();
+        int connectedCount = 0;
+        int spawnedCount = 0;
+        boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+
+        for (PortRef pref : ports) {
+            RecipeNode srcNode = graph.findNodeById(pref.nodeId());
+            if (srcNode == null) continue;
+
+            if (!pref.isInput()) {
+                if (pref.portIndex() >= srcNode.getOutputs().size()) continue;
+                IngredientStack srcOut = srcNode.getOutputs().get(pref.portIndex());
+                boolean matched = false;
+
+                for (RecipeNode tn : frameNodes) {
+                    if (tn.getId().equals(srcNode.getId())) continue;
+                    for (int inIdx = 0; inIdx < tn.getInputs().size(); inIdx++) {
+                        IngredientStack tnIn = tn.getInputs().get(inIdx);
+                        if (matchesIngredient(srcOut, tnIn)) {
+                            if (!isAlreadyConnected(graph, srcNode.getId(), pref.portIndex(), tn.getId(), inIdx)) {
+                                graph.addConnection(srcNode.getId(), pref.portIndex(), tn.getId(), inIdx);
+                                FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(srcNode.getId(), pref.portIndex(), tn.getId(), inIdx);
+                                Double oldMachineCount = shiftDown ? tn.getMachineCount() : null;
+                                Double newMachineCount = null;
+
+                                if (shiftDown) {
+                                    double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, srcNode, pref.portIndex(), tn, inIdx);
+                                    newMachineCount = matchedCount;
+                                    tn.setMachineCount(matchedCount);
+                                    NodeWidget tw = screen.findWidgetForNode(tn);
+                                    if (tw != null) {
+                                        tw.updateCountBuffer();
+                                        tw.invalidateCache();
+                                    }
+                                }
+
+                                subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(edge, shiftDown ? tn.getId() : null, oldMachineCount, newMachineCount));
+                                connectedCount++;
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (matched) break;
+                }
+
+                // If not matched, auto-spawn missing recipe node if available in search index
+                if (!matched && templateNode != null) {
+                    com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe sr =
+                            com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.findRecipeForInput(templateNode, srcOut.getId());
+                    if (sr != null && sr.recipe() != null) {
+                        RecipeNode newNode = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
+                        if (newNode != null) {
+                            if (templateNode.getMachineIcon() != null) newNode.setMachineIcon(templateNode.getMachineIcon());
+                            newNode.setMultiblock(templateNode.isMultiblock());
+                            newNode.setTargetTier(templateNode.getTargetTier());
+                            newNode.setSteamMode(templateNode.getSteamMode());
+                            newNode.setOverclockMode(templateNode.getOverclockMode());
+                            newNode.setParallel(templateNode.getParallel());
+                            newNode.getAddons().clear();
+                            for (var addon : templateNode.getAddons()) {
+                                if (addon != null) newNode.getAddons().add(addon.copy());
+                            }
+                            newNode.getProperties().copyFrom(templateNode.getProperties());
+
+                            newNode.setPosX(targetPosX);
+                            newNode.setPosY(curMaxY);
+                            double nh = newNode.getCardHeight() > 0 ? newNode.getCardHeight() : 160;
+                            curMaxY += nh + 16;
+
+                            graph.addNode(newNode);
+                            frame.addNode(newNode.getId());
+                            frameNodes.add(newNode);
+                            createdNodes.add(newNode);
+                            spawnedCount++;
+
+                            for (int inIdx = 0; inIdx < newNode.getInputs().size(); inIdx++) {
+                                IngredientStack tnIn = newNode.getInputs().get(inIdx);
+                                if (matchesIngredient(srcOut, tnIn)) {
+                                    graph.addConnection(srcNode.getId(), pref.portIndex(), newNode.getId(), inIdx);
+                                    FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(srcNode.getId(), pref.portIndex(), newNode.getId(), inIdx);
+                                    Double oldMachineCount = shiftDown ? newNode.getMachineCount() : null;
+                                    Double newMachineCount = null;
+
+                                    if (shiftDown) {
+                                        double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, srcNode, pref.portIndex(), newNode, inIdx);
+                                        newMachineCount = matchedCount;
+                                        newNode.setMachineCount(matchedCount);
+                                    }
+
+                                    subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(edge, shiftDown ? newNode.getId() : null, oldMachineCount, newMachineCount));
+                                    createdEdges.add(edge);
+                                    connectedCount++;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (pref.portIndex() >= srcNode.getInputs().size()) continue;
+                IngredientStack srcIn = srcNode.getInputs().get(pref.portIndex());
+
+                for (RecipeNode tn : frameNodes) {
+                    if (tn.getId().equals(srcNode.getId())) continue;
+                    for (int outIdx = 0; outIdx < tn.getOutputs().size(); outIdx++) {
+                        IngredientStack tnOut = tn.getOutputs().get(outIdx);
+                        if (matchesIngredient(tnOut, srcIn)) {
+                            if (!isAlreadyConnected(graph, tn.getId(), outIdx, srcNode.getId(), pref.portIndex())) {
+                                graph.addConnection(tn.getId(), outIdx, srcNode.getId(), pref.portIndex());
+                                FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(tn.getId(), outIdx, srcNode.getId(), pref.portIndex());
+                                Double oldMachineCount = shiftDown ? srcNode.getMachineCount() : null;
+                                Double newMachineCount = null;
+
+                                if (shiftDown) {
+                                    double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, tn, outIdx, srcNode, pref.portIndex());
+                                    newMachineCount = matchedCount;
+                                    srcNode.setMachineCount(matchedCount);
+                                    NodeWidget sw = screen.findWidgetForNode(srcNode);
+                                    if (sw != null) {
+                                        sw.updateCountBuffer();
+                                        sw.invalidateCache();
+                                    }
+                                }
+
+                                subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(edge, shiftDown ? srcNode.getId() : null, oldMachineCount, newMachineCount));
+                                connectedCount++;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!createdNodes.isEmpty()) {
+            frame.recomputeBounds(frameNodes, CanvasGroupFrame.DEFAULT_PADDING);
+            screen.rebuildWidgets();
+            subCmds.add(0, new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(createdNodes, createdEdges, "Spawn " + spawnedCount + " Missing Recipes"));
+            if (origFrameX != frame.getPosX() || origFrameY != frame.getPosY() || origFrameW != frame.getWidth() || origFrameH != frame.getHeight()) {
+                subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ResizeFrameCommand(
+                        frame.getId(), origFrameX, origFrameY, origFrameW, origFrameH, frame.getPosX(), frame.getPosY(), frame.getWidth(), frame.getHeight(), "Auto-fit Frame"
+                ));
+            }
+        }
+
+        if (!subCmds.isEmpty()) {
+            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(subCmds, "Batch connect " + connectedCount + " wires to " + frame.getTitle()));
+            screen.markSummaryDirty();
+            for (NodeWidget nw : screen.getNodeWidgets()) {
+                nw.invalidateCache();
+            }
+            BoardToast.show(Component.literal("§a🔗 ").append(
+                    Component.translatable("gui.gtcalcboard.toast.bundle_frame_connected", connectedCount, frame.getTitle())
+            ));
+            Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F)
+            );
+        }
+    }
+
+    private void handleBundleConnectToNode(NodeWidget targetWidget, Set<PortRef> ports) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || targetWidget == null || ports == null || ports.isEmpty()) return;
+
+        RecipeNode tn = targetWidget.getNode();
+        List<com.gtceu.calcboard.api.history.BoardCommand> subCmds = new ArrayList<>();
+        int connectedCount = 0;
+        boolean shiftDown = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+
+        for (PortRef pref : ports) {
+            RecipeNode srcNode = graph.findNodeById(pref.nodeId());
+            if (srcNode == null || srcNode.getId().equals(tn.getId())) continue;
+
+            if (!pref.isInput()) {
+                if (pref.portIndex() >= srcNode.getOutputs().size()) continue;
+                IngredientStack srcOut = srcNode.getOutputs().get(pref.portIndex());
+
+                if (tn.isReroute()) {
+                    tn.bindRerouteIngredient(srcOut);
+                    if (!isAlreadyConnected(graph, srcNode.getId(), pref.portIndex(), tn.getId(), 0)) {
+                        graph.addConnection(srcNode.getId(), pref.portIndex(), tn.getId(), 0);
+                        subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(new FlowGraph.ConnectionEdge(srcNode.getId(), pref.portIndex(), tn.getId(), 0)));
+                        connectedCount++;
+                    }
+                } else {
+                    for (int inIdx = 0; inIdx < tn.getInputs().size(); inIdx++) {
+                        IngredientStack tnIn = tn.getInputs().get(inIdx);
+                        if (matchesIngredient(srcOut, tnIn)) {
+                            if (!isAlreadyConnected(graph, srcNode.getId(), pref.portIndex(), tn.getId(), inIdx)) {
+                                graph.addConnection(srcNode.getId(), pref.portIndex(), tn.getId(), inIdx);
+                                FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(srcNode.getId(), pref.portIndex(), tn.getId(), inIdx);
+                                Double oldMachineCount = shiftDown ? tn.getMachineCount() : null;
+                                Double newMachineCount = null;
+
+                                if (shiftDown) {
+                                    double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, srcNode, pref.portIndex(), tn, inIdx);
+                                    newMachineCount = matchedCount;
+                                    tn.setMachineCount(matchedCount);
+                                    targetWidget.updateCountBuffer();
+                                    targetWidget.invalidateCache();
+                                }
+
+                                subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(edge, shiftDown ? tn.getId() : null, oldMachineCount, newMachineCount));
+                                connectedCount++;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (pref.portIndex() >= srcNode.getInputs().size()) continue;
+                IngredientStack srcIn = srcNode.getInputs().get(pref.portIndex());
+
+                if (tn.isReroute()) {
+                    tn.bindRerouteIngredient(srcIn);
+                    if (!isAlreadyConnected(graph, tn.getId(), 0, srcNode.getId(), pref.portIndex())) {
+                        graph.addConnection(tn.getId(), 0, srcNode.getId(), pref.portIndex());
+                        subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(new FlowGraph.ConnectionEdge(tn.getId(), 0, srcNode.getId(), pref.portIndex())));
+                        connectedCount++;
+                    }
+                } else {
+                    for (int outIdx = 0; outIdx < tn.getOutputs().size(); outIdx++) {
+                        IngredientStack tnOut = tn.getOutputs().get(outIdx);
+                        if (matchesIngredient(tnOut, srcIn)) {
+                            if (!isAlreadyConnected(graph, tn.getId(), outIdx, srcNode.getId(), pref.portIndex())) {
+                                graph.addConnection(tn.getId(), outIdx, srcNode.getId(), pref.portIndex());
+                                FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(tn.getId(), outIdx, srcNode.getId(), pref.portIndex());
+                                Double oldMachineCount = shiftDown ? srcNode.getMachineCount() : null;
+                                Double newMachineCount = null;
+
+                                if (shiftDown) {
+                                    double matchedCount = FlowGraphSolver.calculateConsumerMatchCount(graph, tn, outIdx, srcNode, pref.portIndex());
+                                    newMachineCount = matchedCount;
+                                    srcNode.setMachineCount(matchedCount);
+                                    NodeWidget sw = screen.findWidgetForNode(srcNode);
+                                    if (sw != null) {
+                                        sw.updateCountBuffer();
+                                        sw.invalidateCache();
+                                    }
+                                }
+
+                                subCmds.add(new com.gtceu.calcboard.api.history.BoardCommand.ConnectWireCommand(edge, shiftDown ? srcNode.getId() : null, oldMachineCount, newMachineCount));
+                                connectedCount++;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!subCmds.isEmpty()) {
+            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(subCmds, "Batch connect " + connectedCount + " wires to " + tn.getName()));
+            screen.markSummaryDirty();
+            targetWidget.invalidateCache();
+            for (NodeWidget nw : screen.getNodeWidgets()) {
+                nw.invalidateCache();
+            }
+            BoardToast.show(Component.literal("§a🔗 ").append(
+                    Component.translatable("gui.gtcalcboard.toast.bundle_node_connected", connectedCount, tn.getName())
+            ));
+            Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
+            );
+        }
     }
 
     public void renderMarquee(net.minecraft.client.gui.GuiGraphics graphics) {

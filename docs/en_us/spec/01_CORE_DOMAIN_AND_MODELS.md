@@ -74,6 +74,15 @@ classDiagram
         +List~ResourceLocation~ availableWorkstations
         +NodePropertyStore properties
         +double efficiency
+        +Set~Integer~ hiddenInputIndices
+        +Set~Integer~ hiddenOutputIndices
+        +hideInputPort(int) void
+        +unhideInputPort(int) void
+        +hideOutputPort(int) void
+        +unhideOutputPort(int) void
+        +getVisibleInputIndices() List~Integer~
+        +getVisibleOutputIndices() List~Integer~
+        +getTotalHiddenCount() int
         +setMachineIcon(icon) void
         +getEnergyType() EnergyType
         +getOverclockResult() OverclockResult
@@ -86,6 +95,7 @@ classDiagram
 * **Clean Architecture & SPI Delegation (Pure Domain Model)**:
   - `RecipeNode` is a pure calculation domain entity across all supported mods (Create, Thermal, GTCEu, Vanilla, etc.).
   - Contains no hardcoded mod branches; machine icon change handling (`setMachineIcon`), physical energy type resolution (`getEnergyType`), single machine power computation (`computeSingleMachinePower`), node operational validation (`validateNode`), and multiblock BOM calculation (`buildMultiblockBOM`) are delegated dynamically via `ModAdapterRegistry.getAdapterForNode(this)`.
+* **`hiddenInputIndices` / `hiddenOutputIndices`**: Set of integer port indices hidden by the user to reduce visual clutter on cards. Persisted via `RecipeNodeSerializer`. Renderers and wire solvers invoke `getVisibleInputIndices()` / `getVisibleOutputIndices()` to filter rendered and active ports.
 * **`isFlipped`**: Horizontally inverts the input (left) and output (right) socket ports to eliminate wire crossings in complex flowcharts.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: Machine utilization computed by solvers (`FlowGraphSolver`, `MassBalanceSolver`) subject to upstream supply limits and closed-loop cycles.
 * **`calculateEffectiveOutputRates()`**: Computes per-second output flow combining machine count, parallel multiplier, overclocking, sub-tick batching, addon compounding, and byproduct tier chance boosts.
@@ -241,7 +251,44 @@ $$\text{Blueprint String} = \text{"GTBOARD:"} + [\text{Title} + \text{":"}] + \t
 
 Maintains command deltas for all canvas operations with minimal memory overhead (<2MB for 1,000+ undo steps).
 
-* **Supported Commands**: `MoveNodesCommand`, `AddConnectionCommand` / `RemoveConnectionCommand`, `AddNodesCommand` / `RemoveNodesCommand`, `ModifyPropertyCommand`, `GroupModuleCommand` / `ExpandModuleCommand`.
+* **Supported Commands**: `MoveNodesCommand`, `AddConnectionCommand` / `RemoveConnectionCommand`, `AddNodesCommand` / `RemoveNodesCommand`, `ModifyPropertyCommand`, `GroupModuleCommand` / `ExpandModuleCommand`, `ResizeFrameCommand`.
+
+---
+
+## 6. Canvas Group Frames & Shared Machine Pools (`CanvasGroupFrame`)
+
+Manages visual grouping regions and time-sharing machine pools.
+
+* **`isSharedMachineFrame`**: Time-sharing mode where all enclosed machine recipes share a single physical machine pool.
+* **Cumulative Duty Calculation**: $\text{Total Duty} = \sum \text{machineCount}_i$, Required Machines = $\lceil \text{Total Duty} \rceil$.
+* **Batch Hardware Config Synchronization (`syncHardwareConfig`)**: Synchronizes voltage tiers, overclock modes, parallel limits, and equipped addons across all enclosed machines from the frame header.
+* **One-Click Auto-Fit Frame (`autoFit`)**: Automatically adjusts frame bounding box to tightly enclose all contained/intersecting nodes with a 24px padding.
+
+---
+
+## 7. Port Reference Record (`PortRef`)
+
+A lightweight immutable record identifying specific input/output ports on the canvas.
+
+```java
+public record PortRef(String nodeId, boolean isInput, int portIndex) {}
+```
+
+* **Multi-Port Selection**: Windows Explorer-style `Ctrl + Click` individual toggle and `Shift + Click` continuous range selection.
+* **Bundle Batch Wiring**: Dragging from multiple selected ports renders real-time multi-bezier curves, spawning vertical aligned junction nodes or auto-wiring shared machine pools.
+
+---
+
+## 8. Category Default Machine Preset System (`CategoryMachinePreset`, `CategoryMachinePresetManager`)
+
+Remembers preferred machine models, voltage tiers, parallel factors, overclock modes, and hardware addons per recipe category (`categoryId`), automatically applying them when placing new nodes.
+
+* **Domain Entity (`CategoryMachinePreset`)**:
+  - Encapsulates machine icon, multiblock state, target voltage tier, parallel count, overclock mode, steam mode, addons, node properties, and threading configuration bound to a recipe category.
+  - `applyTo(RecipeNode node)`: Injects preset configuration into new nodes while safely preserving the minimum required voltage tier of the recipe.
+* **Preset Manager (`CategoryMachinePresetManager`)**:
+  - Singleton in-memory registry and NBT persistence manager (`serializeNBT` / `deserializeNBT`).
+  - Provides CRUD interfaces via `BoardSettingsDialog` and `MachineConfigDialog`.
 
 ---
 

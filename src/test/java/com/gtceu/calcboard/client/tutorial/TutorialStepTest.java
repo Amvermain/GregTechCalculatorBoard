@@ -19,7 +19,7 @@ public class TutorialStepTest {
     @Test
     public void testTutorialStepSequence() {
         TutorialStep[] steps = TutorialStep.values();
-        Assertions.assertEquals(8, steps.length);
+        Assertions.assertEquals(10, steps.length);
 
         Assertions.assertEquals(TutorialStep.STEP_1_ADD_RECIPE, steps[0]);
         Assertions.assertEquals(TutorialStep.STEP_2_DRAG_TO_SEARCH, steps[1]);
@@ -28,9 +28,11 @@ public class TutorialStepTest {
         Assertions.assertEquals(TutorialStep.STEP_5_MACHINE_CONFIG, steps[4]);
         Assertions.assertEquals(TutorialStep.STEP_6_GROUP_FRAME, steps[5]);
         Assertions.assertEquals(TutorialStep.STEP_7_COMPOUND_MODULE, steps[6]);
-        Assertions.assertEquals(TutorialStep.COMPLETED, steps[7]);
+        Assertions.assertEquals(TutorialStep.STEP_8_SHARED_MACHINE, steps[7]);
+        Assertions.assertEquals(TutorialStep.STEP_9_BOM_INSPECTION, steps[8]);
+        Assertions.assertEquals(TutorialStep.COMPLETED, steps[9]);
 
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < 9; i++) {
             Assertions.assertEquals(i + 1, steps[i].getStepNumber());
         }
     }
@@ -124,5 +126,44 @@ public class TutorialStepTest {
         Assertions.assertEquals(1, bm.getPages().size());
         Assertions.assertEquals("My Factory", bm.getActivePage().getName());
         Assertions.assertEquals(1, bm.getActivePage().getGraph().getNodes().size());
+    }
+
+    @Test
+    public void testAdvancedTutorialLifecycle() {
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager mgr = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance();
+        com.gtceu.calcboard.api.storage.BoardManager bm = com.gtceu.calcboard.api.storage.BoardManager.getInstance();
+        bm.resetToDefault();
+
+        // 1. Test Basic Tutorial ends at Step 7
+        mgr.startTutorial(null);
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.tutorial.TutorialManager.TutorialMode.BASIC, mgr.getMode());
+        Assertions.assertEquals(TutorialStep.STEP_1_ADD_RECIPE, mgr.getCurrentStep());
+
+        // Fast-forward to step 7
+        for (int i = 0; i < 6; i++) {
+            mgr.nextStep();
+        }
+        Assertions.assertEquals(TutorialStep.STEP_7_COMPOUND_MODULE, mgr.getCurrentStep());
+        mgr.nextStep(); // Should complete, not go to Step 8!
+        Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
+        mgr.stopTutorial();
+
+        // 2. Test Advanced Tutorial starts at Step 8 with 3 cutter nodes
+        mgr.startAdvancedTutorial(null);
+        Assertions.assertEquals(com.gtceu.calcboard.client.gui.tutorial.TutorialManager.TutorialMode.ADVANCED, mgr.getMode());
+        Assertions.assertEquals(TutorialStep.STEP_8_SHARED_MACHINE, mgr.getCurrentStep());
+
+        com.gtceu.calcboard.api.storage.BoardPage advPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(advPage);
+        Assertions.assertEquals(3, advPage.getGraph().getNodes().size(), "Advanced tutorial should initialize 3 cutter nodes!");
+
+        // Step 8 -> Step 9
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.STEP_9_BOM_INSPECTION, mgr.getCurrentStep());
+
+        // Step 9 -> Completed
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
+        mgr.stopTutorial();
     }
 }

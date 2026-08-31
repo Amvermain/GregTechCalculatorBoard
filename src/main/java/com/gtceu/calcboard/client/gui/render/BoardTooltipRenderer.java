@@ -187,9 +187,7 @@ public final class BoardTooltipRenderer {
 
                     tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
-                    if (stats.isConnected()) {
-                        tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_sever").getString()));
-                    }
+                    tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_hide").getString()));
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;
@@ -224,15 +222,17 @@ public final class BoardTooltipRenderer {
                         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_final").getString()));
                     }
 
-                    if (out.getChance() < 1.0) {
-                        RecipeNode node = widget.getNode();
-                        double effChance = node != null ? node.getEffectiveOutputChance(outIdx) : out.getChance();
+                    RecipeNode node = widget.getNode();
+                    double effChance = node != null ? node.getEffectiveOutputChance(outIdx) : out.getChance();
+                    if (effChance < 1.0 || out.getChance() < 1.0) {
                         if (effChance <= 0.0) {
                             if (node != null && node.getSteamMode().isSteam()) {
                                 tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Steam Mode: No Byproducts)"));
                             } else if (node != null && node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
-                                String reqTierName = outIdx == 1 ? "HV" : (outIdx == 2 ? "EV" : "IV");
-                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Requires " + reqTierName + "+)"));
+                                com.gtceu.calcboard.api.type.GTVoltageTier reqTier = (node.getRecipeTier() != null && node.getRecipeTier().ordinal() > com.gtceu.calcboard.api.type.GTVoltageTier.HV.ordinal())
+                                        ? node.getRecipeTier()
+                                        : com.gtceu.calcboard.api.type.GTVoltageTier.HV;
+                                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0% (Requires " + reqTier.getName() + "+)"));
                             } else {
                                 tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim() + ": 0%"));
                             }
@@ -265,9 +265,7 @@ public final class BoardTooltipRenderer {
 
                     tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
-                    if (stats.isConnected()) {
-                        tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_sever").getString()));
-                    }
+                    tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_hide").getString()));
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;
@@ -360,7 +358,7 @@ public final class BoardTooltipRenderer {
                         if (!n.hasValidReflector()) {
                             int req = n.getRequiredReflectorTier();
                             int inst = n.getInstalledReflectorTier();
-                            String instStr = inst > 0 ? ("Tier " + inst) : Component.translatable("gui.gtcalcboard.none").getString();
+                            String instStr = inst > 0 ? ("Tier " + inst) : Component.translatable("gui.gtcalcboard.none_plain").getString();
                             tooltipLines.add(Component.literal("§c❌ " + String.format(java.util.Locale.ROOT, Component.translatable("gui.gtcalcboard.node_warning.reflector_detail").getString(), String.valueOf(req), instStr)));
                         }
                         if (graph != null && com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.hasTurbineFlowDeficit(n, graph)) {
@@ -384,7 +382,8 @@ public final class BoardTooltipRenderer {
                         int holderBonus = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineHolderEfficiencyBonus(n);
                         String effStr = "§b⏱ " + Component.translatable("gui.gtcalcboard.rotor.eff").getString() + ": §f" + eff + "%";
                         if (holderBonus > 0) {
-                            effStr += " §a(+" + holderBonus + "% Holder)";
+                            int totalEff = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTotalTurbineEfficiency(n);
+                            effStr += " §a(+" + holderBonus + "% Holder -> " + totalEff + "%)";
                         }
                         tooltipLines.add(Component.literal(effStr));
                         tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.rotor.power").getString() + ": §f" + pwr + "%"));

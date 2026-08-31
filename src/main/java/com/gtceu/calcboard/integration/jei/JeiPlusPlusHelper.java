@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.bom.PartCategory;
 
 import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.world.item.ItemStack;
@@ -24,7 +25,13 @@ public class JeiPlusPlusHelper {
     private static final String JEI_PLUS_PLUS_MOD_ID = "jei_plus_plus";
 
     public static boolean isJeiPlusPlusLoaded() {
-        return ModList.get().isLoaded(JEI_PLUS_PLUS_MOD_ID);
+        if (!ModCompatHelper.isModLoaded(JEI_PLUS_PLUS_MOD_ID)) return false;
+        try {
+            Class.forName("com.lingmu0.JeiPlusPlusMod.client.RecipeTreeSession");
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public static boolean registerBoMGoal(IJeiRuntime jeiRuntime, MultiblockBOMSummary summary) {

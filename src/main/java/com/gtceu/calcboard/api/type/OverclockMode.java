@@ -1,5 +1,8 @@
 package com.gtceu.calcboard.api.type;
 
+/**
+ * Overclock calculation modes defining energy and processing speed multipliers per voltage tier step.
+ */
 public enum OverclockMode {
     STANDARD("Standard (4x EU / 2x Speed)", 4.0, 2.0),
     PERFECT("Perfect (4x EU / 4x Speed)", 4.0, 4.0),

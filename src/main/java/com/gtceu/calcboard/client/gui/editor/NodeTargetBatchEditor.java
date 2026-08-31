@@ -1,42 +1,45 @@
 package com.gtceu.calcboard.client.gui.editor;
 
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-
-import com.gtceu.calcboard.api.model.RecipeNode;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Handles inline text editing for target batch goal quantity on reroute and goal nodes.
+ * Handles inline text editing for target batch goal quantity on reroute and goal nodes using InlineTextEditor.
  */
 public class NodeTargetBatchEditor {
 
     private final NodeWidget widget;
-    private boolean isEditing = false;
-    private String buffer = "";
+    private final InlineTextEditor editor;
 
     public NodeTargetBatchEditor(NodeWidget widget) {
         this.widget = widget;
-        this.buffer = FormatUtil.formatEditAmount(widget.getNode().getTargetBatchAmount(), isFluid());
+        this.editor = new InlineTextEditor(24, c -> Character.isDigit(c) || c == '.' || c == ' ' || Character.isLetter(c));
     }
 
     public boolean isEditing() {
-        return isEditing;
+        return editor.isEditing();
+    }
+
+    public InlineTextEditor getEditor() {
+        return editor;
     }
 
     public void startEditing() {
-        this.isEditing = true;
         RecipeNode node = widget.getNode();
-        this.buffer = FormatUtil.formatEditAmount(node.getTargetBatchAmount(), isFluid());
+        editor.startEditing(FormatUtil.formatEditAmount(node.getTargetBatchAmount(), isFluid()));
     }
 
     public void commit() {
-        if (!isEditing) return;
-        isEditing = false;
+        if (!editor.isEditing()) return;
         RecipeNode node = widget.getNode();
         double oldVal = node.getTargetBatchAmount();
+        String text = editor.getText().trim();
+        editor.stopEditing();
+
         try {
-            double parsed = FormatUtil.parseBatchAmount(buffer.trim(), isFluid());
+            double parsed = FormatUtil.parseBatchAmount(text, isFluid());
             if (parsed >= 0 && Math.abs(parsed - oldVal) > 0.0001) {
                 node.setTargetBatchAmount(parsed);
                 if (widget.getParent() != null) {
@@ -44,19 +47,15 @@ public class NodeTargetBatchEditor {
                 }
             }
         } catch (Exception ignored) {}
-        this.buffer = FormatUtil.formatEditAmount(node.getTargetBatchAmount(), isFluid());
+
         widget.invalidateCache();
     }
 
     public void cancel() {
-        this.isEditing = false;
-        this.buffer = FormatUtil.formatEditAmount(widget.getNode().getTargetBatchAmount(), isFluid());
+        editor.stopEditing();
     }
 
     public void updateBuffer() {
-        if (!isEditing) {
-            this.buffer = FormatUtil.formatEditAmount(widget.getNode().getTargetBatchAmount(), isFluid());
-        }
         widget.invalidateCache();
     }
 
@@ -66,12 +65,17 @@ public class NodeTargetBatchEditor {
     }
 
     public String getDisplayText() {
-        if (isEditing) {
-            String text = buffer;
-            if ((System.currentTimeMillis() / 500) % 2 == 0) {
-                text += "_";
+        if (editor.isEditing()) {
+            String txt = editor.getText();
+            int cursor = editor.getCursorPos();
+            boolean blink = (System.currentTimeMillis() / 500) % 2 == 0;
+            if (blink && !editor.hasSelection()) {
+                if (cursor >= txt.length()) {
+                    return txt + "_";
+                }
+                return txt.substring(0, cursor) + "|" + txt.substring(cursor);
             }
-            return text;
+            return txt;
         }
         double amount = widget.getNode().getTargetBatchAmount();
         if (amount <= 0) return "";
@@ -79,18 +83,11 @@ public class NodeTargetBatchEditor {
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
-        if (!isEditing) return false;
-        if (Character.isDigit(codePoint) || codePoint == '.' || codePoint == ' ' || Character.isLetter(codePoint)) {
-            if (buffer.length() < 16) {
-                buffer += codePoint;
-                return true;
-            }
-        }
-        return false;
+        return editor.charTyped(codePoint, modifiers);
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (!isEditing) return false;
+        if (!editor.isEditing()) return false;
 
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
             commit();
@@ -98,22 +95,20 @@ public class NodeTargetBatchEditor {
         } else if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             cancel();
             return true;
-        } else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-            if (!buffer.isEmpty()) {
-                buffer = buffer.substring(0, buffer.length() - 1);
-            }
-            return true;
-        } else if (keyCode == GLFW.GLFW_KEY_DELETE) {
-            buffer = "";
-            return true;
         }
-        return true;
+
+        return editor.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    public void onClick(net.minecraft.client.gui.Font font, double mouseX, double textStartX, boolean shiftDown) {
+        editor.onClick(font, mouseX - textStartX, shiftDown);
+    }
+
+    public void onDrag(net.minecraft.client.gui.Font font, double mouseX, double textStartX) {
+        editor.onDrag(font, mouseX - textStartX);
     }
 
     public static String formatAmount(double amount) {
         return FormatUtil.formatCleanNumber(amount);
     }
 }
-
-
-

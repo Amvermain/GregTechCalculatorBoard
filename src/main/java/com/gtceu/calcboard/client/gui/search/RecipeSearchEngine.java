@@ -233,6 +233,112 @@ public class RecipeSearchEngine {
         return name.startsWith("dev.emi.emi") || name.startsWith("com.gtceu.calcboard.integration.emi");
     }
 
+    /**
+     * Finds a matching recipe that consumes the given inputId within the specified machine category or workstations,
+     * prioritizing recipes that share the same secondary inputs/fluids (e.g. Lubricant vs Water) as templateNode.
+     */
+    public static SearchableRecipe findRecipeForInput(
+            RecipeNode templateNode,
+            ResourceLocation inputId
+    ) {
+        if (templateNode == null || inputId == null) return null;
+        List<SearchableRecipe> allRecipes = RecipeSearchCacheManager.getGlobalRecipes();
+        if (allRecipes == null || allRecipes.isEmpty()) return null;
+
+        ResourceLocation catId = templateNode.getRecipeCategoryId();
+        ResourceLocation machineIcon = templateNode.getMachineIcon();
+        List<ResourceLocation> workstations = templateNode.getAvailableWorkstations();
+
+        Set<String> targetKeys = new HashSet<>();
+        if (catId != null) {
+            targetKeys.add(catId.toString().toLowerCase(Locale.ROOT));
+            targetKeys.add(catId.getPath().toLowerCase(Locale.ROOT));
+        }
+        if (machineIcon != null) {
+            targetKeys.add(machineIcon.toString().toLowerCase(Locale.ROOT));
+            targetKeys.add(machineIcon.getPath().toLowerCase(Locale.ROOT));
+        }
+        if (workstations != null) {
+            for (ResourceLocation ws : workstations) {
+                if (ws != null) {
+                    targetKeys.add(ws.toString().toLowerCase(Locale.ROOT));
+                    targetKeys.add(ws.getPath().toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+
+        Set<ResourceLocation> templateInputIds = new HashSet<>();
+        for (IngredientStack in : templateNode.getInputs()) {
+            if (in != null && in.getId() != null) {
+                templateInputIds.add(in.getId());
+            }
+        }
+
+        // 1. First pass: exact category/workstation match + exact input match, scored by secondary inputs
+        SearchableRecipe bestSr = null;
+        int maxScore = -1;
+
+        for (SearchableRecipe sr : allRecipes) {
+            if (!sr.isSupported()) continue;
+            if (sr.hasExactInput(inputId)) {
+                String srCat = sr.categoryId();
+                if (srCat != null && !srCat.isEmpty()) {
+                    String lowerCat = srCat.toLowerCase(Locale.ROOT);
+                    boolean catMatched = targetKeys.contains(lowerCat);
+                    if (!catMatched && lowerCat.contains(":")) {
+                        String path = lowerCat.substring(lowerCat.indexOf(':') + 1);
+                        catMatched = targetKeys.contains(path);
+                    }
+                    if (catMatched) {
+                        int score = calculateSecondaryMatchScore(sr, templateInputIds, inputId);
+                        if (score > maxScore) {
+                            maxScore = score;
+                            bestSr = sr;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (bestSr != null) {
+            return bestSr;
+        }
+
+        // 2. Second pass: category name / partial match if exact didn't hit
+        String nodeName = templateNode.getName();
+        String baseName = nodeName != null && nodeName.contains(" (") ? nodeName.substring(0, nodeName.indexOf(" (")).toLowerCase(Locale.ROOT).trim() : (nodeName != null ? nodeName.toLowerCase(Locale.ROOT).trim() : "");
+
+        for (SearchableRecipe sr : allRecipes) {
+            if (!sr.isSupported()) continue;
+            if (sr.hasExactInput(inputId)) {
+                String catName = sr.categoryName();
+                if (catName != null && !baseName.isEmpty() && catName.toLowerCase(Locale.ROOT).contains(baseName)) {
+                    int score = calculateSecondaryMatchScore(sr, templateInputIds, inputId);
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestSr = sr;
+                    }
+                }
+            }
+        }
+
+        return bestSr;
+    }
+
+    private static int calculateSecondaryMatchScore(SearchableRecipe sr, Set<ResourceLocation> templateInputIds, ResourceLocation mainInputId) {
+        int score = 0;
+        if (sr.inputIds() != null && templateInputIds != null && !templateInputIds.isEmpty()) {
+            for (ResourceLocation inId : sr.inputIds()) {
+                if (inId != null && !inId.equals(mainInputId)) {
+                    if (templateInputIds.contains(inId)) {
+                        score += 100;
+                    }
+                }
+            }
+        }
+        return score;
+    }
+
     public record StackSearchData(String name, String searchText) {}
     private static final Map<ResourceLocation, StackSearchData> STACK_DATA_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 

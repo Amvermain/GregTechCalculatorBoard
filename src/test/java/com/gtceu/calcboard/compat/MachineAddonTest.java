@@ -163,10 +163,10 @@ public class MachineAddonTest {
         Assertions.assertEquals(1152, scheeliteTurbine.getParallel());
         Assertions.assertEquals(1152, scheeliteTurbine.getTotalParallel());
         Assertions.assertEquals(36864.0, scheeliteTurbine.getSingleMachineEUt(), 0.001);
-        // Duration: 2.0s * (2.20 + 0.10) = 4.60s
-        Assertions.assertEquals(4.60, scheeliteTurbine.getEffectiveDurationSeconds(), 0.001);
-        // Throughput: (20 / 92 ticks) * 1152 parallel = 250.434... cycles/s
-        Assertions.assertEquals(250.434, scheeliteTurbine.getCyclesPerSecond(), 0.01);
+        // Duration: 2.0s * (2.20 * 1.10) = 4.84s
+        Assertions.assertEquals(4.84, scheeliteTurbine.getEffectiveDurationSeconds(), 0.001);
+        // Throughput: 1152 parallel / 4.84s = 238.016 cycles/s
+        Assertions.assertEquals(238.016, scheeliteTurbine.getCyclesPerSecond(), 0.01);
     }
 
     @Test
@@ -409,6 +409,7 @@ public class MachineAddonTest {
 
         MachineAddon enderiumRotor = new MachineAddon("gtceu:rotor_enderium", "Enderium Turbine Rotor", MachineAddon.Category.ROTOR, "180%", null);
         enderiumRotor.setDurationMultiplier(1.80);
+        enderiumRotor.setRotorEfficiency(180);
         enderiumRotor.setRotorPower(300);
         enderiumRotor.setRotorMaxEUt(264000.0);
         node.addAddon(enderiumRotor);
@@ -422,13 +423,61 @@ public class MachineAddonTest {
         Assertions.assertEquals(3.60, node.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(106.666, node.getCyclesPerSecond(), 0.01);
 
-        // 2. IV Rotor Holder (8,192 * 3.0 = 24,576 EU/t -> 768 parallel, +10% duration bonus)
+        // 2. IV Rotor Holder (8,192 * 3.0 = 24,576 EU/t -> 768 parallel, +10% multiplicative duration bonus: 180% * 1.10 = 198%)
         node.setTargetTier(GTVoltageTier.IV);
+        node.autoCalculateTurbineParallel();
         Assertions.assertEquals(10, GTTurbineHelper.getTurbineHolderEfficiencyBonus(node));
+        Assertions.assertEquals(198, GTTurbineHelper.getTotalTurbineEfficiency(node));
         Assertions.assertEquals(768, node.getTotalParallel());
         Assertions.assertEquals(24576.0, node.getSingleMachineEUt(), 0.001);
-        Assertions.assertEquals(3.80, node.getEffectiveDurationSeconds(), 0.001);
-        Assertions.assertEquals(202.105, node.getCyclesPerSecond(), 0.01);
+        Assertions.assertEquals(3.96, node.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(193.939, node.getCyclesPerSecond(), 0.01);
+    }
+
+    @Test
+    public void testLargePlasmaTurbinePrismaliumZpmHolder() {
+        RecipeNode node = RecipeNode.create("Plasma Generator (Argon Plasma)", 116.0, 2048.0, GTVoltageTier.IV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_generator"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:large_plasma_turbine"));
+        node.setGenerator(true);
+        node.setMultiblock(true);
+        node.setTargetTier(GTVoltageTier.ZPM);
+
+        // 1. Equip Prismalium Turbine Rotor (260% eff, 1600% power)
+        MachineAddon prismaliumRotor = new MachineAddon("gtceu:rotor_prismalium", "Prismalium Turbine Rotor", MachineAddon.Category.ROTOR, "260%", null);
+        prismaliumRotor.setDurationMultiplier(2.60);
+        prismaliumRotor.setRotorPower(1600);
+        prismaliumRotor.setRotorEfficiency(260);
+        node.addAddon(prismaliumRotor);
+        node.setRotorEfficiency(260);
+        node.setRotorPower(1600);
+        node.setRotorName("Prismalium Turbine Rotor");
+
+        // Assert ZPM Holder properties vs IV Base Tier: delta = 2 -> +20% holder bonus
+        Assertions.assertEquals(GTVoltageTier.IV, GTTurbineHelper.getTurbineBaseTier(node));
+        Assertions.assertEquals(20, GTTurbineHelper.getTurbineHolderEfficiencyBonus(node));
+        // Multiplicative efficiency: 260% * 1.20 = 312%
+        Assertions.assertEquals(312, GTTurbineHelper.getTotalTurbineEfficiency(node));
+
+        // Max EU/t: 16,384 base * 64x total power = 1,048,576 EU/t (8A ZPM)
+        Assertions.assertEquals(1048576.0, GTTurbineHelper.getNodeRotorHolderMaxEUt(node, GTVoltageTier.ZPM, 1600), 0.001);
+        Assertions.assertEquals(512, node.getTotalParallel());
+        Assertions.assertEquals(1048576.0, node.getSingleMachineEUt(), 0.001);
+
+        // Duration without maintenance hatch: 116 ticks * 3.12 = 361.92 ticks (18.096s)
+        Assertions.assertEquals(18.096, node.getEffectiveDurationSeconds(), 0.001);
+
+        // 2. Add Configurable Maintenance Hatch (Eco Mode: 1.1x duration)
+        MachineAddon ecoHatch = new MachineAddon("gtceu:configurable_maintenance_hatch", "Configurable Maintenance Hatch", MachineAddon.Category.MAINTENANCE, "Eco Mode", null);
+        ecoHatch.setDurationMultiplier(1.10);
+        node.addAddon(ecoHatch);
+
+        // Duration with eco hatch: 361.92 * 1.10 = 398.112 ticks (19.9056s)
+        Assertions.assertEquals(19.9056, node.getEffectiveDurationSeconds(), 0.001);
+        // Demand per turbine for 5 mB * 512 parallel = 2560 mB per run: 2560 / 398.112 = 6.43017 mB/t
+        double ticksPerRun = node.getOverclockResult().durationTicks();
+        double mbPerTick = (5.0 * node.getTotalParallel()) / ticksPerRun;
+        Assertions.assertEquals(6.43017, mbPerTick, 0.001);
     }
 
     @Test

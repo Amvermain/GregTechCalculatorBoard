@@ -74,13 +74,14 @@ public final class JeiRecipeSearchIndexer {
         // Layout collection
         JeiRecipeLayoutCollector collector = new JeiRecipeLayoutCollector();
         try {
-            category.setRecipe(collector, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
+            mezz.jei.api.gui.builder.IRecipeLayoutBuilder builder = JeiRecipeLayoutCollector.createProxyBuilder(collector);
+            category.setRecipe(builder, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
         } catch (Throwable ignored) {}
 
         List<IngredientStack> inputs = new ArrayList<>();
         List<IngredientStack> outputs = new ArrayList<>();
 
-        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catResId != null && ("gtceu".equals(catResId.getNamespace()) || "start_core".equals(catResId.getNamespace())));
+        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catResId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catResId.getNamespace()));
         if (isGT) {
             List<IngredientStack> gtIns = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");

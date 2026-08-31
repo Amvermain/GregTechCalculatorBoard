@@ -2,9 +2,11 @@ package com.gtceu.calcboard.integration.jei;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.compat.gtceu.GTRecipeExtractionTest;
 import com.gtceu.calcboard.integration.jei.JeiRecipeConverter;
 import com.gtceu.calcboard.integration.jei.JeiRecipeLayoutCollector;
 import com.gtceu.calcboard.integration.jei.JeiRecipeSearchIndexer;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @ExtendWith(MinecraftBootstrapExtension.class)
@@ -38,11 +41,11 @@ public class JeiRecipeIntegrationTest {
 
     private static class MockRecipeCategory<T> implements IRecipeCategory<T> {
         private final RecipeType<T> recipeType;
-        private final Component title;
+        private final String title;
 
         public MockRecipeCategory(RecipeType<T> recipeType, String title) {
             this.recipeType = recipeType;
-            this.title = Component.literal(title);
+            this.title = title;
         }
 
         @Override
@@ -52,7 +55,7 @@ public class JeiRecipeIntegrationTest {
 
         @Override
         public Component getTitle() {
-            return title;
+            return Component.literal(title);
         }
 
         @Override
@@ -89,6 +92,13 @@ public class JeiRecipeIntegrationTest {
                     builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(in);
                 }
                 builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(sr.getResultItem(null));
+            } else if (recipe instanceof GTRecipeExtractionTest.GTRecipeWrapperFixture) {
+                builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_INGOT, 1));
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_NUGGET, 1));
+            } else if (recipe instanceof GTRecipeExtractionTest.StructuralGTRecipeFixture) {
+                builder.addSlot(RecipeIngredientRole.INPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_INGOT, 4));
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addItemStack(new ItemStack(Items.IRON_NUGGET, 2));
+                builder.addSlot(RecipeIngredientRole.OUTPUT, 0, 0).addFluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000);
             }
         }
 
@@ -192,6 +202,73 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertEquals(9.0, node.getInputs().get(0).getAmount(), 0.001);
         Assertions.assertEquals("minecraft:iron_block", node.getOutputs().get(0).getId().toString());
         Assertions.assertEquals(1.0, node.getOutputs().get(0).getAmount(), 0.001);
+    }
+
+    @Test
+    public void testGTCEuJeiWrapperPreservesDetailsAndDerivedSpeed() {
+        GTRecipeExtractionTest.StructuralGTRecipeFixture recipe = new GTRecipeExtractionTest.StructuralGTRecipeFixture();
+        recipe.duration = 100;
+        recipe.tickInputs.put("gtceu:eu_recipe_capability", List.of(new GTRecipeExtractionTest.MockEnergyContent(128L)));
+        GTRecipeExtractionTest.GTRecipeWrapperFixture wrapper = new GTRecipeExtractionTest.GTRecipeWrapperFixture(recipe);
+
+        RecipeType<GTRecipeExtractionTest.GTRecipeWrapperFixture> recipeType = RecipeType.create(
+                "gtceu", "assembler", GTRecipeExtractionTest.GTRecipeWrapperFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.GTRecipeWrapperFixture> category = new MockRecipeCategory<>(recipeType, "Assembler");
+
+        RecipeNode node = JeiRecipeConverter.convert(category, wrapper);
+
+        Assertions.assertNotNull(node);
+        Assertions.assertEquals(100.0, node.getBaseDurationTicks(), 1e-6);
+        Assertions.assertEquals(128.0, node.getBaseEUt(), 1e-6);
+        Assertions.assertEquals(GTVoltageTier.MV, node.getRecipeTier());
+        Assertions.assertEquals(GTVoltageTier.MV, node.getTargetTier());
+        Assertions.assertEquals(5.0, node.getEffectiveDurationSeconds(), 1e-6);
+        Assertions.assertEquals(0.2, node.getCyclesPerSecond(), 1e-6);
+        Assertions.assertEquals(1, node.getInputs().size());
+        Assertions.assertEquals(1, node.getOutputs().size());
+    }
+
+    @Test
+    public void testStarTechnologyCategoryMethodOnlyRecipePreservesDetails() {
+        GTRecipeExtractionTest.BacterialHarvestingCustomRecipe recipe = new GTRecipeExtractionTest.BacterialHarvestingCustomRecipe();
+        GTRecipeExtractionTest.GTRecipeWrapperFixture wrapper = new GTRecipeExtractionTest.GTRecipeWrapperFixture(recipe);
+
+        RecipeType<GTRecipeExtractionTest.GTRecipeWrapperFixture> recipeType = RecipeType.create(
+                "star_technology", "bacterial_harvesting", GTRecipeExtractionTest.GTRecipeWrapperFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.GTRecipeWrapperFixture> category = new MockRecipeCategory<>(recipeType, "Bacterial Harvesting");
+
+        RecipeNode node = JeiRecipeConverter.convert(category, wrapper);
+
+        Assertions.assertNotNull(node);
+        Assertions.assertEquals(160.0, node.getBaseDurationTicks(), 1e-6);
+        Assertions.assertEquals(65536.0, node.getBaseEUt(), 1e-6);
+        Assertions.assertEquals(GTVoltageTier.ZPM, node.getRecipeTier());
+        Assertions.assertEquals(1, node.getInputs().size());
+        Assertions.assertEquals(1, node.getOutputs().size());
+    }
+
+    @Test
+    public void testGTRecipeWithNonFirstFluidOutputIsSearchableByFluid() {
+        GTRecipeExtractionTest.StructuralGTRecipeFixture recipe = new GTRecipeExtractionTest.StructuralGTRecipeFixture();
+        recipe.duration = 100;
+        recipe.outputs.put("gtceu:item", List.of(new GTRecipeExtractionTest.MockMultipleOutputGTRecipe.MockContent(
+                new ItemStack(Items.IRON_NUGGET, 2), 10000, 0)));
+        recipe.outputs.put("gtceu:fluid", List.of(new GTRecipeExtractionTest.MockMultipleOutputGTRecipe.MockContent(
+                new GTRecipeExtractionTest.MockFluidTagInputGTRecipe.MockFluidIngredient(
+                        new FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000)), 10000, 0)));
+
+        RecipeType<GTRecipeExtractionTest.StructuralGTRecipeFixture> recipeType = RecipeType.create(
+                "gtceu", "electrolyzer", GTRecipeExtractionTest.StructuralGTRecipeFixture.class);
+        MockRecipeCategory<GTRecipeExtractionTest.StructuralGTRecipeFixture> category = new MockRecipeCategory<>(recipeType, "Electrolyzer");
+
+        RecipeSearchEngine.SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndex(category, recipe, null);
+
+        Assertions.assertNotNull(sr);
+        Assertions.assertTrue(sr.hasExactOutput(ResourceLocation.tryParse("minecraft:iron_nugget")),
+                "item output must be indexed");
+        Assertions.assertTrue(sr.hasExactOutput(ResourceLocation.tryParse("minecraft:water")),
+                "non-first fluid output must be indexed for reverse producer search");
+        Assertions.assertTrue(sr.outputSearchIndex().contains("minecraft:water"));
     }
 
     @Test
@@ -438,5 +515,27 @@ public class JeiRecipeIntegrationTest {
 
         Assertions.assertEquals(0.50, node.getEffectiveOutputChance(0), 1e-4);
         Assertions.assertEquals(0.45, node.getEffectiveOutputChance(1), 1e-4);
+    }
+
+    @Test
+    public void testJeiHelpersSafeWhenNotLoaded() {
+        try {
+            ModCompatHelper.setTestOverride("jei_plus_plus", false);
+            ModCompatHelper.setTestOverride("jei", false);
+
+            // JEI++ Helper safety
+            Assertions.assertFalse(JeiPlusPlusHelper.isJeiPlusPlusLoaded());
+            Assertions.assertFalse(JeiPlusPlusHelper.registerBoMGoal(null, null));
+
+            // JEI Unofficial Helper safety
+            Assertions.assertFalse(JeiUnofficialHelper.isJeiUnofficialLoaded(null));
+            Assertions.assertFalse(JeiUnofficialHelper.registerBoMGroup(null, null));
+
+            // Adapter BOM support check when neither is loaded
+            JeiRecipeViewerAdapter adapter = new JeiRecipeViewerAdapter();
+            Assertions.assertFalse(adapter.isBoMGoalRegistrationSupported());
+        } finally {
+            ModCompatHelper.clearTestOverrides();
+        }
     }
 }

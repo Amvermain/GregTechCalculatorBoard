@@ -134,8 +134,7 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
-        String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
-        return ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
+        return GTCEuRecipeHandler.isGTCategoryNamespace(categoryId.getNamespace());
     }
 
     @Override
@@ -154,7 +153,7 @@ public class GTCEuModAdapter implements IModAdapter {
             if (ns.equals("minecraft") || ns.equals("emi")) {
                 return false;
             }
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
+            if (GTCEuRecipeHandler.isGTCategoryNamespace(ns)) {
                 return true;
             }
         }
@@ -163,16 +162,13 @@ public class GTCEuModAdapter implements IModAdapter {
             if (ns.equals("minecraft") || ns.equals("emi")) {
                 return false;
             }
-            if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
+            if (GTCEuRecipeHandler.isGTCategoryNamespace(ns)) {
                 return true;
             }
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                String ns = ws.getNamespace().toLowerCase(Locale.ROOT);
-                if (ns.equals("gtceu") || ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology")) {
-                    return true;
-                }
+            if (ws != null && GTCEuRecipeHandler.isGTCategoryNamespace(ws.getNamespace())) {
+                return true;
             }
         }
         return node.getEnergyTypeOverride() == EnergyType.ELECTRIC_EU || (node.getEnergyTypeOverride() == null && node.getBaseEUt() > 0 && (node.getMachineIcon() == null || !node.getMachineIcon().getNamespace().equals("minecraft")));
@@ -315,7 +311,7 @@ public class GTCEuModAdapter implements IModAdapter {
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.REFLECTOR) {
-            tooltip.add(Component.literal("§b🪞 ").append(Component.translatable("gui.gtcalcboard.addon.reflector.tier", addon.getReflectorTier())));
+            tooltip.add(Component.literal("§b✦ ").append(Component.translatable("gui.gtcalcboard.addon.reflector.tier", addon.getReflectorTier())));
             return;
         }
         IModAdapter.super.buildAddonTooltip(node, addon, isActiveAddon, tooltip);
@@ -389,6 +385,30 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
         return GTCEuRecipeHandler.adaptRecipeDetails(emiRecipeObj, backing, details);
+    }
+
+    @Override
+    public com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster buildCompoundRecipe(
+            Object recipeObj,
+            Object backingRecipe,
+            ResourceLocation preferredWorkstation,
+            double startX,
+            double startY
+    ) {
+        if (backingRecipe == null) return null;
+
+        String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Machine";
+        ResourceLocation icon = preferredWorkstation;
+
+        if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backingRecipe)) {
+            EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+            GTCEuRecipeHandler.extractGTRecipeDetails(backingRecipe, details);
+            return GTCEuLayeredRecipeExtractor.buildCompoundCluster(
+                    backingRecipe, machineName, icon, details.tier, startX, startY
+            );
+        }
+
+        return null;
     }
 
     @Override
@@ -623,7 +643,15 @@ public class GTCEuModAdapter implements IModAdapter {
         }
 
         if (catId != null && "gtceu".equals(catId.getNamespace())) {
-            return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + catId.getPath());
+            String cPath = catId.getPath();
+            for (GTVoltageTier t : GTVoltageTier.values()) {
+                String prefix = t.name().toLowerCase(Locale.ROOT) + "_";
+                if (cPath.startsWith(prefix)) {
+                    cPath = cPath.substring(prefix.length());
+                    break;
+                }
+            }
+            return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + cPath);
         }
 
         return null;

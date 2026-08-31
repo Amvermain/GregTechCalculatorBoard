@@ -176,6 +176,13 @@ public final class RecipeNodeSerializer {
             tag.putString("threadingJson", node.getThreadingConfig().toJson().toString());
         }
 
+        if (!node.getHiddenInputIndices().isEmpty()) {
+            tag.putIntArray("hiddenInputs", node.getHiddenInputIndices().stream().mapToInt(Integer::intValue).toArray());
+        }
+        if (!node.getHiddenOutputIndices().isEmpty()) {
+            tag.putIntArray("hiddenOutputs", node.getHiddenOutputIndices().stream().mapToInt(Integer::intValue).toArray());
+        }
+
         return tag;
     }
 
@@ -351,6 +358,17 @@ public final class RecipeNodeSerializer {
                 com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(tag.getString("threadingJson")).getAsJsonObject();
                 node.getThreadingConfig().fromJson(json);
             } catch (Throwable ignored) {}
+        }
+
+        if (tag.contains("hiddenInputs")) {
+            for (int idx : tag.getIntArray("hiddenInputs")) {
+                node.hideInputPort(idx);
+            }
+        }
+        if (tag.contains("hiddenOutputs")) {
+            for (int idx : tag.getIntArray("hiddenOutputs")) {
+                node.hideOutputPort(idx);
+            }
         }
 
         return node;

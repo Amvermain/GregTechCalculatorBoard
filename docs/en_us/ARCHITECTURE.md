@@ -7,7 +7,7 @@
 > 📘 **Detailed Technical Specification Series**:
 > * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](../ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](CODE_SPECIFICATION.md)
-> The complete v1.0.0 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
+> The complete v2.0.0+ architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
 
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer (SPI) of **GregTech Calculator Board**.
 
@@ -21,19 +21,22 @@ GTCalcBoard is architected into 5 strictly isolated layers following **Clean Arc
 graph TD
     subgraph UI["1. Presentation & UI Layer (com.gtceu.calcboard.client.gui)"]
         BS["BoardScreen & Editor (2D Viewport, Camera Pan/Zoom, Matrix Transforms)"]
-        CIH["CanvasInteractionHandler (Mouse Drag, Box Selection, Port Wiring)"]
+        CIH["CanvasInteractionHandler (CanvasPanZoomHandler, CanvasSelectionHandler, CanvasQuickAddMarkerHandler)"]
         BATCH["Single-Pass Batch Render (Single Geometry Draw Pass)"]
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E))"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
-        Dialogs["dialog.* (MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
+        Widgets["widget.* (NodeWidget, HiddenPortsPopup, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
+        Editors["editor.* (InlineTextEditor Engine, NodeCountEditor, NodeNameEditor, NodeParallelEditor, NodeTargetBatchEditor)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
+        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
     end
 
     subgraph Core["2. Core Domain & Math Engine (com.gtceu.calcboard.api)"]
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec)"]
-        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, PortFlowStats)"]
-        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, ProductionETACalculator)"]
+        Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
+        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, NodeRateCalculator, NodeWorkstationResolver)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset)"]
         Prop["property.* (NodeProperties, NodePropertyStore)"]
     end
 

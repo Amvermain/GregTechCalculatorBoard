@@ -38,7 +38,8 @@ public class BoardSettingsDialog {
         HUD("gui.gtcalcboard.settings.tab_hud"),
         UNITS("gui.gtcalcboard.settings.tab_units"),
         RATIO("gui.gtcalcboard.settings.tab_ratio"),
-        WIRES("gui.gtcalcboard.settings.tab_wires");
+        WIRES("gui.gtcalcboard.settings.tab_wires"),
+        PRESETS("gui.gtcalcboard.settings.tab_presets");
 
         private final String nameKey;
 
@@ -174,6 +175,7 @@ public class BoardSettingsDialog {
             case UNITS -> renderUnitsTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
             case RATIO -> renderRatioTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
             case WIRES -> renderWiresTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
+            case PRESETS -> renderPresetsTab(graphics, font, mainX, mainY, mainW, mainH, mouseX, mouseY, bm);
         }
 
         graphics.pose().popPose();
@@ -468,6 +470,7 @@ public class BoardSettingsDialog {
         // Sidebar Tabs Click
         int headerH = 26;
         int contentY = dialogY + headerH;
+        int contentH = dialogH - headerH;
         int sidebarW = SIDEBAR_WIDTH;
         SettingsTab[] tabs = SettingsTab.values();
         int tabBtnH = 24;
@@ -494,6 +497,7 @@ public class BoardSettingsDialog {
             case UNITS -> handleUnitsClick(mouseX, mouseY, mainX, mainY, mainW, bm);
             case RATIO -> handleRatioClick(mouseX, mouseY, mainX, mainY, mainW, bm);
             case WIRES -> handleWiresClick(mouseX, mouseY, mainX, mainY, mainW, bm);
+            case PRESETS -> handlePresetsClick(mouseX, mouseY, mainX, mainY, mainW, contentH, bm);
         }
 
         return true;
@@ -714,6 +718,160 @@ public class BoardSettingsDialog {
             }
             palX += palSize + 6;
         }
+    }
+
+    private int presetScrollOffset = 0;
+
+    private void renderPresetsTab(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, BoardManager bm) {
+        graphics.drawString(font, "§d" + Component.translatable("gui.gtcalcboard.settings.presets_desc").getString(), x, y, 0xFFFFFFFF, false);
+
+        var presetManager = com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance();
+        var allPresets = presetManager.getAllPresets();
+
+        // Clear All Button (Top Right)
+        if (!allPresets.isEmpty()) {
+            int clearBtnW = 64;
+            int clearBtnH = 16;
+            int clearBtnX = x + w - clearBtnW - 4;
+            int clearBtnY = y - 2;
+            boolean clearHover = mouseX >= clearBtnX && mouseX <= clearBtnX + clearBtnW && mouseY >= clearBtnY && mouseY <= clearBtnY + clearBtnH;
+            graphics.fill(clearBtnX, clearBtnY, clearBtnX + clearBtnW, clearBtnY + clearBtnH, clearHover ? 0xFF882222 : 0xFF442222);
+            graphics.renderOutline(clearBtnX, clearBtnY, clearBtnW, clearBtnH, clearHover ? 0xFFFF6666 : 0xFF883333);
+            graphics.drawCenteredString(font, "🗑 " + Component.translatable("gui.gtcalcboard.settings.clear_all_presets").getString(), clearBtnX + clearBtnW / 2, clearBtnY + 4, 0xFFFFFFFF);
+        }
+
+        int startY = y + 18;
+        int listH = h - 22;
+
+        if (allPresets.isEmpty()) {
+            graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.no_presets").getString(), x + 4, startY + 10, 0xFF8899AA, false);
+            graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.settings.no_presets_hint").getString(), x + 4, startY + 24, 0xFF667788, false);
+            return;
+        }
+
+        graphics.enableScissor(x, startY, x + w, startY + listH);
+
+        int rowH = 26;
+        int rowY = startY - presetScrollOffset;
+        for (var entry : allPresets.entrySet()) {
+            var catId = entry.getKey();
+            var preset = entry.getValue();
+
+            if (rowY + rowH >= startY && rowY <= startY + listH) {
+                boolean rowHover = mouseX >= x && mouseX <= x + w - 4 && mouseY >= rowY && mouseY <= rowY + rowH - 2;
+                graphics.fill(x, rowY, x + w - 4, rowY + rowH - 2, rowHover ? 0xFF222836 : 0xFF181C26);
+                graphics.renderOutline(x, rowY, w - 4, rowH - 2, rowHover ? 0xFF5B9BD5 : 0xFF35445E);
+
+                // Machine Icon / Item Render
+                int iconX = x + 4;
+                int iconY = rowY + 3;
+                if (preset.getMachineIcon() != null) {
+                    var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(preset.getMachineIcon());
+                    if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                        graphics.renderItem(new net.minecraft.world.item.ItemStack(item), iconX, iconY);
+                    }
+                }
+
+                // Category Name
+                int textX = iconX + 22;
+                String catText = catId.toString();
+                if (font.width(catText) > 120) {
+                    catText = font.plainSubstrByWidth(catText, 110) + "...";
+                }
+                graphics.drawString(font, "§f" + catText, textX, rowY + 7, 0xFFFFFFFF, false);
+
+                // Badges (MB/SB, Tier, Parallel, Addons)
+                int badgeX = x + 155;
+                String mbBadge = preset.isMultiblock() ? "§a[MB]" : "§7[SB]";
+                graphics.drawString(font, mbBadge, badgeX, rowY + 7, 0xFFFFFFFF, false);
+                badgeX += font.width(mbBadge) + 4;
+
+                if (preset.getTargetTier() != null) {
+                    String tierBadge = "§e" + preset.getTargetTier().name();
+                    graphics.drawString(font, tierBadge, badgeX, rowY + 7, 0xFFFFFFFF, false);
+                    badgeX += font.width(tierBadge) + 4;
+                }
+
+                if (preset.getParallel() > 1) {
+                    String parBadge = "§b⚡" + preset.getParallel() + "x";
+                    graphics.drawString(font, parBadge, badgeX, rowY + 7, 0xFFFFFFFF, false);
+                    badgeX += font.width(parBadge) + 4;
+                }
+
+                if (!preset.getAddons().isEmpty()) {
+                    String addonBadge = "§d📦" + preset.getAddons().size();
+                    graphics.drawString(font, addonBadge, badgeX, rowY + 7, 0xFFFFFFFF, false);
+                }
+
+                // Delete Button
+                int delBtnW = 20;
+                int delBtnH = 18;
+                int delBtnX = x + w - 4 - delBtnW - 4;
+                int delBtnY = rowY + 3;
+                boolean delHover = mouseX >= delBtnX && mouseX <= delBtnX + delBtnW && mouseY >= delBtnY && mouseY <= delBtnY + delBtnH;
+                graphics.fill(delBtnX, delBtnY, delBtnX + delBtnW, delBtnY + delBtnH, delHover ? 0xFF882222 : 0xFF3D2020);
+                graphics.renderOutline(delBtnX, delBtnY, delBtnW, delBtnH, delHover ? 0xFFFF4444 : 0xFF663333);
+                graphics.drawCenteredString(font, "🗑", delBtnX + delBtnW / 2, delBtnY + 5, 0xFFFFFFFF);
+            }
+            rowY += rowH;
+        }
+
+        graphics.disableScissor();
+    }
+
+    private void handlePresetsClick(double mouseX, double mouseY, int x, int y, int w, int h, BoardManager bm) {
+        var presetManager = com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance();
+        var allPresets = presetManager.getAllPresets();
+
+        // Clear All Button Click
+        if (!allPresets.isEmpty()) {
+            int clearBtnW = 64;
+            int clearBtnH = 16;
+            int clearBtnX = x + w - clearBtnW - 4;
+            int clearBtnY = y - 2;
+            if (mouseX >= clearBtnX && mouseX <= clearBtnX + clearBtnW && mouseY >= clearBtnY && mouseY <= clearBtnY + clearBtnH) {
+                presetManager.clearAll();
+                bm.saveForCurrentContext();
+                onSettingsChanged();
+                playClickSound();
+                return;
+            }
+        }
+
+        int startY = y + 18;
+        int listH = h - 22;
+        int rowH = 26;
+        int rowY = startY - presetScrollOffset;
+
+        for (var entry : allPresets.entrySet()) {
+            var catId = entry.getKey();
+            if (rowY + rowH >= startY && rowY <= startY + listH) {
+                int delBtnW = 20;
+                int delBtnH = 18;
+                int delBtnX = x + w - 4 - delBtnW - 4;
+                int delBtnY = rowY + 3;
+                if (mouseX >= delBtnX && mouseX <= delBtnX + delBtnW && mouseY >= delBtnY && mouseY <= delBtnY + delBtnH) {
+                    presetManager.removePreset(catId);
+                    bm.saveForCurrentContext();
+                    onSettingsChanged();
+                    playClickSound();
+                    return;
+                }
+            }
+            rowY += rowH;
+        }
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (!visible) return false;
+        if (SettingsTab.values()[activeTab] == SettingsTab.PRESETS) {
+            var presetManager = com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance();
+            int totalH = presetManager.getAllPresets().size() * 26;
+            int maxScroll = Math.max(0, totalH - 180);
+            presetScrollOffset = (int) Math.max(0, Math.min(maxScroll, presetScrollOffset - delta * 20));
+            return true;
+        }
+        return false;
     }
 
     private boolean isInsideRow(double mouseX, double mouseY, int x, int y, int w, int h) {

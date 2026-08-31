@@ -119,8 +119,8 @@ public class SteamParallelTest {
         node.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:huge_restrictive_tin_item_pipe"), "Pipe", 1.0));
 
         IngredientStack mainOut = IngredientStack.item(ResourceLocation.tryParse("gtceu:tin_dust"), "Tin Dust", 12.0);
-        IngredientStack byprod = IngredientStack.item(ResourceLocation.tryParse("gtceu:zinc_dust"), "Zinc Dust", 2.0, 0.0);
-        byprod.setTierChanceBoost(0.1); // +10% per tier above ULV
+        IngredientStack byprod = IngredientStack.item(ResourceLocation.tryParse("gtceu:zinc_dust"), "Zinc Dust", 2.0, 0.15);
+        byprod.setTierChanceBoost(0.1); // +10% per tier above HV
 
         node.getOutputs().add(mainOut);
         node.getOutputs().add(byprod);

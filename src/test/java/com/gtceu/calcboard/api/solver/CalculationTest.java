@@ -115,10 +115,10 @@ public class CalculationTest {
         turbine.autoCalculateTurbineParallel();
         Assertions.assertEquals(1152, turbine.getParallel());
         Assertions.assertEquals(36864.0, turbine.getTotalEUt(), 0.001);
-        Assertions.assertEquals(4.20, turbine.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(4.40, turbine.getEffectiveDurationSeconds(), 0.001);
 
         var scheeliteRates = turbine.calculateInputRates();
-        Assertions.assertEquals(1152.0 / 4.20, scheeliteRates.get(nitrobenzene), 0.01);
+        Assertions.assertEquals(1152.0 / 4.40, scheeliteRates.get(nitrobenzene), 0.01);
 
         // EV Rotor Holder (4,096 EU/t base * 4.5 = 18,432 EU/t -> 576 parallels)
         turbine.setTargetTier(GTVoltageTier.EV);
@@ -561,29 +561,29 @@ public class CalculationTest {
 
     @Test
     public void testTierChanceBoostOnOverclock() {
-        RecipeNode macerator = RecipeNode.create("Macerator", 20.0, 30.0, GTVoltageTier.LV);
-        macerator.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0, 1.0));
+        RecipeNode centrifuge = RecipeNode.create("Centrifuge", 20.0, 30.0, GTVoltageTier.LV);
+        centrifuge.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ore"), "Iron Ore", 1.0, 1.0));
 
         IngredientStack byprod = IngredientStack.item(ResourceLocation.tryParse("gtceu:nickel_dust"), "Nickel Dust", 1.0, 0.50);
         byprod.setTierChanceBoost(0.05);
-        macerator.addOutput(byprod);
+        centrifuge.addOutput(byprod);
 
-        Assertions.assertEquals(0, macerator.getTierDelta());
-        Assertions.assertEquals(0.50, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
-        Assertions.assertEquals(0.50, macerator.calculateOutputRates().get(byprod), 0.001);
+        Assertions.assertEquals(0, centrifuge.getTierDelta());
+        Assertions.assertEquals(0.50, byprod.getEffectiveChance(centrifuge.getTierDelta()), 0.001);
+        Assertions.assertEquals(0.50, centrifuge.calculateOutputRates().get(byprod), 0.001);
 
-        macerator.setTargetTier(GTVoltageTier.MV);
-        Assertions.assertEquals(1, macerator.getTierDelta());
-        Assertions.assertEquals(0.55, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
-        Assertions.assertEquals(0.55 * 2.0, macerator.calculateOutputRates().get(byprod), 0.001);
+        centrifuge.setTargetTier(GTVoltageTier.MV);
+        Assertions.assertEquals(1, centrifuge.getTierDelta());
+        Assertions.assertEquals(0.55, byprod.getEffectiveChance(centrifuge.getTierDelta()), 0.001);
+        Assertions.assertEquals(0.55 * 2.0, centrifuge.calculateOutputRates().get(byprod), 0.001);
 
-        macerator.setTargetTier(GTVoltageTier.HV);
-        Assertions.assertEquals(2, macerator.getTierDelta());
-        Assertions.assertEquals(0.60, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
-        Assertions.assertEquals(0.60 * 4.0, macerator.calculateOutputRates().get(byprod), 0.001);
+        centrifuge.setTargetTier(GTVoltageTier.HV);
+        Assertions.assertEquals(2, centrifuge.getTierDelta());
+        Assertions.assertEquals(0.60, byprod.getEffectiveChance(centrifuge.getTierDelta()), 0.001);
+        Assertions.assertEquals(0.60 * 4.0, centrifuge.calculateOutputRates().get(byprod), 0.001);
 
-        macerator.setTargetTier(GTVoltageTier.MAX);
-        Assertions.assertEquals(1.00, byprod.getEffectiveChance(macerator.getTierDelta()), 0.001);
+        centrifuge.setTargetTier(GTVoltageTier.MAX);
+        Assertions.assertEquals(1.00, byprod.getEffectiveChance(centrifuge.getTierDelta()), 0.001);
     }
 
     @Test

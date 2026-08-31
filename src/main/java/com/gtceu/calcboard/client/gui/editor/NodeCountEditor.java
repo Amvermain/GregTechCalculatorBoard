@@ -1,42 +1,46 @@
 package com.gtceu.calcboard.client.gui.editor;
 
+import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-
-import com.gtceu.calcboard.api.model.RecipeNode;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Handles inline text editing for machine count inside a NodeWidget.
+ * Handles inline text editing for machine count inside a NodeWidget using InlineTextEditor.
  */
 public class NodeCountEditor {
+
     private final NodeWidget widget;
-    private boolean isEditing = false;
-    private String buffer = "";
+    private final InlineTextEditor editor;
 
     public NodeCountEditor(NodeWidget widget) {
         this.widget = widget;
-        this.buffer = formatCount(widget.getNode().getMachineCount());
+        this.editor = new InlineTextEditor(12, c -> Character.isDigit(c) || c == '.');
     }
 
     public boolean isEditing() {
-        return isEditing;
+        return editor.isEditing();
+    }
+
+    public InlineTextEditor getEditor() {
+        return editor;
     }
 
     public void startEditing() {
-        this.isEditing = true;
-        this.buffer = formatCount(widget.getNode().getMachineCount());
+        editor.startEditing(formatCount(widget.getNode().getMachineCount()));
     }
 
     public void commit() {
-        if (!isEditing) return;
-        isEditing = false;
+        if (!editor.isEditing()) return;
         double oldVal = widget.getNode().getMachineCount();
+        String text = editor.getText().trim();
+        editor.stopEditing();
+
         try {
-            double parsed = Double.parseDouble(buffer.trim());
+            double parsed = Double.parseDouble(text);
             if (parsed > 0 && Math.abs(parsed - oldVal) > 0.0001) {
                 widget.getNode().setMachineCount(parsed);
                 if (widget.getParent() != null) {
-                    widget.getParent().recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(
+                    widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.machineCount(
                         widget.getNode().getId(),
                         oldVal,
                         parsed
@@ -48,60 +52,62 @@ public class NodeCountEditor {
                     }
                 }
             }
-        } catch (NumberFormatException ignored) {
-        }
-        this.buffer = formatCount(widget.getNode().getMachineCount());
+        } catch (NumberFormatException ignored) {}
+
         widget.invalidateCache();
     }
 
     public void updateBuffer() {
-        if (!isEditing) {
-            this.buffer = formatCount(widget.getNode().getMachineCount());
+        if (!editor.isEditing()) {
+            // No action needed when not editing
         }
         widget.invalidateCache();
     }
 
     public String getDisplayText() {
-        String text = isEditing ? buffer : formatCount(widget.getNode().getMachineCount());
-        if (isEditing && (System.currentTimeMillis() / 500) % 2 == 0) {
-            text += "_";
+        if (editor.isEditing()) {
+            String txt = editor.getText();
+            int cursor = editor.getCursorPos();
+            boolean blink = (System.currentTimeMillis() / 500) % 2 == 0;
+            if (blink && !editor.hasSelection()) {
+                if (cursor >= txt.length()) {
+                    return txt + "_";
+                }
+                return txt.substring(0, cursor) + "|" + txt.substring(cursor);
+            }
+            return txt;
         }
-        return text;
+        return formatCount(widget.getNode().getMachineCount());
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
-        if (!isEditing) return false;
-        if (Character.isDigit(codePoint) || (codePoint == '.' && !buffer.contains("."))) {
-            if (buffer.length() < 10) {
-                buffer += codePoint;
-                return true;
-            }
+        if (!editor.isEditing()) return false;
+        if (codePoint == '.' && editor.getText().contains(".") && !editor.getSelectedText().contains(".")) {
+            return false;
         }
-        return false;
+        return editor.charTyped(codePoint, modifiers);
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (!isEditing) return false;
+        if (!editor.isEditing()) return false;
 
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_ESCAPE) {
             commit();
             return true;
-        } else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-            if (!buffer.isEmpty()) {
-                buffer = buffer.substring(0, buffer.length() - 1);
-            }
-            return true;
-        } else if (keyCode == GLFW.GLFW_KEY_DELETE) {
-            buffer = "";
-            return true;
         }
-        return true;
+
+        return editor.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    public void onClick(net.minecraft.client.gui.Font font, double mouseX, double textStartX, boolean shiftDown) {
+        editor.onClick(font, mouseX - textStartX, shiftDown);
+    }
+
+    public void onDrag(net.minecraft.client.gui.Font font, double mouseX, double textStartX) {
+        editor.onDrag(font, mouseX - textStartX);
     }
 
     public static String formatCount(double count) {
         return String.format("%.2f", count).replaceAll("\\.?0+$", "");
     }
 }
-
-
-

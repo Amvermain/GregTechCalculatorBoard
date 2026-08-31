@@ -95,6 +95,25 @@ public class CreateModAdapter implements IModAdapter {
     }
 
     @Override
+    public com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster buildCompoundRecipe(
+            Object recipeObj,
+            Object backingRecipe,
+            ResourceLocation preferredWorkstation,
+            double startX,
+            double startY
+    ) {
+        if (backingRecipe == null) return null;
+        if (CreateSequencedRecipeExtractor.isSequencedRecipe(backingRecipe)) {
+            String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Sequenced Assembly";
+            ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : ResourceLocation.tryParse("create:sequenced_assembly");
+            return CreateSequencedRecipeExtractor.buildCompoundCluster(
+                    backingRecipe, machineName, icon, GTVoltageTier.ULV, startX, startY
+            );
+        }
+        return null;
+    }
+
+    @Override
     public void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
     }
 

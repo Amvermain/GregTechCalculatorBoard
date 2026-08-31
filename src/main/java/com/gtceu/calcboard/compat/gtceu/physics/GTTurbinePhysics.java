@@ -39,6 +39,10 @@ public final class GTTurbinePhysics {
         return GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
     }
 
+    public static int getTotalTurbineEfficiency(RecipeNode node) {
+        return GTTurbineHelper.getTotalTurbineEfficiency(node);
+    }
+
     public static void syncTurbineMachineIcon(RecipeNode node) {
         if (node == null || !node.isTurbine()) return;
         if (node.isMultiblock()) {

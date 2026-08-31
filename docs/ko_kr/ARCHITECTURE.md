@@ -7,7 +7,7 @@
 > 📘 **상세 코드 명세서 시리즈**:
 > * 🇰🇷 **한국어 에디션**: [docs/ko_kr/CODE_SPECIFICATION.md](CODE_SPECIFICATION.md)
 > * 🇺🇸 **영문 에디션**: [docs/en_us/CODE_SPECIFICATION.md](../en_us/CODE_SPECIFICATION.md)
-> 전체 v1.0.0 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
+> 전체 v2.0.0+ 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
 
 본 문서는 **GregTech Calculator Board (그렉텍 계산기 보드)**의 내부 시스템 아키텍처, 수학적 솔버 엔진, 캔버스 렌더링 파이프라인, 및 멀티 모드 호환성 계층(SPI)을 설명합니다.
 
@@ -21,19 +21,22 @@
 graph TD
     subgraph UI["1. 프레젠테이션 & UI 계층 (com.gtceu.calcboard.client.gui)"]
         BS["BoardScreen & Editor (2D 뷰포트, 카메라 이동/줌, 화면 매트릭스)"]
-        CIH["CanvasInteractionHandler (마우스 드래그, 박스 선택, 포트 와이어링)"]
+        CIH["CanvasInteractionHandler (CanvasPanZoomHandler, CanvasSelectionHandler, CanvasQuickAddMarkerHandler)"]
         BATCH["Single-Pass Batch Render (단일 지오메트리 패스)"]
         WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E))"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
-        Dialogs["dialog.* (MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
+        Widgets["widget.* (NodeWidget, HiddenPortsPopup, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
+        Editors["editor.* (InlineTextEditor Engine, NodeCountEditor, NodeNameEditor, NodeParallelEditor, NodeTargetBatchEditor)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
+        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
     end
 
     subgraph Core["2. 코어 수학 & 도메인 엔진 (com.gtceu.calcboard.api)"]
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec)"]
-        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, PortFlowStats)"]
-        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, ProductionETACalculator)"]
+        Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
+        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, NodeRateCalculator, NodeWorkstationResolver)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset)"]
         Prop["property.* (NodeProperties, NodePropertyStore)"]
     end
 

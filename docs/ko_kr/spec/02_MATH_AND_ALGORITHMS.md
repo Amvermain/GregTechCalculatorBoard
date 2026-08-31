@@ -80,6 +80,13 @@ $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a
 - **대형 제련로 (Multi Smelter)**:
   $$\text{Parallel} = \text{SmelterParallel} \quad (\text{기본 } 32\text{x}, 64\text{x}, 128\text{x}\dots)$$
 
+#### 대형 증기/가스/플라즈마 터빈 로터 및 홀더 효율 공식
+- 로터 자체 효율 $E_{\text{rotor}}$, 로터 파워 $P_{\text{rotor}}$, 로터 홀더 티어 보너스 $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$일 때:
+  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right)\right)$$
+  $$\text{DurationTicks} = \max\left(1.0, \, \text{BaseDurationTicks} \times \text{RotorEffMult} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()\right)$$
+  $$\text{Max EU/t} = \text{HolderBaseEUt} \times \frac{P_{\text{rotor}}}{100.0}$$
+  $$\text{Total Parallel} = \left\lfloor \frac{\text{Max EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+
 ---
 
 ### 1.5 확률 부산물 전압 티어 부스트 (Tier Chance Boost)

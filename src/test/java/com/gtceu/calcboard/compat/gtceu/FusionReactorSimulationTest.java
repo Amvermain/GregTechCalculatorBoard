@@ -265,6 +265,34 @@ public class FusionReactorSimulationTest {
         assertNotNull(badgesInstalled);
         assertTrue(badgesInstalled.stream().anyMatch(b -> b.text().contains("T1")));
     }
+
+    @Test
+    @DisplayName("Verify preferred fusion workstation matches recipe minimum voltage tier upon creation")
+    void testFusionPreferredWorkstationMatching() {
+        List<ResourceLocation> wsList = List.of(
+                ResourceLocation.tryParse("start_core:luv_fusion_reactor"),
+                ResourceLocation.tryParse("start_core:zpm_fusion_reactor"),
+                ResourceLocation.tryParse("start_core:uv_fusion_reactor"),
+                ResourceLocation.tryParse("start_core:auxiliary_booster_fusion_reactor")
+        );
+
+        RecipeNode mk3Node = RecipeNode.create("Fusion Mk3 Recipe", 64, 65536, GTVoltageTier.UV);
+        mk3Node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
+        mk3Node.setEuToStart(640_000_000L);
+        mk3Node.getAvailableWorkstations().addAll(wsList);
+
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(mk3Node);
+        ResourceLocation preferredMk3 = adapter.getPreferredMultiblockWorkstation(mk3Node, wsList);
+        assertEquals(ResourceLocation.tryParse("start_core:uv_fusion_reactor"), preferredMk3);
+
+        RecipeNode mk2Node = RecipeNode.create("Fusion Mk2 Recipe", 144, 24576, GTVoltageTier.LuV);
+        mk2Node.setRecipeCategoryId(ResourceLocation.tryParse("start_core:reflector_fusion_reactor"));
+        mk2Node.setEuToStart(180_000_000L);
+        mk2Node.getAvailableWorkstations().addAll(wsList);
+
+        ResourceLocation preferredMk2 = adapter.getPreferredMultiblockWorkstation(mk2Node, wsList);
+        assertEquals(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"), preferredMk2);
+    }
 }
 
 

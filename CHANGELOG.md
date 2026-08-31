@@ -4,6 +4,102 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-alpha.2] - 2026-08-31
+
+### Added
+- **Shared Machine Pool (Time-Sharing Frame)**:
+  - Added dedicated Shared Machine Pool frames allowing multiple recipe cards to share a single physical machine pool across time.
+  - Computes cumulative duty (`Total Duty %`) and quantized required machines (`Ceil`), displaying real-time header badges and comprehensive breakdown tooltips.
+  - Added `[⚙ Config]` button in the frame header to synchronize voltage tiers, overclock modes, parallel limits, and equipped addons across all enclosed machines.
+  - Accurately de-duplicates shared multiblock structures in the Bill of Materials (BOM) calculation.
+- **Port Multi-Selection & Bundle Batch Wiring UX**:
+  - Added marquee port selection: dragging a box over machine cards selectively grabs input or output ports without selecting entire cards.
+  - Added Windows Explorer-style selection: `Ctrl + Click` to toggle individual ports, `Shift + Click` to select continuous port ranges.
+  - Added multi-wire bundle dragging with real-time multi-bezier curve rendering.
+  - Dropping on empty canvas automatically creates vertically aligned Junction nodes with 1:1 wiring.
+  - Dropping onto a Shared Machine Pool automatically wires matching machines, spawns missing recipe cards from the search index, synchronizes hardware configs, and expands frame bounds.
+  - Intelligent secondary input preference matching: prioritizes recipes sharing the same secondary fluids/items (e.g. Lubricant vs Water) as the template machine.
+  - Holding `Shift` while dropping performs 1:1 Auto-Ratio matching with exact fractional machine counts (Duty).
+  - Added `[⛶ Auto-Fit]` action button in frame headers and double-click to instantly auto-fit frame bounds to enclosed contents.
+- **Interactive Tutorial Step 11**:
+  - Added interactive tutorial step introducing Shared Machine Pools, hardware synchronization, and bundle wiring.
+
+### Changed & Improved
+- **Two-Column Machine Card Port Highlight Precision**:
+  - Refined slot selection highlights and hit-test bounding boxes on 2-column cards so port highlights remain strictly confined to their respective left/right halves even on rows with empty inputs or outputs.
+- **Frame Auto-Expansion on Node Spawning**:
+  - Frame bounds automatically expand downward when auto-spawning multiple recipe cards from bundle drops, fully integrated with `ResizeFrameCommand` for instant Undo/Redo (`Ctrl + Z`).
+
+### Fixed
+- **Fractional Auto-Ratio Machine Count Truncation**:
+  - Fixed an issue where performing 1:1 Auto-Ratio on newly spawned machines in a Shared Machine Pool truncated fractional counts (e.g. `0.22`, `0.47`) into integer `1`.
+- **Junction Node Bundle Spawn Rendering Sync**:
+  - Fixed a UI widget list synchronization issue where junction nodes created from bundle drops did not appear on the canvas until another node was modified.
+
+## [2.1.0-alpha.1] - 2026-08-31
+
+### Added
+- **I/O Port Hiding & Selective Restore**:
+  - Added the ability to hide unwanted input/output ports by right-clicking socket ports, automatically disconnecting attached wires to keep complex multi-product machine cards compact and clean.
+  - Added a status pill badge at the bottom of cards indicating the number of hidden ports (e.g. `2 Outputs hidden`, `1 Input hidden`, `3 Ports hidden`).
+  - Clicking the pill badge opens a dropdown popup modal listing all hidden ports with ingredient previews, allowing individual ports to be restored to the card with a single click.
+  - Hidden port states are fully preserved across local saves, dedicated server multiplayer synchronization, and shareable blueprints.
+- **Smart Inline Text Editing Engine**:
+  - Upgraded all canvas inline editable text fields (machine name, machine count, parallel count, target batch quantity) with rich text manipulation.
+  - Added mouse click/drag cursor positioning, range selection with `Shift + Arrow Keys` / `Shift + Home/End`, and select-all with `Ctrl + A`.
+  - Added fast word-level jumping and deletion via `Ctrl + Arrow Keys` and `Ctrl + Backspace / Delete`.
+  - Added full clipboard integration for copy (`Ctrl + C`), cut (`Ctrl + X`), and paste (`Ctrl + V`).
+- **JEI Unofficial Full Compatibility & Dedicated Integration**:
+  - Added full support for the JEI Unofficial recipe viewer fork, including native bookmark groups and crafting mode integration.
+  - Separated JEI++ (Just Enough Calculation) and JEI Unofficial integrations into dedicated subsystems for robust independent lifecycle management.
+- **Multiblock BOM Shopping List Export to JEI / JEI++**:
+  - Direct export of required multiblock construction parts, casings, and hatches to JEI / JEI Unofficial bookmark groups or JEI++ calculation goals via the BOM dialog and `B` hotkey.
+
+### Changed & Improved
+- **JEI Recipe Slot & Layout Extraction Stability**:
+  - Upgraded the recipe parsing layer for JEI 15.20+ and JEI Unofficial to safely capture complex vanilla and modded recipe layouts without crashing or missing item stacks.
+
+### Fixed
+- **JEI Recipe Search Missing Ingredients & Anvil Fallback**:
+  - Fixed an issue where browsing vanilla recipes in JEI Unofficial caused recipes to display as empty `[Anvil] Anvil` entries with missing input and output item previews.
+
+## [2.0.2] - 2026-08-31
+
+### Added
+- **Multi-Column & Progressive Assembly Compound Cluster Generation (`EmiStepRecipeDetector`, `CompoundRecipeBuilder`)**:
+  - Multi-step, multi-slice, and progressive assembly recipes (such as `Stargate Component Assembly` and GTCEu `Assembly Line` with up to 16 columns) imported from recipe viewers are now automatically partitioned across sequential layer nodes (`Layer I` through `Layer XVI`) grouped inside a purple Compound Module frame (`🧩 ...`).
+
+### Fixed
+- **GTCEu Macerator Byproduct Tier Gating Logic (`GTPowerCalculator`, `NodeRateCalculator`, `BoardTooltipRenderer`)**:
+  - Fixed an issue where secondary outputs (slot 1 onward) in Macerator recipes with 100% base chance or multi-product definitions (such as Plant Ball processing) were incorrectly calculated and displayed as active on ULV/LV/MV tiers or labeled with inaccurate tier requirements.
+  - Gated all secondary outputs from slot 1 onward behind the HV+ voltage tier requirement (`Byproducts from HV+`), matching in-game singleblock and multiblock Macerator behavior, with inactive outputs properly displaying `0% (Requires HV+)`.
+
+## [2.0.1] - 2026-08-31
+
+### Added
+- **Automatic Fusion Reactor Controller Matching (`GTCEuModAdapter`, `GTAddonCompatibilityHandler`, `EmiRecipeConverter`, `JeiRecipeConverter`)**:
+  - When importing recipes for Fusion Reactors (Mk1, Mk2, Mk3), the controller workstation matching the recipe's minimum required voltage tier (e.g. 180M EU $\rightarrow$ ZPM Mk2) is now strictly prioritized and assigned as the default machine icon upon creation.
+
+### Changed & Improved
+- **Machine Configuration Dialog Layout & Label Optimization (`MachineConfigDialog`, `GTCEuModGuiHandler`, `AddonCatalogView`)**:
+  - Compacted top header buttons (Recipe Switch, Single/Multiblock Toggle, Font Scale) and added ellipsis truncation for long machine titles to eliminate button overlap across all languages.
+  - Formatted controller buttons in the multiblock selector (e.g. `⚛ Fusion Mk1/Mk2/Mk3`, `⚡ Aux Mk1/Mk2`) by stripping internal bracket tags (such as `[FRC I]`) for clean rendering within constrained widths.
+  - Refined horizontal category scroll bar navigation (◀ / ▶ arrows) and added smart name shortening for long addon titles in the hardware catalog.
+- **Reroute Junction Flow Balancing & Multi-Branch Auto-Ratio (`FlowBalanceMatrixSolver`, `FlowGraphTopologyAnalyzer`, `FlowSummaryAggregator`)**:
+  - Enhanced Auto-Ratio backwards and forward balancing across complex multi-branch network graphs containing reroute/junction nodes, ensuring 100% operational efficiency without artificial flow bottlenecks.
+  - Improved port flow statistics gauges to accurately track pass-through demands on reroute nodes.
+
+### Fixed
+- **Fusion Reactor Node Tier & Badge Synchronization on Creation (`EmiRecipeConverter`, `GTBadgeProvider`, `GTAddonCompatibilityHandler`)**:
+  - Fixed an issue where recipes requiring Fusion Mk2 (ZPM) were overwritten with Mk3 (UV) controllers during multiblock conversion, causing voltage tier and badge mismatch.
+  - Fixed badge evaluation in `GTBadgeProvider` to derive reactor tier from the active controller model rather than purely runtime operating voltage, preserving accurate Mk1/Mk2/Mk3 display when overclocking.
+- **GTCEu Turbine Rotor Holder Efficiency Calculation (`GTPowerCalculator`, `GTTurbinePhysics`, `GTTurbineHelper`)**:
+  - Fixed an issue where the efficiency bonus from higher-tier rotor holders (e.g. EV, IV, ZPM) was incorrectly added rather than scaled multiplicatively with rotor efficiency, causing cycle duration and fuel consumption discrepancies.
+- **GTCEu Recipe Viewer Extraction & Condition Branching (`GTCEuRecipeHandler`, `JeiRecipeConverter`)**:
+  - Fixed an issue where certain complex GTCEu recipes with condition branches, multi-fluid outputs, or specific chance byproducts failed to extract properly or dropped valid output ports during EMI/JEI conversion (thanks to @kairan0 via PR #3, #4, #5).
+- **Reflector Missing Badge & Warning Text Formatting (`GTBadgeProvider`, `GTNodeValidator`, `BoardTooltipRenderer`)**:
+  - Fixed an issue where the missing reflector tier text displayed '(None)' in parentheses instead of a clean 'None' label, and standardized reflector badge symbols to ✦.
+
 ## [2.0.0] - 2026-08-30
 
 ### Added

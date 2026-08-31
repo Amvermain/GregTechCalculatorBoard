@@ -2,6 +2,9 @@ package com.gtceu.calcboard.api.type;
 
 import net.minecraft.resources.ResourceLocation;
 
+/**
+ * Star Technology threading helix definitions with voltage tiers, categories, and speed/parallel stats.
+ */
 public enum GTThreadingHelix {
     // Supreme
     UEV_SUPREME("start_core:uev_supreme_thread_helix", "UEV Supreme", GTVoltageTier.UEV, Category.SUPREME, 20, 0, 0, 0, 0),

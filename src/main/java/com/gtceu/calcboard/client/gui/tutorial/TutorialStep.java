@@ -8,7 +8,9 @@ public enum TutorialStep {
     STEP_5_MACHINE_CONFIG(5, "gui.gtcalcboard.tutorial.step5_title", "gui.gtcalcboard.tutorial.step5_desc"),
     STEP_6_GROUP_FRAME(6, "gui.gtcalcboard.tutorial.step6_title", "gui.gtcalcboard.tutorial.step6_desc"),
     STEP_7_COMPOUND_MODULE(7, "gui.gtcalcboard.tutorial.step7_title", "gui.gtcalcboard.tutorial.step7_desc"),
-    COMPLETED(8, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
+    STEP_8_SHARED_MACHINE(8, "gui.gtcalcboard.tutorial.step8_title", "gui.gtcalcboard.tutorial.step8_desc"),
+    STEP_9_BOM_INSPECTION(9, "gui.gtcalcboard.tutorial.step9_title", "gui.gtcalcboard.tutorial.step9_desc"),
+    COMPLETED(10, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
 
     private final int stepNumber;
     private final String titleKey;

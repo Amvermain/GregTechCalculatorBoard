@@ -144,7 +144,7 @@ flowchart TD
 
 ## 6. Internationalization (i18n) Synchronization
 
-All user-facing strings are synchronized 1:1 between `en_us.json` and `ko_kr.json`.
+All user-facing strings are synchronized 1:1 across English (`en_us.json`), Korean (`ko_kr.json`), and Simplified Chinese (`zh_cn.json`).
 
 ```json
 {

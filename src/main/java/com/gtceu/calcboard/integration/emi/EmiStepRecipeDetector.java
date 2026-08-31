@@ -1,14 +1,14 @@
 package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.model.CompoundRecipeBuilder;
-import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.compat.gtceu.GTCEuLayeredRecipeExtractor;
+import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import net.minecraft.resources.ResourceLocation;
 
 /**
  * Deterministic runtime detector for multi-step / layered recipes.
- * Leverages official mod APIs (GTCEu LayeredRecipeHelper, Create SequencedAssembly) without view/pixel heuristics.
+ * Dispatches to registered {@link IModAdapter} instances using official mod APIs and runtime reflection.
  */
 public final class EmiStepRecipeDetector {
 
@@ -37,24 +37,16 @@ public final class EmiStepRecipeDetector {
         if (recipe == null) return null;
 
         Object backing = EmiRecipeConverter.unwrapBackingRecipe(recipe);
-        if (backing == null) return null;
+        ResourceLocation catId = recipe.getCategory() != null ? recipe.getCategory().getId() : null;
 
-        String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Machine";
-        if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-            machineName = EmiRecipeConverter.formatName(recipe.getCategory().getId().getPath());
-        }
-
-        ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : EmiRecipeConverter.findMachineIcon(recipe);
-        EmiRecipeConverter.RecipeDetails details = EmiRecipeConverter.extractRecipeDetails(recipe, preferredWorkstation);
-        GTVoltageTier tier = details.tier;
-
-        // 1. GTCEu / StarT Fork Layered Recipe Helper (Official API)
-        if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backing)) {
-            CompoundRecipeBuilder.CompoundCluster cluster = GTCEuLayeredRecipeExtractor.buildCompoundCluster(
-                    backing, machineName, icon, tier, startX, startY
-            );
-            if (cluster != null && !cluster.nodes().isEmpty()) {
-                return cluster;
+        for (IModAdapter adapter : ModAdapterRegistry.getAdapters()) {
+            if (adapter.isLoaded() && (catId == null || adapter.handlesCategory(catId))) {
+                CompoundRecipeBuilder.CompoundCluster cluster = adapter.buildCompoundRecipe(
+                        recipe, backing, preferredWorkstation, startX, startY
+                );
+                if (cluster != null && !cluster.nodes().isEmpty()) {
+                    return cluster;
+                }
             }
         }
 

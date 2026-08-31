@@ -268,6 +268,17 @@ public class RerouteJunctionTest {
         Assertions.assertEquals(1.0, effMap.get(boiler2.getId()), 0.001);
         Assertions.assertEquals(1.0, effMap.get(boiler3.getId()), 0.001);
         Assertions.assertEquals(1.0, effMap.get(boiler4.getId()), 0.001);
+
+        // Verify sieve output port stats matches junction downstream demand exactly
+        var sieveOutStats = graph.getOutputPortStats(sieve, 0);
+        Assertions.assertEquals(86.0, sieveOutStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(86.0, sieveOutStats.connectedRate(), 0.001,
+                "Sieve output port demanded rate must equal total downstream demand of 86.0/s through junction!");
+        Assertions.assertTrue(sieveOutStats.isBalanced());
+
+        var junctionOutStats = graph.getOutputPortStats(diamondJunction, 0);
+        Assertions.assertEquals(86.0, junctionOutStats.requiredOrProducedRate(), 0.001);
+        Assertions.assertEquals(86.0, junctionOutStats.connectedRate(), 0.001);
     }
 }
 

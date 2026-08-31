@@ -111,9 +111,10 @@ public final class BoardHotkeyHandler {
             return screen.getNoteEditDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
-        // 3. Active inline editing in Node Widgets (Backspace, Enter, Esc, Digits)
+        // 3. Active inline editing in Node Widgets (Backspace, Enter, Esc, Digits, Home, End, Arrows, Delete, Selection, Clipboard)
         for (NodeWidget w : screen.getNodeWidgets()) {
-            if (w.keyPressed(keyCode, scanCode, modifiers)) {
+            if (w.isAnyEditorActive()) {
+                w.keyPressed(keyCode, scanCode, modifiers);
                 return true;
             }
         }
@@ -152,6 +153,9 @@ public final class BoardHotkeyHandler {
                 } else {
                     screen.createFrameFromSelection();
                 }
+                return true;
+            } else if (keyCode == GLFW.GLFW_KEY_S && shift) {
+                screen.createSharedMachineFrameFromSelection();
                 return true;
             }
         }

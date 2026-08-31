@@ -101,11 +101,32 @@ public class FlowGraph {
     }
 
     public CanvasGroupFrame findFrameById(String id) {
-        if (id == null) return null;
         for (CanvasGroupFrame f : frames) {
             if (f.getId().equals(id)) return f;
         }
         return null;
+    }
+
+    public CanvasGroupFrame findFrameEnclosingNode(RecipeNode node) {
+        if (node == null || frames.isEmpty()) return null;
+        for (CanvasGroupFrame frame : frames) {
+            if (frame != null) {
+                if (frame.containsNode(node.getId())) {
+                    return frame;
+                }
+                for (RecipeNode enclosed : frame.getEnclosedNodes(this)) {
+                    if (enclosed != null && enclosed.getId().equals(node.getId())) {
+                        return frame;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public boolean isNodeInSharedMachineFrame(RecipeNode node) {
+        CanvasGroupFrame frame = findFrameEnclosingNode(node);
+        return frame != null && frame.isSharedMachineFrame();
     }
 
     public void addNode(RecipeNode node) {

@@ -136,10 +136,10 @@ public class ModDomainModularizationTest {
         boolean hasWarningBadge = badges.stream().anyMatch(b -> b.isWarning() && (b.text().contains("2") || b.text().contains("reflector_required")));
         assertTrue(hasWarningBadge);
 
-        // 2. Satisfied Reflector Badge: [🪞 T2]
+        // 2. Satisfied Reflector Badge: [✦ T2]
         node.addAddon(new GTReflectorAddon("gtceu:reflector_tier_2", "T2 Reflector", "", null, 2));
         List<NodeBadge> satisfiedBadges = NodeBadgeRegistry.getBadgesForNode(node);
-        boolean hasSatisfiedBadge = satisfiedBadges.stream().anyMatch(b -> b.text().contains("🪞 T2"));
+        boolean hasSatisfiedBadge = satisfiedBadges.stream().anyMatch(b -> b.text().contains("✦ T2"));
         assertTrue(hasSatisfiedBadge);
     }
 

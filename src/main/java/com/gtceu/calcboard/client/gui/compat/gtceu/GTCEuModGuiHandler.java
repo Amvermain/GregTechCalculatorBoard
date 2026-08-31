@@ -192,7 +192,8 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 String rotorInfo = "§6🌀 §f" + rName + " §7| §b⏱ " + eff + "% §e⚡ " + pwr + "%";
                 int holderBonus = GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
                 if (holderBonus > 0) {
-                    rotorInfo += " §a(+" + holderBonus + "% Holder)";
+                    int totalEff = GTTurbineHelper.getTotalTurbineEfficiency(node);
+                    rotorInfo += " §a(+" + holderBonus + "% Holder -> " + totalEff + "%)";
                 }
                 graphics.drawString(font, rotorInfo, x + 10, y + 30, 0xFFFFFFFF, false);
 
@@ -217,7 +218,8 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 if (node.isLargeTurbine()) {
                     int holderBonus = GTTurbineHelper.getTurbineHolderEfficiencyBonus(node);
                     if (holderBonus > 0) {
-                        specStr += String.format(Locale.ROOT, "   §a(+%d%% Holder)", holderBonus);
+                        int totalEff = GTTurbineHelper.getTotalTurbineEfficiency(node);
+                        specStr += String.format(Locale.ROOT, "   §a(+%d%% Holder -> %d%%)", holderBonus, totalEff);
                     }
                 }
                 graphics.drawString(font, specStr, x + 10, y + 46, 0xFFD0D6E4, false);
@@ -445,6 +447,18 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
     private static String getMultiblockShortLabel(ResourceLocation id) {
         if (id == null) return "🏛 Multi";
         String path = id.getPath().toLowerCase(Locale.ROOT);
+        if (path.contains("auxiliary_booster_fusion") || path.contains("auxiliary_fusion") || path.contains("aux_booster")) {
+            if (path.contains("mk2") || path.contains("mk_2") || path.contains("ii") || path.contains("aux2") || path.contains("aux_2") || path.contains("uiv")) return "⚡ Aux Mk2";
+            if (path.contains("mk3") || path.contains("mk_3") || path.contains("iii") || path.contains("aux3") || path.contains("aux_3") || path.contains("opv")) return "⚡ Aux Mk3";
+            return "⚡ Aux Mk1";
+        }
+        if (path.contains("reflector_fusion")) return "⚛ Reflector";
+        if (path.contains("luv_fusion") || path.contains("fusion_reactor_mk1") || path.contains("fusion_mk1") || path.contains("mk_1") || path.contains("mk1") || path.contains("mki")) return "⚛ Fusion Mk1";
+        if (path.contains("zpm_fusion") || path.contains("fusion_reactor_mk2") || path.contains("fusion_mk2") || path.contains("mk_2") || path.contains("mk2") || path.contains("mkii")) return "⚛ Fusion Mk2";
+        if (path.contains("uv_fusion") || path.contains("fusion_reactor_mk3") || path.contains("fusion_mk3") || path.contains("mk_3") || path.contains("mk3") || path.contains("mkiii")) return "⚛ Fusion Mk3";
+        if (path.contains("uev_fusion") || path.contains("fusion_reactor_mk4") || path.contains("fusion_mk4") || path.contains("mk_4") || path.contains("mk4") || path.contains("mkiv")) return "⚛ Fusion Mk4";
+        if (path.contains("uxv_fusion") || path.contains("fusion_reactor_mk5") || path.contains("fusion_mk5") || path.contains("mk_5") || path.contains("mk5") || path.contains("mkv")) return "⚛ Fusion Mk5";
+        if (path.contains("max_fusion") || path.contains("fusion_reactor_mk6") || path.contains("fusion_mk6") || path.contains("mk_6") || path.contains("mk6") || path.contains("mkvi")) return "⚛ Fusion Mk6";
         if (path.contains("extreme_chemical_reactor") || path.equals("ecr")) return "⚡ ECR";
         if (path.contains("incomprehensible_chemical_reactor") || path.equals("icr")) return "⚡ ICR";
         if (path.contains("large_chemical_reactor") || path.equals("lcr")) return "🏛 LCR";
@@ -455,9 +469,26 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         if (path.contains("large_fluid_distillation") || path.contains("large_distillation")) return "🏛 Large DT";
         if (path.contains("distillation_tower")) return "🏛 Distillation";
         if (path.contains("yielding_exhaustor") || path.contains("yeast")) return "🧬 Yeast";
+
         var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
         if (item != null && item != net.minecraft.world.item.Items.AIR) {
             String name = item.getDescription().getString();
+            name = name.replaceAll("\\[.*?\\]", "").trim();
+            if (name.contains("Fusion Reactor")) {
+                if (name.contains("MK VI") || name.contains("Mk 6") || name.contains("Mk.6") || name.contains("MK 6") || name.contains("VI")) return "⚛ Fusion Mk6";
+                if (name.contains("MK V") || name.contains("Mk 5") || name.contains("Mk.5") || name.contains("MK 5") || name.contains("V")) return "⚛ Fusion Mk5";
+                if (name.contains("MK IV") || name.contains("Mk 4") || name.contains("Mk.4") || name.contains("MK 4") || name.contains("IV")) return "⚛ Fusion Mk4";
+                if (name.contains("MK III") || name.contains("Mk 3") || name.contains("Mk.3") || name.contains("MK 3") || name.contains("III")) return "⚛ Fusion Mk3";
+                if (name.contains("MK II") || name.contains("Mk 2") || name.contains("Mk.2") || name.contains("MK 2") || name.contains("II")) return "⚛ Fusion Mk2";
+                if (name.contains("MK I") || name.contains("Mk 1") || name.contains("Mk.1") || name.contains("MK 1") || name.contains("I")) return "⚛ Fusion Mk1";
+                return "⚛ Fusion";
+            }
+            if (name.contains("Auxiliary Booster") || name.contains("Auxiliary Fusion")) {
+                if (name.contains("III") || name.contains("3")) return "⚡ Aux Mk3";
+                if (name.contains("II") || name.contains("2")) return "⚡ Aux Mk2";
+                return "⚡ Aux Mk1";
+            }
+            if (name.contains("Reflector Fusion")) return "⚛ Reflector";
             if (name.startsWith("Advanced ")) name = "Adv. " + name.substring(9);
             else if (name.startsWith("Elite ")) name = "Elite " + name.substring(6);
             else if (name.startsWith("Ultimate ")) name = "Ult. " + name.substring(9);

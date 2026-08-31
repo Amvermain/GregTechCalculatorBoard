@@ -148,6 +148,35 @@ public final class GTTurbineHelper {
     }
 
     /**
+     * Calculates the combined total turbine efficiency (%) according to GTCEu Modern formulas.
+     * Total = max(100, RotorEfficiency * (100 + HolderBonus) / 100).
+     */
+    public static int getTotalTurbineEfficiency(RecipeNode node) {
+        if (node == null) return 100;
+        int rEff = 100;
+        boolean foundRotor = false;
+        for (MachineAddon a : node.getAddons()) {
+            if (a.getCategory() == MachineAddon.Category.ROTOR) {
+                if (a.getRotorEfficiency() > 0 && a.getRotorEfficiency() != 100) {
+                    rEff = a.getRotorEfficiency();
+                } else if (a.getDurationMultiplier() > 0) {
+                    rEff = (int) Math.round(a.getDurationMultiplier() * 100.0);
+                } else {
+                    rEff = a.getRotorEfficiency();
+                }
+                foundRotor = true;
+                break;
+            }
+        }
+        if (!foundRotor && node.getRotorEfficiency() > 0) {
+            rEff = node.getRotorEfficiency();
+        }
+        int holderBonus = getTurbineHolderEfficiencyBonus(node);
+        int holderEff = 100 + holderBonus;
+        return Math.max(100, (int) Math.round((double) (rEff * holderEff) / 100.0));
+    }
+
+    /**
      * Calculates base capacity of the rotor holder at the given voltage tier.
      */
     public static double getNodeRotorHolderBaseCapacity(RecipeNode node, GTVoltageTier tier) {

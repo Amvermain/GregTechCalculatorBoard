@@ -69,14 +69,15 @@ public class JeiRecipeConverter {
         JeiRecipeLayoutCollector collector = new JeiRecipeLayoutCollector();
         if (category != null) {
             try {
-                category.setRecipe(collector, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
+                mezz.jei.api.gui.builder.IRecipeLayoutBuilder builder = JeiRecipeLayoutCollector.createProxyBuilder(collector);
+                category.setRecipe(builder, recipe, JeiRecipeLayoutCollector.EmptyFocusGroup.INSTANCE);
             } catch (Throwable ignored) {}
         }
 
         List<IngredientStack> inputs = new ArrayList<>();
         List<IngredientStack> outputs = new ArrayList<>();
 
-        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && ("gtceu".equals(catId.getNamespace()) || "start_core".equals(catId.getNamespace())));
+        boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catId.getNamespace()));
         if (isGT) {
             List<IngredientStack> gtIns = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
@@ -283,9 +284,15 @@ public class JeiRecipeConverter {
         }
 
         if (node.isFusion()) {
+            node.setMultiblock(true);
             GTVoltageTier minTier = node.getMinFusionVoltageTier();
-            if (node.getTargetTier().ordinal() < minTier.ordinal()) {
-                node.setTargetTier(minTier);
+            node.setTargetTier(minTier);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
+                if (preferredWs != null) {
+                    node.setMachineIcon(preferredWs);
+                }
             }
         }
 
@@ -298,6 +305,10 @@ public class JeiRecipeConverter {
             if (out != null && out.getId() != null && !EmiRecipeConverter.isDummyConditionMarker(out.getId())) {
                 node.addOutput(out);
             }
+        }
+
+        if (preferredWorkstation == null) {
+            com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }
 
         return node;

@@ -103,23 +103,47 @@ public class CanvasWireRenderer {
             }
         }
 
-        // Render Active Wire Dragging
+        // Render Active Wire Dragging (Single or Multi-Port Bundle)
         var canvasHandler = screen.getCanvasHandler();
         NodeWidget wireStart = canvasHandler.getWireStartNode();
         if (wireStart != null) {
-            float x1, y1;
             int matchedColor = BoardManager.getInstance().getMatchedWireColor();
             int dragWireColor = Screen.hasShiftDown() ? 0xFFFFD700 : matchedColor;
-            if (canvasHandler.isWireStartInput()) {
-                x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
-                y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
-                float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
-                ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
+
+            boolean isCurrentPortSelected = screen.isPortSelected(wireStart.getNode().getId(), canvasHandler.isWireStartInput(), canvasHandler.getWireStartPortIdx());
+            java.util.Set<com.gtceu.calcboard.client.gui.model.PortRef> selectedPorts = (isCurrentPortSelected && screen.getSelectedPorts().size() > 1) ? screen.getSelectedPorts() : null;
+
+            if (selectedPorts != null) {
+                for (com.gtceu.calcboard.client.gui.model.PortRef p : selectedPorts) {
+                    RecipeNode pNode = graph.findNodeById(p.nodeId());
+                    NodeWidget pWidget = screen.findWidgetForNode(pNode);
+                    if (pWidget == null) continue;
+                    float px, py;
+                    if (p.isInput()) {
+                        px = pWidget.getInputPortX(p.portIndex());
+                        py = pWidget.getInputPortY(p.portIndex());
+                        float startDirX = pNode.isFlipped() ? 1.0f : -1.0f;
+                        ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, px, py, 1.0f, startDirX, 0xFF38BDF8, 2.5f);
+                    } else {
+                        px = pWidget.getOutputPortX(p.portIndex());
+                        py = pWidget.getOutputPortY(p.portIndex());
+                        float startDirX = pNode.isFlipped() ? -1.0f : 1.0f;
+                        ConnectionRenderer.addBezierToBatch(px, py, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, 0xFF38BDF8, 2.5f);
+                    }
+                }
             } else {
-                x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
-                y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
-                float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
-                ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
+                float x1, y1;
+                if (canvasHandler.isWireStartInput()) {
+                    x1 = wireStart.getInputPortX(canvasHandler.getWireStartPortIdx());
+                    y1 = wireStart.getInputPortY(canvasHandler.getWireStartPortIdx());
+                    float startDirX = wireStart.getNode().isFlipped() ? 1.0f : -1.0f;
+                    ConnectionRenderer.addBezierToBatch((float) canvasMouseX, (float) canvasMouseY, x1, y1, 1.0f, startDirX, dragWireColor, 3.0f);
+                } else {
+                    x1 = wireStart.getOutputPortX(canvasHandler.getWireStartPortIdx());
+                    y1 = wireStart.getOutputPortY(canvasHandler.getWireStartPortIdx());
+                    float startDirX = wireStart.getNode().isFlipped() ? -1.0f : 1.0f;
+                    ConnectionRenderer.addBezierToBatch(x1, y1, (float) canvasMouseX, (float) canvasMouseY, startDirX, -1.0f, dragWireColor, 3.0f);
+                }
             }
         }
         ConnectionRenderer.endBatch();

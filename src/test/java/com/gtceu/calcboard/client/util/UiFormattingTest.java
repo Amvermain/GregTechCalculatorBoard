@@ -42,7 +42,9 @@ public class UiFormattingTest {
         Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_MACHINE_CONFIG.getStepNumber());
         Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_GROUP_FRAME.getStepNumber());
         Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_COMPOUND_MODULE.getStepNumber());
-        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
+        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_SHARED_MACHINE.getStepNumber());
+        Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_9_BOM_INSPECTION.getStepNumber());
+        Assertions.assertEquals(10, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
     }
 
     @Test

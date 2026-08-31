@@ -22,7 +22,7 @@ The mod is fully optional on both client and server:
 
 #### Pluggable Recipe Viewer SPI (EMI, JEI, & Vanilla Support)
 
-*   **Multi-Viewer Ecosystem Compatibility**: Seamlessly integrates with **EMI**, **JEI (Just Enough Items)**, and **JEI++ (Just Enough Calculation / BoM)**. Automatically elects the best available viewer at runtime.
+*   **Multi-Viewer Ecosystem Compatibility**: Seamlessly integrates with **EMI**, **JEI (Just Enough Items)**, **JEI Unofficial**, and **JEI++ (Just Enough Calculation / BoM)**. Automatically elects the best available viewer at runtime.
 *   **Side Favorites Dock Panel**: A collapsible panel on the left of the board screen (`[⭐ Favorites (N) ▶]`) allows placing favorited items onto the canvas via single-click or drag-and-drop.
 *   **Hierarchical Recipe Navigation & Interactive Preview**:
     *   Hovering over a favorite displays a sub-panel listing all producing recipes (Machine / Duration / EU/t).
@@ -78,6 +78,30 @@ The mod is fully optional on both client and server:
 #### Blueprint Packaging & Shareable Imports
 *   **Rich Blueprint Metadata**: Export entire flowcharts or selected node groups with custom titles, descriptions, authors, and tag metadata.
 *   **Interactive Import Preview**: Inspect node count, machines, connections, and major inputs/outputs before choosing to open in a new page or overwrite.
+
+#### Shared Machine Pool (Time-Sharing Frame)
+*   **Time-Shared Machine Pooling**: Group multiple recipes into a shared machine pool frame to model a single physical machine executing multiple recipes across time.
+*   **Duty Cycle & Required Machine Solving**: Computes cumulative duty (`Total Duty %`) and quantized required machines (`Ceil`), rendering live header badges and comprehensive breakdown tooltips.
+*   **Hardware Config Synchronization**: Synchronize voltage tiers, overclock modes, parallel counts, and addons across all enclosed machines from the frame header.
+*   **De-duplicated Multiblock BOM**: Accurately accounts shared multiblock structures once in the BOM calculation.
+
+#### Port Multi-Selection & Bundle Batch Wiring UX
+*   **Marquee Port Selection**: Drag a selection box over machine cards to selectively grab multiple input or output ports without selecting entire cards.
+*   **Explorer-Style Multi-Select**: `Ctrl + Click` to toggle individual ports, `Shift + Click` to select port ranges.
+*   **Multi-Wire Bundle Dragging**: Drag from multiple selected ports to bundle wires with real-time multi-bezier curve rendering.
+*   **Junction Node Generation & Frame Auto-Wiring**: Drop on empty canvas to spawn vertical aligned junction nodes, or drop onto a Shared Machine Pool to automatically wire matching machines and spawn missing recipe cards with hardware sync and auto-expanding bounds.
+*   **Secondary Input Preference Matching**: Intelligently prioritizes matching secondary inputs/fluids (e.g. Lubricant vs Water) when auto-spawning recipes in machine pools.
+*   **One-Click Auto-Fit Frame**: Header `[⛶]` button and double-click to instantly auto-fit frame bounds to enclosed contents.
+
+#### I/O Port Hiding & Selective Restore
+
+*   **Hide Unused Ports**: Right-click any input/output port to sever existing wires and hide unwanted ports, keeping complex multi-output machine cards compact and clutter-free.
+*   **Hidden Ports Badge & Dropdown Popup**: Displays a pill badge (e.g. `2 Outputs hidden`, `3 Ports hidden`) on the machine card. Clicking the badge opens a dropdown popup to selectively unhide ports with a single click.
+
+#### Smart Inline Text Editing Engine
+
+*   **Rich Text Control**: All inline editable fields (machine name, machine count, parallel count, target batch quantity) support native cursor positioning, Shift/drag selection, Ctrl+A select all, and Ctrl+C/V/X clipboard operations.
+*   **Word-Level Navigation**: Rapidly jump and delete words using Ctrl + Arrow Keys and Ctrl + Backspace/Delete.
 
 #### Accessibility & Canvas Controls
 

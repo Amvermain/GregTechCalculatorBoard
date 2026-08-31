@@ -10,7 +10,7 @@
 
 ## 1. 개요 및 배경 (Motivation)
 
-GregTechCalculatorBoard는 v1.0.0 릴리즈를 향해 가면서 다음과 같은 대규모 핵심 아키텍처 및 수학적/그래픽스/네트워크 혁신을 달성하였습니다:
+GregTechCalculatorBoard는 v1.0.0 릴리즈를 향해 가면서 다음과 같은 대규모 핵심 아키텍처 및 수학적/그래픽스/네트워크 기능 고도화를 달성하였습니다:
 1. **5계층 시스템 아키텍처**: UI, Core, Compat, Integration 외에 독립적인 **Server & Network** 계층 완비.
 2. **5대 그래프 수학 솔버 엔진**: 가우스-요르단 부분 피보팅 기반의 **폐루프 질량 보존 선형 연립방정식 솔버 ($A\mathbf{x} = \mathbf{b}$)** 구현.
 3. **고성능 렌더링 파이프라인**: 프레임당 `glClear`를 배제한 단일 패스 배치 렌더링 및 **$128 \times 128$ AABB 균일 그리드 공간 분할 와이어 색인 (`WireSpatialIndex`, $O(E) \rightarrow O(\log E)$)**.
@@ -19,7 +19,7 @@ GregTechCalculatorBoard는 v1.0.0 릴리즈를 향해 가면서 다음과 같은
 
 그러나 기존 문서 체계는 다음과 같은 심각한 파편화와 결손을 안고 있었습니다:
 - 루트 `ARCHITECTURE.md`와 하위 폴더 문서 간의 3중 파편화 및 불일치.
-- 한국어 스펙 문서(`docs/ko_kr/spec/`)에 최신 혁신 기술(선형 솔버 수식, 온디맨드 페이징, WireSpatialIndex) 누락.
+- 한국어 스펙 문서(`docs/ko_kr/spec/`)에 최신 핵심 기술 및 수학적 모델(선형 솔버 수식, 온디맨드 페이징, WireSpatialIndex) 누락.
 - 영문 스펙 문서(`docs/en_us/spec/`)의 심각한 분량 축약(한국어 대비 40~55%) 및 수식 결손.
 
 ---
