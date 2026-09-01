@@ -196,7 +196,7 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.2
 ## Special Thanks
 
 - **The Reel One** - For providing UX/UI feedback, design suggestions, and community testing.
-- **rafa** - For providing UX/UI feedback, design suggestions, and community testing.
+- **rafaelpnsm** - For providing UX/UI feedback, design suggestions, and community testing.
 
 ---
 
