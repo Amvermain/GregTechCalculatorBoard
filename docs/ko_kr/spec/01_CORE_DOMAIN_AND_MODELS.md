@@ -292,6 +292,28 @@ public record PortRef(String nodeId, boolean isInput, int portIndex) {}
   - 싱글톤 패턴 기반의 인메모리 레지스트리 및 NBT 영속화 관리 (`serializeNBT` / `deserializeNBT`).
   - 보드 설정 다이얼로그(`BoardSettingsDialog`) 및 머신 설정 다이얼로그(`MachineConfigDialog`)를 통한 CRUD 인터페이스 제공.
 
+## 9. 검색 도메인 모델 및 헤드리스 레시피 제공자 SPI (`SearchableRecipe`, `ILevelRecipeProvider`) (ADR-009)
+
+클라이언트 GUI 계층에 종속되지 않고 순수 코어 도메인 및 헤드리스/전용 서버 환경에서 레시피를 검색·색인·인스턴스화할 수 있도록 분리된 표준 모델 및 SPI입니다.
+
+* **`SearchableRecipe` (경량 검색 불변 레코드)**:
+  ```java
+  public record SearchableRecipe(
+      ResourceLocation id,
+      ResourceLocation categoryId,
+      String displayName,
+      List<IngredientStack> inputs,
+      List<IngredientStack> outputs,
+      double durationTicks,
+      double eut,
+      GTVoltageTier tier,
+      Object rawRecipe
+  )
+  ```
+* **`ILevelRecipeProvider` (헤드리스 레시피 제공자 SPI)**:
+  - EMI, JEI 등 클라이언트 전용 모드가 비활성화되었거나 전용 서버 환경일 때 바닐라 `Level.getRecipeManager()` 기반으로 `SearchableRecipe` 목록을 제공하는 추상화 인터페이스.
+  - GUI 의존성 없는 $O(1)$ 레시피 인스턴스화 및 도메인 노드 생성 지원.
+
 ---
 
 > ➡️ **다음 장으로 이동**: [[02] 수학적 연산 엔진 및 그래프 해석 알고리즘](02_MATH_AND_ALGORITHMS.md)

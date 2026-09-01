@@ -9,11 +9,8 @@ import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
-import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
-import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
-import com.gtceu.calcboard.client.gui.tutorial.TutorialStep;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
-
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeFilterConfig;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.google.gson.JsonElement;
@@ -39,12 +36,13 @@ public class UiFormattingTest {
         Assertions.assertEquals(2, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_2_DRAG_TO_SEARCH.getStepNumber());
         Assertions.assertEquals(3, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_3_JUNCTION.getStepNumber());
         Assertions.assertEquals(4, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_4_SHIFT_WIRING.getStepNumber());
-        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_MACHINE_CONFIG.getStepNumber());
-        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_GROUP_FRAME.getStepNumber());
-        Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_COMPOUND_MODULE.getStepNumber());
-        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_SHARED_MACHINE.getStepNumber());
-        Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_9_BOM_INSPECTION.getStepNumber());
-        Assertions.assertEquals(10, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
+        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_MACHINE_SELECTOR.getStepNumber());
+        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_MACHINE_CONFIG.getStepNumber());
+        Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_GROUP_FRAME.getStepNumber());
+        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_COMPOUND_MODULE.getStepNumber());
+        Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_9_SHARED_MACHINE.getStepNumber());
+        Assertions.assertEquals(10, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_10_BOM_INSPECTION.getStepNumber());
+        Assertions.assertEquals(11, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
     }
 
     @Test
@@ -268,15 +266,15 @@ public class UiFormattingTest {
         config.setCategoryExcluded("gtceu:chemical_reactor", false);
         Assertions.assertFalse(config.isCategoryExcluded("gtceu:chemical_reactor"));
 
-        RecipeSearchEngine.SearchableRecipe r1 = new RecipeSearchEngine.SearchableRecipe(
+        SearchableRecipe r1 = new SearchableRecipe(
                 new Object(), "Reaction 1", "gtceu", "chemical_reactor", "Chemical Reactor",
                 "", ""
         );
-        RecipeSearchEngine.SearchableRecipe r2 = new RecipeSearchEngine.SearchableRecipe(
+        SearchableRecipe r2 = new SearchableRecipe(
                 new Object(), "Reaction 2", "gtceu", "chemical_reactor", "Chemical Reactor",
                 "", ""
         );
-        RecipeSearchEngine.SearchableRecipe r3 = new RecipeSearchEngine.SearchableRecipe(
+        SearchableRecipe r3 = new SearchableRecipe(
                 new Object(), "Distillation 1", "gtceu", "distillation_tower", "Distillation Tower",
                 "", ""
         );

@@ -4,8 +4,8 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
@@ -24,8 +24,12 @@ public final class GTNodeValidator {
         if (node == null) return true;
         boolean valid = true;
 
+        if (node.getBaseEUt() > 0 && !GTTurbineHelper.isTurbine(node) && node.isGenerator()) {
+            node.setGenerator(false);
+        }
+
         // 1. Reflector requirement check (RFC-001 & RFC-002)
-        int req = node.getProperties().get(NodeProperties.REQUIRED_REFLECTOR_TIER);
+        int req = node.getProperties().get(GTCEuProperties.REQUIRED_REFLECTOR_TIER);
         if (req > 0) {
             int inst = node.getInstalledReflectorTier();
             if (inst < req) {
@@ -36,7 +40,22 @@ public final class GTNodeValidator {
             }
         }
 
-        // 2. Turbine 100% Flow Fulfillment Check
+        // 2. Heating Coil Temperature Check
+        int reqTemp = node.getProperties().get(GTCEuProperties.EBF_TEMPERATURE);
+        if (reqTemp <= 0) {
+            reqTemp = node.getRecipeTemperature();
+        }
+        if (reqTemp > 0) {
+            int instTemp = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getInstalledCoilTemperature(node);
+            if (instTemp < reqTemp) {
+                if (warnings != null) {
+                    warnings.add(Component.translatable("gui.gtcalcboard.node_warning.coil_temp_deficit", instTemp, reqTemp));
+                }
+                valid = false;
+            }
+        }
+
+        // 3. Turbine 100% Flow Fulfillment Check
         if (graph != null && GTTurbineHelper.isTurbine(node)) {
             for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
                 FlowGraphSolver.PortFlowStats stats = graph.getInputPortStats(node, inIdx);

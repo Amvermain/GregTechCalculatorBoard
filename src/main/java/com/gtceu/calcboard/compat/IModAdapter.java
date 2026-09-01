@@ -20,6 +20,7 @@ import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.SteamMode;
 
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
@@ -550,6 +551,13 @@ public interface IModAdapter {
     }
 
     /**
+     * Calculates the maximum viable parallel capacity for the node under current voltage, hatch, and hardware limits.
+     */
+    default int getMaxParallelCapacity(RecipeNode node) {
+        return node != null ? Math.max(1, node.getParallel()) : 1;
+    }
+
+    /**
      * Computes the effective probability/chance (0.0 ~ 1.0) of producing an output byproduct slot.
      */
     default double computeEffectiveOutputChance(RecipeNode node, int outputIndex, double defaultChance) {
@@ -687,6 +695,62 @@ public interface IModAdapter {
      */
     default GTVoltageTier sanitizeTargetTier(RecipeNode node, GTVoltageTier requestedTier) {
         return requestedTier != null ? requestedTier : (node != null ? node.getRecipeTier() : GTVoltageTier.ULV);
+    }
+
+    /**
+     * Checks if this machine node supports interactive fluid booster / catalyst control in the GUI header.
+     */
+    default boolean supportsBoosterControl(RecipeNode node) {
+        return false;
+    }
+
+    /**
+     * Gets the formatted display text for the booster button in the GUI header.
+     */
+    default Component getBoosterDisplayComponent(RecipeNode node) {
+        return null;
+    }
+
+    /**
+     * Cycles the booster level or mode on the machine node (e.g. None -> Passive -> Active).
+     */
+    default void cycleBooster(RecipeNode node, int direction) {
+        // Default no-op
+    }
+
+    /**
+     * Synchronizes any required auxiliary/booster fluid ingredient inputs on the machine node.
+     */
+    default void syncBoosterInputs(RecipeNode node) {
+        // Default no-op
+    }
+
+    /**
+     * Gets the background color integer (0xAARRGGBB) for the booster button.
+     */
+    default int getBoosterBackgroundColor(RecipeNode node, boolean isHovered) {
+        return isHovered ? 0xFF2A303C : 0xFF1E222D;
+    }
+
+    /**
+     * Gets the outline border color integer (0xAARRGGBB) for the booster button.
+     */
+    default int getBoosterBorderColor(RecipeNode node, boolean isHovered) {
+        return isHovered ? 0xFF6B7B96 : 0xFF353C4D;
+    }
+
+    /**
+     * Gets the text color integer (0xAARRGGBB) for the booster button.
+     */
+    default int getBoosterTextColor(RecipeNode node, boolean isHovered) {
+        return 0xFFFFFFFF;
+    }
+
+    /**
+     * Builds tooltip lines for the booster button in the machine config dialog.
+     */
+    default void buildBoosterTooltip(RecipeNode node, List<Component> tooltip) {
+        // Default no-op
     }
 }
 

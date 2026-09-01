@@ -307,6 +307,22 @@ public class JeiRecipeConverter {
             }
         }
 
+        // Auto-provision Heating Coil if temperature is required
+        int reqTemp = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE);
+        if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
+        if (reqTemp > 0) {
+            var coil = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getCoilForTemperature(reqTemp);
+            if (coil != null) {
+                com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.installCoil(node, coil);
+            }
+        }
+
+        // Auto-provision Fusion Reflector if required
+        int reqReflector = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.REQUIRED_REFLECTOR_TIER);
+        if (reqReflector > 0) {
+            com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper.installReflector(node, reqReflector);
+        }
+
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }

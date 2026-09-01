@@ -960,6 +960,67 @@ public interface BoardCommand {
             return "Switch recipe for " + (newRecipe != null ? newRecipe.name() : "node");
         }
     }
+
+    /**
+     * Reversible command for switching a RecipeNode's machine workstation/controller icon and its associated traits.
+     */
+    class SetMachineIconCommand implements BoardCommand {
+        private final String nodeId;
+        private final ResourceLocation oldIcon;
+        private final ResourceLocation newIcon;
+        private final boolean oldMultiblock;
+        private final boolean newMultiblock;
+        private final int oldParallel;
+        private final int newParallel;
+        private final com.gtceu.calcboard.api.type.SteamMode oldSteamMode;
+        private final com.gtceu.calcboard.api.type.SteamMode newSteamMode;
+        private final com.gtceu.calcboard.api.type.GTVoltageTier oldTier;
+        private final com.gtceu.calcboard.api.type.GTVoltageTier newTier;
+
+        public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon,
+                                     boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier) {
+            this.nodeId = node.getId();
+            this.oldIcon = oldIcon;
+            this.newIcon = newIcon;
+            this.oldMultiblock = oldMultiblock;
+            this.newMultiblock = node.isMultiblock();
+            this.oldParallel = oldParallel;
+            this.newParallel = node.getParallel();
+            this.oldSteamMode = oldSteamMode;
+            this.newSteamMode = node.getSteamMode();
+            this.oldTier = oldTier;
+            this.newTier = node.getTargetTier();
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node != null) {
+                node.setMachineIcon(oldIcon);
+                node.setMultiblock(oldMultiblock);
+                node.setParallel(oldParallel);
+                node.setSteamMode(oldSteamMode);
+                node.setTargetTier(oldTier);
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node != null) {
+                node.setMachineIcon(newIcon);
+                node.setMultiblock(newMultiblock);
+                node.setParallel(newParallel);
+                node.setSteamMode(newSteamMode);
+                node.setTargetTier(newTier);
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return "Switch machine icon to " + (newIcon != null ? newIcon.getPath() : "none");
+        }
+    }
 }
 
 

@@ -2,10 +2,11 @@ package com.gtceu.calcboard.compat.gtceu.physics;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 
 /**
- * Encapsulates physics, efficiency calculations, and parallel flow scaling for GTCEu turbines.
+ * Encapsulates physics, efficiency calculations, and parallel flow scaling for GTCEu turbines (RFC-006).
  */
 public final class GTTurbinePhysics {
 
@@ -41,6 +42,62 @@ public final class GTTurbinePhysics {
 
     public static int getTotalTurbineEfficiency(RecipeNode node) {
         return GTTurbineHelper.getTotalTurbineEfficiency(node);
+    }
+
+    public static GTVoltageTier getRotorHolderTier(RecipeNode node) {
+        return GTTurbineHelper.getRotorHolderTier(node);
+    }
+
+    public static void setRotorHolderTier(RecipeNode node, GTVoltageTier tier) {
+        GTTurbineHelper.setRotorHolderTier(node, tier);
+    }
+
+    public static GTVoltageTier getDynamoTier(RecipeNode node) {
+        return GTTurbineHelper.getDynamoTier(node);
+    }
+
+    public static void setDynamoTier(RecipeNode node, GTVoltageTier tier) {
+        GTTurbineHelper.setDynamoTier(node, tier);
+    }
+
+    public static int getDynamoAmperage(RecipeNode node) {
+        return GTTurbineHelper.getDynamoAmperage(node);
+    }
+
+    public static void setDynamoAmperage(RecipeNode node, int amperage) {
+        GTTurbineHelper.setDynamoAmperage(node, amperage);
+    }
+
+    public static boolean isLubricantBoost(RecipeNode node) {
+        return GTTurbineHelper.isLubricantBoost(node);
+    }
+
+    public static void setLubricantBoost(RecipeNode node, boolean boost) {
+        GTTurbineHelper.setLubricantBoost(node, boost);
+    }
+
+    public static boolean isCoolantBoost(RecipeNode node) {
+        return GTTurbineHelper.isCoolantBoost(node);
+    }
+
+    public static void setCoolantBoost(RecipeNode node, boolean boost) {
+        GTTurbineHelper.setCoolantBoost(node, boost);
+    }
+
+    public static double getTurbineBoostMultiplier(RecipeNode node) {
+        return GTTurbineHelper.getTurbineBoostMultiplier(node);
+    }
+
+    public static double calculateRotorWearPerSecond(RecipeNode node) {
+        return GTTurbineHelper.calculateRotorWearPerSecond(node);
+    }
+
+    public static double calculateRotorLifespanHours(RecipeNode node) {
+        return GTTurbineHelper.calculateRotorLifespanHours(node);
+    }
+
+    public static double calculateRotorReplacementRatePerHour(RecipeNode node) {
+        return GTTurbineHelper.calculateRotorReplacementRatePerHour(node);
     }
 
     public static void syncTurbineMachineIcon(RecipeNode node) {

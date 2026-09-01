@@ -53,6 +53,23 @@ public interface IModGuiHandler {
     }
 
     /**
+     * Handles mouse drag on Section 1 header inside MachineConfigDialog.
+     */
+    default boolean handleDialogHeaderDrag(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                           double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return false;
+    }
+
+    /**
+     * Handles mouse release on Section 1 header inside MachineConfigDialog.
+     */
+    default boolean handleDialogHeaderRelease(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                              double mouseX, double mouseY, int button,
+                                              EditBox parallelBox, BoardScreen parent) {
+        return false;
+    }
+
+    /**
      * Handles mouse wheel scroll on Section 1 header inside MachineConfigDialog.
      */
     default boolean handleDialogHeaderScroll(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,

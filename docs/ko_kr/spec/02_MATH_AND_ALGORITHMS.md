@@ -80,12 +80,29 @@ $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a
 - **대형 제련로 (Multi Smelter)**:
   $$\text{Parallel} = \text{SmelterParallel} \quad (\text{기본 } 32\text{x}, 64\text{x}, 128\text{x}\dots)$$
 
-#### 대형 증기/가스/플라즈마 터빈 로터 및 홀더 효율 공식
-- 로터 자체 효율 $E_{\text{rotor}}$, 로터 파워 $P_{\text{rotor}}$, 로터 홀더 티어 보너스 $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$일 때:
-  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right)\right)$$
-  $$\text{DurationTicks} = \max\left(1.0, \, \text{BaseDurationTicks} \times \text{RotorEffMult} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()\right)$$
-  $$\text{Max EU/t} = \text{HolderBaseEUt} \times \frac{P_{\text{rotor}}}{100.0}$$
-  $$\text{Total Parallel} = \left\lfloor \frac{\text{Max EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+#### 대형 증기/가스/플라즈마 터빈 로터, 독립 티어 및 내구도 소모율 공식 (ADR-006)
+- **로터 홀더 및 다이나모 해치 독립 티어 분리 (Decoupled Tiers)**:
+  로터 홀더 티어 전압 $V_{\text{holder}}$, 다이나모 해치 티어 전압 $V_{\text{dynamo}}$, 암페어 $A_{\text{dynamo}}$일 때:
+  $$\text{Cap}_{\text{holder}} = V_{\text{holder}} \times 2.0 \quad (\text{단위: EU/t, 최대 유량 한계})$$
+  $$\text{Cap}_{\text{dynamo}} = V_{\text{dynamo}} \times A_{\text{dynamo}} \quad (\text{단위: EU/t, 발전 출력 상한})$$
+  $$\text{P}_{\text{max, turbine}} = \min(\text{Cap}_{\text{holder}}, \, \text{Cap}_{\text{dynamo}})$$
+
+- **터빈 로터 효율 및 발전량 계산**:
+  로터 기본 효율 $E_{\text{rotor}}$, 로터 파워 $P_{\text{rotor}}$, 로터 홀더 보너스 $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$, 윤활유 부스트 승수 $M_{\text{boost}} \in \{1.0, 1.25, 1.50\}$일 때:
+  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right) \times M_{\text{boost}}\right)$$
+  $$\text{Calculated Output EU/t} = \min\left(\text{P}_{\text{max, turbine}}, \, \text{BaseRecipeEUt} \times \frac{P_{\text{rotor}}}{100.0} \times M_{\text{boost}}\right)$$
+  $$\text{Total Parallel} = \left\lfloor \frac{\text{Calculated Output EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+
+- **로터 내구도 소모율(Wear Rate) 및 수명($T_{\text{lifespan}}$) 공식**:
+  로터 기본 내구도 $D_{\text{rotor}}$, 초당 내구도 소모율 $\text{Loss}_{\text{sec}}$:
+  $$\text{Loss}_{\text{sec}} = \text{BaseLossRate} \times \left(\frac{\text{ActualFlowRate}}{\text{OptimalFlowRate}}\right) \times \frac{1.0}{M_{\text{boost}}}$$
+  $$T_{\text{lifespan}} = \frac{D_{\text{rotor}}}{\text{Loss}_{\text{sec}}} \quad (\text{단위: 초})$$
+  $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
+
+#### 공급 전력 기반 기계 가용 최대 병렬 ($P_{\max}$) 도출 수식
+장착된 에너지 해치 티어 전압 $V_{\text{hatch}}$, 암페어 $A_{\text{hatch}}$, 단일 레시피 소비 전력 $E_{\text{recipe}}$일 때:
+$$P_{\max} = \min\left(\text{ConfiguredParallel}, \, \left\lfloor \frac{V_{\text{hatch}} \times A_{\text{hatch}}}{E_{\text{recipe}}} \right\rfloor\right)$$
+$\text{ConfiguredParallel} > P_{\max}$일 경우 캔버스 카드에 하드웨어 용량 초과 경고 뱃지를 렌더링합니다.
 
 ---
 

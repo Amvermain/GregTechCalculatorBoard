@@ -34,3 +34,17 @@ stateDiagram-v2
 | **[ADR-002](ADR_002_ARCHITECTURE_DOCS_RESTRUCTURING_AND_SPEC_MODERNIZATION.md)** | 아키텍처 및 기술 사양 문서 체계 대량 개편 및 최신화<br/>*(Architecture Docs Restructuring & Spec Modernization)* | 🟢 `IMPLEMENTED` | `v2.0.0` | 2026-08-29 | 5계층 아키텍처, 5대 그래프 솔버, $128 \times 128$ 와이어 공간 분할 색인 사양서 전면 개편 및 영문 1:1 대칭화 |
 | **[ADR-003](ADR_003_MULTIPLAYER_NETWORK_INTEGRITY_AND_SYSTEM_STABILIZATION.md)** | 멀티플레이어 네트워크 무결성, 서버 동시성 안정화 및 원자적 데이터 영속화 사양<br/>*(Multiplayer Network Streaming Integrity & Atomic Persistence)* | 🟢 `IMPLEMENTED` | `v2.0.0` | 2026-08-29 | 512KB C2S 분할 스트리밍, `ATOMIC_MOVE` 원자적 파일 저장소, 접속 종료 시 락 즉시 해제, 프레즌스 타깃 스트리밍 |
 | **[ADR-004](ADR_004_CLEAN_ARCHITECTURE_AND_DOMAIN_DECOMPOSITION.md)** | 클린 아키텍처 정립 및 잔여 갓 클래스(God Class) 책임 분해<br/>*(Clean Architecture Realization & God Class Decomposition)* | 🟢 `IMPLEMENTED` | `v2.0.0` | 2026-08-29 | `RecipeNode` 도메인 순수성 회복, `RecipeSearchDialog`, `CanvasInteractionHandler`, `FlowGraphSolver` SRP 4대 클래스 분해 |
+| **[ADR-005](ADR_005_MULTIBLOCK_SELECTOR_TUTORIAL_INTEGRATION.md)** | 기계 및 멀티블록 선택(Machine Selector) 튜토리얼 통합 사양<br/>*(Machine & Multiblock Selector Tutorial Integration)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 11단계 튜토리얼 체계 확장, EBF 연습 노드 배치 및 멀티블록 선택 시 다음 스텝 자동 전이 연동 |
+| **[ADR-006](ADR_006_TURBINE_AND_MACHINE_PARALLEL_ENHANCEMENT.md)** | 터빈 발전기 소모품 모델링·독립 티어 분리 및 기계 가용 병렬 산출 명세<br/>*(Turbine Consumables, Decoupled Hatch Tiers & Dynamic Machine Parallel Estimation)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 로터 내구도 마모율/수명 모델링, 로터 홀더/다이나모 해치 독립 티어 분리, 윤활유 부스트 토글, $P_{\max}$ 가용 병렬 산출 |
+| **[ADR-009](ADR_009_HEADLESS_LAYER_ISOLATION_AND_SERVER_SAFETY.md)** | 헤드리스 계층 격리 및 데디케이티드 서버 안전성 강화 명세<br/>*(Headless Layer Isolation & Dedicated Server Safety Enhancement)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | API/Compat 계층의 클라이언트 직접 참조 100% 해소, `SearchableRecipe` 도메인 승격, SPI 주입 및 패킷 DistExecutor 무결성 확보 |
+| **[ADR-010](ADR_010_STATIC_REFLECTION_CACHING_AND_CLEAN_EXCEPTION.md)** | 리플렉션 정적 캐싱 및 예외 처리 무결성 개편 명세<br/>*(Static Reflection Caching & Clean Exception Handling)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 런타임 동적 리플렉션의 static final 1회 캐싱, $O(1)$ 직접 호출 최적화, bare catch 제거 및 Headless LinkageError 무결성 보장 |
+| **[ADR-011](ADR_011_CONTROL_FLOW_FLATTENING_AND_SELF_DESCRIPTIVE_CODE.md)** | 제어 흐름 평탄화 및 자기 서술적 클린 코드 정비 명세<br/>*(Control Flow Flattening & Self-Descriptive Code Refactoring)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 중첩 깊이 1~2단계 평탄화, 조기 반환 가드 전면 적용, 나열 주석 전면 제거 및 CanvasInteractionHandler 3대 서브 핸들러 분해 |
+
+---
+
+## 💡 활성 RFC 제안 목록 (Active RFC Proposals)
+
+| 번호 | 문서 제목 (Title) | 상태 | 대상 버전 | 기안일 | 핵심 요약 |
+| :---: | :--- | :---: | :---: | :---: | :--- |
+| **[RFC-007](../RFC_007_HIERARCHICAL_PAGE_EXPLORER_AND_MACHINE_TEMPLATES.md)** | 계층형 폴더블 페이지 탐색기 및 머신 하드웨어 템플릿 시스템<br/>*(Hierarchical Foldable Page Explorer & Machine Setup Templates)* | 🟡 `PROPOSED` | `v2.2.0` | 2026-09-01 | 다층 폴더 트리 사이드바, 실시간 검색, `Ctrl+K` 퀵 스위처, 기계 하드웨어 스펙 보존형 원클릭 레시피 복제/교체 시스템 |
+| **[RFC-008](../RFC_008_AE2_AUTOCRAFTING_PLAN_AND_PRECISION_ETA_INTEGRATION.md)** | AE2 오토크래프팅 플랜 연동 및 패턴-페이지 기반 정밀 ETA 시스템<br/>*(AE2 Autocrafting Plan Integration & Pattern-Page Precision ETA Engine)* | 🟡 `PROPOSED` | `v2.3.0` | 2026-09-01 | RFC-007 기반 `BoardPage` ↔ AE2 가공 패턴 1:1 바인딩, `ICraftingPlan.patternTimes()` 인터셉트 및 $O(K)$ 정밀 ETA/병목 산출 및 딥링크 |

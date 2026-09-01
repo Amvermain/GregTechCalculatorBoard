@@ -84,42 +84,6 @@ public class StarTAddonCrawler {
     }
 
     public static void addBuiltinStarTTraits(List<MachineAddon> list, java.util.Set<String> seenIds) {
-        // SPT Lubricant Boosting (+25% EU/t output)
-        MachineAddon sptLubricant = new MachineAddon(
-                "gtceu:spt_lubricant_boosting",
-                "SPT Lubricant Boosting [+25% EU/t]",
-                MachineAddon.Category.MULTIBLOCK_TRAIT,
-                "+25% EU/t output (Consumes 1,000 B/h Tungsten Disulfide)",
-                ResourceLocation.tryParse("gtceu:supreme_plasma_turbine")
-        );
-        sptLubricant.setEutMultiplier(1.25);
-        sptLubricant.setDiscoverySource("Supreme Plasma Turbine Lubricant Boosting (+25% EU/t)");
-        tryAddTrait(list, seenIds, sptLubricant);
-
-        // SPT Coolant Boosting (+75% EU/t output)
-        MachineAddon sptCoolant = new MachineAddon(
-                "gtceu:spt_coolant_boosting",
-                "SPT Coolant Boosting [+75% EU/t]",
-                MachineAddon.Category.MULTIBLOCK_TRAIT,
-                "+75% EU/t output (Consumes 2,500 B/h Superstate Helium 3)",
-                ResourceLocation.tryParse("gtceu:supreme_plasma_turbine")
-        );
-        sptCoolant.setEutMultiplier(1.75);
-        sptCoolant.setDiscoverySource("Supreme Plasma Turbine Coolant Boosting (+75% EU/t)");
-        tryAddTrait(list, seenIds, sptCoolant);
-
-        // NPT Lubricant Boosting (+50% EU/t output)
-        MachineAddon nptLubricant = new MachineAddon(
-                "gtceu:npt_lubricant_boosting",
-                "NPT Lubricant Boosting [+50% EU/t]",
-                MachineAddon.Category.MULTIBLOCK_TRAIT,
-                "+50% EU/t output (Consumes 2,500 B/h Tungsten Disulfide)",
-                ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine")
-        );
-        nptLubricant.setEutMultiplier(1.50);
-        nptLubricant.setDiscoverySource("Nyinsane Plasma Turbine Lubricant Boosting (+50% EU/t)");
-        tryAddTrait(list, seenIds, nptLubricant);
-
         // Sterile Cleaning Maintenance Hatch (Star Technology Core)
         MachineAddon sterileMaint = new MachineAddon(
                 "start_core:sterile_cleaning_maintenance_hatch",

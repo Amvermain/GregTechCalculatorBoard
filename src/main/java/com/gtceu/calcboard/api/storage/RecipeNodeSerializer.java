@@ -210,24 +210,24 @@ public final class RecipeNodeSerializer {
         }
 
         // Backward compatibility for legacy saves and blueprints
-        if (tag.contains("recipeTemperature") && !node.getProperties().has(NodeProperties.EBF_TEMPERATURE)) {
+        if (tag.contains("recipeTemperature") && !node.getProperties().hasById("ebf_temperature")) {
             node.setRecipeTemperature(tag.getInt("recipeTemperature"));
         }
-        if (tag.contains("rpm") && !node.getProperties().has(NodeProperties.KINETIC_RPM)) {
+        if (tag.contains("rpm") && !node.getProperties().hasById("kinetic_rpm")) {
             node.setRpm(tag.getInt("rpm"));
         }
-        if (tag.contains("rotorEfficiency") && !node.getProperties().has(NodeProperties.TURBINE_ROTOR_EFFICIENCY)) {
+        if (tag.contains("rotorEfficiency") && !node.getProperties().hasById("rotor_efficiency")) {
             node.setRotorEfficiency(tag.getInt("rotorEfficiency"));
         }
-        if (tag.contains("rotorPower") && !node.getProperties().has(NodeProperties.TURBINE_ROTOR_POWER)) {
+        if (tag.contains("rotorPower") && !node.getProperties().hasById("rotor_power")) {
             node.setRotorPower(tag.getInt("rotorPower"));
         }
-        if (tag.contains("rotorName") && !node.getProperties().has(NodeProperties.TURBINE_ROTOR_NAME)) {
+        if (tag.contains("rotorName") && !node.getProperties().hasById("rotor_name")) {
             node.setRotorName(tag.getString("rotorName"));
         }
-        if (tag.contains("fusionStartEU") && !node.getProperties().has(NodeProperties.FUSION_START_EU)) {
+        if (tag.contains("fusionStartEU") && !node.getProperties().hasById("fusion_start_eu")) {
             node.setEuToStart(tag.getLong("fusionStartEU"));
-        } else if (tag.contains("euToStart") && !node.getProperties().has(NodeProperties.FUSION_START_EU)) {
+        } else if (tag.contains("euToStart") && !node.getProperties().hasById("fusion_start_eu")) {
             node.setEuToStart(tag.getLong("euToStart"));
         }
 

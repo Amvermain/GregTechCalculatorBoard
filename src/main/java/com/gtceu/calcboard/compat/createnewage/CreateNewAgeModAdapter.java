@@ -13,7 +13,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
@@ -375,7 +375,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         return 15.0 / 512.0;
     }
 
-    public static List<RecipeSearchEngine.SearchableRecipe> getVirtualSearchRecipes() {
+    public static List<SearchableRecipe> getVirtualSearchRecipes() {
         return CreateNewAgeRecipeHandler.getVirtualSearchRecipes();
     }
 

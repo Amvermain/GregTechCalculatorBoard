@@ -67,7 +67,7 @@ public final class GTBoilerPhysics {
         boolean isLargeBoiler = isLargeBoilerRecipe(node);
         double speed = bt.getSpeedMultiplier(isLiquid, isLargeBoiler);
         if (bt.isMultiblock()) {
-            int throttle = node.getProperties().get(NodeProperties.BOILER_THROTTLE);
+            int throttle = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.BOILER_THROTTLE);
             throttle = Math.max(25, Math.min(100, throttle));
             speed *= (throttle / 100.0);
         }

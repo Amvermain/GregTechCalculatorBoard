@@ -20,8 +20,8 @@ import com.gtceu.calcboard.client.gui.search.RecipeFilterDialog;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.ParsedQuery;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchQueryEngine;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 

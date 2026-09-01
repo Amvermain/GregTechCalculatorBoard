@@ -84,16 +84,21 @@ public class GenericModGuiHandler implements IModGuiHandler {
         if (node.isLiquidBoilerRecipe() || (adapter != null && adapter.isBoilerRecipe(node))) {
             GTBoilerTier bTier = GTBoilerTier.getBoilerTier(node);
             btnW = Math.max(54, safeFontWidth(bTier.getDisplayName(), 46) + 8);
-        } else if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            String steamText = node.isMultiblock() ? ("🏛 " + node.getSteamMode().getShortName()) : node.getSteamMode().getDisplayName();
+        } else if (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            String steamText = node.getSteamMode().getDisplayName();
             btnW = Math.max(48, safeFontWidth(steamText, 40) + 8);
+        } else {
+            GTVoltageTier tier = node.getTargetTier();
+            String tierText = (tier != null ? tier.getName() : "LV");
+            if (node.isMultiblock()) tierText = "🏛 " + tierText;
+            btnW = Math.max(32, safeFontWidth(tierText, 24) + 8);
         }
         return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
     }
 
     @Override
     public boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node == null || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || node.getEnergyType() == EnergyType.NONE || (node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
+        if (node == null || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || node.getEnergyType() == EnergyType.NONE || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;
@@ -255,7 +260,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
         return false;
     }
 
-    private static int safeFontWidth(String text, int defaultWidth) {
+    protected static int safeFontWidth(String text, int defaultWidth) {
         try {
             var mc = Minecraft.getInstance();
             if (mc != null && mc.font != null) {

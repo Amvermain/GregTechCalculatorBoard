@@ -255,35 +255,16 @@ public class GTCEuAddonCrawler {
 
     public static boolean isMufflerHatchItem(Item item, ResourceLocation id) {
         if (item instanceof BlockItem bi) {
-            Block b = bi.getBlock();
-            try {
-                Method mGetDef = b.getClass().getMethod("getDefinition");
-                Object def = mGetDef.invoke(b);
-                if (def != null) {
-                    Class<?> mufflerPartCls = null;
-                    try {
-                        mufflerPartCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.MufflerPartMachine");
-                    } catch (Throwable ignored) {}
-                    if (mufflerPartCls == null) {
-                        try {
-                            mufflerPartCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.MufflerHatchPartMachine");
-                        } catch (Throwable ignored) {}
-                    }
-                    if (mufflerPartCls != null) {
-                        Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
-                        Class<?> mCls = (Class<?>) mGetMachineClass.invoke(def);
-                        if (mCls != null && mufflerPartCls.isAssignableFrom(mCls)) {
-                            return true;
-                        }
-                    }
+            Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getBlockMachineDefinition(bi.getBlock());
+            if (def != null) {
+                Class<?> mCls = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineClass(def);
+                if (com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isMufflerMachineClass(mCls)) {
+                    return true;
                 }
-            } catch (Throwable ignored) {}
+            }
         }
         var stats = com.gtceu.calcboard.compat.gtceu.helper.GTHatchHelper.extractStatsFromMachineDef(null, id);
-        if (stats != null && stats.abilities() != null && stats.abilities().contains("MUFFLER")) {
-            return true;
-        }
-        return false;
+        return stats != null && stats.abilities() != null && stats.abilities().contains("MUFFLER");
     }
 
     public static boolean isMaintenanceHatchItem(Item item, ResourceLocation id) {
@@ -291,38 +272,24 @@ public class GTCEuAddonCrawler {
             return true;
         }
         if (item instanceof BlockItem bi) {
-            Block b = bi.getBlock();
-            try {
-                Method mGetDef = b.getClass().getMethod("getDefinition");
-                Object def = mGetDef.invoke(b);
-                if (def != null) {
-                    Class<?> maintPartCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.MaintenanceHatchPartMachine");
-                    Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
-                    Class<?> mCls = (Class<?>) mGetMachineClass.invoke(def);
-                    if (mCls != null && maintPartCls.isAssignableFrom(mCls)) {
-                        return true;
-                    }
+            Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getBlockMachineDefinition(bi.getBlock());
+            if (def != null) {
+                Class<?> mCls = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineClass(def);
+                if (com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isMaintenanceMachineClass(mCls)) {
+                    return true;
                 }
-            } catch (Throwable ignored) {}
+            }
         }
         return false;
     }
 
     public static boolean isConfigurableMaintenanceHatch(Item item) {
         if (item instanceof BlockItem bi) {
-            Block b = bi.getBlock();
-            try {
-                Method mGetDef = b.getClass().getMethod("getDefinition");
-                Object def = mGetDef.invoke(b);
-                if (def != null) {
-                    Class<?> cfgMaintCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.part.ConfigurableMaintenanceHatchPartMachine");
-                    Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
-                    Class<?> mCls = (Class<?>) mGetMachineClass.invoke(def);
-                    if (mCls != null && cfgMaintCls.isAssignableFrom(mCls)) {
-                        return true;
-                    }
-                }
-            } catch (Throwable ignored) {}
+            Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getBlockMachineDefinition(bi.getBlock());
+            if (def != null) {
+                Class<?> mCls = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineClass(def);
+                return com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isConfigurableMaintenanceMachineClass(mCls);
+            }
         }
         return false;
     }

@@ -348,10 +348,26 @@ Rendered at the top of all UI layers (bottom-center `screenHeight - 48px`) with 
 
 ## 6. Interactive Onboarding Tutorials (`tutorial/*`)
 
-Guides newcomers through fundamental workflows (node creation, wiring, ratio balancing, compound modules) via pulsing highlight borders and instructional popups.
+Guides newcomers through fundamental workflows (node creation, wiring, ratio balancing, compound modules, machine switching, and shared machine pools) via pulsing highlight borders and instructional popups.
 
 * **`TutorialManager`**: Singleton tutorial state tracker detecting milestone completion.
 * **`TutorialOverlay`**: Renders pulse glow rings around target widgets/ports and instructions.
+
+### 6.1 Standard 11-Step Tutorial Progression Sequence
+
+| Step | Identifier | Milestone Objective & Completion Trigger |
+| :---: | :--- | :--- |
+| **Step 1** | `STEP_1_OPEN_SEARCH` | Open recipe search dialog via toolbar button or `Space` key |
+| **Step 2** | `STEP_2_PLACE_RECIPE` | Select recipe from search results and place initial machine node on canvas |
+| **Step 3** | `STEP_3_CONNECT_WIRE` | Drag wire from output socket to connect to matching input socket |
+| **Step 4** | `STEP_4_AUTO_RATIO` | Perform 1:1 Auto-Ratio balancing via `Shift + Drag` or dialog button |
+| **Step 5** | `STEP_5_MACHINE_SELECTOR` | **[ADR-005]** Click machine card icon to switch between single/multiblock (e.g. EBF) machines via `MachineSelectorDialog` and inspect capability badges (`🏛 Multiblock`, `♨ Coil`, `⚡ Par Hatch`) |
+| **Step 6** | `STEP_6_CONFIG_ADDONS` | Open `MachineConfigDialog` (`C` key) to configure voltage tiers, heating coils, and energy hatches |
+| **Step 7** | `STEP_7_BOM_DASHBOARD` | Open Bill of Materials dashboard (`B` key or toolbar `[📦 BOM]`) to inspect multiblock parts requirements |
+| **Step 8** | `STEP_8_BATCH_TARGET` | Set batch target quantity (e.g. `1,000x`) on goal nodes and inspect estimated completion time (ETA) |
+| **Step 9** | `STEP_9_COMPOUND_MODULE`| Group multiple nodes into a modular Compound Node via `Ctrl + G` |
+| **Step 10** | `STEP_10_SHARED_POOL` | Group multiple recipes into a Shared Machine Pool frame to calculate time-sharing duty cycle (`Total Duty %`) |
+| **Step 11** | `STEP_11_BATCH_WIRING` | Perform marquee port multi-selection and bundle batch wiring (`Bundle Batch Wiring`) |
 
 ---
 

@@ -268,13 +268,13 @@ public class SysteamsRecipeHandler {
         ResourceLocation catRef = ResourceLocation.tryParse("systeams:" + type);
 
         if (isDynamoMode) {
-            double energyRF = node.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF);
+            double energyRF = node.getProperties().get(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF);
             if (energyRF <= 0) {
                 energyRF = node.getBaseDurationTicks() * node.getBaseEUt();
                 if (energyRF <= 0) {
                     energyRF = 200.0 * 20.0;
                 }
-                node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, energyRF);
+                node.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, energyRF);
             }
 
             double steamRatio = getSteamRatio(catRef);
@@ -315,7 +315,7 @@ public class SysteamsRecipeHandler {
                 node.setName(node.getName().replace("Dynamo", "Boiler").replace("dynamo", "boiler"));
             }
         } else {
-            double energyRF = node.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF);
+            double energyRF = node.getProperties().get(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF);
             if (energyRF <= 0) {
                 double totalSteam = 0.0;
                 for (IngredientStack out : node.getOutputs()) {
@@ -323,7 +323,7 @@ public class SysteamsRecipeHandler {
                 }
                 double steamRatio = getSteamRatio(catRef);
                 energyRF = steamRatio > 0 ? (totalSteam / steamRatio) : 300000.0;
-                node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, energyRF);
+                node.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, energyRF);
             }
 
             double basePowerRF = ThermalAugmentHelper.getThermalDynamoBasePowerRF(null);
@@ -361,7 +361,7 @@ public class SysteamsRecipeHandler {
         String type = getDynamoBoilerType(node);
         ResourceLocation catRef = ResourceLocation.tryParse("systeams:" + type);
 
-        double energyRF = node.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF);
+        double energyRF = node.getProperties().get(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF);
         if (energyRF <= 0) {
             double totalSteam = 0.0;
             for (IngredientStack out : node.getOutputs()) {
@@ -369,7 +369,7 @@ public class SysteamsRecipeHandler {
             }
             double steamRatio = getSteamRatio(catRef);
             energyRF = steamRatio > 0 ? (totalSteam / steamRatio) : 300000.0;
-            node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, energyRF);
+            node.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, energyRF);
         }
 
         double steamRatio = getSteamRatio(catRef);

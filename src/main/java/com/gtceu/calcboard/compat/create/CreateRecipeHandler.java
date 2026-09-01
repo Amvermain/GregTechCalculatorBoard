@@ -7,7 +7,7 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -190,11 +190,11 @@ public class CreateRecipeHandler {
         return null;
     }
 
-    public static List<RecipeSearchEngine.SearchableRecipe> getVirtualKineticSearchRecipes() {
+    public static List<SearchableRecipe> getVirtualKineticSearchRecipes() {
         if (!ModCompatHelper.isCreateLoaded() && !ModCompatHelper.isCreateAdditionsLoaded()) {
             return Collections.emptyList();
         }
-        List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
+        List<SearchableRecipe> list = new ArrayList<>();
         String catId = "create:kinetic_generation";
         String catName = Component.translatable("category.gtcalcboard.create_kinetic").getString();
         if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
@@ -299,7 +299,7 @@ public class CreateRecipeHandler {
                 String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
                 String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
 
-                list.add(new RecipeSearchEngine.SearchableRecipe(
+                list.add(new SearchableRecipe(
                         node,
                         displayName,
                         modId.intern(),

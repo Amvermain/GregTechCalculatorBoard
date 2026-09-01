@@ -59,6 +59,27 @@ public class NodePropertyStore {
         return values.containsKey(key);
     }
 
+    public boolean hasById(String keyId) {
+        NodePropertyKey<?> key = NodeProperties.getById(keyId);
+        return key != null && has(key);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T getById(String keyId, T defaultValue) {
+        NodePropertyKey<?> key = NodeProperties.getById(keyId);
+        if (key == null) return defaultValue;
+        Object val = values.get(key);
+        return val != null ? (T) val : defaultValue;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> void setById(String keyId, T value) {
+        NodePropertyKey<T> key = (NodePropertyKey<T>) NodeProperties.getById(keyId);
+        if (key != null) {
+            set(key, value);
+        }
+    }
+
     /**
      * Removes the property entry.
      */

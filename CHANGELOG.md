@@ -4,6 +4,35 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-alpha.3] - 2026-09-02
+
+### Added
+- **Turbine Generator Rotor Lifetime & Wear Rate Modeling**:
+  - Calculates real-time durability wear rate per second and total estimated lifetime for turbine rotors in Large Gas, Steam, and Plasma Turbines, rendering detailed durability badges in card tooltips.
+  - Added decoupled tier selection for Rotor Holders and Dynamo Hatches in machine configuration.
+  - Added Lubricant supply toggle for 100% maximum turbine output efficiency boost.
+- **Dynamic Available Machine Parallel & Overclock Estimation**:
+  - Dynamically calculates the physical maximum parallel capacity (P_max) supportable by equipped energy hatches and supplied voltage, displaying visual warnings when configured parallel exceeds hardware limits.
+- **Machine & Multiblock Selector Interactive Tutorial Step**:
+  - Added interactive tutorial onboarding steps for switching between singleblock machines and multiblock structures (e.g. Electric Blast Furnace), exploring hardware capability badges (`🏛 Multiblock`, `♨ Coil`, `⚡ Par Hatch`).
+- **In-Game Command Support (`/calcboard open`)**:
+  - Added `/calcboard open` command on client and server environments to instantly launch and access calculator boards.
+
+### Changed & Improved
+- **Canvas Interaction & Sub-Handler Optimization**:
+  - Improved mouse dragging responsiveness, frame resizing, note editing, and wire routing across large-scale factory canvases.
+- **Heating Coil, Reflector & Thermal Augment Detection Precision**:
+  - Enhanced runtime specification detection for modpack custom heating coils, nuclear reactor reflectors, and Thermal Series augments, accurately factoring temperature and efficiency bonuses into overclock formulas.
+- **Modular Property Registry & Optional Mod Compatibility**:
+  - Decoupled tech mod properties (GTCEu, Create, Thermal) into dedicated modular registries (`GTCEuProperties`, `CreateProperties`, `ThermalProperties`), ensuring robust stability and isolation in modpack environments where optional mods are absent.
+  - Blueprints containing properties from uninstalled mods are safely preserved without data loss or crashes during cross-instance transfers.
+
+### Fixed
+- **Dedicated Server Headless Classloading Safety**:
+  - Completely isolated client GUI and rendering dependencies to eliminate `NoClassDefFoundError` crashes on dedicated server environments.
+- **Turbine Power & Coil Temperature Missing Bonus Calculation**:
+  - Fixed an issue where certain gas turbines and multiblock reactors defaulted to baseline efficiency values without factoring in equipped rotor bonuses or custom coil temperatures.
+
 ## [2.1.0-alpha.2] - 2026-08-31
 
 ### Added

@@ -548,10 +548,16 @@ public class BoardManager {
         return BlueprintFileManager.getBlueprintsDirectory();
     }
 
+    private static volatile java.util.function.Function<File, File> customSaveDirectoryProvider = null;
+
+    public static void setCustomSaveDirectoryProvider(java.util.function.Function<File, File> provider) {
+        customSaveDirectoryProvider = provider;
+    }
+
     public File getDefaultSaveFile() {
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+        if (customSaveDirectoryProvider != null) {
             try {
-                File clientFile = com.gtceu.calcboard.client.ClientSaveHelper.getClientSaveFile(getSaveDirectory());
+                File clientFile = customSaveDirectoryProvider.apply(getSaveDirectory());
                 if (clientFile != null) return clientFile;
             } catch (Throwable ignored) {}
         }

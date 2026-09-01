@@ -31,6 +31,7 @@ public class GTCEuSteamProcessingTest {
 
     @BeforeEach
     void setUp() {
+        MultiblockDetector.reinitialize();
         CategoryCapabilityMatrix.getInstance();
     }
 
@@ -340,33 +341,30 @@ public class GTCEuSteamProcessingTest {
         Assertions.assertEquals(16384.0, GTTurbineHelper.getTurbineBaseProduction(plasma), 0.001);
         Assertions.assertEquals(16384.0, plasma.getSingleMachineEUt(), 0.001);
 
-        // 2. Supreme Plasma Turbine (SPT): 6x base parallel capacity (98,304 EU/t)
-        plasma.setMachineIcon(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"));
+        // 2. Supreme Plasma Turbine (SPT): 6x base parallel capacity (98,304 EU/t base, 0.9x unboosted penalty)
+        plasma.setMachineIcon(ResourceLocation.tryParse("start_core:supreme_plasma_turbine"));
         Assertions.assertEquals(98304.0, GTTurbineHelper.getTurbineBaseProduction(plasma), 0.001);
         plasma.setParallel(6);
-        Assertions.assertEquals(98304.0, plasma.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(98304.0 * 0.9, plasma.getSingleMachineEUt(), 0.001);
 
-        // Install SPT Lubricant Boosting (+25%)
-        MachineAddon sptLub = new MachineAddon("gtceu:spt_lubricant_boosting", "SPT Lubricant", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
-        sptLub.setEutMultiplier(1.25);
-        com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(plasma).onAddonInstalled(plasma, sptLub);
-
+        // Cycle to SPT Passive Boost (+25%, 1.25x)
+        GTTurbineHelper.cycleTurbineBoost(plasma, 1);
         Assertions.assertEquals(98304.0 * 1.25, plasma.getSingleMachineEUt(), 0.001);
         Assertions.assertTrue(plasma.getInputs().stream().anyMatch(in -> in.isFluid() && in.getId().getPath().contains("tungsten_disulfide")));
 
-        // Install SPT Coolant Boosting (+75%)
-        MachineAddon sptCool = new MachineAddon("gtceu:spt_coolant_boosting", "SPT Coolant", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
-        sptCool.setEutMultiplier(1.75);
-        com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(plasma).onAddonInstalled(plasma, sptCool);
-
+        // Cycle to SPT Full Boost (Active Full Boost: 2.0x)
+        GTTurbineHelper.cycleTurbineBoost(plasma, 1);
+        Assertions.assertEquals(98304.0 * 2.0, plasma.getSingleMachineEUt(), 0.001);
         Assertions.assertTrue(plasma.getInputs().stream().anyMatch(in -> in.isFluid() && in.getId().getPath().contains("helium_3")));
 
-        // 3. Nyinsane Plasma Turbine (NPT): 12x base parallel capacity (196,608 EU/t)
+        // 3. Nyinsane Plasma Turbine (NPT): 12x base parallel capacity (196,608 EU/t base, 0.8x unboosted penalty)
         plasma.getAddons().clear();
-        plasma.setMachineIcon(ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"));
+        GTTurbineHelper.setLubricantBoost(plasma, false);
+        GTTurbineHelper.setCoolantBoost(plasma, false);
+        plasma.setMachineIcon(ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine"));
         Assertions.assertEquals(196608.0, GTTurbineHelper.getTurbineBaseProduction(plasma), 0.001);
         plasma.setParallel(12);
-        Assertions.assertEquals(196608.0, plasma.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(196608.0 * 0.8, plasma.getSingleMachineEUt(), 0.001);
     }
 
     @Test
@@ -643,6 +641,20 @@ public class GTCEuSteamProcessingTest {
         assertFalse(widget.changeTier(-1));
         assertEquals(SteamMode.LOW_PRESSURE, macerator.getSteamMode());
         assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_macerator"), macerator.getMachineIcon());
+    }
+
+    @Test
+    void testMultiblockSwitchResetsSteamMode() {
+        RecipeNode node = RecipeNode.create("Steam Turbine", 20.0, 1024.0, GTVoltageTier.HV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:steam_turbine"));
+        node.setGenerator(true);
+        node.setSteamMode(SteamMode.HIGH_PRESSURE);
+        assertEquals(SteamMode.HIGH_PRESSURE, node.getSteamMode());
+
+        // Switch to multiblock: steam mode must be reset to NONE
+        node.setMultiblock(true);
+        assertEquals(SteamMode.NONE, node.getSteamMode());
+        assertTrue(node.isMultiblock());
     }
 }
 

@@ -19,6 +19,7 @@ import com.gtceu.calcboard.client.gui.dialog.FrameEditDialog;
 import com.gtceu.calcboard.client.gui.dialog.GlobalBalanceDashboardDialog;
 import com.gtceu.calcboard.client.gui.dialog.GuideDialog;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+import com.gtceu.calcboard.client.gui.dialog.MachineSelectorDialog;
 import com.gtceu.calcboard.client.gui.dialog.MultiblockBOMDialog;
 import com.gtceu.calcboard.client.gui.dialog.NoteEditDialog;
 import com.gtceu.calcboard.client.gui.dialog.RecentSavesDialog;
@@ -109,6 +110,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     private final WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
     private RecipeSearchDialog searchDialog;
     private MachineConfigDialog machineConfigDialog;
+    private MachineSelectorDialog machineSelectorDialog;
     private GuideDialog guideDialog;
     private DeletePageConfirmDialog deletePageDialog;
     private TutorialExitConfirmDialog tutorialExitDialog;
@@ -1042,6 +1044,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             recentSavesDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (searchDialog != null && searchDialog.isVisible()) {
             searchDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
+            machineSelectorDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             machineConfigDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
         } else if (frameEditDialog != null && frameEditDialog.isVisible()) {
@@ -1066,6 +1070,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             || (multiblockBOMDialog != null && multiblockBOMDialog.isVisible())
             || (guideDialog != null && guideDialog.isVisible())
             || (searchDialog != null && searchDialog.isVisible())
+            || (machineSelectorDialog != null && machineSelectorDialog.isVisible())
             || (machineConfigDialog != null && machineConfigDialog.isVisible())
             || (deletePageDialog != null && deletePageDialog.isVisible())
             || (tutorialExitDialog != null && tutorialExitDialog.isVisible())
@@ -1131,6 +1136,9 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseClicked(mouseX, mouseY, button);
         }
+        if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
+            return machineSelectorDialog.mouseClicked(mouseX, mouseY, button);
+        }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             return machineConfigDialog.mouseClicked(mouseX, mouseY, button);
         }
@@ -1172,6 +1180,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            if (machineConfigDialog.mouseReleased(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
         if (favoritesDockWidget.mouseReleased(mouseX, mouseY, button)) {
             return true;
         }
@@ -1189,6 +1202,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
+            if (machineConfigDialog.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+                return true;
+            }
+        }
         if (favoritesDockWidget.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
             return true;
         }
@@ -1220,6 +1238,9 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         }
         if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
             return multiblockBOMDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
+            return machineSelectorDialog.mouseScrolled(mouseX, mouseY, delta);
         }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             return machineConfigDialog.mouseScrolled(mouseX, mouseY, delta);
@@ -1294,9 +1315,40 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
+    public MachineSelectorDialog getMachineSelectorDialog() { return machineSelectorDialog; }
     public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
     public AutoConnectFilterDialog getAutoConnectDialog() { return autoConnectDialog; }
+
+    public void openMachineSelectorDialog(RecipeNode node) {
+        if (!ensureEditPermission() || node == null) return;
+        if (machineSelectorDialog == null) {
+            machineSelectorDialog = new MachineSelectorDialog(this);
+        }
+        machineSelectorDialog.open(node);
+    }
+
+    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) {
+        if (!ensureEditPermission() || node == null || newWs == null) return;
+        if (Objects.equals(node.getMachineIcon(), newWs)) return;
+
+        ResourceLocation oldIcon = node.getMachineIcon();
+        boolean oldMb = node.isMultiblock();
+        int oldPar = node.getParallel();
+        com.gtceu.calcboard.api.type.SteamMode oldSteam = node.getSteamMode();
+        com.gtceu.calcboard.api.type.GTVoltageTier oldTier = node.getTargetTier();
+
+        node.setMachineIcon(newWs);
+
+        TutorialManager.getInstance().onMachineSwitched(node, newWs);
+
+        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.SetMachineIconCommand(node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier));
+        markSummaryDirty();
+        rebuildWidgets();
+
+        String mName = node.getMachineDisplayName();
+        BoardToast.show(Component.literal("§b🏛 ").append(Component.translatable("message.gtcalcboard.machine_switched", mName)));
+    }
 
     public void openAutoConnectDialog() {
         if (!ensureEditPermission()) return;

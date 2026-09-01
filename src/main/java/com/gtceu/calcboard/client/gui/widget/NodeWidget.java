@@ -524,7 +524,7 @@ public class NodeWidget {
 
         boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
 
-        if (node.supportsSteamMode()) {
+        if (!node.isMultiblock() && node.supportsSteamMode()) {
             SteamMode curSteam = node.getSteamMode();
             if (curSteam == SteamMode.LOW_PRESSURE) {
                 if (direction > 0) {
@@ -786,13 +786,10 @@ public class NodeWidget {
             return false;
         }
 
-        // Machine Icon Click -> Toggle Multiblock / Singleblock mode
+        // Machine Icon Click -> Open Machine / Controller Selector Dialog
         if (button == 0 && isMachineIconHovered(mouseX, mouseY)) {
-            if (node.hasMultiblockOption()) {
-                boolean newMb = !node.isMultiblock();
-                node.setMultiblock(newMb);
-                if (parent != null) parent.markSummaryDirty();
-                invalidateCache();
+            if (parent != null) {
+                parent.openMachineSelectorDialog(node);
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
                 );

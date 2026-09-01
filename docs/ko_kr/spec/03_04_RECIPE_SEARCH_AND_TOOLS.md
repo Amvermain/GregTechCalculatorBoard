@@ -348,10 +348,26 @@
 
 ## 6. 인터랙티브 온보딩 튜토리얼 (`tutorial/*`)
 
-신규 사용자가 계산기 보드의 핵심 기능(노드 생성, 와이어 배선, 비율 맞춤, 모듈화)을 쉽게 익힐 수 있도록 단계별 가이드 말풍선과 UI 하이라이트 글로우(Glow) 효과를 제공합니다.
+신규 사용자가 계산기 보드의 핵심 기능(노드 생성, 와이어 배선, 비율 맞춤, 모듈화, 기계 전환, 공유 기계 풀)을 쉽게 익힐 수 있도록 단계별 가이드 말풍선과 UI 하이라이트 글로우(Glow) 효과를 제공합니다.
 
 * **`TutorialManager`**: 싱글톤 튜토리얼 상태 관리자. 단계별 목표 달성 감지(`TutorialStep`).
 * **`TutorialOverlay`**: 타겟 노드, 버튼, 포트 주변에 펄스 애니메이션 테두리와 안내 가이드 팝업 렌더링.
+
+### 6.1 표준 11단계 튜토리얼 시퀀스 (Tutorial Progression Sequence)
+
+| 단계 (Step) | 식별자 | 학습 내용 및 완료 조건 |
+| :---: | :--- | :--- |
+| **Step 1** | `STEP_1_OPEN_SEARCH` | 레시피 검색창 열기 (상단 검색 버튼 또는 `Space` 단축키) |
+| **Step 2** | `STEP_2_PLACE_RECIPE` | 검색창에서 레시피 선택 후 캔버스에 첫 번째 기계 노드 배치 |
+| **Step 3** | `STEP_3_CONNECT_WIRE` | 출력 포트에서 드래그하여 다른 기계의 입력 포트로 와이어 배선 |
+| **Step 4** | `STEP_4_AUTO_RATIO` | `Shift + 드래그` 또는 `Auto-Ratio` 버튼으로 1:1 유량 비율 자동 정합 |
+| **Step 5** | `STEP_5_MACHINE_SELECTOR` | **[ADR-005]** 기계 카드 아이콘 클릭 ➔ `MachineSelectorDialog`에서 단일/멀티블록(EBF 등) 기계 전환 실습 및 능력 뱃지(`🏛 Multiblock`, `♨ Coil`, `⚡ Par Hatch`) 확인 |
+| **Step 6** | `STEP_6_CONFIG_ADDONS` | `MachineConfigDialog`(`C` 키) 열어 전압 티어, 가열 코일, 에너지 해치 등 하드웨어 설정 |
+| **Step 7** | `STEP_7_BOM_DASHBOARD` | `B` 키 또는 툴바 `[📦 BOM]` 버튼으로 전체 공정 멀티블록 자재 청구서 확인 |
+| **Step 8** | `STEP_8_BATCH_TARGET` | 목표 노드에 배치 생산량 설정(예: `1,000x`) 및 잔여 소요 시간(ETA) 확인 |
+| **Step 9** | `STEP_9_COMPOUND_MODULE`| `Ctrl + G`로 여러 노드를 하나의 복합 모듈(Compound Node)로 묶기 |
+| **Step 10** | `STEP_10_SHARED_POOL` | 여러 레시피를 단일 물리 기계 풀(Shared Machine Pool)로 묶어 시간 분할 점유율(`Total Duty %`) 계산 |
+| **Step 11** | `STEP_11_BATCH_WIRING` | 마키 포트 선택 및 번들 와이어 일괄 배선(`Bundle Batch Wiring`) 실습 |
 
 ---
 

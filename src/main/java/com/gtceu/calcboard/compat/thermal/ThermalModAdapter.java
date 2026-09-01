@@ -30,6 +30,7 @@ import java.util.List;
 public class ThermalModAdapter implements IModAdapter {
 
     static {
+        ThermalProperties.init();
         com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.THERMAL_AUGMENT, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon(id, name, desc, icon));
     }
 

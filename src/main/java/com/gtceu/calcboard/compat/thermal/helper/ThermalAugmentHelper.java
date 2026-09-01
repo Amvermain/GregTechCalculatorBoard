@@ -3,78 +3,56 @@ package com.gtceu.calcboard.compat.thermal.helper;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NumericTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 
-/**
- * Helper class for parsing Thermal Series and KubeJS augments via deterministic NBT data and runtime reflection.
- */
 public class ThermalAugmentHelper {
+
+    private static final Class<?> DYNAMO_BLOCK_ENTITY_CLS;
+    private static final Class<?> MACHINE_BLOCK_ENTITY_CLS;
+    private static final Class<?> THERMAL_CORE_CONFIG_CLS;
+
+    static {
+        ClassLoader cl = ThermalAugmentHelper.class.getClassLoader();
+        Class<?> dynCls = null;
+        try {
+            dynCls = Class.forName("cofh.thermal.expansion.block.entity.dynamo.DynamoBlockEntity", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        DYNAMO_BLOCK_ENTITY_CLS = dynCls;
+
+        Class<?> machCls = null;
+        try {
+            machCls = Class.forName("cofh.thermal.expansion.block.entity.machine.MachineBlockEntity", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        MACHINE_BLOCK_ENTITY_CLS = machCls;
+
+        Class<?> cfgCls = null;
+        try {
+            cfgCls = Class.forName("cofh.thermal.core.config.ThermalCoreConfig", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        THERMAL_CORE_CONFIG_CLS = cfgCls;
+    }
 
     public static MachineAddon parseThermalAugment(ItemStack stack, ResourceLocation id) {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
 
-        CompoundTag augTag = null;
-        if (stack.hasTag()) {
-            if (stack.getTag().contains("AugmentData")) {
-                augTag = stack.getTag().getCompound("AugmentData");
-            } else if (hasAnyAugmentKey(stack.getTag())) {
-                augTag = stack.getTag();
-            }
-        }
-
-        if (augTag == null) {
-            try {
-                for (java.lang.reflect.Method m : stack.getItem().getClass().getMethods()) {
-                    String mn = m.getName().toLowerCase();
-                    if (mn.contains("augmentdata") || mn.contains("augmenttag") || mn.contains("augment") || mn.contains("data")) {
-                        if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(ItemStack.class)) {
-                            Object res = m.invoke(stack.getItem(), stack);
-                            if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) {
-                                augTag = ct;
-                                break;
-                            }
-                        } else if (m.getParameterCount() == 0) {
-                            Object res = m.invoke(stack.getItem());
-                            if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) {
-                                augTag = ct;
-                                break;
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-
-            if (augTag == null) {
-                Class<?> cl = stack.getItem().getClass();
-                while (cl != null && cl != Object.class) {
-                    for (java.lang.reflect.Field f : cl.getDeclaredFields()) {
-                        try {
-                            f.setAccessible(true);
-                            Object fVal = f.get(stack.getItem());
-                            if (fVal instanceof CompoundTag ct) {
-                                if (ct.contains("AugmentData")) {
-                                    augTag = ct.getCompound("AugmentData");
-                                    break;
-                                } else if (hasAnyAugmentKey(ct)) {
-                                    augTag = ct;
-                                    break;
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-                    if (augTag != null) break;
-                    cl = cl.getSuperclass();
-                }
-            }
-        }
-
+        CompoundTag augTag = extractAugmentTag(stack);
         if (augTag == null) {
             return null;
         }
@@ -85,6 +63,60 @@ public class ThermalAugmentHelper {
             addon.setDiscoverySource((stack.hasTag() ? "Active Recipe Output NBT (AugmentData)" : "Thermal IAugmentItem Reflection") + " [" + id + "]");
         }
         return addon;
+    }
+
+    private static CompoundTag extractAugmentTag(ItemStack stack) {
+        if (stack.hasTag()) {
+            CompoundTag tag = stack.getTag();
+            if (tag != null) {
+                if (tag.contains("AugmentData")) return tag.getCompound("AugmentData");
+                if (hasAnyAugmentKey(tag)) return tag;
+            }
+        }
+
+        CompoundTag methodTag = inspectAugmentMethods(stack);
+        if (methodTag != null) return methodTag;
+
+        return inspectAugmentFields(stack);
+    }
+
+    private static CompoundTag inspectAugmentMethods(ItemStack stack) {
+        Item item = stack.getItem();
+        for (Method m : item.getClass().getMethods()) {
+            String mn = m.getName().toLowerCase(Locale.ROOT);
+            if (mn.contains("augmentdata") || mn.contains("augmenttag") || mn.contains("augment") || mn.contains("data")) {
+                if (m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(ItemStack.class)) {
+                    try {
+                        Object res = m.invoke(item, stack);
+                        if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) return ct;
+                    } catch (ReflectiveOperationException ignored) {}
+                } else if (m.getParameterCount() == 0) {
+                    try {
+                        Object res = m.invoke(item);
+                        if (res instanceof CompoundTag ct && hasAnyAugmentKey(ct)) return ct;
+                    } catch (ReflectiveOperationException ignored) {}
+                }
+            }
+        }
+        return null;
+    }
+
+    private static CompoundTag inspectAugmentFields(ItemStack stack) {
+        Class<?> cl = stack.getItem().getClass();
+        while (cl != null && cl != Object.class) {
+            for (Field f : cl.getDeclaredFields()) {
+                try {
+                    f.setAccessible(true);
+                    Object fVal = f.get(stack.getItem());
+                    if (fVal instanceof CompoundTag ct) {
+                        if (ct.contains("AugmentData")) return ct.getCompound("AugmentData");
+                        if (hasAnyAugmentKey(ct)) return ct;
+                    }
+                } catch (ReflectiveOperationException ignored) {}
+            }
+            cl = cl.getSuperclass();
+        }
+        return null;
     }
 
     private static boolean hasAnyAugmentKey(CompoundTag tag) {
@@ -99,87 +131,23 @@ public class ThermalAugmentHelper {
     }
 
     public static MachineAddon parseThermalAugmentTag(CompoundTag augTag, String name, ResourceLocation id) {
-        if (augTag == null) {
-            return null;
-        }
+        if (augTag == null) return null;
 
         if (augTag.contains("AugmentData")) {
             augTag = augTag.getCompound("AugmentData");
         }
 
         int parallel = extractTagInt(augTag, 1, "Scale", "BaseMod", "Factor", "Tier", "Level", "DynScale", "DynamoScale", "MachineScale", "Parallel");
-
-        double eutMult = 1.0;
-        boolean hasDynamoKeys = false;
-        boolean hasMachineKeys = false;
-
-        if (augTag.contains("DynamoPower") || augTag.contains("DynPower")) {
-            double dynPower = extractTagRawNumber(augTag, "DynamoPower", "DynPower");
-            eutMult = 1.0 + dynPower;
-            hasDynamoKeys = true;
-        } else if (augTag.contains("MachinePower") || augTag.contains("ProcessPower")) {
-            double machPower = extractTagRawNumber(augTag, "MachinePower", "ProcessPower");
-            eutMult = 1.0 + machPower;
-            hasMachineKeys = true;
-        } else if (augTag.contains("PowerMod") || augTag.contains("EnergyMod")) {
-            eutMult = extractTagNumber(augTag, "PowerMod", "EnergyMod");
-        }
-
-        double durMult = 1.0;
-        if (augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy")) {
-            durMult = extractTagNumber(augTag, "DynamoEnergy", "DynEnergy");
-            hasDynamoKeys = true;
-        } else if (augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed")) {
-            double spd = extractTagRawNumber(augTag, "MachineSpeed", "ProcessSpeed");
-            if (spd > 0) {
-                durMult = 1.0 / (1.0 + spd);
-            }
-            hasMachineKeys = true;
-        } else if (augTag.contains("SpeedMod")) {
-            double spdMod = extractTagNumber(augTag, "SpeedMod");
-            if (spdMod > 0) {
-                durMult = 1.0 / spdMod;
-            }
-        } else if (augTag.contains("FuelMod")) {
-            durMult = extractTagNumber(augTag, "FuelMod");
-            hasDynamoKeys = true;
-        } else if (augTag.contains("EfficiencyMod") || augTag.contains("ProcessEnergy") || augTag.contains("MachineEnergy")) {
-            durMult = extractTagNumber(augTag, "EfficiencyMod", "ProcessEnergy", "MachineEnergy");
-            hasMachineKeys = true;
-        }
+        double eutMult = calculateEutMultiplier(augTag);
+        double durMult = calculateDurationMultiplier(augTag);
 
         if (parallel <= 1 && eutMult == 1.0 && durMult == 1.0) {
             return null;
         }
 
         boolean isKit = parallel > 1;
-        ThermalAugmentAddon.AugmentTarget target = ThermalAugmentAddon.AugmentTarget.ALL;
-        if (!isKit) {
-            String typeStr = augTag.getString("Type").toLowerCase(java.util.Locale.ROOT);
-            String path = id != null ? id.getPath().toLowerCase(java.util.Locale.ROOT) : "";
-
-            if (hasDynamoKeys || typeStr.contains("dynamo") || typeStr.contains("fuel")
-                    || path.contains("dynamo") || path.contains("reaction_chamber") || path.contains("injector")
-                    || path.contains("flux_linkage")) {
-                target = ThermalAugmentAddon.AugmentTarget.DYNAMO;
-            } else if (hasMachineKeys || typeStr.contains("machine") || typeStr.contains("process")
-                    || path.contains("machine") || path.contains("sieve") || path.contains("reclamation")
-                    || path.contains("catalyst") || path.contains("filter")) {
-                target = ThermalAugmentAddon.AugmentTarget.MACHINE;
-            }
-        }
-
-        String desc = "";
-        if (isKit) {
-            desc = String.format("⚡ %dx Scale Factor", parallel);
-        } else if (eutMult != 1.0 && durMult != 1.0) {
-            desc = String.format("⚡ Max Output: +%d%% (%.2fx) | ⏱ Fuel: %.2fx", (int) Math.round((eutMult - 1.0) * 100), eutMult, durMult);
-        } else if (durMult != 1.0) {
-            desc = String.format("⏱ Fuel Energy: %.2fx (%+d%%)", durMult, (int) Math.round((durMult - 1.0) * 100));
-        } else if (eutMult != 1.0) {
-            desc = String.format("⚡ Max Output: +%d%% (%.2fx)", (int) Math.round((eutMult - 1.0) * 100), eutMult);
-        }
-
+        ThermalAugmentAddon.AugmentTarget target = resolveAugmentTarget(augTag, id, isKit);
+        String desc = formatAugmentDescription(isKit, parallel, eutMult, durMult);
         String addonId = id.toString() + (parallel > 1 ? "_scale_" + parallel : "");
 
         ThermalAugmentAddon addon = new ThermalAugmentAddon(addonId, name == null || name.isEmpty() ? id.getPath() : name, desc, id, parallel, durMult, eutMult, isKit, target);
@@ -187,39 +155,96 @@ public class ThermalAugmentHelper {
         return addon;
     }
 
+    private static double calculateEutMultiplier(CompoundTag augTag) {
+        if (augTag.contains("DynamoPower") || augTag.contains("DynPower")) {
+            return 1.0 + extractTagRawNumber(augTag, "DynamoPower", "DynPower");
+        } else if (augTag.contains("MachinePower") || augTag.contains("ProcessPower")) {
+            return 1.0 + extractTagRawNumber(augTag, "MachinePower", "ProcessPower");
+        } else if (augTag.contains("PowerMod") || augTag.contains("EnergyMod")) {
+            return extractTagNumber(augTag, "PowerMod", "EnergyMod");
+        }
+        return 1.0;
+    }
+
+    private static double calculateDurationMultiplier(CompoundTag augTag) {
+        if (augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy")) {
+            return extractTagNumber(augTag, "DynamoEnergy", "DynEnergy");
+        } else if (augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed")) {
+            double spd = extractTagRawNumber(augTag, "MachineSpeed", "ProcessSpeed");
+            return spd > 0 ? 1.0 / (1.0 + spd) : 1.0;
+        } else if (augTag.contains("SpeedMod")) {
+            double spdMod = extractTagNumber(augTag, "SpeedMod");
+            return spdMod > 0 ? 1.0 / spdMod : 1.0;
+        } else if (augTag.contains("FuelMod")) {
+            return extractTagNumber(augTag, "FuelMod");
+        } else if (augTag.contains("EfficiencyMod") || augTag.contains("ProcessEnergy") || augTag.contains("MachineEnergy")) {
+            return extractTagNumber(augTag, "EfficiencyMod", "ProcessEnergy", "MachineEnergy");
+        }
+        return 1.0;
+    }
+
+    private static ThermalAugmentAddon.AugmentTarget resolveAugmentTarget(CompoundTag augTag, ResourceLocation id, boolean isKit) {
+        if (isKit) return ThermalAugmentAddon.AugmentTarget.ALL;
+
+        String typeStr = augTag.getString("Type").toLowerCase(Locale.ROOT);
+        String path = id != null ? id.getPath().toLowerCase(Locale.ROOT) : "";
+
+        boolean hasDynamoKeys = augTag.contains("DynamoPower") || augTag.contains("DynPower") || augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy") || augTag.contains("FuelMod");
+        boolean hasMachineKeys = augTag.contains("MachinePower") || augTag.contains("ProcessPower") || augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed") || augTag.contains("MachineEnergy");
+
+        if (hasDynamoKeys || typeStr.contains("dynamo") || typeStr.contains("fuel")
+                || path.contains("dynamo") || path.contains("reaction_chamber") || path.contains("injector")
+                || path.contains("flux_linkage")) {
+            return ThermalAugmentAddon.AugmentTarget.DYNAMO;
+        } else if (hasMachineKeys || typeStr.contains("machine") || typeStr.contains("process")
+                || path.contains("machine") || path.contains("sieve") || path.contains("reclamation")
+                || path.contains("catalyst") || path.contains("filter")) {
+            return ThermalAugmentAddon.AugmentTarget.MACHINE;
+        }
+
+        return ThermalAugmentAddon.AugmentTarget.ALL;
+    }
+
+    private static String formatAugmentDescription(boolean isKit, int parallel, double eutMult, double durMult) {
+        if (isKit) {
+            return String.format(Locale.ROOT, "⚡ %dx Scale Factor", parallel);
+        } else if (eutMult != 1.0 && durMult != 1.0) {
+            return String.format(Locale.ROOT, "⚡ Max Output: +%d%% (%.2fx) | ⏱ Fuel: %.2fx", (int) Math.round((eutMult - 1.0) * 100), eutMult, durMult);
+        } else if (durMult != 1.0) {
+            return String.format(Locale.ROOT, "⏱ Fuel Energy: %.2fx (%+d%%)", durMult, (int) Math.round((durMult - 1.0) * 100));
+        } else if (eutMult != 1.0) {
+            return String.format(Locale.ROOT, "⚡ Max Output: +%d%% (%.2fx)", (int) Math.round((eutMult - 1.0) * 100), eutMult);
+        }
+        return "";
+    }
+
     public static boolean isDynamoNode(RecipeNode node) {
         if (node == null) return false;
         if (node.isGenerator() || node.getBaseEUt() < 0) return true;
 
-        if (node.getRecipeCategoryId() != null) {
-            String p = node.getRecipeCategoryId().getPath().toLowerCase(java.util.Locale.ROOT);
-            if (p.contains("fuel") || p.contains("dynamo") || p.contains("lapidary") || p.contains("magmatic")
-                    || p.contains("numismatic") || p.contains("gourmand") || p.contains("compression")
-                    || p.contains("disenchantment") || p.contains("stirling")) {
-                return true;
-            }
+        if (node.getRecipeCategoryId() != null && isDynamoKeyword(node.getRecipeCategoryId().getPath())) {
+            return true;
         }
-        if (node.getMachineIcon() != null) {
-            String p = node.getMachineIcon().getPath().toLowerCase(java.util.Locale.ROOT);
-            if (p.contains("dynamo") || p.contains("lapidary") || p.contains("magmatic")
-                    || p.contains("numismatic") || p.contains("gourmand") || p.contains("compression")
-                    || p.contains("disenchantment") || p.contains("stirling")) {
-                return true;
-            }
+        if (node.getMachineIcon() != null && isDynamoKeyword(node.getMachineIcon().getPath())) {
+            return true;
         }
-        if (node.getName() != null) {
-            String n = node.getName().toLowerCase(java.util.Locale.ROOT);
-            if (n.contains("dynamo") || n.contains("lapidary") || n.contains("fuel")) {
-                return true;
-            }
+        if (node.getName() != null && isDynamoKeyword(node.getName())) {
+            return true;
         }
         return false;
+    }
+
+    private static boolean isDynamoKeyword(String str) {
+        String p = str.toLowerCase(Locale.ROOT);
+        return p.contains("fuel") || p.contains("dynamo") || p.contains("lapidary") || p.contains("magmatic")
+                || p.contains("numismatic") || p.contains("gourmand") || p.contains("compression")
+                || p.contains("disenchantment") || p.contains("stirling");
     }
 
     public static double extractTagRawNumber(CompoundTag tag, String... keys) {
         if (tag == null) return 0.0;
         for (String k : keys) {
-            if (tag.contains(k) && tag.get(k) instanceof net.minecraft.nbt.NumericTag num) {
+            if (tag.contains(k) && tag.get(k) instanceof NumericTag num) {
                 return num.getAsDouble();
             }
         }
@@ -229,7 +254,7 @@ public class ThermalAugmentHelper {
     public static double extractTagNumber(CompoundTag tag, String... keys) {
         if (tag == null) return 1.0;
         for (String k : keys) {
-            if (tag.contains(k) && tag.get(k) instanceof net.minecraft.nbt.NumericTag num) {
+            if (tag.contains(k) && tag.get(k) instanceof NumericTag num) {
                 return num.getAsDouble();
             }
         }
@@ -239,7 +264,7 @@ public class ThermalAugmentHelper {
     public static int extractTagInt(CompoundTag tag, int def, String... keys) {
         if (tag == null) return def;
         for (String k : keys) {
-            if (tag.contains(k) && tag.get(k) instanceof net.minecraft.nbt.NumericTag num) {
+            if (tag.contains(k) && tag.get(k) instanceof NumericTag num) {
                 int val = (int) Math.round(num.getAsDouble());
                 if (val > 0) return val;
             }
@@ -251,34 +276,22 @@ public class ThermalAugmentHelper {
         if (node == null) return false;
 
         ResourceLocation icon = node.getMachineIcon();
-        if (icon != null) {
-            String ns = icon.getNamespace().toLowerCase(java.util.Locale.ROOT);
-            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_foundation")
-                    || ns.equals("thermal_innovation") || ns.equals("thermal_extra") || ns.equals("cofh_core")
-                    || ns.equals("systeams") || isThermalTaggedItem(icon)) {
-                return true;
-            }
-        }
-
-        ResourceLocation catId = node.getRecipeCategoryId();
-        if (catId != null) {
-            String ns = catId.getNamespace().toLowerCase(java.util.Locale.ROOT);
-            if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_foundation")
-                    || ns.equals("thermal_innovation") || ns.equals("thermal_extra") || ns.equals("cofh_core")
-                    || ns.equals("systeams")) {
-                return true;
-            }
-        }
-
-        // 2. If node already has Thermal augments installed, it is Thermal
-        if (node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT || (a.getModId() != null && a.getModId().equals("thermal")))) {
+        if (icon != null && isThermalNamespaceOrTag(icon)) {
             return true;
         }
 
-        // 3. Fallback for mock test dynamo nodes without explicit thermal icon/category
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId != null && isThermalNamespace(catId.getNamespace())) {
+            return true;
+        }
+
+        if (node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT || "thermal".equals(a.getModId()))) {
+            return true;
+        }
+
         if (node.getName() != null) {
-            String nl = node.getName().toLowerCase(java.util.Locale.ROOT);
-            if (nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic") || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment") || nl.contains("stirling")) {
+            String nl = node.getName().toLowerCase(Locale.ROOT);
+            if (isThermalDynamoFallbackName(nl)) {
                 if (icon == null || !icon.getNamespace().equals("gtceu") || nl.contains("dynamo") || nl.contains("lapidary")) {
                     return true;
                 }
@@ -288,12 +301,26 @@ public class ThermalAugmentHelper {
         return false;
     }
 
+    private static boolean isThermalDynamoFallbackName(String nl) {
+        return nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic")
+                || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment")
+                || nl.contains("stirling");
+    }
+
+    private static boolean isThermalNamespace(String ns) {
+        String lower = ns.toLowerCase(Locale.ROOT);
+        return lower.equals("thermal") || lower.equals("thermal_expansion") || lower.equals("thermal_foundation")
+                || lower.equals("thermal_innovation") || lower.equals("thermal_extra") || lower.equals("cofh_core")
+                || lower.equals("systeams");
+    }
+
+    private static boolean isThermalNamespaceOrTag(ResourceLocation icon) {
+        return isThermalNamespace(icon.getNamespace()) || isThermalTaggedItem(icon);
+    }
+
     public static boolean isThermalTaggedItem(ResourceLocation id) {
         if (id == null) return false;
-        String ns = id.getNamespace().toLowerCase();
-        if (ns.equals("thermal") || ns.equals("systeams") || ns.equals("thermal_expansion") || ns.equals("cofh_core")) {
-            return true;
-        }
+        if (isThermalNamespace(id.getNamespace())) return true;
         return hasItemTag(id, "thermal:dynamos", "systeams:dynamos", "thermal:machines", "systeams:machines", "systeams:boilers");
     }
 
@@ -310,51 +337,37 @@ public class ThermalAugmentHelper {
     }
 
     private static boolean checkItemClassHierarchy(ResourceLocation id, String searchName) {
-        if (id == null) return false;
-        try {
-            Class<?> frClass = Class.forName("net.minecraftforge.registries.ForgeRegistries");
-            Object itemsReg = frClass.getField("ITEMS").get(null);
-            if (itemsReg == null) return false;
-            Method getValue = itemsReg.getClass().getMethod("getValue", ResourceLocation.class);
-            Object item = getValue.invoke(itemsReg, id);
-            if (item != null) {
-                Class<?> cur = item.getClass();
-                while (cur != null && cur != Object.class) {
-                    if (cur.getSimpleName().contains(searchName) || cur.getName().contains(searchName)) return true;
-                    for (Class<?> iface : cur.getInterfaces()) {
-                        if (iface.getSimpleName().contains(searchName) || iface.getName().contains(searchName)) return true;
-                    }
-                    cur = cur.getSuperclass();
+        if (id == null || ForgeRegistries.ITEMS == null) return false;
+        Item item = ForgeRegistries.ITEMS.getValue(id);
+        if (item != null) {
+            Class<?> cur = item.getClass();
+            while (cur != null && cur != Object.class) {
+                if (cur.getSimpleName().contains(searchName) || cur.getName().contains(searchName)) return true;
+                for (Class<?> iface : cur.getInterfaces()) {
+                    if (iface.getSimpleName().contains(searchName) || iface.getName().contains(searchName)) return true;
                 }
+                cur = cur.getSuperclass();
             }
-        } catch (Throwable ignored) {}
+        }
         return false;
     }
 
     private static boolean hasItemTag(ResourceLocation id, String... tagIds) {
-        if (id == null) return false;
-        try {
-            Class<?> frClass = Class.forName("net.minecraftforge.registries.ForgeRegistries");
-            Object itemsReg = frClass.getField("ITEMS").get(null);
-            if (itemsReg == null) return false;
-            Method getValue = itemsReg.getClass().getMethod("getValue", ResourceLocation.class);
-            Object item = getValue.invoke(itemsReg, id);
-            if (item != null) {
-                Method getHolder = itemsReg.getClass().getMethod("getHolder", Object.class);
-                java.util.Optional<?> holderOpt = (java.util.Optional<?>) getHolder.invoke(itemsReg, item);
-                if (holderOpt.isPresent()) {
-                    Object holder = holderOpt.get();
-                    Method containsTag = holder.getClass().getMethod("containsTag", net.minecraft.tags.TagKey.class);
-                    var itemReg = net.minecraft.core.registries.Registries.ITEM;
-                    for (String t : tagIds) {
-                        var tagKey = net.minecraft.tags.TagKey.create(itemReg, ResourceLocation.tryParse(t));
-                        if ((boolean) containsTag.invoke(holder, tagKey)) {
-                            return true;
-                        }
-                    }
+        if (id == null || ForgeRegistries.ITEMS == null) return false;
+        Item item = ForgeRegistries.ITEMS.getValue(id);
+        if (item == null) return false;
+
+        var holderOpt = ForgeRegistries.ITEMS.getHolder(item);
+        if (holderOpt.isPresent()) {
+            var holder = holderOpt.get();
+            var itemReg = Registries.ITEM;
+            for (String t : tagIds) {
+                TagKey<Item> tagKey = TagKey.create(itemReg, ResourceLocation.tryParse(t));
+                if (holder.containsTag(tagKey)) {
+                    return true;
                 }
             }
-        } catch (Throwable ignored) {}
+        }
         return false;
     }
 
@@ -395,49 +408,51 @@ public class ThermalAugmentHelper {
     }
 
     public static double getThermalDynamoBasePowerRF(ResourceLocation dynamoId) {
-        try {
-            Class<?> dynEntityClass = Class.forName("cofh.thermal.expansion.block.entity.dynamo.DynamoBlockEntity");
-            for (java.lang.reflect.Field f : dynEntityClass.getDeclaredFields()) {
+        if (DYNAMO_BLOCK_ENTITY_CLS != null) {
+            for (Field f : DYNAMO_BLOCK_ENTITY_CLS.getDeclaredFields()) {
                 if (f.getName().equalsIgnoreCase("BASE_POWER") || f.getName().equalsIgnoreCase("DEFAULT_POWER")) {
-                    f.setAccessible(true);
-                    Object val = f.get(null);
-                    if (val instanceof Number num && num.doubleValue() > 0) {
-                        return num.doubleValue();
-                    }
+                    try {
+                        f.setAccessible(true);
+                        Object val = f.get(null);
+                        if (val instanceof Number num && num.doubleValue() > 0) {
+                            return num.doubleValue();
+                        }
+                    } catch (ReflectiveOperationException ignored) {}
                 }
             }
-        } catch (Throwable ignored) {}
+        }
 
-        try {
-            Class<?> thermalConfigClass = Class.forName("cofh.thermal.core.config.ThermalCoreConfig");
-            for (java.lang.reflect.Field f : thermalConfigClass.getDeclaredFields()) {
-                if (f.getName().toLowerCase().contains("dynamopower") || f.getName().toLowerCase().contains("defaultpower")) {
-                    f.setAccessible(true);
-                    Object val = f.get(null);
-                    if (val instanceof Number num && num.doubleValue() > 0) {
-                        return num.doubleValue();
-                    }
+        if (THERMAL_CORE_CONFIG_CLS != null) {
+            for (Field f : THERMAL_CORE_CONFIG_CLS.getDeclaredFields()) {
+                if (f.getName().toLowerCase(Locale.ROOT).contains("dynamopower") || f.getName().toLowerCase(Locale.ROOT).contains("defaultpower")) {
+                    try {
+                        f.setAccessible(true);
+                        Object val = f.get(null);
+                        if (val instanceof Number num && num.doubleValue() > 0) {
+                            return num.doubleValue();
+                        }
+                    } catch (ReflectiveOperationException ignored) {}
                 }
             }
-        } catch (Throwable ignored) {}
+        }
 
         return 200.0;
     }
 
     public static double getThermalMachineBasePowerRF(ResourceLocation machineId) {
-        try {
-            Class<?> machEntityClass = Class.forName("cofh.thermal.expansion.block.entity.machine.MachineBlockEntity");
-            for (java.lang.reflect.Field f : machEntityClass.getDeclaredFields()) {
+        if (MACHINE_BLOCK_ENTITY_CLS != null) {
+            for (Field f : MACHINE_BLOCK_ENTITY_CLS.getDeclaredFields()) {
                 if (f.getName().equalsIgnoreCase("BASE_POWER") || f.getName().equalsIgnoreCase("DEFAULT_POWER")) {
-                    f.setAccessible(true);
-                    Object val = f.get(null);
-                    if (val instanceof Number num && num.doubleValue() > 0) {
-                        return num.doubleValue();
-                    }
+                    try {
+                        f.setAccessible(true);
+                        Object val = f.get(null);
+                        if (val instanceof Number num && num.doubleValue() > 0) {
+                            return num.doubleValue();
+                        }
+                    } catch (ReflectiveOperationException ignored) {}
                 }
             }
-        } catch (Throwable ignored) {}
-
+        }
         return 20.0;
     }
 
@@ -448,14 +463,14 @@ public class ThermalAugmentHelper {
         if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
             if (addon.getParallelMultiplier() > 1) return true;
             if (addon.getId() != null) {
-                String lid = addon.getId().toLowerCase(java.util.Locale.ROOT);
+                String lid = addon.getId().toLowerCase(Locale.ROOT);
                 if (lid.contains("upgrade_kit") || lid.contains("tier_kit")) return true;
             }
         }
         return false;
     }
 
-    public static boolean canInstallThermalAddon(RecipeNode node, MachineAddon addon, java.util.function.BiPredicate<RecipeNode, MachineAddon> compatibilityChecker) {
+    public static boolean canInstallThermalAddon(RecipeNode node, MachineAddon addon, BiPredicate<RecipeNode, MachineAddon> compatibilityChecker) {
         if (node == null || addon == null) return false;
         if (compatibilityChecker != null && !compatibilityChecker.test(node, addon)) return false;
         if (isThermalUpgradeKit(addon)) {
@@ -493,7 +508,7 @@ public class ThermalAugmentHelper {
         }
     }
 
-    public static void handleUninstallThermalAddon(RecipeNode node, MachineAddon addon, java.util.function.BiConsumer<RecipeNode, MachineAddon> onRemovedCallback) {
+    public static void handleUninstallThermalAddon(RecipeNode node, MachineAddon addon, BiConsumer<RecipeNode, MachineAddon> onRemovedCallback) {
         if (node == null || addon == null) return;
         if (isThermalUpgradeKit(addon)) {
             node.getAddons().removeIf(a -> a.getId().equals(addon.getId()) || isThermalUpgradeKit(a));
@@ -505,37 +520,45 @@ public class ThermalAugmentHelper {
         }
     }
 
-    public static void buildThermalAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<net.minecraft.network.chat.Component> tooltip) {
+    public static void buildThermalAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
         if (addon == null || tooltip == null) return;
         if (isThermalUpgradeKit(addon)) {
-            tooltip.add(net.minecraft.network.chat.Component.literal("§6").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.upgrade_desc", addon.getParallelMultiplier())));
-            if (isActiveAddon) {
-                tooltip.add(net.minecraft.network.chat.Component.literal("§c").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
-            } else {
-                boolean isInst = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
-                if (isInst) {
-                    tooltip.add(net.minecraft.network.chat.Component.literal("§c").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
-                } else {
-                    tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.install_kit")));
-                }
-            }
+            buildUpgradeKitTooltip(node, addon, isActiveAddon, tooltip);
         } else {
-            long totalRegAugs = node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count();
-            int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+            buildRegularAugmentTooltip(node, addon, tooltip);
+        }
+    }
 
-            tooltip.add(net.minecraft.network.chat.Component.literal("§7").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
-            if (targetCount > 0) {
-                tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
-                if (totalRegAugs < 3) {
-                    tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
-                }
-                tooltip.add(net.minecraft.network.chat.Component.literal("§c").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
+    private static void buildUpgradeKitTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
+        tooltip.add(Component.literal("§6").append(Component.translatable("gui.gtcalcboard.addon.thermal.upgrade_desc", addon.getParallelMultiplier())));
+        if (isActiveAddon) {
+            tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
+        } else {
+            boolean isInst = node.getAddons().stream().anyMatch(a -> a.getId().equals(addon.getId()));
+            if (isInst) {
+                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_kit")));
             } else {
-                if (totalRegAugs < 3) {
-                    tooltip.add(net.minecraft.network.chat.Component.literal("§a").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.install")));
-                } else {
-                    tooltip.add(net.minecraft.network.chat.Component.literal("§e").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
-                }
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install_kit")));
+            }
+        }
+    }
+
+    private static void buildRegularAugmentTooltip(RecipeNode node, MachineAddon addon, List<Component> tooltip) {
+        long totalRegAugs = node.getAddons().stream().filter(a -> !isThermalUpgradeKit(a)).count();
+        int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
+
+        tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots", totalRegAugs)));
+        if (targetCount > 0) {
+            tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.installed", targetCount)));
+            if (totalRegAugs < 3) {
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.add_copy")));
+            }
+            tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.addon.thermal.remove_copy")));
+        } else {
+            if (totalRegAugs < 3) {
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.addon.thermal.install")));
+            } else {
+                tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.addon.thermal.slots_full")));
             }
         }
     }

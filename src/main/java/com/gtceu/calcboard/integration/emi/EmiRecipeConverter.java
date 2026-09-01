@@ -131,9 +131,9 @@ public class EmiRecipeConverter {
         if (details.energyType == EnergyType.ELECTRIC_FE || (catId != null && (catId.getNamespace().equals("thermal") || catId.getNamespace().equals("systeams")))) {
             long energyRF = com.gtceu.calcboard.compat.thermal.ThermalModAdapter.extractEnergyRF(backing);
             if (energyRF > 0) {
-                node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, (double) energyRF);
+                node.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, (double) energyRF);
             } else if (details.durationTicks > 0 && details.eut > 0) {
-                node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, details.durationTicks * details.eut);
+                node.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, details.durationTicks * details.eut);
             }
         }
 
@@ -281,6 +281,23 @@ public class EmiRecipeConverter {
                 }
             }
         }
+
+        // Auto-provision Heating Coil if temperature is required
+        int reqTemp = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE);
+        if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
+        if (reqTemp > 0) {
+            var coil = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getCoilForTemperature(reqTemp);
+            if (coil != null) {
+                com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.installCoil(node, coil);
+            }
+        }
+
+        // Auto-provision Fusion Reflector if required
+        int reqReflector = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.REQUIRED_REFLECTOR_TIER);
+        if (reqReflector > 0) {
+            com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper.installReflector(node, reqReflector);
+        }
+
         node.autoCalculateTurbineParallel();
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);

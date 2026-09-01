@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.integration.emi;
 
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
 import dev.emi.emi.api.stack.EmiIngredient;

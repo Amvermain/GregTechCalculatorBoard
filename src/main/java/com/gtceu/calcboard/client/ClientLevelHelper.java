@@ -14,17 +14,21 @@ import java.util.function.Consumer;
 /**
  * Client-only helper for accessing client level, recipe manager, and language manager safely.
  */
-public final class ClientLevelHelper {
+public final class ClientLevelHelper implements com.gtceu.calcboard.api.catalog.ILevelRecipeProvider {
+
+    public static final ClientLevelHelper INSTANCE = new ClientLevelHelper();
 
     private ClientLevelHelper() {}
 
-    public static boolean isRecipeBakingComplete() {
+    @Override
+    public boolean isRecipeBakingComplete() {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.level == null) return false;
         return com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().isRecipeBakingComplete();
     }
 
-    public static void collectClientRecipes(Consumer<ItemStack> collector) {
+    @Override
+    public void collectClientRecipes(Consumer<ItemStack> collector) {
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.level != null) {
             try {
@@ -54,7 +58,8 @@ public final class ClientLevelHelper {
         }
     }
 
-    public static ItemStack getRecipeResultItem(Recipe<?> r) {
+    @Override
+    public ItemStack getRecipeResultItem(Recipe<?> r) {
         if (r == null) return ItemStack.EMPTY;
         Minecraft mc = Minecraft.getInstance();
         try {
@@ -68,7 +73,8 @@ public final class ClientLevelHelper {
         }
     }
 
-    public static String getSelectedLanguage() {
+    @Override
+    public String getSelectedLanguage() {
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.getLanguageManager() != null) {
             return mc.getLanguageManager().getSelected();

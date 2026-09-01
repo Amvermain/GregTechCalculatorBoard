@@ -290,6 +290,28 @@ Remembers preferred machine models, voltage tiers, parallel factors, overclock m
   - Singleton in-memory registry and NBT persistence manager (`serializeNBT` / `deserializeNBT`).
   - Provides CRUD interfaces via `BoardSettingsDialog` and `MachineConfigDialog`.
 
+## 9. Search Domain Model & Headless Recipe Provider SPI (`SearchableRecipe`, `ILevelRecipeProvider`) (ADR-009)
+
+Decouples recipe indexing, searching, and instantiation from the client GUI layer, enabling pure core domain and headless/dedicated server operations.
+
+* **`SearchableRecipe` (Lightweight Search Record)**:
+  ```java
+  public record SearchableRecipe(
+      ResourceLocation id,
+      ResourceLocation categoryId,
+      String displayName,
+      List<IngredientStack> inputs,
+      List<IngredientStack> outputs,
+      double durationTicks,
+      double eut,
+      GTVoltageTier tier,
+      Object rawRecipe
+  )
+  ```
+* **`ILevelRecipeProvider` (Headless Recipe Provider SPI)**:
+  - Abstraction interface providing `SearchableRecipe` instances from vanilla `Level.getRecipeManager()` when client-side recipe viewers (EMI/JEI) are absent or in dedicated server environments.
+  - Enables zero-GUI-dependency $O(1)$ recipe indexing and domain node spawning.
+
 ---
 
 > ➡️ **Next Chapter**: [[02] Mathematical Engine & Graph Analysis Algorithms](02_MATH_AND_ALGORITHMS.md)

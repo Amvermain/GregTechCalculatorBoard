@@ -38,6 +38,9 @@ public class BoardKeybindDispatcher {
         if (screen.getNoteEditDialog() != null && screen.getNoteEditDialog().isVisible()) {
             return screen.getNoteEditDialog().keyPressed(keyCode, scanCode, modifiers);
         }
+        if (screen.getMachineSelectorDialog() != null && screen.getMachineSelectorDialog().isVisible()) {
+            return screen.getMachineSelectorDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
         if (screen.getMachineConfigDialog() != null && screen.getMachineConfigDialog().isVisible()) {
             return screen.getMachineConfigDialog().keyPressed(keyCode, scanCode, modifiers);
         }
@@ -78,6 +81,9 @@ public class BoardKeybindDispatcher {
         }
         if (screen.getPageTabBar() != null && screen.getPageTabBar().charTyped(codePoint, modifiers)) {
             return true;
+        }
+        if (screen.getMachineSelectorDialog() != null && screen.getMachineSelectorDialog().isVisible()) {
+            return screen.getMachineSelectorDialog().charTyped(codePoint, modifiers);
         }
         if (screen.getMachineConfigDialog() != null && screen.getMachineConfigDialog().isVisible()) {
             return screen.getMachineConfigDialog().charTyped(codePoint, modifiers);

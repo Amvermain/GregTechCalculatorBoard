@@ -120,5 +120,11 @@ public class ClientPacketHandler {
             bs.markSummaryDirty();
         }
     }
+
+    public static void handleOpenBoard(S2COpenBoardPacket packet) {
+        com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
+        Minecraft mc = Minecraft.getInstance();
+        mc.tell(() -> mc.setScreen(new BoardScreen()));
+    }
 }
 

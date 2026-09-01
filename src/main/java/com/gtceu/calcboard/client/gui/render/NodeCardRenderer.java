@@ -118,6 +118,12 @@ public class NodeCardRenderer {
         if (iconId != null) {
             var item = ForgeRegistries.ITEMS.getValue(iconId);
             if (item != null && item != Items.AIR) {
+                if (com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineIconGlowing(node.getId())) {
+                    int glowBorder = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFFFFD700);
+                    graphics.fill(x + 2, y + 1, x + 20, y + 19, 0x4400E676);
+                    graphics.renderOutline(x + 2, y + 1, 18, 18, glowBorder);
+                    graphics.renderOutline(x + 1, y, 20, 20, glowBorder & 0x77FFFFFF);
+                }
                 graphics.renderItem(new ItemStack(item), x + 3, y + 2);
                 titleX = x + 22;
             }

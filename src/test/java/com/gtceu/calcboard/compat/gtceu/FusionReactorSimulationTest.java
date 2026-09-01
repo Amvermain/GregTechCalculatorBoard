@@ -293,6 +293,33 @@ public class FusionReactorSimulationTest {
         ResourceLocation preferredMk2 = adapter.getPreferredMultiblockWorkstation(mk2Node, wsList);
         assertEquals(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"), preferredMk2);
     }
+
+    @Test
+    @DisplayName("Verify multiblock fusion workstations are sorted in ascending power/voltage order (LuV -> ZPM -> UV -> UHV -> UEV -> UIV)")
+    void testFusionWorkstationsSortedByVoltageTier() {
+        RecipeNode node = RecipeNode.create("Fusion Recipe", 32, 16384, GTVoltageTier.LuV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("start_core:reflector_fusion_reactor"));
+        node.setMultiblock(true);
+
+        // Add in scrambled order like in EMI catalysts
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:luv_fusion_reactor"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:uev_fusion_reactor"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:uhv_auxiliary_fusion_reactor"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:uiv_auxiliary_fusion_reactor"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:uv_fusion_reactor"));
+        node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"));
+
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        List<ResourceLocation> sorted = adapter.getMultiblockWorkstations(node);
+
+        assertEquals(6, sorted.size());
+        assertEquals(ResourceLocation.tryParse("start_core:luv_fusion_reactor"), sorted.get(0)); // LuV (Mk1)
+        assertEquals(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"), sorted.get(1)); // ZPM (Mk2)
+        assertEquals(ResourceLocation.tryParse("start_core:uv_fusion_reactor"), sorted.get(2));  // UV (Mk3)
+        assertEquals(ResourceLocation.tryParse("start_core:uhv_auxiliary_fusion_reactor"), sorted.get(3)); // UHV (Aux 1)
+        assertEquals(ResourceLocation.tryParse("start_core:uev_fusion_reactor"), sorted.get(4)); // UEV (Mk4)
+        assertEquals(ResourceLocation.tryParse("start_core:uiv_auxiliary_fusion_reactor"), sorted.get(5)); // UIV (Aux 2)
+    }
 }
 
 

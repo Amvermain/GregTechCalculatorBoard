@@ -40,36 +40,36 @@ public class NodePropertyStoreTest {
         assertTrue(store.isEmpty());
 
         // Default fallback
-        assertEquals(0, store.get(NodeProperties.EBF_TEMPERATURE));
-        assertEquals(32, store.get(NodeProperties.KINETIC_RPM));
-        assertEquals(0L, store.get(NodeProperties.FUSION_START_EU));
-        assertFalse(store.has(NodeProperties.EBF_TEMPERATURE));
+        assertEquals(0, store.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
+        assertEquals(32, store.get(com.gtceu.calcboard.compat.create.CreateProperties.KINETIC_RPM));
+        assertEquals(0L, store.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.FUSION_START_EU));
+        assertFalse(store.has(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
 
         // Set non-default
-        store.set(NodeProperties.EBF_TEMPERATURE, 1800);
-        assertTrue(store.has(NodeProperties.EBF_TEMPERATURE));
-        assertEquals(1800, store.get(NodeProperties.EBF_TEMPERATURE));
+        store.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE, 1800);
+        assertTrue(store.has(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
+        assertEquals(1800, store.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
 
         // Set back to default auto-removes
-        store.set(NodeProperties.EBF_TEMPERATURE, 0);
-        assertFalse(store.has(NodeProperties.EBF_TEMPERATURE));
-        assertEquals(0, store.get(NodeProperties.EBF_TEMPERATURE));
+        store.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE, 0);
+        assertFalse(store.has(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
+        assertEquals(0, store.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
 
         // Setting null removes
-        store.set(NodeProperties.TURBINE_ROTOR_NAME, "Titanium (140%)");
-        assertTrue(store.has(NodeProperties.TURBINE_ROTOR_NAME));
-        store.set(NodeProperties.TURBINE_ROTOR_NAME, null);
-        assertFalse(store.has(NodeProperties.TURBINE_ROTOR_NAME));
+        store.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.TURBINE_ROTOR_NAME, "Titanium (140%)");
+        assertTrue(store.has(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.TURBINE_ROTOR_NAME));
+        store.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.TURBINE_ROTOR_NAME, null);
+        assertFalse(store.has(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.TURBINE_ROTOR_NAME));
     }
 
     @Test
     @DisplayName("NodePropertyStore NBT serialization and deserialization")
     void testPropertyStoreNBT() {
         NodePropertyStore original = new NodePropertyStore();
-        original.set(NodeProperties.EBF_TEMPERATURE, 2700);
-        original.set(NodeProperties.FUSION_START_EU, 160_000_000L);
-        original.set(NodeProperties.KINETIC_RPM, 128);
-        original.set(NodeProperties.CLEANROOM_TYPE, "STERILE_CLEANROOM");
+        original.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE, 2700);
+        original.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.FUSION_START_EU, 160_000_000L);
+        original.set(com.gtceu.calcboard.compat.create.CreateProperties.KINETIC_RPM, 128);
+        original.set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.CLEANROOM_TYPE, "STERILE_CLEANROOM");
 
         CompoundTag tag = original.serializeNBT();
         assertNotNull(tag);
@@ -81,10 +81,10 @@ public class NodePropertyStoreTest {
         NodePropertyStore loaded = new NodePropertyStore();
         loaded.deserializeNBT(tag);
 
-        assertEquals(2700, loaded.get(NodeProperties.EBF_TEMPERATURE));
-        assertEquals(160_000_000L, loaded.get(NodeProperties.FUSION_START_EU));
-        assertEquals(128, loaded.get(NodeProperties.KINETIC_RPM));
-        assertEquals("STERILE_CLEANROOM", loaded.get(NodeProperties.CLEANROOM_TYPE));
+        assertEquals(2700, loaded.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE));
+        assertEquals(160_000_000L, loaded.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.FUSION_START_EU));
+        assertEquals(128, loaded.get(com.gtceu.calcboard.compat.create.CreateProperties.KINETIC_RPM));
+        assertEquals("STERILE_CLEANROOM", loaded.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.CLEANROOM_TYPE));
         assertEquals(original, loaded);
     }
 
@@ -162,9 +162,9 @@ public class NodePropertyStoreTest {
         // 4. Create extraction
         RecipePropertyExtractorPipeline.extractAll(null, new CompoundTag(), ResourceLocation.tryParse("create:milling"), store);
 
-        assertEquals(160_000_000L, store.get(NodeProperties.FUSION_START_EU));
-        assertEquals("CLEANROOM", store.get(NodeProperties.CLEANROOM_TYPE));
-        assertEquals(32, store.get(NodeProperties.KINETIC_RPM));
+        assertEquals(160_000_000L, store.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.FUSION_START_EU));
+        assertEquals("CLEANROOM", store.get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.CLEANROOM_TYPE));
+        assertEquals(32, store.get(com.gtceu.calcboard.compat.create.CreateProperties.KINETIC_RPM));
     }
 
     @Test
@@ -173,7 +173,7 @@ public class NodePropertyStoreTest {
         RecipeNode fusionNode = RecipeNode.create("Fusion Reactor Mk1", 40, 16384, GTVoltageTier.LuV);
         fusionNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
         fusionNode.setEuToStart(160_000_000L);
-        fusionNode.getProperties().set(NodeProperties.CLEANROOM_TYPE, "STERILE_CLEANROOM");
+        fusionNode.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.CLEANROOM_TYPE, "STERILE_CLEANROOM");
 
         List<NodeBadge> badges = NodeBadgeRegistry.getBadgesForNode(fusionNode);
         assertNotNull(badges);

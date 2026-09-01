@@ -28,6 +28,7 @@ public class MultiblockDetector {
     private static final Set<ResourceLocation> TURBINE_RECIPE_CATEGORIES = new HashSet<>();
     private static final Set<ResourceLocation> BATCH_MODE_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> PARALLEL_HATCH_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> LASER_HATCH_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> STEAM_MULTIBLOCKS = new HashSet<>();
     private static final Map<ResourceLocation, Double> STEAM_MULTIBLOCK_CONSUMPTIONS = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
@@ -66,6 +67,8 @@ public class MultiblockDetector {
         }
         if (recipeCategoryId != null) {
             TURBINE_RECIPE_CATEGORIES.add(recipeCategoryId);
+            if (baseTier != null) TURBINE_BASE_TIERS.put(recipeCategoryId, baseTier);
+            if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(recipeCategoryId, baseProduction);
         }
     }
 
@@ -89,6 +92,17 @@ public class MultiblockDetector {
 
     public static void registerParallelHatchController(ResourceLocation controllerId) {
         registerParallelHatchMultiblock(controllerId);
+    }
+
+    public static void registerLaserHatchMultiblock(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            LASER_HATCH_CONTROLLERS.add(controllerId);
+            MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
+        }
+    }
+
+    public static void registerLaserHatchController(ResourceLocation controllerId) {
+        registerLaserHatchMultiblock(controllerId);
     }
 
     public static void registerSteamMultiblock(ResourceLocation controllerId, int defaultParallel) {
@@ -153,24 +167,31 @@ public class MultiblockDetector {
             initializing = true;
             try {
                 initTestEnvironmentDefaults();
-
-                // 1. Scan universal EMI "multiblock_info" recipe category
+                initializeStructureCatalog();
                 scanEmiMultiblockRecipes(rmObj);
-
-                // 2. Delegate mod-specific multiblock discovery to each loaded IModAdapter
-                for (IModAdapter adapter : ModAdapterRegistry.getAllLoadedAdapters()) {
-                    try {
-                        adapter.scanMultiblocks(rmObj);
-                    } catch (Throwable t) {
-                        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn(
-                                "[GTCalcBoard] [MultiblockDetector] Adapter '{}' scanMultiblocks failed: {}",
-                                adapter.getModId(), t.getMessage()
-                        );
-                    }
-                }
+                scanAdapterMultiblocks(rmObj);
             } finally {
                 initialized = true;
                 initializing = false;
+            }
+        }
+    }
+
+    private static void initializeStructureCatalog() {
+        try {
+            com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.initialize();
+        } catch (Throwable ignored) {}
+    }
+
+    private static void scanAdapterMultiblocks(Object rmObj) {
+        for (IModAdapter adapter : ModAdapterRegistry.getAllLoadedAdapters()) {
+            try {
+                adapter.scanMultiblocks(rmObj);
+            } catch (Throwable t) {
+                com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn(
+                        "[GTCalcBoard] [MultiblockDetector] Adapter '{}' scanMultiblocks failed: {}",
+                        adapter.getModId(), t.getMessage()
+                );
             }
         }
     }
@@ -188,54 +209,70 @@ public class MultiblockDetector {
 
     private static class EmiMultiblockScanner {
         private static void scan(Object rmObj) {
-            if (rmObj == null && com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) {
-                try {
-                    rmObj = dev.emi.emi.api.EmiApi.getRecipeManager();
-                } catch (Throwable ignored) {}
-            }
-            if (rmObj == null) return;
+            Object resolvedManager = resolveEmiRecipeManager(rmObj);
+            if (resolvedManager == null) return;
 
-            if (rmObj instanceof dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
-                if (emiManager.getCategories() != null) {
-                    for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : emiManager.getCategories()) {
-                        if (cat == null || cat.getId() == null) continue;
-                        String catPath = cat.getId().getPath();
-                        if (catPath.equals("multiblock_info") || catPath.contains("multiblock")) {
-                            List<dev.emi.emi.api.recipe.EmiRecipe> mbRecipes = emiManager.getRecipes(cat);
-                            if (mbRecipes != null) {
-                                for (dev.emi.emi.api.recipe.EmiRecipe recipe : mbRecipes) {
-                                    processEmiMultiblockRecipe(recipe);
-                                }
-                            }
-                        }
-                    }
-                }
+            if (resolvedManager instanceof dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
+                scanEmiManagerCategories(emiManager);
                 return;
             }
 
-            Iterable<?> recipes = null;
-            if (rmObj instanceof Iterable<?> it) {
-                recipes = it;
-            } else {
-                try {
-                    Method mGetRecipes = rmObj.getClass().getMethod("getRecipes");
-                    Object res = mGetRecipes.invoke(rmObj);
-                    if (res instanceof Iterable<?> it) recipes = it;
-                } catch (Throwable ignored) {}
-            }
+            scanGenericRecipeCollection(resolvedManager);
+        }
 
-            if (recipes != null) {
-                for (Object recipeObj : recipes) {
-                    if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
-                        if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-                            String catPath = recipe.getCategory().getId().getPath();
-                            if (catPath.equals("multiblock_info") || catPath.contains("multiblock")) {
-                                processEmiMultiblockRecipe(recipe);
-                            }
-                        }
-                    }
+        private static Object resolveEmiRecipeManager(Object rmObj) {
+            if (rmObj != null) return rmObj;
+            if (!com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) return null;
+            try {
+                return dev.emi.emi.api.EmiApi.getRecipeManager();
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        private static void scanEmiManagerCategories(dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
+            if (emiManager.getCategories() == null) return;
+            for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : emiManager.getCategories()) {
+                if (cat == null || cat.getId() == null) continue;
+                if (!isMultiblockCategory(cat.getId().getPath())) continue;
+
+                List<dev.emi.emi.api.recipe.EmiRecipe> mbRecipes = emiManager.getRecipes(cat);
+                if (mbRecipes != null) {
+                    mbRecipes.forEach(EmiMultiblockScanner::processEmiMultiblockRecipe);
                 }
             }
+        }
+
+        private static void scanGenericRecipeCollection(Object rmObj) {
+            Iterable<?> recipes = extractRecipeIterable(rmObj);
+            if (recipes == null) return;
+
+            for (Object recipeObj : recipes) {
+                if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
+                    processRecipeIfMultiblock(recipe);
+                }
+            }
+        }
+
+        private static Iterable<?> extractRecipeIterable(Object rmObj) {
+            if (rmObj instanceof Iterable<?> it) return it;
+            try {
+                Method mGetRecipes = rmObj.getClass().getMethod("getRecipes");
+                Object res = mGetRecipes.invoke(rmObj);
+                if (res instanceof Iterable<?> it) return it;
+            } catch (Throwable ignored) {}
+            return null;
+        }
+
+        private static void processRecipeIfMultiblock(dev.emi.emi.api.recipe.EmiRecipe recipe) {
+            if (recipe.getCategory() == null || recipe.getCategory().getId() == null) return;
+            if (isMultiblockCategory(recipe.getCategory().getId().getPath())) {
+                processEmiMultiblockRecipe(recipe);
+            }
+        }
+
+        private static boolean isMultiblockCategory(String path) {
+            return path.equals("multiblock_info") || path.contains("multiblock");
         }
 
         private static void processEmiMultiblockRecipe(dev.emi.emi.api.recipe.EmiRecipe recipe) {
@@ -268,12 +305,54 @@ public class MultiblockDetector {
     }
 
     public static void initTestEnvironmentDefaults() {
-        registerTurbine(ResourceLocation.tryParse("gtceu:large_steam_turbine"), ResourceLocation.tryParse("gtceu:steam_turbine"), GTVoltageTier.HV, 1024.0);
-        registerTurbine(ResourceLocation.tryParse("gtceu:large_gas_turbine"), ResourceLocation.tryParse("gtceu:gas_turbine"), GTVoltageTier.EV, 4096.0);
-        registerTurbine(ResourceLocation.tryParse("gtceu:large_plasma_turbine"), ResourceLocation.tryParse("gtceu:plasma_turbine"), GTVoltageTier.IV, 16384.0);
-        registerTurbine(ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"), ResourceLocation.tryParse("gtceu:plasma_generator"), GTVoltageTier.IV, 98304.0);
-        registerTurbine(ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"), ResourceLocation.tryParse("gtceu:plasma_generator"), GTVoltageTier.IV, 196608.0);
+        initTurbineDefaults();
+        initCoilDefaults();
+        initStandardMultiblockDefaults();
+        initSteamMultiblockDefaults();
+        initThreadingMultiblockDefaults();
+    }
 
+    private static void initTurbineDefaults() {
+        ResourceLocation lst1 = ResourceLocation.tryParse("gtceu:large_steam_turbine");
+        ResourceLocation lst2 = ResourceLocation.tryParse("gtceu:steam_large_turbine");
+        ResourceLocation lgt1 = ResourceLocation.tryParse("gtceu:large_gas_turbine");
+        ResourceLocation lgt2 = ResourceLocation.tryParse("gtceu:gas_large_turbine");
+        ResourceLocation lpt1 = ResourceLocation.tryParse("gtceu:large_plasma_turbine");
+        ResourceLocation lpt2 = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
+        ResourceLocation spt = ResourceLocation.tryParse("gtceu:supreme_plasma_turbine");
+        ResourceLocation sptStart = ResourceLocation.tryParse("start_core:supreme_plasma_turbine");
+        ResourceLocation npt = ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine");
+        ResourceLocation nptStart = ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine");
+        ResourceLocation plasmaGen = ResourceLocation.tryParse("gtceu:plasma_generator");
+
+        ResourceLocation st = ResourceLocation.tryParse("gtceu:steam_turbine");
+        ResourceLocation gt = ResourceLocation.tryParse("gtceu:gas_turbine");
+        ResourceLocation pt = ResourceLocation.tryParse("gtceu:plasma_turbine");
+
+        registerTurbine(lst1, st, GTVoltageTier.HV, 1024.0);
+        registerTurbine(lst2, st, GTVoltageTier.HV, 1024.0);
+        registerTurbine(null, ResourceLocation.tryParse("gtceu:steam_turbine_superheated"), GTVoltageTier.HV, 1024.0);
+        registerTurbine(lgt1, gt, GTVoltageTier.EV, 4096.0);
+        registerTurbine(lgt2, gt, GTVoltageTier.EV, 4096.0);
+        registerTurbine(lpt1, pt, GTVoltageTier.IV, 16384.0);
+        registerTurbine(lpt2, pt, GTVoltageTier.IV, 16384.0);
+        registerTurbine(null, plasmaGen, GTVoltageTier.IV, 16384.0);
+        registerTurbine(spt, null, GTVoltageTier.IV, 98304.0);
+        registerTurbine(sptStart, null, GTVoltageTier.IV, 98304.0);
+        registerTurbine(npt, null, GTVoltageTier.IV, 196608.0);
+        registerTurbine(nptStart, null, GTVoltageTier.IV, 196608.0);
+
+        registerLaserHatchController(spt);
+        registerLaserHatchController(sptStart);
+        registerLaserHatchController(npt);
+        registerLaserHatchController(nptStart);
+        registerDefaultParallel(spt, 6);
+        registerDefaultParallel(sptStart, 6);
+        registerDefaultParallel(npt, 12);
+        registerDefaultParallel(nptStart, 12);
+    }
+
+    private static void initCoilDefaults() {
         ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
         ResourceLocation ecr = ResourceLocation.tryParse("gtceu:extreme_chemical_reactor");
         ResourceLocation icr = ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor");
@@ -291,10 +370,50 @@ public class MultiblockDetector {
         registerCoilMultiblock(cracker, cracker);
         registerCoilMultiblock(multiSmelter, multiSmelter);
 
+        ResourceLocation rhf = ResourceLocation.tryParse("gtceu:mega_blast_furnace");
+        ResourceLocation rhfAlt = ResourceLocation.tryParse("gtceu:rotary_hearth_furnace");
+        ResourceLocation rhfStart = ResourceLocation.tryParse("start_core:rotary_hearth_furnace");
+        ResourceLocation hif = ResourceLocation.tryParse("gtceu:hardened_industrial_furnace");
+        ResourceLocation hifStart = ResourceLocation.tryParse("start_core:hardened_industrial_furnace");
+        ResourceLocation chef = ResourceLocation.tryParse("gtceu:catalytic_hellfire_energized_furnace");
+        ResourceLocation chefStart = ResourceLocation.tryParse("start_core:catalytic_hellfire_energized_furnace");
+
+        registerCoilMultiblock(rhf, ebf);
+        registerCoilMultiblock(rhfAlt, ebf);
+        registerCoilMultiblock(rhfStart, ebf);
+        registerCoilMultiblock(hif, ebf);
+        registerCoilMultiblock(hifStart, ebf);
+        registerCoilMultiblock(chef, ebf);
+        registerCoilMultiblock(chefStart, ebf);
+    }
+
+    private static void initStandardMultiblockDefaults() {
+        ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        ResourceLocation ecr = ResourceLocation.tryParse("gtceu:extreme_chemical_reactor");
+        ResourceLocation icr = ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor");
+        ResourceLocation ebf = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
+        ResourceLocation rhf = ResourceLocation.tryParse("gtceu:mega_blast_furnace");
+        ResourceLocation rhfAlt = ResourceLocation.tryParse("gtceu:rotary_hearth_furnace");
+        ResourceLocation rhfStart = ResourceLocation.tryParse("start_core:rotary_hearth_furnace");
+        ResourceLocation hif = ResourceLocation.tryParse("gtceu:hardened_industrial_furnace");
+        ResourceLocation hifStart = ResourceLocation.tryParse("start_core:hardened_industrial_furnace");
+        ResourceLocation chef = ResourceLocation.tryParse("gtceu:catalytic_hellfire_energized_furnace");
+        ResourceLocation chefStart = ResourceLocation.tryParse("start_core:catalytic_hellfire_energized_furnace");
+        ResourceLocation pyrolyse = ResourceLocation.tryParse("gtceu:pyrolyse_oven");
+        ResourceLocation cracker = ResourceLocation.tryParse("gtceu:cracker");
+        ResourceLocation multiSmelter = ResourceLocation.tryParse("gtceu:multi_smelter");
+
         registerMultiblock(lcr);
         registerMultiblock(ecr);
         registerMultiblock(icr);
         registerMultiblock(ebf);
+        registerMultiblock(rhf);
+        registerMultiblock(rhfAlt);
+        registerMultiblock(rhfStart);
+        registerMultiblock(hif);
+        registerMultiblock(hifStart);
+        registerMultiblock(chef);
+        registerMultiblock(chefStart);
         registerMultiblock(pyrolyse);
         registerMultiblock(cracker);
         registerMultiblock(multiSmelter);
@@ -302,14 +421,22 @@ public class MultiblockDetector {
         registerParallelHatchController(lcr);
         registerParallelHatchController(ecr);
         registerParallelHatchController(icr);
-        registerParallelHatchController(ResourceLocation.tryParse("gtceu:large_macerator"));
+        registerParallelHatchController(rhf);
+        registerParallelHatchController(rhfAlt);
+        registerParallelHatchController(rhfStart);
+        registerParallelHatchController(hif);
+        registerParallelHatchController(hifStart);
+        registerParallelHatchController(chef);
+        registerParallelHatchController(chefStart);
         registerParallelHatchController(ResourceLocation.tryParse("gtceu:processing_array"));
         registerParallelHatchController(ResourceLocation.tryParse("start_core:star_forge"));
         registerParallelHatchController(ResourceLocation.tryParse("start_core:supreme_assembly_line"));
         registerBatchModeMultiblock(lcr);
         registerBatchModeMultiblock(ecr);
         registerBatchModeMultiblock(icr);
+    }
 
+    private static void initSteamMultiblockDefaults() {
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_grinder"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_oven"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_compressor"), 8);
@@ -319,8 +446,9 @@ public class MultiblockDetector {
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_purifier"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_rock_breaker"), 8);
         registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_kiln"), 8);
+    }
 
-        // Star Technology Threading Multiblocks
+    private static void initThreadingMultiblockDefaults() {
         registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:fermenting_arboreal_rejuvenation_monstrosity"), 8);
         registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:multithreaded_component_synthesis_forge"), 24);
         registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:aqueous_transformation_processing_center"), 8);
@@ -373,6 +501,7 @@ public class MultiblockDetector {
         DEFAULT_MULTIBLOCK_PARALLELS.clear();
         BATCH_MODE_CONTROLLERS.clear();
         PARALLEL_HATCH_CONTROLLERS.clear();
+        LASER_HATCH_CONTROLLERS.clear();
         STEAM_MULTIBLOCKS.clear();
         STEAM_MULTIBLOCK_CONSUMPTIONS.clear();
         THREADING_MAX_HELIX_CAPACITY.clear();
@@ -380,42 +509,81 @@ public class MultiblockDetector {
         initialize(rmObj);
     }
 
+    private static void ensureInitialized() {
+        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
+            initialize();
+        }
+    }
+
+    public static boolean supportsLaserHatch(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
+        ensureInitialized();
+        if (machineIcon != null && LASER_HATCH_CONTROLLERS.contains(machineIcon)) {
+            return true;
+        }
+        if (availableWorkstations == null) return false;
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && LASER_HATCH_CONTROLLERS.contains(ws)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean supportsTurbineRotor(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
+        if (isTurbineMachine(machineIcon)) return true;
+        if (availableWorkstations == null) return false;
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && isTurbineMachine(ws)) return true;
+        }
+        return false;
+    }
+
     public static boolean supportsParallelHatch(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
         return supportsParallelHatch(machineIcon, availableWorkstations, null);
     }
 
     public static boolean supportsParallelHatch(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations, ResourceLocation categoryId) {
-        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
-            initialize();
-        }
-        if (machineIcon != null && isMultiblock(machineIcon)) {
-            return PARALLEL_HATCH_CONTROLLERS.contains(machineIcon);
-        }
+        ensureInitialized();
+        if (checkParallelHatch(machineIcon)) return true;
         if (availableWorkstations != null) {
             for (ResourceLocation ws : availableWorkstations) {
-                if (ws != null && PARALLEL_HATCH_CONTROLLERS.contains(ws)) {
-                    return true;
-                }
+                if (checkParallelHatch(ws)) return true;
             }
         }
-        if (categoryId != null && PARALLEL_HATCH_CONTROLLERS.contains(categoryId)) {
+        return checkParallelHatchCategory(categoryId);
+    }
+
+    private static boolean checkParallelHatch(ResourceLocation id) {
+        if (id == null || isTurbineMachine(id)) return false;
+        if (PARALLEL_HATCH_CONTROLLERS.contains(id)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id);
+        if (defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH")) {
+            registerParallelHatchController(id);
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean checkParallelHatchCategory(ResourceLocation categoryId) {
+        if (categoryId == null || isTurbineRecipeCategory(categoryId)) return false;
+        if (PARALLEL_HATCH_CONTROLLERS.contains(categoryId)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(categoryId);
+        if (defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH")) {
+            registerParallelHatchController(categoryId);
             return true;
         }
         return false;
     }
 
     public static boolean supportsBatchMode(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
-        if (!initialized || MULTIBLOCK_RECIPE_CONTROLLERS.isEmpty()) {
-            initialize();
-        }
+        ensureInitialized();
         if (machineIcon != null && BATCH_MODE_CONTROLLERS.contains(machineIcon)) {
             return true;
         }
-        if (availableWorkstations != null) {
-            for (ResourceLocation ws : availableWorkstations) {
-                if (ws != null && BATCH_MODE_CONTROLLERS.contains(ws)) {
-                    return true;
-                }
+        if (availableWorkstations == null) return false;
+        for (ResourceLocation ws : availableWorkstations) {
+            if (ws != null && BATCH_MODE_CONTROLLERS.contains(ws)) {
+                return true;
             }
         }
         return false;
@@ -432,14 +600,38 @@ public class MultiblockDetector {
     public static int getDefaultParallel(RecipeNode node) {
         if (node == null) return 1;
         if (node.getMachineIcon() != null) {
-            int p = getDefaultParallel(node.getMachineIcon());
-            if (p > 1) return p;
+            return getDefaultParallel(node.getMachineIcon());
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             int p = getDefaultParallel(ws);
             if (p > 1) return p;
         }
         return 1;
+    }
+
+    public static GTVoltageTier getTurbineBaseTier(RecipeNode node) {
+        if (node == null) return GTVoltageTier.HV;
+        if (node.getMachineIcon() != null) {
+            GTVoltageTier t = TURBINE_BASE_TIERS.get(node.getMachineIcon());
+            if (t != null) return t;
+        }
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null) {
+                GTVoltageTier t = TURBINE_BASE_TIERS.get(ws);
+                if (t != null) return t;
+            }
+        }
+        if (node.getRecipeCategoryId() != null) {
+            GTVoltageTier t = TURBINE_BASE_TIERS.get(node.getRecipeCategoryId());
+            if (t != null) return t;
+        }
+        return GTVoltageTier.HV;
+    }
+
+    public static boolean requiresMinimumBaseTier(ResourceLocation turbineId) {
+        if (turbineId == null) return false;
+        GTVoltageTier baseTier = getTurbineBaseTier(turbineId);
+        return baseTier != null && baseTier.ordinal() >= GTVoltageTier.IV.ordinal();
     }
 
     public static GTVoltageTier getTurbineBaseTier(ResourceLocation id) {
@@ -463,7 +655,9 @@ public class MultiblockDetector {
         if (!initialized && !initializing) {
             initialize();
         }
-        return MULTIBLOCK_RECIPE_CONTROLLERS.contains(workstationId);
+        if (MULTIBLOCK_RECIPE_CONTROLLERS.contains(workstationId)) return true;
+        String path = workstationId.getPath().toLowerCase(Locale.ROOT);
+        return path.contains("fusion_reactor") || path.contains("auxiliary_fusion") || path.contains("auxiliary_booster");
     }
 
     public static boolean isCoilMultiblock(ResourceLocation workstationId) {
@@ -507,10 +701,7 @@ public class MultiblockDetector {
         if (!initialized && !initializing) {
             initialize();
         }
-        if (TURBINE_RECIPE_CATEGORIES.contains(categoryId)) return true;
-        String path = categoryId.getPath().toLowerCase(Locale.ROOT);
-        return path.equals("gas_turbine") || path.equals("steam_turbine") || path.equals("plasma_turbine")
-                || path.equals("large_gas_turbine") || path.equals("large_steam_turbine") || path.equals("large_plasma_turbine");
+        return TURBINE_RECIPE_CATEGORIES.contains(categoryId);
     }
 
     public static Set<ResourceLocation> getAllCoilControllers() {
@@ -562,222 +753,305 @@ public class MultiblockDetector {
 
     public static boolean inspectAndRegisterMachine(ResourceLocation id, Object def, ResourceLocation recipeCategoryId) {
         if (id == null) return false;
-        boolean isMb = false;
+        if (def == null) {
+            return registerFallbackFromCatalog(id);
+        }
 
-        if (def != null) {
-            Class<?> cls = def.getClass();
-            String clsName = cls.getName().toLowerCase(Locale.ROOT);
-            String simpleName = cls.getSimpleName().toLowerCase(Locale.ROOT);
+        Class<?> cls = def.getClass();
+        Class<?> mCls = extractMachineClass(cls, def);
+        boolean isMb = isMultiblockDefinition(cls, def, mCls, id);
 
-            // 1. Check if Definition class is a Multiblock
-            if (simpleName.contains("multiblock") || clsName.contains("multiblock")) {
-                isMb = true;
-            } else {
-                try {
-                    Method mIsMb = cls.getMethod("isMultiblock");
-                    Object res = mIsMb.invoke(def);
-                    if (res instanceof Boolean b && b) isMb = true;
-                } catch (Throwable ignored) {}
-            }
-
-            // 2. Check machine class
-            Class<?> mCls = null;
-            try {
-                Method mGetMachineClass = cls.getMethod("getMachineClass");
-                mCls = (Class<?>) mGetMachineClass.invoke(def);
-                if (mCls != null) {
-                    String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
-                    if (mClsName.contains("multiblock") || mClsName.contains("controller")) {
-                        isMb = true;
-                    }
-                }
-            } catch (Throwable ignored) {}
-
-            // 3. Check Structure Pattern Catalog
-            if (!isMb && com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id) != null) {
-                isMb = true;
-            }
-
-            if (isMb) {
-                registerMultiblock(id);
-
-                // Check Coils via reflection, catalog, and capability matrix
-                boolean isCoil = false;
-                try {
-                    Class<?> coilWorkableCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine");
-                    if (mCls != null && coilWorkableCls.isAssignableFrom(mCls)) {
-                        isCoil = true;
-                    }
-                } catch (Throwable ignored) {}
-
-                if (!isCoil) {
-                    var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id);
-                    if (defStruct != null && (defStruct.coilSlotCount() > 0 || defStruct.supportsAbility("HEATING_COILS"))) {
-                        isCoil = true;
-                    }
-                }
-                if (!isCoil && recipeCategoryId != null) {
-                    CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
-                    if (cap != null && cap.canUseCoils()) {
-                        isCoil = true;
-                    }
-                }
-                if (isCoil) {
-                    registerCoilMultiblock(id, recipeCategoryId);
-                }
-
-                // Check Recipe Modifiers and Workable Multiblock Machine capabilities
-                boolean supportsParallel = false;
-                boolean supportsBatch = false;
-
-                try {
-                    Method mGetModifiers = cls.getMethod("getRecipeModifiers");
-                    Object modifiers = mGetModifiers.invoke(def);
-                    if (modifiers != null) {
-                        String modStr = modifiers.toString();
-                        if (modStr.contains("PARALLEL") || modStr.contains("Parallel") || modStr.contains("parallel")) {
-                            supportsParallel = true;
-                        }
-                        if (modStr.contains("BATCH") || modStr.contains("Batch") || modStr.contains("batch")) {
-                            supportsBatch = true;
-                        }
-                    }
-                } catch (Throwable ignored) {}
-
-                var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id);
-                if (defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH")) {
-                    supportsParallel = true;
-                }
-
-                // Workable electric multiblock machines support parallel hatch by default
-                try {
-                    Class<?> workableCls = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.WorkableElectricMultiblockMachine");
-                    if (mCls != null && workableCls.isAssignableFrom(mCls)) {
-                        supportsParallel = true;
-                    }
-                } catch (Throwable ignored) {}
-
-                if (recipeCategoryId != null) {
-                    CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
-                    if (cap != null && cap.hasMultiblockOption()) {
-                        supportsParallel = true;
-                    }
-                }
-
-                if (supportsParallel) {
-                    registerParallelHatchController(id);
-                }
-                if (supportsBatch) {
-                    registerBatchModeController(id);
-                }
-
-                // Check Threading capabilities via reflection, modifiers, or structure catalog
-                boolean isThreading = false;
-                try {
-                    Class<?> threadingMachineCls = Class.forName("com.startechnology.start_core.machine.threading.StarTThreadingCapableMachine");
-                    if (mCls != null && threadingMachineCls.isAssignableFrom(mCls)) {
-                        isThreading = true;
-                    }
-                } catch (Throwable ignored) {}
-
-                if (!isThreading && mCls != null) {
-                    String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
-                    if (mClsName.contains("threadingcapable") || mClsName.contains("startthreading")) {
-                        isThreading = true;
-                    }
-                }
-
-                if (!isThreading) {
-                    try {
-                        Method mGetModifiers = cls.getMethod("getRecipeModifiers");
-                        Object modifiers = mGetModifiers.invoke(def);
-                        if (modifiers != null) {
-                            String modStr = modifiers.toString().toLowerCase(Locale.ROOT);
-                            if (modStr.contains("threading_machine") || modStr.contains("startrecipemodifiers") || modStr.contains("threading")) {
-                                isThreading = true;
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-                }
-
-                if (!isThreading && defStruct != null) {
-                    if (defStruct.supportsAbility("THREADING") || defStruct.supportsAbility("THREADING_HELIX")) {
-                        isThreading = true;
-                    } else if (defStruct.candidateBlocks().stream().anyMatch(b -> b.getPath().contains("threading_controller") || b.getPath().contains("thread_helix") || b.getPath().contains("threading_helix"))) {
-                        isThreading = true;
-                    }
-                }
-
-                if (isThreading) {
-                    int detectedHelixCount = 0;
-                    if (defStruct != null) {
-                        for (var part : defStruct.parts()) {
-                            if (part != null && part.itemId() != null) {
-                                String pPath = part.itemId().getPath();
-                                if (pPath.contains("thread_helix") || pPath.contains("threading_helix") || pPath.contains("supreme_helix") || pPath.contains("overdrive_helix") || pPath.contains("coprocessor_helix") || pPath.contains("weaver_helix")) {
-                                    detectedHelixCount = Math.max(detectedHelixCount, part.amount());
-                                }
-                            }
-                        }
-                    }
-                    registerThreadingMultiblock(id, detectedHelixCount > 0 ? detectedHelixCount : 8);
-                }
-            }
-        } else {
-            // If def is null, check existing catalog
-            if (isMultiblock(id) || com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id) != null) {
-                isMb = true;
-                registerMultiblock(id);
-                var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id);
-                if (defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH")) {
-                    registerParallelHatchController(id);
-                }
-            }
+        if (isMb) {
+            registerMultiblock(id);
+            detectAndRegisterCoilMultiblock(id, mCls, recipeCategoryId);
+            detectAndRegisterParallelAndBatch(id, def, cls);
+            detectAndRegisterLaserHatch(id);
+            detectAndRegisterThreading(id, def, cls, mCls);
         }
 
         return isMb;
     }
 
+    private static final Class<?> COIL_WORKABLE_CLS;
+    private static final Class<?> THREADING_CAPABLE_CLS;
+    private static final Class<?> GT_MODIFIERS_CLS;
+    private static final Class<?> GT_REGISTRIES_CLS;
+    private static final Field RECIPE_TYPES_FIELD;
+
+    static {
+        ClassLoader cl = MultiblockDetector.class.getClassLoader();
+        Class<?> coilCls = null;
+        try {
+            coilCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        COIL_WORKABLE_CLS = coilCls;
+
+        Class<?> threadCls = null;
+        try {
+            threadCls = Class.forName("com.startechnology.start_core.machine.threading.StarTThreadingCapableMachine", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        THREADING_CAPABLE_CLS = threadCls;
+
+        Class<?> modCls = null;
+        try {
+            modCls = Class.forName("com.gregtechceu.gtceu.api.recipe.modifier.GTRecipeModifiers", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        GT_MODIFIERS_CLS = modCls;
+
+        Class<?> gtRegs = null;
+        Field rtField = null;
+        try {
+            gtRegs = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries", false, cl);
+            rtField = gtRegs.getField("RECIPE_TYPES");
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        GT_REGISTRIES_CLS = gtRegs;
+        RECIPE_TYPES_FIELD = rtField;
+    }
+
+    private static boolean registerFallbackFromCatalog(ResourceLocation id) {
+        if (!isMultiblock(id) && MultiblockStructureCatalog.getStructure(id) == null) {
+            return false;
+        }
+        registerMultiblock(id);
+        var defStruct = MultiblockStructureCatalog.getStructure(id);
+        if (defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH")) {
+            registerParallelHatchController(id);
+        }
+        return true;
+    }
+
+    private static Class<?> extractMachineClass(Class<?> cls, Object def) {
+        try {
+            Method mGetMachineClass = cls.getMethod("getMachineClass");
+            mGetMachineClass.setAccessible(true);
+            return (Class<?>) mGetMachineClass.invoke(def);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isMultiblockDefinition(Class<?> cls, Object def, Class<?> mCls, ResourceLocation id) {
+        String clsName = cls.getName().toLowerCase(Locale.ROOT);
+        String simpleName = cls.getSimpleName().toLowerCase(Locale.ROOT);
+        if (simpleName.contains("multiblock") || clsName.contains("multiblock")) {
+            return true;
+        }
+
+        try {
+            Method mIsMb = cls.getMethod("isMultiblock");
+            mIsMb.setAccessible(true);
+            Object res = mIsMb.invoke(def);
+            if (res instanceof Boolean b && b) return true;
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+
+        if (mCls != null) {
+            String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
+            if (mClsName.contains("multiblock") || mClsName.contains("controller")) {
+                return true;
+            }
+        }
+
+        return MultiblockStructureCatalog.getStructure(id) != null;
+    }
+
+    private static void detectAndRegisterCoilMultiblock(ResourceLocation id, Class<?> mCls, ResourceLocation recipeCategoryId) {
+        if (isCoilMachineClass(mCls) || isCoilFromCatalog(id) || isCoilFromCategory(recipeCategoryId)) {
+            registerCoilMultiblock(id, recipeCategoryId);
+        }
+    }
+
+    private static boolean isCoilMachineClass(Class<?> mCls) {
+        if (mCls == null || COIL_WORKABLE_CLS == null) return false;
+        return COIL_WORKABLE_CLS.isAssignableFrom(mCls);
+    }
+
+    private static boolean isCoilFromCatalog(ResourceLocation id) {
+        var defStruct = MultiblockStructureCatalog.getStructure(id);
+        return defStruct != null && (defStruct.coilSlotCount() > 0 || defStruct.supportsAbility("HEATING_COILS"));
+    }
+
+    private static boolean isCoilFromCategory(ResourceLocation recipeCategoryId) {
+        if (recipeCategoryId == null) return false;
+        CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
+        return cap != null && cap.canUseCoils();
+    }
+
+    private static void detectAndRegisterParallelAndBatch(ResourceLocation id, Object def, Class<?> cls) {
+        if (isTurbineMachine(id)) return;
+
+        boolean supportsParallel = hasParallelModifier(cls, def) || hasParallelFromCatalog(id);
+        boolean supportsBatch = hasBatchModifier(cls, def);
+
+        if (supportsParallel) registerParallelHatchController(id);
+        if (supportsBatch) registerBatchModeController(id);
+    }
+
+    private static boolean hasParallelModifier(Class<?> cls, Object def) {
+        return hasRecipeModifier(cls, def, "PARALLEL_HATCH");
+    }
+
+    private static boolean hasBatchModifier(Class<?> cls, Object def) {
+        return hasRecipeModifier(cls, def, "BATCH_MODE");
+    }
+
+    private static boolean hasRecipeModifier(Class<?> cls, Object def, String targetName) {
+        for (Method m : cls.getMethods()) {
+            if (m.getParameterCount() != 0 || !isRecipeModifierGetter(m.getName())) continue;
+            try {
+                m.setAccessible(true);
+                Object modifiers = m.invoke(def);
+                if (modifiers != null && containsRecipeModifier(modifiers, targetName)) {
+                    return true;
+                }
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+        }
+        return false;
+    }
+
+    private static boolean isRecipeModifierGetter(String name) {
+        return name.equals("getRecipeModifiers") || name.equals("getRecipeModifier") || name.equals("recipeModifiers");
+    }
+
+    private static boolean hasParallelFromCatalog(ResourceLocation id) {
+        var defStruct = MultiblockStructureCatalog.getStructure(id);
+        return defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH");
+    }
+
+    private static void detectAndRegisterLaserHatch(ResourceLocation id) {
+        var defStruct = MultiblockStructureCatalog.getStructure(id);
+        if (defStruct != null && (defStruct.supportsAbility("INPUT_LASER") || defStruct.supportsAbility("LASER_TARGET_HATCH") || defStruct.supportsAbility("LASER_SOURCE_HATCH"))) {
+            registerLaserHatchController(id);
+        }
+    }
+
+    private static void detectAndRegisterThreading(ResourceLocation id, Object def, Class<?> cls, Class<?> mCls) {
+        boolean isThreading = isThreadingMachineClass(mCls) || hasThreadingModifier(cls, def) || isThreadingFromCatalog(id);
+        if (!isThreading) return;
+
+        int detectedHelixCount = detectHelixCountFromCatalog(id);
+        registerThreadingMultiblock(id, detectedHelixCount > 0 ? detectedHelixCount : 8);
+    }
+
+    private static boolean isThreadingMachineClass(Class<?> mCls) {
+        if (mCls == null) return false;
+        if (THREADING_CAPABLE_CLS != null && THREADING_CAPABLE_CLS.isAssignableFrom(mCls)) {
+            return true;
+        }
+        String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
+        return mClsName.contains("threadingcapable") || mClsName.contains("startthreading");
+    }
+
+    private static boolean hasThreadingModifier(Class<?> cls, Object def) {
+        try {
+            Method mGetModifiers = cls.getMethod("getRecipeModifiers");
+            mGetModifiers.setAccessible(true);
+            Object modifiers = mGetModifiers.invoke(def);
+            if (modifiers != null) {
+                String modStr = modifiers.toString().toLowerCase(Locale.ROOT);
+                return modStr.contains("threading_machine") || modStr.contains("startrecipemodifiers") || modStr.contains("threading");
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return false;
+    }
+
+    private static boolean isThreadingFromCatalog(ResourceLocation id) {
+        var defStruct = MultiblockStructureCatalog.getStructure(id);
+        if (defStruct == null) return false;
+
+        if (defStruct.supportsAbility("THREADING") || defStruct.supportsAbility("THREADING_HELIX")) {
+            return true;
+        }
+        return defStruct.candidateBlocks().stream().anyMatch(b ->
+                b.getPath().contains("threading_controller") || b.getPath().contains("thread_helix") || b.getPath().contains("threading_helix"));
+    }
+
+    private static int detectHelixCountFromCatalog(ResourceLocation id) {
+        var defStruct = MultiblockStructureCatalog.getStructure(id);
+        if (defStruct == null) return 0;
+
+        int count = 0;
+        for (var part : defStruct.parts()) {
+            if (part != null && part.itemId() != null && isHelixPartPath(part.itemId().getPath())) {
+                count = Math.max(count, part.amount());
+            }
+        }
+        return count;
+    }
+
+    private static boolean isHelixPartPath(String path) {
+        return path.contains("thread_helix") || path.contains("threading_helix")
+                || path.contains("supreme_helix") || path.contains("overdrive_helix")
+                || path.contains("coprocessor_helix") || path.contains("weaver_helix");
+    }
+
     public static ResourceLocation extractRecipeTypeId(Object rt) {
         if (rt == null) return null;
         if (rt instanceof ResourceLocation rl) return rl;
+
+        ResourceLocation loc = extractFromForgeRecipeTypes(rt);
+        if (loc != null) return loc;
+
+        ResourceLocation refLoc = extractRecipeTypeIdViaReflection(rt);
+        if (refLoc != null) return refLoc;
+
+        String str = rt.toString();
+        if (str != null && str.contains(":")) {
+            return ResourceLocation.tryParse(str);
+        }
+        return null;
+    }
+
+    private static ResourceLocation extractFromForgeRecipeTypes(Object rt) {
+        if (rt instanceof net.minecraft.world.item.crafting.RecipeType<?> rType && net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES != null) {
+            ResourceLocation loc = net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES.getKey(rType);
+            if (loc != null && !loc.getPath().equals("air")) return loc;
+        }
+        return null;
+    }
+
+    private static ResourceLocation extractRecipeTypeIdViaReflection(Object rt) {
+        ResourceLocation fromField = extractRegistryNameFromField(rt);
+        if (fromField != null) return fromField;
+
+        ResourceLocation fromMethod = extractRegistryNameFromMethod(rt);
+        if (fromMethod != null) return fromMethod;
+
+        return extractRegistryNameFromGTRegistry(rt);
+    }
+
+    private static ResourceLocation extractRegistryNameFromField(Object rt) {
         try {
-            if (rt instanceof net.minecraft.world.item.crafting.RecipeType<?> rType) {
-                ResourceLocation loc = net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES.getKey(rType);
-                if (loc != null && !loc.getPath().equals("air")) return loc;
-            }
-        } catch (Throwable ignored) {}
-        try {
-            Field fRegistryName = rt.getClass().getField("registryName");
-            Object val = fRegistryName.get(rt);
+            Field f = rt.getClass().getField("registryName");
+            f.setAccessible(true);
+            Object val = f.get(rt);
             if (val instanceof ResourceLocation rl) return rl;
-        } catch (Throwable ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return null;
+    }
+
+    private static ResourceLocation extractRegistryNameFromMethod(Object rt) {
+        for (String mName : new String[]{"getRegistryName", "getId"}) {
+            try {
+                Method m = rt.getClass().getMethod(mName);
+                m.setAccessible(true);
+                Object idVal = m.invoke(rt);
+                if (idVal instanceof ResourceLocation rl) return rl;
+            } catch (ReflectiveOperationException | LinkageError ignored) {}
+        }
+        return null;
+    }
+
+    private static ResourceLocation extractRegistryNameFromGTRegistry(Object rt) {
+        if (RECIPE_TYPES_FIELD == null) return null;
         try {
-            Method mRegistryName = rt.getClass().getMethod("getRegistryName");
-            Object idVal = mRegistryName.invoke(rt);
-            if (idVal instanceof ResourceLocation rl) return rl;
-        } catch (Throwable ignored) {}
-        try {
-            Method mGetId = rt.getClass().getMethod("getId");
-            Object idVal = mGetId.invoke(rt);
-            if (idVal instanceof ResourceLocation rl) return rl;
-        } catch (Throwable ignored) {}
-        try {
-            Class<?> gtRegs = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-            Object recipeTypesReg = gtRegs.getField("RECIPE_TYPES").get(null);
+            Object recipeTypesReg = RECIPE_TYPES_FIELD.get(null);
             if (recipeTypesReg != null) {
                 Method mGetKey = recipeTypesReg.getClass().getMethod("getKey", Object.class);
+                mGetKey.setAccessible(true);
                 Object k = mGetKey.invoke(recipeTypesReg, rt);
                 if (k instanceof ResourceLocation rl) return rl;
             }
-        } catch (Throwable ignored) {}
-        try {
-            String str = rt.toString();
-            if (str != null && str.contains(":")) {
-                ResourceLocation parsed = ResourceLocation.tryParse(str);
-                if (parsed != null) return parsed;
-            }
-        } catch (Throwable ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
         return null;
     }
 
@@ -788,14 +1062,75 @@ public class MultiblockDetector {
         }
         try {
             Method valuesMethod = registry.getClass().getMethod("values");
+            valuesMethod.setAccessible(true);
             Object result = valuesMethod.invoke(registry);
             if (result instanceof Iterable<?> iterable) {
                 return iterable;
             }
-        } catch (Throwable ignored) {}
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
         return null;
     }
+
+    private static boolean containsRecipeModifier(Object modifiersObj, String targetName) {
+        if (modifiersObj == null || targetName == null || GT_MODIFIERS_CLS == null) return false;
+        try {
+            Field f = GT_MODIFIERS_CLS.getField(targetName);
+            f.setAccessible(true);
+            Object targetModifier = f.get(null);
+            if (targetModifier != null) {
+                return containsModifierObject(modifiersObj, targetModifier);
+            }
+        } catch (ReflectiveOperationException | LinkageError ignored) {}
+        return false;
+    }
+
+    private static boolean containsModifierObject(Object obj, Object target) {
+        if (obj == null || target == null) return false;
+        if (obj == target || obj.equals(target)) return true;
+
+        if (obj instanceof Object[] arr) {
+            for (Object item : arr) {
+                if (containsModifierObject(item, target)) return true;
+            }
+            return false;
+        }
+
+        if (obj instanceof Iterable<?> it) {
+            for (Object item : it) {
+                if (containsModifierObject(item, target)) return true;
+            }
+            return false;
+        }
+
+        return inspectModifierFields(obj, target);
+    }
+
+    private static boolean inspectModifierFields(Object obj, Object target) {
+        Class<?> cls = obj.getClass();
+        while (cls != null && cls != Object.class) {
+            for (Field f : cls.getDeclaredFields()) {
+                try {
+                    f.setAccessible(true);
+                    Object val = f.get(obj);
+                    if (val != null && val != obj && isMatchingModifierValue(val, target)) {
+                        return true;
+                    }
+                } catch (ReflectiveOperationException | LinkageError ignored) {}
+            }
+            cls = cls.getSuperclass();
+        }
+        return false;
+    }
+
+    private static boolean isMatchingModifierValue(Object val, Object target) {
+        if (val == target || val.equals(target)) return true;
+        if (val instanceof Object[] || val instanceof Iterable<?>) {
+            return containsModifierObject(val, target);
+        }
+        return false;
+    }
 }
+
 
 
 

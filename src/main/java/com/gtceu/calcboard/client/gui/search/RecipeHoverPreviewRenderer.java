@@ -1,6 +1,8 @@
 package com.gtceu.calcboard.client.gui.search;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
+
+import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
@@ -8,6 +10,7 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import net.minecraft.client.Minecraft;
@@ -24,7 +27,7 @@ import java.util.Map;
 public class RecipeHoverPreviewRenderer {
 
     public static int[] calculatePreviewBounds(
-            RecipeSearchEngine.SearchableRecipe sr,
+            SearchableRecipe sr,
             int dialogX,
             int dialogY,
             int dialogW,
@@ -86,7 +89,7 @@ public class RecipeHoverPreviewRenderer {
     }
 
     public static Object getHoveredIngredient(
-            RecipeSearchEngine.SearchableRecipe sr,
+            SearchableRecipe sr,
             int dialogX,
             int dialogY,
             int dialogW,
@@ -111,7 +114,7 @@ public class RecipeHoverPreviewRenderer {
 
     public static void renderPreview(
             GuiGraphics graphics,
-            RecipeSearchEngine.SearchableRecipe sr,
+            SearchableRecipe sr,
             int dialogX,
             int dialogY,
             int dialogW,
@@ -181,7 +184,7 @@ public class RecipeHoverPreviewRenderer {
     public static void renderRecipeNodePreview(
             GuiGraphics graphics,
             Font font,
-            RecipeSearchEngine.SearchableRecipe sr,
+            SearchableRecipe sr,
             RecipeNode rn,
             int dialogX,
             int dialogY,
@@ -375,7 +378,7 @@ public class RecipeHoverPreviewRenderer {
         private static void renderEmiRecipePreview(
                 GuiGraphics graphics,
                 Font font,
-                RecipeSearchEngine.SearchableRecipe sr,
+                SearchableRecipe sr,
                 Object emiRecipeObj,
                 int dialogX,
                 int dialogY,

@@ -25,14 +25,67 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import com.gtceu.calcboard.client.command.CalcBoardClientCommands;
+import com.gtceu.calcboard.client.storage.ClientPreferenceManager;
+import com.gtceu.calcboard.config.CalcBoardClientConfig;
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+
 @Mod.EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientForgeEvents {
+
+    private static int welcomeMessageDelayTicks = -1;
+
+    @SubscribeEvent
+    public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+        CalcBoardClientCommands.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
+    public static void onScreenMouseClicked(ScreenEvent.MouseButtonPressed.Pre event) {
+        if (event.getScreen() instanceof net.minecraft.client.gui.screens.ChatScreen) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.gui != null && mc.gui.getChat() != null) {
+                net.minecraft.network.chat.Style style = mc.gui.getChat().getClickedComponentStyleAt(event.getMouseX(), event.getMouseY());
+                if (style != null && style.getClickEvent() != null) {
+                    String val = style.getClickEvent().getValue();
+                    if (val != null && (val.equals("/gtcalcboard open") || val.equals("gtcalcboard open") || val.equals("/gtcalcboard"))) {
+                        event.setCanceled(true);
+                        mc.tell(() -> {
+                            ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
+                            mc.setScreen(new BoardScreen());
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onClientChat(net.minecraftforge.client.event.ClientChatEvent event) {
+        String msg = event.getMessage().trim();
+        if (msg.equalsIgnoreCase("/gtcalcboard open") || msg.equalsIgnoreCase("/gtcalcboard")) {
+            event.setCanceled(true);
+            Minecraft mc = Minecraft.getInstance();
+            mc.tell(() -> {
+                ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
+                mc.setScreen(new BoardScreen());
+            });
+        }
+    }
 
     @SubscribeEvent
     public static void onPlayerLoggedIn(ClientPlayerNetworkEvent.LoggingIn event) {
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Client logged in to world/server. Reloading board data and preloading catalogs...");
         // Load personal boards scoped to this world / server
         BoardManager.getInstance().reloadForCurrentContext();
+
+        // Load client-wide preferences & determine welcome chat delay
+        ClientPreferenceManager.getInstance().ensureLoaded();
+        if (CalcBoardClientConfig.SHOW_WELCOME_CHAT_MESSAGE.get() && !ClientPreferenceManager.getInstance().isWelcomeMessageSeen()) {
+            welcomeMessageDelayTicks = 50; // ~2.5 seconds delay after logging in
+        } else {
+            welcomeMessageDelayTicks = -1;
+        }
 
         // Fast load registry-backed addons immediately (<5ms, zero memory overhead)
         MachineAddonCatalog.getInstance().ensureFastLoaded();
@@ -53,6 +106,7 @@ public class ClientForgeEvents {
 
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        welcomeMessageDelayTicks = -1;
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.screen instanceof BoardScreen) {
             mc.setScreen(null);
@@ -102,6 +156,8 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
         if (event.getNewScreen() instanceof BoardScreen) {
+            welcomeMessageDelayTicks = -1;
+            ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
             RecipeSearchDialog.notifyFavoritesChanged();
             RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
         }
@@ -146,6 +202,8 @@ public class ClientForgeEvents {
 
         // Allow opening Calculator Board directly from inventory, chests, crafting tables, etc.
         if (KeyBindings.OPEN_BOARD.isActiveAndMatches(com.mojang.blaze3d.platform.InputConstants.getKey(event.getKeyCode(), event.getScanCode()))) {
+            welcomeMessageDelayTicks = -1;
+            ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
             mc.setScreen(new BoardScreen());
             event.setCanceled(true);
         }
@@ -194,12 +252,62 @@ public class ClientForgeEvents {
                 }
                 return;
             }
+
+            if (welcomeMessageDelayTicks > 0) {
+                welcomeMessageDelayTicks--;
+                if (welcomeMessageDelayTicks == 0) {
+                    sendWelcomeChatMessage(mc);
+                }
+            }
+
             while (KeyBindings.OPEN_BOARD.consumeClick()) {
                 if (mc.screen == null) {
+                    welcomeMessageDelayTicks = -1;
+                    ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
                     mc.setScreen(new BoardScreen());
                 }
             }
         }
+    }
+
+    private static void sendWelcomeChatMessage(Minecraft mc) {
+        if (mc.player == null) return;
+        if (!CalcBoardClientConfig.SHOW_WELCOME_CHAT_MESSAGE.get()) return;
+        if (ClientPreferenceManager.getInstance().isWelcomeMessageSeen()) return;
+
+        ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
+
+        var prefix = net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.welcome.prefix")
+                .withStyle(net.minecraft.ChatFormatting.AQUA, net.minecraft.ChatFormatting.BOLD);
+
+        var keyComponent = net.minecraft.network.chat.Component.keybind("key.gtcalcboard.open_board")
+                .withStyle(net.minecraft.ChatFormatting.YELLOW, net.minecraft.ChatFormatting.BOLD);
+
+        var text = net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.welcome.text", keyComponent)
+                .withStyle(net.minecraft.ChatFormatting.GRAY);
+
+        var openBtn = net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.welcome.open_button")
+                .withStyle(style -> style
+                        .withColor(net.minecraft.ChatFormatting.GREEN)
+                        .withUnderlined(true)
+                        .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                                net.minecraft.network.chat.ClickEvent.Action.RUN_COMMAND,
+                                "/gtcalcboard open"
+                        ))
+                        .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                                net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
+                                net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.welcome.open_button.tooltip")
+                        ))
+                );
+
+        var fullMessage = net.minecraft.network.chat.Component.empty()
+                .append(prefix)
+                .append(net.minecraft.network.chat.Component.literal(" "))
+                .append(text)
+                .append(net.minecraft.network.chat.Component.literal(" "))
+                .append(openBtn);
+
+        mc.player.sendSystemMessage(fullMessage);
     }
 }
 

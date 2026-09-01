@@ -29,6 +29,7 @@ public class TutorialManager {
     private String practiceNodeId = null;
     private String boilerNodeId = null;
     private String turbineNodeId = null;
+    private String selectorNodeId = null;
 
     public static TutorialManager getInstance() {
         return INSTANCE;
@@ -85,7 +86,7 @@ public class TutorialManager {
         this.currentScreen = screen;
         this.active = true;
         this.mode = mode;
-        this.currentStep = (mode == TutorialMode.ADVANCED) ? TutorialStep.STEP_8_SHARED_MACHINE : TutorialStep.STEP_1_ADD_RECIPE;
+        this.currentStep = (mode == TutorialMode.ADVANCED) ? TutorialStep.STEP_9_SHARED_MACHINE : TutorialStep.STEP_1_ADD_RECIPE;
         this.pannedOrZoomed = false;
 
         // Always create a dedicated new page for tutorial to protect user's existing work 100%!
@@ -116,15 +117,16 @@ public class TutorialManager {
         this.practiceNodeId = null;
         this.boilerNodeId = null;
         this.turbineNodeId = null;
+        this.selectorNodeId = null;
         this.tutorialPageId = null;
     }
 
     public void nextStep() {
-        if (mode == TutorialMode.BASIC && currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
+        if (mode == TutorialMode.BASIC && currentStep == TutorialStep.STEP_8_COMPOUND_MODULE) {
             completeTutorial();
             return;
         }
-        if (mode == TutorialMode.ADVANCED && currentStep == TutorialStep.STEP_9_BOM_INSPECTION) {
+        if (mode == TutorialMode.ADVANCED && currentStep == TutorialStep.STEP_10_BOM_INSPECTION) {
             completeTutorial();
             return;
         }
@@ -163,16 +165,18 @@ public class TutorialManager {
             setupStep3Exercise(tutPage);
         } else if (step == TutorialStep.STEP_4_SHIFT_WIRING) {
             setupStep4Exercise(tutPage);
-        } else if (step == TutorialStep.STEP_5_MACHINE_CONFIG) {
-            setupStep5Exercise(tutPage);
-        } else if (step == TutorialStep.STEP_6_GROUP_FRAME) {
+        } else if (step == TutorialStep.STEP_5_MACHINE_SELECTOR) {
+            setupStep5SelectorExercise(tutPage);
+        } else if (step == TutorialStep.STEP_6_MACHINE_CONFIG) {
             setupStep6Exercise(tutPage);
-        } else if (step == TutorialStep.STEP_7_COMPOUND_MODULE) {
+        } else if (step == TutorialStep.STEP_7_GROUP_FRAME) {
             setupStep7Exercise(tutPage);
-        } else if (step == TutorialStep.STEP_8_SHARED_MACHINE) {
+        } else if (step == TutorialStep.STEP_8_COMPOUND_MODULE) {
             setupStep8Exercise(tutPage);
-        } else if (step == TutorialStep.STEP_9_BOM_INSPECTION) {
+        } else if (step == TutorialStep.STEP_9_SHARED_MACHINE) {
             setupStep9Exercise(tutPage);
+        } else if (step == TutorialStep.STEP_10_BOM_INSPECTION) {
+            setupStep10Exercise(tutPage);
         }
     }
 
@@ -223,7 +227,32 @@ public class TutorialManager {
         if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep5Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+    private void setupStep5SelectorExercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
+
+        ensureBoilerAndTurbineExist(tutPage);
+
+        if (selectorNodeId == null || tutPage.getGraph().findNodeById(selectorNodeId) == null) {
+            ResourceLocation sbIcon = ResourceLocation.tryParse("gtceu:lv_electric_blast_furnace");
+            RecipeNode furnaceNode = RecipeNode.create(sbIcon, "Iron Ingot to Steel", 200.0, 120.0, GTVoltageTier.LV);
+            furnaceNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
+            furnaceNode.setAvailableWorkstations(java.util.List.of(
+                ResourceLocation.tryParse("gtceu:lv_electric_blast_furnace"),
+                ResourceLocation.tryParse("gtceu:electric_blast_furnace")
+            ));
+            furnaceNode.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 1.0));
+            furnaceNode.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:steel_ingot"), "Steel Ingot", 1.0));
+            furnaceNode.setPosX(340);
+            furnaceNode.setPosY(-50);
+            furnaceNode.setMachineCount(1.0);
+            furnaceNode.setMultiblock(false);
+            this.selectorNodeId = furnaceNode.getId();
+            tutPage.getGraph().addNode(furnaceNode);
+        }
+        if (currentScreen != null) currentScreen.rebuildWidgets();
+    }
+
+    private void setupStep6Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
 
         ensureBoilerAndTurbineExist(tutPage);
@@ -234,7 +263,7 @@ public class TutorialManager {
         if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep6Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+    private void setupStep7Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
 
         ensureBoilerAndTurbineExist(tutPage);
@@ -242,12 +271,12 @@ public class TutorialManager {
         if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 
-    private void setupStep7Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+    private void setupStep8Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
 
         ensureBoilerAndTurbineExist(tutPage);
         if (tutPage.getGraph().getFrames().isEmpty()) {
-            // Auto-create a frame if user skipped step 6
+            // Auto-create a frame if user skipped step 7
             RecipeNode boiler = tutPage.getGraph().findNodeById(boilerNodeId);
             RecipeNode turbine = tutPage.getGraph().findNodeById(turbineNodeId);
             if (boiler != null && turbine != null) {
@@ -266,7 +295,7 @@ public class TutorialManager {
         }
     }
 
-    private void setupStep8Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+    private void setupStep9Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
         tutPage.getGraph().clear();
 
@@ -298,7 +327,7 @@ public class TutorialManager {
         }
     }
 
-    private void setupStep9Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+    private void setupStep10Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
         boolean hasSharedFrame = tutPage.getGraph().getFrames().stream().anyMatch(CanvasGroupFrame::isSharedMachineFrame);
         if (!hasSharedFrame && tutPage.getGraph().getNodes().size() >= 2) {
@@ -372,7 +401,7 @@ public class TutorialManager {
         if (currentStep == TutorialStep.STEP_2_DRAG_TO_SEARCH) {
             nextStep(); // Advance to Step 3 (Junction)
         } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            nextStep(); // Advance to Step 5 (Machine Config)
+            nextStep(); // Advance to Step 5 (Machine Selector)
         }
     }
 
@@ -389,21 +418,30 @@ public class TutorialManager {
     public void onAutoRatioTriggered() {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            nextStep(); // Advance to Step 5 (Machine Config)
+            nextStep(); // Advance to Step 5 (Machine Selector)
+        }
+    }
+
+    public void onMachineSwitched(RecipeNode node, ResourceLocation newWs) {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_5_MACHINE_SELECTOR) {
+            if (node != null && (node.isMultiblock() || (newWs != null && newWs.getPath().contains("electric_blast_furnace")))) {
+                nextStep(); // Advance to Step 6 (Machine Config)
+            }
         }
     }
 
     public void onMachineConfigOpened() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_5_MACHINE_CONFIG) {
-            nextStep(); // Advance to Step 6 (Group Frame)
+        if (currentStep == TutorialStep.STEP_6_MACHINE_CONFIG) {
+            nextStep(); // Advance to Step 7 (Group Frame)
         }
     }
 
     public void onGroupFramed() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_6_GROUP_FRAME) {
-            nextStep(); // Advance to Step 7 (Compound Module)
+        if (currentStep == TutorialStep.STEP_7_GROUP_FRAME) {
+            nextStep(); // Advance to Step 8 (Compound Module)
         }
     }
 
@@ -424,28 +462,28 @@ public class TutorialManager {
 
     public void onModuleGrouped() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
+        if (currentStep == TutorialStep.STEP_8_COMPOUND_MODULE) {
             nextStep();
         }
     }
 
     public void onModuleExpanded() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_7_COMPOUND_MODULE) {
+        if (currentStep == TutorialStep.STEP_8_COMPOUND_MODULE) {
             nextStep();
         }
     }
 
     public void onSharedMachineFramed() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_8_SHARED_MACHINE) {
+        if (currentStep == TutorialStep.STEP_9_SHARED_MACHINE) {
             nextStep();
         }
     }
 
     public void onBOMOpened() {
         if (!active) return;
-        if (currentStep == TutorialStep.STEP_9_BOM_INSPECTION) {
+        if (currentStep == TutorialStep.STEP_10_BOM_INSPECTION) {
             completeTutorial();
         }
     }
@@ -460,6 +498,10 @@ public class TutorialManager {
 
     public String getPracticeNodeId() {
         return practiceNodeId;
+    }
+
+    public String getSelectorNodeId() {
+        return selectorNodeId;
     }
 
     // --- Dynamic Widget Glowing Helpers ---
@@ -480,9 +522,25 @@ public class TutorialManager {
         return false;
     }
 
+    public boolean isMachineIconGlowing(String nodeId) {
+        if (!active) return false;
+        if (currentStep == TutorialStep.STEP_5_MACHINE_SELECTOR) {
+            return selectorNodeId != null && selectorNodeId.equals(nodeId);
+        }
+        return false;
+    }
+
+    public boolean isMachineSelectorRowGlowing(ResourceLocation machineId) {
+        if (!active || machineId == null) return false;
+        if (currentStep == TutorialStep.STEP_5_MACHINE_SELECTOR) {
+            return machineId.getPath().contains("electric_blast_furnace");
+        }
+        return false;
+    }
+
     public boolean isMachineConfigButtonGlowing(String nodeId) {
         if (!active) return false;
-        if (currentStep == TutorialStep.STEP_5_MACHINE_CONFIG) {
+        if (currentStep == TutorialStep.STEP_6_MACHINE_CONFIG) {
             return turbineNodeId != null && turbineNodeId.equals(nodeId);
         }
         return false;
@@ -490,7 +548,7 @@ public class TutorialManager {
 
     public boolean isFrameCollapseButtonGlowing(String frameId) {
         if (!active) return false;
-        return currentStep == TutorialStep.STEP_7_COMPOUND_MODULE;
+        return currentStep == TutorialStep.STEP_8_COMPOUND_MODULE;
     }
 
     public boolean isWireGlowing(String fromNodeId, String toNodeId) {

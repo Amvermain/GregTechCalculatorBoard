@@ -80,12 +80,29 @@ $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a
 - **Multi Smelter**:
   $$\text{Parallel} = \text{SmelterParallel} \quad (32\text{x}, 64\text{x}, 128\text{x}\dots)$$
 
-#### Large Steam/Gas/Plasma Turbine Rotor & Holder Efficiency Formulas
-- Given rotor efficiency $E_{\text{rotor}}$, rotor power $P_{\text{rotor}}$, and rotor holder tier bonus $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$:
-  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right)\right)$$
-  $$\text{DurationTicks} = \max\left(1.0, \, \text{BaseDurationTicks} \times \text{RotorEffMult} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()\right)$$
-  $$\text{Max EU/t} = \text{HolderBaseEUt} \times \frac{P_{\text{rotor}}}{100.0}$$
-  $$\text{Total Parallel} = \left\lfloor \frac{\text{Max EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+#### Large Steam/Gas/Plasma Turbine Rotor, Decoupled Tiers & Durability Formulas (ADR-006)
+- **Decoupled Rotor Holder & Dynamo Hatch Tiers**:
+  Given Rotor Holder tier voltage $V_{\text{holder}}$, Dynamo Hatch tier voltage $V_{\text{dynamo}}$, and amperage $A_{\text{dynamo}}$:
+  $$\text{Cap}_{\text{holder}} = V_{\text{holder}} \times 2.0 \quad (\text{EU/t, Flow Rate Limit})$$
+  $$\text{Cap}_{\text{dynamo}} = V_{\text{dynamo}} \times A_{\text{dynamo}} \quad (\text{EU/t, Power Generation Ceiling})$$
+  $$\text{P}_{\text{max, turbine}} = \min(\text{Cap}_{\text{holder}}, \, \text{Cap}_{\text{dynamo}})$$
+
+- **Turbine Rotor Efficiency & Generation Calculation**:
+  Given rotor efficiency $E_{\text{rotor}}$, rotor power $P_{\text{rotor}}$, rotor holder tier bonus $B_{\text{holder}} = \max(0, (\text{HolderTier} - \text{BaseTier}) \times 10\%)$, and lubricant boost multiplier $M_{\text{boost}} \in \{1.0, 1.25, 1.50\}$:
+  $$\text{RotorEffMult} = \max\left(1.0, \, \frac{E_{\text{rotor}}}{100.0} \times \left(1.0 + \frac{B_{\text{holder}}}{100.0}\right) \times M_{\text{boost}}\right)$$
+  $$\text{Calculated Output EU/t} = \min\left(\text{P}_{\text{max, turbine}}, \, \text{BaseRecipeEUt} \times \frac{P_{\text{rotor}}}{100.0} \times M_{\text{boost}}\right)$$
+  $$\text{Total Parallel} = \left\lfloor \frac{\text{Calculated Output EU/t}}{\text{BaseRecipeEUt}} \right\rfloor$$
+
+- **Rotor Durability Wear Rate & Lifetime ($T_{\text{lifespan}}$) Formulas**:
+  Given base durability $D_{\text{rotor}}$ and loss rate per second $\text{Loss}_{\text{sec}}$:
+  $$\text{Loss}_{\text{sec}} = \text{BaseLossRate} \times \left(\frac{\text{ActualFlowRate}}{\text{OptimalFlowRate}}\right) \times \frac{1.0}{M_{\text{boost}}}$$
+  $$T_{\text{lifespan}} = \frac{D_{\text{rotor}}}{\text{Loss}_{\text{sec}}} \quad (\text{seconds})$$
+  $$\text{Rotor Replacement Rate (Items/hour)} = \frac{3600.0}{T_{\text{lifespan}}} \times \text{MachineCount}$$
+
+#### Power Supply Based Maximum Available Machine Parallel ($P_{\max}$) Formula
+Given equipped Energy Hatch voltage $V_{\text{hatch}}$, amperage $A_{\text{hatch}}$, and single recipe power $E_{\text{recipe}}$:
+$$P_{\max} = \min\left(\text{ConfiguredParallel}, \, \left\lfloor \frac{V_{\text{hatch}} \times A_{\text{hatch}}}{E_{\text{recipe}}} \right\rfloor\right)$$
+If $\text{ConfiguredParallel} > P_{\max}$, a hardware capacity warning badge is rendered on the canvas node card.
 
 ---
 

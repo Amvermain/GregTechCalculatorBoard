@@ -63,7 +63,7 @@ public class MachineConfigDialog {
     private long lastObservedCatalogVersion = -1;
     private List<Component> deferredTooltip = null;
 
-    private static final int DIALOG_WIDTH = 480;
+    private static final int DIALOG_WIDTH = 500;
     private static final int DIALOG_HEIGHT = 295;
 
     public MachineConfigDialog(BoardScreen parent) {
@@ -72,6 +72,10 @@ public class MachineConfigDialog {
         this.addonCatalogView = new AddonCatalogView(this);
         this.customAddonBuilderView = new CustomAddonBuilderView(this);
         this.threadingHelixView = new ThreadingHelixView(this);
+    }
+
+    public BoardScreen getParent() {
+        return parent;
     }
 
     public ActiveAddonsView getActiveAddonsView() {
@@ -326,6 +330,13 @@ public class MachineConfigDialog {
             String toggleText = isMb ? "§a" + Component.translatable("gui.gtcalcboard.config.multiblock_mode").getString()
                     : "§7" + Component.translatable("gui.gtcalcboard.config.singleblock_mode").getString();
             graphics.drawCenteredString(font, font.plainSubstrByWidth(toggleText, toggleW - 4), toggleX + toggleW / 2, y + 7, 0xFFFFFFFF);
+            if (toggleHover) {
+                this.deferredTooltip = List.of(
+                        Component.literal(isMb ? "§a🏛 " : "§7🏭 ").append(Component.translatable(isMb ? "gui.gtcalcboard.config.multiblock_mode" : "gui.gtcalcboard.config.singleblock_mode")),
+                        Component.literal("§7[Click]: §f" + Component.translatable(isMb ? "gui.gtcalcboard.tooltip.switch_to_singleblock" : "gui.gtcalcboard.tooltip.switch_to_multiblock").getString()),
+                        Component.literal("§e[Right-Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString())
+                );
+            }
         }
 
         // Switch Recipe Button
@@ -341,7 +352,7 @@ public class MachineConfigDialog {
         // Category Machine Default Preset Button
         ResourceLocation catId = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId() : node.getMachineIcon();
         boolean hasPreset = (catId != null && CategoryMachinePresetManager.getInstance().hasPreset(catId));
-        int presetBtnW = 68;
+        int presetBtnW = 76;
         int presetBtnH = 16;
         int presetBtnX = switchBtnX - presetBtnW - 4;
         boolean presetHover = virtualMouseX >= presetBtnX && virtualMouseX <= presetBtnX + presetBtnW && virtualMouseY >= y + 3 && virtualMouseY <= y + 3 + presetBtnH;
@@ -377,12 +388,18 @@ public class MachineConfigDialog {
             }
         }
 
-        String title = "⚙ " + Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()).getString();
+        String title = "⚙ " + node.getName();
         int maxTitleW = presetBtnX - (x + 8) - 6;
+        boolean titleHover = virtualMouseX >= x + 8 && virtualMouseX <= presetBtnX - 6 && virtualMouseY >= y + 4 && virtualMouseY <= y + 20;
         if (font.width(title) > maxTitleW) {
             title = font.plainSubstrByWidth(title, Math.max(16, maxTitleW - font.width("..."))) + "...";
         }
         graphics.drawString(font, title, x + 8, y + 7, 0xFFE0E6F0, false);
+        if (titleHover) {
+            this.deferredTooltip = List.of(
+                    Component.literal("⚙ ").append(Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()))
+            );
+        }
 
         // SECTION 1: Base Parallel Header Area
         graphics.fill(x + 6, y + 26, x + dialogW - 6, y + 66, 0xFF1E222D);
@@ -554,6 +571,14 @@ public class MachineConfigDialog {
         int toggleW = 84;
         int toggleX = fontBtnX - toggleW - 4;
         if (node.hasMultiblockOption() && mX >= toggleX && mX <= toggleX + toggleW && mY >= y + 3 && mY <= y + 19) {
+            if (button == 1) {
+                // Right-Click: Open Machine & Controller Selector Dialog
+                if (parent != null) {
+                    parent.openMachineSelectorDialog(node);
+                    mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F));
+                }
+                return true;
+            }
             boolean nextMb = !node.isMultiblock();
             node.setMultiblock(nextMb);
             if (nextMb) {
@@ -594,7 +619,7 @@ public class MachineConfigDialog {
         }
 
         // Category Machine Default Preset Button Click
-        int presetBtnW = 68;
+        int presetBtnW = 76;
         int presetBtnH = 16;
         int presetBtnX = switchBtnX - presetBtnW - 4;
         if (mX >= presetBtnX && mX <= presetBtnX + presetBtnW && mY >= y + 3 && mY <= y + 3 + presetBtnH) {
@@ -707,6 +732,14 @@ public class MachineConfigDialog {
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
+        // SECTION 1: Header GUI Handler Scroll
+        if (mY >= y + 26 && mY <= y + 68 && mX >= x + 6 && mX <= x + dialogW - 6) {
+            var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
+            if (guiHandler.handleDialogHeaderScroll(this, node, x, y, dialogW, mX, mY, delta)) {
+                return true;
+            }
+        }
+
         // Category Filter Chip Scroll
         if (mY >= y + 128 && mY <= y + 148 && mX >= x + 10 && mX <= x + dialogW - 10) {
             double cur = addonCatalogView.getCategoryScrollX();
@@ -777,10 +810,57 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (!visible || node == null) return false;
+
+        Minecraft mc = Minecraft.getInstance();
+        int screenWidth = mc.getWindow().getGuiScaledWidth();
+        int screenHeight = mc.getWindow().getGuiScaledHeight();
+
+        float scale = currentFontScale.getScale();
+        int cx = screenWidth / 2;
+        int cy = screenHeight / 2;
+
+        int mX = (int) Math.round((mouseX - cx) / scale + cx);
+        int mY = (int) Math.round((mouseY - cy) / scale + cy);
+
+        int dialogW = DIALOG_WIDTH;
+        int dialogH = DIALOG_HEIGHT;
+        int x = (screenWidth - dialogW) / 2;
+        int y = (screenHeight - dialogH) / 2;
+
+        var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
+        if (guiHandler.handleDialogHeaderDrag(this, node, x, y, dialogW, mX, mY, button, dragX / scale, dragY / scale)) {
+            return true;
+        }
+
         return visible;
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (!visible || node == null) return false;
+
+        Minecraft mc = Minecraft.getInstance();
+        int screenWidth = mc.getWindow().getGuiScaledWidth();
+        int screenHeight = mc.getWindow().getGuiScaledHeight();
+
+        float scale = currentFontScale.getScale();
+        int cx = screenWidth / 2;
+        int cy = screenHeight / 2;
+
+        int mX = (int) Math.round((mouseX - cx) / scale + cx);
+        int mY = (int) Math.round((mouseY - cy) / scale + cy);
+
+        int dialogW = DIALOG_WIDTH;
+        int dialogH = DIALOG_HEIGHT;
+        int x = (screenWidth - dialogW) / 2;
+        int y = (screenHeight - dialogH) / 2;
+
+        var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
+        if (guiHandler.handleDialogHeaderRelease(this, node, x, y, dialogW, mX, mY, button, parallelBox, parent)) {
+            invalidateFilteredCatalog();
+            return true;
+        }
+
         return visible;
     }
 }

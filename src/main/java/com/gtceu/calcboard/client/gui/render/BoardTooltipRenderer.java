@@ -303,9 +303,7 @@ public final class BoardTooltipRenderer {
                     List<Component> tooltipLines = new ArrayList<>();
                     String mName = n.getMachineDisplayName();
                     tooltipLines.add(Component.literal((n.isMultiblock() ? "§e🏛 " : "§b⚡ ") + mName));
-                    if (n.hasMultiblockOption()) {
-                        tooltipLines.add(Component.literal("§7[Click]: §f" + Component.translatable(n.isMultiblock() ? "gui.gtcalcboard.tooltip.switch_to_singleblock" : "gui.gtcalcboard.tooltip.switch_to_multiblock").getString()));
-                    }
+                    tooltipLines.add(Component.literal("§7[Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString()));
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
                     return;
                 }
@@ -323,14 +321,22 @@ public final class BoardTooltipRenderer {
                             tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_badge").getString()));
                             tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.tooltip.systeams_toggle_to_dynamo").getString()));
                         }
-                    } else if (n.isMultiblock() && !n.isGenerator() && !n.isTurbine()) {
-                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.addon_cat.energy_hatch").getString() + " §7(" + n.getTargetTier().getName() + ")"));
-                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.multiblock_energy_hatch_hint").getString()));
-                    } else if (n.supportsSteamMode() && n.getSteamMode() != com.gtceu.calcboard.api.type.SteamMode.NONE) {
+                    } else if (n.isMultiblock()) {
+                        if (n.isTurbine()) {
+                            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "HV") + ")"));
+                            tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
+                        } else if (!n.isGenerator()) {
+                            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.addon_cat.energy_hatch").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
+                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.multiblock_energy_hatch_hint").getString()));
+                        } else {
+                            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
+                            tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
+                        }
+                    } else if (!n.isMultiblock() && n.supportsSteamMode() && n.getSteamMode() != com.gtceu.calcboard.api.type.SteamMode.NONE) {
                         tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_tier").getString() + " §7(" + n.getSteamMode().name() + ")"));
                         tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_steam_tier").getString()));
                     } else {
-                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + n.getTargetTier().getName() + ")"));
+                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
                         tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
                     }
                     graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
@@ -387,6 +393,11 @@ public final class BoardTooltipRenderer {
                         }
                         tooltipLines.add(Component.literal(effStr));
                         tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.rotor.power").getString() + ": §f" + pwr + "%"));
+                        if (com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isDynamoBottleneck(n)) {
+                            int pmax = com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator.getMaxParallelCapacity(n);
+                            int holderPmax = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderMaxParallel(n);
+                            tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§c" + Component.translatable("gui.gtcalcboard.tooltip.pmax_dyn_bottleneck_detail").getString(), pmax, holderPmax)));
+                        }
                         if (n.getTotalParallel() > 1) {
                             tooltipLines.add(Component.literal("§b⚙ " + Component.translatable("gui.gtcalcboard.config.total_effective", String.valueOf(n.getTotalParallel())).getString()));
                         }

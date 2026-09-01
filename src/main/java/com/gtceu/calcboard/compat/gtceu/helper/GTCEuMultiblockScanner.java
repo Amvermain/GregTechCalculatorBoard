@@ -31,208 +31,87 @@ public class GTCEuMultiblockScanner {
 
     private static void scanGTCEuRegistries() {
         try {
-            Class<?> multiblockDefCls = null;
-            try {
-                multiblockDefCls = Class.forName("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
-            } catch (Throwable ignored) {}
-
-            Class<?> coilWorkableCls = null;
-            try {
-                coilWorkableCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine");
-            } catch (Throwable ignored) {}
-
-            Class<?> largeTurbineCls = null;
-            try {
-                largeTurbineCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.generator.LargeTurbineMachine");
-            } catch (Throwable ignored) {}
-
-            Class<?> iTurbineCls = null;
-            try {
-                iTurbineCls = Class.forName("com.gregtechceu.gtceu.api.machine.feature.multiblock.ITurbineMachine");
-            } catch (Throwable ignored) {}
-
-            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
-            Iterable<?> iterable = getRegistryIterable(machinesRegistry);
-
+            Iterable<?> iterable = GTCEuReflectionBridge.getMachinesRegistryIterable();
             if (iterable == null) return;
 
             for (Object def : iterable) {
                 if (def == null) continue;
-                try {
-                    Method mGetId = def.getClass().getMethod("getId");
-                    ResourceLocation id = (ResourceLocation) mGetId.invoke(def);
-                    if (id == null) continue;
-
-                    boolean isMb = MultiblockDetector.inspectAndRegisterMachine(id, def, null);
-
-                    Class<?> mCls = null;
-                    try {
-                        Method mGetMachineClass = def.getClass().getMethod("getMachineClass");
-                        mCls = (Class<?>) mGetMachineClass.invoke(def);
-                    } catch (Throwable ignored) {}
-
-                    var structDef = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructureCached(id);
-
-                    boolean isCoilMb = isMb && ((coilWorkableCls != null && mCls != null && coilWorkableCls.isAssignableFrom(mCls))
-                            || (structDef != null && (structDef.coilSlotCount() > 0 || structDef.supportsAbility("HEATING_COILS"))));
-
-                    boolean isTurbineMb = isMb && ((largeTurbineCls != null && mCls != null && largeTurbineCls.isAssignableFrom(mCls))
-                            || (iTurbineCls != null && mCls != null && iTurbineCls.isAssignableFrom(mCls))
-                            || (structDef != null && (structDef.supportsAbility("ROTOR_HOLDER") || structDef.supportsAbility("TURBINE_ROTOR"))));
-
-                    if (isCoilMb) {
-                        MultiblockDetector.registerCoilMultiblock(id, null);
-                    }
-
-                    if (isTurbineMb) {
-                        GTVoltageTier turbineTier = null;
-                        for (String mName : new String[]{"getTier", "tier", "getBaseTier"}) {
-                            try {
-                                Method m = def.getClass().getMethod(mName);
-                                Object tVal = m.invoke(def);
-                                if (tVal instanceof Number num) {
-                                    int tIdx = num.intValue();
-                                    if (tIdx >= 0 && tIdx < GTVoltageTier.values().length) {
-                                        turbineTier = GTVoltageTier.values()[tIdx];
-                                        break;
-                                    }
-                                } else if (tVal instanceof Enum<?> en) {
-                                    try {
-                                        turbineTier = GTVoltageTier.valueOf(en.name());
-                                        break;
-                                    } catch (Throwable ignored) {}
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-
-                        double baseEnergy = turbineTier != null ? (double) (turbineTier.getVoltage() * 2L) : 4096.0;
-                        for (String mName : new String[]{"getBaseEnergyPerTick", "getBaseEnergy", "getBaseEUt", "getEnergyCapacity"}) {
-                            try {
-                                Method m = def.getClass().getMethod(mName);
-                                Object eVal = m.invoke(def);
-                                if (eVal instanceof Number num && num.doubleValue() > 0) {
-                                    baseEnergy = num.doubleValue();
-                                    break;
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-
-                        MultiblockDetector.registerTurbine(id, null, turbineTier, baseEnergy);
-                    }
-
-                    boolean isSteamMb = def.getClass().getName().toLowerCase(Locale.ROOT).contains("steam")
-                            || (id.getPath().startsWith("steam_") && isMb)
-                            || def.getClass().getSimpleName().contains("SteamParallel");
-
-                    if (isSteamMb) {
-                        double steamDrainRate = 64.0;
-                        boolean foundCustomRate = false;
-                        for (String mName : new String[]{"getSteamDrainRate", "getSteamDrain", "getSteamConsumption", "getSteamPerTick", "getSteamRate", "getBaseSteamRate", "getConversionRate"}) {
-                            try {
-                                Method m = def.getClass().getMethod(mName);
-                                Object sVal = m.invoke(def);
-                                if (sVal instanceof Number num && num.doubleValue() > 0) {
-                                    steamDrainRate = num.doubleValue();
-                                    foundCustomRate = true;
-                                    break;
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-
-                        if (!foundCustomRate) {
-                            for (String fName : new String[]{"STEAM_DRAIN_RATE", "STEAM_PER_TICK", "STEAM_CONSUMPTION", "DEFAULT_STEAM_DRAIN_RATE", "STEAM_DRAIN"}) {
-                                try {
-                                    Field f = def.getClass().getField(fName);
-                                    Object sVal = f.get(null);
-                                    if (sVal instanceof Number num && num.doubleValue() > 0) {
-                                        steamDrainRate = num.doubleValue();
-                                        foundCustomRate = true;
-                                        break;
-                                    }
-                                } catch (Throwable ignored) {}
-                            }
-                        }
-
-                        int innatePar = 8;
-                        for (String mName : new String[]{"getParallelAmount", "getSteamParallel", "getBaseParallel", "getParallels", "getParallelCount", "getDefaultParallel"}) {
-                            try {
-                                Method m = def.getClass().getMethod(mName);
-                                Object pVal = m.invoke(def);
-                                if (pVal instanceof Number num && num.intValue() > 1) {
-                                    innatePar = num.intValue();
-                                    break;
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-
-                        MultiblockDetector.registerSteamMultiblock(id, innatePar, steamDrainRate);
-                    }
-
-                    if (!isSteamMb) {
-                        int innatePar = 1;
-                        for (String mName : new String[]{"getParallelAmount", "getSteamParallel", "getBaseParallel", "getParallels", "getParallelCount", "getDefaultParallel"}) {
-                            try {
-                                Method m = def.getClass().getMethod(mName);
-                                Object pVal = m.invoke(def);
-                                if (pVal instanceof Number num && num.intValue() > 1) {
-                                    innatePar = num.intValue();
-                                    break;
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-                        if (innatePar > 1) {
-                            MultiblockDetector.registerDefaultParallel(id, innatePar);
-                        }
-                    }
-
-                    List<Object> recipeTypesList = new java.util.ArrayList<>();
-                    try {
-                        Method mGetRecipeTypes = def.getClass().getMethod("getRecipeTypes");
-                        Object rTypes = mGetRecipeTypes.invoke(def);
-                        if (rTypes instanceof Object[] arr) {
-                            for (Object rt : arr) {
-                                if (rt != null) recipeTypesList.add(rt);
-                            }
-                        } else if (rTypes instanceof Iterable<?> it) {
-                            for (Object rt : it) {
-                                if (rt != null) recipeTypesList.add(rt);
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-
-                    if (recipeTypesList.isEmpty()) {
-                        try {
-                            Method mGetRecipeType = def.getClass().getMethod("getRecipeType");
-                            Object rt = mGetRecipeType.invoke(def);
-                            if (rt != null) recipeTypesList.add(rt);
-                        } catch (Throwable ignored) {}
-                    }
-
-                    for (Object rt : recipeTypesList) {
-                        ResourceLocation rl = MultiblockDetector.extractRecipeTypeId(rt);
-                        if (rl != null) {
-                            MultiblockDetector.inspectAndRegisterMachine(id, def, rl);
-                            if (isCoilMb) {
-                                MultiblockDetector.registerCoilMultiblock(id, rl);
-                            }
-                            if (isTurbineMb) {
-                                MultiblockDetector.registerTurbine(id, rl, null, 0.0);
-                            }
-
-                            ResourceLocation relRl = GTCEuCapabilityScanner.getRelatedRecipeCategory(rl);
-                            if (relRl != null && !relRl.equals(rl)) {
-                                MultiblockDetector.inspectAndRegisterMachine(id, def, relRl);
-                                if (isCoilMb) {
-                                    MultiblockDetector.registerCoilMultiblock(id, relRl);
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
+                processScannedMachineDefinition(def);
             }
         } catch (Throwable t) {
             GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] [GTCEuMultiblockScanner] GTCEu Registry scan failed: {}", t.getMessage());
+        }
+    }
+
+    private static void processScannedMachineDefinition(Object def) {
+        ResourceLocation id = GTCEuReflectionBridge.getMachineId(def);
+        if (id == null) return;
+
+        boolean isMb = MultiblockDetector.inspectAndRegisterMachine(id, def, null);
+        Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
+        var structDef = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructureCached(id);
+
+        boolean isCoilMb = isMb && (GTCEuReflectionBridge.isCoilWorkableClass(mCls)
+                || (structDef != null && (structDef.coilSlotCount() > 0 || structDef.supportsAbility("HEATING_COILS"))));
+
+        boolean isTurbineMb = isMb && !isCoilMb && (GTCEuReflectionBridge.isLargeTurbineClass(mCls)
+                || GTCEuReflectionBridge.isITurbineClass(mCls)
+                || (structDef != null && !structDef.supportsAbility("HEATING_COILS") && (structDef.supportsAbility("ROTOR_HOLDER") || structDef.supportsAbility("TURBINE_ROTOR"))));
+
+        if (isCoilMb) {
+            MultiblockDetector.registerCoilMultiblock(id, null);
+        }
+
+        GTVoltageTier turbineTier = null;
+        double baseEnergy = 0.0;
+        if (isTurbineMb) {
+            turbineTier = extractTurbineBaseTier(id, def);
+            baseEnergy = extractBaseEnergyFromDefinition(id, def, turbineTier);
+            MultiblockDetector.registerTurbine(id, null, turbineTier, baseEnergy);
+        }
+
+        inspectSpecialMultiblockFeatures(id, def, isMb);
+        registerMachineRecipeCategories(id, def, isCoilMb, isTurbineMb, turbineTier, baseEnergy);
+    }
+
+    private static void inspectSpecialMultiblockFeatures(ResourceLocation id, Object def, boolean isMb) {
+        boolean isSteamMb = def.getClass().getName().toLowerCase(Locale.ROOT).contains("steam")
+                || (id.getPath().startsWith("steam_") && isMb)
+                || def.getClass().getSimpleName().contains("SteamParallel");
+
+        if (isSteamMb) {
+            double steamDrainRate = GTCEuReflectionBridge.getSteamDrainRate(def);
+            int innatePar = GTCEuReflectionBridge.getDefaultParallel(def);
+            MultiblockDetector.registerSteamMultiblock(id, Math.max(8, innatePar), steamDrainRate);
+        } else {
+            int innatePar = GTCEuReflectionBridge.getDefaultParallel(def);
+            if (innatePar > 1) {
+                MultiblockDetector.registerDefaultParallel(id, innatePar);
+            }
+        }
+    }
+
+    private static void registerMachineRecipeCategories(ResourceLocation id, Object def, boolean isCoilMb, boolean isTurbineMb, GTVoltageTier turbineTier, double baseEnergy) {
+        List<Object> recipeTypesList = GTCEuReflectionBridge.getRecipeTypes(def);
+        for (Object rt : recipeTypesList) {
+            ResourceLocation rl = MultiblockDetector.extractRecipeTypeId(rt);
+            if (rl == null) continue;
+
+            MultiblockDetector.inspectAndRegisterMachine(id, def, rl);
+            if (isCoilMb) {
+                MultiblockDetector.registerCoilMultiblock(id, rl);
+            }
+            if (isTurbineMb && MultiblockDetector.isTurbineRecipeCategory(rl)) {
+                MultiblockDetector.registerTurbine(id, rl, turbineTier, baseEnergy);
+            }
+
+            ResourceLocation relRl = GTCEuCapabilityScanner.getRelatedRecipeCategory(rl);
+            if (relRl != null && !relRl.equals(rl)) {
+                MultiblockDetector.inspectAndRegisterMachine(id, def, relRl);
+                if (isCoilMb) {
+                    MultiblockDetector.registerCoilMultiblock(id, relRl);
+                }
+            }
         }
     }
 
@@ -410,6 +289,26 @@ public class GTCEuMultiblockScanner {
             }
         } catch (Throwable ignored) {}
         return null;
+    }
+
+    private static GTVoltageTier extractTurbineBaseTier(ResourceLocation id, Object def) {
+        GTVoltageTier registered = MultiblockDetector.getTurbineBaseTier(id);
+        if (registered != null && registered != GTVoltageTier.ULV) {
+            return registered;
+        }
+        GTVoltageTier fromDef = GTCEuReflectionBridge.getMachineTier(def);
+        if (fromDef != null) {
+            return fromDef;
+        }
+        return GTVoltageTier.HV;
+    }
+
+    private static double extractBaseEnergyFromDefinition(ResourceLocation id, Object def, GTVoltageTier tier) {
+        Double registered = MultiblockDetector.getTurbineBaseProduction(id);
+        if (registered != null && registered > 0) {
+            return registered;
+        }
+        return GTCEuReflectionBridge.getTurbineBaseEnergy(def, tier);
     }
 }
 

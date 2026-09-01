@@ -76,7 +76,6 @@ public class StarTModAdapter extends GTCEuModAdapter {
 
     @Override
     public void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
-        super.discoverAddons(collector, recipeOutputStacks);
         StarTAddonCrawler.discoverAddons(collector, recipeOutputStacks);
     }
 
@@ -181,6 +180,101 @@ public class StarTModAdapter extends GTCEuModAdapter {
             addon.setDiscoverySource("Star Technology Threading Helix [" + helix.getTier().name() + "]");
             node.getAddons().add(addon);
         }
+    }
+
+    @Override
+    public boolean supportsBoosterControl(RecipeNode node) {
+        return StarTTurbineHelper.supportsBoost(node);
+    }
+
+    @Override
+    public net.minecraft.network.chat.Component getBoosterDisplayComponent(RecipeNode node) {
+        if (!StarTTurbineHelper.supportsBoost(node)) return null;
+        com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel curModel = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(node);
+        boolean lub = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.LUBRICANT_BOOST));
+        boolean cool = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.COOLANT_BOOST));
+        String activeFluid = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "Og" : "He3";
+        String fullMult = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "3.0x" : "2.0x";
+        String passMult = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "+50%" : "+25%";
+        String noneMult = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "0.8x" : "0.9x";
+
+        if (lub && cool) {
+            return net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.config.turbine_boost_full", activeFluid, fullMult);
+        } else if (lub) {
+            return net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.config.turbine_boost_passive", passMult);
+        } else {
+            return net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.config.turbine_boost_none", noneMult);
+        }
+    }
+
+    @Override
+    public void cycleBooster(RecipeNode node, int direction) {
+        StarTTurbineHelper.cycleTurbineBoost(node, direction);
+    }
+
+    @Override
+    public void syncBoosterInputs(RecipeNode node) {
+        StarTTurbineHelper.syncBoosterInputs(node);
+    }
+
+    @Override
+    public int getBoosterBackgroundColor(RecipeNode node, boolean isHovered) {
+        if (!StarTTurbineHelper.supportsBoost(node)) return super.getBoosterBackgroundColor(node, isHovered);
+        boolean lub = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.LUBRICANT_BOOST));
+        boolean cool = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.COOLANT_BOOST));
+        if (lub && cool) return isHovered ? 0xFF284456 : 0xFF1C3240;
+        if (lub) return isHovered ? 0xFF60501D : 0xFF4A3E16;
+        return isHovered ? 0xFF3D2424 : 0xFF2A1818;
+    }
+
+    @Override
+    public int getBoosterBorderColor(RecipeNode node, boolean isHovered) {
+        if (!StarTTurbineHelper.supportsBoost(node)) return super.getBoosterBorderColor(node, isHovered);
+        boolean lub = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.LUBRICANT_BOOST));
+        boolean cool = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.COOLANT_BOOST));
+        if (lub && cool) return 0xFF38BDF8;
+        if (lub) return 0xFFFFD700;
+        return isHovered ? 0xFFFF7777 : 0xFFAA4444;
+    }
+
+    @Override
+    public int getBoosterTextColor(RecipeNode node, boolean isHovered) {
+        if (!StarTTurbineHelper.supportsBoost(node)) return super.getBoosterTextColor(node, isHovered);
+        boolean lub = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.LUBRICANT_BOOST));
+        boolean cool = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.COOLANT_BOOST));
+        if (lub && cool) return 0xFF38BDF8;
+        if (lub) return 0xFFFFD700;
+        return isHovered ? 0xFFFF7777 : 0xFFAA6666;
+    }
+
+    @Override
+    public void buildBoosterTooltip(RecipeNode node, List<net.minecraft.network.chat.Component> tt) {
+        if (!StarTTurbineHelper.supportsBoost(node) || tt == null) return;
+        boolean lub = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.LUBRICANT_BOOST));
+        boolean cool = Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.COOLANT_BOOST));
+        com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel curModel = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(node);
+        String activeFluid = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "BEC-Og" : "SS-He3";
+        String fullMult = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "3.0x" : "2.0x";
+        String passMult = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "+50%" : "+25%";
+        String noneMult = curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "0.8x" : "0.9x";
+
+        if (lub && cool) {
+            tt.add(net.minecraft.network.chat.Component.literal("§b" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_full_desc", activeFluid, fullMult).getString()));
+            tt.add(net.minecraft.network.chat.Component.literal("§7• " + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "BEC-Og (800 mB/hr)" : "SS-He3 (2,500 mB/hr)") + " + WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " mB/hr)"));
+        } else if (lub) {
+            tt.add(net.minecraft.network.chat.Component.literal("§e" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_passive_desc", passMult).getString()));
+            tt.add(net.minecraft.network.chat.Component.literal("§7• WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " mB/hr)"));
+            tt.add(net.minecraft.network.chat.Component.literal("§a💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_hint_full", activeFluid, fullMult).getString()));
+        } else {
+            tt.add(net.minecraft.network.chat.Component.literal("§c" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_desc", noneMult).getString()));
+            tt.add(net.minecraft.network.chat.Component.literal("§7• " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_warn").getString()));
+        }
+    }
+
+    @Override
+    public void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
+        super.onMachineIconChanged(node, oldIcon, newIcon);
+        StarTTurbineHelper.syncBoosterInputs(node);
     }
 }
 

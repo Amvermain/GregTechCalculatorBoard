@@ -221,14 +221,7 @@ public class FlowGraph {
             sibling.setThreadingConfig(sourceNode.getThreadingConfig());
             sibling.setGenerator(sourceNode.isGenerator());
 
-            if (sourceNode.getProperties().has(com.gtceu.calcboard.api.property.NodeProperties.KINETIC_RPM)) {
-                sibling.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.KINETIC_RPM,
-                        sourceNode.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.KINETIC_RPM));
-            }
-            if (sourceNode.getProperties().has(com.gtceu.calcboard.api.property.NodeProperties.BOILER_THROTTLE)) {
-                sibling.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.BOILER_THROTTLE,
-                        sourceNode.getProperties().get(com.gtceu.calcboard.api.property.NodeProperties.BOILER_THROTTLE));
-            }
+            sibling.getProperties().copyFrom(sourceNode.getProperties());
         }
     }
 

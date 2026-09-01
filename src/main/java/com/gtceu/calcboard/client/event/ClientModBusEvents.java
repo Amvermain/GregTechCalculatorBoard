@@ -20,6 +20,10 @@ public class ClientModBusEvents {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            com.gtceu.calcboard.api.storage.BoardManager.setCustomSaveDirectoryProvider(com.gtceu.calcboard.client.ClientSaveHelper::getClientSaveFile);
+            com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.setLevelRecipeProvider(com.gtceu.calcboard.client.ClientLevelHelper.INSTANCE);
+        });
     }
 
     @SubscribeEvent

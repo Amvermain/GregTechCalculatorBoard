@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.client.gui.search;
 
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;

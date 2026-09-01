@@ -77,7 +77,7 @@ public class GTCEuCapabilityScanner {
                                         b.lowPressureWorkstation = mId;
                                     }
                                 }
-                                if (isTurbine) {
+                                if (isTurbine && MultiblockDetector.isTurbineRecipeCategory(catId)) {
                                     b.isTurbine = true;
                                     if (turbineTier != null) b.turbineBaseTier = turbineTier;
                                     if (turbineBaseEnergy > 0) b.turbineBaseProduction = turbineBaseEnergy;

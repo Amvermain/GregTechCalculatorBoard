@@ -238,7 +238,7 @@ public class RecipeNode {
     public void setTargetTier(GTVoltageTier targetTier) {
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
         this.targetTier = adapter.sanitizeTargetTier(this, targetTier);
-        if (!isMultiblock && (steamMode == null || !steamMode.isSteam()) && (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon))) {
+        if (!isMultiblock && !isTurbine() && (steamMode == null || !steamMode.isSteam()) && (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon))) {
             ResourceLocation ws = getWorkstationForTier(this.targetTier);
             if (ws != null) {
                 setMachineIcon(ws);
@@ -290,6 +290,10 @@ public class RecipeNode {
     }
 
     public boolean isGenerator() {
+        if (com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(machineIcon)
+                || com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilRecipeCategory(recipeCategoryId)) {
+            return false;
+        }
         return isGenerator;
     }
 
@@ -690,28 +694,28 @@ public class RecipeNode {
     }
 
     public int getRecipeTemperature() {
-        return properties.get(NodeProperties.EBF_TEMPERATURE);
+        return properties.getById("ebf_temperature", 0);
     }
 
     public void setRecipeTemperature(int recipeTemperature) {
-        properties.set(NodeProperties.EBF_TEMPERATURE, Math.max(0, recipeTemperature));
+        properties.setById("ebf_temperature", Math.max(0, recipeTemperature));
     }
 
     public int getBoilerThrottle() {
-        int t = properties.get(NodeProperties.BOILER_THROTTLE);
+        int t = properties.getById("boiler_throttle", 100);
         return Math.max(25, Math.min(100, t));
     }
 
     public void setBoilerThrottle(int throttle) {
-        properties.set(NodeProperties.BOILER_THROTTLE, Math.max(25, Math.min(100, throttle)));
+        properties.setById("boiler_throttle", Math.max(25, Math.min(100, throttle)));
     }
 
     public long getEuToStart() {
-        return properties.get(NodeProperties.FUSION_START_EU);
+        return properties.getById("fusion_start_eu", 0L);
     }
 
     public void setEuToStart(long euToStart) {
-        properties.set(NodeProperties.FUSION_START_EU, Math.max(0L, euToStart));
+        properties.setById("fusion_start_eu", Math.max(0L, euToStart));
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
         this.targetTier = adapter.sanitizeTargetTier(this, this.targetTier);
     }
@@ -788,11 +792,11 @@ public class RecipeNode {
     }
 
     public int getRequiredReflectorTier() {
-        return properties.get(NodeProperties.REQUIRED_REFLECTOR_TIER);
+        return properties.getById("required_reflector_tier", 0);
     }
 
     public void setRequiredReflectorTier(int tier) {
-        properties.set(NodeProperties.REQUIRED_REFLECTOR_TIER, Math.max(0, tier));
+        properties.setById("required_reflector_tier", Math.max(0, tier));
     }
 
     public int getInstalledReflectorTier() {
@@ -829,6 +833,9 @@ public class RecipeNode {
         if (this.isMultiblock == multiblock) return;
         this.isMultiblock = multiblock;
         if (multiblock) {
+            if (this.steamMode != null && this.steamMode.isSteam()) {
+                this.steamMode = com.gtceu.calcboard.api.type.SteamMode.NONE;
+            }
             if (this.parallel <= 1) {
                 int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
                 if (defPar > 1) {
@@ -884,12 +891,12 @@ public class RecipeNode {
     }
 
     public int getRpm() {
-        int cur = properties.get(NodeProperties.KINETIC_RPM);
+        int cur = properties.getById("kinetic_rpm", 32);
         return cur > 0 ? cur : 32;
     }
 
     public void setRpm(int rpm) {
-        properties.set(NodeProperties.KINETIC_RPM, Math.max(1, Math.min(256, rpm)));
+        properties.setById("kinetic_rpm", Math.max(1, Math.min(256, rpm)));
     }
 
     public void cycleRpm(int direction) {
@@ -914,27 +921,27 @@ public class RecipeNode {
     }
 
     public int getRotorEfficiency() {
-        return properties.get(NodeProperties.TURBINE_ROTOR_EFFICIENCY);
+        return properties.getById("rotor_efficiency", 100);
     }
 
     public void setRotorEfficiency(int rotorEfficiency) {
-        properties.set(NodeProperties.TURBINE_ROTOR_EFFICIENCY, Math.max(1, Math.min(100000, rotorEfficiency)));
+        properties.setById("rotor_efficiency", Math.max(1, Math.min(100000, rotorEfficiency)));
     }
 
     public int getRotorPower() {
-        return properties.get(NodeProperties.TURBINE_ROTOR_POWER);
+        return properties.getById("rotor_power", 100);
     }
 
     public void setRotorPower(int rotorPower) {
-        properties.set(NodeProperties.TURBINE_ROTOR_POWER, Math.max(1, Math.min(1000000, rotorPower)));
+        properties.setById("rotor_power", Math.max(1, Math.min(1000000, rotorPower)));
     }
 
     public String getRotorName() {
-        return properties.get(NodeProperties.TURBINE_ROTOR_NAME);
+        return properties.getById("rotor_name", "Standard (100%)");
     }
 
     public void setRotorName(String rotorName) {
-        properties.set(NodeProperties.TURBINE_ROTOR_NAME, rotorName != null ? rotorName : "Standard (100%)");
+        properties.setById("rotor_name", rotorName != null ? rotorName : "Standard (100%)");
     }
 
     public boolean isLargeTurbine() {

@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.compat.gtceu.GTRecipeExtractionTest;
 import com.gtceu.calcboard.integration.jei.JeiRecipeConverter;
@@ -261,7 +262,7 @@ public class JeiRecipeIntegrationTest {
                 "gtceu", "electrolyzer", GTRecipeExtractionTest.StructuralGTRecipeFixture.class);
         MockRecipeCategory<GTRecipeExtractionTest.StructuralGTRecipeFixture> category = new MockRecipeCategory<>(recipeType, "Electrolyzer");
 
-        RecipeSearchEngine.SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndex(category, recipe, null);
+        SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndex(category, recipe, null);
 
         Assertions.assertNotNull(sr);
         Assertions.assertTrue(sr.hasExactOutput(ResourceLocation.tryParse("minecraft:iron_nugget")),
@@ -283,7 +284,7 @@ public class JeiRecipeIntegrationTest {
         );
 
         JeiRecipeWrapper<MockCraftingRecipe> wrapper = new JeiRecipeWrapper<>(category, recipe);
-        RecipeSearchEngine.SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndex(wrapper, null);
+        SearchableRecipe sr = JeiRecipeSearchIndexer.buildIndex(wrapper, null);
 
         Assertions.assertNotNull(sr);
         Assertions.assertEquals("minecraft:crafting_iron_block", sr.recipeId().toString());

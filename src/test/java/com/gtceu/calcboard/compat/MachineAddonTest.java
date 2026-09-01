@@ -119,11 +119,11 @@ public class MachineAddonTest {
         Assertions.assertEquals(333, turbine.getParallel());
         Assertions.assertEquals(10649.0, turbine.getSingleMachineEUt(), 0.001);
 
-        // 3. Downgrade Rotor Holder to HV (2,048 base) with Titanium -> capped at 2,662 EU/t (84 parallel)
+        // 3. For Gas Turbine (Base Tier: EV), attempting to set HV clamps to the minimum base tier EV -> 5,324 EU/t (167 parallel)
         turbine.setTargetTier(GTVoltageTier.HV);
         turbine.autoCalculateTurbineParallel();
-        Assertions.assertEquals(84, turbine.getParallel());
-        Assertions.assertEquals(2662.0, turbine.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(167, turbine.getParallel());
+        Assertions.assertEquals(5324.0, turbine.getSingleMachineEUt(), 0.001);
 
         // 4. Upgrade Rotor Holder to LuV (16,384 base) with Titanium -> 21,299 EU/t (666 parallel)
         turbine.setTargetTier(GTVoltageTier.LuV);

@@ -272,7 +272,7 @@ public class SysteamsBoilerTest {
         dynamo.setEnergyType(EnergyType.ELECTRIC_FE);
         dynamo.setGenerator(true);
         dynamo.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:diamond"), "Diamond", 1.0));
-        dynamo.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
+        dynamo.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
 
         Assertions.assertTrue(com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(dynamo));
 
@@ -310,25 +310,25 @@ public class SysteamsBoilerTest {
     @Test
     public void testBoilerFluidAlternativesSync() {
         com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager.setGlobalRecipesForTesting(List.of(
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_1", null, "Steam", "systeams", "systeams:boiling", "Boiling", "", "",
                         new ResourceLocation[]{ResourceLocation.tryParse("minecraft:water")},
                         new ResourceLocation[]{ResourceLocation.tryParse("gtceu:steam")},
                         new String[]{"Water"}, new String[]{"Steam"}, true
                 ),
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_2", null, "Warm Steam", "systeams", "systeams:boiling", "Boiling", "", "",
                         new ResourceLocation[]{ResourceLocation.tryParse("gtceu:steam")},
                         new ResourceLocation[]{ResourceLocation.tryParse("systeams:warm_steam")},
                         new String[]{"Steam"}, new String[]{"Warm Steam"}, true
                 ),
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_3", null, "Hot Steam", "systeams", "systeams:boiling", "Boiling", "", "",
                         new ResourceLocation[]{ResourceLocation.tryParse("systeams:warm_steam")},
                         new ResourceLocation[]{ResourceLocation.tryParse("systeams:hot_steam")},
                         new String[]{"Warm Steam"}, new String[]{"Hot Steam"}, true
                 ),
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_4", null, "Superhot Steam", "systeams", "systeams:boiling", "Boiling", "", "",
                         new ResourceLocation[]{ResourceLocation.tryParse("systeams:hot_steam")},
                         new ResourceLocation[]{ResourceLocation.tryParse("systeams:superhot_steam")},
@@ -352,7 +352,7 @@ public class SysteamsBoilerTest {
         ));
         boiler.addInput(waterIn);
         boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 150000.0));
-        boiler.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
+        boiler.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
 
         com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(boiler, ResourceLocation.tryParse("gtceu:steam"));
 
