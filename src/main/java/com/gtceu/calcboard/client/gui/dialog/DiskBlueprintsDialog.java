@@ -406,6 +406,13 @@ public class DiskBlueprintsDialog {
     }
 
     private void loadBlueprintEntry(SavedBlueprintEntry entry) {
+        com.gtceu.calcboard.api.storage.FolderBlueprintPackage folderPkg = BlueprintFileManager.loadFolderBlueprint(entry.file());
+        if (folderPkg != null) {
+            close();
+            screen.openImportFolderDialog(folderPkg);
+            return;
+        }
+
         BlueprintPackage pkg = BlueprintFileManager.loadBlueprint(entry.file());
         if (pkg != null) {
             close();
@@ -418,6 +425,15 @@ public class DiskBlueprintsDialog {
     }
 
     private void copyBlueprintCode(SavedBlueprintEntry entry) {
+        com.gtceu.calcboard.api.storage.FolderBlueprintPackage folderPkg = BlueprintFileManager.loadFolderBlueprint(entry.file());
+        if (folderPkg != null) {
+            String code = com.gtceu.calcboard.api.storage.FolderBlueprintCodec.exportToString(folderPkg);
+            Minecraft.getInstance().keyboardHandler.setClipboard(code);
+            BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copy_success")));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.3F));
+            return;
+        }
+
         BlueprintPackage pkg = BlueprintFileManager.loadBlueprint(entry.file());
         if (pkg != null) {
             String title = pkg.getMetadata() != null ? pkg.getMetadata().getTitle() : entry.fileName();

@@ -26,10 +26,22 @@ public final class BoardHotkeyHandler {
     public static boolean handleKeyPressed(BoardScreen screen, int keyCode, int scanCode, int modifiers, double lastMouseX, double lastMouseY) {
         if (screen == null) return false;
 
-        // Priority ESC handlers (Active wire drag, Welcome dialog, active tutorial, modals)
+        // Priority ESC handlers (Active wire drag, QuickPageSwitcher, TemplateClone, Drawer, Welcome dialog, active tutorial, modals)
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             if (screen.getCanvasHandler() != null && screen.getCanvasHandler().isDraggingWire()) {
                 screen.getCanvasHandler().cancelWireDrag();
+                return true;
+            }
+            if (screen.getQuickPageSwitcherDialog() != null && screen.getQuickPageSwitcherDialog().isVisible()) {
+                screen.getQuickPageSwitcherDialog().close();
+                return true;
+            }
+            if (screen.getTemplateCloneDialog() != null && screen.getTemplateCloneDialog().isVisible()) {
+                screen.getTemplateCloneDialog().close();
+                return true;
+            }
+            if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+                screen.getPageBrowserDrawer().setOpen(false);
                 return true;
             }
             if (screen.getWelcomeDialog().isVisible()) {
@@ -111,7 +123,6 @@ public final class BoardHotkeyHandler {
             return screen.getNoteEditDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
-        // 3. Active inline editing in Node Widgets (Backspace, Enter, Esc, Digits, Home, End, Arrows, Delete, Selection, Clipboard)
         for (NodeWidget w : screen.getNodeWidgets()) {
             if (w.isAnyEditorActive()) {
                 w.keyPressed(keyCode, scanCode, modifiers);
@@ -119,43 +130,15 @@ public final class BoardHotkeyHandler {
             }
         }
 
-        // 4. Global Hotkeys (Ctrl+Z, Ctrl+Y, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+D, Ctrl+A, Ctrl+G)
         if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
-            boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
-            if (keyCode == GLFW.GLFW_KEY_Z) {
-                if (shift) {
-                    screen.redo();
-                } else {
-                    screen.undo();
-                }
+            if (handleControlHotkeys(screen, keyCode, modifiers, lastMouseX, lastMouseY)) {
                 return true;
-            } else if (keyCode == GLFW.GLFW_KEY_Y) {
-                screen.redo();
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_X) {
-                screen.cutSelection();
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_C) {
-                screen.copySelection();
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_V) {
-                screen.pasteSelection(screen.toCanvasX(lastMouseX), screen.toCanvasY(lastMouseY));
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_D) {
-                screen.duplicateSelection();
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_A) {
-                screen.selectAll();
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_G) {
-                if (shift) {
-                    screen.performGroupIntoModule();
-                } else {
-                    screen.createFrameFromSelection();
-                }
-                return true;
-            } else if (keyCode == GLFW.GLFW_KEY_S && shift) {
-                screen.createSharedMachineFrameFromSelection();
+            }
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_TAB && modifiers == 0) {
+            if (screen.getPageBrowserDrawer() != null) {
+                screen.getPageBrowserDrawer().toggle();
                 return true;
             }
         }
@@ -285,6 +268,53 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
+        return false;
+    }
+
+    private static boolean handleControlHotkeys(BoardScreen screen, int keyCode, int modifiers, double lastMouseX, double lastMouseY) {
+        boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
+        if (keyCode == GLFW.GLFW_KEY_K || keyCode == GLFW.GLFW_KEY_P) {
+            screen.openQuickPageSwitcher();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_Z) {
+            if (shift) screen.redo();
+            else screen.undo();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_Y) {
+            screen.redo();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_X) {
+            screen.cutSelection();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_C) {
+            screen.copySelection();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_V) {
+            screen.pasteSelection(screen.toCanvasX(lastMouseX), screen.toCanvasY(lastMouseY));
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_D) {
+            screen.duplicateSelection();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_A) {
+            screen.selectAll();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_G) {
+            if (shift) screen.performGroupIntoModule();
+            else screen.createFrameFromSelection();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_S && shift) {
+            screen.createSharedMachineFrameFromSelection();
+            return true;
+        }
         return false;
     }
 }

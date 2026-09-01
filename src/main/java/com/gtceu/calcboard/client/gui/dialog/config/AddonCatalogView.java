@@ -204,7 +204,8 @@ public class AddonCatalogView {
                 if (!adapter.isAddonCompatible(node, resetCard)) continue;
                 if (dialog.getSelectedCategory() != null && !resetCard.getCategory().equals(dialog.getSelectedCategory())) continue;
                 if (dialog.getSelectedCategory() == null && rel != null && !rel.contains(resetCard.getCategory())) continue;
-                if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || "기본".contains(q) || "none".contains(q)) {
+                String resetBtnText = Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString().toLowerCase();
+                if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || resetBtnText.contains(q) || "none".contains(q)) {
                     filtered.add(resetCard);
                 }
             }
@@ -451,9 +452,7 @@ public class AddonCatalogView {
                     .replace("Maintenance", "Maint.")
                     .replace("Advanced", "Adv.")
                     .replace("Borealic", "Boreal.")
-                    .replace("Complex", "Compl.")
-                    .replace("터빈 로터", "로터")
-                    .replace("涡轮转子", "转子");
+                    .replace("Complex", "Compl.");
             if (font.width(aName) > cardW - 36) {
                 aName = font.plainSubstrByWidth(aName, Math.max(16, cardW - 36 - font.width("..."))) + "...";
             }
@@ -485,7 +484,7 @@ public class AddonCatalogView {
                 tooltip.add(Component.literal("§eLeft-Click: §aAdd 1 Hatch"));
                 tooltip.add(Component.literal("§eShift + Left-Click: §aFill All (" + maxSlots + "x)"));
                 tooltip.add(Component.literal("§eRight-Click: §cRemove 1 Hatch"));
-            } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains("장착") || c.getString().contains("제거"))) {
+            } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains(Component.translatable("gui.gtcalcboard.config.install").getString()) || c.getString().contains(Component.translatable("gui.gtcalcboard.config.remove").getString()))) {
                 if (isInst) {
                     tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
                 } else {

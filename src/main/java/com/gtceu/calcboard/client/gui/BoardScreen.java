@@ -12,6 +12,11 @@ import com.gtceu.calcboard.client.gui.dialog.BoardSettingsDialog;
 import com.gtceu.calcboard.client.gui.dialog.DeletePageConfirmDialog;
 import com.gtceu.calcboard.client.gui.dialog.TutorialExitConfirmDialog;
 import com.gtceu.calcboard.client.gui.dialog.ExportBlueprintDialog;
+import com.gtceu.calcboard.client.gui.dialog.ExportFolderDialog;
+import com.gtceu.calcboard.client.gui.dialog.ImportFolderDialog;
+import com.gtceu.calcboard.client.gui.dialog.QuickPageSwitcherDialog;
+import com.gtceu.calcboard.client.gui.dialog.TemplateCloneDialog;
+import com.gtceu.calcboard.client.gui.widget.PageBrowserDrawer;
 import com.gtceu.calcboard.client.gui.dialog.ImportBlueprintDialog;
 import com.gtceu.calcboard.client.gui.dialog.DiskBlueprintsDialog;
 import com.gtceu.calcboard.client.gui.dialog.ExportToTeamDialog;
@@ -108,6 +113,9 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     private final FavoritesDockWidget favoritesDockWidget = new FavoritesDockWidget(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private final WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
+    private final PageBrowserDrawer pageBrowserDrawer = new PageBrowserDrawer(this);
+    private QuickPageSwitcherDialog quickPageSwitcherDialog;
+    private TemplateCloneDialog templateCloneDialog;
     private RecipeSearchDialog searchDialog;
     private MachineConfigDialog machineConfigDialog;
     private MachineSelectorDialog machineSelectorDialog;
@@ -120,6 +128,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     private ExportToTeamDialog exportToTeamDialog;
     private ExportBlueprintDialog exportBlueprintDialog;
     private ImportBlueprintDialog importBlueprintDialog;
+    private ExportFolderDialog exportFolderDialog;
+    private ImportFolderDialog importFolderDialog;
     private DiskBlueprintsDialog diskBlueprintsDialog;
     private RecentSavesDialog recentSavesDialog;
     private FrameEditDialog frameEditDialog;
@@ -386,6 +396,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             return;
         }
         super.init();
+        if (this.quickPageSwitcherDialog == null) this.quickPageSwitcherDialog = new QuickPageSwitcherDialog(this);
+        if (this.templateCloneDialog == null) this.templateCloneDialog = new TemplateCloneDialog(this);
         if (this.searchDialog == null) this.searchDialog = new RecipeSearchDialog(this);
         if (this.machineConfigDialog == null) this.machineConfigDialog = new MachineConfigDialog(this);
         if (this.guideDialog == null) this.guideDialog = new GuideDialog(this);
@@ -397,6 +409,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         if (this.exportToTeamDialog == null) this.exportToTeamDialog = new ExportToTeamDialog(this);
         if (this.exportBlueprintDialog == null) this.exportBlueprintDialog = new ExportBlueprintDialog(this);
         if (this.importBlueprintDialog == null) this.importBlueprintDialog = new ImportBlueprintDialog(this);
+        if (this.exportFolderDialog == null) this.exportFolderDialog = new ExportFolderDialog(this);
+        if (this.importFolderDialog == null) this.importFolderDialog = new ImportFolderDialog(this);
         if (this.diskBlueprintsDialog == null) this.diskBlueprintsDialog = new DiskBlueprintsDialog(this);
         if (this.recentSavesDialog == null) this.recentSavesDialog = new RecentSavesDialog(this);
         if (this.frameEditDialog == null) this.frameEditDialog = new FrameEditDialog(this);
@@ -470,6 +484,32 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         return importBlueprintDialog;
     }
 
+    public ExportFolderDialog getExportFolderDialog() {
+        return exportFolderDialog;
+    }
+
+    public ImportFolderDialog getImportFolderDialog() {
+        return importFolderDialog;
+    }
+
+    public void openExportFolderDialog(String folderPath) {
+        if (exportFolderDialog != null) {
+            exportFolderDialog.open(folderPath);
+        }
+    }
+
+    public void openImportFolderDialog() {
+        if (importFolderDialog != null) {
+            importFolderDialog.open();
+        }
+    }
+
+    public void openImportFolderDialog(com.gtceu.calcboard.api.storage.FolderBlueprintPackage pkg) {
+        if (importFolderDialog != null) {
+            importFolderDialog.open(pkg);
+        }
+    }
+
     public DiskBlueprintsDialog getDiskBlueprintsDialog() {
         return diskBlueprintsDialog;
     }
@@ -485,6 +525,12 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     public void openDeletePageDialog(int pageIndex, String pageName) {
         if (deletePageDialog != null) {
             deletePageDialog.open(pageIndex, pageName);
+        }
+    }
+
+    public void openDeleteMultiplePagesDialog(List<String> pageIds) {
+        if (deletePageDialog != null) {
+            deletePageDialog.openMultiple(pageIds);
         }
     }
 
@@ -990,6 +1036,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
         }
         favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
+        pageBrowserDrawer.render(graphics, mouseX, mouseY, partialTicks);
 
         if (summaryDirty || cachedSummary == null) {
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
@@ -1001,7 +1048,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         BoardHudRenderer.renderCentralLoadingCard(graphics, font, width, height, isAnyModalOpen(), favoritesDockWidget);
 
         // 7. Render Tooltips only if no modal dialog is open
-        if (!isAnyModalOpen()) {
+        if (!isAnyModalOpen() && !pageBrowserDrawer.isOpen()) {
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
             favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
             workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
@@ -1016,7 +1063,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             RenderSystem.disableDepthTest();
         }
 
-        if (welcomeDialog != null && welcomeDialog.isVisible()) {
+        if (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible()) {
+            quickPageSwitcherDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (templateCloneDialog != null && templateCloneDialog.isVisible()) {
+            templateCloneDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (welcomeDialog != null && welcomeDialog.isVisible()) {
             welcomeDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (settingsDialog != null && settingsDialog.isVisible()) {
             settingsDialog.render(graphics, width, height, mouseX, mouseY);
@@ -1038,6 +1089,10 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             exportBlueprintDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (importBlueprintDialog != null && importBlueprintDialog.isVisible()) {
             importBlueprintDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (exportFolderDialog != null && exportFolderDialog.isVisible()) {
+            exportFolderDialog.render(graphics, mouseX, mouseY, partialTicks);
+        } else if (importFolderDialog != null && importFolderDialog.isVisible()) {
+            importFolderDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
             diskBlueprintsDialog.render(graphics, mouseX, mouseY, partialTicks);
         } else if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
@@ -1064,7 +1119,9 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     }
 
     public boolean isAnyModalOpen() {
-        return (welcomeDialog != null && welcomeDialog.isVisible())
+        return (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible())
+            || (templateCloneDialog != null && templateCloneDialog.isVisible())
+            || (welcomeDialog != null && welcomeDialog.isVisible())
             || (settingsDialog != null && settingsDialog.isVisible())
             || (globalBalanceDialog != null && globalBalanceDialog.isVisible())
             || (multiblockBOMDialog != null && multiblockBOMDialog.isVisible())
@@ -1078,6 +1135,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             || (exportToTeamDialog != null && exportToTeamDialog.isVisible())
             || (exportBlueprintDialog != null && exportBlueprintDialog.isVisible())
             || (importBlueprintDialog != null && importBlueprintDialog.isVisible())
+            || (exportFolderDialog != null && exportFolderDialog.isVisible())
+            || (importFolderDialog != null && importFolderDialog.isVisible())
             || (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible())
             || (recentSavesDialog != null && recentSavesDialog.isVisible())
             || (frameEditDialog != null && frameEditDialog.isVisible())
@@ -1094,6 +1153,18 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible()) {
+            return quickPageSwitcherDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (templateCloneDialog != null && templateCloneDialog.isVisible()) {
+            return templateCloneDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (deletePageDialog != null && deletePageDialog.isVisible()) {
+            return deletePageDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (tutorialExitDialog != null && tutorialExitDialog.isVisible()) {
+            return tutorialExitDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
         if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
             return saveToTeamDialog.mouseClicked(mouseX, mouseY, button);
         }
@@ -1105,6 +1176,12 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         }
         if (importBlueprintDialog != null && importBlueprintDialog.isVisible()) {
             return importBlueprintDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (exportFolderDialog != null && exportFolderDialog.isVisible()) {
+            return exportFolderDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (importFolderDialog != null && importFolderDialog.isVisible()) {
+            return importFolderDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
             return diskBlueprintsDialog.mouseClicked(mouseX, mouseY, button);
@@ -1120,12 +1197,6 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         }
         if (TutorialOverlay.mouseClicked(this, width, height, mouseX, mouseY, button)) {
             return true;
-        }
-        if (deletePageDialog != null && deletePageDialog.isVisible()) {
-            return deletePageDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (tutorialExitDialog != null && tutorialExitDialog.isVisible()) {
-            return tutorialExitDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
         if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
             return globalBalanceDialog.mouseClicked(mouseX, mouseY, button, width, height);
@@ -1154,6 +1225,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
             return autoConnectDialog.mouseClicked(mouseX, mouseY, button);
         }
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
+            if (pageBrowserDrawer.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
         if (workspaceTabBar.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
@@ -1180,6 +1256,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
+            if (pageBrowserDrawer.mouseReleased(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             if (machineConfigDialog.mouseReleased(mouseX, mouseY, button)) {
                 return true;
@@ -1202,6 +1283,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
+            if (pageBrowserDrawer.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+                return true;
+            }
+        }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             if (machineConfigDialog.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
                 return true;
@@ -1224,6 +1310,23 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible()) {
+            return quickPageSwitcherDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (templateCloneDialog != null && templateCloneDialog.isVisible()) {
+            return templateCloneDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (importFolderDialog != null && importFolderDialog.isVisible()) {
+            return importFolderDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (exportFolderDialog != null && exportFolderDialog.isVisible()) {
+            return exportFolderDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
+            if (pageBrowserDrawer.mouseScrolled(mouseX, mouseY, delta)) {
+                return true;
+            }
+        }
         if (settingsDialog != null && settingsDialog.isVisible()) {
             return settingsDialog.mouseScrolled(mouseX, mouseY, delta);
         }
@@ -1314,11 +1417,29 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     }
 
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
+    public PageBrowserDrawer getPageBrowserDrawer() { return pageBrowserDrawer; }
+    public QuickPageSwitcherDialog getQuickPageSwitcherDialog() { return quickPageSwitcherDialog; }
+    public TemplateCloneDialog getTemplateCloneDialog() { return templateCloneDialog; }
     public RecipeSearchDialog getSearchDialog() { return searchDialog; }
     public MachineSelectorDialog getMachineSelectorDialog() { return machineSelectorDialog; }
     public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
     public AutoConnectFilterDialog getAutoConnectDialog() { return autoConnectDialog; }
+
+    public void openQuickPageSwitcher() {
+        if (quickPageSwitcherDialog == null) {
+            quickPageSwitcherDialog = new QuickPageSwitcherDialog(this);
+        }
+        quickPageSwitcherDialog.open();
+    }
+
+    public void openTemplateCloneDialog(BoardPage page) {
+        if (!ensureEditPermission()) return;
+        if (templateCloneDialog == null) {
+            templateCloneDialog = new TemplateCloneDialog(this);
+        }
+        templateCloneDialog.open(page);
+    }
 
     public void openMachineSelectorDialog(RecipeNode node) {
         if (!ensureEditPermission() || node == null) return;

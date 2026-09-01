@@ -23,6 +23,7 @@ public final class WireSpatialIndex {
     ) {}
 
     private final Map<Long, List<IndexedWire>> grid = new HashMap<>();
+    private final float[] scratchCp = new float[4];
 
     public void clear() {
         grid.clear();
@@ -31,12 +32,11 @@ public final class WireSpatialIndex {
     public void insert(FlowGraph.ConnectionEdge edge, float x1, float y1, float x2, float y2, float fromDirX, float toDirX) {
         if (edge == null) return;
 
-        float[] cp = new float[4];
-        ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, cp);
-        float c1x = cp[0];
-        float c1y = cp[1];
-        float c2x = cp[2];
-        float c2y = cp[3];
+        ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, scratchCp);
+        float c1x = scratchCp[0];
+        float c1y = scratchCp[1];
+        float c2x = scratchCp[2];
+        float c2y = scratchCp[3];
 
         float minX = Math.min(Math.min(x1, x2), Math.min(c1x, c2x)) - 8.0f;
         float maxX = Math.max(Math.max(x1, x2), Math.max(c1x, c2x)) + 8.0f;

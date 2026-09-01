@@ -11,7 +11,8 @@ public enum TutorialStep {
     STEP_8_COMPOUND_MODULE(8, "gui.gtcalcboard.tutorial.step7_title", "gui.gtcalcboard.tutorial.step7_desc"),
     STEP_9_SHARED_MACHINE(9, "gui.gtcalcboard.tutorial.step8_title", "gui.gtcalcboard.tutorial.step8_desc"),
     STEP_10_BOM_INSPECTION(10, "gui.gtcalcboard.tutorial.step9_title", "gui.gtcalcboard.tutorial.step9_desc"),
-    COMPLETED(11, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
+    STEP_11_FOLDER_BROWSER(11, "gui.gtcalcboard.tutorial.step11_title", "gui.gtcalcboard.tutorial.step11_desc"),
+    COMPLETED(12, "gui.gtcalcboard.tutorial.completed_title", "gui.gtcalcboard.tutorial.completed_desc");
 
     private final int stepNumber;
     private final String titleKey;

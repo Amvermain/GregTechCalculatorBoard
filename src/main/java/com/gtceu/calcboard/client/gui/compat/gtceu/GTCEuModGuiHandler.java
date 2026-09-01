@@ -427,7 +427,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 }
             }
             if (font.width(rotorInfo) > maxRotorInfoW) {
-                String shortRName = rName.replace("Turbine Rotor", "Rotor").replace("터빈 로터", "로터").replace("涡轮转子", "转子");
+                String shortRName = rName.replace("Turbine Rotor", "Rotor");
                 rotorInfo = "§6🌀 §f" + shortRName + " §7| §b⏱" + eff + "% §e⚡" + pwr + "%";
                 if (holderBonus > 0) {
                     rotorInfo += " §a(+" + holderBonus + "%→" + totalEff + "%)";

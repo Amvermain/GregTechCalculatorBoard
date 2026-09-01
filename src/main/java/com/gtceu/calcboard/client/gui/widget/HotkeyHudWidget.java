@@ -13,7 +13,7 @@ public class HotkeyHudWidget {
     private boolean expanded;
 
     private static final int EXPANDED_WIDTH = 195;
-    private static final int EXPANDED_HEIGHT = 196;
+    private static final int EXPANDED_HEIGHT = 220;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
 
@@ -41,7 +41,6 @@ public class HotkeyHudWidget {
         int screenH = screen.height;
 
         if (!expanded) {
-            // Collapsed Chip [?] at Bottom-Left
             int chipX = 8;
             int chipY = screenH - COLLAPSED_HEIGHT - 8;
 
@@ -62,15 +61,12 @@ public class HotkeyHudWidget {
             return;
         }
 
-        // Expanded Panel at Bottom-Left
         int panelX = 8;
         int panelY = screenH - EXPANDED_HEIGHT - 8;
 
-        // Background & Modern Glowing Border
         graphics.fill(panelX, panelY, panelX + EXPANDED_WIDTH, panelY + EXPANDED_HEIGHT, 0xEE0B1120);
         graphics.renderOutline(panelX, panelY, EXPANDED_WIDTH, EXPANDED_HEIGHT, 0xFF1E293B);
 
-        // Header Title & Minimize button [-]
         graphics.fill(panelX, panelY, panelX + EXPANDED_WIDTH, panelY + 16, 0xFF1E293B);
         String title = Component.translatable("gui.gtcalcboard.hotkey_hud.title").getString();
         graphics.drawString(font, title, panelX + 6, panelY + 4, 0xFF38BDF8, false);
@@ -80,8 +76,11 @@ public class HotkeyHudWidget {
         boolean minHovered = mouseX >= minBtnX && mouseX <= minBtnX + 12 && mouseY >= minBtnY && mouseY <= minBtnY + 12;
         graphics.drawString(font, "x", minBtnX + 2, minBtnY + 2, minHovered ? 0xFFFF5555 : 0xFF64748B, false);
 
-        // Hotkey lines
         int curY = panelY + 20;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Tab", "gui.gtcalcboard.hotkey_hud.browser");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + K / P", "gui.gtcalcboard.hotkey_hud.quick_jump");
+        curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "B", "gui.gtcalcboard.hotkey_hud.balance");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Shift+B / M", "gui.gtcalcboard.hotkey_hud.bom");

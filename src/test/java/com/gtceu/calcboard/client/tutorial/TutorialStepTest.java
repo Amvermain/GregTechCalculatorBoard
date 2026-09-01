@@ -19,7 +19,7 @@ public class TutorialStepTest {
     @Test
     public void testTutorialStepSequence() {
         TutorialStep[] steps = TutorialStep.values();
-        Assertions.assertEquals(11, steps.length);
+        Assertions.assertEquals(12, steps.length);
 
         Assertions.assertEquals(TutorialStep.STEP_1_ADD_RECIPE, steps[0]);
         Assertions.assertEquals(TutorialStep.STEP_2_DRAG_TO_SEARCH, steps[1]);
@@ -31,12 +31,13 @@ public class TutorialStepTest {
         Assertions.assertEquals(TutorialStep.STEP_8_COMPOUND_MODULE, steps[7]);
         Assertions.assertEquals(TutorialStep.STEP_9_SHARED_MACHINE, steps[8]);
         Assertions.assertEquals(TutorialStep.STEP_10_BOM_INSPECTION, steps[9]);
-        Assertions.assertEquals(TutorialStep.COMPLETED, steps[10]);
+        Assertions.assertEquals(TutorialStep.STEP_11_FOLDER_BROWSER, steps[10]);
+        Assertions.assertEquals(TutorialStep.COMPLETED, steps[11]);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 11; i++) {
             Assertions.assertEquals(i + 1, steps[i].getStepNumber());
         }
-        Assertions.assertEquals(11, steps[10].getStepNumber());
+        Assertions.assertEquals(12, steps[11].getStepNumber());
     }
 
     @Test
@@ -163,8 +164,21 @@ public class TutorialStepTest {
         mgr.nextStep();
         Assertions.assertEquals(TutorialStep.STEP_10_BOM_INSPECTION, mgr.getCurrentStep());
 
-        // Step 10 -> Completed
+        // Step 10 -> Step 11
         mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.STEP_11_FOLDER_BROWSER, mgr.getCurrentStep());
+
+        // Step 11 -> Completed (via nextStep)
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
+        mgr.stopTutorial();
+
+        // 3. Test onFolderBrowserOpened trigger
+        mgr.startAdvancedTutorial(null);
+        mgr.nextStep(); // to Step 10
+        mgr.nextStep(); // to Step 11
+        Assertions.assertEquals(TutorialStep.STEP_11_FOLDER_BROWSER, mgr.getCurrentStep());
+        mgr.onFolderBrowserOpened();
         Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
         mgr.stopTutorial();
     }

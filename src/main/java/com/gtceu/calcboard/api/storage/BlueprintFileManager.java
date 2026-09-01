@@ -83,6 +83,57 @@ public class BlueprintFileManager {
         }
     }
 
+    public static File saveFolderBlueprint(String title, FolderBlueprintPackage pkg) {
+        if (pkg == null) return null;
+        String safeName = sanitizeFilename(title);
+        File dir = getBlueprintsDirectory();
+        File targetFile = new File(dir, safeName + DEFAULT_EXTENSION);
+        boolean success = saveFolderBlueprint(targetFile, pkg);
+        return success ? targetFile : null;
+    }
+
+    public static boolean saveFolderBlueprint(File file, FolderBlueprintPackage pkg) {
+        if (file == null || pkg == null) return false;
+        try {
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+
+            CompoundTag tag = pkg.serializeNBT();
+            File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
+            NbtIo.writeCompressed(tag, tempFile);
+
+            try {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception e) {
+                Files.move(tempFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static FolderBlueprintPackage loadFolderBlueprint(File file) {
+        if (file == null || !file.exists() || !file.isFile()) return null;
+        try {
+            CompoundTag tag = NbtIo.readCompressed(file);
+            if (tag != null && FolderBlueprintPackage.FORMAT.equals(tag.getString("format"))) {
+                return FolderBlueprintPackage.deserializeNBT(tag);
+            }
+        } catch (Exception ignored) {
+            try {
+                String text = Files.readString(file.toPath());
+                if (text != null && !text.trim().isEmpty()) {
+                    return FolderBlueprintCodec.importPackageFromString(text.trim());
+                }
+            } catch (Exception ignored2) {}
+        }
+        return null;
+    }
+
     public static BlueprintPackage loadBlueprint(File file) {
         if (file == null || !file.exists() || !file.isFile()) return null;
         try {
@@ -122,6 +173,25 @@ public class BlueprintFileManager {
         List<SavedBlueprintEntry> entries = new ArrayList<>();
         for (File file : files) {
             try {
+                FolderBlueprintPackage folderPkg = loadFolderBlueprint(file);
+                if (folderPkg != null) {
+                    BlueprintMetadata meta = new BlueprintMetadata();
+                    meta.setTitle("📁 " + folderPkg.getRootFolderName() + " (" + folderPkg.getPages().size() + " pages)");
+                    meta.setDescription(folderPkg.getDescription());
+                    meta.setAuthor(folderPkg.getAuthor());
+                    int totalNodes = folderPkg.getPages().stream().mapToInt(p -> p.graph() != null ? p.graph().getNodes().size() : 0).sum();
+                    meta.setNodeCount(totalNodes);
+                    meta.setMachineCount(totalNodes);
+                    entries.add(new SavedBlueprintEntry(
+                            file,
+                            file.getName(),
+                            file.lastModified(),
+                            file.length(),
+                            meta
+                    ));
+                    continue;
+                }
+
                 BlueprintPackage pkg = loadBlueprint(file);
                 BlueprintMetadata meta = pkg != null ? pkg.getMetadata() : new BlueprintMetadata();
                 if (meta.getTitle() == null || meta.getTitle().isEmpty() || "Factory Blueprint".equals(meta.getTitle())) {

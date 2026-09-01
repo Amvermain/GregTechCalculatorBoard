@@ -126,7 +126,7 @@ public class TutorialManager {
             completeTutorial();
             return;
         }
-        if (mode == TutorialMode.ADVANCED && currentStep == TutorialStep.STEP_10_BOM_INSPECTION) {
+        if (mode == TutorialMode.ADVANCED && currentStep == TutorialStep.STEP_11_FOLDER_BROWSER) {
             completeTutorial();
             return;
         }
@@ -177,6 +177,8 @@ public class TutorialManager {
             setupStep9Exercise(tutPage);
         } else if (step == TutorialStep.STEP_10_BOM_INSPECTION) {
             setupStep10Exercise(tutPage);
+        } else if (step == TutorialStep.STEP_11_FOLDER_BROWSER) {
+            setupStep11Exercise(tutPage);
         }
     }
 
@@ -340,6 +342,14 @@ public class TutorialManager {
         }
     }
 
+    private void setupStep11Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
+        if (tutPage == null) return;
+        tutPage.setFolderPath("Factory/Refining");
+        if (currentScreen != null) {
+            currentScreen.rebuildWidgets();
+        }
+    }
+
     private void ensureBoilerAndTurbineExist(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
 
@@ -484,6 +494,13 @@ public class TutorialManager {
     public void onBOMOpened() {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_10_BOM_INSPECTION) {
+            nextStep();
+        }
+    }
+
+    public void onFolderBrowserOpened() {
+        if (!active) return;
+        if (currentStep == TutorialStep.STEP_11_FOLDER_BROWSER) {
             completeTutorial();
         }
     }
@@ -509,6 +526,9 @@ public class TutorialManager {
     public boolean isToolbarButtonGlowing(String buttonKey) {
         if (!active) return false;
         if (currentStep == TutorialStep.STEP_1_ADD_RECIPE && "add_recipe".equals(buttonKey)) {
+            return true;
+        }
+        if (currentStep == TutorialStep.STEP_11_FOLDER_BROWSER && "page_browser".equals(buttonKey)) {
             return true;
         }
         return false;

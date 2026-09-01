@@ -15,6 +15,8 @@ import net.minecraft.nbt.Tag;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class BoardManager {
     private static final BoardManager INSTANCE = new BoardManager();
@@ -303,25 +305,81 @@ public class BoardManager {
     }
 
     public BoardPage addPage(String name) {
+        return addPage(name, "");
+    }
+
+    public BoardPage addPage(String name, String folderPath) {
         String finalName = (name != null && !name.trim().isEmpty()) ? name.trim() : "Page " + (pages.size() + 1);
         BoardPage newPage = BoardPage.createDefault(finalName);
-        pages.add(newPage);
-        activePageIndex = pages.size() - 1;
+        if (folderPath != null) {
+            newPage.setFolderPath(folderPath);
+        }
+        addPage(newPage);
         return newPage;
+    }
+
+    private final List<IFolderChangeListener> folderChangeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<IPageLifecycleListener> pageLifecycleListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private java.util.function.Consumer<BoardPage> pageRemovalListener = null;
+
+    public void addFolderChangeListener(IFolderChangeListener listener) {
+        if (listener != null) {
+            this.folderChangeListeners.add(listener);
+        }
+    }
+
+    public void removeFolderChangeListener(IFolderChangeListener listener) {
+        if (listener != null) {
+            this.folderChangeListeners.remove(listener);
+        }
+    }
+
+    public void addPageLifecycleListener(IPageLifecycleListener listener) {
+        if (listener != null) {
+            this.pageLifecycleListeners.add(listener);
+        }
+    }
+
+    public void removePageLifecycleListener(IPageLifecycleListener listener) {
+        if (listener != null) {
+            this.pageLifecycleListeners.remove(listener);
+        }
+    }
+
+    public void notifyFolderCreated(String folderPath) {
+        if (folderPath != null && !folderPath.trim().isEmpty()) {
+            notifyFolderChanged(IFolderChangeListener.FolderChangeEvent.created(folderPath.trim()));
+        }
+    }
+
+    private void notifyFolderChanged(IFolderChangeListener.FolderChangeEvent event) {
+        for (IFolderChangeListener listener : folderChangeListeners) {
+            try {
+                listener.onFolderChanged(event);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
     }
 
     public void addPage(BoardPage page) {
         if (page != null) {
             pages.add(page);
-            activePageIndex = pages.size() - 1;
+            int idx = pages.size() - 1;
+            activePageIndex = idx;
+            for (IPageLifecycleListener l : pageLifecycleListeners) {
+                try {
+                    l.onPageAdded(page, idx);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
         }
     }
 
     public void setActivePageIndex(int index) {
         switchPage(index);
     }
-
-    private java.util.function.Consumer<BoardPage> pageRemovalListener = null;
 
     public void setPageRemovalListener(java.util.function.Consumer<BoardPage> listener) {
         this.pageRemovalListener = listener;
@@ -341,14 +399,30 @@ public class BoardManager {
             if (pageRemovalListener != null) {
                 pageRemovalListener.accept(removed);
             }
+            for (IPageLifecycleListener l : pageLifecycleListeners) {
+                try {
+                    l.onPageRemoved(removed, index);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
             return true;
         }
         return false;
     }
 
     public void switchPage(int index) {
-        if (index >= 0 && index < pages.size()) {
+        if (index >= 0 && index < pages.size() && index != activePageIndex) {
+            BoardPage prev = getActivePage();
             this.activePageIndex = index;
+            BoardPage cur = getActivePage();
+            for (IPageLifecycleListener l : pageLifecycleListeners) {
+                try {
+                    l.onPageSwitched(prev, cur, index);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
         }
     }
 
@@ -356,6 +430,93 @@ public class BoardManager {
         if (index >= 0 && index < pages.size()) {
             pages.get(index).setName(newName);
         }
+    }
+
+    public List<String> getAllFolders() {
+        Set<String> folders = new TreeSet<>();
+        for (BoardPage page : pages) {
+            String fp = page.getFolderPath();
+            if (fp != null && !fp.trim().isEmpty()) {
+                folders.add(fp.trim());
+            }
+        }
+        return new ArrayList<>(folders);
+    }
+
+    public List<BoardPage> getPagesInFolder(String folderPath) {
+        String target = folderPath != null ? folderPath.trim() : "";
+        List<BoardPage> list = new ArrayList<>();
+        for (BoardPage page : pages) {
+            if (target.equalsIgnoreCase(page.getFolderPath().trim())) {
+                list.add(page);
+            }
+        }
+        return list;
+    }
+
+    public void movePageToFolder(int pageIndex, String newFolderPath) {
+        if (pageIndex >= 0 && pageIndex < pages.size()) {
+            BoardPage page = pages.get(pageIndex);
+            String oldFolder = page.getFolderPath();
+            String newFolder = newFolderPath != null ? newFolderPath.trim() : "";
+            page.setFolderPath(newFolder);
+            for (IPageLifecycleListener l : pageLifecycleListeners) {
+                try {
+                    l.onPageFolderChanged(page, oldFolder, newFolder);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public void renameFolder(String oldFolderPath, String newFolderPath) {
+        if (oldFolderPath == null || oldFolderPath.trim().isEmpty()) return;
+        String oldP = oldFolderPath.trim();
+        String newP = newFolderPath != null ? newFolderPath.trim() : "";
+        for (BoardPage page : pages) {
+            String curP = page.getFolderPath().trim();
+            if (curP.equals(oldP)) {
+                page.setFolderPath(newP);
+            } else if (curP.startsWith(oldP + "/")) {
+                page.setFolderPath(newP + curP.substring(oldP.length()));
+            }
+        }
+        notifyFolderChanged(IFolderChangeListener.FolderChangeEvent.renamed(oldP, newP));
+    }
+
+    public boolean moveFolder(String sourceFolderPath, String targetParentFolderPath) {
+        if (sourceFolderPath == null || sourceFolderPath.trim().isEmpty()) return false;
+        String src = sourceFolderPath.trim();
+        String tgt = targetParentFolderPath != null ? targetParentFolderPath.trim() : "";
+
+        if (tgt.equals(src) || tgt.startsWith(src + "/")) {
+            return false;
+        }
+
+        int lastSlash = src.lastIndexOf('/');
+        String simpleName = (lastSlash >= 0) ? src.substring(lastSlash + 1) : src;
+        String newFolderPath = tgt.isEmpty() ? simpleName : (tgt + "/" + simpleName);
+
+        if (newFolderPath.equals(src)) {
+            return true;
+        }
+
+        renameFolder(src, newFolderPath);
+        notifyFolderChanged(IFolderChangeListener.FolderChangeEvent.moved(src, tgt));
+        return true;
+    }
+
+    public void deleteFolder(String folderPath) {
+        if (folderPath == null || folderPath.trim().isEmpty()) return;
+        String target = folderPath.trim();
+        for (BoardPage page : pages) {
+            String curP = page.getFolderPath().trim();
+            if (curP.equals(target) || curP.startsWith(target + "/")) {
+                page.setFolderPath("");
+            }
+        }
+        notifyFolderChanged(IFolderChangeListener.FolderChangeEvent.deleted(target));
     }
 
     public boolean saveToFile(File file) {

@@ -42,7 +42,8 @@ public class UiFormattingTest {
         Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_COMPOUND_MODULE.getStepNumber());
         Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_9_SHARED_MACHINE.getStepNumber());
         Assertions.assertEquals(10, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_10_BOM_INSPECTION.getStepNumber());
-        Assertions.assertEquals(11, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
+        Assertions.assertEquals(11, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_11_FOLDER_BROWSER.getStepNumber());
+        Assertions.assertEquals(12, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
     }
 
     @Test
@@ -664,6 +665,63 @@ public class UiFormattingTest {
         mgr.resetToDefault();
         Assertions.assertEquals(FluidUnitMode.AUTO, mgr.getFluidUnitMode());
         Assertions.assertEquals(FluidUnitMode.AUTO, FormatUtil.getActiveFluidUnitMode());
+    }
+
+    @Test
+    public void testNoHardcodedKoreanInJavaSources() throws Exception {
+        List<String> violations = new ArrayList<>();
+        java.util.regex.Pattern stringLiteralPattern = java.util.regex.Pattern.compile("\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"");
+        java.util.regex.Pattern koreanPattern = java.util.regex.Pattern.compile("[\\uAC00-\\uD7A3]");
+
+        try (var stream = java.nio.file.Files.walk(java.nio.file.Paths.get("src/main/java"))) {
+            stream.filter(p -> p.toString().endsWith(".java")).forEach(p -> {
+                String fileName = p.getFileName().toString();
+                // Allow search indexers and integration handlers to register Korean search keyword aliases
+                if (fileName.contains("Indexer") || fileName.contains("RecipeHandler")) {
+                    return;
+                }
+                try {
+                    List<String> lines = java.nio.file.Files.readAllLines(p, StandardCharsets.UTF_8);
+                    boolean inBlockComment = false;
+                    for (int i = 0; i < lines.size(); i++) {
+                        String line = lines.get(i).trim();
+                        if (inBlockComment) {
+                            if (line.contains("*/")) {
+                                inBlockComment = false;
+                                line = line.substring(line.indexOf("*/") + 2);
+                            } else {
+                                continue;
+                            }
+                        }
+                        if (line.startsWith("/*")) {
+                            if (!line.contains("*/")) {
+                                inBlockComment = true;
+                                continue;
+                            } else {
+                                line = line.substring(line.indexOf("*/") + 2);
+                            }
+                        }
+                        if (line.startsWith("//") || line.startsWith("*")) {
+                            continue;
+                        }
+
+                        var m = stringLiteralPattern.matcher(line);
+                        while (m.find()) {
+                            String literal = m.group(1);
+                            if (koreanPattern.matcher(literal).find()) {
+                                violations.add(fileName + ":" + (i + 1) + " -> \"" + literal + "\"");
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        Assertions.assertTrue(violations.isEmpty(),
+                "Hardcoded Korean strings found in Java source code. All UI texts must use Component.translatable(...) with keys in assets/gtcalcboard/lang/*.json:\n"
+                        + String.join("\n", violations));
     }
 }
 

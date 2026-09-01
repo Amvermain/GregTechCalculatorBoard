@@ -11,6 +11,15 @@ import net.minecraft.client.Minecraft;
 public class BoardKeybindDispatcher {
 
     public static boolean handleKeyPressed(BoardScreen screen, int keyCode, int scanCode, int modifiers, int lastMouseX, int lastMouseY) {
+        if (screen.getQuickPageSwitcherDialog() != null && screen.getQuickPageSwitcherDialog().isVisible()) {
+            return screen.getQuickPageSwitcherDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (screen.getTemplateCloneDialog() != null && screen.getTemplateCloneDialog().isVisible()) {
+            return screen.getTemplateCloneDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            return screen.getPageBrowserDrawer().keyPressed(keyCode, scanCode, modifiers);
+        }
         if (screen.getSaveToTeamDialog() != null && screen.getSaveToTeamDialog().isVisible()) {
             return screen.getSaveToTeamDialog().keyPressed(keyCode, scanCode, modifiers);
         }
@@ -25,6 +34,12 @@ public class BoardKeybindDispatcher {
         }
         if (screen.getImportBlueprintDialog() != null && screen.getImportBlueprintDialog().isVisible()) {
             return screen.getImportBlueprintDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (screen.getExportFolderDialog() != null && screen.getExportFolderDialog().isVisible()) {
+            return screen.getExportFolderDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (screen.getImportFolderDialog() != null && screen.getImportFolderDialog().isVisible()) {
+            return screen.getImportFolderDialog().keyPressed(keyCode, scanCode, modifiers);
         }
         if (screen.getDiskBlueprintsDialog() != null && screen.getDiskBlueprintsDialog().isVisible()) {
             return screen.getDiskBlueprintsDialog().keyPressed(keyCode, scanCode, modifiers);
@@ -61,11 +76,25 @@ public class BoardKeybindDispatcher {
     }
 
     public static boolean handleCharTyped(BoardScreen screen, char codePoint, int modifiers) {
+        if (screen.getQuickPageSwitcherDialog() != null && screen.getQuickPageSwitcherDialog().isVisible()) {
+            return screen.getQuickPageSwitcherDialog().charTyped(codePoint, modifiers);
+        }
+        if (screen.getTemplateCloneDialog() != null && screen.getTemplateCloneDialog().isVisible()) {
+            return screen.getTemplateCloneDialog().charTyped(codePoint, modifiers);
+        }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            if (screen.getPageBrowserDrawer().charTyped(codePoint, modifiers)) {
+                return true;
+            }
+        }
         if (screen.getSaveToTeamDialog() != null && screen.getSaveToTeamDialog().isVisible()) {
             return screen.getSaveToTeamDialog().charTyped(codePoint, modifiers);
         }
         if (screen.getExportBlueprintDialog() != null && screen.getExportBlueprintDialog().isVisible()) {
             return screen.getExportBlueprintDialog().charTyped(codePoint, modifiers);
+        }
+        if (screen.getExportFolderDialog() != null && screen.getExportFolderDialog().isVisible()) {
+            return screen.getExportFolderDialog().charTyped(codePoint, modifiers);
         }
         if (screen.getDiskBlueprintsDialog() != null && screen.getDiskBlueprintsDialog().isVisible()) {
             return screen.getDiskBlueprintsDialog().charTyped(codePoint, modifiers);
