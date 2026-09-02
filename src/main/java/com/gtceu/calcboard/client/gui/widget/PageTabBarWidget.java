@@ -1,10 +1,9 @@
 package com.gtceu.calcboard.client.gui.widget;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
-
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import net.minecraft.client.Minecraft;
@@ -19,9 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Top bar widget for managing and switching between multiple board preset pages / tabs.
- * Supports Local Board pages and Team Board pages, inline renaming, horizontal drag/wheel scrolling,
- * and confirmation modal on tab deletion.
+ * Top bar widget for managing and switching between multiple open board preset pages / tabs (IDE/Browser style).
+ * Supports Local Board open tabs and Team Board pages, inline renaming, horizontal drag/wheel scrolling,
+ * tab close (undock), middle-click close, and confirmation modal on tab deletion.
  */
 public class PageTabBarWidget {
     public static final int TAB_HEIGHT = 18;
@@ -31,7 +30,6 @@ public class PageTabBarWidget {
     private int editingPageIndex = -1;
     private EditBox renameBox = null;
 
-    // Scrolling & Dragging State
     private double scrollX = 0;
     private double maxScrollX = 0;
     private boolean isDraggingTabBar = false;
@@ -39,7 +37,6 @@ public class PageTabBarWidget {
     private double initialScrollX = 0;
     private boolean hasDragged = false;
 
-    // Double-click detection state
     private long lastClickTime = 0;
     private int lastClickedTabIdx = -1;
 
@@ -52,31 +49,8 @@ public class PageTabBarWidget {
         boolean isTeam = teamState.isTeamMode();
         Font font = Minecraft.getInstance().font;
 
-        List<String> pageTitles = new ArrayList<>();
-        int activeIdx = 0;
-
-        if (isTeam) {
-            List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
-            String activePageId = teamState.getActiveTeamPageId();
-            for (int i = 0; i < teamPages.size(); i++) {
-                TeamWorkspacePage tp = teamPages.get(i);
-                pageTitles.add(tp.getTitle());
-                if (tp.getPageId().equals(activePageId)) {
-                    activeIdx = i;
-                }
-            }
-        } else {
-            BoardManager bm = BoardManager.getInstance();
-            List<BoardPage> pages = bm.getPages();
-            activeIdx = bm.getActivePageIndex();
-            for (BoardPage p : pages) {
-                pageTitles.add(p.getName());
-            }
-        }
-
-        if (pageTitles.isEmpty()) {
-            pageTitles.add("Page 1");
-        }
+        List<String> pageTitles = getPageTitles(teamState, isTeam);
+        int activeIdx = getActivePageIndex(teamState, isTeam);
 
         int browserBtnW = 22;
         int leftMargin = screen.getDynamicLeftMargin() + browserBtnW + 4;
@@ -94,13 +68,7 @@ public class PageTabBarWidget {
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         int tabY = screen.getPageTabY();
-
-        int brX = screen.getDynamicLeftMargin();
-        boolean brHover = mouseX >= brX && mouseX <= brX + browserBtnW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
-        boolean isDrawerOpen = screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen();
-        graphics.fill(brX, tabY, brX + browserBtnW, tabY + TAB_HEIGHT, isDrawerOpen ? 0xFF2A4A38 : (brHover ? 0xFF2A364C : 0xFF1C2230));
-        graphics.renderOutline(brX, tabY, browserBtnW, TAB_HEIGHT, isDrawerOpen ? 0xFF55FF88 : (brHover ? 0xFF5588DD : 0xFF353C4D));
-        graphics.drawCenteredString(font, isDrawerOpen ? "§a📁" : "§f📑", brX + browserBtnW / 2, tabY + 5, 0xFFFFFFFF);
+        renderBrowserToggleButton(graphics, font, mouseX, mouseY, tabY, browserBtnW);
 
         int scissorLeft = hasLeftBtn ? (leftMargin + navBtnW + 2) : (leftMargin - 2);
         int scissorRight = hasRightBtn ? (screen.width - navBtnW - 2) : screen.width;
@@ -109,13 +77,34 @@ public class PageTabBarWidget {
         graphics.pose().pushPose();
         graphics.pose().translate((float) -scrollX, 0, 0);
 
+        int curX = renderTabList(graphics, font, pageTitles, activeIdx, isTeam, leftMargin, tabY, mouseX, mouseY, partialTicks);
+        renderAddTabButton(graphics, font, curX, tabY, mouseX);
+
+        graphics.pose().popPose();
+        graphics.disableScissor();
+
+        renderScrollButtons(graphics, font, hasLeftBtn, hasRightBtn, leftMargin, navBtnW, tabY, mouseX, mouseY);
+        graphics.pose().popPose();
+    }
+
+    private void renderBrowserToggleButton(GuiGraphics graphics, Font font, int mouseX, int mouseY, int tabY, int browserBtnW) {
+        int brX = screen.getDynamicLeftMargin();
+        boolean brHover = mouseX >= brX && mouseX <= brX + browserBtnW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
+        boolean isDrawerOpen = screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen();
+        graphics.fill(brX, tabY, brX + browserBtnW, tabY + TAB_HEIGHT, isDrawerOpen ? 0xFF2A4A38 : (brHover ? 0xFF2A364C : 0xFF1C2230));
+        graphics.renderOutline(brX, tabY, browserBtnW, TAB_HEIGHT, isDrawerOpen ? 0xFF55FF88 : (brHover ? 0xFF5588DD : 0xFF353C4D));
+        graphics.drawCenteredString(font, isDrawerOpen ? "§a📁" : "§f📑", brX + browserBtnW / 2, tabY + 5, 0xFFFFFFFF);
+    }
+
+    private int renderTabList(GuiGraphics graphics, Font font, List<String> pageTitles, int activeIdx, boolean isTeam, int leftMargin, int tabY, int mouseX, int mouseY, float partialTicks) {
         int curX = leftMargin;
         BoardManager bmLocal = !isTeam ? BoardManager.getInstance() : null;
+        List<BoardPage> openPages = bmLocal != null ? bmLocal.getOpenPages() : List.of();
 
         for (int i = 0; i < pageTitles.size(); i++) {
             String pageName = pageTitles.get(i);
             boolean isActive = (i == activeIdx);
-            boolean isPinned = (bmLocal != null && i < bmLocal.getPages().size()) && bmLocal.getPages().get(i).isPinned();
+            boolean isPinned = (i < openPages.size()) && openPages.get(i).isPinned();
 
             int textW = font.width(pageName);
             int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
@@ -124,11 +113,13 @@ public class PageTabBarWidget {
             boolean hover = virtualMouseX >= curX && virtualMouseX <= curX + tabW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
 
             int bg = isActive ? (isTeam ? 0xFF1C4232 : 0xFF2A623A) : (hover ? 0xFF353C4D : 0xFF222630);
-            int border = isActive ? (isTeam ? 0xFF55FF88 : 0xFF55FF88) : (hover ? 0xFF5577AA : 0xFF3D4455);
+            int border = isActive ? 0xFF55FF88 : (hover ? 0xFF5577AA : 0xFF3D4455);
             graphics.fill(curX, tabY, curX + tabW, tabY + TAB_HEIGHT, bg);
             graphics.renderOutline(curX, tabY, tabW, TAB_HEIGHT, border);
 
-            String prefix = isPinned ? (isActive ? "§a📌 " : "§e📌 ") : (isActive ? "§a📑 " : "§7📄 ");
+            boolean isAe2 = (i < openPages.size()) && com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(openPages.get(i).getId());
+            String prefix = isAe2 ? (isPinned ? "§b⚡📌 " : "§b⚡ ") : (isPinned ? (isActive ? "§a📌 " : "§e📌 ") : (isActive ? "§a📑 " : "§7📄 "));
+
             if (editingPageIndex == i && renameBox != null) {
                 renameBox.setX(curX + 16);
                 renameBox.setY(tabY + 1);
@@ -146,33 +137,33 @@ public class PageTabBarWidget {
 
             curX += tabW + 3;
         }
+        return curX;
+    }
 
+    private void renderAddTabButton(GuiGraphics graphics, Font font, int curX, int tabY, int mouseX) {
         int addW = 18;
         double virtualMouseX = mouseX + scrollX;
-        boolean addHover = virtualMouseX >= curX && virtualMouseX <= curX + addW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
+        boolean addHover = virtualMouseX >= curX && virtualMouseX <= curX + addW;
         graphics.fill(curX, tabY, curX + addW, tabY + TAB_HEIGHT, addHover ? 0xFF2A623A : 0xFF222630);
         graphics.renderOutline(curX, tabY, addW, TAB_HEIGHT, addHover ? 0xFF55FF88 : 0xFF3D4455);
         graphics.drawCenteredString(font, "§a+", curX + addW / 2, tabY + 5, 0xFFFFFFFF);
+    }
 
-        graphics.pose().popPose();
-        graphics.disableScissor();
-
-        if (hasLeftBtn) {
+    private void renderScrollButtons(GuiGraphics graphics, Font font, boolean hasLeft, boolean hasRight, int leftMargin, int navBtnW, int tabY, int mouseX, int mouseY) {
+        if (hasLeft) {
             int btnX = leftMargin;
             boolean btnHover = mouseX >= btnX && mouseX <= btnX + navBtnW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
             graphics.fill(btnX, tabY, btnX + navBtnW, tabY + TAB_HEIGHT, btnHover ? 0xFF2A364C : 0xEE11151C);
             graphics.renderOutline(btnX, tabY, navBtnW, TAB_HEIGHT, btnHover ? 0xFF55FF88 : 0xFF353C4D);
             graphics.drawCenteredString(font, "§a«", btnX + navBtnW / 2, tabY + 5, btnHover ? 0xFF55FF88 : 0xFF88AA99);
         }
-        if (hasRightBtn) {
+        if (hasRight) {
             int btnX = screen.width - navBtnW - 2;
             boolean btnHover = mouseX >= btnX && mouseX <= btnX + navBtnW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
             graphics.fill(btnX, tabY, btnX + navBtnW, tabY + TAB_HEIGHT, btnHover ? 0xFF2A364C : 0xEE11151C);
             graphics.renderOutline(btnX, tabY, navBtnW, TAB_HEIGHT, btnHover ? 0xFF55FF88 : 0xFF353C4D);
             graphics.drawCenteredString(font, "§a»", btnX + navBtnW / 2, tabY + 5, btnHover ? 0xFF55FF88 : 0xFF88AA99);
         }
-
-        graphics.pose().popPose();
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -240,7 +231,7 @@ public class PageTabBarWidget {
                 titles.add(tp.getTitle());
             }
         } else {
-            for (BoardPage p : BoardManager.getInstance().getPages()) {
+            for (BoardPage p : BoardManager.getInstance().getOpenPages()) {
                 titles.add(p.getName());
             }
         }
@@ -252,7 +243,15 @@ public class PageTabBarWidget {
 
     private int getActivePageIndex(ClientWorkspaceState teamState, boolean isTeam) {
         if (!isTeam) {
-            return BoardManager.getInstance().getActivePageIndex();
+            BoardManager bm = BoardManager.getInstance();
+            String activeId = bm.getActivePage().getId();
+            List<BoardPage> openPages = bm.getOpenPages();
+            for (int i = 0; i < openPages.size(); i++) {
+                if (openPages.get(i).getId().equals(activeId)) {
+                    return i;
+                }
+            }
+            return 0;
         }
         String activePageId = teamState.getActiveTeamPageId();
         List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
@@ -295,8 +294,10 @@ public class PageTabBarWidget {
     }
 
     private boolean handleTabItemClick(int index, String pageName, int activeIdx, boolean isTeam, ClientWorkspaceState teamState, int button, double virtualMouseX, int curX, int tabW, int textW, int tabY) {
-        int pageCount = isTeam ? teamState.getRemotePages().size() : BoardManager.getInstance().getPages().size();
-        if (pageCount > 1 && virtualMouseX >= curX + tabW - 14 && virtualMouseX <= curX + tabW - 2 && button == 0) {
+        int pageCount = isTeam ? teamState.getRemotePages().size() : BoardManager.getInstance().getOpenPages().size();
+        boolean isCloseIconClicked = pageCount > 1 && virtualMouseX >= curX + tabW - 14 && virtualMouseX <= curX + tabW - 2 && button == 0;
+        boolean isMiddleClicked = (button == 2);
+        if (isCloseIconClicked || isMiddleClicked) {
             return handleCloseTabClick(index, pageName, isTeam, teamState);
         }
 
@@ -306,8 +307,9 @@ public class PageTabBarWidget {
 
         if (!isTeam && isRightClick && net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
             BoardManager bm = BoardManager.getInstance();
-            if (index < bm.getPages().size()) {
-                screen.openTemplateCloneDialog(bm.getPages().get(index));
+            List<BoardPage> openPages = bm.getOpenPages();
+            if (index < openPages.size()) {
+                screen.openTemplateCloneDialog(openPages.get(index));
                 return true;
             }
         }
@@ -341,24 +343,30 @@ public class PageTabBarWidget {
         }
 
         BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (index >= openPages.size()) return false;
+        BoardPage targetPage = openPages.get(index);
+
         if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
-            bm.removePage(index);
-            BoardPage active = bm.getActivePage();
-            if (active != null) {
-                screen.setPanX(active.getPanX());
-                screen.setPanY(active.getPanY());
-                screen.setZoom(active.getZoom());
-                BoardScreen.lastPanX = active.getPanX();
-                BoardScreen.lastPanY = active.getPanY();
-                BoardScreen.lastZoom = active.getZoom();
+            int actualPageIndex = bm.getPages().indexOf(targetPage);
+            if (actualPageIndex >= 0) {
+                screen.openDeletePageDialog(actualPageIndex, pageName);
             }
-            screen.rebuildWidgets();
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
-            );
-        } else {
-            screen.openDeletePageDialog(index, pageName);
+            return true;
         }
+
+        bm.closeTab(targetPage.getId());
+        BoardPage active = bm.getActivePage();
+        if (active != null) {
+            screen.setPanX(active.getPanX());
+            screen.setPanY(active.getPanY());
+            screen.setZoom(active.getZoom());
+            BoardScreen.lastPanX = active.getPanX();
+            BoardScreen.lastPanY = active.getPanY();
+            BoardScreen.lastZoom = active.getZoom();
+        }
+        screen.rebuildWidgets();
+        playClickSound();
         return true;
     }
 
@@ -393,37 +401,44 @@ public class PageTabBarWidget {
             return true;
         }
 
-        if (index != activeIdx) {
-            BoardManager bm = BoardManager.getInstance();
-            BoardPage cur = bm.getActivePage();
-            if (cur != null) {
-                cur.setPanX(screen.getPanX());
-                cur.setPanY(screen.getPanY());
-                cur.setZoom(screen.getZoom());
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (index < openPages.size()) {
+            BoardPage targetPage = openPages.get(index);
+            if (!targetPage.getId().equals(bm.getActivePage().getId())) {
+                BoardPage cur = bm.getActivePage();
+                if (cur != null) {
+                    cur.setPanX(screen.getPanX());
+                    cur.setPanY(screen.getPanY());
+                    cur.setZoom(screen.getZoom());
+                }
+                bm.openPage(targetPage.getId());
+                BoardPage next = bm.getActivePage();
+                if (next != null) {
+                    screen.setPanX(next.getPanX());
+                    screen.setPanY(next.getPanY());
+                    screen.setZoom(next.getZoom());
+                }
+                screen.rebuildWidgets();
+                screen.markSummaryDirty();
+                playClickSound();
             }
-            bm.switchPage(index);
-            BoardPage next = bm.getActivePage();
-            if (next != null) {
-                screen.setPanX(next.getPanX());
-                screen.setPanY(next.getPanY());
-                screen.setZoom(next.getZoom());
-            }
-            screen.rebuildWidgets();
-            playClickSound();
         }
         return true;
     }
 
-    private boolean handleAddPageClick(boolean isTeam, int currentSize) {
+    private boolean handleAddPageClick(boolean isTeam, int currentCount) {
         commitRename();
-        if (TutorialManager.getInstance().isActive()) {
-            screen.openTutorialExitDialogForNewPage();
-            return true;
-        }
         if (isTeam) {
-            if (screen.getExportToTeamDialog() != null) {
-                screen.getExportToTeamDialog().open();
-            }
+            ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+            String newTitle = "Page " + (currentCount + 1);
+            String newPageId = "page_" + System.currentTimeMillis();
+            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                new com.gtceu.calcboard.network.packet.c2s.C2SCommitWorkspacePacket(
+                    teamState.getCurrentTeamId(), newPageId, newTitle, 0, "Created " + newTitle, new byte[0], 0, 0, 0
+                )
+            );
+            playClickSound();
             return true;
         }
 
@@ -434,31 +449,17 @@ public class PageTabBarWidget {
             cur.setPanY(screen.getPanY());
             cur.setZoom(screen.getZoom());
         }
-        BoardPage newPage = bm.addPage("Page " + (currentSize + 1));
-        if (newPage != null) {
-            screen.setPanX(newPage.getPanX());
-            screen.setPanY(newPage.getPanY());
-            screen.setZoom(newPage.getZoom());
-            BoardScreen.lastPanX = newPage.getPanX();
-            BoardScreen.lastPanY = newPage.getPanY();
-            BoardScreen.lastZoom = newPage.getZoom();
+
+        bm.addPage("Page " + (bm.getPages().size() + 1));
+        BoardPage next = bm.getActivePage();
+        if (next != null) {
+            screen.setPanX(next.getPanX());
+            screen.setPanY(next.getPanY());
+            screen.setZoom(next.getZoom());
         }
-        this.scrollX = this.maxScrollX + 100;
         screen.rebuildWidgets();
         playClickSound();
         return true;
-    }
-
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (isDraggingTabBar) {
-            double deltaX = mouseX - dragStartX;
-            if (Math.abs(deltaX) > 2) {
-                hasDragged = true;
-            }
-            this.scrollX = Math.max(0, Math.min(maxScrollX, initialScrollX - deltaX));
-            return true;
-        }
-        return false;
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
@@ -469,36 +470,26 @@ public class PageTabBarWidget {
         return false;
     }
 
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        int tabY = screen.getPageTabY();
-        if (mouseY >= tabY - 2 && mouseY <= tabY + TAB_HEIGHT + 2) {
-            if (maxScrollX > 0) {
-                this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX - delta * 30.0));
-                return true;
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (isDraggingTabBar && maxScrollX > 0) {
+            double delta = dragStartX - mouseX;
+            this.scrollX = Math.max(0, Math.min(maxScrollX, initialScrollX + delta));
+            if (Math.abs(delta) > 3) {
+                this.hasDragged = true;
             }
+            return true;
         }
         return false;
     }
 
-    private void startRename(int index, String currentName, int x, int y, int width) {
-        this.editingPageIndex = index;
-        Font font = Minecraft.getInstance().font;
-        this.renameBox = new EditBox(font, x, y, Math.max(60, width), 16, Component.translatable("gui.gtcalcboard.page_name_hint"));
-        this.renameBox.setMaxLength(64);
-        this.renameBox.setValue(currentName);
-        this.renameBox.setFocused(true);
-    }
-
-    public void commitRename() {
-        if (editingPageIndex >= 0 && renameBox != null) {
-            String val = renameBox.getValue().trim();
-            if (!val.isEmpty()) {
-                BoardManager.getInstance().renamePage(editingPageIndex, val);
-                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onNodeRenamed();
-            }
-            editingPageIndex = -1;
-            renameBox = null;
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        int tabY = screen.getPageTabY();
+        if (mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT + 2 && maxScrollX > 0) {
+            commitRename();
+            this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX - delta * 30));
+            return true;
         }
+        return false;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -506,13 +497,13 @@ public class PageTabBarWidget {
             if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
                 commitRename();
                 return true;
-            } else if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            }
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 editingPageIndex = -1;
                 renameBox = null;
                 return true;
             }
-            renameBox.keyPressed(keyCode, scanCode, modifiers);
-            return true;
+            return renameBox.keyPressed(keyCode, scanCode, modifiers);
         }
         return false;
     }
@@ -524,23 +515,58 @@ public class PageTabBarWidget {
         return false;
     }
 
+    private void startRename(int index, String currentName, int x, int y, int width) {
+        this.editingPageIndex = index;
+        Font font = Minecraft.getInstance().font;
+        this.renameBox = new EditBox(font, x, y, Math.max(width, 70), 16, Component.literal(""));
+        this.renameBox.setValue(currentName);
+        this.renameBox.setFocused(true);
+    }
+
+    private void commitRename() {
+        if (editingPageIndex < 0 || renameBox == null) return;
+        String newName = renameBox.getValue().trim();
+        if (!newName.isEmpty()) {
+            ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+            if (teamState.isTeamMode()) {
+                List<TeamWorkspacePage> teamPages = new ArrayList<>(teamState.getRemotePages());
+                if (editingPageIndex < teamPages.size()) {
+                    TeamWorkspacePage tp = teamPages.get(editingPageIndex);
+                    com.gtceu.calcboard.network.NetworkHandler.sendToServer(
+                        new com.gtceu.calcboard.network.packet.c2s.C2SCommitWorkspacePacket(
+                            teamState.getCurrentTeamId(), tp.getPageId(), newName, tp.getPageRevision(), "Renamed page to " + newName, tp.getCompressedGraphData(), 0, 0, 0
+                        )
+                    );
+                }
+            } else {
+                BoardManager bm = BoardManager.getInstance();
+                List<BoardPage> openPages = bm.getOpenPages();
+                if (editingPageIndex < openPages.size()) {
+                    BoardPage targetPage = openPages.get(editingPageIndex);
+                    int actualIndex = bm.getPages().indexOf(targetPage);
+                    if (actualIndex >= 0) {
+                        bm.renamePage(actualIndex, newName);
+                    }
+                }
+            }
+        }
+        editingPageIndex = -1;
+        renameBox = null;
+        screen.rebuildWidgets();
+    }
+
+    private int calculateTotalWidth(List<String> titles, Font font) {
+        int width = 0;
+        for (String title : titles) {
+            int textW = font.width(title);
+            width += textW + (titles.size() > 1 ? 26 : 16) + 3;
+        }
+        return width;
+    }
+
     private void playClickSound() {
         Minecraft.getInstance().getSoundManager().play(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
     }
-
-    private int calculateTotalWidth(List<String> pageTitles, Font font) {
-        int total = 6;
-        for (String title : pageTitles) {
-            int textW = font.width(title);
-            int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
-            total += tabW + 3;
-        }
-        total += 18 + 6; // Add button
-        return total;
-    }
 }
-
-
-

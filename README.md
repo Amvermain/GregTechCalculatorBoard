@@ -101,6 +101,19 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Parallel Hatches**: Supports standard and constant-power (Absolute) parallel hatches with direct numeric input and mouse wheel scaling.
 - **Configurable Maintenance Hatches**: Supports Max Speed (0.9x duration) and Max Eco (1.1x duration) modes.
 
+### 17. Applied Energistics 2 (AE2) Integration & Autocrafting Plan ETA
+- **1:1 Page-to-Pattern Binding**: Bind any flowchart sub-page directly to an AE2 Processing Pattern (`[💠 Bind AE2 Pattern]`) or generate board pages directly from the Pattern Encoding Terminal.
+- **DAG Pipeline & Critical Path ETA**: Evaluates multi-tier autocrafting jobs over a directed acyclic graph (DAG), accounting for machine parallelism, batch counts, and stage pipeline delays to calculate exact completion times.
+- **Crafting Confirmation UI Overlay**: Renders an unobtrusive header banner with calculated total ETA, total energy, and bottleneck drill-down badges directly on AE2's Crafting Confirmation Screen (`CraftConfirmScreen`) prior to starting jobs.
+
+### 18. Precision Flow Modeling & Usability Suite
+- **16px Grid Snapping**: Toggle discrete $16\text{px}$ coordinate snapping (`G` key or HUD checkbox) for nodes, frames, and sticky notes.
+- **Hierarchical Page Drawer (`PageBrowserDrawer`)**: Manage dozens of canvas pages inside collapsible virtual folder trees (`folderPath`) with real-time text search and drag-and-drop relocation.
+- **Quick Page Switcher (`Ctrl + K`)**: IDE-style fuzzy search popup to instantly jump between canvas pages across complex project workspaces.
+- **Infinite & Fixed-Rate External Supply (`SupplyMode`)**: Configure Junction nodes to infinite supply ($\infty$) or specified rates ($R_{\text{ext}}$), blocking unwarranted upstream demand and offsetting raw input deficits in summary calculations.
+- **Machine Hardware Template Cloner (`TemplateCloneDialog`)**: Extract tier, parallel, overclock, and addon configurations into named reusable templates and batch-inject them across selected nodes.
+- **Enhanced Scrollbar State Machine**: Proportional track click jumping and global mouse drag tracking across all dialog search lists.
+
 ---
 
 ## Controls & Shortcuts
@@ -114,6 +127,8 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Marquee Box Selection | Left Click + Drag on empty canvas space (Shift + Click to toggle) |
 | Multi-Node Dragging | Drag any selected node to move all selected nodes together |
 | Group into Module | Ctrl + G |
+| Quick Page Switcher | Ctrl + K (Fuzzy search and instant jump) |
+| Toggle 16px Grid Snap | G or lower-left HUD checkbox |
 | Undo / Redo | Ctrl + Z (Undo) / Ctrl + Y or Ctrl + Shift + Z (Redo) |
 | Clipboard Operations | Ctrl + C (Copy) / Ctrl + X (Cut) / Ctrl + V (Paste) / Ctrl + D (Duplicate) |
 | Select All Nodes | Ctrl + A |
@@ -162,6 +177,7 @@ GregTech Calculator Board is completely optional on both client and server sides
   - [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM recipe tree integration)
 - **Supported Tech & Factory Mods**:
   - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ or Star Technology forks)
+  - [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (Autocrafting pattern binding & DAG ETA evaluation)
   - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
   - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
   - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
@@ -179,7 +195,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.3.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.4.jar`.
 
 ---
 

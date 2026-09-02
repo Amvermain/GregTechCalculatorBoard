@@ -4,6 +4,37 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-alpha.4] - 2026-09-02
+
+### Added
+- **Applied Energistics 2 (AE2) Integration & Autocrafting Plan ETA**:
+  - Bind any flowchart sub-page directly to an AE2 Processing Pattern (`[💠 Bind AE2 Pattern]`) or generate board pages directly from the Pattern Encoding Terminal.
+  - Renders an unobtrusive header banner with calculated total ETA, total energy, and bottleneck drill-down badges directly on AE2's Crafting Confirmation Screen (`CraftConfirmScreen`) prior to starting autocrafting jobs.
+- **16px Precision Grid Snapping**:
+  - Toggle discrete 16px coordinate snapping (`G` key or lower-left HUD checkbox) for nodes, frames, and sticky notes.
+- **Hierarchical Page Navigation Drawer (`PageBrowserDrawer`)**:
+  - Slide-in sidebar navigation drawer for organizing dozens of canvas pages inside expandable virtual folder trees with real-time text search and drag-and-drop page relocation.
+- **Quick Page Switcher (`Ctrl + K`)**:
+  - IDE-style fuzzy search popup modal to instantly jump between canvas pages across complex project workspaces.
+- **Infinite & Fixed-Rate External Supply (`SupplyMode`)**:
+  - Configure Junction nodes as infinite external sources or specified per-second rates, blocking unwarranted upstream demand and automatically offsetting raw input deficits in summary calculations.
+- **Machine Hardware Template Cloner (`TemplateCloneDialog`)**:
+  - Extract voltage tier, parallel count, overclock mode, and addon configurations into named reusable templates and batch-inject them across selected machine nodes.
+
+### Changed & Improved
+- **Scrollbar Interaction Optimization**:
+  - Added proportional track click jumping and robust global mouse thumb dragging across recipe search lists and picker dialogs.
+- **Process Balance Summary External Flow Accounting**:
+  - Enhanced `SummaryOverlay` calculations to accurately deduct infinite and fixed-rate external supplies when compiling net raw material deficits.
+- **Documentation & In-Game Guide Synchronization**:
+  - Fully synchronized official technical specifications and in-game guidebook entries with the latest hotkeys (`G`, `Ctrl+K`), folder drawer, template cloner, and AE2 features.
+
+### Fixed
+- **Recipe Search Scrollbar Dragging Issue**:
+  - Fixed an issue where clicking and dragging the scrollbar thumb in the recipe search dialog did not update the list position.
+- **Mod Addon & Fusion Capability Detection Inconsistencies**:
+  - Fixed an issue where certain fusion category machines and Thermal upgrade kits failed to register hardware stats in specific modpack environments.
+
 ## [2.1.0-alpha.3] - 2026-09-02
 
 ### Added

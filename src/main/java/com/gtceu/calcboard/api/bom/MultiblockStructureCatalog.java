@@ -201,6 +201,16 @@ public class MultiblockStructureCatalog {
 
     private static final Map<net.minecraft.world.item.Item, String> ITEM_NAME_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
+    public static class StructureSlotCounts {
+        public int coilSlots = 0;
+        public int energyHatchSlots = 0;
+        public int inputBusSlots = 0;
+        public int outputBusSlots = 0;
+        public int inputHatchSlots = 0;
+        public int outputHatchSlots = 0;
+        public int maintenanceSlots = 0;
+    }
+
     private static class EmiStructureScanner {
         private static void scan() {
             var recipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
@@ -256,16 +266,6 @@ public class MultiblockStructureCatalog {
         }
 
         private record ControllerInfo(ResourceLocation id, String name) {}
-
-        private static class StructureSlotCounts {
-            int coilSlots = 0;
-            int energyHatchSlots = 0;
-            int inputBusSlots = 0;
-            int outputBusSlots = 0;
-            int inputHatchSlots = 0;
-            int outputHatchSlots = 0;
-            int maintenanceSlots = 0;
-        }
 
         private static ControllerInfo resolveControllerInfo(dev.emi.emi.api.recipe.EmiRecipe recipe, Set<ResourceLocation> aliasIds) {
             ResourceLocation controllerId = extractControllerFromOutput(recipe, aliasIds);
@@ -363,7 +363,7 @@ public class MultiblockStructureCatalog {
                 int amount = Math.max(1, (int) stack.getAmount());
                 String name = ITEM_NAME_CACHE.computeIfAbsent(is.getItem(), itm -> is.getHoverName().getString());
                 PartCategory category = classifyPart(itemId);
-                accumulateSlotCounts(itemId.getPath().toLowerCase(Locale.ROOT), category, amount, slotCounts);
+                accumulateSlotCounts(itemId, category, amount, slotCounts);
 
                 if (!itemId.equals(controllerId)) {
                     parts.add(new MultiblockStructurePart(itemId, name, amount, category));
@@ -372,22 +372,8 @@ public class MultiblockStructureCatalog {
             }
         }
 
-        private static void accumulateSlotCounts(String path, PartCategory category, int amount, StructureSlotCounts slots) {
-            if (category == PartCategory.COIL) {
-                slots.coilSlots = Math.max(slots.coilSlots, amount);
-            } else if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch")) || path.contains("laser_target") || path.contains("laser_source")) {
-                slots.energyHatchSlots = Math.max(slots.energyHatchSlots, amount);
-            } else if (path.contains("input_bus") || path.contains("import_bus")) {
-                slots.inputBusSlots = Math.max(slots.inputBusSlots, amount);
-            } else if (path.contains("output_bus") || path.contains("export_bus")) {
-                slots.outputBusSlots = Math.max(slots.outputBusSlots, amount);
-            } else if (path.contains("input_hatch") || path.contains("fluid_import")) {
-                slots.inputHatchSlots = Math.max(slots.inputHatchSlots, amount);
-            } else if (path.contains("output_hatch") || path.contains("fluid_export")) {
-                slots.outputHatchSlots = Math.max(slots.outputHatchSlots, amount);
-            } else if (path.contains("maintenance")) {
-                slots.maintenanceSlots = Math.max(slots.maintenanceSlots, amount);
-            }
+        private static void accumulateSlotCounts(ResourceLocation itemId, PartCategory category, int amount, StructureSlotCounts slots) {
+            ModAdapterRegistry.accumulateStructureSlots(itemId, category, amount, slots);
         }
 
         private static MultiblockStructureDef createMultiblockDef(

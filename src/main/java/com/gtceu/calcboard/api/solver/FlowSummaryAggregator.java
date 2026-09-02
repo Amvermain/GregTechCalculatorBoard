@@ -152,7 +152,22 @@ public final class FlowSummaryAggregator {
         Map<IngredientStack, Double> totalConsumption = new HashMap<>();
 
         for (RecipeNode node : graph.getNodes()) {
-            if (node.isReroute()) continue;
+            if (node.isReroute()) {
+                if (node.isExternalSupply()) {
+                    IngredientStack rStack = node.getRerouteIngredient();
+                    if (rStack != null) {
+                        if (node.isInfiniteSupply()) {
+                            double downstreamDemand = FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, node, 0, null);
+                            if (downstreamDemand > 0.0) {
+                                mergeRate(totalProduction, rStack, downstreamDemand);
+                            }
+                        } else if (node.getExternalSupplyRate() > 0.0) {
+                            mergeRate(totalProduction, rStack, node.getExternalSupplyRate());
+                        }
+                    }
+                }
+                continue;
+            }
             boolean isCompoundSlave = node.isCompoundNode() && !node.isCompoundMaster();
             boolean isSharedMachine = sharedMachineNodeIds.contains(node.getId());
 

@@ -170,4 +170,30 @@ Provides 5 preset UI scaling levels for `MachineConfigDialog` across high-DPI di
 
 ---
 
+## 5. Junction Node External & Infinite Supply Modal (`JunctionSupplyDialog`) (ADR-012)
+
+Modal dialog opened by right-clicking a Junction/Reroute node to configure external resource supply modes (`SupplyMode`) and flow rates.
+
+* **Supply Mode Selector**:
+  - `[ Normal ]` (`SupplyMode.NONE`): Standard pass-through relying solely on upstream connected production.
+  - `[ ∞ Infinite Supply ]` (`SupplyMode.INFINITE`): Marks the node as an infinite external source (water pump, bedrock vein, etc.), blocking upstream demand propagation. Renders an $\infty$ badge on the card header.
+  - `[ Fixed Rate ]` (`SupplyMode.FIXED_RATE`): Enables the per-second external supply rate ($R_{\text{ext}}$) input field.
+* **Precision Number Input & Unit Formatting**:
+  - Direct floating-point text editing with validation.
+  - Automatic unit label binding: `items/s` (items) and `mB/s` (fluids).
+  - Committing via `Enter` or `[OK]` executes a `ModifyNodePropertyCommand` with immediate graph recalculation and Undo history tracking.
+
+---
+
+## 6. Machine Hardware Template Cloner Modal (`TemplateCloneDialog`) (ADR-012)
+
+Injects pre-configured hardware configuration templates (`MachineHardwareTemplate`) into single or multi-selected machine nodes.
+
+* **Core Features**:
+  - **Capture from Current Node**: Encapsulates tier, parallel count, overclock mode, addons, and threading from the source node into a named preset.
+  - **Template Library Browser**: Inspect, rename, apply, or delete saved hardware templates.
+  - **One-Click Batch Application**: Injects hardware settings across all selected nodes while safely preserving their individual recipe input/output signatures and baseline voltage requirements.
+
+---
+
 > ➡️ **Proceed to next section**: [[03-03] Page Summary and Global Balance Dashboard](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)

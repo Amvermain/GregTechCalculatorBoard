@@ -65,17 +65,143 @@ public final class ProductionETACalculator {
         return totalIncomingSupply;
     }
 
-    /**
-     * Calculates estimated completion time in seconds for a given target batch quantity.
-     *
-     * @param targetAmount   The desired target quantity (items or mB).
-     * @param netRatePerSec  The net production / inflow rate per second.
-     * @return Duration in seconds, 0.0 if amount is 0, or Double.POSITIVE_INFINITY if rate <= 0.
-     */
     public static double calculateETA(double targetAmount, double netRatePerSec) {
         if (targetAmount <= 0.0) return 0.0;
         if (netRatePerSec <= 1e-9) return Double.POSITIVE_INFINITY;
         return targetAmount / netRatePerSec;
+    }
+
+    public static double calculateETA(FlowGraph graph, RecipeNode targetNode, double targetAmount, double netRatePerSec) {
+        if (targetAmount <= 0.0) return 0.0;
+        if (netRatePerSec <= 1e-9) return Double.POSITIVE_INFINITY;
+
+        double cycleDuration = findUpstreamCycleDuration(graph, targetNode);
+        if (cycleDuration > 0.0001) {
+            double cycleCapacity = netRatePerSec * cycleDuration;
+            if (cycleCapacity > 1e-9) {
+                long cycles = (long) Math.ceil(targetAmount / cycleCapacity);
+                return cycles * cycleDuration;
+            }
+        }
+        return targetAmount / netRatePerSec;
+    }
+
+    public static double calculateDepletionTime(double supplyAmount, double netOutflowRate) {
+        if (supplyAmount <= 0.0) return 0.0;
+        if (netOutflowRate <= 1e-9) return Double.POSITIVE_INFINITY;
+        return supplyAmount / netOutflowRate;
+    }
+
+    public static double calculateDepletionTime(FlowGraph graph, RecipeNode sourceNode, double supplyAmount, double netOutflowRate) {
+        if (supplyAmount <= 0.0) return 0.0;
+        if (netOutflowRate <= 1e-9) return Double.POSITIVE_INFINITY;
+
+        double cycleDuration = findDownstreamCycleDuration(graph, sourceNode);
+        if (cycleDuration > 0.0001) {
+            double cycleCapacity = netOutflowRate * cycleDuration;
+            if (cycleCapacity > 1e-9) {
+                long cycles = (long) Math.ceil(supplyAmount / cycleCapacity);
+                return cycles * cycleDuration;
+            }
+        }
+        return supplyAmount / netOutflowRate;
+    }
+
+    public static double findUpstreamCycleDuration(FlowGraph graph, RecipeNode targetNode) {
+        if (graph == null || targetNode == null) return 0.0;
+
+        Queue<String> queue = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        queue.add(targetNode.getId());
+        visited.add(targetNode.getId());
+
+        double maxDuration = 0.0;
+
+        while (!queue.isEmpty()) {
+            String currentId = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (edge.toNodeId().equals(currentId)) {
+                    RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+                    if (fromNode != null && visited.add(fromNode.getId())) {
+                        if (fromNode.isReroute()) {
+                            queue.add(fromNode.getId());
+                        } else {
+                            maxDuration = Math.max(maxDuration, fromNode.getEffectiveDurationSeconds());
+                        }
+                    }
+                }
+            }
+        }
+        return maxDuration;
+    }
+
+    public static double findDownstreamCycleDuration(FlowGraph graph, RecipeNode sourceNode) {
+        if (graph == null || sourceNode == null) return 0.0;
+
+        Queue<String> queue = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        queue.add(sourceNode.getId());
+        visited.add(sourceNode.getId());
+
+        double maxDuration = 0.0;
+
+        while (!queue.isEmpty()) {
+            String currentId = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (edge.fromNodeId().equals(currentId)) {
+                    RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+                    if (toNode != null && visited.add(toNode.getId())) {
+                        if (toNode.isReroute()) {
+                            queue.add(toNode.getId());
+                        } else {
+                            maxDuration = Math.max(maxDuration, toNode.getEffectiveDurationSeconds());
+                        }
+                    }
+                }
+            }
+        }
+        return maxDuration;
+    }
+
+    public static double calculateNetOutflowRate(FlowGraph graph, RecipeNode sourceNode) {
+        if (graph == null || sourceNode == null) return 0.0;
+
+        record ConsumerHop(String nodeId, double weight) {}
+        Queue<ConsumerHop> queue = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+
+        queue.add(new ConsumerHop(sourceNode.getId(), 1.0));
+        visited.add(sourceNode.getId());
+
+        double totalOutflow = 0.0;
+
+        while (!queue.isEmpty()) {
+            ConsumerHop hop = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (edge.fromNodeId().equals(hop.nodeId)) {
+                    RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+                    if (consumer != null) {
+                        if (consumer.isReroute()) {
+                            if (visited.add(consumer.getId())) {
+                                queue.add(new ConsumerHop(consumer.getId(), hop.weight));
+                            }
+                        } else if (edge.inputIndex() < consumer.getInputs().size()) {
+                            IngredientStack inStack = consumer.getInputs().get(edge.inputIndex());
+                            double cRate = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount();
+
+                            int inDegree = 0;
+                            for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+                                if (inEdge.toNodeId().equals(consumer.getId()) && inEdge.inputIndex() == edge.inputIndex()) {
+                                    inDegree++;
+                                }
+                            }
+                            totalOutflow += (cRate * hop.weight) / Math.max(1, inDegree);
+                        }
+                    }
+                }
+            }
+        }
+        return totalOutflow;
     }
 
     /**

@@ -461,11 +461,7 @@ public class ThermalAugmentHelper {
         if (addon instanceof ThermalAugmentAddon ta && ta.isUpgradeKit()) return true;
         if (addon.isUpgradeTierKit()) return true;
         if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
-            if (addon.getParallelMultiplier() > 1) return true;
-            if (addon.getId() != null) {
-                String lid = addon.getId().toLowerCase(Locale.ROOT);
-                if (lid.contains("upgrade_kit") || lid.contains("tier_kit")) return true;
-            }
+            return addon.getParallelMultiplier() > 1;
         }
         return false;
     }

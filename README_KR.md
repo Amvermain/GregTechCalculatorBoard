@@ -101,6 +101,19 @@
 - **병렬 해치**: 일반 병렬 해치 및 정전력(Absolute) 병렬 해치 지원, 숫자 직접 입력(`Par`) 및 마우스 휠 스케일링.
 - **설정형 유지보수 해치 (CMH)**: Max Speed(시간 0.9배 가속) 및 Max Eco(시간 1.1배 친환경) 유지보수 모드 지원.
 
+### 17. 어플라이드 에너지스틱스 2 (AE2) 오토크래프팅 플랜 & 정밀 ETA 연동
+- **1:1 페이지-패턴 바인딩**: 공정 서브페이지를 AE2 가공 패턴(Processing Pattern)과 1:1로 직접 매핑(`[💠 Bind AE2 Pattern]`)하거나 패턴 인코딩 터미널에서 보드 페이지 즉시 생성.
+- **DAG 파이프라인 & 크리티컬 패스 ETA**: 다단계 오토크래프팅 작업을 유향 비순환 그래프(DAG)로 모델링하여 기계 병렬 수, 배치 주기, 파이프라인 지연 시간을 반영한 정확한 완료 소요 시간을 계산.
+- **오토크래프팅 계획 확인 창 UI 오버레이**: AE2의 제작 계획 확인 화면(`CraftConfirmScreen`) 상단에 예상 총 소요 시간(ETA), 총 소요 전력(EU), 병목 단계 심층 분석 배지를 비간섭형 오버레이로 렌더링.
+
+### 18. 정밀 유량 모델링 & 사용성(Usability) 강화 기능군
+- **16px 정밀 격자 스냅 (Grid Snap)**: `G` 키 또는 좌하단 HUD 토글로 노드, 프레임, 스티키 노트를 $16\text{px}$ 단위로 정밀 흡착 배치.
+- **계층형 페이지 탐색기 드로어 (`PageBrowserDrawer`)**: 수십 개의 캔버스 페이지를 가상 폴더 트리(`folderPath`) 구조로 분류하고, 실시간 검색 및 드래그 앤 드롭으로 체계적 관리.
+- **키보드 퀵 페이지 스위처 (`Ctrl + K`)**: IDE 스타일의 퍼지 검색 팝업 모달로 복잡한 프로젝트 워크스페이스 내 원하는 페이지로 즉시 점프.
+- **무한 및 고정 외부 자원 공급 (`SupplyMode`)**: 정션 노드를 무한 공급원($\infty$) 또는 초당 고정 공급량($R_{\text{ext}}$)으로 지정하여 불필요한 상류 요구량 역전파를 차단하고 공정 결산 시 원자재 결손량을 자동 상쇄.
+- **기계 하드웨어 템플릿 복제 다이얼로그 (`TemplateCloneDialog`)**: 기계의 티어, 병렬, 오버클럭, 애드온 사양을 명명된 템플릿으로 저장하고 다중 선택된 노드들에 원클릭으로 일괄 주입.
+- **스크롤바 인터랙션 최적화**: 트랙 빈 영역 클릭 시 즉시 비례 이동(Track Click Jump) 및 전역 마우스 드래그 캡처(Thumb Dragging) 지원.
+
 ---
 
 ## 조작법 및 단축키
@@ -114,6 +127,8 @@
 | 선택 박스 (Marquee) | 빈 공간 클릭 드래그로 사각형 영역 선택 (Shift + 클릭으로 개별 토글) |
 | 다중 노드 이동 | 선택된 노드 중 하나를 잡고 드래그하여 일괄 이동 |
 | 복합 모듈화 압축 | Ctrl + G |
+| 퀵 페이지 스위처 | Ctrl + K (퍼지 검색 및 즉시 점프) |
+| 16px 격자 스냅 토글 | G 키 또는 좌하단 HUD 체크박스 |
 | 실행 취소 / 다시 실행 | Ctrl + Z (실행 취소) / Ctrl + Y 또는 Ctrl + Shift + Z (다시 실행) |
 | 클립보드 작업 | Ctrl + C (복사) / Ctrl + X (잘라내기) / Ctrl + V (붙여넣기) / Ctrl + D (즉시 복제) |
 | 전체 노드 선택 | Ctrl + A |
@@ -162,6 +177,7 @@
   - [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM 레시피 트리 목표 등록)
 - **지원 산업 및 팩토리 모드**:
   - [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ 또는 Star Technology 포크)
+  - [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (오토크래프팅 패턴 바인딩 & DAG 완료 시간 연산)
   - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
   - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
   - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
@@ -179,7 +195,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.3.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.4.jar` 경로에 생성됩니다.
 
 ---
 

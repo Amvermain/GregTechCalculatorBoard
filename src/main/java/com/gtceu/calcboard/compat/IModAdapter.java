@@ -110,6 +110,12 @@ public interface IModAdapter {
     }
 
     /**
+     * Accumulates structure slot counts for a given item and part category into the slot counts collector.
+     */
+    default void accumulateStructureSlots(ResourceLocation itemId, PartCategory category, int amount, com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.StructureSlotCounts slots) {
+    }
+
+    /**
      * Adapts compound recipes (e.g. water+fuel -> steam) or mod-specific energy/duration rules.
      * Returns true if custom handling was applied.
      */

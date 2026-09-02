@@ -77,6 +77,8 @@ public class RecipeSearchDialog {
     private int lastMouseX = 0;
     private int lastMouseY = 0;
     private long lastObservedGlobalVersion = -1;
+    private boolean isDraggingScrollBar = false;
+    private double dragGrabOffsetY = 0;
 
     public static void registerFavoritesListener(Runnable listener) {
         RecipeSearchCacheManager.registerFavoritesListener(listener);
@@ -776,6 +778,29 @@ public class RecipeSearchDialog {
         int listW = dialogW - 24;
         int listH = dialogH - 60;
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
+        int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
+
+        // Scrollbar track / thumb click check
+        if (maxScroll > 0 && button == 0) {
+            int scrollTrackH = listH - 4;
+            int barH = Math.max(16, (int) ((double) visibleRows / filteredRecipes.size() * scrollTrackH));
+            int barY = listY + 2 + (int) ((double) scrollOffset / maxScroll * (scrollTrackH - barH));
+            int barX = listX + listW - 4;
+
+            if (mouseX >= barX - 4 && mouseX <= barX + 8 && mouseY >= listY + 2 && mouseY <= listY + 2 + scrollTrackH) {
+                if (mouseY >= barY && mouseY <= barY + barH) {
+                    isDraggingScrollBar = true;
+                    dragGrabOffsetY = mouseY - barY;
+                } else {
+                    double relativeY = mouseY - (listY + 2) - barH / 2.0;
+                    double ratio = relativeY / Math.max(1.0, scrollTrackH - barH);
+                    scrollOffset = Math.max(0, Math.min(maxScroll, (int) Math.round(ratio * maxScroll)));
+                    isDraggingScrollBar = true;
+                    dragGrabOffsetY = barH / 2.0;
+                }
+                return true;
+            }
+        }
 
         for (int i = 0; i < visibleRows; i++) {
             int index = scrollOffset + i;
@@ -1042,6 +1067,38 @@ public class RecipeSearchDialog {
             return filterDialog.charTyped(codePoint, modifiers);
         }
         return searchBox.charTyped(codePoint, modifiers);
+    }
+
+    public boolean mouseDragged(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        if (!visible || !isDraggingScrollBar || button != 0) return false;
+
+        int dialogW = Math.min(380, screenWidth - 24);
+        int dialogH = Math.min(280, screenHeight - 24);
+        int listH = dialogH - 60;
+        int visibleRows = Math.max(1, listH / ROW_HEIGHT);
+        int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
+        if (maxScroll <= 0) return false;
+
+        int sideW = 104;
+        int gap = 6;
+        boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
+        int y = (screenHeight - dialogH) / 2;
+        int listY = y + 52;
+        int scrollTrackH = listH - 4;
+        int barH = Math.max(16, (int) ((double) visibleRows / filteredRecipes.size() * scrollTrackH));
+
+        double relativeY = mouseY - (listY + 2) - dragGrabOffsetY;
+        double ratio = relativeY / Math.max(1.0, scrollTrackH - barH);
+        scrollOffset = Math.max(0, Math.min(maxScroll, (int) Math.round(ratio * maxScroll)));
+        return true;
+    }
+
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (isDraggingScrollBar && button == 0) {
+            isDraggingScrollBar = false;
+            return true;
+        }
+        return false;
     }
 }
 

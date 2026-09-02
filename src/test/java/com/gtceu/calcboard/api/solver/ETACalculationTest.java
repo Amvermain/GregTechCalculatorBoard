@@ -189,6 +189,117 @@ public class ETACalculationTest {
         Assertions.assertEquals(120.0, deserialized.getTargetBatchTimeSec(), 0.001);
         Assertions.assertTrue(deserialized.hasTargetBatch());
     }
+
+    @Test
+    public void testInputSourceJunctionDepletionTimeCalculation() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode freezer = RecipeNode.create("Vacuum Freezer", 375.0, 491520.0, GTVoltageTier.UV);
+        IngredientStack hotIngot = IngredientStack.item(ResourceLocation.tryParse("gtceu:hot_ingot"), "Hot Ingot", 1.0);
+        IngredientStack liquidHelium = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:liquid_helium"), "Liquid Helium", 500.0);
+        freezer.getInputs().add(hotIngot);
+        freezer.getInputs().add(liquidHelium);
+        freezer.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:ingot"), "Ingot", 1.0));
+        freezer.setMachineCount(1.0);
+        graph.addNode(freezer);
+
+        RecipeNode inputJunctionIngot = RecipeNode.createReroute(100.0, 50.0);
+        inputJunctionIngot.bindRerouteIngredient(hotIngot);
+        inputJunctionIngot.setTargetBatchAmount(10.0);
+        graph.addNode(inputJunctionIngot);
+
+        RecipeNode inputJunctionHelium = RecipeNode.createReroute(100.0, 100.0);
+        inputJunctionHelium.bindRerouteIngredient(liquidHelium);
+        inputJunctionHelium.setTargetBatchAmount(5000.0);
+        graph.addNode(inputJunctionHelium);
+
+        graph.addConnection(inputJunctionIngot.getId(), 0, freezer.getId(), 0);
+        graph.addConnection(inputJunctionHelium.getId(), 0, freezer.getId(), 1);
+
+        double drainRateIngot = ProductionETACalculator.calculateNetOutflowRate(graph, inputJunctionIngot);
+        Assertions.assertEquals(1.0 / 18.75, drainRateIngot, 0.0001);
+
+        double dtIngot = ProductionETACalculator.calculateDepletionTime(inputJunctionIngot.getTargetBatchAmount(), drainRateIngot);
+        Assertions.assertEquals(187.5, dtIngot, 0.01);
+        Assertions.assertEquals("3m 8s", FormatUtil.formatETA(dtIngot));
+
+        double drainRateHelium = ProductionETACalculator.calculateNetOutflowRate(graph, inputJunctionHelium);
+        Assertions.assertEquals(500.0 / 18.75, drainRateHelium, 0.0001);
+
+        double dtHelium = ProductionETACalculator.calculateDepletionTime(inputJunctionHelium.getTargetBatchAmount(), drainRateHelium);
+        Assertions.assertEquals(187.5, dtHelium, 0.01);
+        Assertions.assertEquals("3m 8s", FormatUtil.formatETA(dtHelium));
+    }
+
+    @Test
+    public void testDiscreteMachineCycleMismatchETAndDT() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode ebf = RecipeNode.create("Electric Blast Furnace", 600.0, 120.0, GTVoltageTier.UXV);
+        IngredientStack inPowder = IngredientStack.item(ResourceLocation.tryParse("gtceu:purple_powder"), "Purple Powder", 1.0);
+        IngredientStack outIngot = IngredientStack.item(ResourceLocation.tryParse("gtceu:hot_ingot"), "Hot Ingot", 1.0);
+        ebf.getInputs().add(inPowder);
+        ebf.getOutputs().add(outIngot);
+        ebf.setMachineCount(2.0);
+        graph.addNode(ebf);
+
+        RecipeNode inJunc = RecipeNode.createReroute(60, 60);
+        inJunc.bindRerouteIngredient(inPowder);
+        inJunc.setTargetBatchAmount(1.0);
+        graph.addNode(inJunc);
+        graph.addConnection(inJunc.getId(), 0, ebf.getId(), 0);
+
+        RecipeNode outJunc = RecipeNode.createReroute(560, 60);
+        outJunc.bindRerouteIngredient(outIngot);
+        outJunc.setTargetBatchAmount(1.0);
+        graph.addNode(outJunc);
+        graph.addConnection(ebf.getId(), 0, outJunc.getId(), 0);
+
+        double drainRate = ProductionETACalculator.calculateNetOutflowRate(graph, inJunc);
+        double dt1 = ProductionETACalculator.calculateDepletionTime(graph, inJunc, 1.0, drainRate);
+        Assertions.assertEquals(30.0, dt1, 0.01);
+
+        double netRate = ProductionETACalculator.calculateNetInflowRate(graph, outJunc, 0);
+        double et1 = ProductionETACalculator.calculateETA(graph, outJunc, 1.0, netRate);
+        Assertions.assertEquals(30.0, et1, 0.01);
+
+        double et2 = ProductionETACalculator.calculateETA(graph, outJunc, 2.0, netRate);
+        Assertions.assertEquals(30.0, et2, 0.01);
+
+        double et3 = ProductionETACalculator.calculateETA(graph, outJunc, 3.0, netRate);
+        Assertions.assertEquals(60.0, et3, 0.01);
+    }
+
+    @Test
+    public void testDiscreteMachineCycleMatchETAndDT() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode ebf = RecipeNode.create("Electric Blast Furnace", 600.0, 120.0, GTVoltageTier.UXV);
+        IngredientStack inPowder = IngredientStack.item(ResourceLocation.tryParse("gtceu:purple_powder"), "Purple Powder", 1.0);
+        IngredientStack outIngot = IngredientStack.item(ResourceLocation.tryParse("gtceu:hot_ingot"), "Hot Ingot", 1.0);
+        ebf.getInputs().add(inPowder);
+        ebf.getOutputs().add(outIngot);
+        ebf.setMachineCount(8.0);
+        graph.addNode(ebf);
+
+        RecipeNode inJunc = RecipeNode.createReroute(60, 60);
+        inJunc.bindRerouteIngredient(inPowder);
+        inJunc.setTargetBatchAmount(8.0);
+        graph.addNode(inJunc);
+        graph.addConnection(inJunc.getId(), 0, ebf.getId(), 0);
+
+        RecipeNode outJunc = RecipeNode.createReroute(560, 60);
+        outJunc.bindRerouteIngredient(outIngot);
+        outJunc.setTargetBatchAmount(8.0);
+        graph.addNode(outJunc);
+        graph.addConnection(ebf.getId(), 0, outJunc.getId(), 0);
+
+        double drainRate = ProductionETACalculator.calculateNetOutflowRate(graph, inJunc);
+        double dt8 = ProductionETACalculator.calculateDepletionTime(graph, inJunc, 8.0, drainRate);
+        Assertions.assertEquals(30.0, dt8, 0.01);
+
+        double netRate = ProductionETACalculator.calculateNetInflowRate(graph, outJunc, 0);
+        double et8 = ProductionETACalculator.calculateETA(graph, outJunc, 8.0, netRate);
+        Assertions.assertEquals(30.0, et8, 0.01);
+    }
 }
 
 

@@ -151,5 +151,20 @@ public class ModAdapterRegistry {
         }
         return com.gtceu.calcboard.api.bom.PartCategory.OTHER;
     }
+
+    public static void accumulateStructureSlots(
+            ResourceLocation itemId,
+            com.gtceu.calcboard.api.bom.PartCategory category,
+            int amount,
+            com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.StructureSlotCounts slots
+    ) {
+        init();
+        if (itemId == null || slots == null) return;
+        for (IModAdapter a : ADAPTERS) {
+            if (a.isLoaded()) {
+                a.accumulateStructureSlots(itemId, category, amount, slots);
+            }
+        }
+    }
 }
 

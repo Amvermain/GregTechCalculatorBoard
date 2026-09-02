@@ -136,6 +136,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     private NoteEditDialog noteEditDialog;
     private BoardSettingsDialog settingsDialog;
     private AutoConnectFilterDialog autoConnectDialog;
+    private com.gtceu.calcboard.client.gui.dialog.PatternBindingDialog patternBindingDialog;
+    private com.gtceu.calcboard.client.gui.dialog.JunctionSupplyDialog junctionSupplyDialog;
 
     private BalanceSummary cachedSummary = null;
     private boolean summaryDirty = true;
@@ -417,6 +419,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         if (this.noteEditDialog == null) this.noteEditDialog = new NoteEditDialog(this);
         if (this.settingsDialog == null) this.settingsDialog = new BoardSettingsDialog(this);
         if (this.autoConnectDialog == null) this.autoConnectDialog = new AutoConnectFilterDialog(this);
+        if (this.patternBindingDialog == null) this.patternBindingDialog = new com.gtceu.calcboard.client.gui.dialog.PatternBindingDialog(this);
+        if (this.junctionSupplyDialog == null) this.junctionSupplyDialog = new com.gtceu.calcboard.client.gui.dialog.JunctionSupplyDialog(this);
 
         BoardManager.getInstance().setPageRemovalListener(page -> {
             if (TutorialManager.getInstance().isTutorialPage(page.getId())) {
@@ -554,6 +558,12 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     public DeletePageConfirmDialog getDeletePageDialog() {
         return deletePageDialog;
+    }
+
+    public void openJunctionSupplyDialog(RecipeNode node) {
+        if (junctionSupplyDialog != null) {
+            junctionSupplyDialog.open(node);
+        }
     }
 
     public TutorialExitConfirmDialog getTutorialExitDialog() {
@@ -1109,6 +1119,10 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             noteEditDialog.render(graphics, width, height, mouseX, mouseY);
         } else if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
             autoConnectDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (patternBindingDialog != null && patternBindingDialog.isVisible()) {
+            patternBindingDialog.render(graphics, width, height, mouseX, mouseY);
+        } else if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
+            junctionSupplyDialog.render(graphics, width, height, mouseX, mouseY);
         }
 
         // 9. Interactive Tutorial Overlay
@@ -1141,7 +1155,9 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             || (recentSavesDialog != null && recentSavesDialog.isVisible())
             || (frameEditDialog != null && frameEditDialog.isVisible())
             || (noteEditDialog != null && noteEditDialog.isVisible())
-            || (autoConnectDialog != null && autoConnectDialog.isVisible());
+            || (autoConnectDialog != null && autoConnectDialog.isVisible())
+            || (patternBindingDialog != null && patternBindingDialog.isVisible())
+            || (junctionSupplyDialog != null && junctionSupplyDialog.isVisible());
     }
 
     public NodeWidget findWidgetForNode(RecipeNode node) {
@@ -1225,6 +1241,12 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
             return autoConnectDialog.mouseClicked(mouseX, mouseY, button);
         }
+        if (patternBindingDialog != null && patternBindingDialog.isVisible()) {
+            return patternBindingDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
+        if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
+            return junctionSupplyDialog.mouseClicked(mouseX, mouseY, button);
+        }
         if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
             if (pageBrowserDrawer.mouseClicked(mouseX, mouseY, button)) {
                 return true;
@@ -1256,6 +1278,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (searchDialog != null && searchDialog.isVisible()) {
+            if (searchDialog.mouseReleased(mouseX, mouseY, button)) {
+                return true;
+            }
+        }
         if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
             if (pageBrowserDrawer.mouseReleased(mouseX, mouseY, button)) {
                 return true;
@@ -1283,6 +1310,11 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (searchDialog != null && searchDialog.isVisible()) {
+            if (searchDialog.mouseDragged(mouseX, mouseY, button, width, height)) {
+                return true;
+            }
+        }
         if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
             if (pageBrowserDrawer.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
                 return true;
@@ -1425,6 +1457,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
     public AutoConnectFilterDialog getAutoConnectDialog() { return autoConnectDialog; }
+    public com.gtceu.calcboard.client.gui.dialog.JunctionSupplyDialog getJunctionSupplyDialog() { return junctionSupplyDialog; }
 
     public void openQuickPageSwitcher() {
         if (quickPageSwitcherDialog == null) {
@@ -1793,6 +1826,10 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     public FavoritesDockWidget getFavoritesDockWidget() {
         return favoritesDockWidget;
+    }
+
+    public com.gtceu.calcboard.client.gui.dialog.PatternBindingDialog getPatternBindingDialog() {
+        return patternBindingDialog;
     }
 
     @Override

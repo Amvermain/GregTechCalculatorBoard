@@ -177,6 +177,44 @@ public class NodePropertyStore {
 
 ---
 
+### 1.8 `SupplyMode` 및 외부 공급 유량 모델 (ADR-012)
+정션(Junction) 노드 및 원자재 공급점에 대해 무한 공급(Infinite) 또는 지정된 초당 고정 공급량(Fixed Rate)을 정의합니다.
+
+```java
+public enum SupplyMode {
+    NONE,         // 외부 공급 없음 (상류 연결 노드의 생산 유량에만 의존)
+    INFINITE,     // 무한 자원 공급 (상류 요구량 전파를 차단하고 하류 수요를 100% 충족)
+    FIXED_RATE    // 초당 고정 수량 공급 (지정된 externalSupplyRate 만큼 공급 충당)
+}
+```
+
+* **`RecipeNode` 외부 공급 속성**:
+  - `supplyMode` (`SupplyMode`, 기본값 `NONE`): 노드의 외부 공급 모드.
+  - `externalSupplyRate` (`double`, 기본값 `0.0`): `FIXED_RATE` 모드 시 초당 고정 공급 수량 (단위: items/s 또는 mB/s).
+  - `customParallel` (`int`, 기본값 `0`): 사용자가 수동 지정한 커스텀 병렬 수치.
+
+---
+
+### 1.9 `BoardPage` 계층형 디렉터리 및 AE2 바인딩 모델 (ADR-008, ADR-012)
+워크스페이스 내 다중 캔버스 페이지를 계층형 폴더 경로(`folderPath`)로 분류하고, AE2 패턴 ID(`ae2PatternId`)와 1:1 바인딩을 지원합니다.
+
+```java
+public class BoardPage {
+    private final String id;
+    private String name;
+    private String folderPath;           // 계층형 폴더 경로 (예: "Chemical/Polymers")
+    private ResourceLocation ae2PatternId; // 1:1 바인딩된 AE2 가공 패턴 ID
+    private final FlowGraph graph;
+    private final List<CanvasGroupFrame> frames;
+    private final List<CanvasStickyNote> stickyNotes;
+}
+```
+
+* **계층형 폴더 경로 (`folderPath`)**: Windows 탐색기 방식의 슬래시(`/`) 구분자 기반 가상 디렉터리 트리. `PageBrowserDrawer`와 연동하여 수백 개의 페이지를 트리 계층으로 탐색 및 일괄 정리.
+* **AE2 패턴 ID 바인딩 (`ae2PatternId`)**: 해당 페이지의 공정 전체를 AE2 가공 패턴과 1:1 매핑하여, ME 오토크래프팅 실행 시 정밀 파이프라인 ETA 연산 및 모니터링 연동.
+
+---
+
 ## 2. 결정론적 수용 능력 매트릭스 (`CategoryCapabilityMatrix`)
 
 불안정한 텍스트 툴팁 파싱 휴리스틱을 전면 배제하고, 게임 로딩 시 연역적 분석을 통해 빌드된 $O(1)$ 글로벌 불변 캐시 시스템입니다.
@@ -313,6 +351,32 @@ public record PortRef(String nodeId, boolean isInput, int portIndex) {}
 * **`ILevelRecipeProvider` (헤드리스 레시피 제공자 SPI)**:
   - EMI, JEI 등 클라이언트 전용 모드가 비활성화되었거나 전용 서버 환경일 때 바닐라 `Level.getRecipeManager()` 기반으로 `SearchableRecipe` 목록을 제공하는 추상화 인터페이스.
   - GUI 의존성 없는 $O(1)$ 레시피 인스턴스화 및 도메인 노드 생성 지원.
+
+---
+
+## 10. 기계 하드웨어 템플릿 모델 (`MachineHardwareTemplate`) (ADR-012)
+
+기계의 하드웨어 구성(티어, 병렬, 오버클럭 모드, 장착 애드온, 쓰레딩 및 특수 노드 프로퍼티)을 독립된 프리셋 템플릿으로 캡슐화하여, 다른 노드나 다중 선택 노드에 원클릭으로 주입·복제할 수 있도록 지원합니다.
+
+```java
+public class MachineHardwareTemplate {
+    private String id;
+    private String name;
+    private GTVoltageTier targetTier;
+    private int parallel;
+    private OverclockMode overclockMode;
+    private SteamMode steamMode;
+    private List<MachineAddon> addons;
+    private NodePropertyStore properties;
+    private NodeThreadingConfig threadingConfig;
+
+    public void applyTo(RecipeNode targetNode) { ... }
+    public static MachineHardwareTemplate fromNode(String name, RecipeNode sourceNode) { ... }
+}
+```
+
+* **하드웨어 구성 추출 (`fromNode`)**: 소스 노드로부터 티어, 병렬, 애드온 및 확장 속성을 복사하여 불변 템플릿 생성.
+* **하드웨어 일괄 주입 (`applyTo`)**: 타겟 노드의 고유 레시피 입출력 및 최소 요구 전압 티어($\text{recipeTier}$)를 안전하게 보존하면서 하드웨어 사양을 주입.
 
 ---
 

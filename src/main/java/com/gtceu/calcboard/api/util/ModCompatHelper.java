@@ -112,6 +112,10 @@ public class ModCompatHelper {
         return isModLoaded("enderio");
     }
 
+    public static boolean isAe2Loaded() {
+        return isModLoaded("ae2") || isModLoaded("appliedenergistics2");
+    }
+
     public static boolean isModLoaded(String modId) {
         if (TEST_OVERRIDES.containsKey(modId)) {
             return Boolean.TRUE.equals(TEST_OVERRIDES.get(modId));

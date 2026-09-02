@@ -233,6 +233,11 @@ public class BoardSettingsDialog {
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
                 Component.translatable("gui.gtcalcboard.settings.collapse_summary").getString(),
                 bm.isSummaryOverlayCollapsed());
+        rowY += rowH + 2;
+
+        drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
+                Component.translatable("gui.gtcalcboard.settings.grid_snap").getString(),
+                bm.isGridSnapEnabled());
     }
 
     private void renderUnitsTab(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, BoardManager bm) {
@@ -561,6 +566,13 @@ public class BoardSettingsDialog {
 
         if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
             bm.setSummaryOverlayCollapsed(!bm.isSummaryOverlayCollapsed());
+            onSettingsChanged();
+            return;
+        }
+        rowY += rowH + 2;
+
+        if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
+            bm.setGridSnapEnabled(!bm.isGridSnapEnabled());
             onSettingsChanged();
         }
     }

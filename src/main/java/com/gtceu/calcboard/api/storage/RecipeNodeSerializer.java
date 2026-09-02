@@ -183,6 +183,16 @@ public final class RecipeNodeSerializer {
             tag.putIntArray("hiddenOutputs", node.getHiddenOutputIndices().stream().mapToInt(Integer::intValue).toArray());
         }
 
+        if (node.getSupplyMode() != com.gtceu.calcboard.api.type.SupplyMode.NONE) {
+            tag.putString("supplyMode", node.getSupplyMode().name());
+        }
+        if (node.getExternalSupplyRate() > 0.0) {
+            tag.putDouble("externalSupplyRate", node.getExternalSupplyRate());
+        }
+        if (node.getCustomParallel() > 0) {
+            tag.putInt("customParallel", node.getCustomParallel());
+        }
+
         return tag;
     }
 
@@ -369,6 +379,18 @@ public final class RecipeNodeSerializer {
             for (int idx : tag.getIntArray("hiddenOutputs")) {
                 node.hideOutputPort(idx);
             }
+        }
+
+        if (tag.contains("supplyMode")) {
+            try {
+                node.setSupplyMode(com.gtceu.calcboard.api.type.SupplyMode.valueOf(tag.getString("supplyMode")));
+            } catch (Throwable ignored) {}
+        }
+        if (tag.contains("externalSupplyRate")) {
+            node.setExternalSupplyRate(tag.getDouble("externalSupplyRate"));
+        }
+        if (tag.contains("customParallel")) {
+            node.setCustomParallel(tag.getInt("customParallel"));
         }
 
         return node;

@@ -335,6 +335,11 @@ public class CanvasGroupFrame {
         this.posY = posY;
     }
 
+    public void setPos(double posX, double posY) {
+        this.posX = posX;
+        this.posY = posY;
+    }
+
     public double getWidth() {
         return width;
     }

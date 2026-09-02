@@ -127,6 +127,7 @@ public class CanvasStickyNote {
     public void setPosX(double posX) { this.posX = posX; }
     public double getPosY() { return posY; }
     public void setPosY(double posY) { this.posY = posY; }
+    public void setPos(double posX, double posY) { this.posX = posX; this.posY = posY; }
     public double getWidth() { return width; }
     public void setWidth(double width) { this.width = Math.max(MIN_WIDTH, width); }
     public double getHeight() { return height; }

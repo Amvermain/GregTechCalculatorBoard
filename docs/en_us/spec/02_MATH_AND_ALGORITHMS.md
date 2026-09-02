@@ -210,4 +210,36 @@ $$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad 
 
 ---
 
+### [Algorithm 6] Infinite/Fixed External Supply Flow Modeling (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) (ADR-012)
+
+When external resource supply modes (`SupplyMode`) are configured on junction or source nodes, upstream demand backpropagation is deterministically controlled and raw deficits are neutralized:
+
+1. **Infinite Supply Mode (`SupplyMode.INFINITE`)**:
+   - Blocks upstream demand propagation regardless of downstream demand $D_{\text{down}}$:
+     $$\text{Demand}_{\text{upstream}} = 0$$
+   - Satisfies 100% of downstream demand from infinite external feed, preventing unwarranted upstream machine scaling.
+2. **Fixed Rate Supply Mode (`SupplyMode.FIXED_RATE`)**:
+   - Propagates only the remaining demand exceeding the fixed per-second feed rate $R_{\text{ext}}$:
+     $$\text{Demand}_{\text{upstream}} = \max(0.0, \, D_{\text{down}} - R_{\text{ext}})$$
+3. **Summary Deficit Offset (`FlowSummaryAggregator`)**:
+   - When compiling total unconnected raw material deficits ($\text{RawDeficit}$), subtracts effective supply from external nodes ($\min(D_{\text{down}}, R_{\text{ext}})$ or $\text{INFINITE}$) to account only for genuine net deficits.
+
+---
+
+### [Algorithm 7] AE2 Autocrafting Plan Evaluation & Critical Path Pipeline ETA (`Ae2CraftingPlanEvaluator`) (ADR-008)
+
+For multi-page flowchart graphs bound to AE2 crafting patterns, calculates exact parallel execution times and pipeline latency over an $O(K)$ topologically sorted DAG:
+
+1. **Single Node Batch Duration ($T_{\text{batch}}$) & Run Count ($N_{\text{runs}}$)**:
+   $$\text{EffectiveParallel} = \text{node.getParallel}() \times \text{node.getMachineCount}()$$
+   $$N_{\text{runs}} = \left\lceil \frac{\text{RequiredQuantity}}{\text{RecipeOutputAmount} \times \text{EffectiveParallel}} \right\rceil$$
+   $$T_{\text{node}} = N_{\text{runs}} \times \text{node.getEffectiveDurationSeconds}()$$
+2. **Critical Path & Pipeline Staggering ($T_{\text{pipeline}}$)**:
+   For upstream predecessor set $\text{Pred}(u)$:
+   $$T_{\text{start}}(u) = \max_{p \in \text{Pred}(u)} \left( T_{\text{start}}(p) + \text{FirstBatchDuration}(p) \right)$$
+   $$T_{\text{finish}}(u) = T_{\text{start}}(u) + T_{\text{node}}(u)$$
+   $$\text{Total ETA} = \max_{u \in \text{TerminalNodes}} T_{\text{finish}}(u)$$
+
+---
+
 > ➡️ **Next Chapter**: [[03] UI & Canvas Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md)

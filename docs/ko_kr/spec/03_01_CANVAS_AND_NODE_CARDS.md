@@ -16,6 +16,14 @@ $$\text{ScreenX} = (\text{CanvasX} \times \text{Zoom}) + \text{PanX}, \quad \tex
 * **팬(Pan) 제어**: 마우스 우클릭 드래그 또는 휠 클릭 드래그
 * **그리드 간격**: $20\text{px} \times \text{Zoom}$ 단위 도트 배경 렌더링
 
+### 1.1 16px 정밀 격자 스냅 (Grid Snap) 및 좌표 양자화 (ADR-012)
+노드, 프레임, 스티키 노트의 드래그 이동 및 크기 조절 시 $16\text{px}$ 단위의 정밀 양자화(Quantization)를 적용합니다.
+
+$$x_{\text{snapped}} = \text{round}\left(\frac{x}{16.0}\right) \times 16.0, \quad y_{\text{snapped}} = \text{round}\left(\frac{y}{16.0}\right) \times 16.0$$
+
+* **HUD 토글 및 단축키**: `G` 키 또는 좌하단 HUD 토글 버튼을 통해 격자 스냅 활성화/비활성화 전환.
+* **사용자 설정 영속화**: `BoardSettingsDialog` 및 클라이언트 NBT에 스냅 활성화 상태를 저장.
+
 ---
 
 ## 2. 3차 베지어 와이어 렌더링 (`ConnectionRenderer`)

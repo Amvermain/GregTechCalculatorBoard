@@ -14,7 +14,9 @@ import net.minecraft.nbt.Tag;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -32,7 +34,6 @@ public class BoardManager {
     private boolean hotkeyHudExpanded = true;
     private boolean favoritesDockExpanded = true;
 
-    // Customization & Visibility Preferences
     private boolean showGuideButton = true;
     private boolean showTutorialButton = true;
     private boolean showTimeUnitButton = true;
@@ -44,6 +45,8 @@ public class BoardManager {
     private WireColorPreset matchedWireColorPreset = WireColorPreset.GREEN;
     private int maxHarmonizeScale = 16;
     private double harmonizeSurplusTolerance = 0.02;
+    private boolean gridSnapEnabled = false;
+    private int gridSnapSize = 16;
 
     private boolean autoLoaded = false;
 
@@ -88,7 +91,12 @@ public class BoardManager {
         this.matchedWireColorPreset = WireColorPreset.GREEN;
         this.maxHarmonizeScale = 16;
         this.harmonizeSurplusTolerance = 0.02;
+        this.gridSnapEnabled = false;
+        this.gridSnapSize = 16;
         com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
+        com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().clear();
+        this.openPageIds.clear();
+        this.openPageIds.add(this.pages.get(0).getId());
         this.autoLoaded = false;
     }
 
@@ -270,16 +278,157 @@ public class BoardManager {
         return getMatchedWireColorPreset().getArgb();
     }
 
+    public boolean isGridSnapEnabled() {
+        return gridSnapEnabled;
+    }
+
+    public void setGridSnapEnabled(boolean gridSnapEnabled) {
+        this.gridSnapEnabled = gridSnapEnabled;
+    }
+
+    public void toggleGridSnap() {
+        this.gridSnapEnabled = !this.gridSnapEnabled;
+    }
+
+    public int getGridSnapSize() {
+        return gridSnapSize > 0 ? gridSnapSize : 16;
+    }
+
+    public void setGridSnapSize(int gridSnapSize) {
+        this.gridSnapSize = Math.max(8, Math.min(64, gridSnapSize));
+    }
+
     public static BoardManager getInstance() {
         INSTANCE.ensureLoaded();
         return INSTANCE;
     }
+
+    private final List<String> openPageIds = new ArrayList<>();
 
     public List<BoardPage> getPages() {
         if (pages.isEmpty()) {
             pages.add(BoardPage.createDefault("Page 1"));
         }
         return pages;
+    }
+
+    public List<String> getOpenPageIds() {
+        if (openPageIds.isEmpty()) {
+            openPageIds.add(getActivePage().getId());
+        }
+        return Collections.unmodifiableList(openPageIds);
+    }
+
+    public List<BoardPage> getOpenPages() {
+        List<BoardPage> list = new ArrayList<>();
+        for (String id : getOpenPageIds()) {
+            getPage(id).ifPresent(list::add);
+        }
+        if (list.isEmpty()) {
+            BoardPage active = getActivePage();
+            list.add(active);
+            if (!openPageIds.contains(active.getId())) {
+                openPageIds.add(active.getId());
+            }
+        }
+        return list;
+    }
+
+    public Optional<BoardPage> getPage(String pageId) {
+        if (pageId == null || pageId.isEmpty()) return Optional.empty();
+        for (BoardPage page : pages) {
+            if (page.getId().equals(pageId)) {
+                return Optional.of(page);
+            }
+        }
+        return Optional.empty();
+    }
+
+    public boolean openPage(String pageId) {
+        if (pageId == null || pageId.isEmpty()) return false;
+        Optional<BoardPage> opt = getPage(pageId);
+        if (opt.isEmpty()) return false;
+
+        BoardPage page = opt.get();
+        if (!openPageIds.contains(pageId)) {
+            openPageIds.add(pageId);
+            notifyTabOpened(page, pageId);
+        }
+
+        int index = pages.indexOf(page);
+        if (index >= 0) {
+            switchPage(index);
+        }
+        return true;
+    }
+
+    public boolean openPage(BoardPage page) {
+        if (page == null) return false;
+        return openPage(page.getId());
+    }
+
+    public void closeTab(String pageId) {
+        if (pageId == null || pageId.isEmpty()) return;
+        int idx = openPageIds.indexOf(pageId);
+        if (idx < 0) return;
+
+        openPageIds.remove(idx);
+        Optional<BoardPage> closedOpt = getPage(pageId);
+        closedOpt.ifPresent(p -> notifyTabClosed(p, pageId));
+
+        if (openPageIds.isEmpty()) {
+            if (!pages.isEmpty()) {
+                openPage(pages.get(0).getId());
+            }
+            return;
+        }
+
+        if (getActivePage().getId().equals(pageId)) {
+            int nextIdx = Math.min(idx, openPageIds.size() - 1);
+            String nextId = openPageIds.get(nextIdx);
+            openPage(nextId);
+        }
+    }
+
+    public void closeOtherTabs(String keepPageId) {
+        if (keepPageId == null || keepPageId.isEmpty()) return;
+        List<String> toClose = new ArrayList<>(openPageIds);
+        for (String id : toClose) {
+            if (!id.equals(keepPageId)) {
+                closeTab(id);
+            }
+        }
+    }
+
+    public void closeAllTabs() {
+        openPageIds.clear();
+        if (!pages.isEmpty()) {
+            openPage(pages.get(0).getId());
+        }
+    }
+
+    public boolean isTabOpen(String pageId) {
+        return openPageIds.contains(pageId);
+    }
+
+    private void notifyTabOpened(BoardPage page, String pageId) {
+        for (IPageLifecycleListener l : pageLifecycleListeners) {
+            try {
+                l.onTabOpened(page, pageId);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
+    }
+
+    private void notifyTabClosed(BoardPage page, String pageId) {
+        for (IPageLifecycleListener l : pageLifecycleListeners) {
+            try {
+                l.onTabClosed(page, pageId);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
     }
 
     public int getActivePageIndex() {
@@ -367,6 +516,10 @@ public class BoardManager {
             pages.add(page);
             int idx = pages.size() - 1;
             activePageIndex = idx;
+            if (!openPageIds.contains(page.getId())) {
+                openPageIds.add(page.getId());
+                notifyTabOpened(page, page.getId());
+            }
             for (IPageLifecycleListener l : pageLifecycleListeners) {
                 try {
                     l.onPageAdded(page, idx);
@@ -387,14 +540,17 @@ public class BoardManager {
 
     public boolean removePage(int index) {
         if (pages.size() <= 1) {
-            // Cannot remove last page, just clear it
             pages.get(0).getGraph().clear();
             return false;
         }
         if (index >= 0 && index < pages.size()) {
             BoardPage removed = pages.remove(index);
+            openPageIds.remove(removed.getId());
             if (activePageIndex >= pages.size()) {
                 activePageIndex = pages.size() - 1;
+            }
+            if (openPageIds.isEmpty() && !pages.isEmpty()) {
+                openPageIds.add(getActivePage().getId());
             }
             if (pageRemovalListener != null) {
                 pageRemovalListener.accept(removed);
@@ -416,6 +572,10 @@ public class BoardManager {
             BoardPage prev = getActivePage();
             this.activePageIndex = index;
             BoardPage cur = getActivePage();
+            if (!openPageIds.contains(cur.getId())) {
+                openPageIds.add(cur.getId());
+                notifyTabOpened(cur, cur.getId());
+            }
             for (IPageLifecycleListener l : pageLifecycleListeners) {
                 try {
                     l.onPageSwitched(prev, cur, index);
@@ -563,13 +723,24 @@ public class BoardManager {
             rootTag.putString("matchedWireColorPreset", getMatchedWireColorPreset().name());
             rootTag.putInt("maxHarmonizeScale", getMaxHarmonizeScale());
             rootTag.putDouble("harmonizeSurplusTolerance", getHarmonizeSurplusTolerance());
+            rootTag.putBoolean("gridSnapEnabled", isGridSnapEnabled());
+            rootTag.putInt("gridSnapSize", getGridSnapSize());
             rootTag.put("categoryPresets", com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().serializeNBT());
+            rootTag.put("ae2Bindings", com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().serializeNBT());
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
                 pageList.add(page.serializeNBT());
             }
             rootTag.put("pages", pageList);
+
+            ListTag openTabsList = new ListTag();
+            for (String id : getOpenPageIds()) {
+                CompoundTag t = new CompoundTag();
+                t.putString("id", id);
+                openTabsList.add(t);
+            }
+            rootTag.put("openTabs", openTabsList);
             File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
             NbtIo.writeCompressed(rootTag, tempFile);
             try {
@@ -655,10 +826,21 @@ public class BoardManager {
                 if (rootTag.contains("harmonizeSurplusTolerance")) {
                     this.harmonizeSurplusTolerance = rootTag.getDouble("harmonizeSurplusTolerance");
                 }
+                if (rootTag.contains("gridSnapEnabled")) {
+                    this.gridSnapEnabled = rootTag.getBoolean("gridSnapEnabled");
+                }
+                if (rootTag.contains("gridSnapSize")) {
+                    this.gridSnapSize = rootTag.getInt("gridSnapSize");
+                }
                 if (rootTag.contains("categoryPresets", Tag.TAG_COMPOUND)) {
                     com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().deserializeNBT(rootTag.getCompound("categoryPresets"));
                 } else {
                     com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
+                }
+                if (rootTag.contains("ae2Bindings", Tag.TAG_COMPOUND)) {
+                    com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().deserializeNBT(rootTag.getCompound("ae2Bindings"));
+                } else {
+                    com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().clear();
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);
@@ -671,7 +853,6 @@ public class BoardManager {
                     }
                     this.activePageIndex = Math.max(0, Math.min(this.pages.size() - 1, rootTag.getInt("activePageIndex")));
                 } else {
-                    // Legacy single-page format fallback
                     FlowGraph loaded = FlowGraph.deserializeNBT(rootTag);
                     this.pages.clear();
                     BoardPage p = BoardPage.createDefault("Page 1");
@@ -681,6 +862,20 @@ public class BoardManager {
                     if (rootTag.contains("zoom")) p.setZoom(rootTag.getDouble("zoom"));
                     this.pages.add(p);
                     this.activePageIndex = 0;
+                }
+
+                this.openPageIds.clear();
+                if (rootTag.contains("openTabs", Tag.TAG_LIST)) {
+                    ListTag openTabsList = rootTag.getList("openTabs", Tag.TAG_COMPOUND);
+                    for (int i = 0; i < openTabsList.size(); i++) {
+                        String id = openTabsList.getCompound(i).getString("id");
+                        if (getPage(id).isPresent()) {
+                            this.openPageIds.add(id);
+                        }
+                    }
+                }
+                if (this.openPageIds.isEmpty() && !this.pages.isEmpty()) {
+                    this.openPageIds.add(getActivePage().getId());
                 }
 
                 return true;

@@ -138,19 +138,19 @@ public class CreateKineticTest {
         node.setEnergyType(EnergyType.KINETIC_SU);
         node.setRpm(32);
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(64, node.getRpm());
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(128, node.getRpm());
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(256, node.getRpm());
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(4, node.getRpm());
 
-        node.cycleRpm(-1);
+        CreateProperties.cycleRpm(node, -1);
         Assertions.assertEquals(256, node.getRpm());
     }
 
@@ -335,7 +335,7 @@ public class CreateKineticTest {
         node.setMachineIcon(ResourceLocation.tryParse("vintageimprovements:vibrating_table"));
 
         // 1. Must be recognized as Create Kinetic Machine
-        Assertions.assertTrue(node.isCreateMachine(), "Vintage Improvements must be recognized as Create kinetic machine");
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node), "Vintage Improvements must be recognized as Create kinetic machine");
         Assertions.assertEquals(EnergyType.KINETIC_SU, node.getEnergyType());
 
         // 2. Default RPM is 32 RPM (speedFactor 1.0x) -> 128 SU Impact, 5.0s duration
@@ -359,7 +359,7 @@ public class CreateKineticTest {
         lathe.setRecipeCategoryId(ResourceLocation.tryParse("vintageimprovements:lathe"));
         lathe.setMachineIcon(ResourceLocation.tryParse("vintageimprovements:lathe"));
 
-        Assertions.assertTrue(lathe.isCreateMachine());
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(lathe));
         Assertions.assertEquals(EnergyType.KINETIC_SU, lathe.getEnergyType());
         Assertions.assertEquals(256.0, lathe.getSingleMachineEUt(), 0.001);
     }

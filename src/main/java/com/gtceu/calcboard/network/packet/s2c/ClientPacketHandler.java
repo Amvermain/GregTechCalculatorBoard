@@ -126,5 +126,9 @@ public class ClientPacketHandler {
         Minecraft mc = Minecraft.getInstance();
         mc.tell(() -> mc.setScreen(new BoardScreen()));
     }
+
+    public static void handleAe2CraftingEta(S2CAe2CraftingEtaPacket packet) {
+        com.gtceu.calcboard.client.gui.compat.ae2.ClientCraftingEtaHolder.getInstance().setCurrentResult(packet.getResult());
+    }
 }
 

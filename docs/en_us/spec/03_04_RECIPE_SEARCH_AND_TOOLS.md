@@ -13,6 +13,10 @@ Unified search dialog for finding recipes across tens of thousands of entries in
   - `&` / space (AND), `|` (OR), `!` (NOT)
   - `@gtceu` (Mod ID), `#logs` (Item Tag), `[chemical_reactor]` (Category ID), `"exact"` (Exact match)
 * **Drag to Search**: Dragging from an open socket onto empty canvas automatically filters recipes that consume or produce that material.
+* **Scrollbar Interaction State Machine (ADR-012)**:
+  - **Track Click Jump**: Clicking empty track area instantly jumps scroll position proportionally.
+  - **Thumb Dragging**: Captures mouse dragging state globally, providing continuous, smooth scrolling even if the cursor leaves dialog bounds.
+  - **Mouse Wheel Acceleration**: Precise discrete row stepping ($48\text{px}$) per wheel tick.
 
 ### 1.1 `RecipeSearchDialog` UI Wireframe
 
@@ -368,6 +372,25 @@ Guides newcomers through fundamental workflows (node creation, wiring, ratio bal
 | **Step 9** | `STEP_9_COMPOUND_MODULE`| Group multiple nodes into a modular Compound Node via `Ctrl + G` |
 | **Step 10** | `STEP_10_SHARED_POOL` | Group multiple recipes into a Shared Machine Pool frame to calculate time-sharing duty cycle (`Total Duty %`) |
 | **Step 11** | `STEP_11_BATCH_WIRING` | Perform marquee port multi-selection and bundle batch wiring (`Bundle Batch Wiring`) |
+
+---
+
+## 7. Hierarchical Page Browser Drawer (`PageBrowserDrawer`) (ADR-012)
+
+Slide-in sidebar navigation drawer for managing multi-canvas workspaces organized into expandable directory folder trees:
+
+* **Virtual Directory Tree**: Expandable/collapsible folder hierarchy based on `folderPath` with real-time text search.
+* **Drag-and-Drop Page Organization**: Drag page entries into target folders for instant path restructuring and persistent NBT synchronization.
+* **Context Actions**: Right-click actions for creating new pages/folders, renaming, duplicating, and deleting pages.
+
+---
+
+## 8. Keyboard Quick Page Switcher (`QuickPageSwitcherDialog`) (ADR-012)
+
+IDE-style lightweight modal activated via `Ctrl + K` for instant fuzzy searching across page titles and directory paths:
+
+* **Fuzzy Search & Substring Highlighting**: Instant prefix and subsequence matching across page names and folder paths.
+* **Keyboard Flow**: `↑` / `↓` navigation, `Enter` to switch pages instantly, `Esc` to dismiss.
 
 ---
 

@@ -23,6 +23,7 @@ public class CanvasNoteInteractionHandler {
     private CanvasStickyNote resizingNote = null;
     private double resizeNoteStartX, resizeNoteStartY;
     private double origNoteWidth, origNoteHeight;
+    private double dragStartMouseCanvasX, dragStartMouseCanvasY;
     private long lastNoteHeaderClickTime = 0;
     private CanvasStickyNote lastClickedNote = null;
 
@@ -144,6 +145,8 @@ public class CanvasNoteInteractionHandler {
     ) {
         draggingNote = note;
         dragStartPositions.clear();
+        dragStartMouseCanvasX = canvasMouseX;
+        dragStartMouseCanvasY = canvasMouseY;
 
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
@@ -183,46 +186,95 @@ public class CanvasNoteInteractionHandler {
             Map<String, double[]> dragStartPositions
     ) {
         if (resizingNote != null) {
-            double deltaX = canvasMouseX - resizeNoteStartX;
-            double deltaY = canvasMouseY - resizeNoteStartY;
-            resizingNote.setWidth(Math.max(100, origNoteWidth + deltaX));
-            resizingNote.setHeight(Math.max(60, origNoteHeight + deltaY));
+            double rawDeltaX = canvasMouseX - resizeNoteStartX;
+            double rawDeltaY = canvasMouseY - resizeNoteStartY;
+            boolean isSnap = net.minecraft.client.gui.screens.Screen.hasControlDown() || com.gtceu.calcboard.api.storage.BoardManager.getInstance().isGridSnapEnabled();
+            int gridSize = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getGridSnapSize();
+            if (gridSize <= 0) gridSize = 16;
+
+            double targetRightX = resizingNote.getPosX() + origNoteWidth + rawDeltaX;
+            double targetBottomY = resizingNote.getPosY() + origNoteHeight + rawDeltaY;
+
+            if (isSnap) {
+                targetRightX = Math.round(targetRightX / (double) gridSize) * (double) gridSize;
+                targetBottomY = Math.round(targetBottomY / (double) gridSize) * (double) gridSize;
+            }
+            resizingNote.setWidth(Math.max(100, targetRightX - resizingNote.getPosX()));
+            resizingNote.setHeight(Math.max(60, targetBottomY - resizingNote.getPosY()));
             return true;
         }
 
         if (draggingNote != null) {
-            applyNoteDrag(canvasMouseX - lastDragCanvasX, canvasMouseY - lastDragCanvasY, screen, dragStartPositions);
+            applyNoteDrag(canvasMouseX, canvasMouseY, lastDragCanvasX, lastDragCanvasY, screen, dragStartPositions);
             return true;
         }
         return false;
     }
 
     private void applyNoteDrag(
-            double dx,
-            double dy,
+            double curCanvasX,
+            double curCanvasY,
+            double lastDragCanvasX,
+            double lastDragCanvasY,
             BoardScreen screen,
             Map<String, double[]> dragStartPositions
     ) {
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
 
-        for (String id : dragStartPositions.keySet()) {
-            CanvasStickyNote note = graph.findStickyNoteById(id);
-            if (note != null) {
-                note.setPosX(note.getPosX() + dx);
-                note.setPosY(note.getPosY() + dy);
-                continue;
+        boolean isSnap = net.minecraft.client.gui.screens.Screen.hasControlDown() || com.gtceu.calcboard.api.storage.BoardManager.getInstance().isGridSnapEnabled();
+        int gridSize = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getGridSnapSize();
+        if (gridSize <= 0) gridSize = 16;
+
+        if (isSnap) {
+            String primaryId = draggingNote.getId();
+            double[] primaryStartPos = dragStartPositions.get(primaryId);
+            if (primaryStartPos == null) {
+                primaryStartPos = new double[]{draggingNote.getPosX(), draggingNote.getPosY()};
             }
-            RecipeNode n = graph.findNodeById(id);
-            if (n != null) {
-                n.setPosX(n.getPosX() + dx);
-                n.setPosY(n.getPosY() + dy);
-                continue;
+            double targetPrimaryX = primaryStartPos[0] + (curCanvasX - dragStartMouseCanvasX);
+            double targetPrimaryY = primaryStartPos[1] + (curCanvasY - dragStartMouseCanvasY);
+            double snappedPrimaryX = Math.round(targetPrimaryX / (double) gridSize) * (double) gridSize;
+            double snappedPrimaryY = Math.round(targetPrimaryY / (double) gridSize) * (double) gridSize;
+            double effectiveDeltaX = snappedPrimaryX - primaryStartPos[0];
+            double effectiveDeltaY = snappedPrimaryY - primaryStartPos[1];
+
+            for (Map.Entry<String, double[]> entry : dragStartPositions.entrySet()) {
+                String id = entry.getKey();
+                double[] startPos = entry.getValue();
+                CanvasStickyNote note = graph.findStickyNoteById(id);
+                if (note != null) {
+                    note.setPos(startPos[0] + effectiveDeltaX, startPos[1] + effectiveDeltaY);
+                    continue;
+                }
+                RecipeNode n = graph.findNodeById(id);
+                if (n != null) {
+                    n.setPos(startPos[0] + effectiveDeltaX, startPos[1] + effectiveDeltaY);
+                    continue;
+                }
+                CanvasGroupFrame f = graph.findFrameById(id);
+                if (f != null) {
+                    f.setPos(startPos[0] + effectiveDeltaX, startPos[1] + effectiveDeltaY);
+                }
             }
-            CanvasGroupFrame f = graph.findFrameById(id);
-            if (f != null) {
-                f.setPosX(f.getPosX() + dx);
-                f.setPosY(f.getPosY() + dy);
+        } else {
+            double dx = curCanvasX - lastDragCanvasX;
+            double dy = curCanvasY - lastDragCanvasY;
+            for (String id : dragStartPositions.keySet()) {
+                CanvasStickyNote note = graph.findStickyNoteById(id);
+                if (note != null) {
+                    note.setPos(note.getPosX() + dx, note.getPosY() + dy);
+                    continue;
+                }
+                RecipeNode n = graph.findNodeById(id);
+                if (n != null) {
+                    n.setPos(n.getPosX() + dx, n.getPosY() + dy);
+                    continue;
+                }
+                CanvasGroupFrame f = graph.findFrameById(id);
+                if (f != null) {
+                    f.setPos(f.getPosX() + dx, f.getPosY() + dy);
+                }
             }
         }
     }

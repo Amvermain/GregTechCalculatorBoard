@@ -176,6 +176,22 @@ public class ToolbarWidget {
             }));
         }
 
+        // 3.8 AE2 Pattern Binding
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isAe2Loaded()) {
+            BoardPage activePage = bm.getActivePage();
+            boolean isBound = activePage != null && com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(activePage.getId());
+            String ae2Txt = isBound ? "§b⚡ " + Component.translatable("gui.gtcalcboard.ae2.btn_bound").getString()
+                                    : "§7⚡ " + Component.translatable("gui.gtcalcboard.ae2.btn_bind").getString();
+            int ae2Bg = isBound ? 0xFF0C4A6E : 0xFF282E3B;
+            int ae2Hover = isBound ? 0xFF075985 : 0xFF3E475A;
+            int ae2Border = isBound ? 0xFF0284C7 : 0xFF3D4455;
+            list.add(new ToolbarButtonDef("ae2_bind", ae2Txt, isBound ? 0xFF38BDF8 : 0xFFCCCCCC, ae2Bg, ae2Hover, ae2Border, font.width(ae2Txt) + 12, btn -> {
+                if (screen.getPatternBindingDialog() != null) {
+                    screen.getPatternBindingDialog().open(activePage);
+                }
+            }));
+        }
+
         // 4. Share
         String shareTxt = "📋 " + Component.translatable("gui.gtcalcboard.export").getString();
         list.add(new ToolbarButtonDef("export", shareTxt, 0xFF66DDFF, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(shareTxt) + 12, btn -> copyBlueprintToClipboard()));

@@ -27,6 +27,7 @@ public class CanvasFrameInteractionHandler {
     private double origFrameX, origFrameY;
     private double origFrameWidth, origFrameHeight;
     private long lastFrameHeaderClickTime = 0;
+    private double dragStartMouseCanvasX, dragStartMouseCanvasY;
     private CanvasGroupFrame lastClickedFrame = null;
 
     public CanvasGroupFrame getDraggingFrame() {
@@ -218,6 +219,8 @@ public class CanvasFrameInteractionHandler {
     ) {
         draggingFrame = frame;
         dragStartPositions.clear();
+        dragStartMouseCanvasX = canvasMouseX;
+        dragStartMouseCanvasY = canvasMouseY;
 
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
@@ -296,65 +299,119 @@ public class CanvasFrameInteractionHandler {
         }
 
         if (draggingFrame != null) {
-            applyFrameDrag(canvasMouseX - lastDragCanvasX, canvasMouseY - lastDragCanvasY, screen, dragStartPositions);
+            applyFrameDrag(canvasMouseX, canvasMouseY, lastDragCanvasX, lastDragCanvasY, screen, dragStartPositions);
             return true;
         }
         return false;
     }
 
     private void applyFrameResize(double canvasMouseX, double canvasMouseY) {
-        double deltaX = canvasMouseX - resizeFrameStartX;
-        double deltaY = canvasMouseY - resizeFrameStartY;
+        double rawDeltaX = canvasMouseX - resizeFrameStartX;
+        double rawDeltaY = canvasMouseY - resizeFrameStartY;
+        boolean isSnap = net.minecraft.client.gui.screens.Screen.hasControlDown() || com.gtceu.calcboard.api.storage.BoardManager.getInstance().isGridSnapEnabled();
+        int gridSize = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getGridSnapSize();
+        if (gridSize <= 0) gridSize = 16;
+
         double minWidth = CanvasGroupFrame.MIN_WIDTH;
         double minHeight = CanvasGroupFrame.MIN_HEIGHT;
 
+        double targetRightX = origFrameX + origFrameWidth + rawDeltaX;
+        double targetLeftX = origFrameX + rawDeltaX;
+        double targetBottomY = origFrameY + origFrameHeight + rawDeltaY;
+        double targetTopY = origFrameY + rawDeltaY;
+
+        if (isSnap) {
+            targetRightX = Math.round(targetRightX / (double) gridSize) * (double) gridSize;
+            targetLeftX = Math.round(targetLeftX / (double) gridSize) * (double) gridSize;
+            targetBottomY = Math.round(targetBottomY / (double) gridSize) * (double) gridSize;
+            targetTopY = Math.round(targetTopY / (double) gridSize) * (double) gridSize;
+        }
+
         switch (resizeFrameDir) {
-            case EAST, NORTH_EAST, SOUTH_EAST -> resizingFrame.setWidth(Math.max(minWidth, origFrameWidth + deltaX));
+            case EAST, NORTH_EAST, SOUTH_EAST -> resizingFrame.setWidth(Math.max(minWidth, targetRightX - origFrameX));
             case WEST, NORTH_WEST, SOUTH_WEST -> {
-                double clampedDeltaX = Math.min(deltaX, origFrameWidth - minWidth);
-                resizingFrame.setPosX(origFrameX + clampedDeltaX);
-                resizingFrame.setWidth(origFrameWidth - clampedDeltaX);
+                double newLeftX = Math.min(targetLeftX, origFrameX + origFrameWidth - minWidth);
+                resizingFrame.setPosX(newLeftX);
+                resizingFrame.setWidth(origFrameX + origFrameWidth - newLeftX);
             }
             default -> {}
         }
 
         switch (resizeFrameDir) {
-            case SOUTH, SOUTH_WEST, SOUTH_EAST -> resizingFrame.setHeight(Math.max(minHeight, origFrameHeight + deltaY));
+            case SOUTH, SOUTH_WEST, SOUTH_EAST -> resizingFrame.setHeight(Math.max(minHeight, targetBottomY - origFrameY));
             case NORTH, NORTH_WEST, NORTH_EAST -> {
-                double clampedDeltaY = Math.min(deltaY, origFrameHeight - minHeight);
-                resizingFrame.setPosY(origFrameY + clampedDeltaY);
-                resizingFrame.setHeight(origFrameHeight - clampedDeltaY);
+                double newTopY = Math.min(targetTopY, origFrameY + origFrameHeight - minHeight);
+                resizingFrame.setPosY(newTopY);
+                resizingFrame.setHeight(origFrameY + origFrameHeight - newTopY);
             }
             default -> {}
         }
     }
 
     private void applyFrameDrag(
-            double dx,
-            double dy,
+            double curCanvasX,
+            double curCanvasY,
+            double lastDragCanvasX,
+            double lastDragCanvasY,
             BoardScreen screen,
             Map<String, double[]> dragStartPositions
     ) {
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
 
-        for (String id : dragStartPositions.keySet()) {
-            CanvasGroupFrame f = graph.findFrameById(id);
-            if (f != null) {
-                f.setPosX(f.getPosX() + dx);
-                f.setPosY(f.getPosY() + dy);
-                continue;
+        boolean isSnap = net.minecraft.client.gui.screens.Screen.hasControlDown() || com.gtceu.calcboard.api.storage.BoardManager.getInstance().isGridSnapEnabled();
+        int gridSize = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getGridSnapSize();
+        if (gridSize <= 0) gridSize = 16;
+
+        if (isSnap) {
+            String primaryId = draggingFrame.getId();
+            double[] primaryStartPos = dragStartPositions.get(primaryId);
+            if (primaryStartPos == null) {
+                primaryStartPos = new double[]{draggingFrame.getPosX(), draggingFrame.getPosY()};
             }
-            RecipeNode n = graph.findNodeById(id);
-            if (n != null) {
-                n.setPosX(n.getPosX() + dx);
-                n.setPosY(n.getPosY() + dy);
-                continue;
+            double targetPrimaryX = primaryStartPos[0] + (curCanvasX - dragStartMouseCanvasX);
+            double targetPrimaryY = primaryStartPos[1] + (curCanvasY - dragStartMouseCanvasY);
+            double snappedPrimaryX = Math.round(targetPrimaryX / (double) gridSize) * (double) gridSize;
+            double snappedPrimaryY = Math.round(targetPrimaryY / (double) gridSize) * (double) gridSize;
+            double effectiveDeltaX = snappedPrimaryX - primaryStartPos[0];
+            double effectiveDeltaY = snappedPrimaryY - primaryStartPos[1];
+
+            for (Map.Entry<String, double[]> entry : dragStartPositions.entrySet()) {
+                String id = entry.getKey();
+                double[] startPos = entry.getValue();
+                CanvasGroupFrame f = graph.findFrameById(id);
+                if (f != null) {
+                    f.setPos(startPos[0] + effectiveDeltaX, startPos[1] + effectiveDeltaY);
+                    continue;
+                }
+                RecipeNode n = graph.findNodeById(id);
+                if (n != null) {
+                    n.setPos(startPos[0] + effectiveDeltaX, startPos[1] + effectiveDeltaY);
+                    continue;
+                }
+                CanvasStickyNote note = graph.findStickyNoteById(id);
+                if (note != null) {
+                    note.setPos(startPos[0] + effectiveDeltaX, startPos[1] + effectiveDeltaY);
+                }
             }
-            CanvasStickyNote note = graph.findStickyNoteById(id);
-            if (note != null) {
-                note.setPosX(note.getPosX() + dx);
-                note.setPosY(note.getPosY() + dy);
+        } else {
+            double dx = curCanvasX - lastDragCanvasX;
+            double dy = curCanvasY - lastDragCanvasY;
+            for (String id : dragStartPositions.keySet()) {
+                CanvasGroupFrame f = graph.findFrameById(id);
+                if (f != null) {
+                    f.setPos(f.getPosX() + dx, f.getPosY() + dy);
+                    continue;
+                }
+                RecipeNode n = graph.findNodeById(id);
+                if (n != null) {
+                    n.setPos(n.getPosX() + dx, n.getPosY() + dy);
+                    continue;
+                }
+                CanvasStickyNote note = graph.findStickyNoteById(id);
+                if (note != null) {
+                    note.setPos(note.getPosX() + dx, note.getPosY() + dy);
+                }
             }
         }
     }

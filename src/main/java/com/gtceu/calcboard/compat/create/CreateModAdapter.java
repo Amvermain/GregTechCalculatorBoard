@@ -70,7 +70,7 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        return node.isCreateMachine();
+        return com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node);
     }
 
     @Override

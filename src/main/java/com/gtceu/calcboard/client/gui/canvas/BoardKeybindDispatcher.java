@@ -62,6 +62,12 @@ public class BoardKeybindDispatcher {
         if (screen.getAutoConnectDialog() != null && screen.getAutoConnectDialog().isVisible()) {
             return screen.getAutoConnectDialog().keyPressed(keyCode, scanCode, modifiers);
         }
+        if (screen.getPatternBindingDialog() != null && screen.getPatternBindingDialog().isVisible()) {
+            return screen.getPatternBindingDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
+        if (screen.getJunctionSupplyDialog() != null && screen.getJunctionSupplyDialog().isVisible()) {
+            return screen.getJunctionSupplyDialog().keyPressed(keyCode, scanCode, modifiers);
+        }
         if (screen.getPageTabBar() != null && screen.getPageTabBar().keyPressed(keyCode, scanCode, modifiers)) {
             return true;
         }
@@ -125,6 +131,9 @@ public class BoardKeybindDispatcher {
         }
         if (screen.getNoteEditDialog() != null && screen.getNoteEditDialog().isVisible()) {
             return screen.getNoteEditDialog().charTyped(codePoint, modifiers);
+        }
+        if (screen.getJunctionSupplyDialog() != null && screen.getJunctionSupplyDialog().isVisible()) {
+            return screen.getJunctionSupplyDialog().charTyped(codePoint, modifiers);
         }
 
         for (NodeWidget w : screen.getNodeWidgets()) {

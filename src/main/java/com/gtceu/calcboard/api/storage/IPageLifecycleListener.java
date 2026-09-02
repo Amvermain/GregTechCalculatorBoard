@@ -39,4 +39,20 @@ public interface IPageLifecycleListener {
      * @param newFolderPath the new folder path
      */
     default void onPageFolderChanged(BoardPage page, String oldFolderPath, String newFolderPath) {}
+
+    /**
+     * Invoked when a page is docked into the active open tabs bar.
+     *
+     * @param page   the opened page
+     * @param pageId the page ID
+     */
+    default void onTabOpened(BoardPage page, String pageId) {}
+
+    /**
+     * Invoked when a page tab is undocked/closed from the top bar (not deleted).
+     *
+     * @param page   the closed page
+     * @param pageId the page ID
+     */
+    default void onTabClosed(BoardPage page, String pageId) {}
 }

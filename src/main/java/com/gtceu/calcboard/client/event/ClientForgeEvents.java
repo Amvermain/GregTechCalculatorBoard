@@ -198,6 +198,10 @@ public class ClientForgeEvents {
                 event.setCanceled(true);
                 return;
             }
+            if (com.gtceu.calcboard.client.gui.compat.ae2.ClientAe2PatternTermHook.tryHandlePatternShortcut(screen, mouseX, mouseY)) {
+                event.setCanceled(true);
+                return;
+            }
         }
 
         // Allow opening Calculator Board directly from inventory, chests, crafting tables, etc.

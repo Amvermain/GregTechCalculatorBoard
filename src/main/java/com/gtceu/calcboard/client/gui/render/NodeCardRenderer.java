@@ -792,10 +792,40 @@ public class NodeCardRenderer {
         int bg = isHovered ? 0xF0334155 : 0xF01E293B;
         graphics.fill(x + 2, y + 2, x + 30, y + 30, bg);
 
-        int border = isSelected ? 0xFF00FFFF : (isHovered ? 0xFF94A3B8 : 0xFF64748B);
+        int border;
+        if (isSelected) {
+            border = 0xFF00FFFF;
+        } else if (node.isInfiniteSupply()) {
+            border = 0xFF38BDF8;
+        } else if (node.isExternalSupply()) {
+            border = 0xFF34D399;
+        } else {
+            border = isHovered ? 0xFF94A3B8 : 0xFF64748B;
+        }
         graphics.renderOutline(x + 2, y + 2, 28, 28, border);
         if (isSelected) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x8800FFFF);
+        } else if (node.isInfiniteSupply()) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x4438BDF8);
+        } else if (node.isExternalSupply()) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x4434D399);
+        }
+
+        // External Supply Badge (Top: ∞ or +rate)
+        if (node.isInfiniteSupply()) {
+            graphics.fill(x + 19, y + 1, x + 31, y + 10, 0xEE0B132B);
+            graphics.renderOutline(x + 19, y + 1, 12, 9, 0xFF38BDF8);
+            graphics.drawString(font, "∞", x + 22, y + 1, 0xFF38BDF8, false);
+        } else if (node.isExternalSupply()) {
+            String rateStr = "+" + com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(node.getExternalSupplyRate(), false);
+            int rw = font.width(rateStr);
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 200);
+            graphics.pose().scale(0.7f, 0.7f, 1.0f);
+            int rx = (int) ((x + 16) / 0.7f - rw / 2);
+            int ry = (int) ((y + 1) / 0.7f);
+            graphics.drawString(font, rateStr, rx, ry, 0xFF34D399, true);
+            graphics.pose().popPose();
         }
 
         // 2. Input Port Dot (Left: x, y + 14..18 if !isFlipped, Right: x + 28..32 if isFlipped)
@@ -850,27 +880,58 @@ public class NodeCardRenderer {
             graphics.pose().popPose();
         }
 
-        // 6. Estimated Time (ET) Badge below the node
         if (node.hasTargetBatch() || batchEditor.isEditing()) {
             FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
-            double netRate = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetInflowRate(graph, node, 0);
-            double targetAmount = node.getTargetBatchAmount();
-            double etaSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateETA(targetAmount, netRate);
-            String etaStr = "ET: " + FormatUtil.formatETA(etaSec);
-
-            int etaW = font.width(etaStr);
-            int badgeW = Math.max(32, etaW + 6);
-            int badgeX = x + 16 - badgeW / 2;
-            int badgeY = y + 33;
-
-            int badgeBg = 0xEE0B132B;
-            int badgeBorder = Double.isInfinite(etaSec) ? 0xFF7F1D1D : (netRate > 0 ? 0xFF15803D : 0xFF475569);
-            int etaTextColor = Double.isInfinite(etaSec) ? 0xFFFCA5A5 : (netRate > 0 ? 0xFF86EFAC : 0xFFCBD5E1);
-
-            graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + 11, badgeBg);
-            graphics.renderOutline(badgeX, badgeY, badgeW, 11, badgeBorder);
-            graphics.drawString(font, etaStr, badgeX + (badgeW - etaW) / 2, badgeY + 2, etaTextColor, false);
+            renderJunctionTimeBadge(graphics, font, graph, node, x, y);
         }
+    }
+
+    private static void renderJunctionTimeBadge(GuiGraphics graphics, Font font, FlowGraph graph, RecipeNode node, int x, int y) {
+        boolean isInputSource = isInputSourceJunction(graph, node);
+        double targetAmount = node.getTargetBatchAmount();
+
+        String badgeStr;
+        int badgeBorder;
+        int textColor;
+
+        if (isInputSource) {
+            double drainRate = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetOutflowRate(graph, node);
+            double depletionSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateDepletionTime(graph, node, targetAmount, drainRate);
+            badgeStr = "DT: " + FormatUtil.formatETA(depletionSec);
+            badgeBorder = Double.isInfinite(depletionSec) ? 0xFF475569 : 0xFF0284C7;
+            textColor = Double.isInfinite(depletionSec) ? 0xFF94A3B8 : 0xFF7DD3FC;
+        } else {
+            double netRate = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetInflowRate(graph, node, 0);
+            double etaSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateETA(graph, node, targetAmount, netRate);
+            badgeStr = "ET: " + FormatUtil.formatETA(etaSec);
+            badgeBorder = Double.isInfinite(etaSec) ? 0xFF7F1D1D : (netRate > 0 ? 0xFF15803D : 0xFF475569);
+            textColor = Double.isInfinite(etaSec) ? 0xFFFCA5A5 : (netRate > 0 ? 0xFF86EFAC : 0xFFCBD5E1);
+        }
+
+        int textW = font.width(badgeStr);
+        int badgeW = Math.max(32, textW + 6);
+        int badgeX = x + 16 - badgeW / 2;
+        int badgeY = y + 33;
+        int badgeBg = 0xEE0B132B;
+
+        graphics.fill(badgeX, badgeY, badgeX + badgeW, badgeY + 11, badgeBg);
+        graphics.renderOutline(badgeX, badgeY, badgeW, 11, badgeBorder);
+        graphics.drawString(font, badgeStr, badgeX + (badgeW - textW) / 2, badgeY + 2, textColor, false);
+    }
+
+    public static boolean isInputSourceJunction(FlowGraph graph, RecipeNode node) {
+        if (graph == null || node == null || !node.isReroute()) return false;
+        boolean hasIncoming = false;
+        boolean hasOutgoing = false;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(node.getId())) {
+                hasIncoming = true;
+            }
+            if (edge.fromNodeId().equals(node.getId())) {
+                hasOutgoing = true;
+            }
+        }
+        return !hasIncoming && hasOutgoing;
     }
 }
 

@@ -217,6 +217,10 @@ dependencies {
     testImplementation fg.deobf("local:create-${minecraft_version}-${create_version}:${create_version}")
     testImplementation fg.deobf("local:create-new-age-forge-${minecraft_version}-1.1.4:1.1.4")
 
+    // Applied Energistics 2 (AE2) API & Integration
+    compileOnly fg.deobf("local:appliedenergistics2-forge-${ae2_version}:${ae2_version}")
+    testImplementation fg.deobf("local:appliedenergistics2-forge-${ae2_version}:${ae2_version}")
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
 

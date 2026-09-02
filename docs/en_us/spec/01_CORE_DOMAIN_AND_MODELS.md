@@ -176,6 +176,44 @@ To preserve `RecipeNode` as a pure POJO domain model, rate integration and works
 
 ---
 
+### 1.8 `SupplyMode` & External Flow Model (ADR-012)
+Defines infinite resource supply or specified fixed per-second rates for Junction nodes and raw material ingress points.
+
+```java
+public enum SupplyMode {
+    NONE,         // No external supply (relies entirely on connected upstream node flow)
+    INFINITE,     // Infinite resource supply (blocks upstream demand propagation, satisfies 100% downstream demand)
+    FIXED_RATE    // Fixed rate supply (supplies up to externalSupplyRate items/s or mB/s)
+}
+```
+
+* **`RecipeNode` External Supply Properties**:
+  - `supplyMode` (`SupplyMode`, default `NONE`): External supply mode of the node.
+  - `externalSupplyRate` (`double`, default `0.0`): Fixed external supply rate in items/s or mB/s when in `FIXED_RATE` mode.
+  - `customParallel` (`int`, default `0`): User-specified custom manual parallel count.
+
+---
+
+### 1.9 `BoardPage` Hierarchical Folder & AE2 Binding Model (ADR-008, ADR-012)
+Categorizes multi-canvas pages in a workspace using virtual hierarchical folder paths (`folderPath`) and supports 1:1 binding to AE2 processing pattern IDs (`ae2PatternId`).
+
+```java
+public class BoardPage {
+    private final String id;
+    private String name;
+    private String folderPath;           // Hierarchical directory path (e.g. "Chemical/Polymers")
+    private ResourceLocation ae2PatternId; // 1:1 bound AE2 processing pattern ID
+    private final FlowGraph graph;
+    private final List<CanvasGroupFrame> frames;
+    private final List<CanvasStickyNote> stickyNotes;
+}
+```
+
+* **Hierarchical Folder Path (`folderPath`)**: Slash-delimited virtual directory path integrated with `PageBrowserDrawer` for managing hundreds of pages in expandable folder trees.
+* **AE2 Pattern ID Binding (`ae2PatternId`)**: Binds the entire flowchart process to an AE2 processing pattern for precision pipeline ETA evaluation and live autocrafting monitoring.
+
+---
+
 ## 2. Deterministic Capability Matrix (`CategoryCapabilityMatrix`)
 
 An $O(1)$ immutable global cache built during game initialization via deductive analysis to eliminate heuristic tooltip string parsing.
@@ -311,6 +349,32 @@ Decouples recipe indexing, searching, and instantiation from the client GUI laye
 * **`ILevelRecipeProvider` (Headless Recipe Provider SPI)**:
   - Abstraction interface providing `SearchableRecipe` instances from vanilla `Level.getRecipeManager()` when client-side recipe viewers (EMI/JEI) are absent or in dedicated server environments.
   - Enables zero-GUI-dependency $O(1)$ recipe indexing and domain node spawning.
+
+---
+
+## 10. Machine Hardware Template Model (`MachineHardwareTemplate`) (ADR-012)
+
+Encapsulates machine hardware configurations (tier, parallel count, overclock mode, installed addons, threading config, and node properties) into an independent preset template for one-click cloning and multi-selection application across nodes.
+
+```java
+public class MachineHardwareTemplate {
+    private String id;
+    private String name;
+    private GTVoltageTier targetTier;
+    private int parallel;
+    private OverclockMode overclockMode;
+    private SteamMode steamMode;
+    private List<MachineAddon> addons;
+    private NodePropertyStore properties;
+    private NodeThreadingConfig threadingConfig;
+
+    public void applyTo(RecipeNode targetNode) { ... }
+    public static MachineHardwareTemplate fromNode(String name, RecipeNode sourceNode) { ... }
+}
+```
+
+* **Hardware Extraction (`fromNode`)**: Copies tier, parallel, addons, and property store from a source node to generate an immutable template.
+* **Hardware Injection (`applyTo`)**: Injects hardware specifications into a target node while preserving its recipe inputs/outputs and baseline recipe tier requirement ($\text{recipeTier}$).
 
 ---
 

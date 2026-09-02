@@ -20,6 +20,9 @@ public final class NodeProperties {
     public static final NodePropertyKey<Double> TARGET_BATCH_TIME_SEC = register(
             NodePropertyKey.ofDouble("target_batch_time_sec", 0.0)
     );
+    public static final NodePropertyKey<Boolean> IS_OUTPUT_PORT = register(
+            NodePropertyKey.ofBoolean("is_output_port", false)
+    );
 
     // Generic / Unsupported Recipe Marker (RFC-001)
     public static final NodePropertyKey<Boolean> IS_GENERIC_UNSUPPORTED = register(

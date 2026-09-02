@@ -83,7 +83,7 @@ public record CategoryCapability(
         }
 
         boolean isMb = node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption;
-        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0 || (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion"));
+        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0;
 
         if (isFusion) {
             cats.add(AddonCategory.REFLECTOR);

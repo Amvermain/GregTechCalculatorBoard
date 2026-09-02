@@ -212,4 +212,36 @@ $$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad 
 
 ---
 
+### [알고리즘 6] 무한/고정 외부 공급 유량 모델링 및 역전파 차단 수학 (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) (ADR-012)
+
+정션 및 공급 노드에 외부 자원 공급(`SupplyMode`)이 설정된 경우, 상류 요구량 역전파를 결정론적으로 제어하고 원자재 결손량을 자동 상쇄합니다:
+
+1. **무한 공급 모드 (`SupplyMode.INFINITE`)**:
+   - 하류 연결 노드의 요구량 $D_{\text{down}}$에 관계없이 상류 노드로 전파되는 요구량을 0으로 차단합니다:
+     $$\text{Demand}_{\text{upstream}} = 0$$
+   - 하류 포트에 필요한 전체 유량을 외부 무한 공급으로 충당하므로, 상류 기계의 추가 증설 요구를 억제합니다.
+2. **고정 공급 모드 (`SupplyMode.FIXED_RATE`)**:
+   - 지정된 초당 외부 공급량 $R_{\text{ext}}$을 초과하는 잔여 수요분만 상류로 역전파합니다:
+     $$\text{Demand}_{\text{upstream}} = \max(0.0, \, D_{\text{down}} - R_{\text{ext}})$$
+3. **공정 수지 요약 결손량 상쇄 (`FlowSummaryAggregator`)**:
+   - 그래프 전체의 미연결 원자재 요구량($\text{RawDeficit}$) 집계 시, 외부 공급 노드의 유효 공급량($\min(D_{\text{down}}, R_{\text{ext}})$ 또는 $\text{INFINITE}$)을 차감하여 순수 외부 조달 필요량만을 결산에 반영합니다.
+
+---
+
+### [알고리즘 7] AE2 오토크래프팅 플랜 평가 및 크리티컬 패스 병렬 파이프라인 ETA (`Ae2CraftingPlanEvaluator`) (ADR-008)
+
+AE2 패턴과 바인딩된 다중 서브페이지 공정망에 대해, $O(K)$ 위상 정렬 DAG(Directed Acyclic Graph)를 기반으로 병렬 실행 시간 및 파이프라인 지연 시간을 정확히 적분합니다:
+
+1. **단일 노드 배치 실행 시간 ($T_{\text{batch}}$) 및 병렬 가동 횟수 ($N_{\text{runs}}$)**:
+   $$\text{EffectiveParallel} = \text{node.getParallel}() \times \text{node.getMachineCount}()$$
+   $$N_{\text{runs}} = \left\lceil \frac{\text{RequiredQuantity}}{\text{RecipeOutputAmount} \times \text{EffectiveParallel}} \right\rceil$$
+   $$T_{\text{node}} = N_{\text{runs}} \times \text{node.getEffectiveDurationSeconds}()$$
+2. **크리티컬 패스 및 파이프라인 지연 시간 ($T_{\text{pipeline}}$)**:
+   상류 노드 집합 $\text{Pred}(u)$에 대해:
+   $$T_{\text{start}}(u) = \max_{p \in \text{Pred}(u)} \left( T_{\text{start}}(p) + \text{FirstBatchDuration}(p) \right)$$
+   $$T_{\text{finish}}(u) = T_{\text{start}}(u) + T_{\text{node}}(u)$$
+   $$\text{Total ETA} = \max_{u \in \text{TerminalNodes}} T_{\text{finish}}(u)$$
+
+---
+
 > ➡️ **다음 장으로 이동**: [[03] UI 및 캔버스 렌더링 파이프라인](03_UI_AND_RENDERING_PIPELINE.md)

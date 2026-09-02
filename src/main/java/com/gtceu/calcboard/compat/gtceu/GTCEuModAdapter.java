@@ -142,7 +142,7 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.isCreateMachine()) return false;
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node)) return false;
         if (com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node)) return false;
         if (node.getEnergyTypeOverride() == EnergyType.KINETIC_SU) return false;
         if (GTFusionHelper.isFusion(node)) return true;
@@ -204,6 +204,16 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public PartCategory classifyBOMPart(ResourceLocation itemId) {
         return GTMultiblockBOMResolver.classifyBOMPart(itemId);
+    }
+
+    @Override
+    public void accumulateStructureSlots(
+            ResourceLocation itemId,
+            PartCategory category,
+            int amount,
+            com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.StructureSlotCounts slots
+    ) {
+        GTMultiblockBOMResolver.accumulateStructureSlots(itemId, category, amount, slots);
     }
 
     @Override

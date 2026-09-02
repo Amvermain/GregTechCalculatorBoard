@@ -114,6 +114,21 @@ The mod is fully optional on both client and server:
 *   **Infinite Canvas & LOD**: Pan with right-click or middle-click drag, zoom with mouse wheel, and render large graphs efficiently using Level of Detail (LOD) mode.
 *   **Undo & Redo**: Delta-based history stack (`Ctrl + Z` / `Ctrl + Y`) for all canvas actions.
 
+#### Applied Energistics 2 (AE2) Integration & Autocrafting Plan ETA
+
+*   **1:1 Page-to-Pattern Binding**: Bind any flowchart sub-page directly to an AE2 Processing Pattern (`[💠 Bind AE2 Pattern]`) or generate board pages directly from the Pattern Encoding Terminal.
+*   **DAG Pipeline & Critical Path ETA**: Evaluates multi-tier autocrafting jobs over a directed acyclic graph (DAG), accounting for machine parallelism, batch counts, and stage pipeline delays to display exact completion times.
+*   **Crafting Confirmation UI Overlay**: Renders an unobtrusive header banner with calculated total ETA, total energy, and bottleneck drill-down badges directly on AE2's Crafting Confirmation Screen (`CraftConfirmScreen`) prior to starting jobs.
+
+#### Precision Flow Modeling & Usability Suite
+
+*   **16px Precision Grid Snapping**: Toggle discrete $16\text{px}$ coordinate snapping (`G` key or HUD checkbox) for nodes, frames, and sticky notes.
+*   **Hierarchical Page Navigation Drawer (`PageBrowserDrawer`)**: Manage dozens of canvas pages inside collapsible virtual folder trees (`folderPath`) with real-time text search and drag-and-drop relocation.
+*   **Quick Page Switcher (`Ctrl + K`)**: IDE-style fuzzy search popup to instantly jump between canvas pages across complex project workspaces.
+*   **Infinite & Fixed-Rate External Supply (`SupplyMode`)**: Configure Junction nodes to infinite supply ($\infty$) or specified rates ($R_{\text{ext}}$), blocking unwarranted upstream demand and offsetting raw input deficits in summary calculations.
+*   **Machine Hardware Template Cloner (`TemplateCloneDialog`)**: Extract tier, parallel, overclock, and addon configurations into named reusable templates and batch-inject them across selected nodes.
+*   **Enhanced Scrollbar State Machine**: Proportional track click jumping and global mouse drag tracking across all dialog search lists.
+
 #### Compound Modules (Subgraphs)
 
 *   **Modularization (`Ctrl + G`)**: Collapses groups of interconnected nodes into a single composite module card.
@@ -133,6 +148,7 @@ The mod is fully optional on both client and server:
     *   [JEI++ (Just Enough Calculation)](https://curseforge.com/minecraft/mc-mods/just-enough-calculation) (BOM recipe tree integration)
 *   **Supported Tech & Factory Mods**:
     *   [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ or Star Technology forks)
+    *   [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (Autocrafting pattern binding & DAG ETA evaluation)
     *   [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
     *   [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
     *   [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)

@@ -160,7 +160,8 @@ public class QuickPageSwitcherDialog {
             graphics.drawString(font, sr.page.isPinned() ? "§e📌" : "§7📄", listX + 8, rowY + 6, 0xFFFFFFFF, false);
         }
 
-        String title = sr.displayName;
+        boolean isAe2 = com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(sr.page.getId());
+        String title = (isAe2 ? "§b[AE2] " : "") + sr.displayName;
         if (!sr.folderPath.isEmpty()) {
             graphics.drawString(font, "§8📁 " + sr.folderPath + " >", listX + 26, rowY + 3, 0xFF888888, false);
             graphics.drawString(font, (isActive ? "§a" : "§f") + title, listX + 26, rowY + 12, 0xFFFFFFFF, false);
@@ -278,7 +279,7 @@ public class QuickPageSwitcherDialog {
                 cur.setZoom(screen.getZoom());
             }
 
-            bm.switchPage(sr.pageIndex);
+            bm.openPage(sr.page.getId());
             BoardPage next = bm.getActivePage();
             if (next != null) {
                 screen.setPanX(next.getPanX());

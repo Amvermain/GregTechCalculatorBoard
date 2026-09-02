@@ -16,6 +16,14 @@ $$\text{ScreenX} = (\text{CanvasX} \times \text{Zoom}) + \text{PanX}, \quad \tex
 * **Pan Control**: Right-click drag or middle-wheel drag
 * **Grid Spacing**: $20\text{px} \times \text{Zoom}$ dot grid rendering
 
+### 1.1 16px Precision Grid Snapping & Coordinate Quantization (ADR-012)
+Applies $16\text{px}$ coordinate quantization during node, frame, and sticky note dragging and resizing.
+
+$$x_{\text{snapped}} = \text{round}\left(\frac{x}{16.0}\right) \times 16.0, \quad y_{\text{snapped}} = \text{round}\left(\frac{y}{16.0}\right) \times 16.0$$
+
+* **HUD Toggle & Keybind**: Toggle grid snap via `G` key or the lower-left HUD status checkbox.
+* **Preference Persistence**: Saved in `BoardSettingsDialog` and persistent client NBT configuration.
+
 ---
 
 ## 2. Cubic Bézier Wire Rendering (`ConnectionRenderer`)

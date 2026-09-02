@@ -247,10 +247,12 @@ public class PageBrowserDrawer {
             graphics.drawString(font, "§7📄", listX + indent + 12, curY + 5, 0xFFFFFFFF, false);
         }
 
-        String nameColor = isSelected ? "§b" : (isActive ? "§a" : "§f");
+        boolean isAe2 = com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(page.getId());
+        String nameColor = isSelected ? "§b" : (isActive ? "§a" : (isAe2 ? "§b" : "§f"));
         int nameX = listX + indent + 30;
         int maxNameW = listW - (indent + 34);
-        String trimmedName = font.plainSubstrByWidth(page.getName(), maxNameW);
+        String prefixTag = isAe2 ? "§b[AE2] " : "";
+        String trimmedName = font.plainSubstrByWidth(prefixTag + page.getName(), maxNameW);
         graphics.drawString(font, nameColor + trimmedName, nameX, curY + 6, 0xFFFFFFFF, false);
 
         return curY + ITEM_HEIGHT + 2;
@@ -738,7 +740,7 @@ public class PageBrowserDrawer {
         }
         lastClickedItem = new TreeItemRef(false, pageId);
 
-        BoardManager.getInstance().switchPage(ip.index);
+        BoardManager.getInstance().openPage(ip.page.getId());
         BoardPage active = BoardManager.getInstance().getActivePage();
         if (active != null) {
             screen.setPanX(active.getPanX());

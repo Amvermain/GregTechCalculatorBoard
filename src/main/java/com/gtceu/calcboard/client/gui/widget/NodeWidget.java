@@ -780,6 +780,14 @@ public class NodeWidget {
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.8F)
                         );
                         return true;
+                    } else {
+                        if (parent != null) {
+                            parent.openJunctionSupplyDialog(node);
+                            Minecraft.getInstance().getSoundManager().play(
+                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+                            );
+                            return true;
+                        }
                     }
                 }
             }

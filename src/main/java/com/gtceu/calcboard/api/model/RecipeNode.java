@@ -11,6 +11,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.NodeThreadingConfig;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
@@ -38,6 +39,7 @@ public class RecipeNode {
     private double machineCount;
     private int parallel;
     private OverclockMode overclockMode;
+    private int customParallel = 0;
 
     // Inputs and outputs
     private final List<IngredientStack> inputs = new ArrayList<>();
@@ -63,8 +65,10 @@ public class RecipeNode {
     private double efficiency = 1.0;
     private EnergyType energyType = null;
 
-    // Reroute / Junction Node Abstraction (RFC-001)
+    // Reroute / Junction Node Abstraction (RFC-001, RFC-012)
     private boolean isReroute = false;
+    private SupplyMode supplyMode = SupplyMode.NONE;
+    private double externalSupplyRate = 0.0;
 
     // Horizontal Flip / Directionality (Left-to-Right vs Right-to-Left)
     private boolean isFlipped = false;
@@ -93,8 +97,6 @@ public class RecipeNode {
     private SteamMode steamMode = SteamMode.NONE;
     private boolean isMultiblock = false;
     private NodeThreadingConfig threadingConfig;
-
-    public static final int[] STANDARD_RPMS = {4, 8, 16, 32, 64, 128, 256};
 
     public RecipeNode(String id, String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -376,6 +378,38 @@ public class RecipeNode {
         this.isReroute = reroute;
     }
 
+    public SupplyMode getSupplyMode() {
+        return supplyMode != null ? supplyMode : SupplyMode.NONE;
+    }
+
+    public void setSupplyMode(SupplyMode supplyMode) {
+        this.supplyMode = supplyMode != null ? supplyMode : SupplyMode.NONE;
+    }
+
+    public boolean isExternalSupply() {
+        return isReroute && getSupplyMode().isExternal();
+    }
+
+    public boolean isInfiniteSupply() {
+        return isReroute && getSupplyMode() == SupplyMode.INFINITE;
+    }
+
+    public double getExternalSupplyRate() {
+        return externalSupplyRate;
+    }
+
+    public void setExternalSupplyRate(double externalSupplyRate) {
+        this.externalSupplyRate = Math.max(0.0, externalSupplyRate);
+    }
+
+    public int getCustomParallel() {
+        return customParallel;
+    }
+
+    public void setCustomParallel(int customParallel) {
+        this.customParallel = Math.max(0, customParallel);
+    }
+
     public void bindRerouteIngredient(IngredientStack stack) {
         if (!isReroute || stack == null) return;
         inputs.clear();
@@ -383,6 +417,9 @@ public class RecipeNode {
         inputs.add(stack.copy());
         outputs.add(stack.copy());
         this.name = stack.getDisplayName();
+        if (stack.getAmount() > 0.0) {
+            setTargetBatchAmount(stack.getAmount());
+        }
     }
 
     public void unbindRerouteIngredient() {
@@ -390,6 +427,10 @@ public class RecipeNode {
         inputs.clear();
         outputs.clear();
         this.name = "Reroute";
+    }
+
+    public IngredientStack getRerouteIngredient() {
+        return !outputs.isEmpty() ? outputs.get(0) : null;
     }
 
     public double getTargetBatchAmount() {
@@ -410,6 +451,14 @@ public class RecipeNode {
 
     public void setTargetBatchTimeSec(double seconds) {
         properties.set(NodeProperties.TARGET_BATCH_TIME_SEC, Math.max(0.0, seconds));
+    }
+
+    public boolean isOutputPort() {
+        return properties.get(NodeProperties.IS_OUTPUT_PORT);
+    }
+
+    public void setOutputPort(boolean isOutput) {
+        properties.set(NodeProperties.IS_OUTPUT_PORT, isOutput);
     }
 
     public boolean isModule() {
@@ -899,27 +948,6 @@ public class RecipeNode {
         properties.setById("kinetic_rpm", Math.max(1, Math.min(256, rpm)));
     }
 
-    public void cycleRpm(int direction) {
-        int cur = getRpm();
-        int closestIdx = 3;
-        int minDiff = Integer.MAX_VALUE;
-        for (int i = 0; i < STANDARD_RPMS.length; i++) {
-            int diff = Math.abs(STANDARD_RPMS[i] - cur);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestIdx = i;
-            }
-        }
-        int nextIdx = closestIdx + direction;
-        if (nextIdx < 0) nextIdx = STANDARD_RPMS.length - 1;
-        else if (nextIdx >= STANDARD_RPMS.length) nextIdx = 0;
-        setRpm(STANDARD_RPMS[nextIdx]);
-    }
-
-    public boolean isCreateMachine() {
-        return ModCompatHelper.isCreateMachine(this);
-    }
-
     public int getRotorEfficiency() {
         return properties.getById("rotor_efficiency", 100);
     }
@@ -976,6 +1004,9 @@ public class RecipeNode {
     }
 
     public int getTotalParallel() {
+        if (customParallel > 0) {
+            return customParallel;
+        }
         return ModAdapterRegistry.getAdapterForNode(this).computeEffectiveParallel(this);
     }
 

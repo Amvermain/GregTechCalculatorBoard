@@ -53,4 +53,31 @@ public final class GTMultiblockBOMResolver {
         if (node == null) return Collections.emptyList();
         return GTCEuBOMHelper.resolveGTMultiblockParts(node, dualLowerTierEnergyHatches);
     }
+
+    public static void accumulateStructureSlots(
+            ResourceLocation itemId,
+            PartCategory category,
+            int amount,
+            com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.StructureSlotCounts slots
+    ) {
+        if (itemId == null || slots == null) return;
+        if (category == PartCategory.COIL) {
+            slots.coilSlots = Math.max(slots.coilSlots, amount);
+            return;
+        }
+        String path = itemId.getPath().toLowerCase(Locale.ROOT);
+        if ((path.contains("energy") && path.contains("hatch")) || (path.contains("power") && path.contains("hatch")) || path.contains("laser_target") || path.contains("laser_source")) {
+            slots.energyHatchSlots = Math.max(slots.energyHatchSlots, amount);
+        } else if (path.contains("input_bus") || path.contains("import_bus")) {
+            slots.inputBusSlots = Math.max(slots.inputBusSlots, amount);
+        } else if (path.contains("output_bus") || path.contains("export_bus")) {
+            slots.outputBusSlots = Math.max(slots.outputBusSlots, amount);
+        } else if (path.contains("input_hatch") || path.contains("fluid_import")) {
+            slots.inputHatchSlots = Math.max(slots.inputHatchSlots, amount);
+        } else if (path.contains("output_hatch") || path.contains("fluid_export")) {
+            slots.outputHatchSlots = Math.max(slots.outputHatchSlots, amount);
+        } else if (path.contains("maintenance")) {
+            slots.maintenanceSlots = Math.max(slots.maintenanceSlots, amount);
+        }
+    }
 }

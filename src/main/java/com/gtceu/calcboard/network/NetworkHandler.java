@@ -53,6 +53,7 @@ public class NetworkHandler {
         registerMessage(S2CChunkedDataPacket.class, S2CChunkedDataPacket::encode, S2CChunkedDataPacket::new, S2CChunkedDataPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         registerMessage(S2CSyncCommitHistoryPacket.class, S2CSyncCommitHistoryPacket::encode, S2CSyncCommitHistoryPacket::new, S2CSyncCommitHistoryPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         registerMessage(S2COpenBoardPacket.class, S2COpenBoardPacket::encode, S2COpenBoardPacket::new, S2COpenBoardPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+        registerMessage(S2CAe2CraftingEtaPacket.class, S2CAe2CraftingEtaPacket::encode, S2CAe2CraftingEtaPacket::new, S2CAe2CraftingEtaPacket::handle, Optional.of(NetworkDirection.PLAY_TO_CLIENT));
     }
 
     private static <MSG> void registerMessage(Class<MSG> msgClass,
