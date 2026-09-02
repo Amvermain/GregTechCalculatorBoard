@@ -109,9 +109,12 @@ public record CategoryCapability(
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = def.coilSlotCount() > 0 || def.supportsAbility("HEATING_COILS") || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
+                        || MultiblockDetector.isCoilMultiblock(mbId)
+                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             } else {
-                supportsCoil = canUseCoils || node.canUseCoils() || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
+                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             }
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);

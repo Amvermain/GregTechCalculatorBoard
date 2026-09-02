@@ -4,6 +4,36 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-alpha.5] - 2026-09-02
+
+### Added
+- **Hierarchical Compound Module BOM Aggregation & Scaling**:
+  - Recursively resolves nested subgraphs inside Compound Modules and scales enclosed machine and multiblock structure requirements proportionally based on parent module machine counts when compiling the Bill of Materials (BOM).
+- **Singleblock Tiered Item Resolution & BOM Traceability**:
+  - Automatically resolves singleblock machine nodes into voltage-tiered item forms (e.g. `LV Rock Breaker` instead of generic controller IDs) and tracks which factory machines and process lines require each part in detail tooltips (`usedByMachines`).
+- **GTCEu & Star Technology Multiblock Intrinsic Trait Addons**:
+  - Added support for configuring GTCEu and Star Technology multiblock traits in the hardware config modal, including Throughput Boosting (4x Parallel, 1.6x Duration in Pyrolyse Oven / Super Cracker), Bulk Processing (16x Parallel, 13x Duration in LOAF / Ultimate ABS), and Overpressure (8x Parallel, 1.5x Duration, 1.25x EU in Autoclave), with full support for compound modifier chaining.
+- **Create Sequenced Assembly Distinct Machine Icons**:
+  - Automatically extracts and renders distinct machine icons for individual sub-steps (Deployer, Spout, Mechanical Press, Mechanical Saw) across Create sequenced assembly compound recipe layers.
+
+### Changed & Improved
+- **Shared Machine Pool BOM Duty Cycle Quantization**:
+  - Aggregates cumulative duty cycles across enclosed machines sharing physical hardware and quantizes required machines to integral counts, preventing duplicate structural part entries in the BOM.
+- **Batch Mode & Bulk Processing Trait Clarification**:
+  - Clearly separated zero-penalty Batch Mode from 16x Bulk Processing mode in machine config tabs, tooltips, and badges.
+- **Machine Selector Search & Category Mapping**:
+  - Enhanced filtering, categorization, and sorting for singleblock and multiblock machines across multi-mod environments in the machine selector dialog.
+- **In-Game Guide & Hotkey HUD Widget Reinforcement**:
+  - Synchronized in-game guidebook entries and HUD quick action badges with the latest 16px grid snapping (`G`), quick page switcher (`Ctrl + K`), junction external supply modes, and shared machine pool features.
+- **Star Technology Custom Recipe Modifier Integration**:
+  - Enhanced deterministic reflection integration for Star Technology custom recipe modifiers and multiblock capabilities.
+
+### Fixed
+- **GTCEu ULV Recipe Overclock Delta Calculation**:
+  - Fixed an issue where recipes with ULV base tier (8 EU/t) calculated an extra overclock tier delta when running on LV or higher voltage machines.
+- **Heating Coil Capability Detection on Specific Multiblocks**:
+  - Fixed an issue where certain non-coil multiblock machines (such as Rock Filtrator and Geode Filter) erroneously displayed heating coil addon slots due to loose recipe category matching.
+
 ## [2.1.0-alpha.4] - 2026-09-02
 
 ### Added

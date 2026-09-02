@@ -22,6 +22,7 @@ public class MachineSwitchLifecycleTest {
     @BeforeEach
     public void setup() {
         MultiblockDetector.reinitialize();
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
         adapter = new GTCEuModAdapter();
     }
 

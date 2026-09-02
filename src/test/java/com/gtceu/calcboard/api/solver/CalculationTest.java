@@ -587,6 +587,48 @@ public class CalculationTest {
     }
 
     @Test
+    public void testULVOverclockAndChanceBoost() {
+        RecipeNode rockBreaker = RecipeNode.create("Rock Breaker", 16.0, 7.0, GTVoltageTier.ULV);
+        IngredientStack cobblestone = IngredientStack.item(ResourceLocation.tryParse("minecraft:cobblestone"), "Cobblestone", 1.0, 1.0);
+        IngredientStack bonusDust = IngredientStack.item(ResourceLocation.tryParse("gtceu:stone_dust"), "Stone Dust", 1.0, 0.10);
+        bonusDust.setTierChanceBoost(0.05);
+        rockBreaker.addOutput(cobblestone);
+        rockBreaker.addOutput(bonusDust);
+
+        // 1. Target Tier: ULV -> No OC (7 EU/t, 16 ticks, 0.8s, 1.25/s)
+        rockBreaker.setTargetTier(GTVoltageTier.ULV);
+        Assertions.assertEquals(0, rockBreaker.getTierDelta());
+        Assertions.assertEquals(7.0, rockBreaker.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(0.8, rockBreaker.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(1.25, rockBreaker.getEffectiveCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.10, bonusDust.getEffectiveChance(rockBreaker.getTierDelta()), 0.001);
+
+        // 2. Target Tier: LV -> No OC (7 EU/t, 16 ticks, 0.8s, 1.25/s)
+        rockBreaker.setTargetTier(GTVoltageTier.LV);
+        Assertions.assertEquals(0, rockBreaker.getTierDelta());
+        Assertions.assertEquals(7.0, rockBreaker.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(0.8, rockBreaker.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(1.25, rockBreaker.getEffectiveCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.10, bonusDust.getEffectiveChance(rockBreaker.getTierDelta()), 0.001);
+
+        // 3. Target Tier: MV -> 1st OC (28 EU/t, 8 ticks, 0.4s, 2.5/s)
+        rockBreaker.setTargetTier(GTVoltageTier.MV);
+        Assertions.assertEquals(1, rockBreaker.getTierDelta());
+        Assertions.assertEquals(28.0, rockBreaker.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(0.4, rockBreaker.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(2.5, rockBreaker.getEffectiveCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.15, bonusDust.getEffectiveChance(rockBreaker.getTierDelta()), 0.001);
+
+        // 4. Target Tier: HV -> 2nd OC (112 EU/t, 4 ticks, 0.2s, 5.0/s)
+        rockBreaker.setTargetTier(GTVoltageTier.HV);
+        Assertions.assertEquals(2, rockBreaker.getTierDelta());
+        Assertions.assertEquals(112.0, rockBreaker.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(0.2, rockBreaker.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(5.0, rockBreaker.getEffectiveCyclesPerSecond(), 0.001);
+        Assertions.assertEquals(0.20, bonusDust.getEffectiveChance(rockBreaker.getTierDelta()), 0.001);
+    }
+
+    @Test
     public void testEnergizedStarLoopSimulation() {
         FlowGraph graph = new FlowGraph();
 

@@ -222,10 +222,16 @@ public interface IModAdapter {
             machineId = node.getAvailableWorkstations().get(0);
         }
 
-        if (machineId != null && !machineId.getPath().equals("air")) {
-            String displayName = node.getName() != null && !node.getName().isBlank()
-                    ? node.getName()
-                    : com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(machineId.getPath());
+        GTVoltageTier targetTier = node.getTargetTier() != null ? node.getTargetTier() : node.getRecipeTier();
+        if (targetTier != null) {
+            ResourceLocation tieredWs = getWorkstationForTier(node, targetTier);
+            if (tieredWs != null) {
+                machineId = tieredWs;
+            }
+        }
+
+        if (machineId != null && isLikelyMachineOrStructure(node, machineId)) {
+            String displayName = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(machineId.getPath());
             list.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(
                     machineId,
                     displayName,
@@ -254,6 +260,50 @@ public interface IModAdapter {
 
         populateExtraBOMParts(node, list);
         return list;
+    }
+
+    default boolean isLikelyMachineOrStructure(RecipeNode node, ResourceLocation machineId) {
+        if (machineId == null) return false;
+        String path = machineId.getPath().toLowerCase(java.util.Locale.ROOT);
+        String ns = machineId.getNamespace().toLowerCase(java.util.Locale.ROOT);
+        if (path.equals("air") || path.equals("barrier") || path.equals("structure_void")) return false;
+
+        if (node != null) {
+            if (node.isMultiblock() || node.isGenerator()) return true;
+            if (node.getEnergyType() != com.gtceu.calcboard.api.type.EnergyType.NONE) return true;
+            if (!node.getAddons().isEmpty()) return true;
+            if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return true;
+        }
+
+        if (com.gtceu.calcboard.api.catalog.MultiblockDetector.isMultiblock(machineId)) return true;
+        if (com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(machineId) != null) return true;
+
+        if (ns.equals("gtceu") || ns.contains("start")) {
+            return path.contains("machine") || path.contains("generator") || path.contains("hatch")
+                    || path.contains("bus") || path.contains("sieve") || path.contains("furnace")
+                    || path.contains("assembler") || path.contains("reactor") || path.contains("boiler")
+                    || path.contains("turbine") || path.contains("pump") || path.contains("miner")
+                    || path.contains("smelter") || path.contains("press") || path.contains("crusher")
+                    || path.contains("breaker") || path.contains("centrifuge") || path.contains("cutter")
+                    || path.contains("drill") || path.contains("lathe") || path.contains("mixer")
+                    || path.contains("electrolyzer") || path.contains("extractor") || path.contains("sifter")
+                    || path.startsWith("lv_") || path.startsWith("mv_") || path.startsWith("hv_")
+                    || path.startsWith("ev_") || path.startsWith("iv_") || path.startsWith("luv_")
+                    || path.startsWith("zpm_") || path.startsWith("uv_") || path.startsWith("uhv_")
+                    || path.startsWith("uev_") || path.startsWith("uiv_") || path.startsWith("uxv_")
+                    || path.startsWith("opv_") || path.startsWith("max_");
+        } else if (ns.equals("create") || ns.equals("create_new_age") || ns.equals("create_enchantment_industry")) {
+            return path.contains("deployer") || path.contains("spout") || path.contains("press")
+                    || path.contains("saw") || path.contains("drill") || path.contains("millstone")
+                    || path.contains("crushing_wheel") || path.contains("fan") || path.contains("mixer")
+                    || path.contains("crafter") || path.contains("generator") || path.contains("motor")
+                    || path.contains("wheel") || path.contains("sequenced_assembly");
+        } else if (ns.equals("thermal") || ns.equals("thermal_expansion") || ns.equals("thermal_innovation") || ns.equals("systeams")) {
+            return path.contains("dynamo") || path.contains("machine") || path.contains("cell")
+                    || path.contains("boiler") || path.contains("furnace") || path.contains("centrifuge");
+        }
+
+        return false;
     }
 
     /**

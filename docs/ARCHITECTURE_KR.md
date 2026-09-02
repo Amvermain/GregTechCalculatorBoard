@@ -44,12 +44,12 @@ graph TD
         MAR["ModAdapterRegistry (우선순위 기반 동적 라우팅 SPI)"]
         IMA["IModAdapter (생명주기, 오버클럭, 에너지, BOM 기여 & 유효성 검증)"]
         subgraph Adapters["도메인 모드 어댑터 (100% 헤드리스 안전)"]
-            GT["gtceu (physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
-            CR_MOD["create (RPM/SU, 스트레스 용량, 키네틱 기계)"]
+            GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
+            CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, 스트레스 용량, 키네틱 기계)"]
             CNA["createnewage (모터, 발전기 코일, 자석 링, FE/SU 변환)"]
             TH["thermal (AugmentData, 티어 키트, 다이나모, RF/t)"]
             SY["systeams (보일러, 증기 다이나모, 증기 mB/s)"]
-            ST["start (플라즈마 터빈, 스레딩 헬릭스 구조체, SPT/NPT 특성)"]
+            ST["start (StarTReflectionBridge, 플라즈마 터빈, 스레딩 헬릭스 구조체, SPT/NPT 특성)"]
             VN["vanilla (무전력 패시브 폴백)"]
         end
         MAR --> IMA

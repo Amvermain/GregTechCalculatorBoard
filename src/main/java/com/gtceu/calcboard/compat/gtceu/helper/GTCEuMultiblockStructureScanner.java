@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
 import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.bom.MultiblockStructurePart;
 import com.gtceu.calcboard.api.bom.PartCategory;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -78,6 +79,13 @@ public class GTCEuMultiblockStructureScanner {
             int maxMaint = variants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
 
             GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
+            Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
+            boolean supportsCoilAbility = (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
+                    || MultiblockDetector.isCoilMultiblock(controllerId)
+                    || (GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+            if (!supportsCoilAbility) {
+                maxCoil = 0;
+            }
 
             Set<ResourceLocation> allCandidates = new HashSet<>(patternRes.candidateBlocks());
             for (MultiblockStructurePart p : largest.parts()) {
@@ -165,6 +173,11 @@ public class GTCEuMultiblockStructureScanner {
                     int maxMaint = variants.stream().mapToInt(MultiblockStructureDef::maintenanceSlotCount).max().orElse(0);
 
                     GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
+                    Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
+                    boolean supportsCoilAbility = mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls);
+                    if (!supportsCoilAbility) {
+                        maxCoil = 0;
+                    }
 
                     Set<ResourceLocation> scanCandidates = new HashSet<>(patternRes.candidateBlocks());
                     for (MultiblockStructurePart p : largest.parts()) {
@@ -299,6 +312,11 @@ public class GTCEuMultiblockStructureScanner {
 
             String controllerName = MultiblockStructureCatalog.formatMachineName(controllerId.getPath());
             parts.add(0, new MultiblockStructurePart(controllerId, controllerName, 1, PartCategory.CONTROLLER));
+
+            if (!MultiblockDetector.isCoilMultiblock(controllerId)
+                    && GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() == GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
+                coilSlots = 0;
+            }
 
             return new MultiblockStructureDef(
                     controllerId,

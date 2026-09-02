@@ -96,13 +96,26 @@ public final class GTCEuBOMHelper {
 
         if (def == null) {
             ResourceLocation machineId = node.getMachineIcon();
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                ResourceLocation tieredWs = adapter.getWorkstationForTier(node, tier);
+                if (tieredWs != null) {
+                    machineId = tieredWs;
+                }
+            }
+            boolean isMachine = adapter != null && adapter.isLikelyMachineOrStructure(node, machineId);
+            if (!isMachine) {
+                return list;
+            }
             if (machineId != null) {
-                String controllerName = node.getName() != null && !node.getName().isBlank() ? node.getName() : machineId.getPath();
+                String controllerName = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(machineId.getPath());
                 list.add(new MultiblockStructurePart(machineId, controllerName, 1, PartCategory.CONTROLLER));
             }
-            ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
-            if (ehId != null) {
-                list.add(new MultiblockStructurePart(ehId, formatDisplayName(ehId), dualLowerTierEnergyHatches ? 2 : 1, PartCategory.HATCH_BUS));
+            if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
+                ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
+                if (ehId != null) {
+                    list.add(new MultiblockStructurePart(ehId, formatDisplayName(ehId), dualLowerTierEnergyHatches ? 2 : 1, PartCategory.HATCH_BUS));
+                }
             }
             for (MachineAddon addon : node.getAddons()) {
                 if (addon != null && addon.getItemIcon() != null) {

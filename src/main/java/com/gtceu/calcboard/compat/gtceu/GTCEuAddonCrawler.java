@@ -185,11 +185,18 @@ public class GTCEuAddonCrawler {
         tryAddTrait(list, seenIds, boost);
 
         MachineAddon batch = new MachineAddon("gtceu:batch_processing", "gui.gtcalcboard.addon.batch_processing", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.batch_processing.desc", null);
-        batch.setParallelMultiplier(16);
-        batch.setDurationMultiplier(13.0);
+        batch.setParallelMultiplier(1);
+        batch.setDurationMultiplier(1.0);
         batch.setEutMultiplier(1.0);
         batch.setDiscoverySource("GTCEu Multiblock Trait Specification");
         tryAddTrait(list, seenIds, batch);
+
+        MachineAddon bulk = new MachineAddon("gtceu:bulk_processing", "gui.gtcalcboard.addon.bulk_processing", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.bulk_processing.desc", null);
+        bulk.setParallelMultiplier(16);
+        bulk.setDurationMultiplier(13.0);
+        bulk.setEutMultiplier(1.0);
+        bulk.setDiscoverySource("GTCEu / StarT Multiblock Trait Specification");
+        tryAddTrait(list, seenIds, bulk);
 
         MachineAddon overpressure = new MachineAddon("gtceu:overpressure_autoclave", "gui.gtcalcboard.addon.overpressure_autoclave", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.overpressure_autoclave.desc", ResourceLocation.tryParse("gtceu:autoclave"));
         overpressure.setParallelMultiplier(8);

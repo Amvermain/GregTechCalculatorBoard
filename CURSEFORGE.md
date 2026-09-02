@@ -2,7 +2,7 @@
 
 An in-game flowchart editor and recipe rate calculator for **GregTech CEu Modern**, **EMI**, **JEI**, and multi-mod ecosystems, featuring real-time multiplayer team synchronization.
 
-<span><span><span><span><span><iframe src="https://www.youtube.com/embed/xpAbk7TA0lY?si=lAjWgGbrJJETU6Ku&amp;controls=0" width="560" height="315" frameborder="0" allowfullscreen="allowfullscreen"></iframe></span></span></span></span></span>
+<span><span><span><span><span><span><span><iframe width="560" height="315" src="https://www.youtube.com/embed/IeDe2dZ5b_o?si=uzwK-4LStUl9dR-H" frameborder="0" allowfullscreen="allowfullscreen"></iframe></span></span></span></span></span></span></span>
 
 GregTech Calculator Board provides an in-game, node-based canvas for designing and balancing GregTech production lines. Players can place recipe cards, connect input/output ports with wires, configure machine overclocks and hardware addons, and calculate required machine ratios, power consumption, and material throughput directly inside the client without external spreadsheets or tools.
 

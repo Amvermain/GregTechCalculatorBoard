@@ -233,6 +233,16 @@ public class MachineAddonCatalog {
                 .collect(Collectors.toList());
     }
 
+    public MachineAddon getAddon(String id) {
+        if (id == null) return null;
+        for (MachineAddon addon : getAllAddons()) {
+            if (addon != null && id.equals(addon.getId())) {
+                return addon;
+            }
+        }
+        return null;
+    }
+
     public void registerCustomAddon(MachineAddon customAddon) {
         if (customAddon != null && !customAddons.contains(customAddon)) {
             customAddons.add(customAddon);

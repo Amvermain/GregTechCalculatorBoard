@@ -190,10 +190,16 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 
 ---
 
-## 5. Multiblock Construction BOM (Multiblock Construction BOM)
+## 5. Multiblock & Factory BOM Calculation (Multiblock & Factory BOM)
 
 - [ ] **3D Structure Auto-Scanning**:
   - [ ] Accurately aggregates casings, heating coils, hatches/busses, and controllers for all placed multiblocks.
+- [ ] **Hierarchical Compound Module BOM Scaling**:
+  - [ ] Recursively compounds parent module machine counts ($P_{\text{child}} = P_{\text{parent}} \times M_{\text{module}}$) to scale nested sub-machine and multiblock part counts accurately.
+- [ ] **Shared Machine Pool Frame Duty Aggregation**:
+  - [ ] Calculates cumulative duty cycles across enclosed machines sharing physical hardware, quantizing to integral machines ($\lceil \sum \text{Duty} \rceil$) to prevent duplicate BOM parts.
+- [ ] **Singleblock Voltage Tier Item Resolution & Usage Trace**:
+  - [ ] Dynamically resolves singleblock machines into tier-specific items (e.g. `gtceu:lv_rock_breaker`) and lists contributing processes in `usedByMachines`.
 - [ ] **Dual Hatch Optimization**:
   - [ ] Toggling between `1x Regular Tier Hatch` vs `2x Lower Tier Hatches` dynamically updates BoM items.
 - [ ] **Material Filtering & Stack Breakdown**:

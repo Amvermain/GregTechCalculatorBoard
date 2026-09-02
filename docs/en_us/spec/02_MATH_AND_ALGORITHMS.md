@@ -1,22 +1,27 @@
-# [02] Mathematical Engine & Graph Analysis Algorithms (Math & Algorithms)
+# [02] Mathematical Solver Engine & Graph Algorithms (Math & Algorithms)
 
 > 📍 **GTCalcBoard Technical Specification Series**
-> [[00] System Overview](00_OVERVIEW.md) ➔ [[01] Core Domain & Models](01_CORE_DOMAIN_AND_MODELS.md) ➔ **[02] Math & Algorithms** ➔ [[03] UI & Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md) ➔ [[04] Multiplayer & Network](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) ➔ [[05] External Integration & i18n](05_INTEGRATION_AND_I18N.md)
+> [[00] System Overview](00_OVERVIEW.md) ➔ [[01] Core Domain Models](01_CORE_DOMAIN_AND_MODELS.md) ➔ **[02] Math & Algorithms** ➔ [[03] UI & Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md) ➔ [[04] Multiplayer & Networking](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md) ➔ [[05] External Integration & i18n](05_INTEGRATION_AND_I18N.md)
 
 ---
 
-## 1. Overclocking & Physics Formulas
+## 1. Overclocking & Specialized Machine Physics
 
-GTCalcBoard implements exact numerical physics formulas across GregTech and supported technical mods.
+GTCalcBoard strictly computes physical energy and recipe duration formulas for GregTech CEu Modern and integrated tech mods.
 
 ### 1.1 Voltage Tier Delta ($\Delta\text{Tier}$)
-$$\Delta\text{Tier} = \max(0, \, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal})$$
+$$
+\Delta\text{Tier} = \begin{cases} 
+\max(0, \, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal} - 1) & (\text{RecipeTier} = \text{ULV}) \\
+\max(0, \, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal}) & (\text{otherwise})
+\end{cases}
+$$
 
 ---
 
-### 1.2 Overclock Mode Formulas
+### 1.2 Overclock Mode Duration & Power Formulas
 
-For $\Delta\text{Tier} > 0$, Energy and Speed factors are evaluated as follows:
+When $\Delta\text{Tier} > 0$, Energy and Speed Factors are determined as follows:
 
 $$
 \text{Energy Factor} = 4.0^{\Delta\text{Tier}}
@@ -30,9 +35,9 @@ $$
 \end{cases}
 $$
 
-* **STANDARD Mode**: Standard Single/Multiblock Machines ($1\text{ Tier} = 4\times\text{Power}, 2\times\text{Speed}$)
-* **PERFECT Mode**: Perfect Overclock Multiblocks ($1\text{ Tier} = 4\times\text{Power}, 4\times\text{Speed}$)
-* **LOSSLESS Mode**: Unchanged Speed, Conserved Energy ($1\text{ Tier} = 1\times\text{Power}, 1\times\text{Speed}$)
+* **STANDARD Mode**: Standard singleblock and multiblock machines ($4\times\text{power}, 2\times\text{speed per tier}$)
+* **PERFECT Mode**: Perfect overclocking multiblocks ($4\times\text{power}, 4\times\text{speed per tier}$)
+* **LOSSLESS Mode**: Speed unchanged, energy conserved ($1\times\text{power}, 1\times\text{speed per tier}$)
 
 $$
 \text{Calculated Duration (ticks)} = \frac{\text{BaseDurationTicks}}{\text{Speed Factor}}
@@ -44,9 +49,9 @@ $$
 
 ---
 
-### 1.3 Sub-Tick Batch Processing ($< 1.0\text{ Tick}$)
+### 1.3 Sub-tick Batching for High-Tier Overclocks ($< 1.0\text{ Tick}$)
 
-When recipe duration falls below $1.0\text{ tick}$ ($0.05\text{ s}$), operations are promoted to batching per engine tick:
+When aggressive overclocks push recipe durations below $1.0\text{ tick}$ ($0.05\text{ s}$), executions are promoted to fractional per-tick batches aligned with Minecraft's engine tickrate:
 
 $$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
 $$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
@@ -54,19 +59,19 @@ $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \tex
 
 ---
 
-### 1.4 Hardware Addon Multiplier Compounding
+### 1.4 Hardware Addon Compounding
 
-For all installed addons $a \in \text{InstalledAddons}$, duration and power multipliers are compounded:
+For all installed addons $a \in \text{InstalledAddons}$, duration and power multipliers compound multiplicatively:
 
 $$\text{Total Duration} = \text{Effective Duration} \times \prod_{a \in \text{Addons}} a.\text{getDurationMultiplier}()$$
 $$\text{Total EU/t} = \text{Effective EU/t} \times \prod_{a \in \text{Addons}} a.\text{getEutMultiplier}()$$
 
-#### Heating Coil Machine Formulas
+#### Heating Coil Machine-Specific Bonus Deduction
 - **Electric Blast Furnace (EBF)**:
-  For recipe temperature $T_{\text{recipe}}$ and coil temperature $T_{\text{coil}}$:
+  Given recipe temperature $T_{\text{recipe}}$ and coil temperature $T_{\text{coil}}$:
   $$\Delta T_{\text{excess}} = \max(0, \, T_{\text{coil}} - T_{\text{recipe}})$$
   $$\text{EUt Multiplier} = 0.95^{\lfloor \Delta T_{\text{excess}} / 900 \rfloor}$$
-  *(5% compound power discount per 900K excess temperature)*
+  *(5% compounding power reduction per 900K excess temperature)*
 
 - **Pyrolyse Oven**:
   $$\text{Duration Multiplier} = \frac{100.0}{\text{PyrolyseSpeedPercent}}$$
@@ -121,6 +126,30 @@ $$\text{Single Machine Expected Output Rate (per sec)} = \text{Amount} \times \t
 $$\text{Effective Speed Multiplier} = \text{TierSpeedMultiplier} \times \theta$$
 $$\text{Steam Rate (mB/t)} = \text{BaseSteamRate} \times \text{Effective Speed Multiplier}$$
 $$\text{Water Rate (mB/t)} = \frac{\text{Steam Rate (mB/t)}}{160.0} \quad (1\text{mB Water} \rightarrow 160\text{mB Steam})$$
+
+---
+
+### 1.7 GTCEu & Star Technology Multiblock Trait Physics Formulas (`MULTIBLOCK_TRAIT`)
+
+Physics formulas for intrinsic multiblock processing modifiers and traits:
+
+1. **Throughput Boosting (Pyrolyse Oven, Super Cracker, etc.)**:
+   - Multipliers: Parallel $P_{\text{trait}} = 4$, Duration $D_{\text{mult}} = 1.6$, Power $E_{\text{mult}} = 0.95$
+   - Effective Duration: $T_{\text{eff}} = T_{\text{base}} \times 1.6 \text{ (ticks)}$
+   - Effective Cycles Per Second (CPS): $\text{CPS} = \frac{20}{T_{\text{eff}}} \times (P_{\text{hatch}} \times 4) = \text{CPS}_{\text{base}} \times 2.5 \quad (2.5\times \text{ speed acceleration})$
+   - Single Machine Power: $\text{EUt}_{\text{single}} = \text{EUt}_{\text{base}} \times 0.95 \times P_{\text{trait}}$
+2. **Bulk Processing (Bulk Processing Array, LOAF, etc.)**:
+   - Multipliers: Parallel $P_{\text{trait}} = 16$, Duration $D_{\text{mult}} = 13.0$
+   - Effective Duration: $T_{\text{eff}} = T_{\text{base}} \times 13.0 \text{ (ticks)}$
+   - Effective Cycles Per Second (CPS): $\text{CPS} = \frac{20}{T_{\text{eff}}} \times (P_{\text{hatch}} \times 16) = \text{CPS}_{\text{base}} \times \frac{16}{13} \approx \text{CPS}_{\text{base}} \times 1.2308 \quad (23.08\% \text{ speed acceleration})$
+3. **Overpressure Autoclave**:
+   - Multipliers: Parallel $P_{\text{trait}} = 8$, Duration $D_{\text{mult}} = 1.5$, Power $E_{\text{mult}} = 1.25$
+   - Effective Cycles Per Second (CPS): $\text{CPS} = \frac{20}{T_{\text{eff}}} \times (P_{\text{hatch}} \times 8) = \text{CPS}_{\text{base}} \times \frac{8}{1.5} \approx \text{CPS}_{\text{base}} \times 5.333 \quad (5.33\times \text{ speed acceleration})$
+4. **Multiblock Trait Stacking**:
+   - For endgame multiblocks combining multiple traits (e.g. LOAF, Ultimate EBF):
+   $$\text{Total Parallel} = P_{\text{hatch}} \times \prod_{k} P_{\text{trait}, k}$$
+   $$\text{Combined Duration Multiplier} = \prod_{k} D_{\text{mult}, k}$$
+   - Example: `Throughput Boosting` ($4\times \text{ Par, } 1.6\times \text{ Dur}$) + `Bulk Processing` ($16\times \text{ Par, } 13.0\times \text{ Dur}$) = $64\times \text{ Parallel, } 20.8\times \text{ Duration} \Rightarrow \frac{64}{20.8} \approx 3.077\times \text{ overall speedup}$.
 
 ---
 
@@ -239,6 +268,23 @@ For multi-page flowchart graphs bound to AE2 crafting patterns, calculates exact
    $$T_{\text{start}}(u) = \max_{p \in \text{Pred}(u)} \left( T_{\text{start}}(p) + \text{FirstBatchDuration}(p) \right)$$
    $$T_{\text{finish}}(u) = T_{\text{start}}(u) + T_{\text{node}}(u)$$
    $$\text{Total ETA} = \max_{u \in \text{TerminalNodes}} T_{\text{finish}}(u)$$
+
+---
+
+### [Algorithm 8] Hierarchical Compound Module BOM Aggregation & Machine Scaling (`MultiblockBOMCalculator`)
+
+Accurately aggregates Bill of Materials (BOM) for flowcharts containing deeply nested compound modules (`isModule()`) and Shared Machine Pool frames (`isSharedMachineFrame()`) in a single flattened resolution pass:
+
+1. **Recursive Parent Multiplier Propagation (`flattenNodesAndFrames`)**:
+   When descending from root nodes into subgraphs $G_{\text{sub}}$, the parent multiplier $P$ is compounded with the module machine count $M_{\text{module}}$:
+   $$P_{\text{child}} = P_{\text{parent}} \times \max(1.0, \, M_{\text{module}})$$
+   Upon reaching leaf node $n$, its effective machine count is scaled to $n.\text{getMachineCount}() \times P$, ensuring module container cards are excluded from BOM parts while internal operational machines scale faithfully.
+2. **Shared Machine Frame Duty Aggregation & Ceiling Quantization**:
+   For machine nodes $\{n_1, n_2, \dots, n_k\}$ enclosed in a Shared Machine Frame, cumulative duty cycle is computed and quantized to an integral physical machine count:
+   $$M_{\text{req}} = \max\left(1, \, \left\lceil \sum_{i=1}^{k} n_i.\text{getMachineCount}() - 10^{-5} \right\rceil\right)$$
+   $M_{\text{req}}$ is assigned to the primary master node, while dependent slave nodes are pruned from duplicate BOM counts.
+3. **Singleblock Tiered Resolution & Traceability (`usedByMachines`)**:
+   Singleblock machines resolve into tier-specific item IDs (e.g. `gtceu:lv_rock_breaker`) matching their target voltage tier, and record contributing machine labels and counts in the `usedByMachines` trace list.
 
 ---
 

@@ -111,28 +111,14 @@ public final class GTCEuCoilModifierHelper {
 
     private static CoilMachineKind classifyModifierObject(Object modifier) {
         if (modifier == null) return null;
-        try {
-            Class<?> gtModifiersCls = Class.forName("com.gregtechceu.gtceu.common.data.GTRecipeModifiers");
-            for (Field f : gtModifiersCls.getFields()) {
-                Object stdMod = f.get(null);
-                if (stdMod != null && (stdMod == modifier || stdMod.equals(modifier))) {
-                    String fName = f.getName().toUpperCase(Locale.ROOT);
-                    if (fName.contains("ELECTRIC_BLAST_FURNACE") || fName.contains("EBF")) return CoilMachineKind.BLAST_FURNACE;
-                    if (fName.contains("PYROLYSE_OVEN") || fName.contains("PYROLYSE")) return CoilMachineKind.PYROLYSE_OVEN;
-                    if (fName.contains("CRACKING_UNIT") || fName.contains("CRACKING") || fName.contains("CRACKER")) return CoilMachineKind.CRACKING_UNIT;
-                    if (fName.contains("CHEMICAL_PLANT") || fName.contains("CHEMICAL_REACTOR") || fName.contains("LCR")) return CoilMachineKind.CHEMICAL_REACTOR;
-                    if (fName.contains("MULTI_SMELTER") || fName.contains("SMELTER")) return CoilMachineKind.MULTI_SMELTER;
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        String modStr = modifier.getClass().getName().toLowerCase(Locale.ROOT) + " " + modifier.toString().toLowerCase(Locale.ROOT);
-        if (modStr.contains("blast") || modStr.contains("ebf")) return CoilMachineKind.BLAST_FURNACE;
-        if (modStr.contains("pyrolyse")) return CoilMachineKind.PYROLYSE_OVEN;
-        if (modStr.contains("crack")) return CoilMachineKind.CRACKING_UNIT;
-        if (modStr.contains("chemical")) return CoilMachineKind.CHEMICAL_REACTOR;
-        if (modStr.contains("smelter")) return CoilMachineKind.MULTI_SMELTER;
-
+        String modId = GTCEuReflectionBridge.getRecipeModifierName(modifier);
+        if (modId != null) {
+            if ("EBF_OC".equals(modId) || "ELECTRIC_BLAST_FURNACE".equals(modId)) return CoilMachineKind.BLAST_FURNACE;
+            if ("PYROLYSE_OVEN_OC".equals(modId) || "PYROLYSE_OVEN".equals(modId)) return CoilMachineKind.PYROLYSE_OVEN;
+            if ("CRACKER_OC".equals(modId) || "CRACKING_UNIT".equals(modId)) return CoilMachineKind.CRACKING_UNIT;
+            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_PLANT".equals(modId)) return CoilMachineKind.CHEMICAL_REACTOR;
+            if ("MULTI_SMELLTER_PARALLEL".equals(modId) || "MULTI_SMELTER_PARALLEL".equals(modId) || "MULTI_SMELTER".equals(modId)) return CoilMachineKind.MULTI_SMELTER;
+        }
         return null;
     }
 
@@ -196,13 +182,13 @@ public final class GTCEuCoilModifierHelper {
         if (id == null) return CoilMachineSpec.GENERIC;
         String path = id.getPath().toLowerCase(Locale.ROOT);
 
-        if (path.contains("blast_furnace") || path.contains("ebf")) {
+        if (path.contains("blast") || path.contains("ebf") || path.contains("abs") || path.contains("alloy_blast")) {
             return new CoilMachineSpec(CoilMachineKind.BLAST_FURNACE, CustomCoilMultiplier.DEFAULT);
         }
         if (path.contains("pyrolyse")) {
             return new CoilMachineSpec(CoilMachineKind.PYROLYSE_OVEN, CustomCoilMultiplier.DEFAULT);
         }
-        if (path.contains("cracker") || path.contains("cracking")) {
+        if (path.contains("cracker") || path.contains("cracking") || path.contains("super_cracker")) {
             return new CoilMachineSpec(CoilMachineKind.CRACKING_UNIT, CustomCoilMultiplier.DEFAULT);
         }
         if (path.contains("chemical") || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {

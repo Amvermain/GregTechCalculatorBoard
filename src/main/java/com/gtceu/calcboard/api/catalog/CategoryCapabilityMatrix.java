@@ -237,6 +237,17 @@ public class CategoryCapabilityMatrix {
                 false, true, true, false, false, false, false, null, null, null, 0.0
         );
         registerMockCategory(
+                ResourceLocation.tryParse("gtceu:alloy_blast_smelter"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:alloy_blast_smelter"),
+                        ResourceLocation.tryParse("gtceu:super_abs"),
+                        ResourceLocation.tryParse("gtceu:mega_abs"),
+                        ResourceLocation.tryParse("gtceu:ultimate_abs")
+                ),
+                ResourceLocation.tryParse("gtceu:alloy_blast_smelter"),
+                false, true, true, false, false, false, false, null, null, null, 0.0
+        );
+        registerMockCategory(
                 ResourceLocation.tryParse("gtceu:steam_turbine"),
                 List.of(
                         ResourceLocation.tryParse("gtceu:lv_steam_turbine"),

@@ -214,8 +214,11 @@ public final class GTCEuPatternScanner {
             candidateBlocks.add(id);
         }
 
+        if (GTCEuAPI.HEATING_COILS.containsKey(b)) {
+            abilities.add("HEATING_COILS");
+        }
+
         matchPartAbilities(b, abilities);
-        matchHeatingCoils(b, abilities);
     }
 
     private static void matchPartAbilities(Block b, Set<String> abilities) {
@@ -230,27 +233,46 @@ public final class GTCEuPatternScanner {
         }
     }
 
-    private static void matchHeatingCoils(Block b, Set<String> abilities) {
-        for (Supplier<? extends Block> sup : GTCEuAPI.HEATING_COILS.values()) {
-            if (sup != null && sup.get() == b) {
-                abilities.add("HEATING_COILS");
-                return;
-            }
-        }
-    }
-
     private static void enrichFromMachineDefinition(MultiblockMachineDefinition multiDef, Set<String> abilities) {
+        if (GTCEuReflectionBridge.isCoilWorkableClass(GTCEuReflectionBridge.getMachineClass(multiDef))) {
+            abilities.add("HEATING_COILS");
+        }
         enrichModifierAbilities(multiDef, abilities);
         enrichIoAbilities(multiDef, abilities);
         enrichStarTThreading(multiDef, abilities);
     }
 
     private static void enrichModifierAbilities(MultiblockMachineDefinition multiDef, Set<String> abilities) {
-        if (multiDef.getRecipeModifier() == null) return;
-        String modStr = multiDef.getRecipeModifier().toString().toUpperCase(Locale.ROOT);
-        if (modStr.contains("PARALLEL")) abilities.add("PARALLEL_HATCH");
-        if (modStr.contains("BATCH")) abilities.add("BATCH_MODE");
-        if (modStr.contains("THREADING")) abilities.add("THREADING");
+        List<Object> modifiers = GTCEuReflectionBridge.getRecipeModifiers(multiDef);
+        if (modifiers == null || modifiers.isEmpty()) return;
+        for (Object mod : modifiers) {
+            if (mod == null) continue;
+            String modId = GTCEuReflectionBridge.getRecipeModifierName(mod);
+            if (modId == null) continue;
+            if ("PARALLEL_HATCH".equals(modId) || "ABSOLUTE_PARALLEL".equals(modId)) {
+                abilities.add("PARALLEL_HATCH");
+            }
+            if ("BATCH_MODE".equals(modId)) abilities.add("BATCH_MODE");
+            if ("EBF_OC".equals(modId) || "EBF_OVERCLOCK".equals(modId) || "ELECTRIC_BLAST_FURNACE".equals(modId)
+                    || "HELL_FORGE_OC".equals(modId)
+                    || "CRACKER_OC".equals(modId) || "CRACKER_OVERCLOCK".equals(modId) || "CRACKING_UNIT".equals(modId)
+                    || "PYROLYSE_OVEN_OC".equals(modId) || "PYROLYSE_OVEN_OVERCLOCK".equals(modId) || "PYROLYSE_OVEN".equals(modId)) {
+                abilities.add("HEATING_COILS");
+            }
+            if ("MULTI_SMELLTER_PARALLEL".equals(modId) || "MULTI_SMELTER_PARALLEL".equals(modId) || "MULTI_SMELTER".equals(modId)) {
+                abilities.add("COIL_PARALLEL");
+                abilities.add("HEATING_COILS");
+            }
+            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_REACTOR_OVERCLOCK".equals(modId) || "CHEMICAL_PLANT".equals(modId)
+                    || "VACUUM_CHEMICAL_REACTION_CHAMBER".equals(modId)) {
+                abilities.add("HEATING_COILS");
+            }
+            if ("THROUGHPUT_BOOSTING".equals(modId)) abilities.add("THROUGHPUT_BOOSTING");
+            if ("OVERPRESSURE".equals(modId)) abilities.add("OVERPRESSURE");
+            if ("BULK_PROCESSING".equals(modId)) abilities.add("BULK_PROCESSING");
+            if ("THREADING".equals(modId) || "THREADING_MACHINE".equals(modId)) abilities.add("THREADING");
+            if ("REFLECTOR_FUSION_REACTOR".equals(modId)) abilities.add("REFLECTOR");
+        }
     }
 
     private static void enrichIoAbilities(MultiblockMachineDefinition multiDef, Set<String> abilities) {

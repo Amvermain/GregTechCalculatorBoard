@@ -165,18 +165,8 @@ public final class BoardHotkeyHandler {
 
             for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
                 NodeWidget widget = nodeWidgets.get(i);
-                if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
-                    IngredientStack hovered = widget.getHoveredIngredient(canvasMouseX, canvasMouseY);
-                    if (hovered != null) {
-                        try {
-                            var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
-                            boolean success = (keyCode == GLFW.GLFW_KEY_R) ? adapter.displayRecipes(hovered) : adapter.displayUses(hovered);
-                            if (success) {
-                                TutorialManager.getInstance().onRecipeLookup();
-                                return true;
-                            }
-                        } catch (Throwable ignored) {}
-                    }
+                if (handleHoveredRecipeLookup(widget, canvasMouseX, canvasMouseY, keyCode)) {
+                    return true;
                 }
             }
         }
@@ -313,6 +303,22 @@ public final class BoardHotkeyHandler {
         }
         if (keyCode == GLFW.GLFW_KEY_S && shift) {
             screen.createSharedMachineFrameFromSelection();
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean handleHoveredRecipeLookup(NodeWidget widget, double canvasX, double canvasY, int keyCode) {
+        if (widget == null || !widget.isPointInside(canvasX, canvasY)) return false;
+        IngredientStack hovered = widget.getHoveredIngredient(canvasX, canvasY);
+        if (hovered == null) return false;
+
+        var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
+        if (adapter == null) return false;
+
+        boolean success = (keyCode == GLFW.GLFW_KEY_R) ? adapter.displayRecipes(hovered) : adapter.displayUses(hovered);
+        if (success) {
+            TutorialManager.getInstance().onRecipeLookup();
             return true;
         }
         return false;

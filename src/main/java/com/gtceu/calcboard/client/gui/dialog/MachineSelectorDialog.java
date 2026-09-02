@@ -35,6 +35,8 @@ public class MachineSelectorDialog {
             boolean isSteam,
             boolean supportsParallelHatch,
             boolean supportsBatchMode,
+            boolean supportsThroughputBoosting,
+            boolean supportsBulkProcessing,
             boolean supportsLaserHatch,
             boolean supportsRotor,
             int helixCapacity,
@@ -57,9 +59,11 @@ public class MachineSelectorDialog {
     private double maxScrollY = 0.0;
     private MachineEntry hoveredEntry = null;
 
-    private static final int DIALOG_WIDTH = 440;
+    private static final int DIALOG_WIDTH = 540;
     private static final int DIALOG_HEIGHT = 280;
     private static final int ROW_HEIGHT = 24;
+
+    private record MachineBadge(String text, int fgColor, int bgColor, int borderColor) {}
 
     public MachineSelectorDialog(BoardScreen parent) {
         this.parent = parent;
@@ -149,6 +153,8 @@ public class MachineSelectorDialog {
             boolean isSteam = MultiblockDetector.isSteamMultiblock(ws);
             boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(ws, null, null);
             boolean supportsBatch = MultiblockDetector.supportsBatchMode(ws, null);
+            boolean supportsThroughput = MultiblockDetector.supportsThroughputBoosting(ws);
+            boolean supportsBulk = MultiblockDetector.supportsBulkProcessing(ws);
             boolean supportsLaser = MultiblockDetector.supportsLaserHatch(ws, null);
             boolean supportsRotor = MultiblockDetector.supportsTurbineRotor(ws, null);
             int helixCap = MultiblockDetector.getMaxHelixCount(ws);
@@ -165,6 +171,8 @@ public class MachineSelectorDialog {
                     isSteam,
                     supportsParHatch,
                     supportsBatch,
+                    supportsThroughput,
+                    supportsBulk,
                     supportsLaser,
                     supportsRotor,
                     helixCap,
@@ -187,6 +195,8 @@ public class MachineSelectorDialog {
                         MultiblockDetector.isSteamMultiblock(ws),
                         MultiblockDetector.supportsParallelHatch(ws, null, null),
                         MultiblockDetector.supportsBatchMode(ws, null),
+                        MultiblockDetector.supportsThroughputBoosting(ws),
+                        MultiblockDetector.supportsBulkProcessing(ws),
                         MultiblockDetector.supportsLaserHatch(ws, null),
                         MultiblockDetector.supportsTurbineRotor(ws, null),
                         MultiblockDetector.getMaxHelixCount(ws),
@@ -330,106 +340,84 @@ public class MachineSelectorDialog {
                 graphics.renderItem(entry.itemStack(), listX + 6, rowY + 3);
             }
 
-            // Name
+            // Prepare Badges
+            List<MachineBadge> badges = new ArrayList<>();
+
+            // 1. Multiblock / Steam / Tier
+            if (entry.isMultiblock()) {
+                badges.add(new MachineBadge("🏛 " + Component.translatable("gui.gtcalcboard.multiblock_badge").getString(), 0xFFDDAAFF, 0xFF2D1B44, 0xFF6C3E9A));
+            } else if (entry.isSteam()) {
+                badges.add(new MachineBadge("♨ " + Component.translatable("gui.gtcalcboard.steam_badge").getString(), 0xFFFFBB66, 0xFF3A2814, 0xFF7A4E1B));
+            } else if (entry.tier() != null) {
+                badges.add(new MachineBadge(entry.tier().getName(), 0xFF88CCFF, 0xFF1B2836, 0xFF354F6B));
+            }
+
+            // 2. Coil
+            if (entry.isCoil()) {
+                badges.add(new MachineBadge("♨ Coil", 0xFFFF9944, 0xFF3D2314, 0xFF8A481B));
+            }
+
+            // 3. Throughput Boosting
+            if (entry.supportsThroughputBoosting()) {
+                badges.add(new MachineBadge("⚡ " + Component.translatable("gui.gtcalcboard.throughput_boosting_badge").getString(), 0xFF88FFDD, 0xFF142E28, 0xFF2A7865));
+            }
+
+            // 4. Bulk Processing
+            if (entry.supportsBulkProcessing()) {
+                badges.add(new MachineBadge("⚡ " + Component.translatable("gui.gtcalcboard.bulk_processing_badge").getString(), 0xFFFFCC88, 0xFF352010, 0xFF855025));
+            }
+
+            // 5. Batch Mode
+            if (entry.supportsBatchMode()) {
+                badges.add(new MachineBadge("📦 " + Component.translatable("gui.gtcalcboard.batch_mode_badge").getString(), 0xFFEEAAFF, 0xFF2A1535, 0xFF6A3585));
+            }
+
+            // 6. Threading Helix
+            if (entry.helixCapacity() > 0) {
+                badges.add(new MachineBadge("🧬 " + Component.translatable("gui.gtcalcboard.helix_badge", entry.helixCapacity()).getString(), 0xFF66EEFF, 0xFF112D33, 0xFF227885));
+            }
+
+            // 7. Turbine Rotor
+            if (entry.supportsRotor()) {
+                badges.add(new MachineBadge("⚙ " + Component.translatable("gui.gtcalcboard.rotor_badge").getString(), 0xFFFFD255, 0xFF382A0F, 0xFF9A7B1C));
+            }
+
+            // 8. Laser Hatch
+            if (entry.supportsLaserHatch()) {
+                badges.add(new MachineBadge("⚡ " + Component.translatable("gui.gtcalcboard.laser_hatch_badge").getString(), 0xFFE8B3FF, 0xFF2B163E, 0xFF7D3C98));
+            }
+
+            // 9. Parallel Hatch
+            if (entry.supportsParallelHatch()) {
+                badges.add(new MachineBadge("⚡ " + Component.translatable("gui.gtcalcboard.parallel_hatch_badge").getString(), 0xFF55FFAA, 0xFF0E2E20, 0xFF2A855E));
+            }
+
+            // 10. Default Parallel
+            if (entry.defaultParallel() > 1) {
+                badges.add(new MachineBadge("⚡ " + entry.defaultParallel() + "x Par", 0xFF7BB3FF, 0xFF1C2D44, 0xFF3E659A));
+            }
+
+            // Calculate Badges Total Width
+            int totalBadgeWidth = 0;
+            for (MachineBadge b : badges) {
+                totalBadgeWidth += font.width(b.text()) + 6 + 3;
+            }
+
+            // Dynamically calculate available space for name
+            int maxNameWidth = Math.max(80, (listW - 14) - 26 - totalBadgeWidth - 6);
             String nameText = (entry.isCurrent() ? "§a✔ " : "") + entry.displayName();
             int textColor = entry.isCurrent() ? 0xFF55FF88 : (hov ? 0xFFFFFFFF : 0xFFCFD6E4);
-            graphics.drawString(font, font.plainSubstrByWidth(nameText, 210), listX + 26, rowY + 7, textColor, false);
+            graphics.drawString(font, font.plainSubstrByWidth(nameText, maxNameWidth), listX + 26, rowY + 7, textColor, false);
 
-            // Badges on the right
+            // Render Badges right-to-left
             int badgeRight = listX + listW - 14;
-
-            // Default Parallel Badge
-            if (entry.defaultParallel() > 1) {
-                String parTxt = "⚡ " + entry.defaultParallel() + "x Par";
-                int bW = font.width(parTxt) + 6;
+            for (int bi = badges.size() - 1; bi >= 0; bi--) {
+                MachineBadge b = badges.get(bi);
+                int bW = font.width(b.text()) + 6;
                 badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF1C2D44);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF3E659A);
-                graphics.drawString(font, parTxt, badgeRight + 3, rowY + 7, 0xFF7BB3FF, false);
-            }
-
-            // Parallel Hatch Capability Badge (for Multiblocks)
-            if (entry.supportsParallelHatch()) {
-                String parHatchTxt = "⚡ " + Component.translatable("gui.gtcalcboard.parallel_hatch_badge").getString();
-                int bW = font.width(parHatchTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF0E2E20);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF2A855E);
-                graphics.drawString(font, parHatchTxt, badgeRight + 3, rowY + 7, 0xFF55FFAA, false);
-            }
-
-            // Laser Hatch Capability Badge
-            if (entry.supportsLaserHatch()) {
-                String laserTxt = "⚡ " + Component.translatable("gui.gtcalcboard.laser_hatch_badge").getString();
-                int bW = font.width(laserTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF2B163E);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF7D3C98);
-                graphics.drawString(font, laserTxt, badgeRight + 3, rowY + 7, 0xFFE8B3FF, false);
-            }
-
-            // Turbine Rotor Capability Badge
-            if (entry.supportsRotor()) {
-                String rotorTxt = "⚙ " + Component.translatable("gui.gtcalcboard.rotor_badge").getString();
-                int bW = font.width(rotorTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF382A0F);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF9A7B1C);
-                graphics.drawString(font, rotorTxt, badgeRight + 3, rowY + 7, 0xFFFFD255, false);
-            }
-
-            // Threading Helix Capacity Badge
-            if (entry.helixCapacity() > 0) {
-                String helixTxt = "🧬 " + Component.translatable("gui.gtcalcboard.helix_badge", entry.helixCapacity()).getString();
-                int bW = font.width(helixTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF112D33);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF227885);
-                graphics.drawString(font, helixTxt, badgeRight + 3, rowY + 7, 0xFF66EEFF, false);
-            }
-
-            // Batch Mode Capability Badge
-            if (entry.supportsBatchMode()) {
-                String batchTxt = "📦 " + Component.translatable("gui.gtcalcboard.batch_mode_badge").getString();
-                int bW = font.width(batchTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF2A1535);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF6A3585);
-                graphics.drawString(font, batchTxt, badgeRight + 3, rowY + 7, 0xFFEEAAFF, false);
-            }
-
-            // Coil Badge
-            if (entry.isCoil()) {
-                String coilTxt = "♨ Coil";
-                int bW = font.width(coilTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF3D2314);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF8A481B);
-                graphics.drawString(font, coilTxt, badgeRight + 3, rowY + 7, 0xFFFF9944, false);
-            }
-
-            // Multiblock / Steam / Tier Badge
-            if (entry.isMultiblock()) {
-                String mbTxt = "🏛 " + Component.translatable("gui.gtcalcboard.multiblock_badge").getString();
-                int bW = font.width(mbTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF2D1B44);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF6C3E9A);
-                graphics.drawString(font, mbTxt, badgeRight + 3, rowY + 7, 0xFFDDAAFF, false);
-            } else if (entry.isSteam()) {
-                String steamTxt = "♨ " + Component.translatable("gui.gtcalcboard.steam_badge").getString();
-                int bW = font.width(steamTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF3A2814);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF7A4E1B);
-                graphics.drawString(font, steamTxt, badgeRight + 3, rowY + 7, 0xFFFFBB66, false);
-            } else if (entry.tier() != null) {
-                String tierTxt = entry.tier().getName();
-                int bW = font.width(tierTxt) + 6;
-                badgeRight -= bW + 3;
-                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, 0xFF1B2836);
-                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, 0xFF354F6B);
-                graphics.drawString(font, tierTxt, badgeRight + 3, rowY + 7, 0xFF88CCFF, false);
+                graphics.fill(badgeRight, rowY + 4, badgeRight + bW, rowY + 18, b.bgColor());
+                graphics.renderOutline(badgeRight, rowY + 4, bW, 14, b.borderColor());
+                graphics.drawString(font, b.text(), badgeRight + 3, rowY + 7, b.fgColor(), false);
             }
         }
 
@@ -469,6 +457,12 @@ public class MachineSelectorDialog {
             }
             if (hoveredEntry.supportsBatchMode()) {
                 tooltip.add(Component.literal("§d📦 " + Component.translatable("gui.gtcalcboard.tooltip.supports_batch_mode").getString()));
+            }
+            if (hoveredEntry.supportsThroughputBoosting()) {
+                tooltip.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.supports_throughput_boosting").getString()));
+            }
+            if (hoveredEntry.supportsBulkProcessing()) {
+                tooltip.add(Component.literal("§6⚡ " + Component.translatable("gui.gtcalcboard.tooltip.supports_bulk_processing").getString()));
             }
             if (hoveredEntry.isCoil()) {
                 tooltip.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.tooltip.requires_heating_coil").getString()));

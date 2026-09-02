@@ -24,6 +24,9 @@ import net.minecraft.sounds.SoundEvents;
 
 import java.util.*;
 
+/**
+ * Top horizontal toolbar widget managing quick access buttons, layout modes, tools, and scrollable action bars.
+ */
 public class ToolbarWidget {
     private final BoardScreen screen;
     private double scrollX = 0;

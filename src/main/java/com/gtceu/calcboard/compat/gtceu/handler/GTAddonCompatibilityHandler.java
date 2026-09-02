@@ -16,6 +16,7 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import com.gtceu.calcboard.compat.gtceu.physics.GTTurbinePhysics;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
 import com.gtceu.calcboard.compat.start.StarTTurbineHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -119,9 +120,12 @@ public final class GTAddonCompatibilityHandler {
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = def.coilSlotCount() > 0 || def.supportsAbility("HEATING_COILS") || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
+                        || MultiblockDetector.isCoilMultiblock(mbId)
+                        || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             } else {
-                supportsCoil = node.canUseCoils() || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
+                        || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             }
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
@@ -320,6 +324,15 @@ public final class GTAddonCompatibilityHandler {
             if (addon.getId().equals("gtceu:batch_processing")) {
                 return !isGen && node.isMultiblock() && MultiblockDetector.supportsBatchMode(node.getMachineIcon(), node.getAvailableWorkstations());
             }
+            if (addon.getId().equals("gtceu:throughput_boosting")) {
+                return !isGen && node.isMultiblock() && MultiblockDetector.supportsThroughputBoosting(node.getMachineIcon());
+            }
+            if (addon.getId().equals("gtceu:bulk_processing")) {
+                return !isGen && node.isMultiblock() && MultiblockDetector.supportsBulkProcessing(node.getMachineIcon());
+            }
+            if (addon.getId().equals("gtceu:overpressure_autoclave")) {
+                return !isGen && node.isMultiblock() && MultiblockDetector.supportsOverpressure(node.getMachineIcon());
+            }
             if (addon.getItemIcon() != null) {
                 ResourceLocation target = addon.getItemIcon();
                 if (node.getMachineIcon() != null && node.getMachineIcon().equals(target)) return true;
@@ -327,7 +340,7 @@ public final class GTAddonCompatibilityHandler {
                 if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().equals(target)) return true;
                 return false;
             }
-            return !isGen && node.isMultiblock();
+            return false;
         }
 
         return true;
@@ -552,7 +565,7 @@ public final class GTAddonCompatibilityHandler {
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT || a.getId().equals(addon.getId()));
+            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
             node.getAddons().add(addon);
             return;
         }

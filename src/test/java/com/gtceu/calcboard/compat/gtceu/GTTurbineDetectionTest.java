@@ -22,6 +22,7 @@ public class GTTurbineDetectionTest {
         ModAdapterRegistry.init();
         com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().reset();
         MultiblockDetector.reinitialize();
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
     }
 
     @Test

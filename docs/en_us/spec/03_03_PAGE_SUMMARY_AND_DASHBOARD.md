@@ -217,6 +217,9 @@ Opened via hotkey `M` or `Shift + B` (and the `[📦 BOM]` toolbar button), this
 * **Category Tab Filtering**: `All`, `Casings`, `Coils`, `Hatches & Buses`, `Controllers`.
 * **Stack Unit Formatting**: Automatically displays quantities in standard inventory stack notation (e.g. `3 stacks + 48 (240 items)`).
 * **Dual Energy Hatch Toggle**: `⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches` for real-time parts substitution.
+* **Hierarchical Compound Module Scaling**: Recursively compounds parent module machine counts ($M_{\text{module}}$) to scale nested sub-machine and multiblock part counts accurately.
+* **Shared Machine Pool Frame Duty Aggregation**: Calculates cumulative duty cycles across enclosed machines sharing physical hardware, quantizing to integral machines ($\lceil \sum \text{Duty} \rceil$) to prevent duplicate BOM parts.
+* **Singleblock Voltage Tier Item Resolution & Usage Trace**: Dynamically resolves singleblock machines into tier-specific items (e.g. `gtceu:lv_rock_breaker`) and lists contributing processes in `usedByMachines`.
 * **One-Click EMI Integration (`[★ Register in EMI]`)**: Registers the full bill of materials as a virtual recipe root in EMI for seamless recipe ingredient tracking.
 * **Clipboard Export (`[📋 Copy List]`)**: Copies the formatted bill of materials list to the system clipboard.
 

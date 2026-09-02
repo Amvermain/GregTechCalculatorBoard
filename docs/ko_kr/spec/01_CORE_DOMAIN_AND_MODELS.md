@@ -240,11 +240,31 @@ flowchart LR
     end
 ```
 
+### 2.1 하드웨어 애드온 카테고리 및 멀티블록 고유 특성 (`AddonCategory`, `MachineAddon`)
+기계의 물리적 능력을 확장하는 애드온 칩을 표준 카테고리로 분류하여 관리합니다:
+
+* **`AddonCategory`**:
+  - `COIL`: 가열 코일 블록 (EBF 등 온도/에너지 할인)
+  - `PARALLEL`: 병렬 제어 해치 (4x ~ 256x 병렬)
+  - `MAINTENANCE`: 유지보수 해치 (가동 시간 10% 단축 등)
+  - `ROTOR`: 대형 터빈 로터 (발전 효율 및 유량 배율)
+  - `REFLECTOR`: 핵융합 반사판 (티어별 감속 배율)
+  - `ENERGY_HATCH` / `HATCH_BUS`: 멀티블록 에너지 및 입출력 버스
+  - `THREADING`: 스레딩 헬릭스 (다중 파이프라인 수용)
+  - `THERMAL_AUGMENT`: 써멀 시리즈 증강 및 업그레이드 킷
+  - `MULTIBLOCK_TRAIT`: GTCEu 멀티블록 고유 특성 애드온
+  - `CUSTOM`: 사용자 정의 수동 애드온 (임의 배율 지정)
+* **GTCEu 멀티블록 고유 특성 애드온 (`MULTIBLOCK_TRAIT`)**:
+  - `THROUGHPUT_BOOSTING` (처리량 증폭): 4배 병렬, 가동 시간 1.6배, 전력 0.95배 (파이롤라이즈 오븐, 슈퍼 크래커 등)
+  - `BULK_PROCESSING` (벌크 처리): 16배 병렬, 가동 시간 13배 (23% 실효 가속)
+  - `BATCH_MODE` (배치 모드): 패널티 없이 다회차 레시피 일괄 가동 지원
+  - `OVERPRESSURE` (과압 가압): 8배 병렬, 가동 시간 1.5배, 전력 1.25배 (오토클레이브 등)
+
 ---
 
-## 3. 복합 모듈 시스템 (`FlowGraphModuleHandler`)
+## 3. 복합 모듈 및 순차 조립 시스템 (`FlowGraphModuleHandler`, `CompoundRecipeBuilder`)
 
-다수의 복잡한 노드 그래프를 단일 복합 모듈 카드(`RecipeNode`)로 패키징(`Ctrl+G`)하거나 원래 서브그래프로 복원(`펼치기`)합니다.
+다수의 복잡한 노드 그래프를 단일 복합 모듈 카드(`RecipeNode`)로 패키징(`Ctrl+G`)하거나 원래 서브그래프로 복원(`펼치기`)하며, Create 순차 조립 공정을 체인 카드로 합성합니다.
 
 ```mermaid
 flowchart LR
@@ -265,6 +285,7 @@ flowchart LR
 1. **경계 I/O 자동 승격 (Boundary I/O Promotion)**: 내부 노드 간의 중간 연결선은 은닉되고, 외부와 연결된 원자재/최종 제품만 모듈 외곽 포트로 자동 승격.
 2. **와이어 리매핑 (Wire Remapping)**: 외부에서 연결되어 있던 와이어의 `ConnectionEdge`가 신규 모듈 카드 포트로 재배선.
 3. **비례 스케일링 (Proportional Scaling)**: 모듈 카드의 기계 대수를 변경하면 내부 하위 그래프의 모든 기계 대수와 유량이 동일 비율로 연동 스케일링.
+4. **순차 조립 단계별 기계 아이콘 추출 (`CompoundRecipeBuilder.LayerSpec`)**: Create 순차 조립(Sequenced Assembly) 공정의 각 단계(Deployer, Spout, Mechanical Press, Mechanical Saw)별 독립 머신 아이콘을 추출하여 계층 카드에 개별 렌더링.
 
 ---
 

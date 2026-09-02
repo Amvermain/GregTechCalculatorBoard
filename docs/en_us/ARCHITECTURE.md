@@ -44,12 +44,12 @@ graph TD
         MAR["ModAdapterRegistry (Priority Dynamic Routing SPI)"]
         IMA["IModAdapter (Lifecycle, Overclock, Energy, BOM Contribution & Validation)"]
         subgraph Adapters["Domain Mod Adapters (100% Headless Safe)"]
-            GT["gtceu (physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
-            CR_MOD["create (RPM/SU, Stress Capacity, Kinetic Machines)"]
+            GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
+            CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, Stress Capacity, Kinetic Machines)"]
             CNA["createnewage (Motors, Generator Coils, Magnet Rings, FE/SU Conversion)"]
             TH["thermal (AugmentData, Tier Kits, Dynamos, RF/t)"]
             SY["systeams (Boilers, Steam Dynamos, Steam mB/s)"]
-            ST["start (Plasma Turbines, Threading Helix Structures, SPT/NPT Traits)"]
+            ST["start (StarTReflectionBridge, Plasma Turbines, Threading Helix Structures, SPT/NPT Traits)"]
             VN["vanilla (Passive Unpowered Fallback)"]
         end
         MAR --> IMA

@@ -10,7 +10,12 @@
 GTCalcBoard는 그렉테크 및 기술 모드의 물리/에너지 수식을 100% 정밀하게 연산합니다.
 
 ### 1.1 전압 티어 차이 ($\Delta\text{Tier}$)
-$$\Delta\text{Tier} = \max(0, \, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal})$$
+$$
+\Delta\text{Tier} = \begin{cases} 
+\max(0, \, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal} - 1) & (\text{RecipeTier} = \text{ULV}) \\
+\max(0, \, \text{TargetTier.ordinal} - \text{RecipeTier.ordinal}) & (\text{otherwise})
+\end{cases}
+$$
 
 ---
 
@@ -241,6 +246,23 @@ AE2 패턴과 바인딩된 다중 서브페이지 공정망에 대해, $O(K)$ �
    $$T_{\text{start}}(u) = \max_{p \in \text{Pred}(u)} \left( T_{\text{start}}(p) + \text{FirstBatchDuration}(p) \right)$$
    $$T_{\text{finish}}(u) = T_{\text{start}}(u) + T_{\text{node}}(u)$$
    $$\text{Total ETA} = \max_{u \in \text{TerminalNodes}} T_{\text{finish}}(u)$$
+
+---
+
+### [알고리즘 8] 계층형 복합 모듈 재귀 BOM 산출 및 기계 대수 승격 연산 (`MultiblockBOMCalculator`)
+
+다층으로 중첩된 복합 모듈(`isModule()`) 및 공유 기계 풀 프레임(`isSharedMachineFrame()`)을 포함하는 플로우 그래프에서 물리적 자재 소요량(BOM)을 단일 패스로 평탄화(Flatten)하여 정밀 집계합니다:
+
+1. **다층 모듈 부모 승수 재귀 전파 (`flattenNodesAndFrames`)**:
+   루트 노드로부터 하위 서브그래프 $G_{\text{sub}}$로 탐색할 때, 모듈 노드의 기계 대수 $M_{\text{module}}$를 부모 승수 $P$에 누적 곱연산합니다:
+   $$P_{\text{child}} = P_{\text{parent}} \times \max(1.0, \, M_{\text{module}})$$
+   리프 노드 $n$에 도달했을 때 실효 기계 대수를 $n.\text{getMachineCount}() \times P$로 스케일링 복제하여 모듈 컨테이너는 부품 목록에서 배제하고 내부 실제 가동 기계들만을 자재 집계 대상으로 평탄화합니다.
+2. **공유 기계 풀 프레임 듀티 통합 및 정수 대수 올림**:
+   공유 프레임에 포함된 기계 노드군 $\{n_1, n_2, \dots, n_k\}$에 대해 총 듀티 사이클 합을 계산하고 1대 이상의 정수 물리 기계 대수로 올림 처리합니다:
+   $$M_{\text{req}} = \max\left(1, \, \left\lceil \sum_{i=1}^{k} n_i.\text{getMachineCount}() - 10^{-5} \right\rceil\right)$$
+   대표 마스터 노드에만 $M_{\text{req}}$ 대수를 적용하고 종속 슬레이브 노드는 중복 자재 집계에서 제외합니다.
+3. **단일 기계 티어형 아이템 자동 분기 및 출처 역추적 (`usedByMachines`)**:
+   단일 기계의 경우 지정된 전압 티어(LV~MAX)에 대응하는 구체적 아이템 ID(예: `gtceu:lv_rock_breaker`)로 연역 변환하며, 동일 부품을 요구하는 모든 기계 이름과 대수를 `usedByMachines` 목록에 명시합니다.
 
 ---
 

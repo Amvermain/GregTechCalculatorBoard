@@ -13,7 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.Item;
@@ -197,7 +197,7 @@ public class TemplateCloneDialog {
         }
 
         if (r.outputIds() != null && r.outputIds().length > 0 && r.outputIds()[0] != null) {
-            Item item = BuiltInRegistries.ITEM.get(r.outputIds()[0]);
+            Item item = ForgeRegistries.ITEMS.getValue(r.outputIds()[0]);
             if (item != null && item != Items.AIR) {
                 graphics.renderItem(new ItemStack(item), listX + 4, rowY + 2);
             }

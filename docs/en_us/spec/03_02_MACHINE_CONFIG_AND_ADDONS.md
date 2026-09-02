@@ -107,25 +107,26 @@ flowchart TB
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Maintenance</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Turbine Rotors</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Thermal</span>
+          <span style="background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Traits</span>
           <span style="background: #1e293b; color: #a855f7; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">+ Custom</span>
         </div>
         <!-- Search & Catalog Chips Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; max-height: 90px; overflow-y: hidden;">
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">Kanthal Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">2,700 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Throughput Boost</span>
+            <span style="color: #38bdf8; font-size: 9px;">4x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">Nichrome Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">3,600 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Bulk Processing</span>
+            <span style="color: #38bdf8; font-size: 9px;">16x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">RTM Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">4,500 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Overpressure</span>
+            <span style="color: #f59e0b; font-size: 9px;">8x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">HSS-G Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">5,400 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Batch Mode</span>
+            <span style="color: #10b981; font-size: 9px;">1x</span>
           </div>
         </div>
       </div>

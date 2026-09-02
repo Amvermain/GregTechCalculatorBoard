@@ -6,6 +6,7 @@ import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.CompoundRecipeBuilder;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -1055,6 +1056,278 @@ public class MultiblockBOMTest {
             .findFirst().orElse(null);
         Assertions.assertNotNull(mvBusEntry);
         Assertions.assertEquals(1, mvBusEntry.totalAmount(), "5 output items require 1 MV Output Bus (9 slots)");
+    }
+
+    @Test
+    public void testCreateSequencedAssemblyBOMContribution() {
+        // Sequenced assembly line with 3 distinct machine steps: Deployer, Spout, Press
+        CompoundRecipeBuilder.LayerSpec step1 = new CompoundRecipeBuilder.LayerSpec(
+                "Step 1",
+                ResourceLocation.tryParse("create:deployer"),
+                20.0,
+                128.0,
+                List.of(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 1.0)),
+                List.of()
+        );
+        CompoundRecipeBuilder.LayerSpec step2 = new CompoundRecipeBuilder.LayerSpec(
+                "Step 2",
+                ResourceLocation.tryParse("create:spout"),
+                20.0,
+                128.0,
+                List.of(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 100.0)),
+                List.of()
+        );
+        CompoundRecipeBuilder.LayerSpec step3 = new CompoundRecipeBuilder.LayerSpec(
+                "Step 3",
+                ResourceLocation.tryParse("create:mechanical_press"),
+                20.0,
+                128.0,
+                List.of(),
+                List.of(IngredientStack.item(ResourceLocation.tryParse("create:precision_mechanism"), "Precision Mechanism", 1.0))
+        );
+
+        CompoundRecipeBuilder.CompoundCluster cluster = CompoundRecipeBuilder.build(
+                "Precision Mechanism Line",
+                ResourceLocation.tryParse("create:sequenced_assembly"),
+                60.0,
+                128.0,
+                GTVoltageTier.ULV,
+                List.of(step1, step2, step3),
+                100,
+                100
+        );
+
+        Assertions.assertEquals(3, cluster.nodes().size());
+
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(cluster.nodes(), false);
+        Assertions.assertNotNull(summary);
+        Assertions.assertEquals(3, summary.totalMultiblockCount(), "All 3 sequenced assembly machines must be counted in BOM");
+
+        MultiblockBOMSummary.BOMItemEntry deployerEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("create:deployer")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(deployerEntry, "Deployer must be present in BOM");
+        Assertions.assertEquals(1, deployerEntry.totalAmount());
+
+        MultiblockBOMSummary.BOMItemEntry spoutEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("create:spout")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(spoutEntry, "Spout must be present in BOM");
+        Assertions.assertEquals(1, spoutEntry.totalAmount());
+
+        MultiblockBOMSummary.BOMItemEntry pressEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("create:mechanical_press")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(pressEntry, "Mechanical Press must be present in BOM");
+        Assertions.assertEquals(1, pressEntry.totalAmount());
+    }
+
+    @Test
+    public void testNonMachineDummyItemFilteredFromBOM() {
+        // Plain raw material node without energy or machine type
+        RecipeNode sandNode = RecipeNode.create("Sand", 20.0, 0.0, GTVoltageTier.ULV);
+        sandNode.setMachineIcon(ResourceLocation.tryParse("minecraft:sand"));
+        sandNode.setEnergyType(EnergyType.NONE);
+        sandNode.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:sand"), "Sand", 1.0));
+
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(List.of(sandNode), false);
+        Assertions.assertNotNull(summary);
+        Assertions.assertEquals(0, summary.totalMultiblockCount(), "Raw material Sand node must NOT be counted as a machine in BOM");
+        Assertions.assertTrue(summary.aggregatedItems().isEmpty(), "No BOM parts should be generated for pure material nodes");
+    }
+
+    @Test
+    public void testCompoundModuleFlatteningInBOM() {
+        ResourceLocation controllerId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
+        List<MultiblockStructurePart> parts = List.of(
+            new MultiblockStructurePart(controllerId, "Electric Blast Furnace", 1, PartCategory.CONTROLLER),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:heatproof_machine_casing"), "Heat Proof Casing", 10, PartCategory.CASING),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:cupronickel_coil_block"), "Cupronickel Coil", 16, PartCategory.COIL),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:lv_energy_input_hatch"), "LV Energy Hatch", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:lv_input_bus"), "LV Input Bus", 1, PartCategory.HATCH_BUS),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:lv_output_bus"), "LV Output Bus", 1, PartCategory.HATCH_BUS)
+        );
+        MultiblockStructureCatalog.registerManualStructure(new MultiblockStructureDef(controllerId, "Electric Blast Furnace", parts, 16, 1, 1, 1, 1, 1, 1));
+
+        com.gtceu.calcboard.api.model.FlowGraph graph = new com.gtceu.calcboard.api.model.FlowGraph();
+
+        RecipeNode ebfNode = new RecipeNode("ebf", "Electric Blast Furnace", 100, 100, GTVoltageTier.LV);
+        ebfNode.setMachineIcon(controllerId);
+        ebfNode.setMultiblock(true);
+        ebfNode.setMachineCount(1.0);
+        ebfNode.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 1.0));
+        ebfNode.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("gtceu:steel_ingot"), "Steel Ingot", 1.0));
+        graph.addNode(ebfNode);
+
+        RecipeNode maceratorNode = new RecipeNode("macerator", "LV Macerator", 100, 30, GTVoltageTier.LV);
+        maceratorNode.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_macerator"));
+        maceratorNode.setMachineCount(1.0);
+        maceratorNode.getInputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:gravel"), "Gravel", 1.0));
+        maceratorNode.getOutputs().add(IngredientStack.item(ResourceLocation.tryParse("minecraft:sand"), "Sand", 1.0));
+        graph.addNode(maceratorNode);
+
+        // Group into compound module named "Sandmaker"
+        RecipeNode moduleNode = graph.groupIntoModule("Sandmaker");
+        Assertions.assertNotNull(moduleNode);
+        Assertions.assertTrue(moduleNode.isModule());
+        Assertions.assertEquals(1, graph.getNodes().size(), "Only the single Sandmaker module node should remain on main graph");
+
+        // Calculate BOM on graph containing the module node
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(graph.getNodes(), false);
+        Assertions.assertNotNull(summary);
+
+        // Sandmaker itself must NOT be present as a controller part
+        boolean hasSandmakerPart = summary.aggregatedItems().stream()
+                .anyMatch(e -> e.displayName().contains("Sandmaker") || e.itemId().getPath().contains("sandmaker"));
+        Assertions.assertFalse(hasSandmakerPart, "Compound module name Sandmaker must NOT appear as a machine part");
+
+        // The internal EBF and Macerator parts must be present
+        MultiblockBOMSummary.BOMItemEntry ebfController = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(controllerId))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(ebfController, "Internal EBF controller must be present in BOM");
+        Assertions.assertEquals(1, ebfController.totalAmount());
+
+        MultiblockBOMSummary.BOMItemEntry casingEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:heatproof_machine_casing")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(casingEntry, "Internal EBF casings must be present in BOM");
+        Assertions.assertEquals(10, casingEntry.totalAmount());
+
+        MultiblockBOMSummary.BOMItemEntry maceratorEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:lv_macerator")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(maceratorEntry, "Internal Macerator must be present in BOM");
+        Assertions.assertEquals(1, maceratorEntry.totalAmount());
+
+        // Scale module count to 2x: all parts must double
+        moduleNode.setMachineCount(2.0);
+        MultiblockBOMSummary summary2 = MultiblockBOMCalculator.calculateBOM(graph.getNodes(), false);
+        MultiblockBOMSummary.BOMItemEntry casingEntry2 = summary2.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:heatproof_machine_casing")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(casingEntry2);
+        Assertions.assertEquals(20, casingEntry2.totalAmount(), "Casings must scale to 20 when module count is 2x");
+    }
+
+    @Test
+    public void testNestedCompoundModuleBOM() {
+        ResourceLocation controllerId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
+        List<MultiblockStructurePart> parts = List.of(
+            new MultiblockStructurePart(controllerId, "Electric Blast Furnace", 1, PartCategory.CONTROLLER),
+            new MultiblockStructurePart(ResourceLocation.tryParse("gtceu:heatproof_machine_casing"), "Heat Proof Casing", 10, PartCategory.CASING)
+        );
+        MultiblockStructureCatalog.registerManualStructure(new MultiblockStructureDef(controllerId, "Electric Blast Furnace", parts, 0, 0, 0, 0, 0, 0, 0));
+
+        // 1. Innermost graph: 1 EBF
+        com.gtceu.calcboard.api.model.FlowGraph innerGraph = new com.gtceu.calcboard.api.model.FlowGraph();
+        RecipeNode ebfNode = new RecipeNode("ebf", "Electric Blast Furnace", 100, 100, GTVoltageTier.LV);
+        ebfNode.setMachineIcon(controllerId);
+        ebfNode.setMultiblock(true);
+        ebfNode.setMachineCount(1.0);
+        innerGraph.addNode(ebfNode);
+
+        // Group into Inner Module
+        RecipeNode innerModule = innerGraph.groupIntoModule("Inner EBF Module");
+        innerModule.setMachineCount(2.0); // 2x inner
+
+        // 2. Middle graph: Inner Module + 1 Macerator
+        com.gtceu.calcboard.api.model.FlowGraph middleGraph = new com.gtceu.calcboard.api.model.FlowGraph();
+        middleGraph.addNode(innerModule);
+
+        RecipeNode maceratorNode = new RecipeNode("macerator", "LV Macerator", 100, 30, GTVoltageTier.LV);
+        maceratorNode.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_macerator"));
+        maceratorNode.setMachineCount(1.0);
+        middleGraph.addNode(maceratorNode);
+
+        // Group into Outer Module
+        RecipeNode outerModule = middleGraph.groupIntoModule("Outer Factory Module");
+        outerModule.setMachineCount(3.0); // 3x outer
+
+        // 3. Top-level graph containing only Outer Module
+        com.gtceu.calcboard.api.model.FlowGraph topGraph = new com.gtceu.calcboard.api.model.FlowGraph();
+        topGraph.addNode(outerModule);
+
+        // Calculate BOM on top-level graph
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(topGraph.getNodes(), false);
+        Assertions.assertNotNull(summary);
+
+        // Neither Outer nor Inner module names should appear in parts
+        boolean hasModuleParts = summary.aggregatedItems().stream()
+                .anyMatch(e -> e.displayName().contains("Module") || e.itemId().getPath().contains("module"));
+        Assertions.assertFalse(hasModuleParts, "Module container nodes must NOT appear as BOM parts");
+
+        // Total EBFs: 3 (outer) * 2 (inner) * 1 = 6 EBF controllers
+        MultiblockBOMSummary.BOMItemEntry ebfController = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(controllerId))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(ebfController);
+        Assertions.assertEquals(6, ebfController.totalAmount(), "Nested EBF controllers must be 3 * 2 * 1 = 6");
+
+        // Total Casings: 6 * 10 = 60 casings
+        MultiblockBOMSummary.BOMItemEntry casingEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:heatproof_machine_casing")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(casingEntry);
+        Assertions.assertEquals(60, casingEntry.totalAmount(), "Nested casings must be 6 * 10 = 60");
+
+        // Total Macerators: 3 (outer) * 1 = 3 macerators
+        MultiblockBOMSummary.BOMItemEntry maceratorEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:lv_macerator")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(maceratorEntry);
+        Assertions.assertEquals(3, maceratorEntry.totalAmount(), "Nested macerators must be 3 * 1 = 3");
+    }
+
+    @Test
+    public void testSandmakerSingleblockTierResolutionAndUsageTracking() {
+        com.gtceu.calcboard.api.model.FlowGraph graph = new com.gtceu.calcboard.api.model.FlowGraph();
+
+        // 1. Rock Breaker (2 machines, LV tier)
+        RecipeNode rockBreaker = new RecipeNode("rb", "Rock Breaker", 100, 14, GTVoltageTier.LV);
+        rockBreaker.setMachineIcon(ResourceLocation.tryParse("gtceu:rock_breaker"));
+        rockBreaker.setTargetTier(GTVoltageTier.LV);
+        rockBreaker.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:rock_breaker"));
+        rockBreaker.setMachineCount(2.0);
+        graph.addNode(rockBreaker);
+
+        // 2. Forge Hammer (자갈) (1 machine, LV tier)
+        RecipeNode hammerGravel = new RecipeNode("fh_g", "Forge Hammer (자갈)", 100, 16, GTVoltageTier.LV);
+        hammerGravel.setMachineIcon(ResourceLocation.tryParse("gtceu:forge_hammer"));
+        hammerGravel.setTargetTier(GTVoltageTier.LV);
+        hammerGravel.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:forge_hammer"));
+        hammerGravel.setMachineCount(1.0);
+        graph.addNode(hammerGravel);
+
+        // 3. Forge Hammer (모래) (1 machine, LV tier)
+        RecipeNode hammerSand = new RecipeNode("fh_s", "Forge Hammer (모래)", 100, 16, GTVoltageTier.LV);
+        hammerSand.setMachineIcon(ResourceLocation.tryParse("gtceu:forge_hammer"));
+        hammerSand.setTargetTier(GTVoltageTier.LV);
+        hammerSand.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:forge_hammer"));
+        hammerSand.setMachineCount(1.0);
+        graph.addNode(hammerSand);
+
+        // Calculate BOM
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(graph.getNodes(), false);
+        Assertions.assertNotNull(summary);
+
+        // Check Rock Breaker: itemId must be resolved to gtceu:lv_rock_breaker, amount 2
+        MultiblockBOMSummary.BOMItemEntry rbEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:lv_rock_breaker")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(rbEntry, "Rock Breaker must resolve to tiered item gtceu:lv_rock_breaker");
+        Assertions.assertEquals(2, rbEntry.totalAmount());
+        Assertions.assertEquals("Lv Rock Breaker", rbEntry.displayName());
+
+        // Check Forge Hammer: itemId must be resolved to gtceu:lv_forge_hammer, amount 2 (1 + 1)
+        MultiblockBOMSummary.BOMItemEntry fhEntry = summary.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(ResourceLocation.tryParse("gtceu:lv_forge_hammer")))
+                .findFirst().orElse(null);
+        Assertions.assertNotNull(fhEntry, "Forge Hammer must resolve to tiered item gtceu:lv_forge_hammer");
+        Assertions.assertEquals(2, fhEntry.totalAmount());
+        Assertions.assertEquals("Lv Forge Hammer", fhEntry.displayName());
+        Assertions.assertTrue(fhEntry.usedByMachines().contains("Forge Hammer (자갈) (x1)"));
+        Assertions.assertTrue(fhEntry.usedByMachines().contains("Forge Hammer (모래) (x1)"));
     }
 }
 

@@ -5,13 +5,13 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.lang.reflect.Modifier;
+import java.util.*;
 
 public final class GTCEuReflectionBridge {
 
     private static final Class<?> MULTIBLOCK_DEF_CLASS;
+    private static final List<Class<?>> MULTIBLOCK_MACHINE_CLASSES;
     private static final Class<?> COIL_WORKABLE_CLASS;
     private static final Class<?> LARGE_TURBINE_CLASS;
     private static final Class<?> I_TURBINE_CLASS;
@@ -29,10 +29,32 @@ public final class GTCEuReflectionBridge {
     private static final Method GET_RECIPE_TYPE_METHOD;
     private static final Method IS_MULTIBLOCK_METHOD;
     private static final Method GET_RECIPE_MODIFIERS_METHOD;
+    private static final Method GET_RECIPE_MODIFIER_METHOD;
+    private static final Map<Object, String> RECIPE_MODIFIER_NAMES;
 
     static {
         MULTIBLOCK_DEF_CLASS = loadClassQuietly("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
-        COIL_WORKABLE_CLASS = loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine");
+        List<Class<?>> mbList = new ArrayList<>();
+        for (String cName : new String[]{
+                "com.gregtechceu.gtceu.api.machine.feature.multiblock.IMultiController",
+                "com.gregtechceu.gtceu.api.machine.multiblock.WorkableElectricMultiblockMachine",
+                "com.gregtechceu.gtceu.api.machine.multiblock.WorkableMultiblockMachine",
+                "com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine",
+                "com.gregtechceu.gtceu.api.machine.feature.multiblock.IMultiMachine",
+                "com.gregtechceu.gtceu.api.machine.MultiblockMachine",
+                "com.gregtechceu.gtceu.api.machine.multiblock.MultiblockMachine",
+                "com.gregtechceu.gtceu.api.machine.IMultiblockMachine"
+        }) {
+            Class<?> loaded = loadClassQuietly(cName);
+            if (loaded != null) mbList.add(loaded);
+        }
+        MULTIBLOCK_MACHINE_CLASSES = Collections.unmodifiableList(mbList);
+
+        Class<?> coilCls = loadClassQuietly("com.gregtechceu.gtceu.api.machine.multiblock.CoilWorkableElectricMultiblockMachine");
+        if (coilCls == null) {
+            coilCls = loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine");
+        }
+        COIL_WORKABLE_CLASS = coilCls;
         LARGE_TURBINE_CLASS = loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.generator.LargeTurbineMachine");
         I_TURBINE_CLASS = loadClassQuietly("com.gregtechceu.gtceu.api.machine.feature.multiblock.ITurbineMachine");
 
@@ -55,6 +77,23 @@ public final class GTCEuReflectionBridge {
         GET_RECIPE_TYPE_METHOD = findMethod(targetDefClass, "getRecipeType");
         IS_MULTIBLOCK_METHOD = findMethod(targetDefClass, "isMultiblock");
         GET_RECIPE_MODIFIERS_METHOD = findMethod(targetDefClass, "getRecipeModifiers");
+        GET_RECIPE_MODIFIER_METHOD = findMethod(targetDefClass, "getRecipeModifier");
+
+        Map<Object, String> modNames = new IdentityHashMap<>();
+        Class<?> gtRecipeModifiersCls = loadClassQuietly("com.gregtechceu.gtceu.common.data.GTRecipeModifiers");
+        if (gtRecipeModifiersCls != null) {
+            for (Field f : gtRecipeModifiersCls.getFields()) {
+                if (Modifier.isStatic(f.getModifiers())) {
+                    try {
+                        Object mod = f.get(null);
+                        if (mod != null) {
+                            modNames.put(mod, f.getName().toUpperCase(Locale.ROOT));
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            }
+        }
+        RECIPE_MODIFIER_NAMES = Collections.unmodifiableMap(modNames);
     }
 
     private GTCEuReflectionBridge() {}
@@ -141,17 +180,115 @@ public final class GTCEuReflectionBridge {
 
     public static boolean isMultiblockDefinition(Object def) {
         if (def == null) return false;
+        if (MULTIBLOCK_DEF_CLASS != null && MULTIBLOCK_DEF_CLASS.isInstance(def)) return true;
         Boolean res = invokeMethodQuietly(IS_MULTIBLOCK_METHOD, def, Boolean.class);
         return Boolean.TRUE.equals(res);
     }
 
-    public static Object[] getRecipeModifiers(Object def) {
-        if (def == null) return null;
-        return invokeMethodQuietly(GET_RECIPE_MODIFIERS_METHOD, def, Object[].class);
+    public static List<Object> getRecipeModifiers(Object def) {
+        if (def == null) return Collections.emptyList();
+        List<Object> result = new ArrayList<>();
+        Object rawMod = invokeMethodQuietly(GET_RECIPE_MODIFIER_METHOD, def, Object.class);
+        if (rawMod == null) {
+            rawMod = invokeMethodQuietly(GET_RECIPE_MODIFIERS_METHOD, def, Object.class);
+        }
+        if (rawMod == null) {
+            Method m = findMethod(def.getClass(), "getRecipeModifier");
+            if (m == null) m = findMethod(def.getClass(), "getRecipeModifiers");
+            if (m != null) rawMod = invokeMethodQuietly(m, def, Object.class);
+        }
+        if (rawMod == null) {
+            Field modField = findField(def.getClass(), "recipeModifier");
+            if (modField != null) {
+                try {
+                    modField.setAccessible(true);
+                    rawMod = modField.get(def);
+                } catch (Throwable ignored) {}
+            }
+        }
+        flattenRecipeModifiers(rawMod, result);
+        return result;
+    }
+
+    private static void flattenRecipeModifiers(Object modifier, List<Object> collector) {
+        if (modifier == null) return;
+        if (modifier instanceof Object[] arr) {
+            for (Object m : arr) {
+                flattenRecipeModifiers(m, collector);
+            }
+            return;
+        }
+        if (modifier instanceof Iterable<?> iterable) {
+            for (Object m : iterable) {
+                flattenRecipeModifiers(m, collector);
+            }
+            return;
+        }
+        try {
+            Method modifiersMethod = findMethod(modifier.getClass(), "modifiers");
+            if (modifiersMethod != null) {
+                Object innerArr = modifiersMethod.invoke(modifier);
+                if (innerArr != null && innerArr != modifier) {
+                    flattenRecipeModifiers(innerArr, collector);
+                    return;
+                }
+            }
+            Field modifiersField = findField(modifier.getClass(), "modifiers");
+            if (modifiersField != null) {
+                modifiersField.setAccessible(true);
+                Object innerArr = modifiersField.get(modifier);
+                if (innerArr != null && innerArr != modifier) {
+                    flattenRecipeModifiers(innerArr, collector);
+                    return;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        collector.add(modifier);
+    }
+
+    public static String getRecipeModifierName(Object modifier) {
+        if (modifier == null) return null;
+        String name = RECIPE_MODIFIER_NAMES.get(modifier);
+        if (name != null) return name;
+        String starTName = com.gtceu.calcboard.compat.start.StarTReflectionBridge.getRecipeModifierName(modifier);
+        if (starTName != null) return starTName;
+        try {
+            Method mGetId = findMethod(modifier.getClass(), "getId");
+            if (mGetId != null) {
+                Object id = mGetId.invoke(modifier);
+                if (id != null) return id.toString().toUpperCase(Locale.ROOT);
+            }
+            Field idField = findField(modifier.getClass(), "id");
+            if (idField != null) {
+                idField.setAccessible(true);
+                Object id = idField.get(modifier);
+                if (id != null) return id.toString().toUpperCase(Locale.ROOT);
+            }
+            Field delegateField = findField(modifier.getClass(), "delegate");
+            if (delegateField != null) {
+                delegateField.setAccessible(true);
+                Object delegate = delegateField.get(modifier);
+                if (delegate != null && delegate != modifier) {
+                    String delName = getRecipeModifierName(delegate);
+                    if (delName != null) return delName;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    public static boolean isMultiblockClass(Class<?> cls) {
+        if (cls == null) return false;
+        for (Class<?> mbCls : MULTIBLOCK_MACHINE_CLASSES) {
+            if (mbCls.isAssignableFrom(cls)) return true;
+        }
+        return false;
     }
 
     public static boolean isCoilWorkableClass(Class<?> cls) {
-        return COIL_WORKABLE_CLASS != null && cls != null && COIL_WORKABLE_CLASS.isAssignableFrom(cls);
+        if (cls == null || COIL_WORKABLE_CLASS == null) return false;
+        return COIL_WORKABLE_CLASS.isAssignableFrom(cls);
     }
 
     public static boolean isLargeTurbineClass(Class<?> cls) {
@@ -236,12 +373,33 @@ public final class GTCEuReflectionBridge {
     }
 
     private static Method findMethod(Class<?> targetClass, String methodName) {
-        if (targetClass == null) return null;
-        try {
-            return targetClass.getMethod(methodName);
-        } catch (Throwable ignored) {
-            return null;
+        if (targetClass == null || methodName == null) return null;
+        Class<?> current = targetClass;
+        while (current != null && current != Object.class) {
+            try {
+                Method m = current.getDeclaredMethod(methodName);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException e) {
+                current = current.getSuperclass();
+            } catch (Throwable ignored) {
+                break;
+            }
         }
+        return null;
+    }
+
+    private static Field findField(Class<?> targetClass, String fieldName) {
+        if (targetClass == null || fieldName == null) return null;
+        Class<?> current = targetClass;
+        while (current != null && current != Object.class) {
+            try {
+                return current.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException e) {
+                current = current.getSuperclass();
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

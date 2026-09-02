@@ -8,6 +8,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
+
+/**
+ * HUD overlay widget for rendering keyboard shortcut cheatsheet and quick action guides on the canvas.
+ */
 public class HotkeyHudWidget {
     private final BoardScreen screen;
     private boolean expanded;

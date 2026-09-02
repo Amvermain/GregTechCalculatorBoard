@@ -143,8 +143,11 @@ public final class CreateSequencedRecipeExtractor {
                         stepOutputs.addAll(finalOutputs);
                     }
 
+                    ResourceLocation stepMachineIcon = extractStepMachineIcon(subRecipe);
+
                     layers.add(new CompoundRecipeBuilder.LayerSpec(
                             stepTitle,
+                            stepMachineIcon,
                             stepDuration,
                             baseSU,
                             stepInputs,
@@ -222,5 +225,36 @@ public final class CreateSequencedRecipeExtractor {
                 }
             }
         } catch (Throwable ignored) {}
+    }
+
+    public static ResourceLocation extractStepMachineIcon(Object subRecipe) {
+        if (subRecipe == null) return null;
+        String clName = subRecipe.getClass().getName().toLowerCase(Locale.ROOT);
+        if (clName.contains("deploy")) {
+            return ResourceLocation.tryParse("create:deployer");
+        } else if (clName.contains("fill") || clName.contains("spout")) {
+            return ResourceLocation.tryParse("create:spout");
+        } else if (clName.contains("press")) {
+            return ResourceLocation.tryParse("create:mechanical_press");
+        } else if (clName.contains("cut") || clName.contains("saw")) {
+            return ResourceLocation.tryParse("create:mechanical_saw");
+        }
+
+        try {
+            Method getSerializerM = subRecipe.getClass().getMethod("getSerializer");
+            Object ser = getSerializerM.invoke(subRecipe);
+            if (ser != null) {
+                ResourceLocation sId = ForgeRegistries.RECIPE_SERIALIZERS.getKey((net.minecraft.world.item.crafting.RecipeSerializer<?>) ser);
+                if (sId != null) {
+                    String p = sId.getPath().toLowerCase(Locale.ROOT);
+                    if (p.contains("deploy")) return ResourceLocation.tryParse("create:deployer");
+                    if (p.contains("fill") || p.contains("spout")) return ResourceLocation.tryParse("create:spout");
+                    if (p.contains("press")) return ResourceLocation.tryParse("create:mechanical_press");
+                    if (p.contains("cut") || p.contains("saw")) return ResourceLocation.tryParse("create:mechanical_saw");
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return ResourceLocation.tryParse("create:deployer");
     }
 }

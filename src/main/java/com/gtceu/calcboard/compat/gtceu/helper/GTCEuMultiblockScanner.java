@@ -47,68 +47,30 @@ public class GTCEuMultiblockScanner {
         ResourceLocation id = GTCEuReflectionBridge.getMachineId(def);
         if (id == null) return;
 
-        boolean isMb = MultiblockDetector.inspectAndRegisterMachine(id, def, null);
-        Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
-        var structDef = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructureCached(id);
+        GTCEuMachineAnalyzer.MachineCapabilities caps = GTCEuMachineAnalyzer.analyze(id, def);
+        MultiblockDetector.registerMachineCapabilities(id, caps);
 
-        boolean isCoilMb = isMb && (GTCEuReflectionBridge.isCoilWorkableClass(mCls)
-                || (structDef != null && (structDef.coilSlotCount() > 0 || structDef.supportsAbility("HEATING_COILS"))));
-
-        boolean isTurbineMb = isMb && !isCoilMb && (GTCEuReflectionBridge.isLargeTurbineClass(mCls)
-                || GTCEuReflectionBridge.isITurbineClass(mCls)
-                || (structDef != null && !structDef.supportsAbility("HEATING_COILS") && (structDef.supportsAbility("ROTOR_HOLDER") || structDef.supportsAbility("TURBINE_ROTOR"))));
-
-        if (isCoilMb) {
-            MultiblockDetector.registerCoilMultiblock(id, null);
-        }
-
-        GTVoltageTier turbineTier = null;
-        double baseEnergy = 0.0;
-        if (isTurbineMb) {
-            turbineTier = extractTurbineBaseTier(id, def);
-            baseEnergy = extractBaseEnergyFromDefinition(id, def, turbineTier);
-            MultiblockDetector.registerTurbine(id, null, turbineTier, baseEnergy);
-        }
-
-        inspectSpecialMultiblockFeatures(id, def, isMb);
-        registerMachineRecipeCategories(id, def, isCoilMb, isTurbineMb, turbineTier, baseEnergy);
+        registerMachineRecipeCategories(id, def, caps);
     }
 
-    private static void inspectSpecialMultiblockFeatures(ResourceLocation id, Object def, boolean isMb) {
-        boolean isSteamMb = def.getClass().getName().toLowerCase(Locale.ROOT).contains("steam")
-                || (id.getPath().startsWith("steam_") && isMb)
-                || def.getClass().getSimpleName().contains("SteamParallel");
-
-        if (isSteamMb) {
-            double steamDrainRate = GTCEuReflectionBridge.getSteamDrainRate(def);
-            int innatePar = GTCEuReflectionBridge.getDefaultParallel(def);
-            MultiblockDetector.registerSteamMultiblock(id, Math.max(8, innatePar), steamDrainRate);
-        } else {
-            int innatePar = GTCEuReflectionBridge.getDefaultParallel(def);
-            if (innatePar > 1) {
-                MultiblockDetector.registerDefaultParallel(id, innatePar);
-            }
-        }
-    }
-
-    private static void registerMachineRecipeCategories(ResourceLocation id, Object def, boolean isCoilMb, boolean isTurbineMb, GTVoltageTier turbineTier, double baseEnergy) {
+    private static void registerMachineRecipeCategories(ResourceLocation id, Object def, GTCEuMachineAnalyzer.MachineCapabilities caps) {
         List<Object> recipeTypesList = GTCEuReflectionBridge.getRecipeTypes(def);
         for (Object rt : recipeTypesList) {
             ResourceLocation rl = MultiblockDetector.extractRecipeTypeId(rt);
             if (rl == null) continue;
 
             MultiblockDetector.inspectAndRegisterMachine(id, def, rl);
-            if (isCoilMb) {
+            if (caps.isCoilWorkable()) {
                 MultiblockDetector.registerCoilMultiblock(id, rl);
             }
-            if (isTurbineMb && MultiblockDetector.isTurbineRecipeCategory(rl)) {
-                MultiblockDetector.registerTurbine(id, rl, turbineTier, baseEnergy);
+            if (caps.isTurbine() && MultiblockDetector.isTurbineRecipeCategory(rl)) {
+                MultiblockDetector.registerTurbine(id, rl, caps.turbineTier(), caps.turbineBaseEnergy());
             }
 
             ResourceLocation relRl = GTCEuCapabilityScanner.getRelatedRecipeCategory(rl);
             if (relRl != null && !relRl.equals(rl)) {
                 MultiblockDetector.inspectAndRegisterMachine(id, def, relRl);
-                if (isCoilMb) {
+                if (caps.isCoilWorkable()) {
                     MultiblockDetector.registerCoilMultiblock(id, relRl);
                 }
             }
@@ -198,32 +160,6 @@ public class GTCEuMultiblockScanner {
             }
 
             if (controllerId == null) return;
-
-            boolean usesCoilBlock = false;
-            if (recipe.getInputs() != null) {
-                for (var ei : recipe.getInputs()) {
-                    if (ei == null || ei.getEmiStacks() == null) continue;
-                    for (var es : ei.getEmiStacks()) {
-                        if (es != null) {
-                            ItemStack stack = es.getItemStack();
-                            if (stack != null && !stack.isEmpty()) {
-                                CoilHelper.CoilStats stats = CoilHelper.getCoilStats(stack);
-                                if (stats != null && stats.temperature() > 0) {
-                                    usesCoilBlock = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (usesCoilBlock) break;
-                }
-            }
-
-            if (usesCoilBlock) {
-                if (!controllerId.equals(ResourceLocation.tryParse("gtceu:rock_filtrator")) && !controllerId.equals(ResourceLocation.tryParse("gtceu:geode_filter"))) {
-                    MultiblockDetector.registerCoilMultiblock(controllerId, null);
-                }
-            }
 
             int helixCount = 0;
             if (recipe.getInputs() != null) {

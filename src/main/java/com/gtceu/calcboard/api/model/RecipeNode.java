@@ -989,7 +989,12 @@ public class RecipeNode {
     }
 
     public int getTierDelta() {
-        return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
+        if (targetTier == null || recipeTier == null) return 0;
+        int delta = targetTier.ordinal() - recipeTier.ordinal();
+        if (recipeTier == GTVoltageTier.ULV) {
+            delta--;
+        }
+        return Math.max(0, delta);
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {

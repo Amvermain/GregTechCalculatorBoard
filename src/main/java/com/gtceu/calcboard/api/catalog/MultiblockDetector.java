@@ -27,6 +27,10 @@ public class MultiblockDetector {
     private static final Set<ResourceLocation> TURBINE_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> TURBINE_RECIPE_CATEGORIES = new HashSet<>();
     private static final Set<ResourceLocation> BATCH_MODE_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> THROUGHPUT_BOOSTING_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> BULK_PROCESSING_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> OVERPRESSURE_CONTROLLERS = new HashSet<>();
+    private static final Set<ResourceLocation> COIL_PARALLEL_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> PARALLEL_HATCH_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> LASER_HATCH_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> STEAM_MULTIBLOCKS = new HashSet<>();
@@ -37,10 +41,6 @@ public class MultiblockDetector {
     private static final Map<ResourceLocation, Integer> DEFAULT_MULTIBLOCK_PARALLELS = new ConcurrentHashMap<>();
     private static volatile boolean initialized = false;
     private static volatile boolean initializing = false;
-
-    static {
-        initTestEnvironmentDefaults();
-    }
 
     public static void registerMultiblock(ResourceLocation id) {
         if (id != null) {
@@ -81,6 +81,122 @@ public class MultiblockDetector {
 
     public static void registerBatchModeController(ResourceLocation controllerId) {
         registerBatchModeMultiblock(controllerId);
+    }
+
+    public static boolean supportsBatchMode(ResourceLocation controllerId) {
+        return supportsBatchMode(controllerId, null);
+    }
+
+    public static void registerThroughputBoostingMultiblock(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            THROUGHPUT_BOOSTING_CONTROLLERS.add(controllerId);
+            MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
+        }
+    }
+
+    public static boolean supportsThroughputBoosting(ResourceLocation controllerId) {
+        if (controllerId == null) return false;
+        ensureInitialized();
+        if (THROUGHPUT_BOOSTING_CONTROLLERS.contains(controllerId)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(controllerId);
+        if (defStruct != null && defStruct.supportsAbility("THROUGHPUT_BOOSTING")) {
+            registerThroughputBoostingMultiblock(controllerId);
+            return true;
+        }
+        return false;
+    }
+
+    public static void registerBulkProcessingMultiblock(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            BULK_PROCESSING_CONTROLLERS.add(controllerId);
+            MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
+        }
+    }
+
+    public static boolean supportsBulkProcessing(ResourceLocation controllerId) {
+        if (controllerId == null) return false;
+        ensureInitialized();
+        if (BULK_PROCESSING_CONTROLLERS.contains(controllerId)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(controllerId);
+        if (defStruct != null && defStruct.supportsAbility("BULK_PROCESSING")) {
+            registerBulkProcessingMultiblock(controllerId);
+            return true;
+        }
+        return false;
+    }
+
+    public static void registerOverpressureMultiblock(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            OVERPRESSURE_CONTROLLERS.add(controllerId);
+            MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
+        }
+    }
+
+    public static boolean supportsOverpressure(ResourceLocation controllerId) {
+        if (controllerId == null) return false;
+        ensureInitialized();
+        if (OVERPRESSURE_CONTROLLERS.contains(controllerId)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(controllerId);
+        if (defStruct != null && defStruct.supportsAbility("OVERPRESSURE")) {
+            registerOverpressureMultiblock(controllerId);
+            return true;
+        }
+        return false;
+    }
+
+    public static void registerCoilParallelMultiblock(ResourceLocation controllerId) {
+        if (controllerId != null) {
+            COIL_PARALLEL_CONTROLLERS.add(controllerId);
+            MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
+        }
+    }
+
+    public static boolean isCoilParallelMultiblock(ResourceLocation controllerId) {
+        if (controllerId == null) return false;
+        ensureInitialized();
+        if (COIL_PARALLEL_CONTROLLERS.contains(controllerId)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(controllerId);
+        if (defStruct != null && defStruct.supportsAbility("COIL_PARALLEL")) {
+            registerCoilParallelMultiblock(controllerId);
+            return true;
+        }
+        return false;
+    }
+
+    public static void registerMachineCapabilities(ResourceLocation id, com.gtceu.calcboard.compat.gtceu.helper.GTCEuMachineAnalyzer.MachineCapabilities caps) {
+        if (id == null || caps == null) return;
+        if (caps.isMultiblock()) {
+            registerMultiblock(id);
+        }
+        if (caps.isCoilWorkable()) {
+            registerCoilMultiblock(id, null);
+        }
+        if (caps.isTurbine()) {
+            registerTurbine(id, null, caps.turbineTier(), caps.turbineBaseEnergy());
+        }
+        if (caps.isSteam()) {
+            registerSteamMultiblock(id, caps.defaultParallel(), caps.steamDrainRate());
+        } else if (caps.defaultParallel() > 1) {
+            registerDefaultParallel(id, caps.defaultParallel());
+        }
+        if (caps.supportsParallelHatch()) {
+            registerParallelHatchMultiblock(id);
+        }
+        if (caps.supportsBatchMode()) {
+            registerBatchModeMultiblock(id);
+        }
+        if (caps.supportsThroughputBoosting()) {
+            registerThroughputBoostingMultiblock(id);
+        }
+        if (caps.supportsBulkProcessing()) {
+            registerBulkProcessingMultiblock(id);
+        }
+        if (caps.supportsOverpressure()) {
+            registerOverpressureMultiblock(id);
+        }
+        if (caps.supportsLaserHatch()) {
+            registerLaserHatchMultiblock(id);
+        }
     }
 
     public static void registerParallelHatchMultiblock(ResourceLocation controllerId) {
@@ -166,7 +282,6 @@ public class MultiblockDetector {
             if (initialized || initializing) return;
             initializing = true;
             try {
-                initTestEnvironmentDefaults();
                 initializeStructureCatalog();
                 scanEmiMultiblockRecipes(rmObj);
                 scanAdapterMultiblocks(rmObj);
@@ -304,187 +419,6 @@ public class MultiblockDetector {
         }
     }
 
-    public static void initTestEnvironmentDefaults() {
-        initTurbineDefaults();
-        initCoilDefaults();
-        initStandardMultiblockDefaults();
-        initSteamMultiblockDefaults();
-        initThreadingMultiblockDefaults();
-    }
-
-    private static void initTurbineDefaults() {
-        ResourceLocation lst1 = ResourceLocation.tryParse("gtceu:large_steam_turbine");
-        ResourceLocation lst2 = ResourceLocation.tryParse("gtceu:steam_large_turbine");
-        ResourceLocation lgt1 = ResourceLocation.tryParse("gtceu:large_gas_turbine");
-        ResourceLocation lgt2 = ResourceLocation.tryParse("gtceu:gas_large_turbine");
-        ResourceLocation lpt1 = ResourceLocation.tryParse("gtceu:large_plasma_turbine");
-        ResourceLocation lpt2 = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
-        ResourceLocation spt = ResourceLocation.tryParse("gtceu:supreme_plasma_turbine");
-        ResourceLocation sptStart = ResourceLocation.tryParse("start_core:supreme_plasma_turbine");
-        ResourceLocation npt = ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine");
-        ResourceLocation nptStart = ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine");
-        ResourceLocation plasmaGen = ResourceLocation.tryParse("gtceu:plasma_generator");
-
-        ResourceLocation st = ResourceLocation.tryParse("gtceu:steam_turbine");
-        ResourceLocation gt = ResourceLocation.tryParse("gtceu:gas_turbine");
-        ResourceLocation pt = ResourceLocation.tryParse("gtceu:plasma_turbine");
-
-        registerTurbine(lst1, st, GTVoltageTier.HV, 1024.0);
-        registerTurbine(lst2, st, GTVoltageTier.HV, 1024.0);
-        registerTurbine(null, ResourceLocation.tryParse("gtceu:steam_turbine_superheated"), GTVoltageTier.HV, 1024.0);
-        registerTurbine(lgt1, gt, GTVoltageTier.EV, 4096.0);
-        registerTurbine(lgt2, gt, GTVoltageTier.EV, 4096.0);
-        registerTurbine(lpt1, pt, GTVoltageTier.IV, 16384.0);
-        registerTurbine(lpt2, pt, GTVoltageTier.IV, 16384.0);
-        registerTurbine(null, plasmaGen, GTVoltageTier.IV, 16384.0);
-        registerTurbine(spt, null, GTVoltageTier.IV, 98304.0);
-        registerTurbine(sptStart, null, GTVoltageTier.IV, 98304.0);
-        registerTurbine(npt, null, GTVoltageTier.IV, 196608.0);
-        registerTurbine(nptStart, null, GTVoltageTier.IV, 196608.0);
-
-        registerLaserHatchController(spt);
-        registerLaserHatchController(sptStart);
-        registerLaserHatchController(npt);
-        registerLaserHatchController(nptStart);
-        registerDefaultParallel(spt, 6);
-        registerDefaultParallel(sptStart, 6);
-        registerDefaultParallel(npt, 12);
-        registerDefaultParallel(nptStart, 12);
-    }
-
-    private static void initCoilDefaults() {
-        ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
-        ResourceLocation ecr = ResourceLocation.tryParse("gtceu:extreme_chemical_reactor");
-        ResourceLocation icr = ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor");
-        ResourceLocation cr = ResourceLocation.tryParse("gtceu:chemical_reactor");
-        ResourceLocation ebf = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
-        ResourceLocation pyrolyse = ResourceLocation.tryParse("gtceu:pyrolyse_oven");
-        ResourceLocation cracker = ResourceLocation.tryParse("gtceu:cracker");
-        ResourceLocation multiSmelter = ResourceLocation.tryParse("gtceu:multi_smelter");
-
-        registerCoilMultiblock(lcr, cr);
-        registerCoilMultiblock(ecr, cr);
-        registerCoilMultiblock(icr, cr);
-        registerCoilMultiblock(ebf, ebf);
-        registerCoilMultiblock(pyrolyse, pyrolyse);
-        registerCoilMultiblock(cracker, cracker);
-        registerCoilMultiblock(multiSmelter, multiSmelter);
-
-        ResourceLocation rhf = ResourceLocation.tryParse("gtceu:mega_blast_furnace");
-        ResourceLocation rhfAlt = ResourceLocation.tryParse("gtceu:rotary_hearth_furnace");
-        ResourceLocation rhfStart = ResourceLocation.tryParse("start_core:rotary_hearth_furnace");
-        ResourceLocation hif = ResourceLocation.tryParse("gtceu:hardened_industrial_furnace");
-        ResourceLocation hifStart = ResourceLocation.tryParse("start_core:hardened_industrial_furnace");
-        ResourceLocation chef = ResourceLocation.tryParse("gtceu:catalytic_hellfire_energized_furnace");
-        ResourceLocation chefStart = ResourceLocation.tryParse("start_core:catalytic_hellfire_energized_furnace");
-
-        registerCoilMultiblock(rhf, ebf);
-        registerCoilMultiblock(rhfAlt, ebf);
-        registerCoilMultiblock(rhfStart, ebf);
-        registerCoilMultiblock(hif, ebf);
-        registerCoilMultiblock(hifStart, ebf);
-        registerCoilMultiblock(chef, ebf);
-        registerCoilMultiblock(chefStart, ebf);
-    }
-
-    private static void initStandardMultiblockDefaults() {
-        ResourceLocation lcr = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
-        ResourceLocation ecr = ResourceLocation.tryParse("gtceu:extreme_chemical_reactor");
-        ResourceLocation icr = ResourceLocation.tryParse("gtceu:incomprehensible_chemical_reactor");
-        ResourceLocation ebf = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
-        ResourceLocation rhf = ResourceLocation.tryParse("gtceu:mega_blast_furnace");
-        ResourceLocation rhfAlt = ResourceLocation.tryParse("gtceu:rotary_hearth_furnace");
-        ResourceLocation rhfStart = ResourceLocation.tryParse("start_core:rotary_hearth_furnace");
-        ResourceLocation hif = ResourceLocation.tryParse("gtceu:hardened_industrial_furnace");
-        ResourceLocation hifStart = ResourceLocation.tryParse("start_core:hardened_industrial_furnace");
-        ResourceLocation chef = ResourceLocation.tryParse("gtceu:catalytic_hellfire_energized_furnace");
-        ResourceLocation chefStart = ResourceLocation.tryParse("start_core:catalytic_hellfire_energized_furnace");
-        ResourceLocation pyrolyse = ResourceLocation.tryParse("gtceu:pyrolyse_oven");
-        ResourceLocation cracker = ResourceLocation.tryParse("gtceu:cracker");
-        ResourceLocation multiSmelter = ResourceLocation.tryParse("gtceu:multi_smelter");
-
-        registerMultiblock(lcr);
-        registerMultiblock(ecr);
-        registerMultiblock(icr);
-        registerMultiblock(ebf);
-        registerMultiblock(rhf);
-        registerMultiblock(rhfAlt);
-        registerMultiblock(rhfStart);
-        registerMultiblock(hif);
-        registerMultiblock(hifStart);
-        registerMultiblock(chef);
-        registerMultiblock(chefStart);
-        registerMultiblock(pyrolyse);
-        registerMultiblock(cracker);
-        registerMultiblock(multiSmelter);
-        registerMultiblock(ResourceLocation.tryParse("gtceu:large_macerator"));
-        registerParallelHatchController(lcr);
-        registerParallelHatchController(ecr);
-        registerParallelHatchController(icr);
-        registerParallelHatchController(rhf);
-        registerParallelHatchController(rhfAlt);
-        registerParallelHatchController(rhfStart);
-        registerParallelHatchController(hif);
-        registerParallelHatchController(hifStart);
-        registerParallelHatchController(chef);
-        registerParallelHatchController(chefStart);
-        registerParallelHatchController(ResourceLocation.tryParse("gtceu:processing_array"));
-        registerParallelHatchController(ResourceLocation.tryParse("start_core:star_forge"));
-        registerParallelHatchController(ResourceLocation.tryParse("start_core:supreme_assembly_line"));
-        registerBatchModeMultiblock(lcr);
-        registerBatchModeMultiblock(ecr);
-        registerBatchModeMultiblock(icr);
-    }
-
-    private static void initSteamMultiblockDefaults() {
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_grinder"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_oven"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_compressor"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_ore_factory"), 6);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_hammer"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_alloy_smelter"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_purifier"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_rock_breaker"), 8);
-        registerSteamMultiblock(ResourceLocation.tryParse("gtceu:steam_kiln"), 8);
-    }
-
-    private static void initThreadingMultiblockDefaults() {
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:fermenting_arboreal_rejuvenation_monstrosity"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:multithreaded_component_synthesis_forge"), 24);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:aqueous_transformation_processing_center"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:ascendant_engraving_matrix"), 9);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:byteforce_unified_incomparable_logistics_depot"), 12);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:electro_magnetic_material_ripper"), 10);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:gravitational_compression_chamber"), 12);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:material_annihilation_array"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:molecular_inducing_xanadu"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:subatomic_particle_lattice_isolation_terminal"), 12);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:superior_particulate_isolation_nexus"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("gtceu:yielding_excression_advanced_seperation_transformator"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("start:threading_processing_plant"), 8);
-        registerThreadingMultiblock(ResourceLocation.tryParse("start_core:threading_processing_plant"), 8);
-
-        for (String idStr : new String[]{
-                "gtceu:fermenting_arboreal_rejuvenation_monstrosity",
-                "gtceu:multithreaded_component_synthesis_forge",
-                "gtceu:aqueous_transformation_processing_center",
-                "gtceu:ascendant_engraving_matrix",
-                "gtceu:byteforce_unified_incomparable_logistics_depot",
-                "gtceu:electro_magnetic_material_ripper",
-                "gtceu:gravitational_compression_chamber",
-                "gtceu:material_annihilation_array",
-                "gtceu:molecular_inducing_xanadu",
-                "gtceu:subatomic_particle_lattice_isolation_terminal",
-                "gtceu:superior_particulate_isolation_nexus",
-                "gtceu:yielding_excression_advanced_seperation_transformator"
-        }) {
-            ResourceLocation rl = ResourceLocation.tryParse(idStr);
-            registerMultiblock(rl);
-            registerParallelHatchController(rl);
-            registerBatchModeController(rl);
-        }
-    }
-
     public static void reinitialize() {
         reinitialize(null);
     }
@@ -500,12 +434,14 @@ public class MultiblockDetector {
         TURBINE_BASE_PRODUCTIONS.clear();
         DEFAULT_MULTIBLOCK_PARALLELS.clear();
         BATCH_MODE_CONTROLLERS.clear();
+        THROUGHPUT_BOOSTING_CONTROLLERS.clear();
+        BULK_PROCESSING_CONTROLLERS.clear();
+        OVERPRESSURE_CONTROLLERS.clear();
         PARALLEL_HATCH_CONTROLLERS.clear();
         LASER_HATCH_CONTROLLERS.clear();
         STEAM_MULTIBLOCKS.clear();
         STEAM_MULTIBLOCK_CONSUMPTIONS.clear();
         THREADING_MAX_HELIX_CAPACITY.clear();
-        initTestEnvironmentDefaults();
         initialize(rmObj);
     }
 
@@ -577,14 +513,22 @@ public class MultiblockDetector {
 
     public static boolean supportsBatchMode(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
         ensureInitialized();
-        if (machineIcon != null && BATCH_MODE_CONTROLLERS.contains(machineIcon)) {
-            return true;
-        }
-        if (availableWorkstations == null) return false;
-        for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && BATCH_MODE_CONTROLLERS.contains(ws)) {
-                return true;
+        if (checkBatchMode(machineIcon)) return true;
+        if (availableWorkstations != null) {
+            for (ResourceLocation ws : availableWorkstations) {
+                if (checkBatchMode(ws)) return true;
             }
+        }
+        return false;
+    }
+
+    private static boolean checkBatchMode(ResourceLocation id) {
+        if (id == null) return false;
+        if (BATCH_MODE_CONTROLLERS.contains(id)) return true;
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(id);
+        if (defStruct != null && defStruct.supportsAbility("BATCH_MODE")) {
+            registerBatchModeMultiblock(id);
+            return true;
         }
         return false;
     }
@@ -656,6 +600,13 @@ public class MultiblockDetector {
             initialize();
         }
         if (MULTIBLOCK_RECIPE_CONTROLLERS.contains(workstationId)) return true;
+        if (COIL_MULTIBLOCK_CONTROLLERS.contains(workstationId)) return true;
+        if (PARALLEL_HATCH_CONTROLLERS.contains(workstationId)) return true;
+        if (THROUGHPUT_BOOSTING_CONTROLLERS.contains(workstationId)) return true;
+        if (BATCH_MODE_CONTROLLERS.contains(workstationId)) return true;
+        if (STEAM_MULTIBLOCKS.contains(workstationId)) return true;
+        if (THREADING_MAX_HELIX_CAPACITY.containsKey(workstationId)) return true;
+        if (MultiblockStructureCatalog.getStructure(workstationId) != null) return true;
         String path = workstationId.getPath().toLowerCase(Locale.ROOT);
         return path.contains("fusion_reactor") || path.contains("auxiliary_fusion") || path.contains("auxiliary_booster");
     }
@@ -665,7 +616,8 @@ public class MultiblockDetector {
         if (!initialized && !initializing) {
             initialize();
         }
-        return COIL_MULTIBLOCK_CONTROLLERS.contains(workstationId);
+        if (COIL_MULTIBLOCK_CONTROLLERS.contains(workstationId)) return true;
+        return isMultiblock(workstationId) && com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(workstationId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
     }
 
     public static void registerCoilCategory(ResourceLocation categoryId) {
@@ -782,8 +734,12 @@ public class MultiblockDetector {
         ClassLoader cl = MultiblockDetector.class.getClassLoader();
         Class<?> coilCls = null;
         try {
-            coilCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine", false, cl);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
+            coilCls = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.CoilWorkableElectricMultiblockMachine", false, cl);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            try {
+                coilCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine", false, cl);
+            } catch (ReflectiveOperationException | LinkageError ignored2) {}
+        }
         COIL_WORKABLE_CLS = coilCls;
 
         Class<?> threadCls = null;
@@ -855,7 +811,9 @@ public class MultiblockDetector {
     }
 
     private static void detectAndRegisterCoilMultiblock(ResourceLocation id, Class<?> mCls, ResourceLocation recipeCategoryId) {
-        if (isCoilMachineClass(mCls) || isCoilFromCatalog(id) || isCoilFromCategory(recipeCategoryId)) {
+        if (isCoilMachineClass(mCls)
+                || isCoilFromCatalog(id)
+                || com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(id).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
             registerCoilMultiblock(id, recipeCategoryId);
         }
     }
@@ -867,13 +825,7 @@ public class MultiblockDetector {
 
     private static boolean isCoilFromCatalog(ResourceLocation id) {
         var defStruct = MultiblockStructureCatalog.getStructure(id);
-        return defStruct != null && (defStruct.coilSlotCount() > 0 || defStruct.supportsAbility("HEATING_COILS"));
-    }
-
-    private static boolean isCoilFromCategory(ResourceLocation recipeCategoryId) {
-        if (recipeCategoryId == null) return false;
-        CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(recipeCategoryId);
-        return cap != null && cap.canUseCoils();
+        return defStruct != null && defStruct.supportsAbility("HEATING_COILS") && defStruct.coilSlotCount() > 0;
     }
 
     private static void detectAndRegisterParallelAndBatch(ResourceLocation id, Object def, Class<?> cls) {

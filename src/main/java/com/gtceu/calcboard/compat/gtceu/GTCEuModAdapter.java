@@ -8,6 +8,7 @@ import com.gtceu.calcboard.api.catalog.AddonFactoryRegistry;
 import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
@@ -609,6 +610,12 @@ public class GTCEuModAdapter implements IModAdapter {
     @Override
     public ResourceLocation getWorkstationForTier(RecipeNode node, GTVoltageTier tier) {
         if (node == null || tier == null) return null;
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            return null;
+        }
+        if (isBoilerRecipe(node) || isLiquidBoilerRecipe(node)) {
+            return null;
+        }
 
         ResourceLocation fromList = node.getWorkstationForTierFromList(tier);
         if (fromList != null) {
@@ -764,6 +771,17 @@ public class GTCEuModAdapter implements IModAdapter {
         if (!node.isFusion() && node.getRequiredReflectorTier() <= 0) {
             node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.REFLECTOR);
         }
+
+        // (G) Innate Multiblock Trait Purge
+        if (!MultiblockDetector.supportsThroughputBoosting(newIcon)) {
+            node.getAddons().removeIf(a -> a.getId() != null && a.getId().equals("gtceu:throughput_boosting"));
+        }
+        if (!MultiblockDetector.supportsBulkProcessing(newIcon)) {
+            node.getAddons().removeIf(a -> a.getId() != null && a.getId().equals("gtceu:bulk_processing"));
+        }
+        if (!MultiblockDetector.supportsOverpressure(newIcon)) {
+            node.getAddons().removeIf(a -> a.getId() != null && a.getId().equals("gtceu:overpressure_autoclave"));
+        }
     }
 
     private void applyMachinePresets(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
@@ -777,6 +795,25 @@ public class GTCEuModAdapter implements IModAdapter {
                 GTVoltageTier baseTier = MultiblockDetector.getTurbineBaseTier(newIcon);
                 if (baseTier != null && (node.getTargetTier() == null || (MultiblockDetector.requiresMinimumBaseTier(newIcon) && node.getTargetTier().ordinal() < baseTier.ordinal()))) {
                     node.setTargetTier(baseTier);
+                }
+            }
+
+            if (MultiblockDetector.supportsThroughputBoosting(newIcon)) {
+                boolean hasBoost = node.getAddons().stream().anyMatch(a -> a.getId() != null && a.getId().equals("gtceu:throughput_boosting"));
+                if (!hasBoost) {
+                    MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+                    if (boost != null) {
+                        node.addAddon(boost);
+                    }
+                }
+            }
+            if (MultiblockDetector.supportsOverpressure(newIcon)) {
+                boolean hasOver = node.getAddons().stream().anyMatch(a -> a.getId() != null && a.getId().equals("gtceu:overpressure_autoclave"));
+                if (!hasOver) {
+                    MachineAddon overpressure = MachineAddonCatalog.getInstance().getAddon("gtceu:overpressure_autoclave");
+                    if (overpressure != null) {
+                        node.addAddon(overpressure);
+                    }
                 }
             }
         }

@@ -29,8 +29,9 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Smart Wire Preservation**: Automatically preserves incoming/outgoing wire connections for matching item and fluid ports (`IngredientStack.getId()`).
 - **Undo / Redo Support**: Fully integrated with the delta history stack (`Ctrl + Z` / `Ctrl + Y`).
 
-### 3. Multiblock Construction Bill of Materials (BOM) System
-- **Automated Structural Solver (`B` Hotkey / `[📦 BOM]`)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across single pages or entire documents.
+### 3. Multiblock & Factory Bill of Materials (BOM) System
+- **Automated Structural Solver (`B` Hotkey / `[📦 BOM]`)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across single pages, shared machine pool frames, or nested compound modules.
+- **Hierarchical Compound Scaling & Traceability**: Recursively resolves nested subgraphs inside Compound Modules proportionally scaled by parent machine counts, and resolves singleblock machines into voltage-tiered item forms with detailed process usage traces (`usedByMachines`).
 - **Hybrid Hatch Override**: Real-time dual lower-tier energy hatch toggling (`⚡ 1x Normal ↔ 2x 1-Tier Lower`) and dynamic casing block deductions.
 - **1-Click Recipe Tree Target**: Export shopping lists directly into EMI Recipe Tree or JEI++ calculation goals, or copy formatted text to clipboard.
 
@@ -197,7 +198,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.4.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.5.jar`.
 
 ---
 

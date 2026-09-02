@@ -32,6 +32,7 @@ public class GTCEuSteamProcessingTest {
     @BeforeEach
     void setUp() {
         MultiblockDetector.reinitialize();
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
         CategoryCapabilityMatrix.getInstance();
     }
 

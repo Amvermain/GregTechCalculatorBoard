@@ -239,11 +239,31 @@ flowchart LR
     end
 ```
 
+### 2.1 Hardware Addon Categories & Multiblock Trait Addons (`AddonCategory`, `MachineAddon`)
+Classifies hardware chips expanding physical machine capabilities into standardized categories:
+
+* **`AddonCategory`**:
+  - `COIL`: Heating Coil Blocks (EBF temperature bonuses and energy discounts)
+  - `PARALLEL`: Parallel Control Hatches (4x to 256x parallels)
+  - `MAINTENANCE`: Maintenance Hatches (10% duration reductions, etc.)
+  - `ROTOR`: Large Turbine Rotors (efficiency & flow rate multipliers)
+  - `REFLECTOR`: Fusion Reflectors (tier-dependent slowdown multipliers)
+  - `ENERGY_HATCH` / `HATCH_BUS`: Multiblock power and I/O buses
+  - `THREADING`: Threading Helices (multi-pipeline throughput)
+  - `THERMAL_AUGMENT`: Thermal Series augments and upgrade kits
+  - `MULTIBLOCK_TRAIT`: GTCEu multiblock intrinsic traits
+  - `CUSTOM`: User-defined custom hardware multipliers
+* **GTCEu Multiblock Intrinsic Traits (`MULTIBLOCK_TRAIT`)**:
+  - `THROUGHPUT_BOOSTING`: 4x Parallels, 1.6x Duration, 0.95x EU (Pyrolyse Oven, Super Cracker)
+  - `BULK_PROCESSING`: 16x Parallels, 13x Duration (23% effective speedup)
+  - `BATCH_MODE`: Enables multi-recipe batch processing without penalty
+  - `OVERPRESSURE`: 8x Parallels, 1.5x Duration, 1.25x EU (Autoclave)
+
 ---
 
-## 3. Compound Module System (`FlowGraphModuleHandler`)
+## 3. Compound Modules & Progressive Assembly (`FlowGraphModuleHandler`, `CompoundRecipeBuilder`)
 
-Packages multi-node subgraphs into a single compact compound module card (`Ctrl+G`) or expands them back into full subgraphs.
+Packages multi-node subgraphs into a single compact compound module card (`Ctrl+G`) or expands them back into full subgraphs, and builds chained cards for Create Sequenced Assembly recipes.
 
 ```mermaid
 flowchart LR
@@ -264,6 +284,7 @@ flowchart LR
 1. **Boundary I/O Promotion**: Intermediate wires between internal nodes are encapsulated; only external feedstock and end-products are promoted to outer card socket ports.
 2. **Wire Remapping**: External `ConnectionEdge` instances are remapped to the newly created compound card ports.
 3. **Proportional Scaling**: Changing machine count on the compound card proportionally scales all internal machine counts and flow rates.
+4. **Distinct Sequenced Assembly Machine Icons (`CompoundRecipeBuilder.LayerSpec`)**: Automatically extracts and assigns distinct machine icons (Deployer, Spout, Mechanical Press, Mechanical Saw) for each intermediate step in Create Sequenced Assembly compound cards.
 
 ---
 

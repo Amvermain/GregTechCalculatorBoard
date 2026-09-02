@@ -69,7 +69,14 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
     private static boolean isCoilMultiblock(RecipeNode node) {
         if (node == null || !node.isMultiblock()) return false;
         if (isFusionMachine(node)) return false;
-        if (MultiblockDetector.isCoilMultiblock(node.getMachineIcon())) return true;
+        if (node.getMachineIcon() != null) {
+            return MultiblockDetector.isCoilMultiblock(node.getMachineIcon())
+                    || com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(node.getMachineIcon()).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
+        }
+        if (node.getMultiblockWorkstation() != null) {
+            return MultiblockDetector.isCoilMultiblock(node.getMultiblockWorkstation())
+                    || com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(node.getMultiblockWorkstation()).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
+        }
         if (MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId())) return true;
         if (node.getRecipeTemperature() > 0) return true;
         if (node.getProperties().get(GTCEuProperties.EBF_TEMPERATURE) > 0) return true;

@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.bom;
 
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -24,8 +25,16 @@ public class MultiblockBOMCalculator {
         return calculateBOM(graph.getNodes(), graph.getFrames(), dualLowerTierEnergyHatches);
     }
 
-    public static MultiblockBOMSummary calculateBOM(List<RecipeNode> nodes, List<CanvasGroupFrame> frames, boolean dualLowerTierEnergyHatches) {
-        if (nodes == null || nodes.isEmpty()) {
+    public static MultiblockBOMSummary calculateBOM(List<RecipeNode> inputNodes, List<CanvasGroupFrame> inputFrames, boolean dualLowerTierEnergyHatches) {
+        if (inputNodes == null || inputNodes.isEmpty()) {
+            return new MultiblockBOMSummary(List.of(), List.of(), 0, 0);
+        }
+
+        List<RecipeNode> nodes = new ArrayList<>();
+        List<CanvasGroupFrame> frames = new ArrayList<>();
+        flattenNodesAndFrames(inputNodes, inputFrames, 1.0, nodes, frames);
+
+        if (nodes.isEmpty()) {
             return new MultiblockBOMSummary(List.of(), List.of(), 0, 0);
         }
 
@@ -72,8 +81,32 @@ public class MultiblockBOMCalculator {
         }
 
         for (RecipeNode node : nodes) {
-            if (node == null || node.isReroute() || (node.isCompoundNode() && !node.isCompoundMaster())) continue;
+            if (node == null || node.isReroute()) continue;
             if (sharedFrameSlavesToSkip.contains(node.getId())) continue;
+
+            if (node.isCompoundNode()) {
+                boolean isSingleMultiblockCluster = node.isMultiblock()
+                        || MultiblockDetector.isMultiblock(node.getMachineIcon())
+                        || (node.getMultiblockWorkstation() != null && MultiblockDetector.isMultiblock(node.getMultiblockWorkstation()));
+
+                boolean sharesClusterMachine = false;
+                if (node.getCompoundGroupId() != null) {
+                    RecipeNode master = null;
+                    for (RecipeNode other : nodes) {
+                        if (other != null && node.getCompoundGroupId().equals(other.getCompoundGroupId()) && other.isCompoundMaster()) {
+                            master = other;
+                            break;
+                        }
+                    }
+                    if (master != null && Objects.equals(node.getMachineIcon(), master.getMachineIcon())) {
+                        sharesClusterMachine = true;
+                    }
+                }
+
+                if ((isSingleMultiblockCluster || sharesClusterMachine) && !node.isCompoundMaster()) {
+                    continue;
+                }
+            }
 
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             List<MultiblockStructurePart> resolvedParts = adapter != null
@@ -168,6 +201,44 @@ public class MultiblockBOMCalculator {
             this.itemId = itemId;
             this.displayName = displayName;
             this.category = category;
+        }
+    }
+
+    private static void flattenNodesAndFrames(
+            List<RecipeNode> sourceNodes,
+            List<CanvasGroupFrame> sourceFrames,
+            double parentMultiplier,
+            List<RecipeNode> flatNodes,
+            List<CanvasGroupFrame> flatFrames
+    ) {
+        if (sourceNodes == null) return;
+        if (sourceFrames != null) {
+            flatFrames.addAll(sourceFrames);
+        }
+
+        for (RecipeNode node : sourceNodes) {
+            if (node == null || node.isReroute()) continue;
+
+            if (node.isModule()) {
+                double moduleMultiplier = parentMultiplier * Math.max(1.0, node.getMachineCount());
+                if (node.getSubGraph() != null) {
+                    flattenNodesAndFrames(
+                            node.getSubGraph().getNodes(),
+                            node.getSubGraph().getFrames(),
+                            moduleMultiplier,
+                            flatNodes,
+                            flatFrames
+                    );
+                }
+            } else {
+                if (Math.abs(parentMultiplier - 1.0) > 0.0001) {
+                    RecipeNode scaled = node.copy();
+                    scaled.setMachineCount(node.getMachineCount() * parentMultiplier);
+                    flatNodes.add(scaled);
+                } else {
+                    flatNodes.add(node);
+                }
+            }
         }
     }
 }

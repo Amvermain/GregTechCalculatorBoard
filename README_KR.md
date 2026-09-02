@@ -29,8 +29,9 @@
 - **스마트 와이어 보존 (Smart Wire Preservation)**: 레시피 교체 전후 동일한 아이템 및 유체 포트(`IngredientStack.getId()`)의 배선 연결을 끊지 않고 자동 유지.
 - **완벽한 Undo / Redo**: 히스토리 델타 스택(`Ctrl + Z` / `Ctrl + Y`)과 완벽 연동.
 
-### 3. 멀티블록 구조체 자동 분석 & 자재 명세서 (BOM) 시스템
-- **자동 구조체 솔버 (`B` 단축키 / `[📦 BOM]`)**: 단일 탭 또는 전체 보드에 배치된 모든 멀티블록과 단일 기계의 소요 자재(케이싱, 코일, 해치, 컨트롤러)를 일괄 산출.
+### 3. 멀티블록 및 공장 전체 자재 명세서 (BOM) 시스템
+- **자동 구조체 솔버 (`B` 단축키 / `[📦 BOM]`)**: 단일 탭, 공유 기계 풀 프레임, 중첩된 복합 모듈에 배치된 모든 멀티블록과 단일 기계의 소요 자재(케이싱, 코일, 해치, 컨트롤러)를 일괄 산출.
+- **다층 복합 모듈 비례 집계 & 출처 역추적**: 복합 모듈 내부 서브그래프를 상위 모듈 기계 대수 승수에 맞추어 재귀 집계하고, 단일 기계를 목표 전압 티어별 실제 아이템으로 변환하여 기여 공정 목록(`usedByMachines`)을 실시간 역추적.
 - **하이브리드 해치 오버라이드**: 듀얼 하위 티어 에너지 해치(`⚡ 1x Normal ↔ 2x 1-Tier Lower`) 토글 및 유틸리티 해치 장착 시 케이싱 자동 감산.
 - **1-클릭 레시피 트리 목표 등록**: 산출된 자재 목록을 EMI Recipe Tree 또는 JEI++ 목표로 원클릭 등록하거나 클립보드 복사 지원.
 
@@ -197,7 +198,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.4.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.5.jar` 경로에 생성됩니다.
 
 ---
 

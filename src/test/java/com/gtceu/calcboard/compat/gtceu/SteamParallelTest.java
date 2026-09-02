@@ -20,6 +20,7 @@ public class SteamParallelTest {
     @BeforeEach
     public void setUp() {
         MultiblockDetector.reinitialize();
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
     }
 
     @Test

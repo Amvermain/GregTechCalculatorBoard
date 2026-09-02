@@ -8,7 +8,7 @@
 
 | 항목 | 내용 |
 | :--- | :--- |
-| **문서 버전** | `v2.0.0` (ADR-001 ~ ADR-004 정합 완료) |
+| **문서 버전** | `v2.1.0-alpha.5` (ADR-001 ~ ADR-012 정합 완료) |
 | **대상 플랫폼** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
 | **의존성** | Java 17+, GregTech CEu Modern, EMI / JEI (Recipe Viewer) |
 | **소프트 의존성** | FTB Teams, Phoenix Guilds (멀티플레이 팀 연동) |

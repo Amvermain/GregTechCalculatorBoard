@@ -217,6 +217,9 @@
 * **카테고리 탭 필터링**: `All`, `Casings`, `Coils`, `Hatches & Buses`, `Controllers`.
 * **스택 단위 환산 표기**: `3 stacks + 48 (240 items)`와 같이 인벤토리 수납 단위 자동 변환.
 * **듀얼 에너지 해치 토글**: `⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches` 실시간 부품 교체.
+* **다층 복합 모듈 재귀 스케일링**: 중첩된 복합 모듈 노드의 기계 대수($M_{\text{module}}$)를 재귀 곱연산하여 내부 실제 기계/멀티블록 부품 자재를 비례 집계.
+* **공유 기계 풀 프레임 듀티 통합**: 공유 프레임 내 동일 물리 기계를 공유하는 공정들의 듀티 사이클 합산 및 실효 기계 대수 올림($\lceil \sum \text{Duty} \rceil$)을 BOM에 1회만 정확히 반영.
+* **단일 기계 전압 티어 아이템 연역 및 출처 추적**: 단일 기계(예: Rock Breaker)의 목표 티어별 구체적 아이템(`gtceu:lv_rock_breaker`) 분기 및 기여 공정 목록(`usedByMachines`) 실시간 제공.
 * **EMI 원클릭 등록 (`[★ Register in EMI]`)**: 전체 소요 자재를 EMI 가상 레시피 트리의 루트 노드로 등록하여 제작 트리 역추적 지원.
 * **클립보드 내보내기 (`[📋 Copy List]`)**: 텍스트 형식으로 클립보드에 자재 목록 복사.
 

@@ -107,25 +107,26 @@ flowchart TB
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">유지보수</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">터빈 로터</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">써멀 증강</span>
+          <span style="background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">멀티 특성</span>
           <span style="background: #1e293b; color: #a855f7; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">+ 커스텀</span>
         </div>
         <!-- Search & Catalog Chips Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; max-height: 90px; overflow-y: hidden;">
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">칸탈 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">2,700 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">처리량 증폭 (Boost)</span>
+            <span style="color: #38bdf8; font-size: 9px;">4x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">니크롬 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">3,600 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">벌크 처리 (Bulk)</span>
+            <span style="color: #38bdf8; font-size: 9px;">16x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">RTM 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">4,500 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">과승 가압 (Overpressure)</span>
+            <span style="color: #f59e0b; font-size: 9px;">8x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">HSS-G 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">5,400 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">배치 모드 (Batch)</span>
+            <span style="color: #10b981; font-size: 9px;">1x</span>
           </div>
         </div>
       </div>

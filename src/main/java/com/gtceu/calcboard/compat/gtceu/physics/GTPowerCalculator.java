@@ -123,8 +123,11 @@ public final class GTPowerCalculator {
             if (maxCapacity < Long.MAX_VALUE && node.getRecipeTier() != null) {
                 GTVoltageTier capacityTier = GTVoltageTier.getMaxTierProvided(maxCapacity);
                 int capacityDelta = capacityTier.ordinal() - node.getRecipeTier().ordinal();
+                if (node.getRecipeTier() == GTVoltageTier.ULV) {
+                    capacityDelta--;
+                }
                 if (capacityDelta > maxTierDelta) {
-                    maxTierDelta = capacityDelta;
+                    maxTierDelta = Math.max(0, capacityDelta);
                 }
             }
             int effectivePar = computeEffectiveParallel(node);
@@ -219,7 +222,7 @@ public final class GTPowerCalculator {
         } else {
             int base = node.isMultiblock() ? getDefaultParallel(node) : 1;
             int effectiveBase = Math.max(base, node.getParallel() > 1 ? node.getParallel() : 1);
-            if (isMultiSmelterNode(node)) {
+            if (isCoilParallelNode(node)) {
                 int coilPar = 0;
                 for (MachineAddon addon : node.getAddons()) {
                     if (addon instanceof GTCoilAddon coil) {
@@ -235,7 +238,14 @@ public final class GTPowerCalculator {
                         }
                     }
                 }
-                par = coilPar > 0 ? coilPar : effectiveBase;
+                int nonCoilParallelMultiplier = 1;
+                for (MachineAddon a : node.getAddons()) {
+                    if (a.getCategory() != MachineAddon.Category.COIL) {
+                        nonCoilParallelMultiplier *= a.getParallelMultiplier();
+                    }
+                }
+                int baseSmelterPar = coilPar > 0 ? coilPar : effectiveBase;
+                par = Math.max(1, baseSmelterPar * nonCoilParallelMultiplier);
             } else {
                 par = Math.max(1, effectiveBase * node.getCombinedParallelMultiplier());
             }
@@ -246,26 +256,20 @@ public final class GTPowerCalculator {
         return par;
     }
 
-    public static boolean isMultiSmelterNode(RecipeNode node) {
+    public static boolean isCoilParallelNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getMachineIcon() != null) {
-            String p = node.getMachineIcon().getPath().toLowerCase(Locale.ROOT);
-            if (p.contains("multi_smelter") || p.contains("smelter")) return true;
+        if (node.getMachineIcon() != null && MultiblockDetector.isCoilParallelMultiblock(node.getMachineIcon())) {
+            return true;
         }
-        if (node.getMultiblockWorkstation() != null) {
-            String p = node.getMultiblockWorkstation().getPath().toLowerCase(Locale.ROOT);
-            if (p.contains("multi_smelter") || p.contains("smelter")) return true;
-        }
-        if (node.getName() != null) {
-            String n = node.getName().toLowerCase(Locale.ROOT);
-            if (n.contains("multi smelter") || n.contains("multismelter")) return true;
+        if (node.getMultiblockWorkstation() != null && MultiblockDetector.isCoilParallelMultiblock(node.getMultiblockWorkstation())) {
+            return true;
         }
         return false;
     }
 
     public static int getDefaultParallel(RecipeNode node) {
         if (node == null) return 1;
-        if (node.isMultiblock() && isMultiSmelterNode(node)) {
+        if (node.isMultiblock() && isCoilParallelNode(node)) {
             for (MachineAddon addon : node.getAddons()) {
                 if (addon instanceof GTCoilAddon coil) {
                     return coil.getSmelterParallel();
