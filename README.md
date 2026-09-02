@@ -126,7 +126,9 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Quick Add Recipe | Space or Double-Click on empty canvas space |
 | Marquee Box Selection | Left Click + Drag on empty canvas space (Shift + Click to toggle) |
 | Multi-Node Dragging | Drag any selected node to move all selected nodes together |
-| Group into Module | Ctrl + G |
+| Create Frame | Ctrl + G |
+| Create Shared Machine Pool | Ctrl + Shift + S |
+| Group into Module | Ctrl + Shift + G |
 | Quick Page Switcher | Ctrl + K (Fuzzy search and instant jump) |
 | Toggle 16px Grid Snap | G or lower-left HUD checkbox |
 | Undo / Redo | Ctrl + Z (Undo) / Ctrl + Y or Ctrl + Shift + Z (Redo) |

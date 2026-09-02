@@ -399,6 +399,8 @@
   "gui.gtcalcboard.hotkey_hud.clipboard": "剪贴板",
   "gui.gtcalcboard.hotkey_hud.sever": "断开连线",
   "gui.gtcalcboard.hotkey_hud.delete": "删除所选项",
+  "gui.gtcalcboard.hotkey_hud.grid_snap": "网格吸附",
+  "gui.gtcalcboard.hotkey_hud.shared_machine": "共享机器池",
   "gui.gtcalcboard.tutorial.page_name": "🎓 教程",
   "gui.gtcalcboard.tutorial.advanced_page_name": "🔬 进阶教程",
   "gui.gtcalcboard.tutorial.skip": "跳过",

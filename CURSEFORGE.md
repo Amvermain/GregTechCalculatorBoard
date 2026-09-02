@@ -131,7 +131,8 @@ The mod is fully optional on both client and server:
 
 #### Compound Modules (Subgraphs)
 
-*   **Modularization (`Ctrl + G`)**: Collapses groups of interconnected nodes into a single composite module card.
+*   **Modularization (`Ctrl + Shift + G`) & Framing (`Ctrl + G`)**: Enclose nodes inside visual grouping frames or collapse entire subgraphs into a single composite module card.
+*   **Shared Machine Pools (`Ctrl + Shift + S`)**: Group multiple recipe cards sharing a physical machine pool with real-time duty cycle calculations and hardware synchronization.
 *   **Internal Flow Hiding**: Encapsulates internally consumed items and fluids, exposing only true external inputs, net outputs, total machine count, and aggregate power draw.
 *   **Unpack / Expand**: Restores encapsulated machines and wiring back onto the main canvas with a single click.
 

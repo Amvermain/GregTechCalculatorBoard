@@ -13,7 +13,7 @@ public class HotkeyHudWidget {
     private boolean expanded;
 
     private static final int EXPANDED_WIDTH = 195;
-    private static final int EXPANDED_HEIGHT = 220;
+    private static final int EXPANDED_HEIGHT = 244;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
 
@@ -89,6 +89,8 @@ public class HotkeyHudWidget {
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Shift + T", "gui.gtcalcboard.hotkey_hud.fluid_unit");
         curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "G", "gui.gtcalcboard.hotkey_hud.grid_snap");
+        curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "J", "gui.gtcalcboard.hotkey_hud.junction");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Space / Dbl-Click", "gui.gtcalcboard.hotkey_hud.add");
@@ -96,6 +98,8 @@ public class HotkeyHudWidget {
         renderKeyLine(graphics, font, panelX + 6, curY, "Shift + Drag", "gui.gtcalcboard.hotkey_hud.shift_wire");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + G", "gui.gtcalcboard.hotkey_hud.frame");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + Shift + S", "gui.gtcalcboard.hotkey_hud.shared_machine");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + Shift + G", "gui.gtcalcboard.hotkey_hud.group");
         curY += 12;
