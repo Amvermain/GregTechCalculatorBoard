@@ -31,6 +31,7 @@ public class BoardSettingsTest {
         Assertions.assertTrue(manager.isShowMultiblockBomButton());
         Assertions.assertTrue(manager.isShowHotkeyHud());
         Assertions.assertTrue(manager.isShowWirePulseAnimation());
+        Assertions.assertEquals(com.gtceu.calcboard.api.type.WireAnimationMode.RATE_MODULATED, manager.getWireAnimationMode());
         Assertions.assertEquals(WireColorPreset.CYAN, manager.getWireColorPreset());
         Assertions.assertEquals(WireColorPreset.GREEN, manager.getMatchedWireColorPreset());
         Assertions.assertEquals(0xFF00E5FF, manager.getWireColor());
@@ -78,6 +79,7 @@ public class BoardSettingsTest {
         Assertions.assertFalse(manager.isShowMultiblockBomButton());
         Assertions.assertFalse(manager.isShowHotkeyHud());
         Assertions.assertFalse(manager.isShowWirePulseAnimation());
+        Assertions.assertEquals(com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED, manager.getWireAnimationMode());
         Assertions.assertEquals(WireColorPreset.GOLD, manager.getWireColorPreset());
         Assertions.assertEquals(WireColorPreset.VIOLET, manager.getMatchedWireColorPreset());
         Assertions.assertEquals(0xFFFFD700, manager.getWireColor());

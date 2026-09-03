@@ -19,6 +19,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.type.OverclockMode;
+import com.gtceu.calcboard.api.type.WireAnimationMode;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -79,6 +80,7 @@ public class NodeCardRenderer {
             isSelected = bs.isNodeSelected(node.getId());
         }
 
+        boolean isStarved = false;
         int outlineColor;
         if (isSelected) {
             outlineColor = 0xFF00FFFF;
@@ -86,6 +88,11 @@ public class NodeCardRenderer {
             float pulse = (float) (0.60 + 0.40 * Math.sin(System.currentTimeMillis() / 200.0));
             int red = (int) (170 + 85 * pulse);
             outlineColor = 0xFF000000 | (red << 16) | (0x33 << 8) | 0x33;
+        } else if (BoardManager.getInstance().getWireAnimationMode() == WireAnimationMode.RATE_MODULATED && (isStarved = isNodeInputStarved(graph, node))) {
+            float pulse = (float) (0.65 + 0.35 * Math.sin(System.currentTimeMillis() / 240.0));
+            int red = (int) (245 * pulse);
+            int green = (int) (158 * pulse);
+            outlineColor = 0xFF000000 | (red << 16) | (green << 8) | 0x0B;
         } else if (node.isModule()) {
             outlineColor = 0xFF9955FF;
         } else if (node.isFusion()) {
@@ -103,6 +110,8 @@ public class NodeCardRenderer {
             graphics.renderOutline(x + 1, y + 1, cardW - 2, height - 2, 0x8800FFFF);
         } else if (!isOperational) {
             graphics.renderOutline(x + 1, y + 1, cardW - 2, height - 2, (outlineColor & 0x00FFFFFF) | 0x88000000);
+        } else if (isStarved) {
+            graphics.renderOutline(x + 1, y + 1, cardW - 2, height - 2, 0x66F59E0B);
         } else if (node.isModule()) {
             graphics.renderOutline(x + 1, y + 1, cardW - 2, height - 2, 0x559955FF);
         } else if (node.isFusion()) {
@@ -726,6 +735,18 @@ public class NodeCardRenderer {
 
     private static void renderIngredient(GuiGraphics graphics, IngredientStack stack, int x, int y) {
         IngredientRenderer.render(graphics, stack, x, y);
+    }
+
+    private static boolean isNodeInputStarved(FlowGraph graph, RecipeNode node) {
+        if (graph == null || node == null) return false;
+        int inputCount = node.getInputs().size();
+        for (int i = 0; i < inputCount; i++) {
+            var stats = graph.getInputPortStats(node, i);
+            if (stats != null && stats.isInputDeficit()) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

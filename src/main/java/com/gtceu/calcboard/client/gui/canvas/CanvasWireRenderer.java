@@ -107,12 +107,14 @@ public class CanvasWireRenderer {
                     int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : defWireColor);
                     float wireThick = isWireGlowing ? 3.5f : 2.0f;
                     ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
+                    float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
                     visibleWiresBuffer.add(x1);
                     visibleWiresBuffer.add(y1);
                     visibleWiresBuffer.add(x2);
                     visibleWiresBuffer.add(y2);
                     visibleWiresBuffer.add(fromDirX);
                     visibleWiresBuffer.add(toDirX);
+                    visibleWiresBuffer.add(satRatio);
                 }
             }
         }
@@ -163,8 +165,18 @@ public class CanvasWireRenderer {
         ConnectionRenderer.endBatch();
 
         // Draw animated flow pulse dots (Single-batch GPU rendering)
-        if (zoom >= 0.28 && BoardManager.getInstance().isShowWirePulseAnimation()) {
-            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWiresBuffer);
+        var animMode = BoardManager.getInstance().getWireAnimationMode();
+        if (zoom >= 0.28 && animMode != com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED) {
+            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWiresBuffer, animMode);
         }
+    }
+
+    private static float calculateSaturationRatio(FlowGraph graph, RecipeNode toNode, int inputIndex) {
+        if (graph == null || toNode == null) return 1.0f;
+        var stats = graph.getInputPortStats(toNode, inputIndex);
+        if (stats == null || !stats.isConnected()) return 1.0f;
+        if (stats.requiredOrProducedRate() <= 0.0001) return 1.0f;
+        if (stats.connectedRate() <= 0.0001) return 0.0f;
+        return (float) Math.min(1.0, stats.connectedRate() / stats.requiredOrProducedRate());
     }
 }

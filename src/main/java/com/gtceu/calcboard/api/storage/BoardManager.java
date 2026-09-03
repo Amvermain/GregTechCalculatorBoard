@@ -6,6 +6,7 @@ import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
 import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
+import com.gtceu.calcboard.api.type.WireAnimationMode;
 import com.gtceu.calcboard.api.type.WireColorPreset;
 
 import net.minecraft.nbt.CompoundTag;
@@ -46,7 +47,7 @@ public class BoardManager {
     private boolean showFluidUnitButton = true;
     private boolean showMultiblockBomButton = true;
     private boolean showHotkeyHud = true;
-    private boolean showWirePulseAnimation = true;
+    private WireAnimationMode wireAnimationMode = WireAnimationMode.RATE_MODULATED;
     private WireColorPreset wireColorPreset = WireColorPreset.CYAN;
     private WireColorPreset matchedWireColorPreset = WireColorPreset.GREEN;
     private int maxHarmonizeScale = 16;
@@ -107,7 +108,7 @@ public class BoardManager {
         this.showFluidUnitButton = true;
         this.showMultiblockBomButton = true;
         this.showHotkeyHud = true;
-        this.showWirePulseAnimation = true;
+        this.wireAnimationMode = WireAnimationMode.RATE_MODULATED;
         this.wireColorPreset = WireColorPreset.CYAN;
         this.matchedWireColorPreset = WireColorPreset.GREEN;
         this.maxHarmonizeScale = 16;
@@ -269,12 +270,24 @@ public class BoardManager {
         this.showHotkeyHud = showHotkeyHud;
     }
 
+    public WireAnimationMode getWireAnimationMode() {
+        return wireAnimationMode != null ? wireAnimationMode : WireAnimationMode.RATE_MODULATED;
+    }
+
+    public void setWireAnimationMode(WireAnimationMode wireAnimationMode) {
+        this.wireAnimationMode = wireAnimationMode != null ? wireAnimationMode : WireAnimationMode.RATE_MODULATED;
+    }
+
+    public void cycleWireAnimationMode() {
+        this.wireAnimationMode = getWireAnimationMode().next();
+    }
+
     public boolean isShowWirePulseAnimation() {
-        return showWirePulseAnimation;
+        return getWireAnimationMode() != WireAnimationMode.DISABLED;
     }
 
     public void setShowWirePulseAnimation(boolean showWirePulseAnimation) {
-        this.showWirePulseAnimation = showWirePulseAnimation;
+        this.wireAnimationMode = showWirePulseAnimation ? WireAnimationMode.RATE_MODULATED : WireAnimationMode.DISABLED;
     }
 
     public WireColorPreset getWireColorPreset() {
@@ -744,7 +757,8 @@ public class BoardManager {
             rootTag.putBoolean("showFluidUnitButton", showFluidUnitButton);
             rootTag.putBoolean("showMultiblockBomButton", showMultiblockBomButton);
             rootTag.putBoolean("showHotkeyHud", showHotkeyHud);
-            rootTag.putBoolean("showWirePulseAnimation", showWirePulseAnimation);
+            rootTag.putBoolean("showWirePulseAnimation", isShowWirePulseAnimation());
+            rootTag.putString("wireAnimationMode", getWireAnimationMode().name());
             rootTag.putString("wireColorPreset", getWireColorPreset().name());
             rootTag.putString("matchedWireColorPreset", getMatchedWireColorPreset().name());
             rootTag.putInt("maxHarmonizeScale", getMaxHarmonizeScale());
@@ -851,8 +865,12 @@ public class BoardManager {
                 if (rootTag.contains("showHotkeyHud")) {
                     this.showHotkeyHud = rootTag.getBoolean("showHotkeyHud");
                 }
-                if (rootTag.contains("showWirePulseAnimation")) {
-                    this.showWirePulseAnimation = rootTag.getBoolean("showWirePulseAnimation");
+                if (rootTag.contains("wireAnimationMode")) {
+                    try {
+                        this.wireAnimationMode = WireAnimationMode.valueOf(rootTag.getString("wireAnimationMode"));
+                    } catch (Exception ignored) {}
+                } else if (rootTag.contains("showWirePulseAnimation")) {
+                    this.wireAnimationMode = rootTag.getBoolean("showWirePulseAnimation") ? WireAnimationMode.RATE_MODULATED : WireAnimationMode.DISABLED;
                 }
                 if (rootTag.contains("wireColorPreset")) {
                     try {

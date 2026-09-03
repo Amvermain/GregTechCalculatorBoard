@@ -249,8 +249,10 @@ public class BoardSettingsDialog {
                 bm.isAddonCatalogListView());
         rowY += rowH + 2;
 
+        String pulseAnimLabel = Component.translatable("gui.gtcalcboard.settings.show_pulse_anim").getString()
+                + ": §b" + bm.getWireAnimationMode().getDisplayName();
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
-                Component.translatable("gui.gtcalcboard.settings.show_pulse_anim").getString(),
+                pulseAnimLabel,
                 bm.isShowWirePulseAnimation());
         rowY += rowH + 2;
 
@@ -610,7 +612,7 @@ public class BoardSettingsDialog {
         rowY += rowH + 2;
 
         if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
-            bm.setShowWirePulseAnimation(!bm.isShowWirePulseAnimation());
+            bm.cycleWireAnimationMode();
             onSettingsChanged();
             return;
         }
