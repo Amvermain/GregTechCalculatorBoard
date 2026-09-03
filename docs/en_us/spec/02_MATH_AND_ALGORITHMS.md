@@ -49,13 +49,22 @@ $$
 
 ---
 
-### 1.3 Sub-tick Batching for High-Tier Overclocks ($< 1.0\text{ Tick}$)
+### 1.3 Sub-tick Batching & Single/Multiblock Overclock Branching ($< 1.0\text{ Tick}$)
 
-When aggressive overclocks push recipe durations below $1.0\text{ tick}$ ($0.05\text{ s}$), executions are promoted to fractional per-tick batches aligned with Minecraft's engine tickrate:
+When aggressive overclocks push calculated recipe durations below $1.0\text{ tick}$ ($0.05\text{ s}$), processing branches according to singleblock and multiblock hardware capabilities:
 
-$$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
-$$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
-$$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$$
+1. **Singleblock Machines (Early Break)**:
+   - Singleblock machines do not support sub-tick parallel processing.
+   - When the overclock loop reaches a duration of $1.0\text{ tick}$ or lower ($\text{duration} \le 1.0$), the overclock calculation terminates immediately (Early Break).
+   - Duration is clamped at $\max(1.0, \, \lfloor \text{duration} \rfloor) = 1.0\text{ tick}$, preventing uncontrolled power factor growth ($\text{Energy Factor}$) or EU/t spikes:
+     $$\text{BatchesPerTick} = 1.0, \quad \text{Effective Duration} = 1.0\text{ tick} \quad (0.05\text{ s})$$
+     $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{Parallel} \times \text{MachineCount}$$
+
+2. **Multiblock Machines (Subtick Parallel)**:
+   - Multiblocks continue to support sub-tick batching for voltage tiers exceeding the $1.0\text{ tick}$ threshold:
+     $$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
+     $$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
+     $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$$
 
 ---
 
@@ -285,6 +294,30 @@ Accurately aggregates Bill of Materials (BOM) for flowcharts containing deeply n
    $M_{\text{req}}$ is assigned to the primary master node, while dependent slave nodes are pruned from duplicate BOM counts.
 3. **Singleblock Tiered Resolution & Traceability (`usedByMachines`)**:
    Singleblock machines resolve into tier-specific item IDs (e.g. `gtceu:lv_rock_breaker`) matching their target voltage tier, and record contributing machine labels and counts in the `usedByMachines` trace list.
+
+---
+
+### [Algorithm 9] Byproduct Void Sink & Port Void Mass Balance Formulations (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) (ADR-019)
+
+Integrates physical Junction void sinks (`SupplyMode.VOID_SINK`) and direct port-level void marking (`isOutputPortVoided`) to purge surplus byproducts generated in petrochem, acid refining, and catalytic loops:
+
+1. **Mass Balance Formulation with Void Sinks**:
+   For any material $s$ in the process flow graph:
+   $$\Delta(s) = P(s) - C(s) - V(s)$$
+   - $P(s) = \sum \text{Produced}(s)$: Total production rate
+   - $C(s) = \sum \text{Consumed}(s)$: Total consumption rate
+   - $\text{netSurplus}(s) = \max(0, \, P(s) - C(s))$: Net surplus exceeding consumption
+   - $V(s) = \min\Big(\text{netSurplus}(s), \, V_{\text{marked}}(s) + V_{\text{sink}}(s)\Big)$: Effective voided flow rate
+   - $\text{NetOutput}(s) = \text{netSurplus}(s) - V(s)$: Final net production rate displayed in `SummaryOverlay`
+
+2. **Deficit Exemption ($P(s) < C(s)$)**:
+   Materials in deficit are strictly exempt from voiding. Downstream consumers maintain absolute first-priority access to available supply; only net surplus ($\text{netSurplus} > 0$) is eligible for voiding up to $V(s)$.
+
+3. **1:N Branch Priority Isolation (`getConnectedConsumerDemand`)**:
+   In topologies where a single output port splits concurrently into normal machines and a `VOID_SINK` junction:
+   - `FlowBalanceMatrixSolver.getConnectedConsumerDemand()` enforces a return value of **strictly 0.0** for consumers where `consumer.isVoidSink()` is true.
+   - The void sink is completely excluded from the output port's total demand sum (`totalPortDemand`), mathematically preventing it from siphoning flow away from or starving (Input Starvation) legitimate downstream machines.
+   - Only surplus remaining after satisfying downstream consumers ($P - \sum C_{\text{normal}}$) is absorbed by the void sink ($V_{\text{sink}}$).
 
 ---
 

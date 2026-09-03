@@ -92,7 +92,7 @@ graph LR
 | `compat.create` | `CreateModAdapter`<br/>`CreateRecipeHandler`<br/>`CreateSequencedRecipeExtractor` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• `CreateSequencedRecipeExtractor`: 순차 조립 단계별 기계 아이콘(Deployer, Spout, Press, Saw) 개별 추출<br/>• RPM 속도 제어 및 Stress Unit (SU) 물리 연산 |
 | `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeRecipeHandler` | • 전기 모터(FE ➔ SU) 및 발전기(SU ➔ FE) 가상 레시피 생성<br/>• 자석 강도 합성 및 회전력/전력 상호 변환 효율 연산 |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • 써멀 증강 및 커스텀 키트(`AugmentData` NBT) 연역 추출<br/>• 다이내모 발전량(RF/t) 및 기계 소요 시간 계수 합성 |
-| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁/수지 연산<br/>• 복합 연료 증기 열효율 및 생산량 변환 |
+| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁/수지 연산<br/>• 복합 연료 증기 열효율 및 다단계 증기 티어(Water ➔ Steam ➔ Warm ➔ Hot ➔ Superhot ➔ Plasma) 변환<br/>• Systeams 등록 유체 ID(`steamier`, `steamiest`, `steamiester`, `steamiestest`) 및 런타임 보일러 레시피 매니저 리플렉션(`boil`/`getBoiledFluid`, `fluidOut`/`fluid`) 유연 호환 지원 |
 | `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper` | • `StarTReflectionBridge`: Star Technology Core 레시피 모디파이어 및 기계 능력 격리 연역<br/>• Star Technology 초고압 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 멀티블록 제약 검증 |
 | `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 비특화 모드 기본 폴백 처리 |
 

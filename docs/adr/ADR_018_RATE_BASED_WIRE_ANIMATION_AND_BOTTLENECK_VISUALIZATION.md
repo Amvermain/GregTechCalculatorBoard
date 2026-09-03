@@ -2,7 +2,7 @@
 # (Rate-Based Wire Flow Modulation & Canvas Bottleneck Visualization)
 
 - **문서 번호**: ADR-018
-- **대상 버전**: `v2.1.0-beta.1`
+- **대상 버전**: `v2.1.0-beta.2`
 - **상태**: `IMPLEMENTED`
 - **결정/완료일**: 2026-09-04
 - **주관 계층**: Client GUI Layer (`client.gui.render`, `client.gui.canvas`, `client.gui.widget`), Client State Layer (`client.gui.model`, `client.gui.manager`), Pure Domain Layer (`api.model`, `domain.graph`)

@@ -49,6 +49,30 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 * **Deficit**: `0xFFEF4444` (Red), feedstock shortage pulsing warning
 * **Surplus**: `0xFF10B981` (Emerald), safe surplus
 
+### 2.3 Rate-Based Wire Flow Modulation & Duty Cycle Stutter (ADR-018)
+Modulates pulse dot animations traveling across connection wires based on the supply saturation ratio ($R_e = \text{Supply} / \text{Demand}$) to visualize bottlenecks in real time:
+
+1. **Saturation Ratio ($R_e$) Formulation**:
+   $$R_e = \begin{cases} 
+   1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
+   0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
+   \min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
+   \end{cases}$$
+
+2. **Duty Cycle Stutter & Stall**:
+   Global period $T = 1600\text{ ms}$, base time $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
+   $$t_{\text{eff}} = \begin{cases} 
+   \frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{Normal Flow Motion}) \\
+   1.0 & \text{if } \tau \ge R_e \quad (\text{Starvation Stall Interval})
+   \end{cases}$$
+
+3. **Dynamic 3-Stage RGB Interpolation**:
+   $$C(R_e) = \begin{cases} 
+   (0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
+   \text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
+   \text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
+   \end{cases}$$
+
 ---
 
 ## 3. High-Performance Rendering & Spatial Indexing
@@ -257,6 +281,24 @@ All inline editable text fields (`NodeNameEditor`, `NodeCountEditor`, `NodeParal
   - Supports `Ctrl + C` (Copy), `Ctrl + X` (Cut), and `Ctrl + V` (Paste).
   - Built-in fallback clipboard buffer for headless test environments.
 * **Shortcut Isolation**: Key presses while editing are fully consumed and prevented from bubbling up to canvas global hotkeys.
+
+---
+
+## 7. Input Starvation Outline & Byproduct Void Rendering (ADR-018, ADR-019)
+
+### 7.1 Input Starvation Machine Bottleneck Outline
+- **Condition**: Triggers when a machine is actively operating ($\text{machineCount} > 0$) but at least one visible input port experiences a supply saturation ratio $R_e < 1.0$.
+- **Visual Feedback**: Renders an amber pulsing glow outline (`0xFFF59E0B`, Amber Pulse) around the node card, highlighting bottlenecks across the canvas.
+- **Tooltip**: Displays a `Bottleneck: Feedstock Shortage` warning badge when hovering over starved cards.
+
+### 7.2 Void Sink Junction & Port Void Rendering
+- **`VOID_SINK` Junction Node**: Renders card borders in purple (`0xFFA855F7`) with a prominent header `VOID` badge.
+- **Voided Output Ports (`isOutputPortVoided`)**:
+  - Highlights the socket in purple (`0xFFA855F7`) with an emphasized border.
+  - Converts slot text and rate labels to purple (`0xFFC084FC`).
+- **Shortcuts & Interaction**:
+  - **`Alt + Right-Click`**: `Alt + Right-Click` on an output port to toggle void marking instantly without severing connected wires.
+  - **Hover Tooltip**: Displays current feedstock saturation (%), void status (`[∅] Voided`), and the `[Alt+Right-Click]: Toggle Void Marking` shortcut prompt.
 
 ---
 

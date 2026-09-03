@@ -46,6 +46,12 @@ The mod is completely standalone and fully optional on both client and server:
 * **Team System Integration**: Native support for **FTB Teams**, **Phoenix Guilds**, and **Vanilla Scoreboard Teams**.
 * **Edit Concurrency Control**: Automatic per-page edit locks and live teammate presence indicators prevent concurrent overwrite collisions, backed by automated background saving and revision history forks.
 
+#### 6. Flow Saturation Wire Animation & Byproduct Void Sink System
+* **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with amber pulsing glow outlines indicating starved bottleneck machines.
+* **Junction Void Sink (`SupplyMode.VOID_SINK`)**: Configure Junction nodes into infinite void sinks to absorb/delete surplus byproducts, isolating downstream consumers and preventing upstream demand spikes.
+* **Port-Level Void Marking**: `Alt + Right-Click` on machine output ports to exclude surplus byproducts from final net production summaries without severing topology.
+* **One-Click Summary Voiding**: Click `[🗑️]` on net product rows in `SummaryOverlay` to mark byproducts as voided, with collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore.
+
 ***
 
 ### Requirements & Mod Compatibility

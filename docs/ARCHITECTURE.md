@@ -26,21 +26,21 @@ graph TD
         BAH["BoardActionHandler (Undo/Redo Actions & Node/Wire Removal Collector)"]
         BVT["BoardViewportTransform (Virtual GUI Scale Coordinate Transform Engine)"]
         CIH["CanvasInteractionHandler (Pan, Zoom, Drag Multi-Selection, QuickAdd)"]
-        RENDER["Two-Pass Z-Order Rendering & glClear Node Depth Buffer Isolation"]
+        RENDER["Two-Pass Z-Order Rendering & Rate-Based Flow Wire Animation Shader"]
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E) Spatial Indexing)"]
         NCTC["NodeCardTextCache (Dirty-Flag Based Text Truncation & Formatting Cache)"]
         Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
     end
 
     subgraph Core["2. Core Domain & Math Engine (com.gtceu.calcboard.api)"]
-        Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec)"]
+        Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec, RecipeNodeSerializer)"]
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
         Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, NodeRateCalculator, NodeWorkstationResolver)"]
         Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode)"]
         Prop["property.* (NodeProperties, NodePropertyStore)"]
     end
 

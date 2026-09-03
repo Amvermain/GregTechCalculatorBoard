@@ -49,6 +49,30 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 * **결손 (Deficit)**: `0xFFEF4444` (레드), 원자재 부족 경고 점멸
 * **초과 (Surplus)**: `0xFF10B981` (에메랄드), 안전 잉여
 
+### 2.3 처리량 포화도 기반 와이어 펄스 도트 렌더링 (Rate-Based Flow Modulation, ADR-018)
+연결선 내부를 이동하는 펄스 도트에 공급 포화율($R_e = \text{Supply} / \text{Demand}$)을 투영하여 유량 흐름 및 병목을 실시간 렌더링합니다:
+
+1. **포화율 ($R_e$) 산출**:
+   $$R_e = \begin{cases} 
+   1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
+   0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
+   \min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
+   \end{cases}$$
+
+2. **듀티 사이클 간헐적 정지 (Duty Cycle Stutter)**:
+   전역 주기 $T = 1600\text{ ms}$, 기준 시간 $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
+   $$t_{\text{eff}} = \begin{cases} 
+   \frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{정상 주행 구간}) \\
+   1.0 & \text{if } \tau \ge R_e \quad (\text{원료 결핍 대기 정지 구간})
+   \end{cases}$$
+
+3. **동적 3단계 RGB 보간 (Color Interpolation)**:
+   $$C(R_e) = \begin{cases} 
+   (0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
+   \text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
+   \text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
+   \end{cases}$$
+
 ---
 
 ## 3. 고성능 렌더링 파이프라인 및 공간 분할 색인
@@ -262,6 +286,24 @@ flowchart LR
   - `Ctrl + C` (복사), `Ctrl + X` (잘라내기), `Ctrl + V` (붙여넣기) 지원.
   - 헤드리스/테스트 환경을 위한 격리된 Fallback 클립보드 버퍼 내장.
 * **단축키 격리**: 인라인 편집 중 발생하는 모든 키 입력은 상위 캔버스 글로벌 단축키로 누출되지 않고 에디터 내부에서 완전 소비.
+
+---
+
+## 7. 원료 결핍 경고 외곽선 및 보이드 렌더링 명세 (ADR-018, ADR-019)
+
+### 7.1 결핍 노드(Input Starvation) 병목 경고 외곽선
+- **판정 조건**: 기계가 정상 가동 중($\text{machineCount} > 0$)이지만 가시 입력 포트 중 하나라도 유량 공급 포화율 $R_e < 1.0$인 경우 결핍 노드로 판정합니다.
+- **시각적 피드백**: 노드 카드 외곽에 호박색 펄스 글로우(`0xFFF59E0B`, Amber Pulse)를 렌더링하여 공정 전체의 병목 지점을 캔버스에서 즉시 식별할 수 있습니다.
+- **툴팁 연동**: 결핍 노드 카드 호버 시 `병목 감지: 원료 공급 부족` 경고 배지가 표시됩니다.
+
+### 7.2 보이드 싱크 정션 및 보이드 포트 렌더링
+- **`VOID_SINK` 정션 노드**: 카드 테두리를 보라색(`0xFFA855F7`)으로 렌더링하고, 헤더에 `VOID` 상태 배지를 부착합니다.
+- **보이드 지정된 출력 포트 (`isOutputPortVoided`)**:
+  - 포트 소켓 색상을 보라색(`0xFFA855F7`)으로 렌더링하고 테두리를 강조합니다.
+  - 슬롯 텍스트 및 유량 라벨을 보라색(`0xFFC084FC`)으로 전환합니다.
+- **단축키 및 인터랙션**:
+  - **`Alt + 우클릭`**: 기계 카드의 출력 포트 아이콘을 `Alt + 우클릭`하여 배관을 분리하지 않고 즉시 보이드 상태를 토글합니다.
+  - **호버 툴팁 안내**: 포트 호버 시 현재 원료 충족률(%)과 보이드 여부(`[∅] 보이드 처리됨`) 및 `[Alt+우클릭]: 보이드 처리 토글` 단축키 가이드가 표시됩니다.
 
 ---
 

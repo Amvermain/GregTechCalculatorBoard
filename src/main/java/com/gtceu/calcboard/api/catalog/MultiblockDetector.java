@@ -184,6 +184,30 @@ public class MultiblockDetector {
         return false;
     }
 
+    public static boolean isCoilParallelMultiblock(RecipeNode node) {
+        if (node == null) return false;
+        if (node.getMachineIcon() != null && isCoilParallelMultiblock(node.getMachineIcon())) return true;
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && isCoilParallelMultiblock(ws)) return true;
+        }
+        return false;
+    }
+
+    private static final Set<ResourceLocation> STEAM_ORE_FACTORIES = Set.of(
+            ResourceLocation.tryParse("gtceu:steam_ore_factory"),
+            ResourceLocation.tryParse("gtceu:bronze_steam_ore_factory"),
+            ResourceLocation.tryParse("gtceu:steel_steam_ore_factory")
+    );
+
+    public static boolean isSteamOreFactory(RecipeNode node) {
+        if (node == null) return false;
+        if (node.getMachineIcon() != null && STEAM_ORE_FACTORIES.contains(node.getMachineIcon())) return true;
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null && STEAM_ORE_FACTORIES.contains(ws)) return true;
+        }
+        return false;
+    }
+
     public static void registerMachineCapabilities(ResourceLocation id, com.gtceu.calcboard.compat.gtceu.helper.GTCEuMachineAnalyzer.MachineCapabilities caps) {
         if (id == null || caps == null) return;
         if (caps.isMultiblock()) {
@@ -689,7 +713,7 @@ public class MultiblockDetector {
             def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(alias);
         }
         if (def != null && def.supportsAbility("ROTOR_HOLDER")) {
-            if (!isCoilMultiblock(workstationId) && (workstationId.getPath().contains("turbine") || (alias != null && alias.getPath().contains("turbine")))) {
+            if (!isCoilMultiblock(workstationId) && (workstationId.getPath().contains("turbine") || (alias != null && alias.getPath().contains("turbine")))) { // lint:allow-heuristic: catalog pattern fallback
                 registerTurbine(workstationId, null, null, 0.0);
                 return true;
             }
@@ -964,7 +988,7 @@ public class MultiblockDetector {
             return true;
         }
         return defStruct.candidateBlocks().stream().anyMatch(b ->
-                b.getPath().contains("threading_controller") || b.getPath().contains("thread_helix") || b.getPath().contains("threading_helix"));
+                b.getPath().contains("threading_controller") || b.getPath().contains("thread_helix") || b.getPath().contains("threading_helix")); // lint:allow-heuristic: candidate block path check
     }
 
     private static int detectHelixCountFromCatalog(ResourceLocation id) {

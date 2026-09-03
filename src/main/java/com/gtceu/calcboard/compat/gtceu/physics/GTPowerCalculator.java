@@ -48,7 +48,7 @@ public final class GTPowerCalculator {
         if (isBoilerRecipe(node) || isLiquidBoilerRecipe(node)) {
             return EnergyType.HEAT_OR_SELF;
         }
-        if (node.getMachineIcon() != null && (node.getMachineIcon().getNamespace().equals("gtceu") || node.getMachineIcon().getNamespace().contains("start"))) {
+        if (node.getMachineIcon() != null && (node.getMachineIcon().getNamespace().equals("gtceu") || node.getMachineIcon().getNamespace().equals("start"))) {
             if (node.getBaseEUt() > 0.0 || node.isGenerator()) {
                 return EnergyType.ELECTRIC_EU;
             }
@@ -341,12 +341,11 @@ public final class GTPowerCalculator {
     public static boolean isGTGenerator(RecipeNode node) {
         if (!node.isGenerator()) return false;
         if (node.getEnergyType() != EnergyType.ELECTRIC_EU) return false;
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getNamespace().equals("gtceu")) return true;
+        if (node.getRecipeCategoryId() != null && (node.getRecipeCategoryId().getNamespace().equals("gtceu") || node.getRecipeCategoryId().getNamespace().equals("start"))) return true;
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null && ws.getNamespace().equals("gtceu")) return true;
+            if (ws != null && (ws.getNamespace().equals("gtceu") || ws.getNamespace().equals("start"))) return true;
         }
-        if (node.getMachineIcon() != null && node.getMachineIcon().getNamespace().equals("gtceu")) return true;
-        if (node.getName() != null && (node.getName().contains("Turbine") || node.getName().contains("Generator"))) return true;
+        if (node.getMachineIcon() != null && (node.getMachineIcon().getNamespace().equals("gtceu") || node.getMachineIcon().getNamespace().equals("start"))) return true;
         return false;
     }
 
@@ -405,13 +404,23 @@ public final class GTPowerCalculator {
         }
 
         int hardwareLimit = Integer.MAX_VALUE;
-        if (node.isMultiblock() && node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("multi_smelter")) {
+        if (node.isMultiblock() && MultiblockDetector.isCoilParallelMultiblock(node)) {
             int coilSmelterPar = CoilHelper.getInstalledCoilSmelterParallel(node);
             if (coilSmelterPar > 0) {
                 hardwareLimit = coilSmelterPar;
             }
         }
         return Math.min(hatchLimit, hardwareLimit);
+    }
+
+    private static final java.util.Set<ResourceLocation> MACERATOR_CATEGORIES = java.util.Set.of(
+            ResourceLocation.tryParse("gtceu:macerator"),
+            ResourceLocation.tryParse("gtceu:macerator_recipes")
+    );
+
+    private static boolean isMaceratorCategory(ResourceLocation catId) {
+        if (catId == null) return false;
+        return MACERATOR_CATEGORIES.contains(catId) || catId.getPath().equals("macerator");
     }
 
     public static double computeEffectiveOutputChance(RecipeNode node, int outputIndex, double defaultChance) {
@@ -421,7 +430,7 @@ public final class GTPowerCalculator {
             return out.getChance() >= 1.0 ? 1.0 : out.getEffectiveChance(node.getTierDelta());
         }
 
-        if (node.isMultiblock() && node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("steam_ore_factory")) {
+        if (node.isMultiblock() && MultiblockDetector.isSteamOreFactory(node)) {
             return out.getEffectiveChance(node.getTierDelta());
         }
 
@@ -429,7 +438,7 @@ public final class GTPowerCalculator {
             return 0.0;
         }
 
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("macerator")) {
+        if (isMaceratorCategory(node.getRecipeCategoryId())) {
             GTVoltageTier curTier = node.getTargetTier();
             if (curTier == null) curTier = GTVoltageTier.LV;
             int curTierIdx = curTier.ordinal();

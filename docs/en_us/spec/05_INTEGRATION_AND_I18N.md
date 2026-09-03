@@ -92,7 +92,7 @@ graph LR
 | `compat.create` | `CreateModAdapter`<br/>`CreateRecipeHandler`<br/>`CreateSequencedRecipeExtractor` | • Kinetic generator virtual recipes (Water Wheel, Windmill)<br/>• `CreateSequencedRecipeExtractor`: Distinct sub-step machine icon extraction (Deployer, Spout, Press, Saw)<br/>• RPM speed control & Stress Unit (SU) math |
 | `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeRecipeHandler` | • Electric Motor (FE ➔ SU) and Generator (SU ➔ FE) recipes<br/>• Magnet strength compounding & conversion efficiency |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • Thermal augments & custom kits (`AugmentData` NBT)<br/>• Dynamo RF/t generation and machine speed multipliers |
-| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • Steam boiler (Steam mB/s) and dynamo tooltips<br/>• Composite fuel thermal efficiency scaling |
+| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • Steam boiler (Steam mB/s) and dynamo tooltips<br/>• Multi-stage steam progression (Water ➔ Steam ➔ Warm ➔ Hot ➔ Superhot ➔ Plasma)<br/>• Systeams registered fluid IDs (`steamier`, `steamiest`, `steamiester`, `steamiestest`) and runtime boiler recipe reflection (`boil`/`getBoiledFluid`, `fluidOut`/`fluid`) flexible compatibility |
 | `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper` | • `StarTReflectionBridge`: Star Technology Core recipe modifiers and machine capability deduction<br/>• Star Technology plasma turbines (SPT/NPT) and multi-helix structures<br/>• SPT/NPT trait compatibility and multiblock validation |
 | `compat.vanilla` | `VanillaModAdapter` | • Standard singleblock and unspecialized mod fallbacks |
 

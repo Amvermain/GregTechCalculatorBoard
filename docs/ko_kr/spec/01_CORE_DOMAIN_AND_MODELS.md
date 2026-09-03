@@ -76,10 +76,15 @@ classDiagram
         +double efficiency
         +Set~Integer~ hiddenInputIndices
         +Set~Integer~ hiddenOutputIndices
+        +Set~Integer~ voidedOutputIndices
+        +SupplyMode supplyMode
         +hideInputPort(int) void
         +unhideInputPort(int) void
         +hideOutputPort(int) void
         +unhideOutputPort(int) void
+        +isOutputPortVoided(int) boolean
+        +setOutputPortVoided(int, boolean) void
+        +isVoidSink() boolean
         +getVisibleInputIndices() List~Integer~
         +getVisibleOutputIndices() List~Integer~
         +getTotalHiddenCount() int
@@ -96,6 +101,7 @@ classDiagram
   - `RecipeNode`는 모든 모드(Create, Thermal, GTCEu, Vanilla 등)를 아우르는 **순수 계산 도메인 데이터 엔티티**입니다.
   - 특정 모드 전용 필드나 하드코딩된 분기를 일체 보유하지 않으며, 머신 아이콘 변경 이벤트(`setMachineIcon`), 물리적 에너지 형태 결정(`getEnergyType`), 단일 기계 소비/발전량 연산(`computeSingleMachinePower`), 노드 가동 유효성 검증(`validateNode`), 멀티블록 BOM 산출(`buildMultiblockBOM`) 등 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
 * **`hiddenInputIndices` / `hiddenOutputIndices`**: 사용자가 카드의 복잡도를 줄이기 위해 비활성화/숨김 처리한 입출력 포트의 인덱스 집합. `RecipeNodeSerializer`를 통해 직렬화/역직렬화되며, 렌더러와 와이어 솔버는 `getVisibleInputIndices()` / `getVisibleOutputIndices()`를 참조하여 가시 포트만 배선 및 렌더링.
+* **`voidedOutputIndices` & `isVoidSink()` (ADR-019)**: 순 생산품 결산에서 제외할 출력 포트 인덱스 세트 및 정션 노드의 보이드 싱크(`SupplyMode.VOID_SINK`) 판별 메서드. 유량 수지 솔버(`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`)와 연동되어 다운스트림 정상 기계의 실수요 충족 후 남은 순 잉여 부산물을 결산에서 폐기 처리.
 * **`isFlipped`**: 노드의 입력(좌)/출력(우) 포트 렌더링 방향을 좌우 수평 반전하여 복잡한 플로우차트의 배선 교차 최소화.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`, `MassBalanceSolver`)에 의해 상류 원자재 공급 제약 및 폐루프 순환 밸런스 하에서 계산된 기계의 실제 가동률.
 * **`calculateEffectiveOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
@@ -398,6 +404,29 @@ public class MachineHardwareTemplate {
 
 * **하드웨어 구성 추출 (`fromNode`)**: 소스 노드로부터 티어, 병렬, 애드온 및 확장 속성을 복사하여 불변 템플릿 생성.
 * **하드웨어 일괄 주입 (`applyTo`)**: 타겟 노드의 고유 레시피 입출력 및 최소 요구 전압 티어($\text{recipeTier}$)를 안전하게 보존하면서 하드웨어 사양을 주입.
+
+---
+
+## 11. 유량 제어 및 시각화 열거형 모델 (SupplyMode, WireAnimationMode) (ADR-018, ADR-019)
+
+### 11.1 `SupplyMode` (정션 노드 공급 모드 열거형)
+캔버스 상의 중계 정션(Reroute Node)의 유량 공급 및 소각 모드를 정의합니다:
+
+| 모드 (SupplyMode) | 직렬화 키 | 번역 키 | 설명 |
+| :--- | :--- | :--- | :--- |
+| `NONE` | `NONE` | `gui.gtcalcboard.junction.supply_mode.none` | 기본 중계/패스스루 모드 (상류/하류 유량 직접 중계) |
+| `INFINITE` | `INFINITE` | `gui.gtcalcboard.junction.supply_mode.infinite` | 무한 공급 모드 (외부 무한 원자재 공급 가정, 역방향 수요 차단) |
+| `FIXED_RATE` | `FIXED_RATE` | `gui.gtcalcboard.junction.supply_mode.fixed_rate` | 고정 외부 공급량 지정 모드 (사용자 정의 수치만큼 공급) |
+| `VOID_SINK` | `VOID_SINK` | `gui.gtcalcboard.junction.supply_mode.void_sink` | **보이드 싱크 모드** (잉여 유량 무한 흡수 및 소각, 역방향 수요 전파 차단, 1:N 분기 시 정상 기계 실수요 충족 후 잔여분만 흡수) |
+
+### 11.2 `WireAnimationMode` (와이어 흐름 애니메이션 모드 열거형)
+계산기 보드의 연결선(Wire) 펄스 도트 렌더링 동작을 제어합니다:
+
+| 모드 (WireAnimationMode) | 설정 인덱스 | 번역 키 | 동작 및 시각화 특성 |
+| :--- | :--- | :--- | :--- |
+| `RATE_MODULATED` | `0` | `gui.gtcalcboard.wire_anim.rate_modulated` | **포화도 연동 (기본값)**: 공급 포화율($R = \text{Supply}/\text{Demand}$) 기반 듀티 사이클 간헐적 정지 및 3단계 RGB 보간(Cyan $\to$ Amber $\to$ Crimson). 결핍 노드 경고 외곽선 연동 |
+| `UNIFORM` | `1` | `gui.gtcalcboard.wire_anim.uniform` | **단순 펄스**: 유량과 무관하게 균일한 속도와 단일 색상으로 도트 주행 |
+| `DISABLED` | `2` | `gui.gtcalcboard.wire_anim.disabled` | **비활성화**: 연결선 내부 펄스 도트 렌더링 생략 |
 
 ---
 

@@ -49,13 +49,22 @@ $$
 
 ---
 
-### 1.3 1틱 미만 서브틱(Sub-tick) 배치 연산 ($< 1.0\text{ Tick}$)
+### 1.3 1틱 미만 서브틱(Sub-tick) 배치 및 싱글/멀티블록 오버클록 분기 ($< 1.0\text{ Tick}$)
 
-고전압 오버클럭으로 인해 레시피 소요 시간이 $1.0\text{ tick}$ ($0.05\text{ s}$) 미만으로 떨어질 때, 마인크래프트 게임 엔진 틱 주기에 맞추어 틱당 배치 횟수로 승격(Batching) 처리합니다:
+고전압 오버클록으로 인해 레시피 소요 시간이 $1.0\text{ tick}$ ($0.05\text{ s}$) 미만으로 떨어질 때, 싱글블록과 멀티블록 기계의 하드웨어 특성에 따라 다음과 같이 분기 처리합니다:
 
-$$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
-$$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
-$$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$$
+1. **싱글블록 기계 (Singleblock Machines - Early Break)**:
+   - 싱글블록 기계는 서브틱 병렬 가공을 지원하지 않습니다.
+   - 따라서 오버클록 루프 중 소요 시간이 $1.0\text{ tick}$ 이하($\text{duration} \le 1.0$)에 도달하면 즉시 오버클록 연산을 조기 종료(Early Break)합니다.
+   - 지속 시간은 $\max(1.0, \, \lfloor \text{duration} \rfloor) = 1.0\text{ tick}$으로 고정되며, 불필요한 추가 전압 승수($\text{Energy Factor}$) 증가나 전력(EU/t) 폭증을 방지합니다:
+     $$\text{BatchesPerTick} = 1.0, \quad \text{Effective Duration} = 1.0\text{ tick} \quad (0.05\text{ s})$$
+     $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{Parallel} \times \text{MachineCount}$$
+
+2. **멀티블록 기계 (Multiblock Machines - Subtick Parallel)**:
+   - 멀티블록 기계는 틱당 $1.0\text{ tick}$ 도달 후에도 추가 상위 전압 티어에 대해 서브틱 병렬 가공을 지원합니다:
+     $$\text{BatchesPerTick} = \frac{1.0}{\text{Calculated Duration (ticks)}}, \quad \text{Effective Duration} = 1.0\text{ tick}$$
+     $$\text{Effective EU/t} = \text{Calculated EU/t} \times \text{BatchesPerTick}$$
+     $$\text{Cycles Per Second (CPS)} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$$
 
 ---
 
@@ -263,6 +272,30 @@ AE2 패턴과 바인딩된 다중 서브페이지 공정망에 대해, $O(K)$ �
    대표 마스터 노드에만 $M_{\text{req}}$ 대수를 적용하고 종속 슬레이브 노드는 중복 자재 집계에서 제외합니다.
 3. **단일 기계 티어형 아이템 자동 분기 및 출처 역추적 (`usedByMachines`)**:
    단일 기계의 경우 지정된 전압 티어(LV~MAX)에 대응하는 구체적 아이템 ID(예: `gtceu:lv_rock_breaker`)로 연역 변환하며, 동일 부품을 요구하는 모든 기계 이름과 대수를 `usedByMachines` 목록에 명시합니다.
+
+---
+
+### [알고리즘 9] 잉여 부산물 보이드 싱크 및 포트 보이드 질량 보존 수식 (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) (ADR-019)
+
+석유 분별, 산 분해, 화학 공정 등에서 발생하는 잉여 부산물 소각을 위해 물리적 정션 보이드 싱크(`SupplyMode.VOID_SINK`) 및 포트 직접 보이드 마킹(`isOutputPortVoided`)을 통합 처리합니다:
+
+1. **질량 보존 및 순 결산 수식 (Mass Balance with Void Sinks)**:
+   전체 공정 그래프의 특정 물질 $s$에 대해:
+   $$\Delta(s) = P(s) - C(s) - V(s)$$
+   - $P(s) = \sum \text{Produced}(s)$: 총 생산량
+   - $C(s) = \sum \text{Consumed}(s)$: 총 소비량
+   - $\text{netSurplus}(s) = \max(0, \, P(s) - C(s))$: 소비량을 초과하는 순 잉여분
+   - $V(s) = \min\Big(\text{netSurplus}(s), \, V_{\text{marked}}(s) + V_{\text{sink}}(s)\Big)$: 유효 보이드 유량
+   - $\text{NetOutput}(s) = \text{netSurplus}(s) - V(s)$: 최종 결산창(`SummaryOverlay`)의 순 생산물 유량
+
+2. **결손 상태($P(s) < C(s)$) 시 보이드 배제**:
+   결손 상태인 물질은 보이드 대상이 되지 않으며, 다운스트림 정상 소비자가 절대적인 1순위 우선권을 가집니다. 오직 실수요를 초과하는 순 잉여분($\text{netSurplus} > 0$)만 $V(s)$ 한도 내에서 폐기 처리됩니다.
+
+3. **1:N 분기 연결 시 소비자 우선순위 엄격 격리 (`getConnectedConsumerDemand`)**:
+   하나의 출력 포트가 여러 정상 기계들과 `VOID_SINK` 정션으로 동시에 분기 연결된 1:N 토폴로지 환경에서:
+   - `FlowBalanceMatrixSolver.getConnectedConsumerDemand()`는 `consumer.isVoidSink()` 대상의 수요를 **엄격히 0으로 강제 반환**합니다.
+   - 포트 출력 분배 및 병목 효율 연산 시 `VOID_SINK`는 총 수요(`totalPortDemand`) 집계 대상에서 완전히 배제되므로, 정상 소비 기계가 공급받아야 할 유량을 가로채거나 굶주리게(Input Starvation) 만드는 현상을 수학적으로 원천 차단합니다.
+   - 오직 정상 소비자들이 필요로 하는 실수요를 모두 충족하고 남은 잔여 유량($P - \sum C_{\text{normal}}$)만이 보이드 싱크의 유효 흡수량($V_{\text{sink}}$)으로 할당됩니다.
 
 ---
 

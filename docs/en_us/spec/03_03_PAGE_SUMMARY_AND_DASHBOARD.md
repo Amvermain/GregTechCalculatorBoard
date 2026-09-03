@@ -73,6 +73,14 @@ Positioned on the right side of the screen as a persistent or collapsible panel,
   </div>
 </div>
 
+### 1.2 Voided Byproducts Management & One-Click Void/Restore UI (ADR-019)
+- **Net Products Row Void Button `[🗑️]`**:
+  - Hovering over any item/fluid row in the Net Products section reveals a `[🗑️]` (Trash Can) button on the right edge.
+  - Clicking marks the corresponding output port across all active machine cards generating that substance with `setOutputPortVoided(true)`, immediately removing it from net products into the void section.
+- **Collapsible `🗑️ Voided Byproducts` Section**:
+  - Automatically renders below the Net Products section with a purple header whenever 1 or more surplus byproducts are voided.
+  - Hovering over any voided row reveals a `[↩️]` (Restore) button to unmark the port and restore the byproduct back into the Net Products summary with 1 click.
+
 ---
 
 ## 2. Global Balance Dashboard Dialog (`GlobalBalanceDashboardDialog`)

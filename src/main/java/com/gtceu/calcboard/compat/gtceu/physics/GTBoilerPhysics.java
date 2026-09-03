@@ -33,6 +33,8 @@ public final class GTBoilerPhysics {
         return false;
     }
 
+    private static final net.minecraft.resources.ResourceLocation WATER_ID = net.minecraft.resources.ResourceLocation.tryParse("minecraft:water");
+
     public static boolean isLiquidBoilerRecipe(RecipeNode node) {
         if (!isBoilerRecipe(node)) return false;
         boolean hasNonWaterFluid = false;
@@ -41,7 +43,7 @@ public final class GTBoilerPhysics {
             if (in != null && in.getId() != null) {
                 if (in.isItem()) {
                     hasItemInput = true;
-                } else if (in.isFluid() && !in.getId().getPath().contains("water")) {
+                } else if (in.isFluid() && !WATER_ID.equals(in.getId()) && !in.getId().getPath().equals("water")) {
                     hasNonWaterFluid = true;
                 }
             }
@@ -50,13 +52,6 @@ public final class GTBoilerPhysics {
         if (hasItemInput) return false;
         if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("liquid")) return true;
         if (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("liquid")) return true;
-        if (node.getName() != null) {
-            String n = node.getName().toLowerCase(Locale.ROOT);
-            if (n.contains("lava") || n.contains("liquid") || n.contains("creosote") || n.contains("diesel") || n.contains("ethanol") || n.contains("biomass")
-                    || n.contains("oil boiler") || n.contains("(oil)") || n.contains("liquid fuel")) {
-                return true;
-            }
-        }
         return false;
     }
 

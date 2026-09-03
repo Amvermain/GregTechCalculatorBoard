@@ -1,6 +1,8 @@
 .agents/
 .tools/
+/tools/
 copyparty.conf
+**/AGENTS.md
 
 # Gradle build artifacts and cache
 .gradle/
@@ -39,6 +41,10 @@ usernamecache.json
 usercache.json
 *.log
 hs_err_pid*
+
+# Python cache
+__pycache__/
+*.pyc
 
 # OS specific files
 .DS_Store

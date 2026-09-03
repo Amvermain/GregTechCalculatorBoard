@@ -2,7 +2,7 @@
 # (Byproduct Void Management & Sink System Specification)
 
 - **문서 번호**: ADR-019
-- **대상 버전**: `v2.1.0-beta.1`
+- **대상 버전**: `v2.1.0-beta.2`
 - **상태**: `IMPLEMENTED`
 - **결정/완료일**: 2026-09-04
 - **주관 계층**: Pure Domain Layer (`api.model`, `api.solver`), Client Presentation Layer (`client.gui.widget`, `client.gui.dialog`, `client.gui.render`), Serialization Layer (`api.storage`)

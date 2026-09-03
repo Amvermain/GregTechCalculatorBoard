@@ -16,11 +16,100 @@ import net.minecraftforge.fluids.FluidStack;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles Systeams recipe adaptation, boiler boiling physics, and steam dynamo statistics.
  */
 public class SysteamsRecipeHandler {
+
+    private static final Map<String, ResourceLocation> DYNAMO_BOILER_TYPES = Map.of(
+            "lapidary", ResourceLocation.tryParse("systeams:lapidary"),
+            "stirling", ResourceLocation.tryParse("systeams:stirling"),
+            "compression", ResourceLocation.tryParse("systeams:compression"),
+            "gourmand", ResourceLocation.tryParse("systeams:gourmand"),
+            "magmatic", ResourceLocation.tryParse("systeams:magmatic"),
+            "pneumatic", ResourceLocation.tryParse("systeams:pneumatic"),
+            "disenchantment", ResourceLocation.tryParse("systeams:disenchantment")
+    );
+
+    private static final Map<ResourceLocation, String> SYSTEAMS_FLUID_NAMES = Map.of(
+            ResourceLocation.tryParse("systeams:steamier"), "Warm Steam",
+            ResourceLocation.tryParse("systeams:steamiest"), "Hot Steam",
+            ResourceLocation.tryParse("systeams:steamiester"), "Superhot Steam",
+            ResourceLocation.tryParse("systeams:steamiestest"), "Plasma",
+            ResourceLocation.tryParse("minecraft:water"), "Water",
+            ResourceLocation.tryParse("gtceu:steam"), "Steam"
+    );
+
+    private static final double DEFAULT_STEAM_DYNAMO_BASE_POWER = 400.0;
+    private static final double DEFAULT_STEAM_RATIO = 0.5;
+    private static final double DEFAULT_SPEED_MULTIPLIER = 15.0;
+    private static final double DEFAULT_WATER_TO_STEAM_RATIO = 0.25;
+
+    private static java.util.function.DoubleSupplier steamDynamoBasePowerSupplier = () -> DEFAULT_STEAM_DYNAMO_BASE_POWER;
+    private static final Map<String, java.util.function.DoubleSupplier> STEAM_RATIO_SUPPLIERS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, java.util.function.DoubleSupplier> SPEED_MULTIPLIER_SUPPLIERS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static Object boilingRecipeManagerInstance;
+    private static Method boilingRecipeManagerBoilMethod;
+    private static Method boiledFluidRatioMethod;
+    private static Method boiledFluidOutputMethod;
+    private static Method configValueGetMethod;
+    private static Class<?> systeamsConfigClass;
+
+    static {
+        initReflectionCache();
+    }
+
+    private static void initReflectionCache() {
+        try {
+            systeamsConfigClass = Class.forName("chiefarug.mods.systeams.SysteamsConfig");
+            Field basePowerField = systeamsConfigClass.getDeclaredField("STEAM_DYNAMO_BASE_POWER");
+            Object basePowerVal = basePowerField.get(null);
+            if (basePowerVal != null) {
+                configValueGetMethod = basePowerVal.getClass().getMethod("get");
+                steamDynamoBasePowerSupplier = () -> {
+                    try {
+                        Object res = configValueGetMethod.invoke(basePowerVal);
+                        if (res instanceof Number n) return n.doubleValue();
+                    } catch (Throwable ignored) {}
+                    return DEFAULT_STEAM_DYNAMO_BASE_POWER;
+                };
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            Class<?> brmCls = Class.forName("chiefarug.mods.systeams.recipe.BoilingRecipeManager");
+            Method instanceM = brmCls.getMethod("instance");
+            boilingRecipeManagerInstance = instanceM.invoke(null);
+            if (boilingRecipeManagerInstance != null) {
+                try {
+                    boilingRecipeManagerBoilMethod = brmCls.getMethod("boil", FluidStack.class);
+                } catch (NoSuchMethodException e) {
+                    boilingRecipeManagerBoilMethod = brmCls.getMethod("getBoiledFluid", FluidStack.class);
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static java.util.function.DoubleSupplier resolveConfigFieldSupplier(String fieldName, double defaultVal) {
+        if (systeamsConfigClass == null || configValueGetMethod == null) return () -> defaultVal;
+        try {
+            Field f = systeamsConfigClass.getDeclaredField(fieldName);
+            Object val = f.get(null);
+            if (val != null) {
+                return () -> {
+                    try {
+                        Object res = configValueGetMethod.invoke(val);
+                        if (res instanceof Number n) return n.doubleValue();
+                    } catch (Throwable ignored) {}
+                    return defaultVal;
+                };
+            }
+        } catch (Throwable ignored) {}
+        return () -> defaultVal;
+    }
 
     public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details, SysteamsModAdapter adapter) {
         ResourceLocation catId = null;
@@ -76,18 +165,8 @@ public class SysteamsRecipeHandler {
         if (energyRF <= 0) return false;
 
         ResourceLocation effectiveCat = catId;
-        if (effectiveCat == null || effectiveCat.getPath().contains("boil")) {
-            if (backing != null) {
-                String bStr = backing.toString().toLowerCase();
-                String bCls = backing.getClass().getName().toLowerCase();
-                if (bStr.contains("lapidary") || bCls.contains("lapidary")) effectiveCat = ResourceLocation.tryParse("systeams:lapidary");
-                else if (bStr.contains("stirling") || bCls.contains("stirling")) effectiveCat = ResourceLocation.tryParse("systeams:stirling");
-                else if (bStr.contains("compression") || bCls.contains("compression")) effectiveCat = ResourceLocation.tryParse("systeams:compression");
-                else if (bStr.contains("gourmand") || bCls.contains("gourmand")) effectiveCat = ResourceLocation.tryParse("systeams:gourmand");
-                else if (bStr.contains("magmatic") || bCls.contains("magmatic")) effectiveCat = ResourceLocation.tryParse("systeams:magmatic");
-                else if (bStr.contains("pneumatic") || bCls.contains("pneumatic")) effectiveCat = ResourceLocation.tryParse("systeams:pneumatic");
-                else if (bStr.contains("disenchantment") || bCls.contains("disenchantment")) effectiveCat = ResourceLocation.tryParse("systeams:disenchantment");
-            }
+        if (effectiveCat == null || effectiveCat.getPath().contains("boil")) { // lint:allow-heuristic: Systeams boiler category discriminator
+            effectiveCat = resolveEffectiveBoilerCategory(backing, catId);
         }
 
         double steamRatio = getSteamRatio(effectiveCat);
@@ -113,16 +192,33 @@ public class SysteamsRecipeHandler {
         return true;
     }
 
+    private static ResourceLocation resolveEffectiveBoilerCategory(Object backing, ResourceLocation fallbackCatId) {
+        if (backing instanceof net.minecraft.world.item.crafting.Recipe<?> recipe) {
+            ResourceLocation recipeId = recipe.getId();
+            for (Map.Entry<String, ResourceLocation> entry : DYNAMO_BOILER_TYPES.entrySet()) {
+                if (recipeId.getPath().contains(entry.getKey())) { // lint:allow-heuristic: Systeams recipe ID naming
+                    return entry.getValue();
+                }
+            }
+        }
+        if (fallbackCatId != null) {
+            for (Map.Entry<String, ResourceLocation> entry : DYNAMO_BOILER_TYPES.entrySet()) {
+                if (fallbackCatId.getPath().contains(entry.getKey())) { // lint:allow-heuristic: Systeams category ID naming
+                    return entry.getValue();
+                }
+            }
+        }
+        return fallbackCatId;
+    }
+
     public record BoiledFluidResult(ResourceLocation outputFluidId, String outputName, double waterToSteamRatio, double customRatioMult) {}
 
     public static List<ResourceLocation> getAllBoilingFluidInputs() {
         List<ResourceLocation> list = new java.util.ArrayList<>();
         list.add(ResourceLocation.tryParse("minecraft:water"));
 
-        ResourceLocation distWater = ResourceLocation.tryParse("gtceu:distilled_water");
-        ResourceLocation steam = ResourceLocation.tryParse("gtceu:steam");
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isGTLoaded() || com.gtceu.calcboard.api.util.ModCompatHelper.isSysteamsLoaded()) {
-            if (!list.contains(distWater)) list.add(distWater);
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isThermalLoaded()) {
+            ResourceLocation steam = ResourceLocation.tryParse("thermal:steam");
             if (!list.contains(steam)) list.add(steam);
         }
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isSysteamsLoaded()) {
@@ -139,13 +235,17 @@ public class SysteamsRecipeHandler {
         return list;
     }
 
-    public static BoiledFluidResult getBoiledResult(ResourceLocation inputFluidId, ResourceLocation catId) {
-        if (inputFluidId != null) {
-            BoiledFluidResult reflResult = extractBoiledResultFromMod(inputFluidId);
-            if (reflResult != null) {
-                return reflResult;
-            }
+    public static BoiledFluidResult getBoiledResult(ResourceLocation inputFluidId, ResourceLocation boilerCatId) {
+        if (inputFluidId == null) {
+            inputFluidId = ResourceLocation.tryParse("minecraft:water");
+        }
 
+        BoiledFluidResult modResult = extractBoiledResultFromMod(inputFluidId);
+        if (modResult != null) {
+            return modResult;
+        }
+
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isSysteamsLoaded()) {
             String path = inputFluidId.getPath();
             if ("steam".equals(path)) {
                 return new BoiledFluidResult(ResourceLocation.tryParse("systeams:steamier"), "Warm Steam", getWaterToSteamRatio(), 1.0);
@@ -166,37 +266,30 @@ public class SysteamsRecipeHandler {
     }
 
     private static BoiledFluidResult extractBoiledResultFromMod(ResourceLocation inputFluidId) {
+        if (boilingRecipeManagerInstance == null || boilingRecipeManagerBoilMethod == null) return null;
         try {
             net.minecraft.world.level.material.Fluid fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(inputFluidId);
             if (fluid != null && fluid != Fluids.EMPTY) {
-                Class<?> brmCls = Class.forName("chiefarug.mods.systeams.recipe.BoilingRecipeManager");
-                Method instanceM = brmCls.getMethod("instance");
-                Object brm = instanceM.invoke(null);
-                if (brm != null) {
-                    Method boilM = null;
-                    try {
-                        boilM = brmCls.getMethod("boil", FluidStack.class);
-                    } catch (NoSuchMethodException e) {
-                        boilM = brmCls.getMethod("getBoiledFluid", FluidStack.class);
+                Object boiled = boilingRecipeManagerBoilMethod.invoke(boilingRecipeManagerInstance, new FluidStack(fluid, 1000));
+                if (boiled != null) {
+                    if (boiledFluidRatioMethod == null) {
+                        boiledFluidRatioMethod = boiled.getClass().getMethod("inToOutRatio");
                     }
-                    Object boiled = boilM.invoke(brm, new FluidStack(fluid, 1000));
-                    if (boiled != null) {
-                        Method ratioM = boiled.getClass().getMethod("inToOutRatio");
-                        Object ratioObj = ratioM.invoke(boiled);
-                        double ratio = (ratioObj instanceof Number n) ? n.doubleValue() : 0.25;
+                    Object ratioObj = boiledFluidRatioMethod.invoke(boiled);
+                    double ratio = (ratioObj instanceof Number n) ? n.doubleValue() : DEFAULT_WATER_TO_STEAM_RATIO;
 
-                        Method getOutputM = null;
+                    if (boiledFluidOutputMethod == null) {
                         try {
-                            getOutputM = boiled.getClass().getMethod("fluidOut");
+                            boiledFluidOutputMethod = boiled.getClass().getMethod("fluidOut");
                         } catch (NoSuchMethodException e) {
-                            getOutputM = boiled.getClass().getMethod("fluid");
+                            boiledFluidOutputMethod = boiled.getClass().getMethod("fluid");
                         }
-                        Object outFluidObj = getOutputM.invoke(boiled);
-                        if (outFluidObj instanceof FluidStack fs && !fs.isEmpty()) {
-                            ResourceLocation outId = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fs.getFluid());
-                            String outName = fs.getDisplayName().getString();
-                            return new BoiledFluidResult(outId, outName, ratio, 1.0);
-                        }
+                    }
+                    Object outFluidObj = boiledFluidOutputMethod.invoke(boiled);
+                    if (outFluidObj instanceof FluidStack fs && !fs.isEmpty()) {
+                        ResourceLocation outId = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fs.getFluid());
+                        String outName = fs.getDisplayName().getString();
+                        return new BoiledFluidResult(outId, outName, ratio, 1.0);
                     }
                 }
             }
@@ -216,14 +309,10 @@ public class SysteamsRecipeHandler {
             }
         } catch (Throwable ignored) {}
 
-        String path = fluidId.getPath().toLowerCase();
-        if (path.contains("steamier") || path.contains("warm_steam")) return "Warm Steam";
-        if (path.contains("steamiestest")) return "Plasma";
-        if (path.contains("steamiester") || path.contains("superhot_steam")) return "Superhot Steam";
-        if (path.contains("steamiest") || path.contains("hot_steam")) return "Hot Steam";
-        if (path.contains("distilled")) return "Distilled Water";
-        if (path.contains("steam")) return "Steam";
-        if (path.contains("water")) return "Water";
+        String staticName = SYSTEAMS_FLUID_NAMES.get(fluidId);
+        if (staticName != null) {
+            return staticName;
+        }
         return fluidId.getPath();
     }
 
@@ -238,43 +327,24 @@ public class SysteamsRecipeHandler {
 
     public static boolean isSteamDynamoNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("steam_dynamo")) return true;
-        if (node.getRecipeCategoryId() != null && (node.getRecipeCategoryId().getPath().equals("steam") || node.getRecipeCategoryId().getPath().contains("steam_dynamo"))) return true;
-        if (node.getName() != null && node.getName().toLowerCase().contains("steam dynamo")) return true;
+        if (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("steam_dynamo")) return true; // lint:allow-heuristic: Systeams icon name matching
+        if (node.getRecipeCategoryId() != null && (node.getRecipeCategoryId().getPath().equals("steam") || node.getRecipeCategoryId().getPath().contains("steam_dynamo"))) return true; // lint:allow-heuristic: Systeams category name matching
         return false;
     }
 
     public static String getDynamoBoilerType(RecipeNode node) {
         if (node == null) return null;
         if (node.getMachineIcon() != null) {
-            String p = node.getMachineIcon().getPath().toLowerCase();
-            if (p.contains("lapidary")) return "lapidary";
-            if (p.contains("stirling")) return "stirling";
-            if (p.contains("compression")) return "compression";
-            if (p.contains("gourmand")) return "gourmand";
-            if (p.contains("magmatic")) return "magmatic";
-            if (p.contains("pneumatic")) return "pneumatic";
-            if (p.contains("disenchantment")) return "disenchantment";
+            String p = node.getMachineIcon().getPath().toLowerCase(java.util.Locale.ROOT);
+            for (String type : DYNAMO_BOILER_TYPES.keySet()) {
+                if (p.contains(type)) return type; // lint:allow-heuristic: Systeams icon type matching
+            }
         }
         if (node.getRecipeCategoryId() != null) {
-            String p = node.getRecipeCategoryId().getPath().toLowerCase();
-            if (p.contains("lapidary")) return "lapidary";
-            if (p.contains("stirling")) return "stirling";
-            if (p.contains("compression")) return "compression";
-            if (p.contains("gourmand")) return "gourmand";
-            if (p.contains("magmatic")) return "magmatic";
-            if (p.contains("pneumatic")) return "pneumatic";
-            if (p.contains("disenchantment")) return "disenchantment";
-        }
-        if (node.getName() != null) {
-            String n = node.getName().toLowerCase();
-            if (n.contains("lapidary")) return "lapidary";
-            if (n.contains("stirling")) return "stirling";
-            if (n.contains("compression")) return "compression";
-            if (n.contains("gourmand")) return "gourmand";
-            if (n.contains("magmatic")) return "magmatic";
-            if (n.contains("pneumatic")) return "pneumatic";
-            if (n.contains("disenchantment")) return "disenchantment";
+            String p = node.getRecipeCategoryId().getPath().toLowerCase(java.util.Locale.ROOT);
+            for (String type : DYNAMO_BOILER_TYPES.keySet()) {
+                if (p.contains(type)) return type;
+            }
         }
         return null;
     }
@@ -330,8 +400,9 @@ public class SysteamsRecipeHandler {
             node.setBaseEUt(0.0);
             node.setBaseDurationTicks(durationTicks);
 
-            if (node.getName() != null && node.getName().contains("Dynamo")) {
-                node.setName(node.getName().replace("Dynamo", "Boiler").replace("dynamo", "boiler"));
+            if (type != null && !type.isEmpty()) {
+                String boilerName = Character.toUpperCase(type.charAt(0)) + type.substring(1) + " Boiler";
+                node.setName(boilerName);
             }
         } else {
             double energyRF = node.getProperties().get(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF);
@@ -366,8 +437,9 @@ public class SysteamsRecipeHandler {
             node.setBaseEUt(basePowerRF);
             node.setBaseDurationTicks(durationTicks);
 
-            if (node.getName() != null && node.getName().contains("Boiler")) {
-                node.setName(node.getName().replace("Boiler", "Dynamo").replace("boiler", "dynamo"));
+            if (type != null && !type.isEmpty()) {
+                String dynamoName = Character.toUpperCase(type.charAt(0)) + type.substring(1) + " Dynamo";
+                node.setName(dynamoName);
             }
         }
     }
@@ -417,83 +489,33 @@ public class SysteamsRecipeHandler {
     }
 
     public static double getSteamDynamoBasePowerRF() {
-        try {
-            Class<?> cfg = Class.forName("chiefarug.mods.systeams.SysteamsConfig");
-            Field f = cfg.getDeclaredField("STEAM_DYNAMO_BASE_POWER");
-            Object val = f.get(null);
-            if (val != null) {
-                Method getM = val.getClass().getMethod("get");
-                Object res = getM.invoke(val);
-                if (res instanceof Number num) {
-                    return num.doubleValue();
-                }
-            }
-        } catch (Throwable ignored) {}
-        return 400.0;
+        return steamDynamoBasePowerSupplier.getAsDouble();
     }
 
     public static double getSteamRatio(ResourceLocation catId) {
-        if (catId != null) {
-            String path = catId.getPath().toLowerCase();
-            String cleaned = path.replace("_fuel", "").replace("dynamo_", "").replace("_boiler", "").replace("boiler_", "").replace("dynamo", "");
-            String fieldName = "STEAM_RATIO_" + cleaned.toUpperCase();
-            try {
-                Class<?> cfg = Class.forName("chiefarug.mods.systeams.SysteamsConfig");
-                Field f = cfg.getDeclaredField(fieldName);
-                Object val = f.get(null);
-                if (val != null) {
-                    var getM = val.getClass().getMethod("get");
-                    Object res = getM.invoke(val);
-                    if (res instanceof Number num) {
-                        return num.doubleValue();
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
-        return 0.5;
+        if (catId == null) return DEFAULT_STEAM_RATIO;
+        String path = catId.getPath().toLowerCase(java.util.Locale.ROOT);
+        String cleaned = path.replace("_fuel", "").replace("dynamo_", "").replace("_boiler", "").replace("boiler_", "").replace("dynamo", "");
+        return STEAM_RATIO_SUPPLIERS.computeIfAbsent(cleaned, k -> {
+            String fieldName = "STEAM_RATIO_" + k.toUpperCase(java.util.Locale.ROOT);
+            return resolveConfigFieldSupplier(fieldName, DEFAULT_STEAM_RATIO);
+        }).getAsDouble();
     }
 
     public static double getSpeedMultiplier(ResourceLocation catId) {
-        if (catId != null) {
-            String path = catId.getPath().toLowerCase();
-            String cleaned = path.replace("_fuel", "").replace("dynamo_", "").replace("_boiler", "").replace("boiler_", "").replace("dynamo", "");
-            String fieldName = "SPEED_" + cleaned.toUpperCase();
-            try {
-                Class<?> cfg = Class.forName("chiefarug.mods.systeams.SysteamsConfig");
-                Field f = cfg.getDeclaredField(fieldName);
-                Object val = f.get(null);
-                if (val != null) {
-                    var getM = val.getClass().getMethod("get");
-                    Object res = getM.invoke(val);
-                    if (res instanceof Number num) {
-                        return num.doubleValue();
-                    }
-                }
-            } catch (Throwable ignored) {}
-
-            if (cleaned.contains("stirling")) return 5.0;
-        }
-        return 15.0;
+        if (catId == null) return DEFAULT_SPEED_MULTIPLIER;
+        String path = catId.getPath().toLowerCase(java.util.Locale.ROOT);
+        String cleaned = path.replace("_fuel", "").replace("dynamo_", "").replace("_boiler", "").replace("boiler_", "").replace("dynamo", "");
+        double fallback = cleaned.contains("stirling") ? 5.0 : DEFAULT_SPEED_MULTIPLIER;
+        return SPEED_MULTIPLIER_SUPPLIERS.computeIfAbsent(cleaned, k -> {
+            String fieldName = "SPEED_" + k.toUpperCase(java.util.Locale.ROOT);
+            return resolveConfigFieldSupplier(fieldName, fallback);
+        }).getAsDouble();
     }
 
     public static double getWaterToSteamRatio() {
-        try {
-            Class<?> brmCls = Class.forName("chiefarug.mods.systeams.recipe.BoilingRecipeManager");
-            Method instanceM = brmCls.getMethod("instance");
-            Object brm = instanceM.invoke(null);
-            if (brm != null) {
-                Method getBoiledM = brmCls.getMethod("getBoiledFluid", FluidStack.class);
-                Object boiled = getBoiledM.invoke(brm, new FluidStack(Fluids.WATER, 1000));
-                if (boiled != null) {
-                    Method ratioM = boiled.getClass().getMethod("inToOutRatio");
-                    Object res = ratioM.invoke(boiled);
-                    if (res instanceof Number num) {
-                        return num.doubleValue();
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return 0.25;
+        BoiledFluidResult boiled = extractBoiledResultFromMod(ResourceLocation.tryParse("minecraft:water"));
+        return boiled != null && boiled.waterToSteamRatio() > 0 ? boiled.waterToSteamRatio() : DEFAULT_WATER_TO_STEAM_RATIO;
     }
 
     public static double getBaseSteamPerTick(ResourceLocation catId) {

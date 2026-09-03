@@ -118,6 +118,13 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Dynamic Addon Catalog & Compact List View (`AddonCatalogView`)**: Automatically scales catalog grid rows (2~5 rows) based on dialog height, with a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list view displaying 10+ addons without scrolling.
 - **Dedicated Board GUI Scale Decoupling**: Independent virtual viewport scale transforms allow customizing board UI size without altering global Minecraft GUI scales.
 
+### 20. Flow Saturation Wire Animation & Byproduct Void Sink System
+- **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with amber pulsing glow outlines indicating starved bottleneck machines.
+- **Configurable Animation Modes**: Toggle between Rate Modulated, Uniform Pulse, and Disabled in Board Settings (`[⚙ Settings]`).
+- **Junction Void Sink (`SupplyMode.VOID_SINK`)**: Configure Junction nodes into infinite void sinks to burn/absorb excess byproducts, isolating downstream consumers and preventing artificial upstream demand spikes.
+- **Port-Level Void Marking**: `Alt + Right-Click` on machine output ports to exclude surplus byproducts from final net production summaries without severing topology.
+- **One-Click Summary Overlay Voiding**: Click `[🗑️]` on net product rows in `SummaryOverlay` to mark byproducts as voided, with collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore.
+
 ---
 
 ## Controls & Shortcuts
@@ -146,6 +153,7 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Drag to Search & Auto-Wire | Drag from port onto empty canvas -> Select recipe |
 | Smart Match Connect (Bidirectional) | Shift + Drag between ports (Integer Ceiling matching) |
 | Disconnect Wire / Port | Right Click on wire or port socket |
+| Toggle Void Marking | Alt + Right Click on output port |
 | Switch Recipe (In-Place) | Click [🔄 Switch Recipe] in Machine Config or Node Context Menu |
 | Cycle Rate Time Unit | T (/s -> /min -> /h -> /d -> /t) |
 | Cycle Global Fluid Unit | Shift + T (Auto -> Always mB -> Always B) |
@@ -201,7 +209,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-beta.1.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-beta.2.jar`.
 
 ---
 

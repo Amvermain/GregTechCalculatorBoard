@@ -76,10 +76,15 @@ classDiagram
         +double efficiency
         +Set~Integer~ hiddenInputIndices
         +Set~Integer~ hiddenOutputIndices
+        +Set~Integer~ voidedOutputIndices
+        +SupplyMode supplyMode
         +hideInputPort(int) void
         +unhideInputPort(int) void
         +hideOutputPort(int) void
         +unhideOutputPort(int) void
+        +isOutputPortVoided(int) boolean
+        +setOutputPortVoided(int, boolean) void
+        +isVoidSink() boolean
         +getVisibleInputIndices() List~Integer~
         +getVisibleOutputIndices() List~Integer~
         +getTotalHiddenCount() int
@@ -96,6 +101,7 @@ classDiagram
   - `RecipeNode` is a pure calculation domain entity across all supported mods (Create, Thermal, GTCEu, Vanilla, etc.).
   - Contains no hardcoded mod branches; machine icon change handling (`setMachineIcon`), physical energy type resolution (`getEnergyType`), single machine power computation (`computeSingleMachinePower`), node operational validation (`validateNode`), and multiblock BOM calculation (`buildMultiblockBOM`) are delegated dynamically via `ModAdapterRegistry.getAdapterForNode(this)`.
 * **`hiddenInputIndices` / `hiddenOutputIndices`**: Set of integer port indices hidden by the user to reduce visual clutter on cards. Persisted via `RecipeNodeSerializer`. Renderers and wire solvers invoke `getVisibleInputIndices()` / `getVisibleOutputIndices()` to filter rendered and active ports.
+* **`voidedOutputIndices` & `isVoidSink()` (ADR-019)**: Set of output port indices excluded from net product summary, and query method for Junction void sink (`SupplyMode.VOID_SINK`). Integrated with mass balance solvers (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) to void surplus byproducts while prioritizing downstream consumers.
 * **`isFlipped`**: Horizontally inverts the input (left) and output (right) socket ports to eliminate wire crossings in complex flowcharts.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: Machine utilization computed by solvers (`FlowGraphSolver`, `MassBalanceSolver`) subject to upstream supply limits and closed-loop cycles.
 * **`calculateEffectiveOutputRates()`**: Computes per-second output flow combining machine count, parallel multiplier, overclocking, sub-tick batching, addon compounding, and byproduct tier chance boosts.
@@ -396,6 +402,29 @@ public class MachineHardwareTemplate {
 
 * **Hardware Extraction (`fromNode`)**: Copies tier, parallel, addons, and property store from a source node to generate an immutable template.
 * **Hardware Injection (`applyTo`)**: Injects hardware specifications into a target node while preserving its recipe inputs/outputs and baseline recipe tier requirement ($\text{recipeTier}$).
+
+---
+
+## 11. Flow Control & Visualization Enums (SupplyMode, WireAnimationMode) (ADR-018, ADR-019)
+
+### 11.1 `SupplyMode` (Junction Node Supply Mode Enum)
+Defines external supply and byproduct voiding behaviors for Junction (reroute) nodes:
+
+| Mode (SupplyMode) | Serialized Key | Translation Key | Description |
+| :--- | :--- | :--- | :--- |
+| `NONE` | `NONE` | `gui.gtcalcboard.junction.supply_mode.none` | Standard pass-through relay between upstream and downstream ports |
+| `INFINITE` | `INFINITE` | `gui.gtcalcboard.junction.supply_mode.infinite` | Infinite supply mode (assumes limitless external input; blocks backward demand) |
+| `FIXED_RATE` | `FIXED_RATE` | `gui.gtcalcboard.junction.supply_mode.fixed_rate` | Fixed external supply rate mode (injects user-configured flow rate) |
+| `VOID_SINK` | `VOID_SINK` | `gui.gtcalcboard.junction.supply_mode.void_sink` | **Void Sink Mode** (absorbs & deletes surplus flow; isolates backward demand; strictly prioritizes downstream machines in 1:N branches) |
+
+### 11.2 `WireAnimationMode` (Wire Flow Animation Mode Enum)
+Controls pulse dot rendering behaviors on canvas connection wires:
+
+| Mode (WireAnimationMode) | Config Index | Translation Key | Behavior & Visualization |
+| :--- | :--- | :--- | :--- |
+| `RATE_MODULATED` | `0` | `gui.gtcalcboard.wire_anim.rate_modulated` | **Rate Modulated (Default)**: Speed modulation, duty cycle stutter/stall, and 3-stage RGB interpolation (Cyan $\to$ Amber $\to$ Crimson) based on saturation ratio ($R = \text{Supply}/\text{Demand}$). Pulsing amber glow on starved machines |
+| `UNIFORM` | `1` | `gui.gtcalcboard.wire_anim.uniform` | **Uniform Pulse**: Constant travel speed and single color irrespective of flow rates |
+| `DISABLED` | `2` | `gui.gtcalcboard.wire_anim.disabled` | **Disabled**: Pulse dot rendering skipped on wires |
 
 ---
 

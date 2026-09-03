@@ -5,6 +5,31 @@
 </p>
 
 
+## [2.1.0-beta.2] - 2026-09-04
+
+### Added
+- **Flow Saturation Wire Flow Modulation & Real-Time Bottleneck Visualization**:
+  - Modulated wire flow animations across the canvas based on real-time supply saturation ratios (Saturation = Supply / Demand). Wires travel smoothly in Cyan Blue when fully supplied, slow down and intermittently stall (duty cycle stutter) in Amber Orange during partial starvation, and severely lag in Crimson Red during severe feedstock shortages.
+  - Starved machine cards with reduced efficiency display an amber pulsing glow outline (Amber Pulse), enabling instantaneous identification of production line bottlenecks across dense flowcharts.
+  - Added a 3-state wire animation toggle (`Rate Modulated`, `Uniform Pulse`, `Disabled`) in Board Settings (`[⚙ Settings]`).
+- **Byproduct Void Management & Sink System**:
+  - **Void Sink Junction Node (`SupplyMode.VOID_SINK`)**: Added a Void Sink mode to Junction reroute nodes to infinitely absorb and delete surplus byproducts without upstream demand backpropagation. In 1:N branching topologies, downstream normal consumer demand is strictly prioritized first, absorbing only true surplus and preventing downstream starvation.
+  - **Port-Level Direct Void Marking**: Added `Alt + Right-Click` on machine output ports to exclude specific byproduct flows from the net product summary without severing wire connections.
+  - **One-Click Summary Overlay Voiding & Collapsible Restore**: Added a `[🗑️]` void button to net product rows in `SummaryOverlay` to move surplus byproducts to voiding with one click, along with a collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore button.
+
+### Changed & Improved
+- **Enhanced Canvas Visual Feedback for Voids and Bottlenecks**:
+  - Rendered void sink junction nodes with purple borders and a `VOID` badge, and highlighted void-marked output ports with purple socket outlines and purple text labels.
+  - Enhanced port hover tooltips with live feedstock saturation percentages (%), voided indicators, and an `[Alt+Right-Click]: Toggle Void Marking` shortcut prompt.
+- **Systeams Steam Unit Formatting & Display Name Readability**:
+  - Applied compact mB/s and B/s flow rate units to steam produced by multi-tier Systeams boilers, and resolved localized fluid display names (Warm Steam, Hot Steam, Superhot Steam, Plasma) accurately.
+
+### Fixed
+- **GTCEu Singleblock Sub-Tick Overclock Truncation & Power Distortion**:
+  - Fixed an issue where high-voltage overclocks on singleblock machines pushed recipe durations below 1 tick (0.05s), causing astronomical EU/t power spikes due to singleblocks lacking subtick parallel capabilities. Singleblock overclocks now terminate early at 1 tick with integer tick truncation, while multiblock machines continue to support subtick parallel processing as intended.
+- **Systeams Boiler Fluid Registry IDs & Recipe Manager Reflection Compatibility**:
+  - Fixed boiler alternative fluid definitions to match Systeams registered fluid IDs (`systeams:steamier`, `systeams:steamiest`, `systeams:steamiester`, `systeams:steamiestest`), and added flexible runtime reflection resolution for boiler manager methods (`boil` vs `getBoiledFluid`, `fluidOut` vs `fluid`), resolving failures during boiler recipe deduction and steam conversion.
+
 ## [2.1.0-beta.1] - 2026-09-03
 
 ### Added
