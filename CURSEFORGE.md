@@ -1,5 +1,11 @@
 # GregTech Calculator Board (GT Calc Board)
 
+<p align="center">
+  <a href="https://discord.gg/NaJWk3UjJN">
+    <img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord">
+  </a>
+</p>
+
 An in-game node flowchart editor and production line rate calculator for **GregTech CEu Modern**, **EMI**, **JEI**, and multi-mod ecosystems, featuring real-time multiplayer team collaboration.
 
 <span><span><span><span><span><span><span><iframe width="560" height="315" src="https://www.youtube.com/embed/IeDe2dZ5b_o?si=uzwK-4LStUl9dR-H" frameborder="0" allowfullscreen="allowfullscreen"></iframe></span></span></span></span></span></span></span>
@@ -69,3 +75,11 @@ The mod is completely standalone and fully optional on both client and server:
   * [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) & [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 * **Multiplayer Team Integration**:
   * [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) / [Phoenix Guilds](https://curseforge.com/minecraft/mc-mods/phoenix-guilds)
+
+***
+
+### Community & Support
+
+* **Discord**: [Join our Discord Server](https://discord.gg/NaJWk3UjJN) - Discuss factory blueprints, ask questions, and chat with the community!
+* **Issue Tracker**: [GitHub Issues](https://github.com/Amvermain/GregTechCalculatorBoard/issues) - Report confirmed bugs and submit technical suggestions.
+* **Source Code**: [GitHub Repository](https://github.com/Amvermain/GregTechCalculatorBoard)

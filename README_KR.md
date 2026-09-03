@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
   <img src="https://img.shields.io/badge/GregTech-CEu%20Modern-blue.svg" alt="GTCEu Modern">
   <img src="https://img.shields.io/badge/Recipe%20Viewer-EMI%20%2F%20JEI%20Supported-purple.svg" alt="EMI & JEI">
+  <a href="https://discord.gg/NaJWk3UjJN"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
 </p>
 
@@ -222,6 +223,13 @@ cd GregTechCalculatorBoard
 - **[Detailed Code Specification (English)](docs/en_us/CODE_SPECIFICATION.md)**: Full system architecture, 5 graph algorithms, overclocking formulas, `CategoryCapabilityMatrix`, multiplayer concurrency lock protocol, and SavedData persistence schemas.
 - **[세부 코드 명세서 (한국어)](docs/ko_kr/CODE_SPECIFICATION.md)**: 전체 시스템 아키텍처, 5대 그래프 알고리즘, 오버클럭 연산 공식, `CategoryCapabilityMatrix`, 멀티플레이 동시성 락 프로토콜 및 영속화 스키마.
 - **[아키텍처 결정 기록 (ADR)](docs/adr/README.md)**: 시스템 아키텍처 결정 내역 및 변경 기록.
+
+---
+
+## 커뮤니티 & 지원 (Community & Support)
+
+- **Discord**: [공식 디스코드 서버 가입](https://discord.gg/NaJWk3UjJN) - 공장 청사진 공유, 질문 및 커뮤니티 소통.
+- **이슈 트래커**: [GitHub Issues](https://github.com/Amvermain/GregTechCalculatorBoard/issues) - 버그 제보 및 기능 제안.
 
 ---
 
