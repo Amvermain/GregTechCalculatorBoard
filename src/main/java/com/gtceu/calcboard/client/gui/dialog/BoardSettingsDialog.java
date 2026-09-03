@@ -1,12 +1,15 @@
 package com.gtceu.calcboard.client.gui.dialog;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.type.BoardGuiScale;
 import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
+import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
 import com.gtceu.calcboard.api.type.WireColorPreset;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -187,6 +190,14 @@ public class BoardSettingsDialog {
         int rowY = y + 20;
         int rowH = 22;
 
+        // 1. Toolbar Mode Selector
+        graphics.drawString(font, Component.translatable("gui.gtcalcboard.settings.toolbar_mode_label").getString(), x, rowY + 5, 0xFFCCCCCC, false);
+        int btnW = 120;
+        int btnX = x + w - btnW - 4;
+        String modeTxt = bm.getToolbarDisplayMode().getDisplayName() + " ▼";
+        drawButton(graphics, font, modeTxt, btnX, rowY, btnW, 20, mouseX, mouseY, 0xFF66E5FF, 0xFF222834, 0xFF35445E);
+        rowY += 26;
+
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
                 Component.translatable("gui.gtcalcboard.settings.show_guide_btn").getString(),
                 bm.isShowGuideButton());
@@ -220,9 +231,22 @@ public class BoardSettingsDialog {
         int rowY = y + 20;
         int rowH = 22;
 
+        // 1. Board GUI Scale Selector
+        graphics.drawString(font, Component.translatable("gui.gtcalcboard.settings.gui_scale_label").getString(), x, rowY + 5, 0xFFCCCCCC, false);
+        int btnW = 120;
+        int btnX = x + w - btnW - 4;
+        String scaleTxt = bm.getBoardGuiScale().getDisplayName() + " ▼";
+        drawButton(graphics, font, scaleTxt, btnX, rowY, btnW, 20, mouseX, mouseY, 0xFF58D3FF, 0xFF222834, 0xFF35445E);
+        rowY += 26;
+
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
                 Component.translatable("gui.gtcalcboard.settings.show_hotkey_hud").getString(),
                 bm.isShowHotkeyHud());
+        rowY += rowH + 2;
+
+        drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
+                Component.translatable("gui.gtcalcboard.settings.addon_catalog_list_view").getString(),
+                bm.isAddonCatalogListView());
         rowY += rowH + 2;
 
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
@@ -512,6 +536,15 @@ public class BoardSettingsDialog {
         int rowY = y + 20;
         int rowH = 22;
 
+        int btnW = 120;
+        int btnX = x + w - btnW - 4;
+        if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= rowY && mouseY <= rowY + 20) {
+            bm.cycleToolbarDisplayMode();
+            onSettingsChanged();
+            return;
+        }
+        rowY += 26;
+
         if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
             bm.setShowGuideButton(!bm.isShowGuideButton());
             onSettingsChanged();
@@ -550,8 +583,27 @@ public class BoardSettingsDialog {
         int rowY = y + 20;
         int rowH = 22;
 
+        int btnW = 120;
+        int btnX = x + w - btnW - 4;
+        if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= rowY && mouseY <= rowY + 20) {
+            bm.cycleBoardGuiScale();
+            onSettingsChanged();
+            if (parent != null) {
+                parent.onGuiScaleChanged();
+            }
+            return;
+        }
+        rowY += 26;
+
         if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
             bm.setShowHotkeyHud(!bm.isShowHotkeyHud());
+            onSettingsChanged();
+            return;
+        }
+        rowY += rowH + 2;
+
+        if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
+            bm.setAddonCatalogListView(!bm.isAddonCatalogListView());
             onSettingsChanged();
             return;
         }
@@ -761,7 +813,7 @@ public class BoardSettingsDialog {
             return;
         }
 
-        graphics.enableScissor(x, startY, x + w, startY + listH);
+        BoardScissorHelper.enableScissor(graphics, x, startY, x + w, startY + listH);
 
         int rowH = 26;
         int rowY = startY - presetScrollOffset;
@@ -828,7 +880,7 @@ public class BoardSettingsDialog {
             rowY += rowH;
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
     }
 
     private void handlePresetsClick(double mouseX, double mouseY, int x, int y, int w, int h, BoardManager bm) {

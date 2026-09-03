@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import net.minecraft.client.Minecraft;
@@ -72,7 +73,7 @@ public class PageTabBarWidget {
 
         int scissorLeft = hasLeftBtn ? (leftMargin + navBtnW + 2) : (leftMargin - 2);
         int scissorRight = hasRightBtn ? (screen.width - navBtnW - 2) : screen.width;
-        graphics.enableScissor(scissorLeft, tabY - 2, scissorRight, tabY + TAB_HEIGHT + 4);
+        BoardScissorHelper.enableScissor(graphics, scissorLeft, tabY - 2, scissorRight, tabY + TAB_HEIGHT + 4);
 
         graphics.pose().pushPose();
         graphics.pose().translate((float) -scrollX, 0, 0);
@@ -81,7 +82,7 @@ public class PageTabBarWidget {
         renderAddTabButton(graphics, font, curX, tabY, mouseX);
 
         graphics.pose().popPose();
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         renderScrollButtons(graphics, font, hasLeftBtn, hasRightBtn, leftMargin, navBtnW, tabY, mouseX, mouseY);
         graphics.pose().popPose();
@@ -492,8 +493,12 @@ public class PageTabBarWidget {
         return false;
     }
 
+    public boolean isEditing() {
+        return editingPageIndex >= 0 && renameBox != null;
+    }
+
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (editingPageIndex >= 0 && renameBox != null) {
+        if (isEditing()) {
             if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
                 commitRename();
                 return true;
@@ -503,7 +508,8 @@ public class PageTabBarWidget {
                 renameBox = null;
                 return true;
             }
-            return renameBox.keyPressed(keyCode, scanCode, modifiers);
+            renameBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
         }
         return false;
     }
@@ -516,6 +522,9 @@ public class PageTabBarWidget {
     }
 
     private void startRename(int index, String currentName, int x, int y, int width) {
+        if (screen.getPageBrowserDrawer() != null) {
+            screen.getPageBrowserDrawer().clearSearchFocus();
+        }
         this.editingPageIndex = index;
         Font font = Minecraft.getInstance().font;
         this.renameBox = new EditBox(font, x, y, Math.max(width, 70), 16, Component.literal(""));

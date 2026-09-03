@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -20,6 +21,8 @@ public class HotkeyHudWidget {
     private static final int EXPANDED_HEIGHT = 244;
     private static final int COLLAPSED_WIDTH = 22;
     private static final int COLLAPSED_HEIGHT = 20;
+
+    private double scrollY = 0;
 
     public HotkeyHudWidget(BoardScreen screen) {
         this.screen = screen;
@@ -66,10 +69,11 @@ public class HotkeyHudWidget {
         }
 
         int panelX = 8;
-        int panelY = screenH - EXPANDED_HEIGHT - 8;
+        int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
+        int panelY = screenH - panelH - 8;
 
-        graphics.fill(panelX, panelY, panelX + EXPANDED_WIDTH, panelY + EXPANDED_HEIGHT, 0xEE0B1120);
-        graphics.renderOutline(panelX, panelY, EXPANDED_WIDTH, EXPANDED_HEIGHT, 0xFF1E293B);
+        graphics.fill(panelX, panelY, panelX + EXPANDED_WIDTH, panelY + panelH, 0xEE0B1120);
+        graphics.renderOutline(panelX, panelY, EXPANDED_WIDTH, panelH, 0xFF1E293B);
 
         graphics.fill(panelX, panelY, panelX + EXPANDED_WIDTH, panelY + 16, 0xFF1E293B);
         String title = Component.translatable("gui.gtcalcboard.hotkey_hud.title").getString();
@@ -80,7 +84,14 @@ public class HotkeyHudWidget {
         boolean minHovered = mouseX >= minBtnX && mouseX <= minBtnX + 12 && mouseY >= minBtnY && mouseY <= minBtnY + 12;
         graphics.drawString(font, "x", minBtnX + 2, minBtnY + 2, minHovered ? 0xFFFF5555 : 0xFF64748B, false);
 
-        int curY = panelY + 20;
+        int contentH = panelH - 20;
+        int totalContentH = 18 * 12 + 4;
+        int maxScrollY = Math.max(0, totalContentH - contentH);
+        scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
+
+        BoardScissorHelper.enableScissor(graphics, panelX + 1, panelY + 18, panelX + EXPANDED_WIDTH - 1, panelY + panelH - 2);
+
+        int curY = panelY + 20 - (int) scrollY;
         renderKeyLine(graphics, font, panelX + 6, curY, "Tab", "gui.gtcalcboard.hotkey_hud.browser");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Ctrl + K / P", "gui.gtcalcboard.hotkey_hud.quick_jump");
@@ -116,6 +127,8 @@ public class HotkeyHudWidget {
         renderKeyLine(graphics, font, panelX + 6, curY, "Right-Click Wire", "gui.gtcalcboard.hotkey_hud.sever");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Delete", "gui.gtcalcboard.hotkey_hud.delete");
+
+        BoardScissorHelper.disableScissor(graphics);
     }
 
     private void renderKeyLine(GuiGraphics graphics, Font font, int x, int y, String key, String langKey) {
@@ -124,6 +137,22 @@ public class HotkeyHudWidget {
         int descW = font.width(desc);
         int targetX = x + EXPANDED_WIDTH - 12 - descW;
         graphics.drawString(font, desc, targetX, y, 0xFF94A3B8, false);
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (!expanded) return false;
+        int screenH = screen.height;
+        int panelX = 8;
+        int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
+        int panelY = screenH - panelH - 8;
+        int contentH = panelH - 20;
+        int totalContentH = 18 * 12 + 4;
+        int maxScrollY = Math.max(0, totalContentH - contentH);
+        if (maxScrollY > 0 && mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + panelH) {
+            scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * 12.0));
+            return true;
+        }
+        return false;
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -141,9 +170,10 @@ public class HotkeyHudWidget {
         }
 
         int panelX = 8;
-        int panelY = screenH - EXPANDED_HEIGHT - 8;
+        int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
+        int panelY = screenH - panelH - 8;
 
-        if (mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + EXPANDED_HEIGHT) {
+        if (mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + panelH) {
             int minBtnX = panelX + EXPANDED_WIDTH - 14;
             int minBtnY = panelY + 2;
             if (mouseX >= minBtnX && mouseX <= minBtnX + 12 && mouseY >= minBtnY && mouseY <= minBtnY + 12) {

@@ -720,7 +720,7 @@ public class MachineAddonTest {
         MachineAddon abyssalKit = ThermalAugmentHelper.parseThermalAugmentTag(tier48Root, "Abyssal Upgrade Kit", ResourceLocation.tryParse("thermal_extra:abyssal_upgrade_kit"));
         Assertions.assertNotNull(abyssalKit);
         Assertions.assertEquals(48, abyssalKit.getParallelMultiplier());
-        Assertions.assertTrue(RecipeNode.isThermalUpgradeKit(abyssalKit));
+        Assertions.assertTrue(abyssalKit.isThermalUpgradeKit());
 
         // 3. Test Multi-Cycle Injector with 1.60x Fuel Energy (DoubleTag DynEnergy)
         CompoundTag mci160Aug = new CompoundTag();

@@ -105,11 +105,26 @@ public final class FlowSummaryAggregator {
      * Solves the overall graph and computes total EU/t, raw ingredients, net outputs, and byproducts.
      */
     public static BalanceSummary computeSummary(FlowGraph graph) {
+        return computeSummary(graph, true);
+    }
+
+    /**
+     * Computes the balance summary using existing node efficiencies and port states without re-evaluating efficiencies.
+     * Prevents bottleneck collapse for isolated subgraphs.
+     */
+    public static BalanceSummary computeSummaryPreservingEfficiencies(FlowGraph graph) {
+        return computeSummary(graph, false);
+    }
+
+    public static BalanceSummary computeSummary(FlowGraph graph, boolean recomputeEfficiencies) {
         if (graph == null) {
             return new BalanceSummary(0, GTVoltageTier.ULV, 0, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
         }
 
-        FlowBalanceMatrixSolver.computeNodeEfficiencies(graph);
+        if (recomputeEfficiencies) {
+            FlowBalanceMatrixSolver.computeNodeEfficiencies(graph);
+            graph.invalidatePortStatsCache();
+        }
 
         double totalConsumedEUt = 0.0;
         double totalGeneratedEUt = 0.0;
@@ -176,7 +191,7 @@ public final class FlowSummaryAggregator {
                     if (node.isModule()) {
                         int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
                         if (node.getSubGraph() != null) {
-                            BalanceSummary subSummary = computeSummary(node.getSubGraph());
+                            BalanceSummary subSummary = computeSummaryPreservingEfficiencies(node.getSubGraph());
                             int subMachines = subSummary.totalMachineCount() * moduleCount;
                             totalMachineCount += subMachines;
                             for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {

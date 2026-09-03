@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.FolderBlueprintCodec;
 import com.gtceu.calcboard.api.storage.FolderBlueprintPackage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -57,8 +58,8 @@ public class ImportFolderDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 340;
         int dialogH = 230;
         int x = (screenWidth - dialogW) / 2;
@@ -139,7 +140,7 @@ public class ImportFolderDialog {
 
         graphics.fill(listX, listY, listX + listW, listY + listH, 0xFF10131B);
         graphics.renderOutline(listX, listY, listW, listH, 0xFF2B3347);
-        graphics.enableScissor(listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
+        BoardScissorHelper.enableScissor(graphics, listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
 
         int curY = listY + 3 - (int) scrollY;
         List<FolderBlueprintPackage.FolderPageEntry> pages = currentPackage.getPages();
@@ -163,7 +164,7 @@ public class ImportFolderDialog {
 
         int totalH = (curY + (int) scrollY) - listY;
         this.maxScrollY = Math.max(0, totalH - listH);
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Import Button
         int btnY = y + dialogH - 28;
@@ -179,8 +180,8 @@ public class ImportFolderDialog {
         if (!visible) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 340;
         int dialogH = 230;
         int x = (screenWidth - dialogW) / 2;
@@ -284,5 +285,13 @@ public class ImportFolderDialog {
         Minecraft.getInstance().getSoundManager().play(
                 net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }

@@ -1,85 +1,59 @@
 package com.gtceu.calcboard.client.gui;
 
-import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
+import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.BalanceSummary;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.storage.FolderBlueprintPackage;
+import com.gtceu.calcboard.client.gui.action.BoardActionHandler;
 import com.gtceu.calcboard.client.gui.canvas.BoardHudRenderer;
 import com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher;
 import com.gtceu.calcboard.client.gui.canvas.CanvasWireRenderer;
-import com.gtceu.calcboard.client.gui.dialog.AutoConnectFilterDialog;
-import com.gtceu.calcboard.client.gui.dialog.BoardSettingsDialog;
-import com.gtceu.calcboard.client.gui.dialog.DeletePageConfirmDialog;
-import com.gtceu.calcboard.client.gui.dialog.TutorialExitConfirmDialog;
-import com.gtceu.calcboard.client.gui.dialog.ExportBlueprintDialog;
-import com.gtceu.calcboard.client.gui.dialog.ExportFolderDialog;
-import com.gtceu.calcboard.client.gui.dialog.ImportFolderDialog;
-import com.gtceu.calcboard.client.gui.dialog.QuickPageSwitcherDialog;
-import com.gtceu.calcboard.client.gui.dialog.TemplateCloneDialog;
-import com.gtceu.calcboard.client.gui.widget.PageBrowserDrawer;
-import com.gtceu.calcboard.client.gui.dialog.ImportBlueprintDialog;
-import com.gtceu.calcboard.client.gui.dialog.DiskBlueprintsDialog;
-import com.gtceu.calcboard.client.gui.dialog.ExportToTeamDialog;
-import com.gtceu.calcboard.client.gui.dialog.FrameEditDialog;
-import com.gtceu.calcboard.client.gui.dialog.GlobalBalanceDashboardDialog;
-import com.gtceu.calcboard.client.gui.dialog.GuideDialog;
-import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-import com.gtceu.calcboard.client.gui.dialog.MachineSelectorDialog;
-import com.gtceu.calcboard.client.gui.dialog.MultiblockBOMDialog;
-import com.gtceu.calcboard.client.gui.dialog.NoteEditDialog;
-import com.gtceu.calcboard.client.gui.dialog.RecentSavesDialog;
-import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
-import com.gtceu.calcboard.client.gui.dialog.SaveToTeamDialog;
+import com.gtceu.calcboard.client.gui.dialog.*;
+import com.gtceu.calcboard.client.gui.compat.InventoryProfilesNextCompat;
+import com.gtceu.calcboard.client.gui.model.PortRef;
+import com.gtceu.calcboard.client.gui.render.BoardCanvasRenderer;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
-import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
-import com.gtceu.calcboard.client.gui.render.CanvasStickyNoteRenderer;
-import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
-import com.gtceu.calcboard.client.gui.widget.BoardToast;
-import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
-import com.gtceu.calcboard.client.gui.widget.HotkeyHudWidget;
-import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.client.gui.widget.PageTabBarWidget;
-import com.gtceu.calcboard.client.gui.widget.SummaryOverlay;
-import com.gtceu.calcboard.client.gui.widget.ToolbarWidget;
-import com.gtceu.calcboard.client.gui.widget.WorkspaceTabBarWidget;
-
-import com.gtceu.calcboard.api.solver.BalanceSummary;
-import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.api.storage.BoardPage;
-import com.gtceu.calcboard.api.model.FlowGraph;
-import com.gtceu.calcboard.api.solver.FlowGraphSolver;
-import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
-import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialOverlay;
 import com.gtceu.calcboard.client.gui.tutorial.WelcomeTutorialDialog;
+import com.gtceu.calcboard.client.gui.util.BoardViewportTransform;
+import com.gtceu.calcboard.client.gui.widget.*;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
+import com.gtceu.calcboard.integration.emi.BoardMenu;
+import com.gtceu.calcboard.network.NetworkHandler;
+import com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket;
+import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
+import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
+import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
-import org.joml.Matrix4f;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.world.entity.player.Inventory;
 import org.lwjgl.opengl.GL11;
 
 import java.util.*;
 
 /**
  * Main GUI Screen for GregTech Calculator Board.
- * Acts as the master orchestrator coordinating canvas rendering, node widgets, and sub-components.
+ * Acts as the master orchestrator coordinating canvas rendering, dialog management, and editor actions.
  */
-public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.integration.emi.BoardMenu> {
+public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public static final int LEFT_MARGIN = 48;
     private static long lastBoardScreenActiveTime = 0;
 
@@ -93,7 +67,6 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         return false;
     }
 
-    // Viewport Coordinates
     public static double lastPanX = 0, lastPanY = 0;
     public static double lastZoom = 1.0;
 
@@ -102,73 +75,40 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     private double zoom = lastZoom;
 
     private final List<NodeWidget> nodeWidgets = new ArrayList<>();
+    private final Map<RecipeNode, NodeWidget> widgetByNode = new HashMap<>();
+    private final Map<String, NodeWidget> widgetByNodeId = new HashMap<>();
 
-    // Sub-components & Handlers
     private final BoardSelectionModel selectionModel = new BoardSelectionModel();
+    private final BoardViewportTransform viewportTransform = new BoardViewportTransform();
     private final WorkspaceTabBarWidget workspaceTabBar = new WorkspaceTabBarWidget(this);
     private final PageTabBarWidget pageTabBar = new PageTabBarWidget(this);
     private final SummaryOverlay summaryOverlay = new SummaryOverlay();
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
     private final FavoritesDockWidget favoritesDockWidget = new FavoritesDockWidget(this);
-    private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
-    private final WelcomeTutorialDialog welcomeDialog = new WelcomeTutorialDialog();
     private final PageBrowserDrawer pageBrowserDrawer = new PageBrowserDrawer(this);
-    private QuickPageSwitcherDialog quickPageSwitcherDialog;
-    private TemplateCloneDialog templateCloneDialog;
-    private RecipeSearchDialog searchDialog;
-    private MachineConfigDialog machineConfigDialog;
-    private MachineSelectorDialog machineSelectorDialog;
-    private GuideDialog guideDialog;
-    private DeletePageConfirmDialog deletePageDialog;
-    private TutorialExitConfirmDialog tutorialExitDialog;
-    private GlobalBalanceDashboardDialog globalBalanceDialog;
-    private MultiblockBOMDialog multiblockBOMDialog;
-    private SaveToTeamDialog saveToTeamDialog;
-    private ExportToTeamDialog exportToTeamDialog;
-    private ExportBlueprintDialog exportBlueprintDialog;
-    private ImportBlueprintDialog importBlueprintDialog;
-    private ExportFolderDialog exportFolderDialog;
-    private ImportFolderDialog importFolderDialog;
-    private DiskBlueprintsDialog diskBlueprintsDialog;
-    private RecentSavesDialog recentSavesDialog;
-    private FrameEditDialog frameEditDialog;
-    private NoteEditDialog noteEditDialog;
-    private BoardSettingsDialog settingsDialog;
-    private AutoConnectFilterDialog autoConnectDialog;
-    private com.gtceu.calcboard.client.gui.dialog.PatternBindingDialog patternBindingDialog;
-    private com.gtceu.calcboard.client.gui.dialog.JunctionSupplyDialog junctionSupplyDialog;
+    private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
+    private final CanvasWireRenderer wireRenderer = new CanvasWireRenderer();
+
+    private final BoardDialogManager dialogManager = new BoardDialogManager(this);
+    private final BoardCanvasRenderer canvasRenderer = new BoardCanvasRenderer();
+    private final BoardActionHandler actionHandler = new BoardActionHandler(this);
 
     private BalanceSummary cachedSummary = null;
     private boolean summaryDirty = true;
-
-    // Mouse tracking for hotkeys
     private double lastMouseX, lastMouseY;
-
-    // Canvas Wire Renderer (Spatial Index & Bezier batching)
-    private final CanvasWireRenderer wireRenderer = new CanvasWireRenderer();
-
-    public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
-        return wireRenderer.findHoveredWire(canvasMouseX, canvasMouseY, maxDist);
-    }
-
-    public WireSpatialIndex getWireSpatialIndex() {
-        return wireRenderer.getWireSpatialIndex();
-    }
-
-    public CanvasWireRenderer getWireRenderer() {
-        return wireRenderer;
-    }
+    private long lastEditTimestamp = 0;
+    private int presencePingTicks = 0;
 
     public BoardScreen() {
-        this(new com.gtceu.calcboard.integration.emi.BoardMenu(0, Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
+        this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
     }
 
-    public BoardScreen(com.gtceu.calcboard.integration.emi.BoardMenu menu) {
-        super(menu, Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : new net.minecraft.world.entity.player.Inventory(null), Component.translatable("gui.gtcalcboard.title"));
+    public BoardScreen(BoardMenu menu) {
+        super(menu, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : new Inventory(null), Component.translatable("gui.gtcalcboard.title"));
         this.imageWidth = 0;
         this.imageHeight = 0;
-        var activePage = BoardManager.getInstance().getActivePage();
+        BoardPage activePage = BoardManager.getInstance().getActivePage();
         this.panX = activePage.getPanX();
         this.panY = activePage.getPanY();
         this.zoom = activePage.getZoom();
@@ -178,249 +118,32 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     }
 
     @Override
-    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-    }
+    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {}
 
     @Override
-    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-    }
+    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {}
 
     public FlowGraph getGraph() {
-        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
-        if (state.isTeamMode()) {
-            return state.getActiveTeamGraph();
-        }
-        return BoardManager.getInstance().getActiveGraph();
-    }
-
-    public BoardSelectionModel getSelectionModel() {
-        return selectionModel;
-    }
-
-    public Set<String> getSelectedNodeIds() {
-        return selectionModel.getSelectedNodeIds();
-    }
-
-    public Set<String> getSelectedNoteIds() {
-        return selectionModel.getSelectedNoteIds();
-    }
-
-    public Set<String> getSelectedFrameIds() {
-        return selectionModel.getSelectedFrameIds();
-    }
-
-    public boolean isNodeSelected(String id) {
-        return selectionModel.isSelected(id);
-    }
-
-    public boolean isNoteSelected(String id) {
-        return selectionModel.isNoteSelected(id);
-    }
-
-    public boolean isFrameSelected(String id) {
-        return selectionModel.isFrameSelected(id);
-    }
-
-    public void selectNode(String id, boolean multi) {
-        selectionModel.select(id, multi);
-    }
-
-    public void selectNote(String id, boolean multi) {
-        selectionModel.selectNote(id, multi);
-    }
-
-    public void selectFrame(String id, boolean multi) {
-        selectionModel.selectFrame(id, multi);
-    }
-
-    public void toggleSelectNode(String id) {
-        selectionModel.toggle(id);
-    }
-
-    public void toggleSelectNote(String id) {
-        selectionModel.toggleNote(id);
-    }
-
-    public void toggleSelectFrame(String id) {
-        selectionModel.toggleFrame(id);
-    }
-
-    public Set<com.gtceu.calcboard.client.gui.model.PortRef> getSelectedPorts() {
-        return selectionModel.getSelectedPorts();
-    }
-
-    public boolean isPortSelected(String nodeId, boolean isInput, int portIndex) {
-        return selectionModel.isPortSelected(nodeId, isInput, portIndex);
-    }
-
-    public boolean isPortSelected(com.gtceu.calcboard.client.gui.model.PortRef port) {
-        return selectionModel.isPortSelected(port);
-    }
-
-    public boolean hasSelectedPorts() {
-        return selectionModel.hasSelectedPorts();
-    }
-
-    public void selectPort(String nodeId, boolean isInput, int portIndex, boolean multi) {
-        selectionModel.selectPort(nodeId, isInput, portIndex, multi);
-    }
-
-    public void toggleSelectPort(String nodeId, boolean isInput, int portIndex) {
-        selectionModel.togglePort(nodeId, isInput, portIndex);
-    }
-
-    public void selectPortRange(String nodeId, boolean isInput, int targetPortIndex) {
-        selectionModel.selectPortRange(nodeId, isInput, targetPortIndex);
-    }
-
-    public void clearPortSelection() {
-        selectionModel.clearPorts();
-    }
-
-    public void clearSelection() {
-        selectionModel.clear();
-    }
-
-    public void selectAll() {
-        selectionModel.selectAll(this);
-    }
-
-    public void deleteSelection() {
-        selectionModel.deleteSelection(this);
-    }
-
-    public void copySelection() {
-        selectionModel.copySelection(this);
-    }
-
-    public void pasteSelection(double canvasX, double canvasY) {
-        selectionModel.pasteSelection(this, canvasX, canvasY);
-    }
-
-    public void cutSelection() {
-        selectionModel.cutSelection(this);
-    }
-
-    public void duplicateSelection() {
-        selectionModel.duplicateSelection(this, lastMouseX, lastMouseY);
-    }
-
-    public void flipSelectedNodes() {
-        if (!ensureEditPermission()) return;
-        List<String> nodeIds = new ArrayList<>(selectionModel.getSelectedNodeIds());
-        if (nodeIds.isEmpty()) {
-            double canvasX = toCanvasX(lastMouseX);
-            double canvasY = toCanvasY(lastMouseY);
-            for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
-                NodeWidget w = nodeWidgets.get(i);
-                if (w.isPointInside(canvasX, canvasY)) {
-                    nodeIds.add(w.getNode().getId());
-                    break;
-                }
-            }
-        }
-        if (nodeIds.isEmpty()) return;
-
-        Map<String, Boolean> prevStates = new HashMap<>();
-        Map<String, Boolean> newStates = new HashMap<>();
-        for (String id : nodeIds) {
-            RecipeNode n = getGraph().findNodeById(id);
-            if (n != null) {
-                prevStates.put(id, n.isFlipped());
-                newStates.put(id, !n.isFlipped());
-                n.setFlipped(!n.isFlipped());
-            }
-        }
-        if (!newStates.isEmpty()) {
-            recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.FlipNodesCommand(prevStates, newStates));
-            markSummaryDirty();
-            for (NodeWidget w : nodeWidgets) {
-                if (newStates.containsKey(w.getNode().getId())) {
-                    w.invalidateCache();
-                }
-            }
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F));
-            BoardToast.show(Component.literal("§b⇄ ").append(Component.translatable("message.gtcalcboard.flipped_nodes", newStates.size())));
-        }
-    }
-
-    public void recordCommand(BoardCommand cmd) {
-        BoardPage page = BoardManager.getInstance().getActivePage();
-        if (page != null) {
-            page.getHistoryManager().record(cmd);
-        }
-    }
-
-    public void undo() {
-        BoardPage page = BoardManager.getInstance().getActivePage();
-        if (page != null) {
-            BoardCommand cmd = page.getHistoryManager().undo(getGraph());
-            if (cmd != null) {
-                rebuildWidgets();
-                markSummaryDirty();
-                TutorialManager.getInstance().onUndo();
-                BoardToast.show(Component.literal("§e↶ ").append(Component.translatable("message.gtcalcboard.undo", cmd.getDescription())));
-            }
-        }
-    }
-
-    public void redo() {
-        BoardPage page = BoardManager.getInstance().getActivePage();
-        if (page != null) {
-            BoardCommand cmd = page.getHistoryManager().redo(getGraph());
-            if (cmd != null) {
-                rebuildWidgets();
-                markSummaryDirty();
-                TutorialManager.getInstance().onRedo();
-                BoardToast.show(Component.literal("§a↷ ").append(Component.translatable("message.gtcalcboard.redo", cmd.getDescription())));
-            }
-        }
-    }
-
-    public void bringNodeToFront(RecipeNode node) {
-        if (node == null) return;
-        getGraph().bringNodeToFront(node);
-        for (int i = 0; i < nodeWidgets.size(); i++) {
-            if (nodeWidgets.get(i).getNode() == node) {
-                NodeWidget w = nodeWidgets.remove(i);
-                nodeWidgets.add(w);
-                break;
-            }
-        }
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        return state.isTeamMode() ? state.getActiveTeamGraph() : BoardManager.getInstance().getActiveGraph();
     }
 
     @Override
     protected void init() {
         if (this.minecraft == null || this.minecraft.player == null || this.minecraft.level == null) {
-            if (this.minecraft != null) {
-                this.minecraft.setScreen(null);
-            }
+            if (this.minecraft != null) this.minecraft.setScreen(null);
             return;
         }
         super.init();
-        if (this.quickPageSwitcherDialog == null) this.quickPageSwitcherDialog = new QuickPageSwitcherDialog(this);
-        if (this.templateCloneDialog == null) this.templateCloneDialog = new TemplateCloneDialog(this);
-        if (this.searchDialog == null) this.searchDialog = new RecipeSearchDialog(this);
-        if (this.machineConfigDialog == null) this.machineConfigDialog = new MachineConfigDialog(this);
-        if (this.guideDialog == null) this.guideDialog = new GuideDialog(this);
-        if (this.deletePageDialog == null) this.deletePageDialog = new DeletePageConfirmDialog(this);
-        if (this.tutorialExitDialog == null) this.tutorialExitDialog = new TutorialExitConfirmDialog(this);
-        if (this.globalBalanceDialog == null) this.globalBalanceDialog = new GlobalBalanceDashboardDialog(this);
-        if (this.multiblockBOMDialog == null) this.multiblockBOMDialog = new MultiblockBOMDialog(this);
-        if (this.saveToTeamDialog == null) this.saveToTeamDialog = new SaveToTeamDialog(this);
-        if (this.exportToTeamDialog == null) this.exportToTeamDialog = new ExportToTeamDialog(this);
-        if (this.exportBlueprintDialog == null) this.exportBlueprintDialog = new ExportBlueprintDialog(this);
-        if (this.importBlueprintDialog == null) this.importBlueprintDialog = new ImportBlueprintDialog(this);
-        if (this.exportFolderDialog == null) this.exportFolderDialog = new ExportFolderDialog(this);
-        if (this.importFolderDialog == null) this.importFolderDialog = new ImportFolderDialog(this);
-        if (this.diskBlueprintsDialog == null) this.diskBlueprintsDialog = new DiskBlueprintsDialog(this);
-        if (this.recentSavesDialog == null) this.recentSavesDialog = new RecentSavesDialog(this);
-        if (this.frameEditDialog == null) this.frameEditDialog = new FrameEditDialog(this);
-        if (this.noteEditDialog == null) this.noteEditDialog = new NoteEditDialog(this);
-        if (this.settingsDialog == null) this.settingsDialog = new BoardSettingsDialog(this);
-        if (this.autoConnectDialog == null) this.autoConnectDialog = new AutoConnectFilterDialog(this);
-        if (this.patternBindingDialog == null) this.patternBindingDialog = new com.gtceu.calcboard.client.gui.dialog.PatternBindingDialog(this);
-        if (this.junctionSupplyDialog == null) this.junctionSupplyDialog = new com.gtceu.calcboard.client.gui.dialog.JunctionSupplyDialog(this);
+        clearForeignWidgets();
+
+        viewportTransform.update(this.minecraft);
+        if (viewportTransform.isScaled()) {
+            this.width = viewportTransform.getVirtualWidth();
+            this.height = viewportTransform.getVirtualHeight();
+        }
+
+        dialogManager.init();
 
         BoardManager.getInstance().setPageRemovalListener(page -> {
             if (TutorialManager.getInstance().isTutorialPage(page.getId())) {
@@ -429,243 +152,80 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         });
         rebuildWidgets();
 
-        if (minecraft != null && minecraft.getConnection() != null) {
-            UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
-            String pageId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getActiveTeamPageId();
-            boolean isTeamMode = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode();
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, pageId, isTeamMode));
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket(teamId, pageId != null ? pageId : "page_main"));
-        }
-
+        initNetworkPresence();
         RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
-        this.summaryOverlay.setCollapsed(BoardManager.getInstance().isSummaryOverlayCollapsed());
+
+        this.summaryOverlay.setCollapsed(BoardManager.getInstance().isSummaryOverlayCollapsed() || this.width < 640);
         this.hotkeyHudWidget.setExpanded(BoardManager.getInstance().isHotkeyHudExpanded());
         this.favoritesDockWidget.setExpanded(BoardManager.getInstance().isFavoritesDockExpanded());
 
-        if (this.width < 640) {
-            summaryOverlay.setCollapsed(true);
-        }
+        checkWelcomePrompt();
+        clearForeignWidgets();
+        InventoryProfilesNextCompat.ensureIntegrationHintInstalled();
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen opened. (Active Page: '{}', Nodes: {}, Wires: {}, TeamMode: {})",
+                BoardManager.getInstance().getActivePage() != null ? BoardManager.getInstance().getActivePage().getName() : "Main",
+                getGraph().getNodes().size(), getGraph().getConnections().size(), ClientWorkspaceState.getInstance().isTeamMode());
+    }
 
+    public void clearForeignWidgets() {
+        this.clearWidgets();
+    }
+
+    private void initNetworkPresence() {
+        if (minecraft == null || minecraft.getConnection() == null) return;
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        UUID teamId = state.getCurrentTeamId();
+        String pageId = state.getActiveTeamPageId();
+        boolean isTeamMode = state.isTeamMode();
+        NetworkHandler.sendToServer(new C2SPingPresencePacket(teamId, pageId, isTeamMode));
+        NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, pageId != null ? pageId : "page_main"));
+    }
+
+    private void checkWelcomePrompt() {
         if (!BoardManager.getInstance().hasSeenWelcomePrompt() && getGraph().getNodes().isEmpty()) {
-            welcomeDialog.show();
+            dialogManager.getWelcomeDialog().show();
             summaryOverlay.setCollapsed(true);
             BoardManager.getInstance().setHasSeenWelcomePrompt(true);
             BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile());
         }
-
-        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info(
-                "[GTCalcBoard] [UI] BoardScreen opened. (Active Page: '{}', Nodes: {}, Wires: {}, TeamMode: {})",
-                BoardManager.getInstance().getActivePage() != null ? BoardManager.getInstance().getActivePage().getName() : "Main",
-                getGraph().getNodes().size(),
-                getGraph().getConnections().size(),
-                com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isTeamMode()
-        );
-    }
-
-    public BoardSettingsDialog getSettingsDialog() {
-        return settingsDialog;
-    }
-
-    public void openSettingsDialog() {
-        if (settingsDialog != null) {
-            settingsDialog.open();
-        }
-    }
-
-    public SaveToTeamDialog getSaveToTeamDialog() {
-        return saveToTeamDialog;
-    }
-
-    public ExportToTeamDialog getExportToTeamDialog() {
-        return exportToTeamDialog;
-    }
-
-    public ExportBlueprintDialog getExportBlueprintDialog() {
-        return exportBlueprintDialog;
-    }
-
-    public ImportBlueprintDialog getImportBlueprintDialog() {
-        return importBlueprintDialog;
-    }
-
-    public ExportFolderDialog getExportFolderDialog() {
-        return exportFolderDialog;
-    }
-
-    public ImportFolderDialog getImportFolderDialog() {
-        return importFolderDialog;
-    }
-
-    public void openExportFolderDialog(String folderPath) {
-        if (exportFolderDialog != null) {
-            exportFolderDialog.open(folderPath);
-        }
-    }
-
-    public void openImportFolderDialog() {
-        if (importFolderDialog != null) {
-            importFolderDialog.open();
-        }
-    }
-
-    public void openImportFolderDialog(com.gtceu.calcboard.api.storage.FolderBlueprintPackage pkg) {
-        if (importFolderDialog != null) {
-            importFolderDialog.open(pkg);
-        }
-    }
-
-    public DiskBlueprintsDialog getDiskBlueprintsDialog() {
-        return diskBlueprintsDialog;
-    }
-
-    public RecentSavesDialog getRecentSavesDialog() {
-        return recentSavesDialog;
-    }
-
-    public WorkspaceTabBarWidget getWorkspaceTabBar() {
-        return workspaceTabBar;
-    }
-
-    public void openDeletePageDialog(int pageIndex, String pageName) {
-        if (deletePageDialog != null) {
-            deletePageDialog.open(pageIndex, pageName);
-        }
-    }
-
-    public void openDeleteMultiplePagesDialog(List<String> pageIds) {
-        if (deletePageDialog != null) {
-            deletePageDialog.openMultiple(pageIds);
-        }
-    }
-
-    public void openDeleteTeamPageDialog(String pageId, String pageName) {
-        if (deletePageDialog != null) {
-            deletePageDialog.openTeamPage(pageId, pageName);
-        }
-    }
-
-    public GlobalBalanceDashboardDialog getGlobalBalanceDialog() {
-        return globalBalanceDialog;
-    }
-
-    public MultiblockBOMDialog getMultiblockBOMDialog() {
-        return multiblockBOMDialog;
-    }
-
-    public GuideDialog getGuideDialog() {
-        return guideDialog;
-    }
-
-    public DeletePageConfirmDialog getDeletePageDialog() {
-        return deletePageDialog;
-    }
-
-    public void openJunctionSupplyDialog(RecipeNode node) {
-        if (junctionSupplyDialog != null) {
-            junctionSupplyDialog.open(node);
-        }
-    }
-
-    public TutorialExitConfirmDialog getTutorialExitDialog() {
-        return tutorialExitDialog;
-    }
-
-    public void openTutorialExitDialog(int targetPageIndex) {
-        if (tutorialExitDialog != null) {
-            tutorialExitDialog.openForSwitch(targetPageIndex);
-        }
-    }
-
-    public void openTutorialExitDialogForNewPage() {
-        if (tutorialExitDialog != null) {
-            tutorialExitDialog.openForCreateNewPage();
-        }
-    }
-
-    public void openTutorialExitDialogForTeamPage(String teamPageId) {
-        if (tutorialExitDialog != null) {
-            tutorialExitDialog.openForTeamPage(teamPageId);
-        }
-    }
-
-    public WelcomeTutorialDialog getWelcomeDialog() {
-        return welcomeDialog;
-    }
-
-    public CanvasInteractionHandler getCanvasHandler() {
-        return canvasHandler;
-    }
-
-    public PageTabBarWidget getPageTabBar() {
-        return pageTabBar;
-    }
-
-    public HotkeyHudWidget getHotkeyHudWidget() {
-        return hotkeyHudWidget;
     }
 
     public void rebuildWidgets() {
         nodeWidgets.clear();
+        widgetByNode.clear();
+        widgetByNodeId.clear();
         for (RecipeNode node : getGraph().getNodes()) {
-            nodeWidgets.add(new NodeWidget(node, this));
+            NodeWidget nw = new NodeWidget(node, this);
+            nodeWidgets.add(nw);
+            widgetByNode.put(node, nw);
+            widgetByNodeId.put(node.getId(), nw);
+        }
+        if (wireRenderer != null) {
+            wireRenderer.markDirty();
         }
         markSummaryDirty();
     }
 
-    public int getDynamicLeftMargin() {
-        int maxRight = 8;
-        try {
-            for (var child : this.children()) {
-                if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
-                    if (widget instanceof net.minecraft.client.gui.components.EditBox) continue;
-                    if (widget.visible && widget.getY() < 60 && widget.getX() >= 0 && widget.getX() < this.width / 3) {
-                        int right = widget.getX() + widget.getWidth();
-                        if (right > maxRight) {
-                            maxRight = right;
-                        }
-                    }
-                }
+    public void markSummaryDirty() {
+        this.summaryDirty = true;
+        if (getGraph() != null) {
+            getGraph().invalidatePortStatsCache();
+        }
+        if (wireRenderer != null) {
+            wireRenderer.markDirty();
+        }
+        if (dialogManager != null) {
+            dialogManager.markDirty();
+        }
+        if (nodeWidgets != null) {
+            for (NodeWidget nw : nodeWidgets) {
+                nw.getTextCache().markDirty();
             }
-        } catch (Throwable ignored) {}
-
-        return maxRight > 8 ? (maxRight + 6) : 8;
+        }
     }
-
-    public int getPageTabY() {
-        return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 22 : 2;
-    }
-
-    public int getToolbarY() {
-        return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 42 : 22;
-    }
-
-    public int getHeaderBottomY() {
-        return com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 64 : 44;
-    }
-
-    public int getFavoritesDockY() {
-        int maxBottom = getHeaderBottomY() + 6;
-        try {
-            for (var child : this.children()) {
-                if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
-                    if (widget instanceof net.minecraft.client.gui.components.EditBox) continue;
-                    if (widget.visible && widget.getX() < 160 && widget.getY() < 120) {
-                        int bottom = widget.getY() + widget.getHeight();
-                        if (bottom > maxBottom) {
-                            maxBottom = bottom;
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return maxBottom;
-    }
-
-    private long lastEditTimestamp = 0;
-    private int presencePingTicks = 0;
 
     public void markTeamDirty() {
-        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         if (state.isTeamMode()) {
             state.markPageDirty(state.getActiveTeamPageId());
             this.lastEditTimestamp = System.currentTimeMillis();
@@ -673,33 +233,26 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     }
 
     public boolean ensureEditPermission() {
-        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
-        if (!state.isTeamMode()) {
-            return true;
-        }
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (!state.isTeamMode()) return true;
 
         String activePageId = state.getActiveTeamPageId();
         state.markPageDirty(activePageId);
         this.lastEditTimestamp = System.currentTimeMillis();
 
-        if (state.doesHoldLock(activePageId)) {
-            return true;
-        }
+        if (state.doesHoldLock(activePageId)) return true;
 
-        com.gtceu.calcboard.server.storage.TeamWorkspacePage page = state.getRemotePage(activePageId);
+        TeamWorkspacePage page = state.getRemotePage(activePageId);
         if (page != null && page.isLocked() && !state.doesHoldLock(activePageId)) {
             String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
-                ? page.getLockHolderName()
-                : state.resolvePlayerName(page.getLockHolderUUID());
-            com.gtceu.calcboard.client.gui.widget.BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.VILLAGER_NO, 1.0F)
-            );
+                    ? page.getLockHolderName() : state.resolvePlayerName(page.getLockHolderUUID());
+            BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VILLAGER_NO, 1.0F));
             return false;
         }
-        // Auto-acquire lock seamlessly upon editing
+
         UUID teamId = state.getCurrentTeamId();
-        com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket(teamId, activePageId));
+        NetworkHandler.sendToServer(new C2SAcquireLockPacket(teamId, activePageId));
         state.setLockHeld(activePageId, true);
         return true;
     }
@@ -707,9 +260,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
     @Override
     public void containerTick() {
         if (this.minecraft == null || this.minecraft.player == null) {
-            if (this.minecraft != null) {
-                this.minecraft.setScreen(null);
-            }
+            if (this.minecraft != null) this.minecraft.setScreen(null);
             return;
         }
         if (!this.minecraft.player.isAlive() || this.minecraft.player.isRemoved()) {
@@ -717,14 +268,13 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             return;
         }
         super.containerTick();
-        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         if (state.isCollaborationEnabled() && state.isTeamMode()) {
             presencePingTicks++;
-            if (presencePingTicks >= 40) { // Every 2 seconds
+            if (presencePingTicks >= 40) {
                 presencePingTicks = 0;
-                com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                    new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), true)
-                );
+                NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), true));
             }
         }
         if (state.isTeamMode()) {
@@ -737,308 +287,49 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         }
     }
 
-    public void addNode(RecipeNode node) {
-        if (!ensureEditPermission()) return;
-        getGraph().addNode(node);
-        rebuildWidgets();
-        TutorialManager.getInstance().onNodeAdded(node);
-    }
-
-    public static double[] getNextNodeCenterPosition(int screenW, int screenH) {
-        double canvasCenterX = (screenW / 2.0 - lastPanX) / lastZoom - 100.0;
-        double canvasCenterY = (screenH / 2.0 - lastPanY) / lastZoom - 40.0;
-
-        FlowGraph graph = BoardManager.getInstance().getActiveGraph();
-        double candX = canvasCenterX;
-        double candY = canvasCenterY;
-        while (isNodeAt(graph, candX, candY)) {
-            candX += 24.0;
-            candY += 24.0;
-        }
-        return new double[]{candX, candY};
-    }
-
-    public double[] getScreenCenterCanvasPosition() {
-        double canvasCenterX = (this.width / 2.0 - this.panX) / this.zoom - 100.0;
-        double canvasCenterY = (this.height / 2.0 - this.panY) / this.zoom - 40.0;
-
-        FlowGraph graph = getGraph();
-        double candX = canvasCenterX;
-        double candY = canvasCenterY;
-        while (isNodeAt(graph, candX, candY)) {
-            candX += 24.0;
-            candY += 24.0;
-        }
-        return new double[]{candX, candY};
-    }
-
-    public void fitToView() {
-        FlowGraph graph = getGraph();
-        if (graph == null) return;
-
-        List<RecipeNode> nodes = graph.getNodes();
-        List<CanvasGroupFrame> frames = graph.getFrames();
-        List<CanvasStickyNote> notes = graph.getStickyNotes();
-
-        if (nodes.isEmpty() && frames.isEmpty() && notes.isEmpty()) {
-            this.panX = 40.0;
-            this.panY = 40.0;
-            this.zoom = 1.0;
-            lastPanX = this.panX;
-            lastPanY = this.panY;
-            lastZoom = this.zoom;
-            var active = BoardManager.getInstance().getActivePage();
-            if (active != null) {
-                active.setPanX(this.panX);
-                active.setPanY(this.panY);
-                active.setZoom(this.zoom);
-            }
-            BoardToast.show(Component.literal("§e🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
-            );
-            return;
-        }
-
-        Set<String> selNodes = getSelectedNodeIds();
-        Set<String> selFrames = getSelectedFrameIds();
-        Set<String> selNotes = getSelectedNoteIds();
-        boolean hasSelection = !selNodes.isEmpty() || !selFrames.isEmpty() || !selNotes.isEmpty();
-
-        double minX = Double.MAX_VALUE;
-        double minY = Double.MAX_VALUE;
-        double maxX = -Double.MAX_VALUE;
-        double maxY = -Double.MAX_VALUE;
-
-        for (RecipeNode n : nodes) {
-            if (hasSelection && !selNodes.contains(n.getId())) continue;
-            double x = n.getPosX();
-            double y = n.getPosY();
-            double w = n.getCardWidth();
-            double h = n.getCardHeight();
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w);
-            maxY = Math.max(maxY, y + h);
-        }
-
-        for (CanvasGroupFrame f : frames) {
-            if (hasSelection && !selFrames.contains(f.getId())) continue;
-            double x = f.getPosX();
-            double y = f.getPosY();
-            double w = f.getWidth();
-            double h = f.getHeight();
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w);
-            maxY = Math.max(maxY, y + h);
-        }
-
-        for (CanvasStickyNote note : notes) {
-            if (hasSelection && !selNotes.contains(note.getId())) continue;
-            double x = note.getPosX();
-            double y = note.getPosY();
-            double w = note.getWidth();
-            double h = note.getHeight();
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x + w);
-            maxY = Math.max(maxY, y + h);
-        }
-
-        if (minX == Double.MAX_VALUE) {
-            for (RecipeNode n : nodes) {
-                minX = Math.min(minX, n.getPosX());
-                minY = Math.min(minY, n.getPosY());
-                maxX = Math.max(maxX, n.getPosX() + n.getCardWidth());
-                maxY = Math.max(maxY, n.getPosY() + n.getCardHeight());
-            }
-        }
-
-        if (minX == Double.MAX_VALUE) return;
-
-        double contentW = Math.max(60.0, maxX - minX);
-        double contentH = Math.max(60.0, maxY - minY);
-        double centerCanvasX = minX + contentW / 2.0;
-        double centerCanvasY = minY + contentH / 2.0;
-
-        double padding = 80.0;
-        double availableW = Math.max(150.0, this.width - padding * 2);
-        double availableH = Math.max(150.0, this.height - padding * 2);
-
-        double targetZoom = Math.min(1.0, Math.min(availableW / contentW, availableH / contentH));
-        targetZoom = Math.max(0.25, Math.min(1.5, targetZoom));
-
-        double targetPanX = (this.width / 2.0) - (centerCanvasX * targetZoom);
-        double targetPanY = (this.height / 2.0) - (centerCanvasY * targetZoom);
-
-        this.setPanX(targetPanX);
-        this.setPanY(targetPanY);
-        this.setZoom(targetZoom);
-        lastPanX = targetPanX;
-        lastPanY = targetPanY;
-        lastZoom = targetZoom;
-
-        var active = BoardManager.getInstance().getActivePage();
-        if (active != null) {
-            active.setPanX(targetPanX);
-            active.setPanY(targetPanY);
-            active.setZoom(targetZoom);
-        }
-
-        BoardToast.show(Component.literal("§b🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
-        Minecraft.getInstance().getSoundManager().play(
-            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
-        );
-    }
-
-    private static boolean isNodeAt(FlowGraph graph, double x, double y) {
-        if (graph == null) return false;
-        for (RecipeNode n : graph.getNodes()) {
-            if (Math.abs(n.getPosX() - x) < 20.0 && Math.abs(n.getPosY() - y) < 20.0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public void removeNode(NodeWidget widget) {
-        if (widget == null || widget.getNode() == null) return;
-        RecipeNode n = widget.getNode();
-        List<RecipeNode> removedNodes = new ArrayList<>();
-        List<CanvasGroupFrame> removedFrames = new ArrayList<>();
-        Set<String> targetNodeIds = new HashSet<>();
-
-        if (n.isCompoundNode()) {
-            List<RecipeNode> siblings = getGraph().findCompoundSiblingNodes(n.getCompoundGroupId());
-            removedNodes.addAll(siblings);
-            for (RecipeNode sib : siblings) {
-                targetNodeIds.add(sib.getId());
-            }
-            CanvasGroupFrame cFrame = getGraph().findCompoundFrame(n.getCompoundGroupId());
-            if (cFrame != null) {
-                removedFrames.add(cFrame);
-            }
-        } else {
-            removedNodes.add(n);
-            targetNodeIds.add(n.getId());
-        }
-
-        List<FlowGraph.ConnectionEdge> removedEdges = new ArrayList<>();
-        for (FlowGraph.ConnectionEdge e : getGraph().getConnections()) {
-            if (targetNodeIds.contains(e.fromNodeId()) || targetNodeIds.contains(e.toNodeId())) {
-                removedEdges.add(e);
-            }
-        }
-
-        getGraph().removeNode(n);
-
-        List<BoardCommand> cmds = new ArrayList<>();
-        cmds.add(new BoardCommand.RemoveNodesCommand(removedNodes, removedEdges, "Delete " + n.getName()));
-        if (!removedFrames.isEmpty()) {
-            cmds.add(new BoardCommand.RemoveFramesCommand(removedFrames, "Delete compound frame"));
-        }
-        if (cmds.size() == 1) {
-            recordCommand(cmds.get(0));
-        } else {
-            recordCommand(new BoardCommand.CompoundCommand(cmds, "Delete compound " + n.getName()));
-        }
-
-        for (String nid : targetNodeIds) {
-            selectionModel.getSelectedNodeIds().remove(nid);
-        }
-        rebuildWidgets();
-        markSummaryDirty();
-        for (RecipeNode rn : removedNodes) {
-            TutorialManager.getInstance().onNodeRemoved(rn);
-        }
-    }
-
-    public void markSummaryDirty() {
-        this.summaryDirty = true;
-        if (globalBalanceDialog != null) {
-            globalBalanceDialog.markDirty();
-        }
-        if (multiblockBOMDialog != null) {
-            multiblockBOMDialog.markDirty();
-        }
-    }
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        lastBoardScreenActiveTime = System.currentTimeMillis();
-        this.lastMouseX = mouseX;
-        this.lastMouseY = mouseY;
+        if (this.minecraft != null) {
+            viewportTransform.update(this.minecraft);
+            if (viewportTransform.isScaled()) {
+                this.width = viewportTransform.getVirtualWidth();
+                this.height = viewportTransform.getVirtualHeight();
+            }
+        }
 
-        // 0. Update graph calculations and efficiencies if dirty
+        int localMouseX = (int) Math.round(viewportTransform.toVirtualX(mouseX));
+        int localMouseY = (int) Math.round(viewportTransform.toVirtualY(mouseY));
+
+        lastBoardScreenActiveTime = System.currentTimeMillis();
+        this.lastMouseX = localMouseX;
+        this.lastMouseY = localMouseY;
+
+        updateGraphSummaryIfDirty();
+
+        graphics.pose().pushPose();
+        viewportTransform.applyPose(graphics.pose());
+
+        renderBackground(graphics);
+        BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
+
+        canvasRenderer.renderCanvasScene(graphics, this, getGraph(), nodeWidgets, wireRenderer, canvasHandler, panX, panY, zoom, width, height, localMouseX, localMouseY, partialTicks);
+
+        renderScreenWidgets(graphics, localMouseX, localMouseY, partialTicks);
+        clearForeignWidgets();
+        renderTopOverlays(graphics, localMouseX, localMouseY, partialTicks);
+
+        graphics.pose().popPose();
+    }
+
+    private void updateGraphSummaryIfDirty() {
         if (summaryDirty || cachedSummary == null) {
             getGraph().cleanupInvalidConnections();
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
             summaryDirty = false;
         }
+    }
 
-        // 1. Dark Background and Grid
-        renderBackground(graphics);
-        BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
-
-        // 2. Begin Zoomed / Panned Canvas Space
-        graphics.pose().pushPose();
-        graphics.pose().translate((float) panX, (float) panY, 0.0f);
-        graphics.pose().scale((float) zoom, (float) zoom, 1.0f);
-
-        double canvasMouseX = toCanvasX(mouseX);
-        double canvasMouseY = toCanvasY(mouseY);
-
-        // 2.5 Render Visual Canvas Group Frames & Sticky Notes (Layer below wires and nodes)
-        CanvasGroupFrameRenderer.renderFrames(graphics, getGraph(), canvasMouseX, canvasMouseY, null, getSelectedFrameIds());
-        CanvasStickyNoteRenderer.renderNotes(graphics, getGraph(), canvasMouseX, canvasMouseY, getSelectedNoteIds());
-
-        // 3. Viewport Culling & Static Connection Lines with Batching and Particle Animation
-        double screenLeft = -panX / zoom - 100;
-        double screenRight = (-panX + width) / zoom + 100;
-        double screenTop = -panY / zoom - 100;
-        double screenBottom = (-panY + height) / zoom + 100;
-
-        wireRenderer.renderWires(graphics, this, getGraph(), canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, zoom);
-
-        // 4. Render Node Widgets with Viewport Culling & Per-Node Isolated Flushing for Z-Order Integrity
-        boolean isLOD = (zoom < 0.28);
-        for (int i = 0; i < nodeWidgets.size(); i++) {
-            NodeWidget widget = nodeWidgets.get(i);
-            double nx = widget.getNode().getPosX();
-            double ny = widget.getNode().getPosY();
-            int nw = widget.getWidth();
-            int nh = widget.getHeight();
-
-            if (nx + nw >= screenLeft && nx <= screenRight && ny + nh >= screenTop && ny <= screenBottom) {
-                RenderSystem.disableDepthTest();
-                RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-                widget.render(graphics, (int) canvasMouseX, (int) canvasMouseY, partialTicks);
-                graphics.flush();
-                if (!isLOD) {
-                    Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
-                }
-            }
-        }
-        RenderSystem.disableDepthTest();
-        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-
-        // 4.5 Render Quick Action Marker
-        canvasHandler.checkMarkerCursorDistance(canvasMouseX, canvasMouseY);
-        if (canvasHandler.hasQuickAddMarker()) {
-            BoardHudRenderer.renderQuickAddMarker(graphics, font, canvasHandler.getQuickAddMarkerCanvasX(), canvasHandler.getQuickAddMarkerCanvasY(), canvasMouseX, canvasMouseY);
-        }
-
-        // Render Active Marquee Box Selection
-        canvasHandler.renderMarquee(graphics);
-
-        graphics.pose().popPose();
-
-        graphics.flush();
-        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-        RenderSystem.disableDepthTest();
-
-        // 5. Render Workspace Mode Tab Bar, Page Tab Bar, Top Toolbar, Hotkey HUD, Favorites Dock and Summary Overlay
+    private void renderScreenWidgets(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
@@ -1053,288 +344,98 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
             summaryDirty = false;
         }
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
-
-        // 5.5 Render bottom-center background loading status HUD
         BoardHudRenderer.renderCentralLoadingCard(graphics, font, width, height, isAnyModalOpen(), favoritesDockWidget);
 
-        // 7. Render Tooltips only if no modal dialog is open
         if (!isAnyModalOpen() && !pageBrowserDrawer.isOpen()) {
+            graphics.flush();
+            com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+            com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
             favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
             workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
         }
+    }
 
-        super.render(graphics, mouseX, mouseY, partialTicks);
-
-        // 8. Top-level Modal Dialogs (Highest Layer: Clear depth buffer for complete modal isolation)
+    private void renderTopOverlays(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         if (isAnyModalOpen()) {
             graphics.flush();
             RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
             RenderSystem.disableDepthTest();
+            dialogManager.renderModals(graphics, width, height, mouseX, mouseY, partialTicks);
         }
-
-        if (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible()) {
-            quickPageSwitcherDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (templateCloneDialog != null && templateCloneDialog.isVisible()) {
-            templateCloneDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (welcomeDialog != null && welcomeDialog.isVisible()) {
-            welcomeDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (settingsDialog != null && settingsDialog.isVisible()) {
-            settingsDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
-            globalBalanceDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
-            multiblockBOMDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (guideDialog != null && guideDialog.isVisible()) {
-            guideDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (deletePageDialog != null && deletePageDialog.isVisible()) {
-            deletePageDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (tutorialExitDialog != null && tutorialExitDialog.isVisible()) {
-            tutorialExitDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
-            saveToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
-            exportToTeamDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (exportBlueprintDialog != null && exportBlueprintDialog.isVisible()) {
-            exportBlueprintDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (importBlueprintDialog != null && importBlueprintDialog.isVisible()) {
-            importBlueprintDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (exportFolderDialog != null && exportFolderDialog.isVisible()) {
-            exportFolderDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (importFolderDialog != null && importFolderDialog.isVisible()) {
-            importFolderDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
-            diskBlueprintsDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
-            recentSavesDialog.render(graphics, mouseX, mouseY, partialTicks);
-        } else if (searchDialog != null && searchDialog.isVisible()) {
-            searchDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
-            machineSelectorDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            machineConfigDialog.render(graphics, mouseX, mouseY, partialTicks, width, height);
-        } else if (frameEditDialog != null && frameEditDialog.isVisible()) {
-            frameEditDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (noteEditDialog != null && noteEditDialog.isVisible()) {
-            noteEditDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
-            autoConnectDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (patternBindingDialog != null && patternBindingDialog.isVisible()) {
-            patternBindingDialog.render(graphics, width, height, mouseX, mouseY);
-        } else if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
-            junctionSupplyDialog.render(graphics, width, height, mouseX, mouseY);
-        }
-
-        // 9. Interactive Tutorial Overlay
         TutorialOverlay.render(graphics, font, this, width, height, mouseX, mouseY);
-
-        // 10. Global Toast Notifications (Top layer)
         BoardToast.render(graphics, font, width, height);
     }
 
     public boolean isAnyModalOpen() {
-        return (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible())
-            || (templateCloneDialog != null && templateCloneDialog.isVisible())
-            || (welcomeDialog != null && welcomeDialog.isVisible())
-            || (settingsDialog != null && settingsDialog.isVisible())
-            || (globalBalanceDialog != null && globalBalanceDialog.isVisible())
-            || (multiblockBOMDialog != null && multiblockBOMDialog.isVisible())
-            || (guideDialog != null && guideDialog.isVisible())
-            || (searchDialog != null && searchDialog.isVisible())
-            || (machineSelectorDialog != null && machineSelectorDialog.isVisible())
-            || (machineConfigDialog != null && machineConfigDialog.isVisible())
-            || (deletePageDialog != null && deletePageDialog.isVisible())
-            || (tutorialExitDialog != null && tutorialExitDialog.isVisible())
-            || (saveToTeamDialog != null && saveToTeamDialog.isVisible())
-            || (exportToTeamDialog != null && exportToTeamDialog.isVisible())
-            || (exportBlueprintDialog != null && exportBlueprintDialog.isVisible())
-            || (importBlueprintDialog != null && importBlueprintDialog.isVisible())
-            || (exportFolderDialog != null && exportFolderDialog.isVisible())
-            || (importFolderDialog != null && importFolderDialog.isVisible())
-            || (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible())
-            || (recentSavesDialog != null && recentSavesDialog.isVisible())
-            || (frameEditDialog != null && frameEditDialog.isVisible())
-            || (noteEditDialog != null && noteEditDialog.isVisible())
-            || (autoConnectDialog != null && autoConnectDialog.isVisible())
-            || (patternBindingDialog != null && patternBindingDialog.isVisible())
-            || (junctionSupplyDialog != null && junctionSupplyDialog.isVisible());
+        return dialogManager.isAnyModalOpen();
     }
 
-    public NodeWidget findWidgetForNode(RecipeNode node) {
-        for (NodeWidget w : nodeWidgets) {
-            if (w.getNode() == node) return w;
+    public BoardViewportTransform getViewportTransform() {
+        return viewportTransform;
+    }
+
+    public static BoardViewportTransform getCurrentTransform() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.screen instanceof BoardScreen bs) {
+            return bs.getViewportTransform();
         }
         return null;
     }
 
+    public void onGuiScaleChanged() {
+        if (this.minecraft != null) {
+            viewportTransform.update(this.minecraft);
+            this.width = viewportTransform.isScaled() ? viewportTransform.getVirtualWidth() : this.minecraft.getWindow().getGuiScaledWidth();
+            this.height = viewportTransform.isScaled() ? viewportTransform.getVirtualHeight() : this.minecraft.getWindow().getGuiScaledHeight();
+            rebuildWidgets();
+            markSummaryDirty();
+        }
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible()) {
-            return quickPageSwitcherDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (templateCloneDialog != null && templateCloneDialog.isVisible()) {
-            return templateCloneDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (deletePageDialog != null && deletePageDialog.isVisible()) {
-            return deletePageDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (tutorialExitDialog != null && tutorialExitDialog.isVisible()) {
-            return tutorialExitDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (saveToTeamDialog != null && saveToTeamDialog.isVisible()) {
-            return saveToTeamDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (exportToTeamDialog != null && exportToTeamDialog.isVisible()) {
-            return exportToTeamDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (exportBlueprintDialog != null && exportBlueprintDialog.isVisible()) {
-            return exportBlueprintDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (importBlueprintDialog != null && importBlueprintDialog.isVisible()) {
-            return importBlueprintDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (exportFolderDialog != null && exportFolderDialog.isVisible()) {
-            return exportFolderDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (importFolderDialog != null && importFolderDialog.isVisible()) {
-            return importFolderDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
-            return diskBlueprintsDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
-            return recentSavesDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (welcomeDialog.mouseClicked(this, width, height, mouseX, mouseY, button)) {
-            return true;
-        }
-        if (settingsDialog != null && settingsDialog.isVisible()) {
-            return settingsDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (TutorialOverlay.mouseClicked(this, width, height, mouseX, mouseY, button)) {
-            return true;
-        }
-        if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
-            return globalBalanceDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
-            return multiblockBOMDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (guideDialog != null && guideDialog.isVisible()) {
-            return guideDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
-            return machineSelectorDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            return machineConfigDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (searchDialog != null && searchDialog.isVisible()) {
-            return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (frameEditDialog != null && frameEditDialog.isVisible()) {
-            return frameEditDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (noteEditDialog != null && noteEditDialog.isVisible()) {
-            return noteEditDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
-            return autoConnectDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (patternBindingDialog != null && patternBindingDialog.isVisible()) {
-            return patternBindingDialog.mouseClicked(mouseX, mouseY, button, width, height);
-        }
-        if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
-            return junctionSupplyDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
-            if (pageBrowserDrawer.mouseClicked(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
-        if (workspaceTabBar.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (pageTabBar.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (favoritesDockWidget.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (summaryOverlay.mouseClicked(mouseX, mouseY, button, width, height)) {
-            return true;
-        }
-        if (toolbarWidget.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (canvasHandler.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
+        double vx = viewportTransform.toVirtualX(mouseX);
+        double vy = viewportTransform.toVirtualY(mouseY);
+        if (dialogManager.handleMouseClicked(vx, vy, button, width, height)) return true;
+        if (TutorialOverlay.mouseClicked(this, width, height, vx, vy, button)) return true;
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseClicked(vx, vy, button)) return true;
+        if (workspaceTabBar.mouseClicked(vx, vy, button)) return true;
+        if (pageTabBar.mouseClicked(vx, vy, button)) return true;
+        if (favoritesDockWidget.mouseClicked(vx, vy, button)) return true;
+        if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseClicked(vx, vy, button)) return true;
+        if (summaryOverlay.mouseClicked(vx, vy, button, width, height)) return true;
+        if (toolbarWidget.mouseClicked(vx, vy, button)) return true;
+        if (canvasHandler.mouseClicked(vx, vy, button)) return true;
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (searchDialog != null && searchDialog.isVisible()) {
-            if (searchDialog.mouseReleased(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
-            if (pageBrowserDrawer.mouseReleased(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
-        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            if (machineConfigDialog.mouseReleased(mouseX, mouseY, button)) {
-                return true;
-            }
-        }
-        if (favoritesDockWidget.mouseReleased(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (pageTabBar.mouseReleased(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (toolbarWidget.mouseReleased(mouseX, mouseY, button)) {
-            return true;
-        }
-        if (canvasHandler.mouseReleased(mouseX, mouseY, button)) {
-            return true;
-        }
+        double vx = viewportTransform.toVirtualX(mouseX);
+        double vy = viewportTransform.toVirtualY(mouseY);
+        if (dialogManager.handleMouseReleased(vx, vy, button)) return true;
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseReleased(vx, vy, button)) return true;
+        if (favoritesDockWidget.mouseReleased(vx, vy, button)) return true;
+        if (pageTabBar.mouseReleased(vx, vy, button)) return true;
+        if (toolbarWidget.mouseReleased(vx, vy, button)) return true;
+        if (canvasHandler.mouseReleased(vx, vy, button)) return true;
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (searchDialog != null && searchDialog.isVisible()) {
-            if (searchDialog.mouseDragged(mouseX, mouseY, button, width, height)) {
-                return true;
-            }
-        }
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
-            if (pageBrowserDrawer.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
-                return true;
-            }
-        }
-        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            if (machineConfigDialog.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
-                return true;
-            }
-        }
-        if (favoritesDockWidget.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
-            return true;
-        }
-        if (pageTabBar.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
-            return true;
-        }
-        if (toolbarWidget.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
-            return true;
-        }
-        if (canvasHandler.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+        double vx = viewportTransform.toVirtualX(mouseX);
+        double vy = viewportTransform.toVirtualY(mouseY);
+        double vdx = viewportTransform.toVirtualX(dragX);
+        double vdy = viewportTransform.toVirtualY(dragY);
+        if (dialogManager.handleMouseDragged(vx, vy, button, vdx, vdy, width, height)) return true;
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseDragged(vx, vy, button, vdx, vdy)) return true;
+        if (favoritesDockWidget.mouseDragged(vx, vy, button, vdx, vdy)) return true;
+        if (pageTabBar.mouseDragged(vx, vy, button, vdx, vdy)) return true;
+        if (toolbarWidget.mouseDragged(vx, vy, button, vdx, vdy)) return true;
+        if (canvasHandler.mouseDragged(vx, vy, button, vdx, vdy)) {
+            if (wireRenderer != null) wireRenderer.markDirty();
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -1342,466 +443,253 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (quickPageSwitcherDialog != null && quickPageSwitcherDialog.isVisible()) {
-            return quickPageSwitcherDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (templateCloneDialog != null && templateCloneDialog.isVisible()) {
-            return templateCloneDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (importFolderDialog != null && importFolderDialog.isVisible()) {
-            return importFolderDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (exportFolderDialog != null && exportFolderDialog.isVisible()) {
-            return exportFolderDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) {
-            if (pageBrowserDrawer.mouseScrolled(mouseX, mouseY, delta)) {
-                return true;
-            }
-        }
-        if (settingsDialog != null && settingsDialog.isVisible()) {
-            return settingsDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (diskBlueprintsDialog != null && diskBlueprintsDialog.isVisible()) {
-            return diskBlueprintsDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (recentSavesDialog != null && recentSavesDialog.isVisible()) {
-            return recentSavesDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (globalBalanceDialog != null && globalBalanceDialog.isVisible()) {
-            return globalBalanceDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (multiblockBOMDialog != null && multiblockBOMDialog.isVisible()) {
-            return multiblockBOMDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
-            return machineSelectorDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
-            return machineConfigDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (guideDialog != null && guideDialog.isVisible()) {
-            return guideDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (searchDialog != null && searchDialog.isVisible()) {
-            return searchDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
-            return autoConnectDialog.mouseScrolled(mouseX, mouseY, delta);
-        }
-        if (favoritesDockWidget.mouseScrolled(mouseX, mouseY, delta)) {
-            return true;
-        }
-        if (pageTabBar.mouseScrolled(mouseX, mouseY, delta)) {
-            return true;
-        }
-        if (summaryOverlay.mouseScrolled(mouseX, mouseY, delta, width, height)) {
-            return true;
-        }
-        if (toolbarWidget.mouseScrolled(mouseX, mouseY, delta)) {
-            return true;
-        }
+        double vx = viewportTransform.toVirtualX(mouseX);
+        double vy = viewportTransform.toVirtualY(mouseY);
+        if (dialogManager.handleMouseScrolled(vx, vy, delta)) return true;
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseScrolled(vx, vy, delta)) return true;
+        if (favoritesDockWidget.mouseScrolled(vx, vy, delta)) return true;
+        if (pageTabBar.mouseScrolled(vx, vy, delta)) return true;
+        if (summaryOverlay.mouseScrolled(vx, vy, delta, width, height)) return true;
+        if (toolbarWidget.mouseScrolled(vx, vy, delta)) return true;
+        if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseScrolled(vx, vy, delta)) return true;
 
-        double canvasMouseX = toCanvasX(mouseX);
-        double canvasMouseY = toCanvasY(mouseY);
+        double canvasMouseX = toCanvasX(vx);
+        double canvasMouseY = toCanvasY(vy);
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
-            if (nodeWidgets.get(i).mouseScrolled(canvasMouseX, canvasMouseY, delta)) {
-                return true;
-            }
+            if (nodeWidgets.get(i).mouseScrolled(canvasMouseX, canvasMouseY, delta)) return true;
         }
-
-        if (canvasHandler.mouseScrolled(mouseX, mouseY, delta)) {
-            return true;
-        }
+        if (canvasHandler.mouseScrolled(vx, vy, delta)) return true;
         return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
-        if (BoardKeybindDispatcher.handleCharTyped(this, codePoint, modifiers)) {
-            return true;
-        }
+        if (BoardKeybindDispatcher.handleCharTyped(this, codePoint, modifiers)) return true;
         return super.charTyped(codePoint, modifiers);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (BoardKeybindDispatcher.handleKeyPressed(this, keyCode, scanCode, modifiers, (int) lastMouseX, (int) lastMouseY)) {
-            return true;
-        }
+        if (BoardKeybindDispatcher.handleKeyPressed(this, keyCode, scanCode, modifiers, (int) lastMouseX, (int) lastMouseY)) return true;
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    public double toCanvasX(double screenX) {
-        return (screenX - panX) / zoom;
+    public double toCanvasX(double screenX) { return (screenX - panX) / zoom; }
+    public double toCanvasY(double screenY) { return (screenY - panY) / zoom; }
+    public double toScreenX(double canvasX) { return canvasX * zoom + panX; }
+    public double toScreenY(double canvasY) { return canvasY * zoom + panY; }
+
+    public static double[] getNextNodeCenterPosition(int screenW, int screenH) {
+        double canvasCenterX = (screenW / 2.0 - lastPanX) / lastZoom - 100.0;
+        double canvasCenterY = (screenH / 2.0 - lastPanY) / lastZoom - 40.0;
+        FlowGraph graph = BoardManager.getInstance().getActiveGraph();
+        double candX = canvasCenterX, candY = canvasCenterY;
+        while (isNodeAt(graph, candX, candY)) { candX += 24.0; candY += 24.0; }
+        return new double[]{candX, candY};
     }
 
-    public double toCanvasY(double screenY) {
-        return (screenY - panY) / zoom;
+    public double[] getScreenCenterCanvasPosition() {
+        double canvasCenterX = (this.width / 2.0 - this.panX) / this.zoom - 100.0;
+        double canvasCenterY = (this.height / 2.0 - this.panY) / this.zoom - 40.0;
+        FlowGraph graph = getGraph();
+        double candX = canvasCenterX, candY = canvasCenterY;
+        while (isNodeAt(graph, candX, candY)) { candX += 24.0; candY += 24.0; }
+        return new double[]{candX, candY};
     }
 
-    public double toScreenX(double canvasX) {
-        return canvasX * zoom + panX;
+    private static boolean isNodeAt(FlowGraph graph, double x, double y) {
+        if (graph == null) return false;
+        for (RecipeNode n : graph.getNodes()) {
+            if (Math.abs(n.getPosX() - x) < 20.0 && Math.abs(n.getPosY() - y) < 20.0) return true;
+        }
+        return false;
     }
 
-    public double toScreenY(double canvasY) {
-        return canvasY * zoom + panY;
+    public int getDynamicLeftMargin() {
+        int maxRight = 8;
+        for (var child : this.children()) {
+            if (child instanceof AbstractWidget widget && !(widget instanceof EditBox)) {
+                if (widget.visible && widget.getY() < 60 && widget.getX() >= 0 && widget.getX() < this.width / 3) {
+                    maxRight = Math.max(maxRight, widget.getX() + widget.getWidth());
+                }
+            }
+        }
+        return maxRight > 8 ? (maxRight + 6) : 8;
     }
 
+    public int getPageTabY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 22 : 2; }
+    public int getToolbarY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 42 : 22; }
+    public int getHeaderBottomY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 64 : 44; }
+
+    public int getFavoritesDockY() {
+        int maxBottom = getHeaderBottomY() + 6;
+        for (var child : this.children()) {
+            if (child instanceof AbstractWidget widget && !(widget instanceof EditBox)) {
+                if (widget.visible && widget.getX() < 160 && widget.getY() < 120) {
+                    maxBottom = Math.max(maxBottom, widget.getY() + widget.getHeight());
+                }
+            }
+        }
+        return maxBottom;
+    }
+
+    public void recordCommand(BoardCommand cmd) {
+        BoardPage page = BoardManager.getInstance().getActivePage();
+        if (page != null) page.getHistoryManager().record(cmd);
+    }
+
+    public FlowGraph.ConnectionEdge findHoveredWire(double canvasMouseX, double canvasMouseY, double maxDist) {
+        return wireRenderer.findHoveredWire(canvasMouseX, canvasMouseY, maxDist);
+    }
+
+    public WireSpatialIndex getWireSpatialIndex() { return wireRenderer.getWireSpatialIndex(); }
+    public CanvasWireRenderer getWireRenderer() { return wireRenderer; }
     public List<NodeWidget> getNodeWidgets() { return nodeWidgets; }
-    public PageBrowserDrawer getPageBrowserDrawer() { return pageBrowserDrawer; }
-    public QuickPageSwitcherDialog getQuickPageSwitcherDialog() { return quickPageSwitcherDialog; }
-    public TemplateCloneDialog getTemplateCloneDialog() { return templateCloneDialog; }
-    public RecipeSearchDialog getSearchDialog() { return searchDialog; }
-    public MachineSelectorDialog getMachineSelectorDialog() { return machineSelectorDialog; }
-    public MachineConfigDialog getMachineConfigDialog() { return machineConfigDialog; }
-    public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
-    public AutoConnectFilterDialog getAutoConnectDialog() { return autoConnectDialog; }
-    public com.gtceu.calcboard.client.gui.dialog.JunctionSupplyDialog getJunctionSupplyDialog() { return junctionSupplyDialog; }
-
-    public void openQuickPageSwitcher() {
-        if (quickPageSwitcherDialog == null) {
-            quickPageSwitcherDialog = new QuickPageSwitcherDialog(this);
-        }
-        quickPageSwitcherDialog.open();
+    public NodeWidget findWidgetForNode(RecipeNode node) {
+        if (node == null) return null;
+        NodeWidget w = widgetByNode.get(node);
+        return w != null ? w : widgetByNodeId.get(node.getId());
     }
+    public NodeWidget findWidgetByNodeId(String nodeId) { return nodeId != null ? widgetByNodeId.get(nodeId) : null; }
 
-    public void openTemplateCloneDialog(BoardPage page) {
-        if (!ensureEditPermission()) return;
-        if (templateCloneDialog == null) {
-            templateCloneDialog = new TemplateCloneDialog(this);
-        }
-        templateCloneDialog.open(page);
-    }
+    public BoardSelectionModel getSelectionModel() { return selectionModel; }
+    public Set<String> getSelectedNodeIds() { return selectionModel.getSelectedNodeIds(); }
+    public Set<String> getSelectedNoteIds() { return selectionModel.getSelectedNoteIds(); }
+    public Set<String> getSelectedFrameIds() { return selectionModel.getSelectedFrameIds(); }
+    public boolean isNodeSelected(String id) { return selectionModel.isSelected(id); }
+    public boolean isNoteSelected(String id) { return selectionModel.isNoteSelected(id); }
+    public boolean isFrameSelected(String id) { return selectionModel.isFrameSelected(id); }
+    public void selectNode(String id, boolean multi) { selectionModel.select(id, multi); }
+    public void selectNote(String id, boolean multi) { selectionModel.selectNote(id, multi); }
+    public void selectFrame(String id, boolean multi) { selectionModel.selectFrame(id, multi); }
+    public void toggleSelectNode(String id) { selectionModel.toggle(id); }
+    public void toggleSelectNote(String id) { selectionModel.toggleNote(id); }
+    public void toggleSelectFrame(String id) { selectionModel.toggleFrame(id); }
 
-    public void openMachineSelectorDialog(RecipeNode node) {
-        if (!ensureEditPermission() || node == null) return;
-        if (machineSelectorDialog == null) {
-            machineSelectorDialog = new MachineSelectorDialog(this);
-        }
-        machineSelectorDialog.open(node);
-    }
+    public Set<PortRef> getSelectedPorts() { return selectionModel.getSelectedPorts(); }
+    public boolean isPortSelected(String nodeId, boolean isInput, int portIndex) { return selectionModel.isPortSelected(nodeId, isInput, portIndex); }
+    public boolean isPortSelected(PortRef port) { return selectionModel.isPortSelected(port); }
+    public boolean hasSelectedPorts() { return selectionModel.hasSelectedPorts(); }
+    public void selectPort(String nodeId, boolean isInput, int portIndex, boolean multi) { selectionModel.selectPort(nodeId, isInput, portIndex, multi); }
+    public void toggleSelectPort(String nodeId, boolean isInput, int portIndex) { selectionModel.togglePort(nodeId, isInput, portIndex); }
+    public void selectPortRange(String nodeId, boolean isInput, int targetPortIndex) { selectionModel.selectPortRange(nodeId, isInput, targetPortIndex); }
+    public void clearPortSelection() { selectionModel.clearPorts(); }
+    public void clearSelection() { selectionModel.clear(); }
+    public void selectAll() { selectionModel.selectAll(this); }
+    public void deleteSelection() { selectionModel.deleteSelection(this); }
+    public void copySelection() { selectionModel.copySelection(this); }
+    public void pasteSelection(double canvasX, double canvasY) { selectionModel.pasteSelection(this, canvasX, canvasY); }
+    public void cutSelection() { selectionModel.cutSelection(this); }
+    public void duplicateSelection() { selectionModel.duplicateSelection(this, lastMouseX, lastMouseY); }
 
-    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) {
-        if (!ensureEditPermission() || node == null || newWs == null) return;
-        if (Objects.equals(node.getMachineIcon(), newWs)) return;
+    public void addNode(RecipeNode node) { actionHandler.addNode(node); }
+    public void removeNode(NodeWidget widget) { actionHandler.removeNode(widget); }
+    public void flipSelectedNodes() { actionHandler.flipSelectedNodes(lastMouseX, lastMouseY); }
+    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) { actionHandler.switchMachineWorkstation(node, newWs); }
+    public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) { actionHandler.switchNodeRecipe(targetNode, newRecipeTemplate); }
+    public void createFrameFromSelection() { actionHandler.createFrameFromSelection(); }
+    public void createSharedMachineFrameFromSelection() { actionHandler.createSharedMachineFrameFromSelection(); }
+    public void createFrameAt(double canvasX, double canvasY) { actionHandler.createFrameAt(canvasX, canvasY); }
+    public void createNoteAt(double canvasX, double canvasY) { actionHandler.createNoteAt(canvasX, canvasY); }
+    public void addRerouteNodeAt(double canvasX, double canvasY) { actionHandler.addRerouteNodeAt(canvasX, canvasY); }
+    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName) { actionHandler.groupNodesIntoModule(targetNodeIds, moduleName, null); }
+    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName, CanvasGroupFrame primaryFrame) { actionHandler.groupNodesIntoModule(targetNodeIds, moduleName, primaryFrame); }
+    public void collapseFrameIntoModule(CanvasGroupFrame frame) { actionHandler.collapseFrameIntoModule(frame); }
+    public void bringNodeToFront(RecipeNode node) { actionHandler.bringNodeToFront(node); }
+    public void undo() { actionHandler.undo(); }
+    public void redo() { actionHandler.redo(); }
+    public void fitToView() { actionHandler.fitToView(); }
 
-        ResourceLocation oldIcon = node.getMachineIcon();
-        boolean oldMb = node.isMultiblock();
-        int oldPar = node.getParallel();
-        com.gtceu.calcboard.api.type.SteamMode oldSteam = node.getSteamMode();
-        com.gtceu.calcboard.api.type.GTVoltageTier oldTier = node.getTargetTier();
-
-        node.setMachineIcon(newWs);
-
-        TutorialManager.getInstance().onMachineSwitched(node, newWs);
-
-        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.SetMachineIconCommand(node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier));
-        markSummaryDirty();
-        rebuildWidgets();
-
-        String mName = node.getMachineDisplayName();
-        BoardToast.show(Component.literal("§b🏛 ").append(Component.translatable("message.gtcalcboard.machine_switched", mName)));
-    }
-
-    public void openAutoConnectDialog() {
-        if (!ensureEditPermission()) return;
-        if (autoConnectDialog == null) {
-            autoConnectDialog = new AutoConnectFilterDialog(this);
-        }
-        autoConnectDialog.open();
-    }
-
-    public void openRecipeSwitchDialog(RecipeNode node) {
-        if (!ensureEditPermission()) return;
-        if (searchDialog != null) {
-            searchDialog.openForSwitch(node);
-        }
-    }
-
-    public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) {
-        if (!ensureEditPermission()) return;
-        if (targetNode == null || newRecipeTemplate == null) return;
-
-        var cmd = getGraph().switchNodeRecipe(targetNode, newRecipeTemplate);
-        if (cmd != null) {
-            recordCommand(cmd);
-            markSummaryDirty();
-            for (NodeWidget w : nodeWidgets) {
-                if (w.getNode().getId().equals(targetNode.getId())) {
-                    w.invalidateCache();
-                }
-            }
-            BoardToast.show(Component.literal("§e🔄 ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
-        }
-    }
-
-    public void openMachineConfigDialog(RecipeNode node) {
-        openMachineConfigDialog(node, null);
-    }
-
-    public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.catalog.AddonCategory initialCategory) {
-        openMachineConfigDialog(node, initialCategory, null);
-    }
-
-    public void openMachineConfigDialog(RecipeNode node, com.gtceu.calcboard.api.catalog.AddonCategory initialCategory, Runnable onCloseCallback) {
-        if (machineConfigDialog == null) {
-            machineConfigDialog = new MachineConfigDialog(this);
-        }
-        TutorialManager.getInstance().onMachineConfigOpened();
-        FlowGraph graph = getGraph();
-        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = graph != null ? graph.findFrameEnclosingNode(node) : null;
-        Runnable chainedCallback = () -> {
-            if (frame != null && frame.isSharedMachineFrame()) {
-                frame.syncHardwareConfig(node, graph);
-                markSummaryDirty();
-                rebuildWidgets();
-            }
-            if (onCloseCallback != null) {
-                onCloseCallback.run();
-            }
-        };
-        machineConfigDialog.open(node, initialCategory, chainedCallback);
-    }
-
-    public void openSharedFrameConfigDialog(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
-        if (!ensureEditPermission() || frame == null) return;
-        FlowGraph graph = getGraph();
-        RecipeNode master = frame.getFirstOperationalNode(graph);
-        if (master != null) {
-            openMachineConfigDialog(master, null, () -> {
-                frame.syncHardwareConfig(master, graph);
-                markSummaryDirty();
-                rebuildWidgets();
-            });
-        }
-    }
-
-    public void openFrameEditDialog(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
-        if (frameEditDialog == null) {
-            frameEditDialog = new FrameEditDialog(this);
-        }
-        frameEditDialog.open(frame);
-    }
-
-    public void createFrameFromSelection() {
-        if (!ensureEditPermission()) return;
-        FlowGraph graph = getGraph();
-        Set<String> selectedNodeIds = getSelectedNodeIds();
-        Set<String> selectedNoteIds = getSelectedNoteIds();
-
-        List<RecipeNode> selectedNodes = new ArrayList<>();
-        if (selectedNodeIds != null && !selectedNodeIds.isEmpty()) {
-            for (RecipeNode n : graph.getNodes()) {
-                if (selectedNodeIds.contains(n.getId())) {
-                    selectedNodes.add(n);
-                }
-            }
-        }
-        List<com.gtceu.calcboard.api.model.CanvasStickyNote> selectedNotes = new ArrayList<>();
-        if (selectedNoteIds != null && !selectedNoteIds.isEmpty()) {
-            for (com.gtceu.calcboard.api.model.CanvasStickyNote note : graph.getStickyNotes()) {
-                if (selectedNoteIds.contains(note.getId())) {
-                    selectedNotes.add(note);
-                }
-            }
-        }
-
-        String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
-        com.gtceu.calcboard.api.model.CanvasGroupFrame frame;
-        if (!selectedNodes.isEmpty() || !selectedNotes.isEmpty()) {
-            frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromElements(defaultTitle, selectedNodes, selectedNotes, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE);
-        } else {
-            double cx = toCanvasX(width / 2.0) - 100;
-            double cy = toCanvasY(height / 2.0) - 60;
-            frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE, cx, cy, 200, 120);
-        }
-        graph.addFrame(frame);
-        clearSelection();
-        rebuildWidgets();
-        markSummaryDirty();
-        openFrameEditDialog(frame);
-        TutorialManager.getInstance().onGroupFramed();
-        BoardToast.show(Component.literal("§b").append(Component.translatable("message.gtcalcboard.frame_created")));
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
-    }
-
-    public void createSharedMachineFrameFromSelection() {
-        if (!ensureEditPermission()) return;
-        FlowGraph graph = getGraph();
-        Set<String> selectedNodeIds = getSelectedNodeIds();
-
-        List<RecipeNode> selectedNodes = new ArrayList<>();
-        if (selectedNodeIds != null && !selectedNodeIds.isEmpty()) {
-            for (RecipeNode n : graph.getNodes()) {
-                if (selectedNodeIds.contains(n.getId())) {
-                    selectedNodes.add(n);
-                }
-            }
-        }
-
-        String defaultTitle = Component.translatable("gui.gtcalcboard.default_shared_frame_name").getString();
-        com.gtceu.calcboard.api.model.CanvasGroupFrame frame;
-        if (!selectedNodes.isEmpty()) {
-            frame = com.gtceu.calcboard.api.model.CanvasGroupFrame.createFromNodes(defaultTitle, selectedNodes, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_EMERALD);
-        } else {
-            double cx = toCanvasX(width / 2.0) - 100;
-            double cy = toCanvasY(height / 2.0) - 60;
-            frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_EMERALD, cx, cy, 200, 120);
-        }
-        frame.setSharedMachineFrame(true);
-        graph.addFrame(frame);
-        clearSelection();
-        rebuildWidgets();
-        markSummaryDirty();
-        TutorialManager.getInstance().onSharedMachineFramed();
-        BoardToast.show(Component.literal("§a🔗 ").append(Component.translatable("message.gtcalcboard.shared_frame_created")));
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
-    }
-
-    public void createFrameAt(double canvasX, double canvasY) {
-        if (!ensureEditPermission()) return;
-        if (!getSelectedNodeIds().isEmpty() || !getSelectedNoteIds().isEmpty()) {
-            createFrameFromSelection();
-            return;
-        }
-
-        String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
-        com.gtceu.calcboard.api.model.CanvasGroupFrame frame = new com.gtceu.calcboard.api.model.CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, com.gtceu.calcboard.api.model.CanvasGroupFrame.COLOR_BLUE, canvasX - 100, canvasY - 60, 200, 120);
-        getGraph().addFrame(frame);
-        clearSelection();
-        rebuildWidgets();
-        markSummaryDirty();
-        openFrameEditDialog(frame);
-        TutorialManager.getInstance().onGroupFramed();
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
-    }
-
-    public void createNoteAt(double canvasX, double canvasY) {
-        if (!ensureEditPermission()) return;
-        FlowGraph graph = getGraph();
-        String defaultTitle = Component.translatable("gui.gtcalcboard.default_note_name").getString();
-        com.gtceu.calcboard.api.model.CanvasStickyNote note = com.gtceu.calcboard.api.model.CanvasStickyNote.create(
-            defaultTitle,
-            "",
-            com.gtceu.calcboard.api.model.CanvasStickyNote.COLOR_AMBER,
-            canvasX - 80, canvasY - 50
-        );
-        graph.addStickyNote(note);
-        clearSelection();
-        rebuildWidgets();
-        markSummaryDirty();
-        openNoteEditDialog(note);
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
-    }
-
-    public void openNoteEditDialog(com.gtceu.calcboard.api.model.CanvasStickyNote note) {
-        if (noteEditDialog == null) {
-            noteEditDialog = new NoteEditDialog(this);
-        }
-        noteEditDialog.open(note);
-    }
-
-    public NoteEditDialog getNoteEditDialog() {
-        return noteEditDialog;
-    }
-
-    public void addRerouteNodeAt(double canvasX, double canvasY) {
-        if (!ensureEditPermission()) return;
-        RecipeNode reroute = RecipeNode.createReroute(canvasX - 16, canvasY - 16);
-        getGraph().addNode(reroute);
-        recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.AddNodesCommand(java.util.List.of(reroute), java.util.Collections.emptyList(), "Add Junction Node"));
-        rebuildWidgets();
-        markSummaryDirty();
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
-    }
-
-    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName) {
-        groupNodesIntoModule(targetNodeIds, moduleName, null);
-    }
-
-    public void groupNodesIntoModule(Set<String> targetNodeIds, String moduleName, com.gtceu.calcboard.api.model.CanvasGroupFrame primaryFrame) {
-        if (!ensureEditPermission()) return;
-        FlowGraph graph = getGraph();
-        if (targetNodeIds == null || targetNodeIds.isEmpty()) return;
-
-        List<RecipeNode> origNodes = new ArrayList<>(graph.getNodes());
-        List<FlowGraph.ConnectionEdge> origEdges = new ArrayList<>(graph.getConnections());
-
-        String name = (moduleName != null && !moduleName.trim().isEmpty()) ? moduleName.trim() : Component.translatable("gui.gtcalcboard.default_compound_name").getString();
-        RecipeNode moduleNode = graph.groupIntoModule(targetNodeIds, name, primaryFrame);
-
-        if (moduleNode != null) {
-            List<RecipeNode> groupedNodes = new ArrayList<>();
-            for (RecipeNode n : origNodes) {
-                if (!graph.getNodes().contains(n)) {
-                    groupedNodes.add(n);
-                }
-            }
-            List<FlowGraph.ConnectionEdge> rewires = new ArrayList<>(graph.getConnections());
-            recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.GroupModuleCommand(groupedNodes, moduleNode, origEdges, rewires));
-
-            clearSelection();
-            rebuildWidgets();
-            markSummaryDirty();
-            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onModuleGrouped();
-
-            BoardToast.show(Component.literal("§d📦 ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
-        }
-    }
-
-    public void collapseFrameIntoModule(com.gtceu.calcboard.api.model.CanvasGroupFrame frame) {
-        if (!ensureEditPermission()) return;
-        FlowGraph graph = getGraph();
-        if (frame == null) return;
-
-        Set<String> nodeIds = new HashSet<>();
-        for (RecipeNode n : frame.getEnclosedNodes(graph)) {
-            nodeIds.add(n.getId());
-        }
-        if (nodeIds.isEmpty()) {
-            nodeIds.addAll(frame.getContainedNodeIds());
-        }
-        if (nodeIds.isEmpty()) return;
-
-        groupNodesIntoModule(nodeIds, frame.getTitle(), frame);
-    }
-
+    public BoardDialogManager getDialogManager() { return dialogManager; }
+    public BoardCanvasRenderer getCanvasRenderer() { return canvasRenderer; }
+    public BoardActionHandler getActionHandler() { return actionHandler; }
+    public CanvasInteractionHandler getCanvasHandler() { return canvasHandler; }
+    public WorkspaceTabBarWidget getWorkspaceTabBar() { return workspaceTabBar; }
+    public PageTabBarWidget getPageTabBar() { return pageTabBar; }
     public ToolbarWidget getToolbarWidget() { return toolbarWidget; }
     public SummaryOverlay getSummaryOverlay() { return summaryOverlay; }
+    public HotkeyHudWidget getHotkeyHudWidget() { return hotkeyHudWidget; }
+    public FavoritesDockWidget getFavoritesDockWidget() { return favoritesDockWidget; }
+    public PageBrowserDrawer getPageBrowserDrawer() { return pageBrowserDrawer; }
     public void performAutoRatio() { toolbarWidget.performAutoRatio(); }
     public void performGroupIntoModule() { toolbarWidget.performGroupIntoModule(); }
+
+    public WelcomeTutorialDialog getWelcomeDialog() { return dialogManager.getWelcomeDialog(); }
+    public QuickPageSwitcherDialog getQuickPageSwitcherDialog() { return dialogManager.getQuickPageSwitcherDialog(); }
+    public TemplateCloneDialog getTemplateCloneDialog() { return dialogManager.getTemplateCloneDialog(); }
+    public RecipeSearchDialog getSearchDialog() { return dialogManager.getSearchDialog(); }
+    public MachineConfigDialog getMachineConfigDialog() { return dialogManager.getMachineConfigDialog(); }
+    public MachineSelectorDialog getMachineSelectorDialog() { return dialogManager.getMachineSelectorDialog(); }
+    public GuideDialog getGuideDialog() { return dialogManager.getGuideDialog(); }
+    public DeletePageConfirmDialog getDeletePageDialog() { return dialogManager.getDeletePageDialog(); }
+    public TutorialExitConfirmDialog getTutorialExitDialog() { return dialogManager.getTutorialExitDialog(); }
+    public GlobalBalanceDashboardDialog getGlobalBalanceDialog() { return dialogManager.getGlobalBalanceDialog(); }
+    public MultiblockBOMDialog getMultiblockBOMDialog() { return dialogManager.getMultiblockBOMDialog(); }
+    public SaveToTeamDialog getSaveToTeamDialog() { return dialogManager.getSaveToTeamDialog(); }
+    public ExportToTeamDialog getExportToTeamDialog() { return dialogManager.getExportToTeamDialog(); }
+    public ExportBlueprintDialog getExportBlueprintDialog() { return dialogManager.getExportBlueprintDialog(); }
+    public ImportBlueprintDialog getImportBlueprintDialog() { return dialogManager.getImportBlueprintDialog(); }
+    public ExportFolderDialog getExportFolderDialog() { return dialogManager.getExportFolderDialog(); }
+    public ImportFolderDialog getImportFolderDialog() { return dialogManager.getImportFolderDialog(); }
+    public DiskBlueprintsDialog getDiskBlueprintsDialog() { return dialogManager.getDiskBlueprintsDialog(); }
+    public RecentSavesDialog getRecentSavesDialog() { return dialogManager.getRecentSavesDialog(); }
+    public FrameEditDialog getFrameEditDialog() { return dialogManager.getFrameEditDialog(); }
+    public NoteEditDialog getNoteEditDialog() { return dialogManager.getNoteEditDialog(); }
+    public BoardSettingsDialog getSettingsDialog() { return dialogManager.getSettingsDialog(); }
+    public AutoConnectFilterDialog getAutoConnectDialog() { return dialogManager.getAutoConnectDialog(); }
+    public PatternBindingDialog getPatternBindingDialog() { return dialogManager.getPatternBindingDialog(); }
+    public JunctionSupplyDialog getJunctionSupplyDialog() { return dialogManager.getJunctionSupplyDialog(); }
+
+    public void openSettingsDialog() { dialogManager.openSettingsDialog(); }
+    public void openExportFolderDialog(String folderPath) { dialogManager.openExportFolderDialog(folderPath); }
+    public void openImportFolderDialog() { dialogManager.openImportFolderDialog(); }
+    public void openImportFolderDialog(FolderBlueprintPackage pkg) { dialogManager.openImportFolderDialog(pkg); }
+    public void openDeletePageDialog(int pageIndex, String pageName) { dialogManager.openDeletePageDialog(pageIndex, pageName); }
+    public void openDeleteMultiplePagesDialog(List<String> pageIds) { dialogManager.openDeleteMultiplePagesDialog(pageIds); }
+    public void openDeleteTeamPageDialog(String pageId, String pageName) { dialogManager.openDeleteTeamPageDialog(pageId, pageName); }
+    public void openJunctionSupplyDialog(RecipeNode node) { dialogManager.openJunctionSupplyDialog(node); }
+    public void openTutorialExitDialog(int targetPageIndex) { dialogManager.openTutorialExitDialog(targetPageIndex); }
+    public void openTutorialExitDialogForNewPage() { dialogManager.openTutorialExitDialogForNewPage(); }
+    public void openTutorialExitDialogForTeamPage(String teamPageId) { dialogManager.openTutorialExitDialogForTeamPage(teamPageId); }
+    public void openQuickPageSwitcher() { dialogManager.openQuickPageSwitcher(); }
+    public void openTemplateCloneDialog(BoardPage page) { dialogManager.openTemplateCloneDialog(page); }
+    public void openMachineSelectorDialog(RecipeNode node) { dialogManager.openMachineSelectorDialog(node); }
+    public void openAutoConnectDialog() { dialogManager.openAutoConnectDialog(); }
+    public void openRecipeSwitchDialog(RecipeNode node) { dialogManager.openRecipeSwitchDialog(node); }
+    public void openMachineConfigDialog(RecipeNode node) { dialogManager.openMachineConfigDialog(node); }
+    public void openMachineConfigDialog(RecipeNode node, AddonCategory initialCategory) { dialogManager.openMachineConfigDialog(node, initialCategory); }
+    public void openMachineConfigDialog(RecipeNode node, AddonCategory initialCategory, Runnable onCloseCallback) { dialogManager.openMachineConfigDialog(node, initialCategory, onCloseCallback); }
+    public void openSharedFrameConfigDialog(CanvasGroupFrame frame) { dialogManager.openSharedFrameConfigDialog(frame); }
+    public void openFrameEditDialog(CanvasGroupFrame frame) { dialogManager.openFrameEditDialog(frame); }
+    public void openNoteEditDialog(CanvasStickyNote note) { dialogManager.openNoteEditDialog(note); }
 
     public double getPanX() { return panX; }
     public void setPanX(double panX) {
         this.panX = panX;
         lastPanX = panX;
-        var active = BoardManager.getInstance().getActivePage();
+        BoardPage active = BoardManager.getInstance().getActivePage();
         if (active != null) active.setPanX(panX);
     }
     public double getPanY() { return panY; }
     public void setPanY(double panY) {
         this.panY = panY;
         lastPanY = panY;
-        var active = BoardManager.getInstance().getActivePage();
+        BoardPage active = BoardManager.getInstance().getActivePage();
         if (active != null) active.setPanY(panY);
     }
     public double getZoom() { return zoom; }
     public void setZoom(double zoom) {
         this.zoom = zoom;
         lastZoom = zoom;
-        var active = BoardManager.getInstance().getActivePage();
+        BoardPage active = BoardManager.getInstance().getActivePage();
         if (active != null) active.setZoom(zoom);
     }
 
     @Override
     public void onClose() {
-        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
         if (state.isCollaborationEnabled() && state.isTeamMode()) {
-            com.gtceu.calcboard.network.NetworkHandler.sendToServer(
-                new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false)
-            );
+            NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false));
         }
         if (state.isTeamMode()) {
             state.autoCommitAndRelease(this, state.getActiveTeamPageId());
@@ -1809,7 +697,7 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         lastPanX = this.panX;
         lastPanY = this.panY;
         lastZoom = this.zoom;
-        var active = BoardManager.getInstance().getActivePage();
+        BoardPage active = BoardManager.getInstance().getActivePage();
         if (active != null) {
             active.setPanX(this.panX);
             active.setPanY(this.panY);
@@ -1820,16 +708,8 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         BoardManager.getInstance().setFavoritesDockExpanded(this.favoritesDockWidget.isExpanded());
         BoardManager.getInstance().saveToFile(BoardManager.getInstance().getDefaultSaveFile(), this.panX, this.panY, this.zoom);
         lastBoardScreenActiveTime = 0;
-        com.gtceu.calcboard.GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
+        GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [UI] BoardScreen closed. State saved.");
         super.onClose();
-    }
-
-    public FavoritesDockWidget getFavoritesDockWidget() {
-        return favoritesDockWidget;
-    }
-
-    public com.gtceu.calcboard.client.gui.dialog.PatternBindingDialog getPatternBindingDialog() {
-        return patternBindingDialog;
     }
 
     @Override
@@ -1837,6 +717,3 @@ public class BoardScreen extends AbstractContainerScreen<com.gtceu.calcboard.int
         return BoardManager.getInstance().isPauseGameInSingleplayer();
     }
 }
-
-
-

@@ -54,6 +54,10 @@ public class GTCEuMultiblockScanner {
     }
 
     private static void registerMachineRecipeCategories(ResourceLocation id, Object def, GTCEuMachineAnalyzer.MachineCapabilities caps) {
+        if (caps.isTurbine()) {
+            MultiblockDetector.registerTurbine(id, null, caps.turbineTier(), caps.turbineBaseEnergy());
+        }
+
         List<Object> recipeTypesList = GTCEuReflectionBridge.getRecipeTypes(def);
         for (Object rt : recipeTypesList) {
             ResourceLocation rl = MultiblockDetector.extractRecipeTypeId(rt);
@@ -63,7 +67,7 @@ public class GTCEuMultiblockScanner {
             if (caps.isCoilWorkable()) {
                 MultiblockDetector.registerCoilMultiblock(id, rl);
             }
-            if (caps.isTurbine() && MultiblockDetector.isTurbineRecipeCategory(rl)) {
+            if (caps.isTurbine()) {
                 MultiblockDetector.registerTurbine(id, rl, caps.turbineTier(), caps.turbineBaseEnergy());
             }
 
@@ -72,6 +76,9 @@ public class GTCEuMultiblockScanner {
                 MultiblockDetector.inspectAndRegisterMachine(id, def, relRl);
                 if (caps.isCoilWorkable()) {
                     MultiblockDetector.registerCoilMultiblock(id, relRl);
+                }
+                if (caps.isTurbine()) {
+                    MultiblockDetector.registerTurbine(id, relRl, caps.turbineTier(), caps.turbineBaseEnergy());
                 }
             }
         }
@@ -171,10 +178,7 @@ public class GTCEuMultiblockScanner {
                             if (stack != null && !stack.isEmpty()) {
                                 ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(stack.getItem());
                                 if (itemId != null) {
-                                    String p = itemId.getPath();
-                                    if (GTThreadingHelix.fromId(itemId.toString()) != null || p.contains("thread_helix") || p.contains("threading_helix")
-                                            || p.contains("threading_controller") || p.contains("supreme_helix") || p.contains("overdrive_helix")
-                                            || p.contains("coprocessor_helix") || p.contains("weaver_helix")) {
+                                    if (GTThreadingHelix.fromId(itemId) != null || GTThreadingHelix.fromId(itemId.toString()) != null) {
                                         helixCount = Math.max(helixCount, (int) es.getAmount());
                                     }
                                 }

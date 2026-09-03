@@ -61,6 +61,9 @@ public final class GTPowerCalculator {
 
     public static double computeSingleMachinePower(RecipeNode node) {
         if (!node.isOperational()) return 0.0;
+        if (node.isModule()) {
+            return node.getBaseEUt();
+        }
         if (node.isGenerator()) {
             if (GTTurbineHelper.isLargeTurbine(node)) {
                 double turbineBoost = GTTurbineHelper.getTurbineBoostMultiplier(node);
@@ -98,6 +101,11 @@ public final class GTPowerCalculator {
     }
 
     public static OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
+        if (node.isModule()) {
+            double duration = Math.max(1.0, node.getBaseDurationTicks());
+            return new OverclockMode.OverclockResult(duration, node.getBaseEUt(), 1.0, 0);
+        }
+
         if (node.getEnergyType() == EnergyType.NONE) {
             double durationTicks = Math.max(1.0, node.getBaseDurationTicks() * node.getCombinedDurationMultiplier());
             return new OverclockMode.OverclockResult(durationTicks, 0.0, 1.0, 0);

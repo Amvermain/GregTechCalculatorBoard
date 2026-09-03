@@ -147,6 +147,15 @@ Modal for toggling specific recipe categories or blacklisting entire machine typ
   </div>
 </div>
 
+### 3.1.1 Adaptive Responsive Toolbar & Overflow Menu (`ToolbarWidget`, ADR-017)
+* **3-Tier Adaptive Title Truncation**: Automatically compresses title text based on window width to maximize button space:
+  - $\ge 560\text{px}$: Full title `"§6GT Calculator Board §7⚙"`
+  - $420\sim 559\text{px}$: Short title `"§6GT Board §7⚙"` (1:1 localized via `gui.gtcalcboard.title_short`)
+  - $< 420\text{px}$: Micro icon `"§6📟 §7⚙"`
+* **Compact $22\text{px}$ Icon Mode**: Dynamically switches buttons to compact square icon buttons according to display mode (`AUTO`, `COMPACT`, `FULL`).
+* **Overflow `[...]` Dropdown Menu**: Wraps buttons exceeding available toolbar width into an overflow popup menu rather than clipping them off-screen.
+* **Minimap Collision Prevention Padding**: Automatically reserves $16\text{px}$ right-hand padding to prevent overlapping JourneyMap or other HUD minimaps.
+
 ---
 
 ### 3.2 Hotkey HUD Widget (`HotkeyHudWidget`)

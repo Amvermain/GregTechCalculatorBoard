@@ -36,6 +36,22 @@ public final class PatternGraphRegistry {
                 }
             }
         });
+        BoardManager.getInstance().registerStorageExtension("ae2Bindings", new com.gtceu.calcboard.api.storage.IBoardStorageExtension() {
+            @Override
+            public void onReset() {
+                clear();
+            }
+
+            @Override
+            public CompoundTag serialize() {
+                return serializeNBT();
+            }
+
+            @Override
+            public void deserialize(CompoundTag tag) {
+                deserializeNBT(tag);
+            }
+        });
     }
 
     public static PatternGraphRegistry getInstance() {

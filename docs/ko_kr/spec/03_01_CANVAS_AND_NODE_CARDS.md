@@ -16,7 +16,16 @@ $$\text{ScreenX} = (\text{CanvasX} \times \text{Zoom}) + \text{PanX}, \quad \tex
 * **팬(Pan) 제어**: 마우스 우클릭 드래그 또는 휠 클릭 드래그
 * **그리드 간격**: $20\text{px} \times \text{Zoom}$ 단위 도트 배경 렌더링
 
-### 1.1 16px 정밀 격자 스냅 (Grid Snap) 및 좌표 양자화 (ADR-012)
+### 1.2 전용 가상 뷰포트 배율 변환 (Dedicated Virtual Viewport Transform, ADR-017)
+마인크래프트 전역 GUI Scale($G$)과 독립적인 보드 전용 가상 배율($B$)을 적용하기 위해 `BoardViewportTransform`을 통해 2단계 좌표 투영을 수행합니다.
+
+$$S = \frac{B}{G}, \quad x_{\text{virtual}} = \frac{x_{\text{raw}}}{S}, \quad y_{\text{virtual}} = \frac{y_{\text{raw}}}{S}$$
+$$W_{\text{virtual}} = \frac{W_{\text{window}}}{S}, \quad H_{\text{virtual}} = \frac{H_{\text{window}}}{S}$$
+
+* **마우스 역투영**: 마인크래프트 화면 마우스 이벤트 $(m_x, m_y)$를 가상 해상도 $(m_x / S, m_y / S)$로 변환한 후 캔버스 좌표 $(CanvasX, CanvasY)$로 투영합니다.
+* **배율 모드 지원**: `AUTO(0)` (화면 크기 기준 자동 1~4x 산출), `SCALE_1X(1)` ~ `SCALE_4X(4)` 수동 고정.
+
+### 1.3 16px 정밀 격자 스냅 (Grid Snap) 및 좌표 양자화 (ADR-012)
 노드, 프레임, 스티키 노트의 드래그 이동 및 크기 조절 시 $16\text{px}$ 단위의 정밀 양자화(Quantization)를 적용합니다.
 
 $$x_{\text{snapped}} = \text{round}\left(\frac{x}{16.0}\right) \times 16.0, \quad y_{\text{snapped}} = \text{round}\left(\frac{y}{16.0}\right) \times 16.0$$
@@ -44,8 +53,10 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 
 ## 3. 고성능 렌더링 파이프라인 및 공간 분할 색인
 
-### 3.1 Single-Pass Batch Rendering
-프레임당 다수의 개별 드로우콜 및 `glClear`를 배제하고, 화면에 보이는 뷰포트 영역(Culling Box) 내의 노드와 와이어만을 선별하여 단일 지오메트리 패스로 일괄 렌더링합니다.
+### 3.1 Two-Pass Z-Order 렌더링 및 `glClear` 노드 깊이 격리 (ADR-014)
+* **결함 없는 아이템 깊이 버퍼 격리**: 3D 아이템 모델과 2D 배경/텍스트 간의 Z-clipping 간섭을 방지하기 위해 노드 단위로 `bufferSource().endBatch()` 및 `RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX)`를 적용하여 깊이 버퍼를 완전 격리합니다.
+* **Two-Pass Z-Order 렌더링**: 비선택 노드를 1차 패스에서 먼저 그리고, 선택 및 조작 중인 노드(`isNodeSelected`)를 지연 큐에 수집하여 2차 패스에서 최상단에 렌더링함으로써 레이어링 순서를 엄격히 보장합니다.
+* **$O(1)$ 포트 통계 캐싱 및 텍스트 캐시 (`NodeCardTextCache`)**: 노드 카드 타이틀 절삭, 포트 수치 및 파워 레이블 포맷팅을 dirty 플래그 기반으로 캐싱하여 렌더링 오버헤드를 극소화합니다.
 
 ### 3.2 $128 \times 128$ AABB 균일 그리드 공간 분할 와이어 색인 (`WireSpatialIndex`)
 1,000개 이상의 복잡한 와이어 네트워크에서 마우스 호버 및 클릭 감지를 $O(E)$ 전수 검사에서 **$O(\log E)$ 공간 분할 색인**으로 최적화합니다.

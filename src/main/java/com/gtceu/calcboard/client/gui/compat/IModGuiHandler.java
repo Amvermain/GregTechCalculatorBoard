@@ -39,6 +39,15 @@ public interface IModGuiHandler {
     /**
      * Renders Section 1 (Top Header / Machine Base Settings) inside MachineConfigDialog.
      */
+    default void renderDialogHeader(MachineConfigDialog dialog, GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int dialogW,
+                                    int mouseX, int mouseY, float partialTicks,
+                                    EditBox parallelBox, BoardScreen parent) {
+        renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    /**
+     * Renders Section 1 (Top Header / Machine Base Settings) inside MachineConfigDialog (legacy fallback).
+     */
     default void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int dialogW,
                                     int mouseX, int mouseY, float partialTicks,
                                     EditBox parallelBox, BoardScreen parent) {}

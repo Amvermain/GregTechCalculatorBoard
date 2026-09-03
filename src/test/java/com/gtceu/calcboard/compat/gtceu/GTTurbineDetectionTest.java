@@ -150,4 +150,95 @@ public class GTTurbineDetectionTest {
         assertTrue(cats.contains(AddonCategory.COIL), "CHEF must have COIL category");
         assertTrue(cats.contains(AddonCategory.ENERGY_HATCH), "CHEF must have ENERGY_HATCH category");
     }
+
+    @Test
+    @DisplayName("Verify that a non-turbine multiblock using rotor holder as building block is NOT classified as turbine")
+    void testBuildingBlockUsingRotorHolderIsNotClassifiedAsTurbine() {
+        ResourceLocation crackerId = ResourceLocation.tryParse("gtceu:cracker");
+        ResourceLocation crackingCat = ResourceLocation.tryParse("gtceu:cracker");
+
+        RecipeNode node = RecipeNode.create(crackerId, "Oil Cracking Unit", 1.0, 120.0, GTVoltageTier.MV);
+        node.setRecipeCategoryId(crackingCat);
+        node.setMultiblock(true);
+        node.setMachineIcon(crackerId);
+
+        assertFalse(node.isTurbine(), "Cracker using rotor holder as casing must NOT be classified as a turbine");
+        assertFalse(node.isLargeTurbine(), "Cracker must NOT be classified as large turbine");
+        assertFalse(MultiblockDetector.isTurbineMachine(crackerId));
+
+        List<AddonCategory> cats = MachineAddon.getRelevantCategories(node);
+        assertFalse(cats.contains(AddonCategory.ROTOR), "Cracker must NOT have ROTOR category");
+    }
+
+    @Test
+    @DisplayName("Verify Large Gas Turbine with official GTCEu naming has ROTOR category")
+    void testLargeGasTurbineDetectionAndRotorCategory() {
+        ResourceLocation gasTurbineId = ResourceLocation.tryParse("gtceu:gas_large_turbine");
+        ResourceLocation fuelCatId = ResourceLocation.tryParse("gtceu:gas_turbine_fuels");
+        MultiblockDetector.registerTurbine(gasTurbineId, fuelCatId, GTVoltageTier.EV, 4096.0);
+
+        RecipeNode node = RecipeNode.create(gasTurbineId, "Gas Turbine (Nitrobenzene)", 1.0, 4096.0, GTVoltageTier.EV);
+        node.setRecipeCategoryId(fuelCatId);
+        node.setMultiblock(true);
+        node.setMachineIcon(gasTurbineId);
+
+        assertTrue(node.isTurbine(), "Gas turbine node must be recognized as turbine");
+        assertTrue(node.isLargeTurbine(), "Gas turbine multiblock must be recognized as large turbine");
+
+        List<AddonCategory> cats = MachineAddon.getRelevantCategories(node);
+        assertTrue(cats.contains(AddonCategory.ROTOR), "Gas turbine must include ROTOR category");
+        assertTrue(cats.contains(AddonCategory.MAINTENANCE), "Gas turbine must include MAINTENANCE category");
+    }
+
+    @Test
+    @DisplayName("Verify Large Steam Turbine with official GTCEu naming has ROTOR category")
+    void testLargeSteamTurbineDetectionAndRotorCategory() {
+        ResourceLocation steamTurbineId = ResourceLocation.tryParse("gtceu:steam_large_turbine");
+        ResourceLocation steamCatId = ResourceLocation.tryParse("gtceu:steam_turbine_fuels");
+        MultiblockDetector.registerTurbine(steamTurbineId, steamCatId, GTVoltageTier.HV, 1024.0);
+
+        RecipeNode node = RecipeNode.create(steamTurbineId, "Large Steam Turbine", 1.0, 1024.0, GTVoltageTier.HV);
+        node.setRecipeCategoryId(steamCatId);
+        node.setMultiblock(true);
+        node.setMachineIcon(steamTurbineId);
+
+        assertTrue(node.isTurbine(), "Steam turbine node must be recognized as turbine");
+        assertTrue(node.isLargeTurbine(), "Steam turbine multiblock must be recognized as large turbine");
+
+        List<AddonCategory> cats = MachineAddon.getRelevantCategories(node);
+        assertTrue(cats.contains(AddonCategory.ROTOR), "Steam turbine must include ROTOR category");
+    }
+
+    @Test
+    @DisplayName("Verify Large Plasma Turbine with official GTCEu naming has ROTOR category")
+    void testLargePlasmaTurbineDetectionAndRotorCategory() {
+        ResourceLocation plasmaTurbineId = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
+        ResourceLocation plasmaCatId = ResourceLocation.tryParse("gtceu:plasma_generator_fuels");
+        MultiblockDetector.registerTurbine(plasmaTurbineId, plasmaCatId, GTVoltageTier.IV, 16384.0);
+
+        RecipeNode node = RecipeNode.create(plasmaTurbineId, "Large Plasma Turbine", 1.0, 16384.0, GTVoltageTier.IV);
+        node.setRecipeCategoryId(plasmaCatId);
+        node.setMultiblock(true);
+        node.setMachineIcon(plasmaTurbineId);
+
+        assertTrue(node.isTurbine(), "Plasma turbine node must be recognized as turbine");
+        assertTrue(node.isLargeTurbine(), "Plasma turbine multiblock must be recognized as large turbine");
+
+        List<AddonCategory> cats = MachineAddon.getRelevantCategories(node);
+        assertTrue(cats.contains(AddonCategory.ROTOR), "Plasma turbine must include ROTOR category");
+    }
+
+    @Test
+    @DisplayName("Verify bidirectional alias mapping between official and legacy turbine IDs")
+    void testTurbineBidirectionalAliasRegistration() {
+        ResourceLocation officialGas = ResourceLocation.tryParse("gtceu:gas_large_turbine");
+        ResourceLocation legacyGas = ResourceLocation.tryParse("gtceu:large_gas_turbine");
+
+        MultiblockDetector.registerTurbine(officialGas, null, GTVoltageTier.EV, 4096.0);
+
+        assertTrue(MultiblockDetector.isTurbineMachine(officialGas));
+        assertTrue(MultiblockDetector.isTurbineMachine(legacyGas));
+        assertEquals(GTVoltageTier.EV, MultiblockDetector.getTurbineBaseTier(officialGas));
+        assertEquals(GTVoltageTier.EV, MultiblockDetector.getTurbineBaseTier(legacyGas));
+    }
 }

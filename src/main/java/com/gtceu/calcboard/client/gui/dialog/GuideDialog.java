@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.dialog;
 
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -167,7 +168,7 @@ public class GuideDialog {
         graphics.renderOutline(contentX - 4, contentY - 4, contentW + 8, contentH + 8, 0xFF222B3B);
 
         // Scissor viewport for smooth text scrolling
-        graphics.enableScissor(contentX - 2, contentY - 2, contentX + contentW + 2, contentY + contentH + 2);
+        BoardScissorHelper.enableScissor(graphics, contentX - 2, contentY - 2, contentX + contentW + 2, contentY + contentH + 2);
 
         GuideCategory activeCat = categories[activeCategoryIndex];
         int renderY = contentY - scrollOffset;
@@ -221,7 +222,7 @@ public class GuideDialog {
             }
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
         graphics.pose().popPose();
     }
 

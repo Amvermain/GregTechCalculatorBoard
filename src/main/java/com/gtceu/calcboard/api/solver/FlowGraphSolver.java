@@ -99,6 +99,13 @@ public final class FlowGraphSolver {
     }
 
     /**
+     * Computes the balance summary using existing node efficiencies and port states without re-evaluating efficiencies.
+     */
+    public static BalanceSummary computeSummaryPreservingEfficiencies(FlowGraph graph) {
+        return FlowSummaryAggregator.computeSummaryPreservingEfficiencies(graph);
+    }
+
+    /**
      * Optimizes all node tiers and machine counts for maximum throughput.
      */
     public static void optimizeMaxThroughput(FlowGraph graph, boolean preferParallels, boolean integerCounts) {

@@ -75,5 +75,19 @@ public enum GTVoltageTier {
         if (index >= values().length) return MAX;
         return values()[index];
     }
+
+    public static GTVoltageTier fromVoltage(long voltage) {
+        return getTierForVoltage(voltage);
+    }
+
+    public static GTVoltageTier fromName(String name) {
+        if (name == null || name.isEmpty()) return null;
+        for (GTVoltageTier t : values()) {
+            if (t.name().equalsIgnoreCase(name) || t.getName().equalsIgnoreCase(name)) {
+                return t;
+            }
+        }
+        return null;
+    }
 }
 

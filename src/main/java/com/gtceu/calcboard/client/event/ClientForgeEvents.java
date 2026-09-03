@@ -26,6 +26,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import com.gtceu.calcboard.client.command.CalcBoardClientCommands;
+import com.gtceu.calcboard.client.gui.compat.InventoryProfilesNextCompat;
 import com.gtceu.calcboard.client.storage.ClientPreferenceManager;
 import com.gtceu.calcboard.config.CalcBoardClientConfig;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
@@ -160,6 +161,14 @@ public class ClientForgeEvents {
             ClientPreferenceManager.getInstance().markWelcomeMessageSeen();
             RecipeSearchDialog.notifyFavoritesChanged();
             RecipeSearchDialog.ensureGlobalRecipesCachedAsync(null);
+            InventoryProfilesNextCompat.ensureIntegrationHintInstalled();
+        }
+    }
+
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void onScreenInitPost(ScreenEvent.Init.Post event) {
+        if (event.getScreen() instanceof BoardScreen boardScreen) {
+            boardScreen.clearForeignWidgets();
         }
     }
 

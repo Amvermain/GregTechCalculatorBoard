@@ -64,12 +64,33 @@ public class MultiblockDetector {
             MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
             if (baseTier != null) TURBINE_BASE_TIERS.put(controllerId, baseTier);
             if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(controllerId, baseProduction);
+
+            ResourceLocation alias = getTurbineAlias(controllerId);
+            if (alias != null && !alias.equals(controllerId)) {
+                TURBINE_CONTROLLERS.add(alias);
+                MULTIBLOCK_RECIPE_CONTROLLERS.add(alias);
+                if (baseTier != null) TURBINE_BASE_TIERS.put(alias, baseTier);
+                if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(alias, baseProduction);
+            }
         }
         if (recipeCategoryId != null) {
             TURBINE_RECIPE_CATEGORIES.add(recipeCategoryId);
             if (baseTier != null) TURBINE_BASE_TIERS.put(recipeCategoryId, baseTier);
             if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(recipeCategoryId, baseProduction);
         }
+    }
+
+    public static ResourceLocation getTurbineAlias(ResourceLocation id) {
+        if (id == null) return null;
+        String path = id.getPath();
+        if (path.startsWith("large_") && path.endsWith("_turbine")) {
+            String middle = path.substring("large_".length(), path.length() - "_turbine".length());
+            return ResourceLocation.tryParse(id.getNamespace() + ":" + middle + "_large_turbine");
+        } else if (path.endsWith("_large_turbine")) {
+            String prefix = path.substring(0, path.length() - "_large_turbine".length());
+            return ResourceLocation.tryParse(id.getNamespace() + ":large_" + prefix + "_turbine");
+        }
+        return null;
     }
 
     public static void registerBatchModeMultiblock(ResourceLocation controllerId) {
@@ -583,7 +604,12 @@ public class MultiblockDetector {
         if (!initialized && !initializing) {
             initialize();
         }
-        return TURBINE_BASE_TIERS.get(id);
+        GTVoltageTier tier = TURBINE_BASE_TIERS.get(id);
+        if (tier == null) {
+            ResourceLocation alias = getTurbineAlias(id);
+            if (alias != null) tier = TURBINE_BASE_TIERS.get(alias);
+        }
+        return tier;
     }
 
     public static Double getTurbineBaseProduction(ResourceLocation id) {
@@ -591,7 +617,12 @@ public class MultiblockDetector {
         if (!initialized && !initializing) {
             initialize();
         }
-        return TURBINE_BASE_PRODUCTIONS.get(id);
+        Double prod = TURBINE_BASE_PRODUCTIONS.get(id);
+        if (prod == null) {
+            ResourceLocation alias = getTurbineAlias(id);
+            if (alias != null) prod = TURBINE_BASE_PRODUCTIONS.get(alias);
+        }
+        return prod;
     }
 
     public static boolean isMultiblock(ResourceLocation workstationId) {
@@ -608,7 +639,7 @@ public class MultiblockDetector {
         if (THREADING_MAX_HELIX_CAPACITY.containsKey(workstationId)) return true;
         if (MultiblockStructureCatalog.getStructure(workstationId) != null) return true;
         String path = workstationId.getPath().toLowerCase(Locale.ROOT);
-        return path.contains("fusion_reactor") || path.contains("auxiliary_fusion") || path.contains("auxiliary_booster");
+        return path.endsWith("fusion_reactor") || path.contains("auxiliary_fusion") || path.contains("auxiliary_booster");
     }
 
     public static boolean isCoilMultiblock(ResourceLocation workstationId) {
@@ -645,7 +676,26 @@ public class MultiblockDetector {
         if (!initialized && !initializing) {
             initialize();
         }
-        return TURBINE_CONTROLLERS.contains(workstationId);
+        if (TURBINE_CONTROLLERS.contains(workstationId)) return true;
+
+        ResourceLocation alias = getTurbineAlias(workstationId);
+        if (alias != null && TURBINE_CONTROLLERS.contains(alias)) {
+            registerTurbine(workstationId, null, null, 0.0);
+            return true;
+        }
+
+        var def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(workstationId);
+        if (def == null && alias != null) {
+            def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(alias);
+        }
+        if (def != null && def.supportsAbility("ROTOR_HOLDER")) {
+            if (!isCoilMultiblock(workstationId) && (workstationId.getPath().contains("turbine") || (alias != null && alias.getPath().contains("turbine")))) {
+                registerTurbine(workstationId, null, null, 0.0);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static boolean isTurbineRecipeCategory(ResourceLocation categoryId) {
@@ -923,17 +973,17 @@ public class MultiblockDetector {
 
         int count = 0;
         for (var part : defStruct.parts()) {
-            if (part != null && part.itemId() != null && isHelixPartPath(part.itemId().getPath())) {
+            if (part != null && part.itemId() != null && isHelixPart(part.itemId())) {
                 count = Math.max(count, part.amount());
             }
         }
         return count;
     }
 
-    private static boolean isHelixPartPath(String path) {
-        return path.contains("thread_helix") || path.contains("threading_helix")
-                || path.contains("supreme_helix") || path.contains("overdrive_helix")
-                || path.contains("coprocessor_helix") || path.contains("weaver_helix");
+    private static boolean isHelixPart(ResourceLocation itemId) {
+        if (itemId == null) return false;
+        return com.gtceu.calcboard.api.type.GTThreadingHelix.fromId(itemId) != null
+                || com.gtceu.calcboard.api.type.GTThreadingHelix.fromId(itemId.toString()) != null;
     }
 
     public static ResourceLocation extractRecipeTypeId(Object rt) {

@@ -27,7 +27,7 @@ public class BoardHudRenderer {
         if (baseGridSize <= 0) baseGridSize = 16;
 
         int visualStep = baseGridSize;
-        while (visualStep * zoom < 10.0) {
+        while (visualStep * zoom < 36.0) {
             visualStep *= 2;
         }
 

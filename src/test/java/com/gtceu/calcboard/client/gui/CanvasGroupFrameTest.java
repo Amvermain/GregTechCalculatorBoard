@@ -379,6 +379,107 @@ public class CanvasGroupFrameTest {
         Assertions.assertEquals(30, frame.getPosX(), 0.001);
         Assertions.assertEquals(40, frame.getPosY(), 0.001);
     }
+
+    @Test
+    public void testSharedMachineFrameRequiredMachinesAndMinimumWidth() {
+        FlowGraph graph = new FlowGraph();
+        RecipeNode n1 = RecipeNode.create("Gas Turbine (Benzene)", 40, 32, GTVoltageTier.EV);
+        n1.setPos(50, 50);
+        n1.setCardWidth(180);
+        n1.setCardHeight(100);
+        n1.setMachineCount(1.0);
+        graph.addNode(n1);
+
+        RecipeNode n2 = RecipeNode.create("Gas Turbine (Nitrobenzene)", 40, 32, GTVoltageTier.EV);
+        n2.setPos(50, 180); // Vertically stacked in 1 column
+        n2.setCardWidth(180);
+        n2.setCardHeight(100);
+        n2.setMachineCount(1.0);
+        graph.addNode(n2);
+
+        CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes("Shared Machine Pool", List.of(n1, n2), CanvasGroupFrame.COLOR_CYAN);
+        frame.setSharedMachineFrame(true);
+        graph.addFrame(frame);
+
+        // Required machines: 1.0 + 1.0 = 2.0 -> 2 physical machines
+        Assertions.assertEquals(2.0, frame.computeTotalMachineDuty(graph), 0.001);
+        Assertions.assertEquals(2, frame.computeRequiredMachines(graph));
+
+        // Auto-fit should enforce MIN_SHARED_FRAME_WIDTH (250px) even though nodes are only 180px wide
+        frame.autoFit(graph, 16.0);
+        Assertions.assertTrue(frame.getWidth() >= CanvasGroupFrame.MIN_SHARED_FRAME_WIDTH,
+                "Shared frame width must be at least " + CanvasGroupFrame.MIN_SHARED_FRAME_WIDTH + ", but was " + frame.getWidth());
+    }
+
+    @Test
+    public void testClosedLoopModuleGroupingPreservesRatesAndPower() {
+        FlowGraph graph = new FlowGraph();
+
+        // 1. External Supplier: feeds raw Chlorine (100 mB/s)
+        RecipeNode extSupplier = RecipeNode.create("Electrolyzer", 20, 30, GTVoltageTier.LV);
+        extSupplier.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:chlorine"), "Chlorine", 100.0, 1.0));
+        graph.addNode(extSupplier);
+
+        // 2. Internal Node 1: Chemical Reactor
+        // Inputs: Chlorine (100 mB/s), Recycle Fluid (50 mB/s)
+        // Outputs: Intermediate Mix (100 mB/s)
+        RecipeNode internal1 = RecipeNode.create("Chemical Reactor", 20, 120, GTVoltageTier.MV);
+        internal1.setPos(200, 100);
+        internal1.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:chlorine"), "Chlorine", 100.0, 1.0));
+        internal1.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:recycle_fluid"), "Recycle Fluid", 50.0, 1.0));
+        internal1.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:intermediate_mix"), "Intermediate Mix", 100.0, 1.0));
+        graph.addNode(internal1);
+
+        // 3. Internal Node 2: Distillation Tower
+        // Inputs: Intermediate Mix (100 mB/s)
+        // Outputs: Final Product (50 mB/s), Recycle Fluid (50 mB/s)
+        RecipeNode internal2 = RecipeNode.create("Distillation Tower", 20, 240, GTVoltageTier.HV);
+        internal2.setPos(500, 100);
+        internal2.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:intermediate_mix"), "Intermediate Mix", 100.0, 1.0));
+        internal2.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:final_product"), "Final Product", 50.0, 1.0));
+        internal2.getOutputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:recycle_fluid"), "Recycle Fluid", 50.0, 1.0));
+        graph.addNode(internal2);
+
+        // 4. External Consumer: consumes Final Product (50 mB/s)
+        RecipeNode extConsumer = RecipeNode.create("Packer", 20, 30, GTVoltageTier.LV);
+        extConsumer.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:final_product"), "Final Product", 50.0, 1.0));
+        graph.addNode(extConsumer);
+
+        // Connections:
+        // extSupplier -> internal1 (Chlorine)
+        graph.addConnection(extSupplier.getId(), 0, internal1.getId(), 0);
+        // internal1 -> internal2 (Intermediate Mix)
+        graph.addConnection(internal1.getId(), 0, internal2.getId(), 0);
+        // internal2 -> internal1 (Recycle Fluid - internal closed loop)
+        graph.addConnection(internal2.getId(), 1, internal1.getId(), 1);
+        // internal2 -> extConsumer (Final Product)
+        graph.addConnection(internal2.getId(), 0, extConsumer.getId(), 0);
+
+        // Pre-group summary: verify expected power and rates
+        com.gtceu.calcboard.api.solver.BalanceSummary preSummary = com.gtceu.calcboard.api.solver.FlowGraphSolver.computeSummary(graph);
+        double expectedTotalPower = preSummary.totalEUt();
+        Assertions.assertTrue(expectedTotalPower > 400.0, "Pre-group power should be sum of all 4 machines");
+
+        // Group internal1 and internal2 into Module
+        RecipeNode module = graph.groupIntoModule(Set.of(internal1.getId(), internal2.getId()), "Chemical Complex");
+        Assertions.assertNotNull(module);
+        Assertions.assertTrue(module.isModule());
+
+        // External connections on graph should be 2: extSupplier -> module, module -> extConsumer
+        Assertions.assertEquals(2, graph.getConnections().size(), "External connections should be rewired to module");
+
+        // Post-group summary: power and flow rates MUST be preserved!
+        com.gtceu.calcboard.api.solver.BalanceSummary postSummary = com.gtceu.calcboard.api.solver.FlowGraphSolver.computeSummary(graph);
+        Assertions.assertEquals(expectedTotalPower, postSummary.totalEUt(), 0.1, "Total power must be preserved after grouping into module");
+
+        // Expand module back: verify roundtrip
+        boolean expanded = graph.expandModule(module);
+        Assertions.assertTrue(expanded);
+        Assertions.assertEquals(4, graph.getConnections().size(), "All 4 connections including loop must be restored");
+
+        com.gtceu.calcboard.api.solver.BalanceSummary restoredSummary = com.gtceu.calcboard.api.solver.FlowGraphSolver.computeSummary(graph);
+        Assertions.assertEquals(expectedTotalPower, restoredSummary.totalEUt(), 0.1, "Total power must be preserved after expanding module");
+    }
 }
 
 

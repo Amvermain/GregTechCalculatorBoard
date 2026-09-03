@@ -61,9 +61,16 @@ public class NodeWidget {
         invalidateCache();
     }
 
+    private final com.gtceu.calcboard.client.gui.render.NodeCardTextCache textCache = new com.gtceu.calcboard.client.gui.render.NodeCardTextCache();
+
+    public com.gtceu.calcboard.client.gui.render.NodeCardTextCache getTextCache() {
+        return textCache;
+    }
+
     public void invalidateCache() {
         this.cachedInputRates = null;
         this.cachedOutputRates = null;
+        this.textCache.markDirty();
         if (parent != null) {
             parent.markSummaryDirty();
         }
@@ -518,8 +525,15 @@ public class NodeWidget {
 
         int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
         int maxIdx = GTVoltageTier.values().length - 1;
-        if (node.isTurbine() && !node.isMultiblock()) {
-            maxIdx = GTVoltageTier.HV.ordinal();
+        if (node.isTurbine()) {
+            if (node.isMultiblock()) {
+                GTVoltageTier baseTier = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineBaseTier(node);
+                if (baseTier != null) {
+                    minIdx = Math.max(minIdx, baseTier.ordinal());
+                }
+            } else {
+                maxIdx = GTVoltageTier.HV.ordinal();
+            }
         }
 
         boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
@@ -625,7 +639,9 @@ public class NodeWidget {
             return false;
         }
 
-        int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
+        int curIdx = node.isLargeTurbine()
+                ? com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderTier(node).ordinal()
+                : (node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal());
         int newIdx = curIdx + direction;
 
         if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
@@ -646,6 +662,9 @@ public class NodeWidget {
         GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
 
         node.setTargetTier(newTier);
+        if (node.isLargeTurbine()) {
+            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setRotorHolderTier(node, newTier);
+        }
         if (!node.isMultiblock()) {
             ResourceLocation sbWs = node.getWorkstationForTier(newTier);
             if (sbWs != null) {

@@ -58,20 +58,18 @@ public final class GTCEuMachineAnalyzer {
         boolean isTurbine = isMb && !isCoil && (
                 GTCEuReflectionBridge.isLargeTurbineClass(mCls)
                         || GTCEuReflectionBridge.isITurbineClass(mCls)
+                        || (scannedAbilities.contains("ROTOR_HOLDER") && GTCEuReflectionBridge.hasTurbineSignature(def))
         );
 
         GTVoltageTier turbineTier = null;
         double baseEnergy = 0.0;
         if (isTurbine) {
-            turbineTier = GTCEuReflectionBridge.getMachineTier(def);
-            if (turbineTier == null) {
-                turbineTier = GTVoltageTier.HV;
-            }
-            baseEnergy = GTCEuReflectionBridge.getTurbineBaseEnergy(def, turbineTier);
+            GTCEuReflectionBridge.TurbineSpecs specs = GTCEuReflectionBridge.deductTurbineSpecs(def);
+            turbineTier = specs.tier();
+            baseEnergy = specs.baseEnergy();
         }
 
-        boolean isSteam = def.getClass().getSimpleName().startsWith("Steam")
-                || def.getClass().getSimpleName().contains("SteamParallel");
+        boolean isSteam = MultiblockDetector.isSteamMultiblock(id) || GTCEuReflectionBridge.isSteamMachine(def);
 
         double steamDrainRate = isSteam ? GTCEuReflectionBridge.getSteamDrainRate(def) : 0.0;
         int innatePar = GTCEuReflectionBridge.getDefaultParallel(def);

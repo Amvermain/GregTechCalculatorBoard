@@ -39,6 +39,11 @@ public final class GTTurbineHelper {
             return true;
         }
 
+        ResourceLocation mbWs = node.getMultiblockWorkstation();
+        if (mbWs != null && MultiblockDetector.isTurbineMachine(mbWs)) {
+            return true;
+        }
+
         ResourceLocation machineIcon = node.getMachineIcon();
         if (machineIcon != null && MultiblockDetector.isTurbineMachine(machineIcon)) {
             return true;
@@ -157,14 +162,19 @@ public final class GTTurbineHelper {
     public static GTVoltageTier getRotorHolderTier(RecipeNode node) {
         if (node == null) return GTVoltageTier.HV;
         GTVoltageTier baseTier = getTurbineBaseTier(node);
+        GTVoltageTier targetTier = node.getTargetTier();
         GTVoltageTier customTier = node.getProperties().get(GTCEuProperties.ROTOR_HOLDER_TIER);
-        if (customTier != null) {
-            return clampToMinimumRotorHolderTier(customTier, baseTier);
+
+        if (targetTier != null) {
+            GTVoltageTier effective = clampToMinimumRotorHolderTier(targetTier, baseTier);
+            if (customTier != effective) {
+                node.getProperties().set(GTCEuProperties.ROTOR_HOLDER_TIER, effective);
+            }
+            return effective;
         }
 
-        GTVoltageTier targetTier = node.getTargetTier();
-        if (targetTier != null) {
-            return clampToMinimumRotorHolderTier(targetTier, baseTier);
+        if (customTier != null) {
+            return clampToMinimumRotorHolderTier(customTier, baseTier);
         }
 
         return clampToMinimumRotorHolderTier(baseTier, baseTier);
@@ -173,7 +183,9 @@ public final class GTTurbineHelper {
     public static void setRotorHolderTier(RecipeNode node, GTVoltageTier tier) {
         if (node == null || tier == null) return;
         GTVoltageTier baseTier = getTurbineBaseTier(node);
-        node.getProperties().set(GTCEuProperties.ROTOR_HOLDER_TIER, clampToMinimumRotorHolderTier(tier, baseTier));
+        GTVoltageTier clamped = clampToMinimumRotorHolderTier(tier, baseTier);
+        node.getProperties().set(GTCEuProperties.ROTOR_HOLDER_TIER, clamped);
+        node.setTargetTier(clamped);
     }
 
     public static GTVoltageTier getDynamoTier(RecipeNode node) {

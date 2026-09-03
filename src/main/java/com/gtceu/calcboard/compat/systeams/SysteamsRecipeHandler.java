@@ -119,27 +119,17 @@ public class SysteamsRecipeHandler {
         List<ResourceLocation> list = new java.util.ArrayList<>();
         list.add(ResourceLocation.tryParse("minecraft:water"));
 
-        try {
-            for (var sr : com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager.getGlobalRecipes()) {
-                if (sr.categoryId().equals("systeams:boiling") || sr.categoryId().equals("boiling") || "systeams".equals(sr.modId())) {
-                    if (sr.inputIds() != null) {
-                        for (ResourceLocation inId : sr.inputIds()) {
-                            if (inId != null && !list.contains(inId)) {
-                                list.add(inId);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        if (list.size() <= 1) {
-            ResourceLocation distWater = ResourceLocation.tryParse("gtceu:distilled_water");
-            ResourceLocation steam = ResourceLocation.tryParse("gtceu:steam");
-            if (com.gtceu.calcboard.api.util.ModCompatHelper.isGTLoaded()) {
-                if (!list.contains(distWater)) list.add(distWater);
-                if (!list.contains(steam)) list.add(steam);
-            }
+        ResourceLocation distWater = ResourceLocation.tryParse("gtceu:distilled_water");
+        ResourceLocation steam = ResourceLocation.tryParse("gtceu:steam");
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isGTLoaded() || com.gtceu.calcboard.api.util.ModCompatHelper.isSysteamsLoaded()) {
+            if (!list.contains(distWater)) list.add(distWater);
+            if (!list.contains(steam)) list.add(steam);
+        }
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isSysteamsLoaded()) {
+            ResourceLocation warmSteam = ResourceLocation.tryParse("systeams:warm_steam");
+            ResourceLocation hotSteam = ResourceLocation.tryParse("systeams:hot_steam");
+            if (!list.contains(warmSteam)) list.add(warmSteam);
+            if (!list.contains(hotSteam)) list.add(hotSteam);
         }
 
         return list;
@@ -152,27 +142,16 @@ public class SysteamsRecipeHandler {
                 return reflResult;
             }
 
-            try {
-                for (var sr : com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager.getGlobalRecipes()) {
-                    if (sr.categoryId().equals("systeams:boiling") || sr.categoryId().equals("boiling") || "systeams".equals(sr.modId())) {
-                        boolean inputMatches = false;
-                        if (sr.inputIds() != null) {
-                            for (ResourceLocation inId : sr.inputIds()) {
-                                if (inId != null && (inId.equals(inputFluidId) || inId.getPath().equals(inputFluidId.getPath()))) {
-                                    inputMatches = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (inputMatches && sr.outputIds() != null && sr.outputIds().length > 0) {
-                            ResourceLocation outId = sr.outputIds()[0];
-                            String outName = sr.outputNames().length > 0 ? sr.outputNames()[0] : "Steam";
-                            double ratio = getWaterToSteamRatio();
-                            return new BoiledFluidResult(outId, outName, ratio, 1.0);
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+            String path = inputFluidId.getPath();
+            if ("steam".equals(path)) {
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:warm_steam"), "Warm Steam", getWaterToSteamRatio(), 1.0);
+            }
+            if ("warm_steam".equals(path)) {
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:hot_steam"), "Hot Steam", getWaterToSteamRatio(), 1.0);
+            }
+            if ("hot_steam".equals(path)) {
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:superhot_steam"), "Superhot Steam", getWaterToSteamRatio(), 1.0);
+            }
         }
 
         ResourceLocation steamId = ResourceLocation.tryParse("gtceu:steam");

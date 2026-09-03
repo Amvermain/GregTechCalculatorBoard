@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.dialog;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -120,11 +121,11 @@ public class QuickPageSwitcherDialog {
         int maxScroll = Math.max(0, results.size() - visibleRows);
         scrollY = Math.max(0, Math.min(maxScroll, scrollY));
 
-        graphics.enableScissor(listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
+        BoardScissorHelper.enableScissor(graphics, listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
 
         if (results.isEmpty()) {
             graphics.drawCenteredString(font, "§7" + Component.translatable("gui.gtcalcboard.quick_switcher.no_results").getString(), listX + listW / 2, listY + listH / 2 - 4, 0xFF888888);
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
             return;
         }
 
@@ -134,7 +135,7 @@ public class QuickPageSwitcherDialog {
             renderResultRow(graphics, font, results.get(i), i, activeIdx, listX, listY, listW, i - startIdx, mouseX, mouseY);
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
     }
 
     private void renderResultRow(GuiGraphics graphics, Font font, SearchResult sr, int index, int activeIdx, int listX, int listY, int listW, int rowOffset, int mouseX, int mouseY) {

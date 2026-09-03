@@ -30,6 +30,7 @@ public class CanvasGroupFrame {
 
     public static final double HEADER_HEIGHT = 24.0;
     public static final double MIN_WIDTH = 120.0;
+    public static final double MIN_SHARED_FRAME_WIDTH = 250.0;
     public static final double MIN_HEIGHT = 80.0;
     public static final double DEFAULT_PADDING = 24.0;
 
@@ -153,7 +154,8 @@ public class CanvasGroupFrame {
         if (count > 0) {
             this.posX = minX - padding;
             this.posY = minY - padding - HEADER_HEIGHT;
-            this.width = Math.max(MIN_WIDTH, (maxX - minX) + padding * 2);
+            double minW = isSharedMachineFrame ? MIN_SHARED_FRAME_WIDTH : MIN_WIDTH;
+            this.width = Math.max(minW, (maxX - minX) + padding * 2);
             this.height = Math.max(MIN_HEIGHT, (maxY - minY) + padding * 2 + HEADER_HEIGHT);
         }
     }
@@ -345,7 +347,8 @@ public class CanvasGroupFrame {
     }
 
     public void setWidth(double width) {
-        this.width = Math.max(MIN_WIDTH, width);
+        double minW = isSharedMachineFrame ? MIN_SHARED_FRAME_WIDTH : MIN_WIDTH;
+        this.width = Math.max(minW, width);
     }
 
     public double getHeight() {

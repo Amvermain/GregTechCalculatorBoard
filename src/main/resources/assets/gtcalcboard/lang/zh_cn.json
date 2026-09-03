@@ -945,5 +945,19 @@
   "gui.gtcalcboard.junction.supply_mode.infinite": "无限供给 (无尽仓 / AE无限元件)",
   "gui.gtcalcboard.junction.supply_mode.fixed_rate": "固定外部供给速率",
   "gui.gtcalcboard.cancel_btn": "取消",
-  "gui.gtcalcboard.apply_btn": "应用"
+  "gui.gtcalcboard.apply_btn": "应用",
+  "gui.gtcalcboard.scale.auto": "自动 (游戏缩放)",
+  "gui.gtcalcboard.scale.1x": "1x (小)",
+  "gui.gtcalcboard.scale.2x": "2x (标准)",
+  "gui.gtcalcboard.scale.3x": "3x (大)",
+  "gui.gtcalcboard.scale.4x": "4x (特大)",
+  "gui.gtcalcboard.toolbar.auto": "自动 (自适应)",
+  "gui.gtcalcboard.toolbar.compact": "紧凑 (图标)",
+  "gui.gtcalcboard.toolbar.full": "完整 (文本)",
+  "gui.gtcalcboard.toolbar.more": "更多选项",
+  "gui.gtcalcboard.config.view_mode.grid": "切换至列表视图",
+  "gui.gtcalcboard.config.view_mode.list": "切换至网格视图",
+  "gui.gtcalcboard.settings.toolbar_mode_label": "工具栏模式:",
+  "gui.gtcalcboard.settings.gui_scale_label": "画板界面缩放:",
+  "gui.gtcalcboard.settings.addon_catalog_list_view": "附加组件目录默认列表视图"
 }

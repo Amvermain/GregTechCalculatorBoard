@@ -42,10 +42,18 @@ stateDiagram-v2
 | **[ADR-010](ADR_010_STATIC_REFLECTION_CACHING_AND_CLEAN_EXCEPTION.md)** | 리플렉션 정적 캐싱 및 예외 처리 무결성 개편 명세<br/>*(Static Reflection Caching & Clean Exception Handling)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 런타임 동적 리플렉션의 static final 1회 캐싱, $O(1)$ 직접 호출 최적화, bare catch 제거 및 Headless LinkageError 무결성 보장 |
 | **[ADR-011](ADR_011_CONTROL_FLOW_FLATTENING_AND_SELF_DESCRIPTIVE_CODE.md)** | 제어 흐름 평탄화 및 자기 서술적 클린 코드 정비 명세<br/>*(Control Flow Flattening & Self-Descriptive Code Refactoring)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.3` | 2026-09-01 | 중첩 깊이 1~2단계 평탄화, 조기 반환 가드 전면 적용, 나열 주석 전면 제거 및 CanvasInteractionHandler 3대 서브 핸들러 분해 |
 | **[ADR-012](ADR_012_BOARD_USABILITY_AND_PRECISION_FLOW_MODELING.md)** | 보드 사용성 개선 및 정밀 플로우 모델링 사양<br/>*(Board Usability & Precision Flow Modeling Architecture)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.4` | 2026-09-02 | 스크롤바 드래그 수정, 16px 격자 스냅, 프리셋 연동, 커스텀 병렬 정수 지정, 외부/무한 공급원 정션 노드 확장 |
+| **[ADR-014](ADR_014_CANVAS_GRAPHICS_PIPELINE_AND_FLOW_SOLVER_OPTIMIZATION.md)** | 대규모 노드 캔버스 그래픽 파이프라인 및 포트 플로우 계산 최적화 명세<br/>*(High-Density Canvas Graphics Pipeline & Port Flow Solver Optimization)* | 🟢 `IMPLEMENTED` | `v2.1.0-alpha.5` | 2026-09-03 | 노드별 glClear 제거, endBatch() 격리 유지, O(1) 포트 플로우 캐싱, 위젯 O(1) 해시 맵, 뷰포트 AABB 컬링, Medium LOD |
+| **[ADR-015](ADR_015_BACKGROUND_INDEXING_STABILIZATION_AND_PIPELINE_OPTIMIZATION.md)** | 백그라운드 레시피 인덱싱 파이프라인 및 머신 매트릭스 베이킹 최적화 명세<br/>*(Background Recipe Indexing Pipeline & Machine Capabilities Matrix Baking Optimization)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.1` | 2026-09-03 | Phase 3(75%) 클라이언트 프리징 해소, EMI 인덱싱 지연 베이킹, O(1) Set 기반 정렬 및 비동기 스레드 동기화 안정화 |
+| **[ADR-016](ADR_016_BOARD_SCREEN_MODULAR_DECOMPOSITION.md)** | BoardScreen 모듈화 분해 및 단일 책임 아키텍처 명세<br/>*(BoardScreen Modular Decomposition & Single Responsibility Architecture Specification)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.1` | 2026-09-03 | 1,920줄 모놀리식 BoardScreen을 BoardDialogManager, BoardCanvasRenderer, BoardActionHandler 4대 서브시스템으로 분해 및 65% 경량화 |
+| **[ADR-017](ADR_017_RESPONSIVE_GUI_SCALE_AND_ADAPTIVE_LAYOUT.md)** | GUI 배율 독립 분리 및 멀티블록 카탈로그·툴바 반응형 레이아웃<br/>*(Dedicated Board GUI Scale Decoupling & Multiblock Catalog Responsive Layout)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.1` | 2026-09-03 | 보드 전용 가상 뷰포트 배율 변환 엔진, 멀티블록 카탈로그 가변 행 및 원클릭 리스트 뷰, 적응형 툴바 및 `[...]` 오버플로우 메뉴 |
 
 ---
 
 ## 💡 활성 RFC 제안 목록 (Active RFC Proposals)
 
-*현재 활성화된 대기 중인 RFC 제안이 없습니다.*
+| 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
+| :---: | :--- | :---: | :---: | :---: | :--- |
+| **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PROPOSED` | `v2.1.0` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
+
+
 

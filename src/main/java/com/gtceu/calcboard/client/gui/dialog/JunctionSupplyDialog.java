@@ -137,8 +137,8 @@ public class JunctionSupplyDialog {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!visible || targetNode == null) return false;
 
-        int screenWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-        int screenHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
 
@@ -229,5 +229,13 @@ public class JunctionSupplyDialog {
             return rateEditBox.charTyped(codePoint, modifiers);
         }
         return false;
+    }
+
+    private int getScreenWidth() {
+        return parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }

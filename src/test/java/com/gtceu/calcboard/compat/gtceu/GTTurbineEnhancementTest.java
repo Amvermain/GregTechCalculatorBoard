@@ -369,4 +369,43 @@ class GTTurbineEnhancementTest {
         assertEquals(30, GTTurbineHelper.getTurbineHolderEfficiencyBonus(node));
         assertEquals(130, GTTurbineHelper.getTotalTurbineEfficiency(node));
     }
+
+    @Test
+    @DisplayName("Verify rotor holder tier and node target tier bidirectional synchronization")
+    void testRotorHolderTierAndNodeTargetTierBidirectionalSync() {
+        ResourceLocation gasTurbineId = ResourceLocation.tryParse("gtceu:gas_large_turbine");
+        RecipeNode node = RecipeNode.create(gasTurbineId, "Gas Turbine (Benzene)", 1.0, 4096.0, GTVoltageTier.EV);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:gas_turbine_fuels"));
+        node.setMultiblock(true);
+        node.setMachineIcon(gasTurbineId);
+
+        // Default: EV (base tier of Large Gas Turbine)
+        assertEquals(GTVoltageTier.EV, GTTurbineHelper.getRotorHolderTier(node));
+        assertEquals(GTVoltageTier.EV, node.getTargetTier());
+
+        // Internal panel change: Set holder to IV -> targetTier automatically syncs to IV
+        GTTurbineHelper.setRotorHolderTier(node, GTVoltageTier.IV);
+        assertEquals(GTVoltageTier.IV, GTTurbineHelper.getRotorHolderTier(node));
+        assertEquals(GTVoltageTier.IV, node.getTargetTier());
+
+        // NodeWidget level tier change simulation
+        com.gtceu.calcboard.client.gui.widget.NodeWidget widget = new com.gtceu.calcboard.client.gui.widget.NodeWidget(node);
+        assertTrue(widget.changeTier(1)); // IV -> LuV
+        assertEquals(GTVoltageTier.LuV, node.getTargetTier());
+        assertEquals(GTVoltageTier.LuV, GTTurbineHelper.getRotorHolderTier(node));
+
+        // Step down to base tier EV
+        assertTrue(widget.changeTier(-1)); // LuV -> IV
+        assertEquals(GTVoltageTier.IV, node.getTargetTier());
+        assertEquals(GTVoltageTier.IV, GTTurbineHelper.getRotorHolderTier(node));
+
+        assertTrue(widget.changeTier(-1)); // IV -> EV
+        assertEquals(GTVoltageTier.EV, node.getTargetTier());
+        assertEquals(GTVoltageTier.EV, GTTurbineHelper.getRotorHolderTier(node));
+
+        // Below base tier (EV) must be prevented for Large Gas Turbine
+        assertFalse(widget.changeTier(-1)); // EV -> MV prohibited
+        assertEquals(GTVoltageTier.EV, node.getTargetTier());
+        assertEquals(GTVoltageTier.EV, GTTurbineHelper.getRotorHolderTier(node));
+    }
 }

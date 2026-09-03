@@ -129,6 +129,12 @@ The mod is fully optional on both client and server:
 *   **Machine Hardware Template Cloner (`TemplateCloneDialog`)**: Extract tier, parallel, overclock, and addon configurations into named reusable templates and batch-inject them across selected nodes.
 *   **Enhanced Scrollbar State Machine**: Proportional track click jumping and global mouse drag tracking across all dialog search lists.
 
+#### Responsive UI Suite & Adaptive Hardware Catalog
+
+*   **Adaptive Responsive Toolbar (`ToolbarWidget`)**: Dynamically contracts board title (`GT Board`, `📟`) and collapses trailing buttons into a `[...]` overflow dropdown menu on narrow resolutions, with automatic padding to prevent minimap overlap.
+*   **Dynamic Addon Catalog & Compact List View (`AddonCatalogView`)**: Automatically scales catalog grid rows (2~5 rows) based on dialog height, with a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list view displaying 10+ addons without scrolling.
+*   **Dedicated Board GUI Scale Decoupling**: Independent virtual viewport scale transforms allow customizing board UI size without altering global Minecraft GUI scales.
+
 #### Compound Modules (Subgraphs)
 
 *   **Modularization (`Ctrl + Shift + G`) & Framing (`Ctrl + G`)**: Enclose nodes inside visual grouping frames or collapse entire subgraphs into a single composite module card.

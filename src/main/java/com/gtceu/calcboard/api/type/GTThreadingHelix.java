@@ -108,6 +108,14 @@ public enum GTThreadingHelix {
         return threading;
     }
 
+    public static GTThreadingHelix fromId(ResourceLocation id) {
+        if (id == null) return null;
+        for (GTThreadingHelix h : values()) {
+            if (h.id != null && h.id.equals(id)) return h;
+        }
+        return null;
+    }
+
     public static GTThreadingHelix fromId(String idStr) {
         if (idStr == null) return null;
         for (GTThreadingHelix h : values()) {

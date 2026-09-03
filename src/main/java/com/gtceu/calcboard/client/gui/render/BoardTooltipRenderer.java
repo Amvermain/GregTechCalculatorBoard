@@ -20,7 +20,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import org.joml.Vector2i;
+import org.joml.Vector2ic;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,11 +35,53 @@ import java.util.List;
  */
 public final class BoardTooltipRenderer {
 
+    public record VirtualTooltipPositioner(int screenWidth, int screenHeight) implements ClientTooltipPositioner {
+        @Override
+        public Vector2ic positionTooltip(int ignoredW, int ignoredH, int mouseX, int mouseY, int tooltipWidth, int tooltipHeight) {
+            Vector2i pos = new Vector2i(mouseX + 12, mouseY - 12);
+            if (pos.x + tooltipWidth > screenWidth) {
+                pos.x = Math.max(pos.x - 24 - tooltipWidth, 4);
+            }
+            int totalH = tooltipHeight + 3;
+            if (pos.y + totalH > screenHeight) {
+                pos.y = screenHeight - totalH;
+            }
+            if (pos.y < 4) {
+                pos.y = 4;
+            }
+            return pos;
+        }
+    }
+
+    public static ClientTooltipPositioner createPositioner(int screenWidth, int screenHeight) {
+        return new VirtualTooltipPositioner(screenWidth, screenHeight);
+    }
+
+    public static void renderComponentTooltip(GuiGraphics graphics, Font font, List<Component> lines, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+        if (lines == null || lines.isEmpty() || font == null || graphics == null) return;
+        List<FormattedCharSequence> formatted = lines.stream().map(Component::getVisualOrderText).toList();
+        graphics.renderTooltip(font, formatted, createPositioner(screenWidth, screenHeight), mouseX, mouseY);
+    }
+
+    public static void renderTooltip(GuiGraphics graphics, Font font, Component component, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+        if (component == null) return;
+        renderComponentTooltip(graphics, font, List.of(component), mouseX, mouseY, screenWidth, screenHeight);
+    }
+
     private BoardTooltipRenderer() {}
 
     public static void renderTooltips(BoardScreen screen, GuiGraphics graphics, Font font, int mouseX, int mouseY) {
         if (screen == null) return;
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0f, 0.0f, 1000.0f);
+        try {
+            renderTooltipsInternal(screen, graphics, font, mouseX, mouseY);
+        } finally {
+            graphics.pose().popPose();
+        }
+    }
 
+    private static void renderTooltipsInternal(BoardScreen screen, GuiGraphics graphics, Font font, int mouseX, int mouseY) {
         double canvasMouseX = screen.toCanvasX(mouseX);
         double canvasMouseY = screen.toCanvasY(mouseY);
         FlowGraph graph = screen.getGraph();
@@ -46,24 +92,24 @@ public final class BoardTooltipRenderer {
             NodeWidget widget = nodeWidgets.get(i);
             if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
                 if (widget.isCloseButtonHovered(canvasMouseX, canvasMouseY)) {
-                    graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.tooltip.remove_node")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.tooltip.remove_node")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
                 if (widget.isTargetButtonHovered(canvasMouseX, canvasMouseY)) {
-                    graphics.renderTooltip(font, Component.literal("§6🎯 ").append(Component.translatable("gui.gtcalcboard.tooltip.target_base")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§6🎯 ").append(Component.translatable("gui.gtcalcboard.tooltip.target_base")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
                 if (widget.isFlipButtonHovered(canvasMouseX, canvasMouseY)) {
                     String flipKey = widget.getNode().isFlipped() ? "gui.gtcalcboard.flip_direction.right_to_left" : "gui.gtcalcboard.flip_direction.left_to_right";
-                    graphics.renderTooltip(font, Component.literal("§b⇄ ").append(Component.translatable(flipKey)), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§b⇄ ").append(Component.translatable(flipKey)), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
                 if (widget.isExpandButtonHovered(canvasMouseX, canvasMouseY)) {
-                    graphics.renderTooltip(font, Component.literal("§d⤢ ").append(Component.translatable("gui.gtcalcboard.tooltip.expand_module")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§d⤢ ").append(Component.translatable("gui.gtcalcboard.tooltip.expand_module")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
                 if (widget.isSwitchButtonHovered(canvasMouseX, canvasMouseY)) {
-                    graphics.renderTooltip(font, Component.literal("§e🔄 ").append(Component.translatable("gui.gtcalcboard.switch_recipe.button")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§e🔄 ").append(Component.translatable("gui.gtcalcboard.switch_recipe.button")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -200,7 +246,7 @@ public final class BoardTooltipRenderer {
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
                     tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_hide").getString()));
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -278,7 +324,7 @@ public final class BoardTooltipRenderer {
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
                     tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_hide").getString()));
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -304,7 +350,7 @@ public final class BoardTooltipRenderer {
                             tooltipLines.add(Component.literal("§7[F3+H Debug] §8Machine Icon: §6" + n.getMachineIcon()));
                         }
                     }
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -315,7 +361,7 @@ public final class BoardTooltipRenderer {
                     String mName = n.getMachineDisplayName();
                     tooltipLines.add(Component.literal((n.isMultiblock() ? "§e🏛 " : "§b⚡ ") + mName));
                     tooltipLines.add(Component.literal("§7[Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString()));
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -350,7 +396,7 @@ public final class BoardTooltipRenderer {
                         tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
                         tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
                     }
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -362,7 +408,7 @@ public final class BoardTooltipRenderer {
                     List<Component> tooltipLines = new ArrayList<>();
                     tooltipLines.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.count").getString()));
                     tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Exact Count: §f%,.4f", widget.getNode().getMachineCount())));
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -445,7 +491,7 @@ public final class BoardTooltipRenderer {
                     }
 
                     tooltipLines.add(Component.literal("§e[ " + Component.translatable("gui.gtcalcboard.config.install").getString() + " / " + Component.translatable("gui.gtcalcboard.config.remove").getString() + " ]"));
-                    graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
             }
@@ -463,9 +509,9 @@ public final class BoardTooltipRenderer {
                     List<Component> lines = java.util.Arrays.stream(raw.split("\n"))
                             .<Component>map(Component::literal)
                             .toList();
-                    graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+                    renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
                 } else {
-                    graphics.renderTooltip(font, Component.translatable(hintKey), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.translatable(hintKey), mouseX, mouseY, screen.width, screen.height);
                 }
                 return;
             }
@@ -480,16 +526,16 @@ public final class BoardTooltipRenderer {
                 boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
 
                 if (searchHovered) {
-                    graphics.renderTooltip(font, Component.literal("§a🔍 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_search")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§a🔍 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_search")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 } else if (junctionHovered) {
-                    graphics.renderTooltip(font, Component.literal("§b🔀 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_junction")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§b🔀 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_junction")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 } else if (frameHovered) {
-                    graphics.renderTooltip(font, Component.literal("§d🖼 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_frame")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§d🖼 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_frame")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 } else if (noteHovered) {
-                    graphics.renderTooltip(font, Component.literal("§e📝 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_note")), mouseX, mouseY);
+                    renderTooltip(graphics, font, Component.literal("§e📝 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_note")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
             }

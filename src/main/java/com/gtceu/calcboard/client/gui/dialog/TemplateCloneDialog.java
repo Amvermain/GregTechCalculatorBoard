@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.template.MachineHardwareTemplate;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import net.minecraft.client.Minecraft;
@@ -165,11 +166,11 @@ public class TemplateCloneDialog {
         int maxScroll = Math.max(0, searchResults.size() - visibleRows);
         searchScrollY = Math.max(0, Math.min(maxScroll, searchScrollY));
 
-        graphics.enableScissor(listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
+        BoardScissorHelper.enableScissor(graphics, listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
 
         if (searchResults.isEmpty()) {
             graphics.drawCenteredString(font, "§7" + Component.translatable("gui.gtcalcboard.template_clone.no_recipes").getString(), listX + listW / 2, listY + listH / 2 - 4, 0xFF888888);
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
             return;
         }
 
@@ -178,7 +179,7 @@ public class TemplateCloneDialog {
             renderRecipeRow(graphics, font, searchResults.get(i), listX, listY, listW, i - startIdx, mouseX, mouseY);
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
     }
 
     private void renderRecipeRow(GuiGraphics graphics, Font font, SearchableRecipe r, int listX, int listY, int listW, int rowOffset, int mouseX, int mouseY) {

@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.ToolbarWidget;
 import net.minecraft.client.Minecraft;
@@ -329,7 +330,7 @@ public class AutoConnectFilterDialog {
         maxScrollY = Math.max(0, totalContentH - listH);
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
-        graphics.enableScissor(listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
+        BoardScissorHelper.enableScissor(graphics, listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
 
         int curY = listY + 2 - (int) scrollY;
         for (int i = 0; i < entries.size(); i++) {
@@ -377,7 +378,7 @@ public class AutoConnectFilterDialog {
             curY += rowH;
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Scrollbar
         if (maxScrollY > 0) {

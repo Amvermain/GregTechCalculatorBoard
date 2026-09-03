@@ -1,10 +1,11 @@
 package com.gtceu.calcboard.api.storage;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.type.BoardGuiScale;
 import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
-
+import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
 import com.gtceu.calcboard.api.type.WireColorPreset;
 
 import net.minecraft.nbt.CompoundTag;
@@ -16,9 +17,11 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BoardManager {
     private static final BoardManager INSTANCE = new BoardManager();
@@ -33,6 +36,9 @@ public class BoardManager {
     private boolean summaryOverlayCollapsed = false;
     private boolean hotkeyHudExpanded = true;
     private boolean favoritesDockExpanded = true;
+    private BoardGuiScale boardGuiScale = BoardGuiScale.AUTO;
+    private ToolbarDisplayMode toolbarDisplayMode = ToolbarDisplayMode.AUTO;
+    private boolean addonCatalogListView = false;
 
     private boolean showGuideButton = true;
     private boolean showTutorialButton = true;
@@ -48,7 +54,19 @@ public class BoardManager {
     private boolean gridSnapEnabled = false;
     private int gridSnapSize = 16;
 
+    private final Map<String, IBoardStorageExtension> storageExtensions = new ConcurrentHashMap<>();
+    private final Map<String, CompoundTag> pendingExtensionTags = new ConcurrentHashMap<>();
+
     private boolean autoLoaded = false;
+
+    public void registerStorageExtension(String key, IBoardStorageExtension extension) {
+        if (key == null || extension == null) return;
+        this.storageExtensions.put(key, extension);
+        CompoundTag pending = this.pendingExtensionTags.remove(key);
+        if (pending != null) {
+            extension.deserialize(pending);
+        }
+    }
 
     private BoardManager() {
         pages.add(BoardPage.createDefault("Page 1"));
@@ -80,6 +98,9 @@ public class BoardManager {
         this.summaryOverlayCollapsed = false;
         this.hotkeyHudExpanded = true;
         this.favoritesDockExpanded = true;
+        this.boardGuiScale = BoardGuiScale.AUTO;
+        this.toolbarDisplayMode = ToolbarDisplayMode.AUTO;
+        this.addonCatalogListView = false;
         this.showGuideButton = true;
         this.showTutorialButton = true;
         this.showTimeUnitButton = true;
@@ -94,7 +115,9 @@ public class BoardManager {
         this.gridSnapEnabled = false;
         this.gridSnapSize = 16;
         com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
-        com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().clear();
+        for (IBoardStorageExtension ext : this.storageExtensions.values()) {
+            ext.onReset();
+        }
         this.openPageIds.clear();
         this.openPageIds.add(this.pages.get(0).getId());
         this.autoLoaded = false;
@@ -712,6 +735,9 @@ public class BoardManager {
             rootTag.putBoolean("summaryOverlayCollapsed", summaryOverlayCollapsed);
             rootTag.putBoolean("hotkeyHudExpanded", hotkeyHudExpanded);
             rootTag.putBoolean("favoritesDockExpanded", favoritesDockExpanded);
+            rootTag.putString("boardGuiScale", getBoardGuiScale().name());
+            rootTag.putString("toolbarDisplayMode", getToolbarDisplayMode().name());
+            rootTag.putBoolean("addonCatalogListView", isAddonCatalogListView());
             rootTag.putBoolean("showGuideButton", showGuideButton);
             rootTag.putBoolean("showTutorialButton", showTutorialButton);
             rootTag.putBoolean("showTimeUnitButton", showTimeUnitButton);
@@ -726,7 +752,12 @@ public class BoardManager {
             rootTag.putBoolean("gridSnapEnabled", isGridSnapEnabled());
             rootTag.putInt("gridSnapSize", getGridSnapSize());
             rootTag.put("categoryPresets", com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().serializeNBT());
-            rootTag.put("ae2Bindings", com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().serializeNBT());
+            for (Map.Entry<String, IBoardStorageExtension> entry : this.storageExtensions.entrySet()) {
+                CompoundTag extTag = entry.getValue().serialize();
+                if (extTag != null) {
+                    rootTag.put(entry.getKey(), extTag);
+                }
+            }
 
             ListTag pageList = new ListTag();
             for (BoardPage page : pages) {
@@ -789,6 +820,19 @@ public class BoardManager {
                 if (rootTag.contains("favoritesDockExpanded")) {
                     this.favoritesDockExpanded = rootTag.getBoolean("favoritesDockExpanded");
                 }
+                if (rootTag.contains("boardGuiScale")) {
+                    try {
+                        this.boardGuiScale = BoardGuiScale.valueOf(rootTag.getString("boardGuiScale"));
+                    } catch (Exception ignored) {}
+                }
+                if (rootTag.contains("toolbarDisplayMode")) {
+                    try {
+                        this.toolbarDisplayMode = ToolbarDisplayMode.valueOf(rootTag.getString("toolbarDisplayMode"));
+                    } catch (Exception ignored) {}
+                }
+                if (rootTag.contains("addonCatalogListView")) {
+                    this.addonCatalogListView = rootTag.getBoolean("addonCatalogListView");
+                }
                 if (rootTag.contains("showGuideButton")) {
                     this.showGuideButton = rootTag.getBoolean("showGuideButton");
                 }
@@ -837,10 +881,15 @@ public class BoardManager {
                 } else {
                     com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
                 }
-                if (rootTag.contains("ae2Bindings", Tag.TAG_COMPOUND)) {
-                    com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().deserializeNBT(rootTag.getCompound("ae2Bindings"));
-                } else {
-                    com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().clear();
+                for (Map.Entry<String, IBoardStorageExtension> entry : this.storageExtensions.entrySet()) {
+                    if (rootTag.contains(entry.getKey(), Tag.TAG_COMPOUND)) {
+                        entry.getValue().deserialize(rootTag.getCompound(entry.getKey()));
+                    } else {
+                        entry.getValue().onReset();
+                    }
+                }
+                if (rootTag.contains("ae2Bindings", Tag.TAG_COMPOUND) && !this.storageExtensions.containsKey("ae2Bindings")) {
+                    this.pendingExtensionTags.put("ae2Bindings", rootTag.getCompound("ae2Bindings"));
                 }
                 if (rootTag.contains("pages", Tag.TAG_LIST)) {
                     ListTag pageList = rootTag.getList("pages", Tag.TAG_COMPOUND);
@@ -962,6 +1011,66 @@ public class BoardManager {
         }
         setHarmonizeSurplusTolerance(next);
         return next;
+    }
+
+    public BoardGuiScale getBoardGuiScale() {
+        return boardGuiScale != null ? boardGuiScale : BoardGuiScale.AUTO;
+    }
+
+    public void setBoardGuiScale(BoardGuiScale scale) {
+        this.boardGuiScale = scale != null ? scale : BoardGuiScale.AUTO;
+    }
+
+    public BoardGuiScale cycleBoardGuiScale() {
+        this.boardGuiScale = getBoardGuiScale().next();
+        saveForCurrentContext();
+        return this.boardGuiScale;
+    }
+
+    public ToolbarDisplayMode getToolbarDisplayMode() {
+        return toolbarDisplayMode != null ? toolbarDisplayMode : ToolbarDisplayMode.AUTO;
+    }
+
+    public void setToolbarDisplayMode(ToolbarDisplayMode mode) {
+        this.toolbarDisplayMode = mode != null ? mode : ToolbarDisplayMode.AUTO;
+    }
+
+    public ToolbarDisplayMode cycleToolbarDisplayMode() {
+        this.toolbarDisplayMode = getToolbarDisplayMode().next();
+        saveForCurrentContext();
+        return this.toolbarDisplayMode;
+    }
+
+    public boolean isAddonCatalogListView() {
+        return addonCatalogListView;
+    }
+
+    public void setAddonCatalogListView(boolean listView) {
+        this.addonCatalogListView = listView;
+    }
+
+    public CompoundTag serializePreferencesNBT() {
+        CompoundTag tag = new CompoundTag();
+        tag.putString("boardGuiScale", getBoardGuiScale().name());
+        tag.putString("toolbarDisplayMode", getToolbarDisplayMode().name());
+        tag.putBoolean("addonCatalogListView", isAddonCatalogListView());
+        return tag;
+    }
+
+    public void deserializePreferencesNBT(CompoundTag rootTag) {
+        if (rootTag.contains("boardGuiScale")) {
+            try {
+                this.boardGuiScale = BoardGuiScale.valueOf(rootTag.getString("boardGuiScale"));
+            } catch (Exception ignored) {}
+        }
+        if (rootTag.contains("toolbarDisplayMode")) {
+            try {
+                this.toolbarDisplayMode = ToolbarDisplayMode.valueOf(rootTag.getString("toolbarDisplayMode"));
+            } catch (Exception ignored) {}
+        }
+        if (rootTag.contains("addonCatalogListView")) {
+            this.addonCatalogListView = rootTag.getBoolean("addonCatalogListView");
+        }
     }
 }
 

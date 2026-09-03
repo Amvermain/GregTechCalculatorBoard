@@ -106,21 +106,32 @@ public final class GTTurbinePhysics {
             net.minecraft.resources.ResourceLocation mbWs = node.getMultiblockWorkstation();
             if (mbWs != null) {
                 node.setMachineIcon(mbWs);
-            } else if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("steam_turbine")) {
-                node.setMachineIcon(net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_steam_turbine"));
-            } else if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("gas_turbine")) {
-                node.setMachineIcon(net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_gas_turbine"));
-            } else if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("plasma_turbine")) {
-                node.setMachineIcon(net.minecraft.resources.ResourceLocation.tryParse("gtceu:large_plasma_turbine"));
+                return;
+            }
+            if (node.getRecipeCategoryId() != null) {
+                var cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
+                if (cap != null && cap.defaultWorkstation() != null) {
+                    node.setMachineIcon(cap.defaultWorkstation());
+                }
             }
         } else {
             com.gtceu.calcboard.api.type.GTVoltageTier tier = node.getTargetTier();
             if (tier == null) tier = com.gtceu.calcboard.api.type.GTVoltageTier.LV;
-            String prefix = tier.name().toLowerCase(java.util.Locale.ROOT);
-            if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("steam_turbine")) {
-                node.setMachineIcon(net.minecraft.resources.ResourceLocation.tryParse("gtceu:" + prefix + "_steam_turbine"));
-            } else if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("gas_turbine")) {
-                node.setMachineIcon(net.minecraft.resources.ResourceLocation.tryParse("gtceu:" + prefix + "_gas_turbine"));
+            net.minecraft.resources.ResourceLocation tierWs = com.gtceu.calcboard.api.model.NodeWorkstationResolver.getWorkstationForTier(node, tier);
+            if (tierWs != null) {
+                node.setMachineIcon(tierWs);
+            } else if (node.getRecipeCategoryId() != null) {
+                var cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
+                if (cap != null && cap.defaultWorkstation() != null) {
+                    String baseName = cap.defaultWorkstation().getPath().replace("large_", "").replace("_large", "");
+                    String prefix = tier.name().toLowerCase(java.util.Locale.ROOT);
+                    net.minecraft.resources.ResourceLocation synthId = net.minecraft.resources.ResourceLocation.tryParse("gtceu:" + prefix + "_" + baseName);
+                    if (synthId != null && net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(synthId)) {
+                        node.setMachineIcon(synthId);
+                    } else {
+                        node.setMachineIcon(cap.defaultWorkstation());
+                    }
+                }
             }
         }
     }

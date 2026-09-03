@@ -22,6 +22,13 @@ public class FlowGraph {
     private final List<CanvasGroupFrame> frames = new ArrayList<>();
     private final List<CanvasStickyNote> stickyNotes = new ArrayList<>();
     private final Map<String, RecipeNode> nodeMap = new HashMap<>();
+    private final Map<PortKey, FlowGraphSolver.PortFlowStats> portStatsCache = new HashMap<>();
+
+    public record PortKey(String nodeId, boolean isInput, int portIndex) {}
+
+    public void invalidatePortStatsCache() {
+        portStatsCache.clear();
+    }
 
     public record ConnectionEdge(
         String fromNodeId,
@@ -133,6 +140,7 @@ public class FlowGraph {
         if (node != null) {
             nodes.add(node);
             nodeMap.put(node.getId(), node);
+            invalidatePortStatsCache();
         }
     }
 
@@ -155,6 +163,7 @@ public class FlowGraph {
                 for (CanvasGroupFrame f : frames) {
                     f.removeNode(node.getId());
                 }
+                invalidatePortStatsCache();
             }
         }
     }
@@ -204,6 +213,7 @@ public class FlowGraph {
                 f.removeNode(sId);
             }
         }
+        invalidatePortStatsCache();
     }
 
     public void syncCompoundParameters(RecipeNode sourceNode) {
@@ -223,6 +233,7 @@ public class FlowGraph {
 
             sibling.getProperties().copyFrom(sourceNode.getProperties());
         }
+        invalidatePortStatsCache();
     }
 
     public RecipeNode findNodeById(String id) {
@@ -262,6 +273,7 @@ public class FlowGraph {
         frames.clear();
         stickyNotes.clear();
         nodeMap.clear();
+        invalidatePortStatsCache();
     }
 
     public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
@@ -272,6 +284,7 @@ public class FlowGraph {
             }
         }
         connections.add(new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx));
+        invalidatePortStatsCache();
     }
 
     public void addConnection(ConnectionEdge edge) {
@@ -281,11 +294,13 @@ public class FlowGraph {
     }
 
     public void removeConnection(ConnectionEdge edge) {
-        connections.remove(edge);
+        if (connections.remove(edge)) {
+            invalidatePortStatsCache();
+        }
     }
 
     public boolean cleanupInvalidConnections() {
-        return connections.removeIf(edge -> {
+        boolean removed = connections.removeIf(edge -> {
             RecipeNode from = findNodeById(edge.fromNodeId());
             RecipeNode to = findNodeById(edge.toNodeId());
             if (from == null || to == null) return true;
@@ -305,6 +320,10 @@ public class FlowGraph {
 
             return true;
         });
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+        return removed;
     }
 
     public void copyFrom(FlowGraph other) {
@@ -344,11 +363,23 @@ public class FlowGraph {
     }
 
     public FlowGraphSolver.PortFlowStats getInputPortStats(RecipeNode node, int inputIndex) {
-        return FlowGraphSolver.getInputPortStats(this, node, inputIndex);
+        if (node == null) return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        PortKey key = new PortKey(node.getId(), true, inputIndex);
+        FlowGraphSolver.PortFlowStats stats = portStatsCache.get(key);
+        if (stats != null) return stats;
+        stats = FlowGraphSolver.getInputPortStats(this, node, inputIndex);
+        portStatsCache.put(key, stats);
+        return stats;
     }
 
     public FlowGraphSolver.PortFlowStats getOutputPortStats(RecipeNode node, int outputIndex) {
-        return FlowGraphSolver.getOutputPortStats(this, node, outputIndex);
+        if (node == null) return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        PortKey key = new PortKey(node.getId(), false, outputIndex);
+        FlowGraphSolver.PortFlowStats stats = portStatsCache.get(key);
+        if (stats != null) return stats;
+        stats = FlowGraphSolver.getOutputPortStats(this, node, outputIndex);
+        portStatsCache.put(key, stats);
+        return stats;
     }
 
     public BalanceSummary computeSummary() {

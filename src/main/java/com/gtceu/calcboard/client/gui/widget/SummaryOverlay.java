@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.widget;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
 import com.gtceu.calcboard.api.solver.BalanceSummary;
@@ -18,6 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Overlay panel widget displaying real-time power balance, machine statistics,
+ * external raw materials, and net products for the active board page.
+ */
 public class SummaryOverlay {
     public static final int WIDTH = 240;
     private boolean collapsed = false;
@@ -49,6 +54,13 @@ public class SummaryOverlay {
         BoardManager.getInstance().setSummaryOverlayCollapsed(this.collapsed);
     }
 
+    public static int getEffectiveWidth(int screenWidth) {
+        if (screenWidth < 520) {
+            return Math.min(WIDTH, Math.max(160, screenWidth - 160));
+        }
+        return WIDTH;
+    }
+
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {
         this.lastSummary = summary;
         Font font = Minecraft.getInstance().font;
@@ -56,7 +68,8 @@ public class SummaryOverlay {
         graphics.pose().pushPose();
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        int x = screenWidth - WIDTH - 10;
+        int effectiveW = getEffectiveWidth(screenWidth);
+        int x = screenWidth - effectiveW - 10;
         int y = 66;
         int height = screenHeight - 74;
         hoveredStack = null;
@@ -76,15 +89,15 @@ public class SummaryOverlay {
         }
 
         // Panel Background
-        graphics.fill(x, y, x + WIDTH, y + height, 0xEE1A1E26);
-        graphics.renderOutline(x, y, WIDTH, height, 0xFF3D4455);
+        graphics.fill(x, y, x + effectiveW, y + height, 0xEE1A1E26);
+        graphics.renderOutline(x, y, effectiveW, height, 0xFF3D4455);
 
         // 1. Fixed Header Title
-        graphics.fill(x, y, x + WIDTH, y + 22, 0xFF242934);
+        graphics.fill(x, y, x + effectiveW, y + 22, 0xFF242934);
         graphics.drawString(font, "§6⚡ " + Component.translatable("gui.gtcalcboard.summary").getString(), x + 8, y + 7, 0xFFFFFFFF, false);
 
         // Collapse button [>>]
-        graphics.drawString(font, "»", x + WIDTH - 16, y + 7, 0xFFAAAAAA, false);
+        graphics.drawString(font, "»", x + effectiveW - 16, y + 7, 0xFFAAAAAA, false);
 
         // 2. Fixed Total Power, Stress & Machines Section
         int curHeaderY = y + 26;
@@ -99,9 +112,9 @@ public class SummaryOverlay {
             String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
             int pLabelW = font.width(pLabel) + 6;
             int eutW = font.width(eutStr);
-            if (pLabelW + eutW <= WIDTH - 16) {
+            if (pLabelW + eutW <= effectiveW - 16) {
                 graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
-                graphics.drawString(font, eutStr, x + WIDTH - 8 - eutW, curHeaderY, 0xFFFFFFFF, false);
+                graphics.drawString(font, eutStr, x + effectiveW - 8 - eutW, curHeaderY, 0xFFFFFFFF, false);
                 curHeaderY += 13;
                 powerH = 13;
             } else {
@@ -146,14 +159,14 @@ public class SummaryOverlay {
         graphics.drawString(font, mLabel, x + 8, machinesY, 0xFFFFFFFF, false);
         graphics.drawString(font, mCountStr, x + 8 + mLabelW, machinesY, 0xFFFFFFFF, false);
 
-        hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
-        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + powerH;
-        hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
-        hoveredFusion = showFusion && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= fusionY - 2 && mouseY <= fusionY + 12;
+        hoveredMachines = mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
+        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= powerY - 2 && mouseY <= powerY + powerH;
+        hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
+        hoveredFusion = showFusion && mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= fusionY - 2 && mouseY <= fusionY + 12;
 
         // Top separator below power & machines
         int headerBottom = machinesY + 14;
-        graphics.fill(x + 8, headerBottom, x + WIDTH - 8, headerBottom + 1, 0xFF353C4D);
+        graphics.fill(x + 8, headerBottom, x + effectiveW - 8, headerBottom + 1, 0xFF353C4D);
 
         // 3. Scrollable Content Area (Raw Inputs + Net Outputs)
         int contentY = headerBottom + 4;
@@ -167,7 +180,7 @@ public class SummaryOverlay {
         maxScrollY = Math.max(0, totalContentH - contentH);
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
-        graphics.enableScissor(x + 1, contentY, x + WIDTH - 1, contentY + contentH);
+        BoardScissorHelper.enableScissor(graphics, x + 1, contentY, x + effectiveW - 1, contentY + contentH);
 
         int curY = contentY - (int) scrollY;
 
@@ -181,7 +194,7 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH, effectiveW);
                 }
                 curY += 16;
             }
@@ -198,17 +211,17 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH, effectiveW);
                 }
                 curY += 16;
             }
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // 4. Render Scrollbar if needed
         if (maxScrollY > 0) {
-            int sbX = x + WIDTH - 5;
+            int sbX = x + effectiveW - 5;
             int sbTrackY = contentY;
             int sbTrackH = contentH;
             graphics.fill(sbX, sbTrackY, sbX + 3, sbTrackY + sbTrackH, 0x55000000);
@@ -221,22 +234,20 @@ public class SummaryOverlay {
         graphics.pose().popPose();
     }
 
-    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH) {
+    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW) {
         IngredientRenderer.render(graphics, stack, x + 8, y - 2);
-
-        String name = stack.getDisplayName();
-        if (name.length() > 13) {
-            name = name.substring(0, 11) + "..";
-        }
-        graphics.drawString(font, "§f" + name, x + 26, y + 2, 0xFFFFFFFF, false);
 
         String ratePrefix = rate > 0 ? "+" : "";
         String rateStr = ratePrefix + formatRate(rate, stack.isFluid());
         int rateW = font.width(rateStr);
-        graphics.drawString(font, rateStr, x + WIDTH - 10 - rateW, y + 2, rateColor, false);
+        graphics.drawString(font, rateStr, x + panelW - 10 - rateW, y + 2, rateColor, false);
+
+        int maxNameW = Math.max(20, panelW - rateW - 46);
+        String name = font.plainSubstrByWidth(stack.getDisplayName(), maxNameW);
+        graphics.drawString(font, "§f" + name, x + 26, y + 2, 0xFFFFFFFF, false);
 
         // Check if hovered
-        if (mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
+        if (mouseX >= x + 8 && mouseX <= x + panelW - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
             hoveredStack = stack;
             hoveredRate = rate;
         }
@@ -319,11 +330,12 @@ public class SummaryOverlay {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
         if (collapsed) return false;
 
-        int x = screenWidth - WIDTH - 10;
+        int effectiveW = getEffectiveWidth(screenWidth);
+        int x = screenWidth - effectiveW - 10;
         int y = 66;
         int height = screenHeight - 74;
 
-        if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + height) {
+        if (mouseX >= x && mouseX <= x + effectiveW && mouseY >= y && mouseY <= y + height) {
             if (maxScrollY > 0) {
                 scrollY = Math.max(0, Math.min(maxScrollY, scrollY - (delta * 18.0)));
                 return true;
@@ -345,11 +357,12 @@ public class SummaryOverlay {
             return false;
         }
 
-        int x = screenWidth - WIDTH - 10;
+        int effectiveW = getEffectiveWidth(screenWidth);
+        int x = screenWidth - effectiveW - 10;
         int y = 66;
 
         // Header click -> collapse/expand
-        if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + 22) {
+        if (mouseX >= x && mouseX <= x + effectiveW && mouseY >= y && mouseY <= y + 22) {
             toggle();
             return true;
         }

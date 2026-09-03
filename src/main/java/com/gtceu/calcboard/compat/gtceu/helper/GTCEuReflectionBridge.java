@@ -18,6 +18,7 @@ public final class GTCEuReflectionBridge {
     private static final Class<?> MUFFLER_PART_CLASS;
     private static final Class<?> MAINTENANCE_HATCH_CLASS;
     private static final Class<?> CONFIGURABLE_MAINT_HATCH_CLASS;
+    private static final List<Class<?>> STEAM_MACHINE_CLASSES;
 
     private static final Field MACHINES_REGISTRY_FIELD;
     private static final Method REGISTRY_GET_METHOD;
@@ -30,7 +31,11 @@ public final class GTCEuReflectionBridge {
     private static final Method IS_MULTIBLOCK_METHOD;
     private static final Method GET_RECIPE_MODIFIERS_METHOD;
     private static final Method GET_RECIPE_MODIFIER_METHOD;
+    private static final Field PAGINATED_TOOLTIPS_FIELD;
+    private static final Method IS_GENERATOR_METHOD;
+    private static final Field GENERATOR_FIELD;
     private static final Map<Object, String> RECIPE_MODIFIER_NAMES;
+    private static final Map<String, Method> METHOD_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     static {
         MULTIBLOCK_DEF_CLASS = loadClassQuietly("com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition");
@@ -49,6 +54,19 @@ public final class GTCEuReflectionBridge {
             if (loaded != null) mbList.add(loaded);
         }
         MULTIBLOCK_MACHINE_CLASSES = Collections.unmodifiableList(mbList);
+
+        List<Class<?>> steamList = new ArrayList<>();
+        for (String cName : new String[]{
+                "com.gregtechceu.gtceu.common.machine.multiblock.steam.SteamParallelMultiblockMachine",
+                "com.gregtechceu.gtceu.api.machine.steam.SteamWorkableTieredMachine",
+                "com.gregtechceu.gtceu.api.machine.steam.SteamProgressMachine",
+                "com.gregtechceu.gtceu.api.machine.steam.SteamMinerMachine",
+                "com.gregtechceu.gtceu.api.machine.steam.SteamBoilerMachine"
+        }) {
+            Class<?> loaded = loadClassQuietly(cName);
+            if (loaded != null) steamList.add(loaded);
+        }
+        STEAM_MACHINE_CLASSES = Collections.unmodifiableList(steamList);
 
         Class<?> coilCls = loadClassQuietly("com.gregtechceu.gtceu.api.machine.multiblock.CoilWorkableElectricMultiblockMachine");
         if (coilCls == null) {
@@ -78,6 +96,10 @@ public final class GTCEuReflectionBridge {
         IS_MULTIBLOCK_METHOD = findMethod(targetDefClass, "isMultiblock");
         GET_RECIPE_MODIFIERS_METHOD = findMethod(targetDefClass, "getRecipeModifiers");
         GET_RECIPE_MODIFIER_METHOD = findMethod(targetDefClass, "getRecipeModifier");
+        PAGINATED_TOOLTIPS_FIELD = findField(targetDefClass, "paginatedTooltips");
+        Class<?> mbDefCls = MULTIBLOCK_DEF_CLASS != null ? MULTIBLOCK_DEF_CLASS : targetDefClass;
+        IS_GENERATOR_METHOD = findMethod(mbDefCls, "isGenerator");
+        GENERATOR_FIELD = findField(mbDefCls, "generator");
 
         Map<Object, String> modNames = new IdentityHashMap<>();
         Class<?> gtRecipeModifiersCls = loadClassQuietly("com.gregtechceu.gtceu.common.data.GTRecipeModifiers");
@@ -160,6 +182,144 @@ public final class GTCEuReflectionBridge {
             return num.doubleValue();
         }
         return defaultEnergy;
+    }
+
+    public record TurbineSpecs(GTVoltageTier tier, double baseEnergy) {}
+
+    public static TurbineSpecs deductTurbineSpecs(Object def) {
+        if (def == null) {
+            return new TurbineSpecs(GTVoltageTier.HV, 1024.0);
+        }
+
+        GTVoltageTier foundTier = null;
+        double foundBaseEnergy = 0.0;
+
+        if (PAGINATED_TOOLTIPS_FIELD != null) {
+            try {
+                Object raw = PAGINATED_TOOLTIPS_FIELD.get(def);
+                if (raw instanceof List<?> pages) {
+                    for (Object pageObj : pages) {
+                        if (pageObj instanceof List<?> compList) {
+                            for (Object compObj : compList) {
+                                if (compObj instanceof net.minecraft.network.chat.Component comp) {
+                                    if (comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
+                                        String key = tc.getKey();
+                                        if ("gtceu.universal.tooltip.base_production_eut".equals(key) && tc.getArgs().length > 0) {
+                                            Object arg = tc.getArgs()[0];
+                                            if (arg instanceof Number num) {
+                                                foundBaseEnergy = num.doubleValue();
+                                                long voltage = Math.round(foundBaseEnergy / 2.0);
+                                                foundTier = GTVoltageTier.fromVoltage(voltage);
+                                            }
+                                        } else if ("gtceu.multiblock.turbine.efficiency_tooltip".equals(key) && tc.getArgs().length > 0) {
+                                            if (foundTier == null) {
+                                                Object arg = tc.getArgs()[0];
+                                                String tierName = (arg instanceof net.minecraft.network.chat.Component c) ? c.getString() : String.valueOf(arg);
+                                                foundTier = GTVoltageTier.fromName(tierName);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        if (foundTier == null) {
+            foundTier = getMachineTier(def);
+        }
+
+        if (foundTier == null || foundBaseEnergy <= 0.0) {
+            ResourceLocation id = getMachineId(def);
+            if (id != null) {
+                if (foundTier == null) {
+                    foundTier = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseTier(id);
+                }
+                if (foundBaseEnergy <= 0.0) {
+                    foundBaseEnergy = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseProduction(id);
+                }
+            }
+        }
+
+        if (foundTier == null) foundTier = GTVoltageTier.HV;
+        if (foundBaseEnergy <= 0.0) foundBaseEnergy = (double) (foundTier.getVoltage() * 2L);
+
+        return new TurbineSpecs(foundTier, foundBaseEnergy);
+    }
+
+    public static boolean isGenerator(Object def) {
+        if (def == null) return false;
+        if (IS_GENERATOR_METHOD != null) {
+            Boolean res = invokeMethodQuietly(IS_GENERATOR_METHOD, def, Boolean.class);
+            if (res != null) return res;
+        }
+        if (GENERATOR_FIELD != null) {
+            try {
+                return GENERATOR_FIELD.getBoolean(def);
+            } catch (Throwable ignored) {}
+        }
+        return false;
+    }
+
+    public static boolean hasTurbineSignature(Object def) {
+        if (def == null) return false;
+        if (isGenerator(def)) return true;
+
+        if (PAGINATED_TOOLTIPS_FIELD != null) {
+            try {
+                Object raw = PAGINATED_TOOLTIPS_FIELD.get(def);
+                if (raw instanceof List<?> pages) {
+                    for (Object pageObj : pages) {
+                        if (pageObj instanceof List<?> compList) {
+                            for (Object compObj : compList) {
+                                if (compObj instanceof net.minecraft.network.chat.Component comp) {
+                                    if (comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
+                                        String key = tc.getKey();
+                                        if ("gtceu.multiblock.turbine.efficiency_tooltip".equals(key)
+                                                || "gtceu.universal.tooltip.base_production_eut".equals(key)) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        String modName = getRecipeModifierName(def);
+        if (modName != null && modName.toUpperCase(Locale.ROOT).contains("TURBINE")) {
+            return true;
+        }
+
+        Class<?> mCls = getMachineClass(def);
+        if (mCls != null && (isLargeTurbineClass(mCls) || isITurbineClass(mCls))) {
+            return true;
+        }
+
+        ResourceLocation id = getMachineId(def);
+        return id != null && com.gtceu.calcboard.api.catalog.MultiblockDetector.isTurbine(id);
+    }
+
+    public static boolean isSteamMachine(Object def) {
+        if (def == null) return false;
+        Class<?> mCls = getMachineClass(def);
+        if (mCls != null) {
+            for (Class<?> steamCls : STEAM_MACHINE_CLASSES) {
+                if (steamCls.isAssignableFrom(mCls)) {
+                    return true;
+                }
+            }
+        }
+        for (Class<?> steamCls : STEAM_MACHINE_CLASSES) {
+            if (steamCls.isInstance(def)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static List<Object> getRecipeTypes(Object def) {
@@ -374,11 +534,16 @@ public final class GTCEuReflectionBridge {
 
     private static Method findMethod(Class<?> targetClass, String methodName) {
         if (targetClass == null || methodName == null) return null;
+        String key = targetClass.getName() + "#" + methodName;
+        Method cached = METHOD_CACHE.get(key);
+        if (cached != null) return cached;
+
         Class<?> current = targetClass;
         while (current != null && current != Object.class) {
             try {
                 Method m = current.getDeclaredMethod(methodName);
                 m.setAccessible(true);
+                METHOD_CACHE.put(key, m);
                 return m;
             } catch (NoSuchMethodException e) {
                 current = current.getSuperclass();

@@ -26,13 +26,18 @@ flowchart TB
         ACTIVE_LIST["Active Addons (Coil, Hatch, etc.)"] ~~~ STATS_BADGE["Duration, Power, Parallel Multipliers"] ~~~ DEL_BTN["[✕] 1-Click Remove"]
     end
 
-    subgraph Section3["4. Addon Catalog Browser"]
+    subgraph Section3["4. Addon Catalog Browser (AddonCatalogView)"]
         direction LR
-        TABS["Category Tabs: Coils, Hatches, etc."] ~~~ SEARCH["Real-time Search Filter"] ~~~ CHIP_GRID["Smart Chip Grid (1-Click Install)"]
+        TABS["Category Tabs: Coils, Hatches, etc."] ~~~ VIEW_MODE["[▦ Grid / ☰ List] View Toggle"] ~~~ DYNAMIC_ROWS["Available Height Dynamic Rows (2~5 rows)"]
     end
 
     Header --> Section1 --> Section2 --> Section3
 ```
+
+### 1.1 Dynamic Adaptive Catalog View (`AddonCatalogView`, ADR-017)
+* **Variable Row Adaptive Layout**: Deprecates static $3 \times 2$ layouts in favor of dynamic row count calculation based on available dialog vertical space ($\text{rows} = \text{clamp}(\lfloor \text{availH} / 54 \rfloor, 2, 5)$).
+* **One-Click $20\text{px}$ Compact List View (`[▦ / ☰]`)**: Provides a dense single-line list mode displaying 10+ addons without scrolling for rapid side-by-side comparison.
+* **Preference Persistence**: Automatically remembers and persists user view mode selection (grid vs list) in `BoardManager` and client NBT.
 
 ---
 

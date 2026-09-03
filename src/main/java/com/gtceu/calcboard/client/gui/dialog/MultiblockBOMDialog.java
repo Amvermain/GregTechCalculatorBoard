@@ -2,9 +2,11 @@ package com.gtceu.calcboard.client.gui.dialog;
 
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMCalculator;
@@ -242,7 +244,7 @@ public class MultiblockBOMDialog {
         int totalListH = pages.size() * rowH;
         maxPageScrollY = Math.max(0, totalListH - listH);
 
-        graphics.enableScissor(x, listY, x + w, listY + listH);
+        BoardScissorHelper.enableScissor(graphics, x, listY, x + w, listY + listH);
 
         int curY = (int) (listY - pageScrollY);
         for (BoardPage page : pages) {
@@ -271,7 +273,7 @@ public class MultiblockBOMDialog {
             curY += rowH;
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Page Scrollbar
         if (maxPageScrollY > 0) {
@@ -369,7 +371,7 @@ public class MultiblockBOMDialog {
         int totalTableH = filtered.size() * rowH;
         maxItemScrollY = Math.max(0, totalTableH - tableH);
 
-        graphics.enableScissor(x, tableY, x + w, tableY + tableH);
+        BoardScissorHelper.enableScissor(graphics, x, tableY, x + w, tableY + tableH);
 
         int curY = (int) (tableY - itemScrollY);
         for (MultiblockBOMSummary.BOMItemEntry entry : filtered) {
@@ -427,7 +429,7 @@ public class MultiblockBOMDialog {
             curY += rowH;
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Main Table Scrollbar
         if (maxItemScrollY > 0) {
@@ -453,7 +455,9 @@ public class MultiblockBOMDialog {
             }
             tip.add(Component.empty());
             tip.add(Component.literal("§8[Click to toggle prepared checklist]"));
-            graphics.renderComponentTooltip(font, tip, mouseX, mouseY);
+            int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+            int screenH = parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tip, mouseX, mouseY, screenW, screenH);
         }
     }
 

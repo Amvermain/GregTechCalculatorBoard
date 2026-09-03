@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.NodeWorkstationResolver;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -309,7 +310,7 @@ public class MachineSelectorDialog {
 
         hoveredEntry = null;
 
-        graphics.enableScissor(listX, listY + 1, listX + listW, listY + listH - 1);
+        BoardScissorHelper.enableScissor(graphics, listX, listY + 1, listX + listW, listY + listH - 1);
         graphics.pose().pushPose();
         graphics.pose().translate(0, -scrollY, 0);
 
@@ -422,7 +423,7 @@ public class MachineSelectorDialog {
         }
 
         graphics.pose().popPose();
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Scrollbar
         if (maxScrollY > 0) {

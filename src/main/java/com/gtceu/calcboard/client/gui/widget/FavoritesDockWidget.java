@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.search.RecipeFilterConfig;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.model.IngredientStack;
@@ -394,7 +395,7 @@ public class FavoritesDockWidget {
                     maxScrollY = Math.max(0, totalH - listH);
                     scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
-                    graphics.enableScissor(getDockX(), listY, getDockX() + EXPANDED_WIDTH, listY + listH);
+                    BoardScissorHelper.enableScissor(graphics, getDockX(), listY, getDockX() + EXPANDED_WIDTH, listY + listH);
 
                     for (int i = 0; i < favorites.size(); i++) {
                         dev.emi.emi.runtime.EmiFavorite fav = favorites.get(i);
@@ -437,7 +438,7 @@ public class FavoritesDockWidget {
                         }
                     }
 
-                    graphics.disableScissor();
+                    BoardScissorHelper.disableScissor(graphics);
 
                     if (maxScrollY > 0) {
                         int scrollBarH = Math.max(10, (int) ((float) listH / totalH * listH));
@@ -482,7 +483,7 @@ public class FavoritesDockWidget {
             subMaxScrollY = Math.max(0, totalH - listH);
             subScrollY = Math.max(0, Math.min(subMaxScrollY, subScrollY));
 
-            graphics.enableScissor(subX, listY, subX + subW, listY + listH);
+            BoardScissorHelper.enableScissor(graphics, subX, listY, subX + subW, listY + listH);
             hoveredFlyoutRecipe = null;
 
             ResourceLocation preferredWs = null;
@@ -543,7 +544,7 @@ public class FavoritesDockWidget {
                 graphics.drawCenteredString(font, "➕", addBtnX + 9, addBtnY + 4, 0xFFFFFFFF);
             }
 
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
 
             if (subMaxScrollY > 0) {
                 int scrollBarH = Math.max(10, (int) ((float) listH / totalH * listH));

@@ -53,8 +53,8 @@ public class DiskBlueprintsDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int x = (screenWidth - DIALOG_W) / 2;
         int y = (screenHeight - DIALOG_H) / 2;
 
@@ -102,8 +102,8 @@ public class DiskBlueprintsDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int x = (screenWidth - DIALOG_W) / 2;
         int y = (screenHeight - DIALOG_H) / 2;
 
@@ -262,8 +262,8 @@ public class DiskBlueprintsDialog {
         if (!visible) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int x = (screenWidth - DIALOG_W) / 2;
         int y = (screenHeight - DIALOG_H) / 2;
 
@@ -444,5 +444,13 @@ public class DiskBlueprintsDialog {
             BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copy_success")));
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.3F));
         }
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }

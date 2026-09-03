@@ -105,7 +105,6 @@ public final class IngredientRenderer {
             dev.emi.emi.api.stack.EmiStack emiStack = com.gtceu.calcboard.integration.emi.EmiStackHelper.toEmiStack(stack);
             if (!emiStack.isEmpty()) {
                 emiStack.render(graphics, x, y, 0, dev.emi.emi.api.stack.EmiIngredient.RENDER_ICON);
-                RenderSystem.disableDepthTest();
                 return true;
             }
             return false;

@@ -14,6 +14,8 @@ import com.gtceu.calcboard.client.gui.dialog.config.ThreadingHelixView;
 import com.gtceu.calcboard.api.preset.CategoryMachinePreset;
 import com.gtceu.calcboard.api.preset.CategoryMachinePresetManager;
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
@@ -63,8 +65,16 @@ public class MachineConfigDialog {
     private long lastObservedCatalogVersion = -1;
     private List<Component> deferredTooltip = null;
 
-    private static final int DIALOG_WIDTH = 500;
-    private static final int DIALOG_HEIGHT = 295;
+    public static final int DIALOG_WIDTH = 500;
+    public static final int DIALOG_HEIGHT = 295;
+
+    public static int getEffectiveDialogWidth(int screenWidth) {
+        return Math.min(680, Math.max(DIALOG_WIDTH, screenWidth - 24));
+    }
+
+    public static int getEffectiveDialogHeight(int screenHeight) {
+        return Math.min(480, Math.max(DIALOG_HEIGHT, screenHeight - 24));
+    }
 
     public MachineConfigDialog(BoardScreen parent) {
         this.parent = parent;
@@ -148,19 +158,21 @@ public class MachineConfigDialog {
         invalidateFilteredCatalog();
 
         Minecraft mc = Minecraft.getInstance();
-        this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
-        this.parallelBox.setMaxLength(6);
-        this.parallelBox.setValue(String.valueOf(node.getTotalParallel()));
-        this.parallelBox.setResponder(text -> {
-            try {
-                int p = Integer.parseInt(text.trim());
-                if (p >= 1 && p <= 100000) {
-                    node.setParallel(p);
-                    node.setCustomParallel(p);
-                    if (parent != null) parent.markSummaryDirty();
-                }
-            } catch (NumberFormatException ignored) {}
-        });
+        if (mc != null && mc.font != null) {
+            this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
+            this.parallelBox.setMaxLength(6);
+            this.parallelBox.setValue(String.valueOf(node.getTotalParallel()));
+            this.parallelBox.setResponder(text -> {
+                try {
+                    int p = Integer.parseInt(text.trim());
+                    if (p >= 1 && p <= 100000) {
+                        node.setParallel(p);
+                        node.setCustomParallel(p);
+                        if (parent != null) parent.markSummaryDirty();
+                    }
+                } catch (NumberFormatException ignored) {}
+            });
+        }
 
         syncThreadingAddons(node);
     }
@@ -284,8 +296,8 @@ public class MachineConfigDialog {
         graphics.pose().scale(scale, scale, 1.0f);
         graphics.pose().translate(-cx, -cy, 0);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -406,7 +418,7 @@ public class MachineConfigDialog {
         graphics.fill(x + 6, y + 26, x + dialogW - 6, y + 66, 0xFF1E222D);
         graphics.renderOutline(x + 6, y + 26, dialogW - 12, 40, 0xFF353C4D);
         var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
-        guiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, virtualMouseX, virtualMouseY, partialTicks, parallelBox, parent);
+        guiHandler.renderDialogHeader(this, graphics, font, node, x, y, dialogW, virtualMouseX, virtualMouseY, partialTicks, parallelBox, parent);
 
         // SECTION 2: Active Addons Tray View
         activeAddonsView.render(graphics, font, node, x, y, dialogW, virtualMouseX, virtualMouseY, parent);
@@ -441,15 +453,15 @@ public class MachineConfigDialog {
             com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 1000);
-            graphics.renderComponentTooltip(font, deferredTooltip, mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, deferredTooltip, mouseX, mouseY, screenWidth, screenHeight);
             graphics.pose().popPose();
         }
     }
 
     public void enableScaledScissor(GuiGraphics graphics, int x1, int y1, int x2, int y2) {
         float scale = currentFontScale.getScale();
-        int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-        int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        int screenW = parent.width;
+        int screenH = parent.height;
         int cx = screenW / 2;
         int cy = screenH / 2;
 
@@ -458,7 +470,7 @@ public class MachineConfigDialog {
         int sx2 = (int) Math.ceil((x2 - cx) * scale + cx);
         int sy2 = (int) Math.ceil((y2 - cy) * scale + cy);
 
-        graphics.enableScissor(Math.max(0, sx1), Math.max(0, sy1), Math.min(screenW, sx2), Math.min(screenH, sy2));
+        BoardScissorHelper.enableScissor(graphics, Math.max(0, sx1), Math.max(0, sy1), Math.min(screenW, sx2), Math.min(screenH, sy2));
     }
 
     public String formatAddonBadge(MachineAddon addon) {
@@ -529,12 +541,13 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return mouseClicked(mouseX, mouseY, button, getScreenWidth(), getScreenHeight());
+    }
+
+    public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible || node == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
-
         float scale = currentFontScale.getScale();
         int cx = screenWidth / 2;
         int cy = screenHeight / 2;
@@ -542,8 +555,8 @@ public class MachineConfigDialog {
         int mX = (int) Math.round((mouseX - cx) / scale + cx);
         int mY = (int) Math.round((mouseY - cy) / scale + cy);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -715,11 +728,11 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (!visible || node == null) return false;
+        return mouseScrolled(mouseX, mouseY, delta, getScreenWidth(), getScreenHeight());
+    }
 
-        Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
+        if (!visible || node == null) return false;
 
         float scale = currentFontScale.getScale();
         int cx = screenWidth / 2;
@@ -728,8 +741,8 @@ public class MachineConfigDialog {
         int mX = (int) Math.round((mouseX - cx) / scale + cx);
         int mY = (int) Math.round((mouseY - cy) / scale + cy);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -811,11 +824,11 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (!visible || node == null) return false;
+        return mouseDragged(mouseX, mouseY, button, dragX, dragY, getScreenWidth(), getScreenHeight());
+    }
 
-        Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY, int screenWidth, int screenHeight) {
+        if (!visible || node == null) return false;
 
         float scale = currentFontScale.getScale();
         int cx = screenWidth / 2;
@@ -824,8 +837,8 @@ public class MachineConfigDialog {
         int mX = (int) Math.round((mouseX - cx) / scale + cx);
         int mY = (int) Math.round((mouseY - cy) / scale + cy);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -838,11 +851,11 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (!visible || node == null) return false;
+        return mouseReleased(mouseX, mouseY, button, getScreenWidth(), getScreenHeight());
+    }
 
-        Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+    public boolean mouseReleased(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        if (!visible || node == null) return false;
 
         float scale = currentFontScale.getScale();
         int cx = screenWidth / 2;
@@ -851,8 +864,8 @@ public class MachineConfigDialog {
         int mX = (int) Math.round((mouseX - cx) / scale + cx);
         int mY = (int) Math.round((mouseY - cy) / scale + cy);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -863,5 +876,21 @@ public class MachineConfigDialog {
         }
 
         return visible;
+    }
+
+    private int getScreenWidth() {
+        if (parent != null && parent.width > 0) {
+            return parent.width;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc.getWindow() != null ? mc.getWindow().getGuiScaledWidth() : DIALOG_WIDTH;
+    }
+
+    private int getScreenHeight() {
+        if (parent != null && parent.height > 0) {
+            return parent.height;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc.getWindow() != null ? mc.getWindow().getGuiScaledHeight() : DIALOG_HEIGHT;
     }
 }

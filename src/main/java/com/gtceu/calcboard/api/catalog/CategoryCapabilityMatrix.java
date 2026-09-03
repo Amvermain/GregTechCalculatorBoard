@@ -253,9 +253,22 @@ public class CategoryCapabilityMatrix {
                         ResourceLocation.tryParse("gtceu:lv_steam_turbine"),
                         ResourceLocation.tryParse("gtceu:mv_steam_turbine"),
                         ResourceLocation.tryParse("gtceu:hv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:steam_large_turbine"),
                         ResourceLocation.tryParse("gtceu:large_steam_turbine")
                 ),
-                ResourceLocation.tryParse("gtceu:large_steam_turbine"),
+                ResourceLocation.tryParse("gtceu:steam_large_turbine"),
+                true, true, false, true, false, false, false, null, null, GTVoltageTier.HV, 1024.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:steam_turbine_fuels"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:mv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:hv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:steam_large_turbine"),
+                        ResourceLocation.tryParse("gtceu:large_steam_turbine")
+                ),
+                ResourceLocation.tryParse("gtceu:steam_large_turbine"),
                 true, true, false, true, false, false, false, null, null, GTVoltageTier.HV, 1024.0
         );
         registerMockCategory(
@@ -264,19 +277,44 @@ public class CategoryCapabilityMatrix {
                         ResourceLocation.tryParse("gtceu:lv_gas_turbine"),
                         ResourceLocation.tryParse("gtceu:mv_gas_turbine"),
                         ResourceLocation.tryParse("gtceu:hv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:gas_large_turbine"),
                         ResourceLocation.tryParse("gtceu:large_gas_turbine")
                 ),
-                ResourceLocation.tryParse("gtceu:large_gas_turbine"),
+                ResourceLocation.tryParse("gtceu:gas_large_turbine"),
+                true, true, false, true, false, false, false, null, null, GTVoltageTier.EV, 4096.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:gas_turbine_fuels"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:mv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:hv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:gas_large_turbine"),
+                        ResourceLocation.tryParse("gtceu:large_gas_turbine")
+                ),
+                ResourceLocation.tryParse("gtceu:gas_large_turbine"),
                 true, true, false, true, false, false, false, null, null, GTVoltageTier.EV, 4096.0
         );
         registerMockCategory(
                 ResourceLocation.tryParse("gtceu:plasma_turbine"),
                 List.of(
+                        ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
                         ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
                         ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"),
                         ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine")
                 ),
-                ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
+                ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
+                false, true, false, true, false, false, false, null, null, GTVoltageTier.IV, 16384.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:plasma_generator_fuels"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
+                        ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
+                        ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"),
+                        ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine")
+                ),
+                ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
                 false, true, false, true, false, false, false, null, null, GTVoltageTier.IV, 16384.0
         );
         registerMockCategory(

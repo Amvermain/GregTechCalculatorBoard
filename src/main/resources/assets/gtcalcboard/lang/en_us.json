@@ -945,5 +945,19 @@
   "gui.gtcalcboard.junction.supply_mode.infinite": "Infinite Supply (Passive / AE Cell)",
   "gui.gtcalcboard.junction.supply_mode.fixed_rate": "Fixed External Supply Rate",
   "gui.gtcalcboard.cancel_btn": "Cancel",
-  "gui.gtcalcboard.apply_btn": "Apply"
+  "gui.gtcalcboard.apply_btn": "Apply",
+  "gui.gtcalcboard.scale.auto": "Auto (Game Scale)",
+  "gui.gtcalcboard.scale.1x": "1x (Small)",
+  "gui.gtcalcboard.scale.2x": "2x (Normal)",
+  "gui.gtcalcboard.scale.3x": "3x (Large)",
+  "gui.gtcalcboard.scale.4x": "4x (Very Large)",
+  "gui.gtcalcboard.toolbar.auto": "Auto (Responsive)",
+  "gui.gtcalcboard.toolbar.compact": "Compact (Icons)",
+  "gui.gtcalcboard.toolbar.full": "Full (Text)",
+  "gui.gtcalcboard.toolbar.more": "More Options",
+  "gui.gtcalcboard.config.view_mode.grid": "Switch to List View",
+  "gui.gtcalcboard.config.view_mode.list": "Switch to Grid View",
+  "gui.gtcalcboard.settings.toolbar_mode_label": "Toolbar Mode:",
+  "gui.gtcalcboard.settings.gui_scale_label": "Board GUI Scale:",
+  "gui.gtcalcboard.settings.addon_catalog_list_view": "Addon Catalog List View by Default"
 }

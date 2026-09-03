@@ -20,12 +20,16 @@
 ```mermaid
 graph TD
     subgraph UI["1. 프레젠테이션 & UI 계층 (com.gtceu.calcboard.client.gui)"]
-        BS["BoardScreen & Editor (2D 뷰포트, 카메라 이동/줌, 화면 매트릭스)"]
-        CIH["CanvasInteractionHandler (CanvasPanZoomHandler, CanvasSelectionHandler, CanvasQuickAddMarkerHandler)"]
-        BATCH["Single-Pass Batch Render (단일 지오메트리 패스)"]
-        WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E))"]
-        Widgets["widget.* (NodeWidget, HiddenPortsPopup, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget)"]
-        Editors["editor.* (InlineTextEditor 엔진, NodeCountEditor, NodeNameEditor, NodeParallelEditor, NodeTargetBatchEditor)"]
+        BS["BoardScreen (화면 오케스트레이터, 최상위 이벤트 라우터)"]
+        BDM["BoardDialogManager (20여종 모달 다이얼로그 생명주기 및 우선순위 디스패치)"]
+        BCR["BoardCanvasRenderer (뷰포트 컬링 및 노드/와이어 렌더링 파이프라인 조율)"]
+        BAH["BoardActionHandler (Undo/Redo 액션 기록 및 노드/와이어 삭제 수집)"]
+        BVT["BoardViewportTransform (가상 GUI 배율 독립 좌표 변환 엔진)"]
+        CIH["CanvasInteractionHandler (Pan, Zoom, 드래그 다중 선택, 퀵애드 인터랙션)"]
+        RENDER["Two-Pass Z-Order 렌더링 & glClear 노드 깊이 버퍼 격리"]
+        WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E) 공간 분할)"]
+        NCTC["NodeCardTextCache (dirty 기반 텍스트 절삭 및 단위 포맷팅 캐시)"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay)"]
         Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
     end
@@ -103,9 +107,11 @@ graph TD
 * **가우스-요르단 선형 연립방정식 해 도출 ($A\mathbf{x} = \mathbf{b}$)**: 화학 공정의 순환 재활용 폐루프 사이클에서 질량 보존 법칙을 만족하는 기계 대수 벡터 $\mathbf{x}$를 부분 피보팅 기반의 엄밀한 선형대수학 수치해석으로 계산합니다.
 * **10-Pass Fixed-Point Relaxation**: 상류 원자재 공급 제약 하에서 모든 기계의 정상 상태 가동률($\eta \in [0.0, 1.0]$)을 수치적으로 수렴 연산합니다.
 
-### 2.3 고성능 렌더링 파이프라인 및 공간 분할
-* **Single-Pass Batch Rendering**: 뷰포트 내의 노드와 와이어를 단일 지오메트리 패스로 렌더링하여 프레임 레이트를 극대화합니다.
+### 2.3 고성능 렌더링 파이프라인 및 가상 뷰포트 배율 독립 엔진
+* **Two-Pass Z-Order 렌더링 및 `glClear` 깊이 버퍼 격리**: 3D 아이템 모델과 2D 배경 간의 Z-clipping 간섭을 원천 차단하기 위해 노드 단위의 깊이 버퍼 격리를 수행하며, 선택 및 조작 중인 노드를 지연 렌더링하여 Z-순서를 완벽히 보장합니다.
+* **가상 뷰포트 배율 독립 엔진 (`BoardViewportTransform`)**: 마인크래프트 전역 GUI Scale과 독립적으로 보드 전용 가상 해상도($S = \text{BoardScale} / \text{GameScale}$)를 산출하여 저해상도/고해상도 디스플레이 모두에서 최적의 작업 공간을 제공합니다.
 * **$128 \times 128$ AABB 균일 그리드 공간 분할 (`WireSpatialIndex`)**: 1,000개 이상의 복잡한 와이어 네트워크에서 마우스 호버 및 클릭 감지를 $O(E)$에서 **$O(\log E)$ 공간 분할 색인**으로 가속합니다.
+* **$O(1)$ 포트 플로우 캐싱 및 텍스트 메모이제이션 (`NodeCardTextCache`)**: 노드 카드의 포트 통계와 타이틀 텍스트 렌더링 연산을 사전 연산 캐시로 보호하여 60 FPS 이상의 프레임 레이트를 보장합니다.
 
 ### 2.4 멀티플레이어 스트리밍 및 분산 락
 * **2계층 온디맨드 페이징**: 보드 오픈 시 경량 메타데이터(`S2CSyncWorkspaceMetaPacket`)만 동기화하고, 활성 탭 클릭 시에만 세부 그래프 NBT를 온디맨드로 지연 로드합니다.

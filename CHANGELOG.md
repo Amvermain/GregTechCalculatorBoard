@@ -4,6 +4,32 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [2.1.0-beta.1] - 2026-09-03
+
+### Added
+- **High-Voltage Turbine Tier Modeling (UHV ~ MAX)**:
+  - Extended GTCEu and Star Technology turbine physics simulations to support ultra-high voltage rotor holders and dynamo hatches (UHV, UEV, UIV, UXV, OpV, MAX), calculating exact flow rates, optimal efficiency points, and base power production.
+- **Dedicated Board GUI Scale Decoupling**:
+  - Added an independent virtual viewport GUI scale option (`[⚙ Settings]` -> GUI Scale) allowing players to scale the calculator board interface independently of Minecraft's global GUI scale.
+- **Dynamic Addon Catalog & Compact List View (`AddonCatalogView`)**:
+  - Dynamically calculates visible catalog rows (2~5 rows) based on dialog height and adds a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list mode, displaying 10+ addons simultaneously without scrolling.
+- **Adaptive Responsive Toolbar & Overflow Menu (`ToolbarWidget`)**:
+  - Implemented automatic 3-stage title contracting (`GT Board`, `📟`) and collapsed overflowing action buttons into a `[...]` popup dropdown menu on compact window widths.
+
+### Changed & Improved
+- **World Login Background Recipe Indexing Optimization**:
+  - Optimized workstation sorting in category capability matrices with O(1) set-based lookups, eliminating client freezes and frame drops during Phase 3 background indexing upon joining worlds or servers.
+- **Two-Pass Z-Order Rendering & Item Depth Isolation**:
+  - Enforced discrete depth buffer isolation and two-pass layering on the canvas, eliminating Z-clipping artifacts and rendering glitches between 3D item models and 2D text elements.
+- **Minimap Overlay Protection Padding**:
+  - Added an automatic 16px right margin to the bottom toolbar to prevent visual collisions with in-game minimap overlays such as JourneyMap.
+
+### Fixed
+- **Toolbar Button Click Bounds on Window Resizing**:
+  - Fixed an issue where resizing the game window caused toolbar button hitboxes to misalign with their visual positions or cut off trailing buttons.
+- **Machine Config Dialog Addon Catalog Layout Truncation**:
+  - Fixed an issue where the bottom rows of the addon catalog were clipped when viewing the machine config dialog on specific display resolutions.
+
 ## [2.1.0-alpha.5] - 2026-09-02
 
 ### Added

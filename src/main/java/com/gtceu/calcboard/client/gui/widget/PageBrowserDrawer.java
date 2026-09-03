@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.widget;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -166,7 +167,7 @@ public class PageBrowserDrawer {
 
         graphics.fill(listX, listY, listX + listW, listY + listH, 0xFF0D1017);
         graphics.renderOutline(listX, listY, listW, listH, 0xFF222733);
-        graphics.enableScissor(listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
+        BoardScissorHelper.enableScissor(graphics, listX + 1, listY + 1, listX + listW - 1, listY + listH - 1);
 
         String query = searchBox != null ? searchBox.getValue().trim().toLowerCase() : "";
         FolderTreeNode root = buildFolderTree(query);
@@ -177,7 +178,7 @@ public class PageBrowserDrawer {
 
         int totalContentH = (curY + (int) scrollY) - listY;
         this.maxScrollY = Math.max(0, totalContentH - listH);
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
     }
 
     private int renderTreeNodeRecursive(GuiGraphics graphics, Font font, FolderTreeNode node, int activeIdx, int listX, int listW, int curY, int mouseX, int mouseY, String query) {
@@ -450,8 +451,17 @@ public class PageBrowserDrawer {
         return list;
     }
 
+    public void clearSearchFocus() {
+        if (searchBox != null) {
+            searchBox.setFocused(false);
+        }
+    }
+
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!open) return false;
+        if (mouseY < screen.getHeaderBottomY()) {
+            return false;
+        }
         if (mouseX > DRAWER_WIDTH) {
             setOpen(false);
             return true;
@@ -985,7 +995,7 @@ public class PageBrowserDrawer {
             return true;
         }
 
-        return true;
+        return false;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {

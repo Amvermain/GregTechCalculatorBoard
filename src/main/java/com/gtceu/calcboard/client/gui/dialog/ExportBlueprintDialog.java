@@ -42,8 +42,8 @@ public class ExportBlueprintDialog {
         this.visible = true;
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 340;
         int dialogH = 220;
         int x = (screenWidth - dialogW) / 2;
@@ -84,8 +84,8 @@ public class ExportBlueprintDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 340;
         int dialogH = 220;
         int x = (screenWidth - dialogW) / 2;
@@ -257,8 +257,8 @@ public class ExportBlueprintDialog {
         if (!visible) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 340;
         int dialogH = 220;
         int x = (screenWidth - dialogW) / 2;
@@ -397,5 +397,13 @@ public class ExportBlueprintDialog {
         } else {
             BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.disk_save_fail")));
         }
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }

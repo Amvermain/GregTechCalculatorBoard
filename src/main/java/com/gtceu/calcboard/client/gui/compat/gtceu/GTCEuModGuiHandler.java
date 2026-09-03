@@ -9,6 +9,7 @@ import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.compat.GenericModGuiHandler;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
@@ -294,6 +295,12 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             nextCtrlX = x + 6 + tierBtnW + 4;
         } else {
             GTVoltageTier tier = node.getTargetTier();
+            if (node.isLargeTurbine()) {
+                tier = GTTurbineHelper.getRotorHolderTier(node);
+                if (tier != null && (node.getTargetTier() == null || node.getTargetTier().ordinal() < tier.ordinal())) {
+                    node.setTargetTier(tier);
+                }
+            }
             int tierColor = !isOperational ? 0xFFFF8888 : (tier != null ? tier.getColor() : 0xFFFFFFFF);
             String tierName = (tier != null ? tier.getName() : "LV");
             if (node.isMultiblock()) {
@@ -381,8 +388,23 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         }
     }
 
+    private static void showTooltip(MachineConfigDialog dialog, GuiGraphics graphics, Font font, List<Component> tooltip, int mouseX, int mouseY) {
+        if (dialog != null) {
+            dialog.setDeferredTooltip(tooltip);
+        } else {
+            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+        }
+    }
+
     @Override
     public void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node,
+                                   int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
+                                   EditBox parallelBox, BoardScreen parent) {
+        renderDialogHeader(null, graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    @Override
+    public void renderDialogHeader(MachineConfigDialog dialog, GuiGraphics graphics, Font font, RecipeNode node,
                                    int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
                                    EditBox parallelBox, BoardScreen parent) {
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
@@ -518,13 +540,13 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     tt.add(Component.literal("§a" + Component.translatable("gui.gtcalcboard.tooltip.pmax_fully_utilized").getString()));
                     tt.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.tooltip.pmax_max_cap").getString(), com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(cap))));
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             } else if ((dynamoHover || ampsHover) && isDynamoBottleneck) {
                 List<Component> tt = new ArrayList<>();
                 double holderCap = GTTurbineHelper.getRotorHolderCapacity(node);
                 double dynamoCap = GTTurbineHelper.getDynamoMaxCapacity(node);
                 tt.add(Component.literal(String.format(Locale.ROOT, "§c" + Component.translatable("gui.gtcalcboard.tooltip.pmax_dynamo_bottleneck_hatch").getString(), com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(dynamoCap), com.gtceu.calcboard.client.gui.util.FormatUtil.formatCompactNumber(holderCap))));
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             } else if (rotorInfoHover) {
                 List<Component> tt = new ArrayList<>();
                 tt.add(Component.literal("§6🌀 §f" + rName));
@@ -546,12 +568,12 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                         }
                     }
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             } else if (boostHover && supportsBoost && adapter != null) {
                 List<Component> tt = new ArrayList<>();
                 adapter.buildBoosterTooltip(node, tt);
                 if (!tt.isEmpty()) {
-                    graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                    showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
                 }
             }
         } else if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
@@ -621,8 +643,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 double steamRate = hoveredTier.getSteamRatePerSec(isLiquid) * thrMult;
                 tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Fuel Burn Speed: §e%.2fx%s", speed, hoveredTier.isMultiblock() && node.getBoilerThrottle() < 100 ? " §8(" + node.getBoilerThrottle() + "% Throttle)" : "")));
                 tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Steam Output: §b%,.0f mB/s §7(%,.0f mB/t)", steamRate, steamRate / 20.0)));
-                tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Water Input: §9%,.2f mB/s §7(%,.3f mB/t)", steamRate / 160.0, (steamRate / 20.0) / 160.0)));
-                graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tooltip, mouseX, mouseY);
             }
         } else if (!node.isMultiblock()) {
             if (node.supportsSteamMode()) {
@@ -690,7 +711,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             boolean hoveredControllerLocked = false;
             String hoveredControllerReq = "";
 
-            graphics.enableScissor(x + 10, y + 36, x + 10 + controllersAreaW, y + 51);
+            BoardScissorHelper.enableScissor(graphics, x + 10, y + 36, x + 10 + controllersAreaW, y + 51);
             graphics.pose().pushPose();
             graphics.pose().translate((float) -headerRow1ScrollX, 0, 0);
 
@@ -729,7 +750,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
 
             graphics.pose().popPose();
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
 
             if (maxHeaderRow1ScrollX > 0) {
                 if (headerRow1ScrollX > 2) {
@@ -761,7 +782,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             int hoveredReflectorTier = -1;
             boolean hoveredReflectorLocked = false;
 
-            graphics.enableScissor(x + 10, y + 51, x + 10 + reflAreaW, y + 66);
+            BoardScissorHelper.enableScissor(graphics, x + 10, y + 51, x + 10 + reflAreaW, y + 66);
             graphics.pose().pushPose();
             graphics.pose().translate((float) -headerRow2ScrollX, 0, 0);
 
@@ -797,7 +818,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
 
             graphics.pose().popPose();
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
 
             if (maxHeaderRow2ScrollX > 0) {
                 if (headerRow2ScrollX > 2) {
@@ -823,7 +844,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 } else {
                     tt.add(Component.literal("§7[Click to select]"));
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             } else if (hoveredReflectorTier >= 0) {
                 List<Component> tt = new ArrayList<>();
                 if (hoveredReflectorTier == 0) {
@@ -848,7 +869,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 } else {
                     tt.add(Component.literal("§7[Click to equip]"));
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             }
         } else if (isCoilMultiblock(node)) {
             List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
@@ -897,7 +918,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
             ResourceLocation hoveredController = null;
 
-            graphics.enableScissor(x + 10, y + 36, x + 10 + controllersAreaW, y + 51);
+            BoardScissorHelper.enableScissor(graphics, x + 10, y + 36, x + 10 + controllersAreaW, y + 51);
             graphics.pose().pushPose();
             graphics.pose().translate((float) -headerRow1ScrollX, 0, 0);
 
@@ -923,7 +944,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
 
             graphics.pose().popPose();
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
 
             if (maxHeaderRow1ScrollX > 0) {
                 if (headerRow1ScrollX > 2) {
@@ -971,7 +992,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             MachineAddon hoveredCoil = null;
             boolean hoveredCoilLocked = false;
 
-            graphics.enableScissor(x + 10, y + 51, x + 10 + coilAreaW, y + 66);
+            BoardScissorHelper.enableScissor(graphics, x + 10, y + 51, x + 10 + coilAreaW, y + 66);
             graphics.pose().pushPose();
             graphics.pose().translate((float) -headerRow2ScrollX, 0, 0);
 
@@ -1008,7 +1029,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
 
             graphics.pose().popPose();
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
 
             if (maxHeaderRow2ScrollX > 0) {
                 if (headerRow2ScrollX > 2) {
@@ -1032,7 +1053,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 } else {
                     tt.add(Component.literal("§7[Click to select]"));
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             } else if (hoveredCoil != null) {
                 List<Component> tt = new ArrayList<>();
                 tt.add(Component.literal("§6♨ " + hoveredCoil.getName()));
@@ -1046,7 +1067,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 } else {
                     tt.add(Component.literal("§7[Click to equip]"));
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             }
         } else {
             List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
@@ -1158,7 +1179,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 } else {
                     tt.add(Component.literal("§7[Click to select]"));
                 }
-                graphics.renderTooltip(font, tt, java.util.Optional.empty(), mouseX, mouseY);
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             }
         }
     }

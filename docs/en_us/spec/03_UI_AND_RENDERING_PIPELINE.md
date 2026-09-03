@@ -11,19 +11,19 @@ GTCalcBoard integrates seamlessly with Minecraft's rendering pipeline to guarant
 
 ```mermaid
 flowchart TB
-    subgraph Viewport["1. Viewport & Canvas Core"]
+    subgraph Viewport["1. Viewport & Rendering Pipeline (BoardScreen / Render)"]
         direction LR
-        BS["BoardScreen<br/>(2D Camera, Zoom/Pan, Fit to View)"] ~~~ CIH["CanvasInteractionHandler<br/>(PanZoom / Selection / QuickAdd)"] ~~~ CR["ConnectionRenderer<br/>(Bézier & WireSpatialIndex)"] ~~~ NCR["NodeCardRenderer<br/>(Node Cards & Gauges)"]
+        BS["BoardScreen<br/>(Main Screen Orchestrator & Router)"] ~~~ BDM["BoardDialogManager<br/>(Modal Lifecycle & Routing)"] ~~~ BCR["BoardCanvasRenderer<br/>(Two-Pass Z-Order & glClear Isolation)"] ~~~ BVT["BoardViewportTransform<br/>(Virtual GUI Scale Transform)"] ~~~ CIH["CanvasInteractionHandler<br/>(Pan / Zoom / Selection / QuickAdd)"]
     end
 
-    subgraph Dialogs["2. Dialogs & Modals"]
+    subgraph Dialogs["2. Dialogs & Modals (dialog.*)"]
         direction LR
-        MCD["MachineConfigDialog<br/>(Parallel, Addon Rack)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(Global Dashboard)"] ~~~ BSD["BoardSettingsDialog<br/>(Settings & Ratio Limits)"] ~~~ BPD["BlueprintDialogs<br/>(Import/Export Preview)"] ~~~ RSD["RecipeSearch & Filter<br/>(CacheManager & QueryEngine)"]
+        MCD["MachineConfigDialog<br/>(Parallel, Dynamic Catalog)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(Global Dashboard)"] ~~~ BSD["BoardSettingsDialog<br/>(Settings & GUI Scale)"] ~~~ BPD["BlueprintDialogs<br/>(Import/Export Preview)"] ~~~ RSD["RecipeSearch & Filter<br/>(CacheManager & QueryEngine)"]
     end
 
-    subgraph Nav["3. Navigation & Utilities"]
+    subgraph Nav["3. Navigation & Utilities (widget.*)"]
         direction LR
-        TBW["ToolbarWidget<br/>(Quick Action Toolbar)"] ~~~ PTB["PageTabBarWidget<br/>(Personal/Team Tabs)"] ~~~ HUD["HotkeyHudWidget<br/>(Keybinding HUD)"] ~~~ GD["GuideDialog & BoardToast<br/>(In-game Guide & Toasts)"] ~~~ TUT["TutorialManager & Overlay<br/>(Interactive Onboarding)"]
+        TBW["ToolbarWidget<br/>(Responsive Toolbar & Overflow Menu)"] ~~~ PTB["PageTabBarWidget<br/>(Personal/Team Tabs)"] ~~~ HUD["HotkeyHudWidget<br/>(Keybinding HUD)"] ~~~ SO["SummaryOverlay<br/>(Responsive Summary Overlay)"] ~~~ GD["GuideDialog & BoardToast<br/>(In-game Guide & Toasts)"]
     end
 
     Viewport --> Dialogs

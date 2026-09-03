@@ -26,13 +26,18 @@ flowchart TB
         ACTIVE_LIST["장착된 칩 목록 (코일, 해치 등)"] ~~~ STATS_BADGE["시간/전력 승수, 병렬 뱃지"] ~~~ DEL_BTN["[✕] 1클릭 애드온 제거"]
     end
 
-    subgraph Section3["4. 애드온 카탈로그 브라우저"]
+    subgraph Section3["4. 애드온 카탈로그 브라우저 (AddonCatalogView)"]
         direction LR
-        TABS["카테고리 탭: 코일, 해치, 로터 등"] ~~~ SEARCH["실시간 애드온 검색"] ~~~ CHIP_GRID["스마트 칩 그리드 (1클릭 장착)"]
+        TABS["카테고리 탭: 코일, 해치, 로터 등"] ~~~ VIEW_MODE["[▦ 그리드 / ☰ 리스트] 뷰 토글"] ~~~ DYNAMIC_ROWS["가용 높이 기반 동적 행수 (2~5행)"]
     end
 
     Header --> Section1 --> Section2 --> Section3
 ```
+
+### 1.1 동적 반응형 카탈로그 뷰 (`AddonCatalogView`, ADR-017)
+* **가변 행 동적 레이아웃**: 고정 $3 \times 2$ 그리드를 탈피하고, 다이얼로그 가용 높이에 따라 표시 행 수를 동적으로 계산합니다 ($\text{rows} = \text{clamp}(\lfloor \text{availH} / 54 \rfloor, 2, 5)$).
+* **원클릭 $20\text{px}$ 컴팩트 리스트 뷰 (`[▦ / ☰]`)**: 헤더의 뷰 토글 버튼을 통해 고밀도 텍스트/아이콘 일렬 리스트 모드로 즉시 전환하여 한 화면에서 10개 이상의 애드온을 스크롤 없이 비교/장착할 수 있습니다.
+* **뷰 모드 영속화**: 사용자의 뷰 선호도(그리드/리스트)는 `BoardManager` 및 NBT에 자동 저장됩니다.
 
 ---
 

@@ -14,8 +14,19 @@ import java.util.*;
 public class NodePropertyStore {
 
     private final Map<NodePropertyKey<?>, Object> values = new LinkedHashMap<>();
+    private Runnable changeListener;
 
     public NodePropertyStore() {}
+
+    public void setChangeListener(Runnable changeListener) {
+        this.changeListener = changeListener;
+    }
+
+    private void notifyChanged() {
+        if (changeListener != null) {
+            changeListener.run();
+        }
+    }
 
     /**
      * Retrieves the property value, returning the key's default value if absent.
@@ -49,6 +60,7 @@ public class NodePropertyStore {
         } else {
             values.put(key, value);
         }
+        notifyChanged();
     }
 
     /**
@@ -86,6 +98,7 @@ public class NodePropertyStore {
     public <T> void remove(NodePropertyKey<T> key) {
         if (key != null) {
             values.remove(key);
+            notifyChanged();
         }
     }
 
@@ -94,6 +107,7 @@ public class NodePropertyStore {
      */
     public void clear() {
         values.clear();
+        notifyChanged();
     }
 
     public void copyFrom(NodePropertyStore other) {
@@ -101,6 +115,7 @@ public class NodePropertyStore {
         if (other != null) {
             values.putAll(other.values);
         }
+        notifyChanged();
     }
 
     public boolean isEmpty() {

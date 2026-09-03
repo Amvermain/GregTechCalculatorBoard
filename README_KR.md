@@ -115,6 +115,11 @@
 - **기계 하드웨어 템플릿 복제 다이얼로그 (`TemplateCloneDialog`)**: 기계의 티어, 병렬, 오버클럭, 애드온 사양을 명명된 템플릿으로 저장하고 다중 선택된 노드들에 원클릭으로 일괄 주입.
 - **스크롤바 인터랙션 최적화**: 트랙 빈 영역 클릭 시 즉시 비례 이동(Track Click Jump) 및 전역 마우스 드래그 캡처(Thumb Dragging) 지원.
 
+### 19. 반응형 UI 스위트 & 적응형 하드웨어 카탈로그
+- **적응형 반응형 툴바 (`ToolbarWidget`)**: 좁은 해상도에서 타이틀을 3단계(`GT 보드`, `📟`)로 자동 축약하고 초과 버튼을 `[...]` 오버플로우 드롭다운 메뉴로 집약하며, 외부 미니맵과의 겹침 방지 여백을 자동 확보.
+- **동적 애드온 카탈로그 & 컴팩트 리스트 뷰 (`AddonCatalogView`)**: 다이얼로그 높이에 따라 카탈로그 행 수(2~5행)를 자동 조절하며, `[▦ / ☰]` 원클릭 토글로 20px 고밀도 리스트 모드로 전환하여 10개 이상의 애드온을 스크롤 없이 비교/장착.
+- **보드 전용 가상 GUI Scale 독립 분리**: 마인크래프트 전체 GUI Scale에 구애받지 않고 보드 화면만의 전용 뷰포트 배율을 자유롭게 설정.
+
 ---
 
 ## 조작법 및 단축키
@@ -198,7 +203,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.5.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0-beta.1.jar` 경로에 생성됩니다.
 
 ---
 

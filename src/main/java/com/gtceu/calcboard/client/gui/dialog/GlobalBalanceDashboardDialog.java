@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.ItemContributionPopup;
 
@@ -273,7 +274,7 @@ public class GlobalBalanceDashboardDialog {
         maxPageScrollY = Math.max(0, totalH - listH);
         pageScrollY = Math.max(0, Math.min(maxPageScrollY, pageScrollY));
 
-        graphics.enableScissor(x + 2, listY, x + w - 2, listY + listH);
+        BoardScissorHelper.enableScissor(graphics, x + 2, listY, x + w - 2, listY + listH);
 
         int curY = listY - (int) pageScrollY;
         for (int i = 0; i < pages.size(); i++) {
@@ -298,7 +299,7 @@ public class GlobalBalanceDashboardDialog {
             curY += rowH;
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
     }
 
     private void renderMainContent(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY) {
@@ -349,7 +350,7 @@ public class GlobalBalanceDashboardDialog {
         maxItemScrollY = Math.max(0, totalH - listH);
         itemScrollY = Math.max(0, Math.min(maxItemScrollY, itemScrollY));
 
-        graphics.enableScissor(x + 2, listY, x + w - 2, listY + listH);
+        BoardScissorHelper.enableScissor(graphics, x + 2, listY, x + w - 2, listY + listH);
 
         int curY = listY - (int) itemScrollY;
         if (rows.isEmpty()) {
@@ -363,7 +364,7 @@ public class GlobalBalanceDashboardDialog {
             }
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Render scrollbar
         if (maxItemScrollY > 0) {

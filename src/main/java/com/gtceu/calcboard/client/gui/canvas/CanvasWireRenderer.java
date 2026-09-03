@@ -23,6 +23,11 @@ public class CanvasWireRenderer {
     private final WireSpatialIndex wireSpatialIndex = new WireSpatialIndex();
     private final FloatArrayList visibleWiresBuffer = new FloatArrayList();
     private final float[] scratchCp = new float[4];
+    private boolean spatialDirty = true;
+
+    public void markDirty() {
+        this.spatialDirty = true;
+    }
 
     public WireSpatialIndex getWireSpatialIndex() {
         return wireSpatialIndex;
@@ -39,6 +44,7 @@ public class CanvasWireRenderer {
     }
 
     public void updateSpatialIndex(BoardScreen screen, FlowGraph graph) {
+        if (!spatialDirty) return;
         wireSpatialIndex.clear();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
@@ -57,6 +63,7 @@ public class CanvasWireRenderer {
                 }
             }
         }
+        spatialDirty = false;
     }
 
     public void renderWires(GuiGraphics graphics, BoardScreen screen, FlowGraph graph,

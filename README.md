@@ -113,7 +113,10 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 - **Quick Page Switcher (`Ctrl + K`)**: IDE-style fuzzy search popup to instantly jump between canvas pages across complex project workspaces.
 - **Infinite & Fixed-Rate External Supply (`SupplyMode`)**: Configure Junction nodes to infinite supply ($\infty$) or specified rates ($R_{\text{ext}}$), blocking unwarranted upstream demand and offsetting raw input deficits in summary calculations.
 - **Machine Hardware Template Cloner (`TemplateCloneDialog`)**: Extract tier, parallel, overclock, and addon configurations into named reusable templates and batch-inject them across selected nodes.
-- **Enhanced Scrollbar State Machine**: Proportional track click jumping and global mouse drag tracking across all dialog search lists.
+### 19. Responsive UI Suite & Adaptive Hardware Catalog
+- **Adaptive Responsive Toolbar (`ToolbarWidget`)**: Dynamically contracts board title (`GT Board`, `📟`) and collapses trailing buttons into a `[...]` overflow dropdown menu on narrow resolutions, with automatic padding to prevent minimap overlap.
+- **Dynamic Addon Catalog & Compact List View (`AddonCatalogView`)**: Automatically scales catalog grid rows (2~5 rows) based on dialog height, with a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list view displaying 10+ addons without scrolling.
+- **Dedicated Board GUI Scale Decoupling**: Independent virtual viewport scale transforms allow customizing board UI size without altering global Minecraft GUI scales.
 
 ---
 
@@ -198,7 +201,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-alpha.5.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-beta.1.jar`.
 
 ---
 

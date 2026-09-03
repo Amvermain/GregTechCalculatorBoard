@@ -52,8 +52,8 @@ public class ImportBlueprintDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 330;
         int dialogH = 225;
         int x = (screenWidth - dialogW) / 2;
@@ -235,8 +235,8 @@ public class ImportBlueprintDialog {
         if (!visible || currentPackage == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 330;
         int dialogH = 225;
         int x = (screenWidth - dialogW) / 2;
@@ -347,5 +347,13 @@ public class ImportBlueprintDialog {
         BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.import_success", String.valueOf(currentPackage.getGraph().getNodes().size()))));
         mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.1F));
         close();
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }

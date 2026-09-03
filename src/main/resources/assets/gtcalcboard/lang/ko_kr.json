@@ -977,5 +977,19 @@
   "gui.gtcalcboard.junction.supply_mode.infinite": "무한 공급 (무한 해치 / AE 무한 셀)",
   "gui.gtcalcboard.junction.supply_mode.fixed_rate": "고정 외부 공급량 지정",
   "gui.gtcalcboard.cancel_btn": "취소",
-  "gui.gtcalcboard.apply_btn": "적용"
+  "gui.gtcalcboard.apply_btn": "적용",
+  "gui.gtcalcboard.scale.auto": "자동 (게임 배율)",
+  "gui.gtcalcboard.scale.1x": "1x (작게)",
+  "gui.gtcalcboard.scale.2x": "2x (보통)",
+  "gui.gtcalcboard.scale.3x": "3x (크게)",
+  "gui.gtcalcboard.scale.4x": "4x (매우 크게)",
+  "gui.gtcalcboard.toolbar.auto": "자동 (반응형)",
+  "gui.gtcalcboard.toolbar.compact": "컴팩트 (아이콘)",
+  "gui.gtcalcboard.toolbar.full": "전체 (텍스트)",
+  "gui.gtcalcboard.toolbar.more": "추가 도구",
+  "gui.gtcalcboard.config.view_mode.grid": "리스트 뷰로 전환",
+  "gui.gtcalcboard.config.view_mode.list": "그리드 뷰로 전환",
+  "gui.gtcalcboard.settings.toolbar_mode_label": "툴바 표시 모드:",
+  "gui.gtcalcboard.settings.gui_scale_label": "보드 GUI 배율:",
+  "gui.gtcalcboard.settings.addon_catalog_list_view": "애드온 카탈로그 기본 리스트 뷰 표시"
 }

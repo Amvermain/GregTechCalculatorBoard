@@ -32,8 +32,8 @@ public class SaveToTeamDialog {
     public void open() {
         this.visible = true;
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 280;
         int dialogH = 120;
         int x = (screenWidth - dialogW) / 2;
@@ -59,8 +59,8 @@ public class SaveToTeamDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 280;
         int dialogH = 120;
         int x = (screenWidth - dialogW) / 2;
@@ -112,8 +112,8 @@ public class SaveToTeamDialog {
         if (!visible) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 280;
         int dialogH = 120;
         int x = (screenWidth - dialogW) / 2;
@@ -185,6 +185,14 @@ public class SaveToTeamDialog {
         int nodeCount = screen.getGraph().getNodes().size();
         com.gtceu.calcboard.client.team.ClientChunkedStreamHelper.commitPageSafely(teamId, pageId, pageTitle, rev, msg, compressed, nodeCount, 0, 0);
         BoardToast.show("gui.gtcalcboard.toast.saved_to_team", pageTitle);
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }
 

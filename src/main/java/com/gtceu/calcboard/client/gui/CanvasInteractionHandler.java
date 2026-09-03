@@ -513,7 +513,9 @@ public class CanvasInteractionHandler {
         }
         lastDragCanvasX = curCanvasX;
         lastDragCanvasY = curCanvasY;
-        screen.markSummaryDirty();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
@@ -528,6 +530,10 @@ public class CanvasInteractionHandler {
             }
 
             if (resizingNode != null) {
+                resizingNode.getTextCache().markDirty();
+                if (screen.getWireRenderer() != null) {
+                    screen.getWireRenderer().markDirty();
+                }
                 resizingNode = null;
                 return true;
             }
