@@ -4,23 +4,34 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+
 ## [2.1.0-beta.1] - 2026-09-03
 
 ### Added
+- **Dedicated Board GUI Scale Decoupling**:
+  - Added an independent virtual viewport GUI scale option (`[⚙ Settings]` -> GUI Scale: Auto, 1x, 2x, 3x, 4x, 5x, 6x) allowing players to scale the calculator board interface independently of Minecraft's global GUI scale.
+- **Adaptive Responsive Toolbar & Display Modes (`ToolbarWidget`)**:
+  - Added 3 toolbar display modes (`AUTO`, `COMPACT` 22px icon mode, `FULL` text label mode) with dynamic 3-stage title contracting (`GT Calculator Board`, `GT Board`, `📟`) and a `[...]` overflow dropdown menu for overflowing buttons on compact window widths.
+- **Dynamic Addon Catalog & High-Density List View (`AddonCatalogView`)**:
+  - Dynamically calculates visible catalog rows (2~5 rows) based on dialog height and adds a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list mode, displaying 10+ addons simultaneously without scrolling. Automatically persists view preferences per-board.
 - **High-Voltage Turbine Tier Modeling (UHV ~ MAX)**:
   - Extended GTCEu and Star Technology turbine physics simulations to support ultra-high voltage rotor holders and dynamo hatches (UHV, UEV, UIV, UXV, OpV, MAX), calculating exact flow rates, optimal efficiency points, and base power production.
-- **Dedicated Board GUI Scale Decoupling**:
-  - Added an independent virtual viewport GUI scale option (`[⚙ Settings]` -> GUI Scale) allowing players to scale the calculator board interface independently of Minecraft's global GUI scale.
-- **Dynamic Addon Catalog & Compact List View (`AddonCatalogView`)**:
-  - Dynamically calculates visible catalog rows (2~5 rows) based on dialog height and adds a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list mode, displaying 10+ addons simultaneously without scrolling.
-- **Adaptive Responsive Toolbar & Overflow Menu (`ToolbarWidget`)**:
-  - Implemented automatic 3-stage title contracting (`GT Board`, `📟`) and collapsed overflowing action buttons into a `[...]` popup dropdown menu on compact window widths.
+- **Russian Language Localization (`ru_ru`)**:
+  - Added complete Russian localization (`ru_ru.json`) covering all UI elements, tooltips, dialogs, hotkey guides, and in-game messages.
+- **Multi-Tier Systeams Boiler Fluid Progression**:
+  - Added support for multi-stage Systeams boiling transitions (Water -> Steam -> Warm Steam -> Hot Steam -> Superhot Steam) with dynamic fluid alternative cycling.
+- **External Inventory Mod UI Collision Isolation**:
+  - Integrated compatibility guards for Inventory Profiles Next (IPN) and similar inventory sorting mods, preventing foreign buttons and widgets from injecting into and cluttering the calculator board canvas.
 
 ### Changed & Improved
 - **World Login Background Recipe Indexing Optimization**:
   - Optimized workstation sorting in category capability matrices with O(1) set-based lookups, eliminating client freezes and frame drops during Phase 3 background indexing upon joining worlds or servers.
 - **Two-Pass Z-Order Rendering & Item Depth Isolation**:
   - Enforced discrete depth buffer isolation and two-pass layering on the canvas, eliminating Z-clipping artifacts and rendering glitches between 3D item models and 2D text elements.
+- **High-Performance Node Card Text Caching (`NodeCardTextCache`)**:
+  - Optimized title truncation, port throughput labels, and power strings with dirty-flag-driven text caching to eliminate per-frame formatting overhead across dense flowcharts.
+- **Hierarchical Compound Module Flow Balance Precision**:
+  - Refined flow graph solving across nested compound modules to accurately balance proportional scaling and isolate internal intermediate flows from net external inputs and outputs.
 - **Minimap Overlay Protection Padding**:
   - Added an automatic 16px right margin to the bottom toolbar to prevent visual collisions with in-game minimap overlays such as JourneyMap.
 
@@ -29,6 +40,10 @@
   - Fixed an issue where resizing the game window caused toolbar button hitboxes to misalign with their visual positions or cut off trailing buttons.
 - **Machine Config Dialog Addon Catalog Layout Truncation**:
   - Fixed an issue where the bottom rows of the addon catalog were clipped when viewing the machine config dialog on specific display resolutions.
+- **Modal Dialog Virtual Viewport Scissor Bounds & Hitbox Alignment**:
+  - Fixed an issue where modal dialogs (BOM, Settings, Templates, Quick Switcher, Export/Import) had misaligned mouse click bounds and clipping boxes when using non-standard virtual GUI scale settings.
+- **Systeams Dynamo Boiler Conversion State Synchronization**:
+  - Fixed an issue where converting dynamos to steam boilers failed to update downstream fluid alternative ports and output steam tiers in offline headless environments.
 
 ## [2.1.0-alpha.5] - 2026-09-02
 
