@@ -211,9 +211,21 @@ public class SysteamsModAdapter implements IModAdapter {
             }
         }
         if (steamRate > 0) {
-            return String.format(java.util.Locale.ROOT, "§b♨ +%,.1f/s Steam", steamRate);
+            return String.format(java.util.Locale.ROOT, "§b♨ +%s Steam", formatSteamRate(steamRate));
         }
         return "§6♨";
+    }
+
+    private String formatSteamRate(double steamRate) {
+        try {
+            return com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(steamRate, true);
+        } catch (Throwable t) {
+            if (steamRate >= 1000.0) {
+                return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate / 1000.0) + " B/s";
+            } else {
+                return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate) + " mB/s";
+            }
+        }
     }
 
     @Override

@@ -182,6 +182,9 @@ public final class RecipeNodeSerializer {
         if (!node.getHiddenOutputIndices().isEmpty()) {
             tag.putIntArray("hiddenOutputs", node.getHiddenOutputIndices().stream().mapToInt(Integer::intValue).toArray());
         }
+        if (!node.getVoidedOutputIndices().isEmpty()) {
+            tag.putIntArray("voidedOutputs", node.getVoidedOutputIndices().stream().mapToInt(Integer::intValue).toArray());
+        }
 
         if (node.getSupplyMode() != com.gtceu.calcboard.api.type.SupplyMode.NONE) {
             tag.putString("supplyMode", node.getSupplyMode().name());
@@ -378,6 +381,11 @@ public final class RecipeNodeSerializer {
         if (tag.contains("hiddenOutputs")) {
             for (int idx : tag.getIntArray("hiddenOutputs")) {
                 node.hideOutputPort(idx);
+            }
+        }
+        if (tag.contains("voidedOutputs")) {
+            for (int idx : tag.getIntArray("voidedOutputs")) {
+                node.setOutputPortVoided(idx, true);
             }
         }
 

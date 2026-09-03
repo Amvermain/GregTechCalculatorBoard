@@ -46,6 +46,7 @@ public class RecipeNode {
     private final List<IngredientStack> outputs = new ArrayList<>();
     private final java.util.Set<Integer> hiddenInputIndices = new java.util.LinkedHashSet<>();
     private final java.util.Set<Integer> hiddenOutputIndices = new java.util.LinkedHashSet<>();
+    private final java.util.Set<Integer> voidedOutputIndices = new java.util.LinkedHashSet<>();
 
     // Master base node for Auto Ratio
     private boolean isBaseNode = false;
@@ -397,6 +398,10 @@ public class RecipeNode {
         return isReroute && getSupplyMode() == SupplyMode.INFINITE;
     }
 
+    public boolean isVoidSink() {
+        return isReroute && getSupplyMode().isSink();
+    }
+
     public double getExternalSupplyRate() {
         return externalSupplyRate;
     }
@@ -544,6 +549,32 @@ public class RecipeNode {
     public void unhideAllPorts() {
         hiddenInputIndices.clear();
         hiddenOutputIndices.clear();
+    }
+
+    public boolean isOutputPortVoided(int index) {
+        return voidedOutputIndices.contains(index);
+    }
+
+    public void setOutputPortVoided(int index, boolean voided) {
+        if (index >= 0 && index < outputs.size()) {
+            if (voided) {
+                voidedOutputIndices.add(index);
+            } else {
+                voidedOutputIndices.remove(index);
+            }
+        }
+    }
+
+    public void clearVoidedOutputPorts() {
+        voidedOutputIndices.clear();
+    }
+
+    public java.util.Set<Integer> getVoidedOutputIndices() {
+        return java.util.Collections.unmodifiableSet(voidedOutputIndices);
+    }
+
+    public int getVoidedOutputCount() {
+        return voidedOutputIndices.size();
     }
 
     public java.util.Set<Integer> getHiddenInputIndices() {

@@ -84,6 +84,10 @@ public class CanvasWireInteractionHandler {
         if (!screen.ensureEditPermission()) return true;
 
         if (button == 1) {
+            if (NodeWidget.isVoidToggleModifier()) {
+                widget.toggleOutputPortVoid(outPortIdx);
+                return true;
+            }
             widget.hidePortAndDisconnectWires(false, outPortIdx);
             return true;
         }

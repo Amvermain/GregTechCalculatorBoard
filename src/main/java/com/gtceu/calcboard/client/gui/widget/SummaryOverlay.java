@@ -6,9 +6,12 @@ import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -35,6 +38,10 @@ public class SummaryOverlay {
     private boolean hoveredPower = false;
     private boolean hoveredStress = false;
     private boolean hoveredFusion = false;
+    private boolean voidedCollapsed = false;
+    private IngredientStack hoveredActionStack = null;
+    private boolean hoveredActionIsRestore = false;
+    private boolean hoveredVoidHeader = false;
     private BalanceSummary lastSummary = null;
 
     public boolean isCollapsed() {
@@ -88,6 +95,12 @@ public class SummaryOverlay {
             return;
         }
 
+        hoveredStack = null;
+        hoveredRate = 0.0;
+        hoveredActionStack = null;
+        hoveredActionIsRestore = false;
+        hoveredVoidHeader = false;
+
         // Panel Background
         graphics.fill(x, y, x + effectiveW, y + height, 0xEE1A1E26);
         graphics.renderOutline(x, y, effectiveW, height, 0xFF3D4455);
@@ -126,23 +139,21 @@ public class SummaryOverlay {
             }
         }
 
-        // Kinetic Stress (SU) Line
-        int stressY = curHeaderY;
+        // Stress Capacity Line
         boolean showSU = Math.abs(summary.totalSU()) > 0.001;
+        int stressY = curHeaderY;
         if (showSU) {
-            String suLabel = "§6" + Component.translatable("gui.gtcalcboard.total_stress").getString();
-            String suValStr = summary.totalSU() >= 0
-                    ? String.format("§a+%,.0f SU", summary.totalSU())
-                    : String.format("§c-%,.0f SU", -summary.totalSU());
-            int suLabelW = font.width(suLabel) + 6;
-            graphics.drawString(font, suLabel, x + 8, curHeaderY, 0xFFFFAA00, false);
-            graphics.drawString(font, suValStr, x + 8 + suLabelW, curHeaderY, 0xFFFFFFFF, false);
+            String sLabel = "§6" + Component.translatable("gui.gtcalcboard.total_stress").getString();
+            String sValStr = String.format("§f%,.0f SU", summary.totalSU());
+            int sLabelW = font.width(sLabel) + 6;
+            graphics.drawString(font, sLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
+            graphics.drawString(font, sValStr, x + 8 + sLabelW, curHeaderY, 0xFFFFFFFF, false);
             curHeaderY += 13;
         }
 
-        // Fusion Startup Ignition Energy Line
-        int fusionY = curHeaderY;
+        // Fusion Startup Energy Line
         boolean showFusion = summary.totalFusionStartupEU() > 0;
+        int fusionY = curHeaderY;
         if (showFusion) {
             String fLabel = "§d⚛ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer").getString();
             String fValStr = "§f" + FormatUtil.formatCompactNumber(summary.totalFusionStartupEU()) + " EU";
@@ -168,14 +179,16 @@ public class SummaryOverlay {
         int headerBottom = machinesY + 14;
         graphics.fill(x + 8, headerBottom, x + effectiveW - 8, headerBottom + 1, 0xFF353C4D);
 
-        // 3. Scrollable Content Area (Raw Inputs + Net Outputs)
+        // 3. Scrollable Content Area (Raw Inputs + Net Outputs + Voided Outputs)
         int contentY = headerBottom + 4;
         int contentH = (y + height) - contentY - 4;
 
         // Calculate total content height
         int rawCount = summary.rawInputs().isEmpty() ? 1 : summary.rawInputs().size();
         int netCount = summary.netOutputs().isEmpty() ? 1 : summary.netOutputs().size();
-        int totalContentH = 16 + (rawCount * 16) + 12 + 16 + (netCount * 16) + 8;
+        int voidCount = summary.hasVoidedOutputs() ? (voidedCollapsed ? 0 : summary.voidedOutputs().size()) : 0;
+        int voidHeaderH = summary.hasVoidedOutputs() ? 22 : 0;
+        int totalContentH = 16 + (rawCount * 16) + 12 + 16 + (netCount * 16) + voidHeaderH + (voidCount * 16) + 8;
 
         maxScrollY = Math.max(0, totalContentH - contentH);
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
@@ -194,7 +207,7 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH, effectiveW);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH, effectiveW, false, false);
                 }
                 curY += 16;
             }
@@ -211,9 +224,30 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH, effectiveW);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH, effectiveW, false, true);
                 }
                 curY += 16;
+            }
+        }
+
+        // Section C: Voided Byproducts
+        if (summary.hasVoidedOutputs()) {
+            curY += 8;
+            String voidSymbol = voidedCollapsed ? "▶ " : "▼ ";
+            String voidHeader = "§d\uD83D\uDDD1 " + Component.translatable("gui.gtcalcboard.voided_outputs").getString() + " §7" + voidSymbol;
+            graphics.drawString(font, voidHeader, x + 8, curY, 0xFFFFFFFF, false);
+            if (mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= curY - 2 && mouseY <= curY + 12 && mouseY >= contentY && mouseY <= contentY + contentH) {
+                hoveredVoidHeader = true;
+            }
+            curY += 14;
+
+            if (!voidedCollapsed) {
+                for (Map.Entry<IngredientStack, Double> entry : summary.voidedOutputs().entrySet()) {
+                    if (curY >= contentY - 16 && curY <= contentY + contentH) {
+                        renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFFC084FC, mouseX, mouseY, contentY, contentH, effectiveW, true, true);
+                    }
+                    curY += 16;
+                }
             }
         }
 
@@ -235,16 +269,35 @@ public class SummaryOverlay {
     }
 
     private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW) {
+        renderSummaryRow(graphics, font, x, y, stack, rate, rateColor, mouseX, mouseY, contentY, contentH, panelW, false, false);
+    }
+
+    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW, boolean isVoidSection, boolean hasActionButton) {
         IngredientRenderer.render(graphics, stack, x + 8, y - 2);
 
         String ratePrefix = rate > 0 ? "+" : "";
         String rateStr = ratePrefix + formatRate(rate, stack.isFluid());
         int rateW = font.width(rateStr);
-        graphics.drawString(font, rateStr, x + panelW - 10 - rateW, y + 2, rateColor, false);
 
-        int maxNameW = Math.max(20, panelW - rateW - 46);
+        int textPaddingRight = hasActionButton ? 18 : 0;
+        graphics.drawString(font, rateStr, x + panelW - 10 - rateW - textPaddingRight, y + 2, rateColor, false);
+
+        int maxNameW = Math.max(20, panelW - rateW - 46 - textPaddingRight);
         String name = font.plainSubstrByWidth(stack.getDisplayName(), maxNameW);
         graphics.drawString(font, "§f" + name, x + 26, y + 2, 0xFFFFFFFF, false);
+
+        if (hasActionButton) {
+            int btnX = x + panelW - 22;
+            int btnY = y;
+            boolean btnHover = mouseX >= btnX && mouseX <= btnX + 14 && mouseY >= btnY && mouseY <= btnY + 13 && mouseY >= contentY && mouseY <= contentY + contentH;
+            if (btnHover) {
+                graphics.fill(btnX - 1, btnY - 1, btnX + 14, btnY + 13, 0x44FFFFFF);
+                hoveredActionStack = stack;
+                hoveredActionIsRestore = isVoidSection;
+            }
+            String btnIcon = isVoidSection ? "§a↩" : "§d🗑";
+            graphics.drawString(font, btnIcon, btnX + 2, btnY + 2, 0xFFFFFFFF, false);
+        }
 
         // Check if hovered
         if (mouseX >= x + 8 && mouseX <= x + panelW - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
@@ -312,6 +365,12 @@ public class SummaryOverlay {
             return;
         }
 
+        if (hoveredActionStack != null) {
+            String actKey = hoveredActionIsRestore ? "gui.gtcalcboard.tooltip.unmark_void" : "gui.gtcalcboard.tooltip.mark_as_void";
+            graphics.renderTooltip(font, List.of(Component.translatable(actKey)), java.util.Optional.empty(), mouseX, mouseY);
+            return;
+        }
+
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
@@ -361,6 +420,19 @@ public class SummaryOverlay {
         int x = screenWidth - effectiveW - 10;
         int y = 66;
 
+        // Void Section Header Click -> collapse/expand void section
+        if (hoveredVoidHeader && button == 0) {
+            voidedCollapsed = !voidedCollapsed;
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F));
+            return true;
+        }
+
+        // Action Button Click (Void or Restore)
+        if (hoveredActionStack != null && button == 0) {
+            executeVoidAction(hoveredActionStack, hoveredActionIsRestore);
+            return true;
+        }
+
         // Header click -> collapse/expand
         if (mouseX >= x && mouseX <= x + effectiveW && mouseY >= y && mouseY <= y + 22) {
             toggle();
@@ -376,6 +448,42 @@ public class SummaryOverlay {
             return true;
         }
         return false;
+    }
+
+    private void executeVoidAction(IngredientStack stack, boolean restore) {
+        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
+            if (!bs.ensureEditPermission()) return;
+            FlowGraph graph = bs.getGraph();
+            if (graph == null) return;
+            boolean changed = false;
+            for (RecipeNode node : graph.getNodes()) {
+                if (node == null || node.isReroute()) continue;
+                for (int i = 0; i < node.getOutputs().size(); i++) {
+                    IngredientStack out = node.getOutputs().get(i);
+                    if (out != null && out.equals(stack)) {
+                        if (restore) {
+                            if (node.isOutputPortVoided(i)) {
+                                node.setOutputPortVoided(i, false);
+                                changed = true;
+                            }
+                        } else {
+                            if (!node.isOutputPortVoided(i)) {
+                                node.setOutputPortVoided(i, true);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (changed) {
+                bs.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                        SoundEvents.UI_BUTTON_CLICK, restore ? 1.4F : 0.9F
+                    )
+                );
+            }
+        }
     }
 }
 

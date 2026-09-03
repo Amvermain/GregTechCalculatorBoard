@@ -135,6 +135,8 @@ public class NodeCardTextCache {
         this.badges = NodeBadgeRegistry.getBadgesForNode(node);
     }
 
+    private record RawPortData(String rateStr, int textColor, int portColor) {}
+
     private void updatePorts(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, int cardW, boolean isOperational) {
         leftPortTexts.clear();
         rightPortTexts.clear();
@@ -147,30 +149,84 @@ public class NodeCardTextCache {
         boolean isFlipped = node.isFlipped();
 
         for (int r = 0; r < maxRows; r++) {
-            boolean hasInput = (r < visInputs.size());
-            boolean hasOutput = (r < visOutputs.size());
-            int inOrigIdx = hasInput ? visInputs.get(r) : -1;
-            int outOrigIdx = hasOutput ? visOutputs.get(r) : -1;
-
-            if (!isFlipped && hasInput) {
-                leftPortTexts.add(createInputPortText(widget, font, graph, node, inputs.get(inOrigIdx), inOrigIdx, cardW, hasOutput, isOperational));
-            } else if (isFlipped && hasOutput) {
-                leftPortTexts.add(createOutputPortText(widget, font, graph, node, outputs.get(outOrigIdx), outOrigIdx, cardW, hasInput, isOperational));
-            } else {
-                leftPortTexts.add(null);
-            }
-
-            if (!isFlipped && hasOutput) {
-                rightPortTexts.add(createOutputPortText(widget, font, graph, node, outputs.get(outOrigIdx), outOrigIdx, cardW, hasInput, isOperational));
-            } else if (isFlipped && hasInput) {
-                rightPortTexts.add(createInputPortText(widget, font, graph, node, inputs.get(inOrigIdx), inOrigIdx, cardW, hasOutput, isOperational));
-            } else {
-                rightPortTexts.add(null);
-            }
+            buildRowPortTexts(widget, font, graph, node, cardW, isOperational, inputs, outputs, visInputs, visOutputs, isFlipped, r);
         }
     }
 
-    private PortText createInputPortText(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, IngredientStack in, int inOrigIdx, int cardW, boolean hasOther, boolean isOperational) {
+    private void buildRowPortTexts(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, int cardW, boolean isOperational,
+                                  List<IngredientStack> inputs, List<IngredientStack> outputs,
+                                  List<Integer> visInputs, List<Integer> visOutputs, boolean isFlipped, int r) {
+        boolean hasInput = (r < visInputs.size());
+        boolean hasOutput = (r < visOutputs.size());
+        int inOrigIdx = hasInput ? visInputs.get(r) : -1;
+        int outOrigIdx = hasOutput ? visOutputs.get(r) : -1;
+
+        boolean hasLeft = !isFlipped ? hasInput : hasOutput;
+        boolean hasRight = !isFlipped ? hasOutput : hasInput;
+
+        RawPortData leftData = null;
+        if (hasLeft) {
+            leftData = !isFlipped
+                    ? computeInputPortData(widget, graph, node, inputs.get(inOrigIdx), inOrigIdx, isOperational)
+                    : computeOutputPortData(widget, graph, node, outputs.get(outOrigIdx), outOrigIdx, isOperational);
+        }
+
+        RawPortData rightData = null;
+        if (hasRight) {
+            rightData = !isFlipped
+                    ? computeOutputPortData(widget, graph, node, outputs.get(outOrigIdx), outOrigIdx, isOperational)
+                    : computeInputPortData(widget, graph, node, inputs.get(inOrigIdx), inOrigIdx, isOperational);
+        }
+
+        int[] allocatedW = allocatePortWidths(font, leftData, rightData, cardW);
+        leftPortTexts.add(createPortText(font, leftData, allocatedW[0]));
+        rightPortTexts.add(createPortText(font, rightData, allocatedW[1]));
+    }
+
+    private int[] allocatePortWidths(Font font, RawPortData leftData, RawPortData rightData, int cardW) {
+        if (leftData == null && rightData == null) {
+            return new int[]{0, 0};
+        }
+        if (leftData != null && rightData == null) {
+            return new int[]{cardW - 36, 0};
+        }
+        if (leftData == null) {
+            return new int[]{0, cardW - 36};
+        }
+
+        int totalAvailableW = Math.max(40, cardW - 68);
+        int rawLeftW = font.width(leftData.rateStr());
+        int rawRightW = font.width(rightData.rateStr());
+
+        if (rawLeftW + rawRightW <= totalAvailableW) {
+            return new int[]{rawLeftW, rawRightW};
+        }
+
+        int halfW = totalAvailableW / 2;
+        if (rawLeftW <= halfW) {
+            return new int[]{rawLeftW, totalAvailableW - rawLeftW};
+        }
+        if (rawRightW <= halfW) {
+            return new int[]{totalAvailableW - rawRightW, rawRightW};
+        }
+
+        double ratio = (double) rawLeftW / (rawLeftW + rawRightW);
+        int maxLeftW = (int) Math.round(totalAvailableW * ratio);
+        return new int[]{maxLeftW, totalAvailableW - maxLeftW};
+    }
+
+    private PortText createPortText(Font font, RawPortData data, int maxTextW) {
+        if (data == null) return null;
+        String text = data.rateStr();
+        int textW = font.width(text);
+        if (textW > maxTextW) {
+            text = font.plainSubstrByWidth(text, maxTextW);
+            textW = font.width(text);
+        }
+        return new PortText(text, textW, data.textColor(), data.portColor());
+    }
+
+    private RawPortData computeInputPortData(NodeWidget widget, FlowGraph graph, RecipeNode node, IngredientStack in, int inOrigIdx, boolean isOperational) {
         double rate = widget.getInputRate(inOrigIdx);
         FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getInputPortStats(node, inOrigIdx) : null;
         boolean isConnected = stats != null && stats.isConnected();
@@ -179,36 +235,19 @@ public class NodeCardTextCache {
 
         int portColor = !isOperational ? 0xFF77333B : (!isConnected ? 0xFF5599FF : (isBalanced ? 0xFF55FF88 : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
 
-        String rateStr;
-        int textColor;
         if (!isOperational) {
-            rateStr = "§c-" + FormatUtil.formatRate(0.0, in);
-            textColor = 0xFFFF7777;
-        } else if (!isConnected) {
-            rateStr = "§7-" + FormatUtil.formatRate(rate, in);
-            textColor = 0xFFFFAAAA;
-        } else if (isBalanced) {
-            rateStr = "§a" + FormatUtil.formatRate(rate, in) + " §2✔";
-            textColor = 0xFFFFFFFF;
-        } else if (isDeficit) {
-            rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, true);
-            textColor = 0xFFFFFFFF;
-        } else {
-            rateStr = FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, false);
-            textColor = 0xFFFFFFFF;
+            return new RawPortData("§c-" + FormatUtil.formatRate(0.0, in), 0xFFFF7777, portColor);
         }
-
-        int maxTextW = hasOther ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
-        int textW = font.width(rateStr);
-        if (textW > maxTextW) {
-            rateStr = font.plainSubstrByWidth(rateStr, maxTextW);
-            textW = font.width(rateStr);
+        if (!isConnected) {
+            return new RawPortData("§7-" + FormatUtil.formatRate(rate, in), 0xFFFFAAAA, portColor);
         }
-
-        return new PortText(rateStr, textW, textColor, portColor);
+        if (isBalanced) {
+            return new RawPortData("§a" + FormatUtil.formatRate(rate, in) + " §2✔", 0xFFFFFFFF, portColor);
+        }
+        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit), 0xFFFFFFFF, portColor);
     }
 
-    private PortText createOutputPortText(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, IngredientStack out, int outOrigIdx, int cardW, boolean hasOther, boolean isOperational) {
+    private RawPortData computeOutputPortData(NodeWidget widget, FlowGraph graph, RecipeNode node, IngredientStack out, int outOrigIdx, boolean isOperational) {
         double rate = widget.getOutputRate(outOrigIdx);
         FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getOutputPortStats(node, outOrigIdx) : null;
         boolean isConnected = stats != null && stats.isConnected();
@@ -219,37 +258,18 @@ public class NodeCardTextCache {
 
         int portColor = !isOperational ? 0xFF77333B : (!isConnected ? (isInactive ? 0xFF444B5A : 0xFF55FF88) : (isBalanced ? 0xFF55FF88 : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
 
-        String rateStr;
-        int textColor;
         if (!isOperational) {
-            rateStr = "§c" + FormatUtil.formatRate(0.0, out) + " §4⏸";
-            textColor = 0xFFFF7777;
-        } else if (!isConnected) {
+            return new RawPortData("§c" + FormatUtil.formatRate(0.0, out) + " §4⏸", 0xFFFF7777, portColor);
+        }
+        if (!isConnected) {
             if (isInactive) {
-                rateStr = "§8+0/s §7(0%)";
-                textColor = 0xFF778092;
-            } else {
-                rateStr = "§a+" + FormatUtil.formatRate(rate, out);
-                textColor = 0xFFAAFFAA;
+                return new RawPortData("§8+0/s §7(0%)", 0xFF778092, portColor);
             }
-        } else if (isBalanced) {
-            rateStr = "§a" + FormatUtil.formatRate(rate, out) + " §2✔";
-            textColor = 0xFFFFFFFF;
-        } else if (isSurplus) {
-            rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out, false);
-            textColor = 0xFFFFFFFF;
-        } else {
-            rateStr = FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out, true);
-            textColor = 0xFFFFFFFF;
+            return new RawPortData("§a+" + FormatUtil.formatRate(rate, out), 0xFFAAFFAA, portColor);
         }
-
-        int maxTextW = hasOther ? Math.max(20, (cardW / 2) - 34) : (cardW - 36);
-        int textW = font.width(rateStr);
-        if (textW > maxTextW) {
-            rateStr = font.plainSubstrByWidth(rateStr, maxTextW);
-            textW = font.width(rateStr);
+        if (isBalanced) {
+            return new RawPortData("§a" + FormatUtil.formatRate(rate, out) + " §2✔", 0xFFFFFFFF, portColor);
         }
-
-        return new PortText(rateStr, textW, textColor, portColor);
+        return new RawPortData(FormatUtil.formatConnectedOutput(rate, stats.connectedRate(), out, isDeficit), 0xFFFFFFFF, portColor);
     }
 }

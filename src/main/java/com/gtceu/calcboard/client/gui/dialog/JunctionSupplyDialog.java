@@ -28,7 +28,7 @@ public class JunctionSupplyDialog {
     private EditBox rateEditBox;
 
     private static final int DIALOG_WIDTH = 260;
-    private static final int DIALOG_HEIGHT = 175;
+    private static final int DIALOG_HEIGHT = 185;
 
     public JunctionSupplyDialog(BoardScreen parent) {
         this.parent = parent;

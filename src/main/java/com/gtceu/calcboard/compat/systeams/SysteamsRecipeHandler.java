@@ -126,10 +126,14 @@ public class SysteamsRecipeHandler {
             if (!list.contains(steam)) list.add(steam);
         }
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isSysteamsLoaded()) {
-            ResourceLocation warmSteam = ResourceLocation.tryParse("systeams:warm_steam");
-            ResourceLocation hotSteam = ResourceLocation.tryParse("systeams:hot_steam");
-            if (!list.contains(warmSteam)) list.add(warmSteam);
-            if (!list.contains(hotSteam)) list.add(hotSteam);
+            ResourceLocation sysSteam = ResourceLocation.tryParse("systeams:steam");
+            ResourceLocation steamier = ResourceLocation.tryParse("systeams:steamier");
+            ResourceLocation steamiest = ResourceLocation.tryParse("systeams:steamiest");
+            ResourceLocation steamiester = ResourceLocation.tryParse("systeams:steamiester");
+            if (!list.contains(sysSteam)) list.add(sysSteam);
+            if (!list.contains(steamier)) list.add(steamier);
+            if (!list.contains(steamiest)) list.add(steamiest);
+            if (!list.contains(steamiester)) list.add(steamiester);
         }
 
         return list;
@@ -144,13 +148,16 @@ public class SysteamsRecipeHandler {
 
             String path = inputFluidId.getPath();
             if ("steam".equals(path)) {
-                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:warm_steam"), "Warm Steam", getWaterToSteamRatio(), 1.0);
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:steamier"), "Warm Steam", getWaterToSteamRatio(), 1.0);
             }
-            if ("warm_steam".equals(path)) {
-                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:hot_steam"), "Hot Steam", getWaterToSteamRatio(), 1.0);
+            if ("steamier".equals(path) || "warm_steam".equals(path)) {
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:steamiest"), "Hot Steam", getWaterToSteamRatio(), 1.0);
             }
-            if ("hot_steam".equals(path)) {
-                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:superhot_steam"), "Superhot Steam", getWaterToSteamRatio(), 1.0);
+            if ("steamiest".equals(path) || "hot_steam".equals(path)) {
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:steamiester"), "Superhot Steam", getWaterToSteamRatio(), 1.0);
+            }
+            if ("steamiester".equals(path) || "superhot_steam".equals(path)) {
+                return new BoiledFluidResult(ResourceLocation.tryParse("systeams:steamiestest"), "Plasma", getWaterToSteamRatio(), 1.0);
             }
         }
 
@@ -166,14 +173,24 @@ public class SysteamsRecipeHandler {
                 Method instanceM = brmCls.getMethod("instance");
                 Object brm = instanceM.invoke(null);
                 if (brm != null) {
-                    Method getBoiledM = brmCls.getMethod("getBoiledFluid", FluidStack.class);
-                    Object boiled = getBoiledM.invoke(brm, new FluidStack(fluid, 1000));
+                    Method boilM = null;
+                    try {
+                        boilM = brmCls.getMethod("boil", FluidStack.class);
+                    } catch (NoSuchMethodException e) {
+                        boilM = brmCls.getMethod("getBoiledFluid", FluidStack.class);
+                    }
+                    Object boiled = boilM.invoke(brm, new FluidStack(fluid, 1000));
                     if (boiled != null) {
                         Method ratioM = boiled.getClass().getMethod("inToOutRatio");
                         Object ratioObj = ratioM.invoke(boiled);
                         double ratio = (ratioObj instanceof Number n) ? n.doubleValue() : 0.25;
 
-                        Method getOutputM = boiled.getClass().getMethod("fluid");
+                        Method getOutputM = null;
+                        try {
+                            getOutputM = boiled.getClass().getMethod("fluidOut");
+                        } catch (NoSuchMethodException e) {
+                            getOutputM = boiled.getClass().getMethod("fluid");
+                        }
                         Object outFluidObj = getOutputM.invoke(boiled);
                         if (outFluidObj instanceof FluidStack fs && !fs.isEmpty()) {
                             ResourceLocation outId = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getKey(fs.getFluid());
@@ -185,6 +202,29 @@ public class SysteamsRecipeHandler {
             }
         } catch (Throwable ignored) {}
         return null;
+    }
+
+    public static String getFluidDisplayName(ResourceLocation fluidId) {
+        if (fluidId == null) return "";
+        try {
+            var fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(fluidId);
+            if (fluid != null && fluid != Fluids.EMPTY) {
+                String name = fluid.getFluidType().getDescription().getString();
+                if (name != null && !name.isEmpty()) {
+                    return name;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        String path = fluidId.getPath().toLowerCase();
+        if (path.contains("steamier") || path.contains("warm_steam")) return "Warm Steam";
+        if (path.contains("steamiestest")) return "Plasma";
+        if (path.contains("steamiester") || path.contains("superhot_steam")) return "Superhot Steam";
+        if (path.contains("steamiest") || path.contains("hot_steam")) return "Hot Steam";
+        if (path.contains("distilled")) return "Distilled Water";
+        if (path.contains("steam")) return "Steam";
+        if (path.contains("water")) return "Water";
+        return fluidId.getPath();
     }
 
     public static boolean isDynamoToBoilerConvertible(RecipeNode node) {
@@ -362,7 +402,8 @@ public class SysteamsRecipeHandler {
         for (int i = 0; i < node.getInputs().size(); i++) {
             IngredientStack in = node.getInputs().get(i);
             if (in.isFluid()) {
-                IngredientStack updatedIn = IngredientStack.fluid(selectedFluidId, "", totalInputFluid);
+                String inName = getFluidDisplayName(selectedFluidId);
+                IngredientStack updatedIn = IngredientStack.fluid(selectedFluidId, inName, totalInputFluid);
                 updatedIn.setAlternatives(in.getAlternatives());
                 updatedIn.selectAlternative(selectedFluidId);
                 node.getInputs().set(i, updatedIn);

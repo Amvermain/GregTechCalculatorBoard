@@ -412,6 +412,26 @@ public class NodeWidget {
         );
     }
 
+    public void toggleOutputPortVoid(int portIndex) {
+        if (parent != null && !parent.ensureEditPermission()) return;
+        if (portIndex < 0 || portIndex >= node.getOutputs().size()) return;
+        boolean currentlyVoided = node.isOutputPortVoided(portIndex);
+        node.setOutputPortVoided(portIndex, !currentlyVoided);
+        invalidateCache();
+        if (parent != null) {
+            parent.markSummaryDirty();
+        }
+        Minecraft.getInstance().getSoundManager().play(
+            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, currentlyVoided ? 0.8F : 1.3F
+            )
+        );
+    }
+
+    public static boolean isVoidToggleModifier() {
+        return Screen.hasControlDown() || Screen.hasAltDown() || Screen.hasShiftDown();
+    }
+
     public IngredientStack getHoveredIngredient(double canvasMouseX, double canvasMouseY) {
         int inIdx = getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
         if (inIdx >= 0 && inIdx < node.getInputs().size()) {
@@ -760,6 +780,10 @@ public class NodeWidget {
             }
             int outPort = getHoveredOutputPortIndex(mouseX, mouseY);
             if (outPort >= 0) {
+                if (isVoidToggleModifier()) {
+                    toggleOutputPortVoid(outPort);
+                    return true;
+                }
                 hidePortAndDisconnectWires(false, outPort);
                 return true;
             }

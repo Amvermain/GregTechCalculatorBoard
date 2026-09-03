@@ -149,7 +149,7 @@ public class CanvasGroupFrameRenderer {
                 if (!isCompatible) {
                     int warnX = badgeStartX + badgeW + 4;
                     if (warnX + 12 <= rightButtonsBoundary + 4) {
-                        graphics.drawString(font, "⚠️", warnX, badgeY + 1, 0xFFEF4444, false);
+                        graphics.drawString(font, "\u26A0", warnX, badgeY + 1, 0xFFEF4444, false);
                     }
                 }
             }
@@ -304,7 +304,7 @@ public class CanvasGroupFrameRenderer {
                     }
 
                     if (!isCompatible) {
-                        tooltipLines.add(Component.literal("§c⚠️ ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
+                        tooltipLines.add(Component.literal("§c\u26A0 ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
                     }
 
                     graphics.renderComponentTooltip(font, tooltipLines, mouseX, mouseY);

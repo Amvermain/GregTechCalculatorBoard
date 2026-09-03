@@ -256,6 +256,9 @@ public final class BoardTooltipRenderer {
 
                     List<Component> tooltipLines = new ArrayList<>();
                     tooltipLines.add(Component.literal("§a[📤 " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
+                    if (widget.getNode().isOutputPortVoided(outIdx)) {
+                        tooltipLines.add(Component.literal("§d[∅] §d" + Component.translatable("gui.gtcalcboard.tooltip.voided_port").getString()));
+                    }
 
                     String prodStr = NodeCardRenderer.formatRate(stats.requiredOrProducedRate(), out.isFluid());
                     String exactProd = FormatUtil.formatExactRate(stats.requiredOrProducedRate(), out.isFluid());
@@ -323,6 +326,7 @@ public final class BoardTooltipRenderer {
                     tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
                     tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
                     tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_hide").getString()));
+                    tooltipLines.add(Component.literal("§d[Ctrl/Alt+Right-Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.alt_right_click_void").getString()));
                     tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
                     renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;

@@ -378,16 +378,20 @@ public class NodeCardRenderer {
                     int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
                     graphics.fill(x + 2, rowY - 2, x + 2 + slotW, rowY + 16, 0x4438BDF8);
                 }
-                int portColor = isPortSelected ? 0xFF38BDF8 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (left != null ? left.portColor() : 0xFF55FF88));
+                boolean isVoided = node.isOutputPortVoided(outOrigIdx);
+                int portColor = isPortSelected ? 0xFF38BDF8 : (isVoided ? 0xFFA855F7 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (left != null ? left.portColor() : 0xFF55FF88)));
                 boolean portHover = mouseX >= x && mouseX <= x + 28 && mouseY >= rowY - 2 && mouseY <= rowY + 16;
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
+                } else if (isVoided) {
+                    graphics.renderOutline(outPortX - 1, outPortY - 1, 8, 8, 0xFFA855F7);
                 }
 
                 renderIngredient(graphics, out, x + 12, rowY - 1);
                 if (left != null) {
-                    graphics.drawString(font, left.text(), x + 30, rowY + 4, left.textColor(), false);
+                    int txtColor = isVoided ? 0xFFC084FC : left.textColor();
+                    graphics.drawString(font, left.text(), x + 30, rowY + 4, txtColor, false);
                 }
             }
 
@@ -406,15 +410,19 @@ public class NodeCardRenderer {
                     int startSlotX = hasBoth ? (x + (cardW / 2) + 2) : (x + 2);
                     graphics.fill(startSlotX, rowY - 2, startSlotX + slotW, rowY + 16, 0x4438BDF8);
                 }
-                int portColor = isPortSelected ? 0xFF38BDF8 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (right != null ? right.portColor() : 0xFF55FF88));
+                boolean isVoided = node.isOutputPortVoided(outOrigIdx);
+                int portColor = isPortSelected ? 0xFF38BDF8 : (isVoided ? 0xFFA855F7 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (right != null ? right.portColor() : 0xFF55FF88)));
                 boolean portHover = mouseX >= x + cardW - 28 && mouseX <= x + cardW && mouseY >= rowY - 2 && mouseY <= rowY + 16;
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
+                } else if (isVoided) {
+                    graphics.renderOutline(outPortX - 1, outPortY - 1, 8, 8, 0xFFA855F7);
                 }
 
                 if (right != null) {
-                    graphics.drawString(font, right.text(), x + cardW - 30 - right.width(), rowY + 4, right.textColor(), false);
+                    int txtColor = isVoided ? 0xFFC084FC : right.textColor();
+                    graphics.drawString(font, right.text(), x + cardW - 30 - right.width(), rowY + 4, txtColor, false);
                 }
                 renderIngredient(graphics, out, x + cardW - 28, rowY - 1);
             } else if (isFlipped && hasInput) {
@@ -574,7 +582,8 @@ public class NodeCardRenderer {
         for (int i = 0; i < node.getOutputs().size(); i++) {
             int px = Math.round(widget.getOutputPortX(i));
             int py = Math.round(widget.getOutputPortY(i));
-            graphics.fill(px - 3, py - 3, px + 3, py + 3, 0xFF55FF88);
+            int dotColor = node.isOutputPortVoided(i) ? 0xFFA855F7 : 0xFF55FF88;
+            graphics.fill(px - 3, py - 3, px + 3, py + 3, dotColor);
         }
     }
 
@@ -594,6 +603,8 @@ public class NodeCardRenderer {
         int border;
         if (isSelected) {
             border = 0xFF00FFFF;
+        } else if (node.isVoidSink()) {
+            border = 0xFFA855F7;
         } else if (node.isInfiniteSupply()) {
             border = 0xFF38BDF8;
         } else if (node.isExternalSupply()) {
@@ -604,17 +615,23 @@ public class NodeCardRenderer {
         graphics.renderOutline(x + 2, y + 2, 28, 28, border);
         if (isSelected) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x8800FFFF);
+        } else if (node.isVoidSink()) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x44A855F7);
         } else if (node.isInfiniteSupply()) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x4438BDF8);
         } else if (node.isExternalSupply()) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x4434D399);
         }
 
-        // External Supply Badge (Top: ∞ or +rate)
+        // External Supply Badge (Top: ∞, VOID, or +rate)
         if (node.isInfiniteSupply()) {
             graphics.fill(x + 19, y + 1, x + 31, y + 10, 0xEE0B132B);
             graphics.renderOutline(x + 19, y + 1, 12, 9, 0xFF38BDF8);
             graphics.drawString(font, "∞", x + 22, y + 1, 0xFF38BDF8, false);
+        } else if (node.isVoidSink()) {
+            graphics.fill(x + 13, y + 1, x + 31, y + 10, 0xEE1E1035);
+            graphics.renderOutline(x + 13, y + 1, 18, 9, 0xFFA855F7);
+            graphics.drawString(font, "VOID", x + 15, y + 1, 0xFFA855F7, false);
         } else if (node.isExternalSupply()) {
             String rateStr = "+" + com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(node.getExternalSupplyRate(), false);
             int rw = font.width(rateStr);
