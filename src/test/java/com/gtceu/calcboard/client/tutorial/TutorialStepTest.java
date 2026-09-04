@@ -19,25 +19,27 @@ public class TutorialStepTest {
     @Test
     public void testTutorialStepSequence() {
         TutorialStep[] steps = TutorialStep.values();
-        Assertions.assertEquals(12, steps.length);
+        Assertions.assertEquals(14, steps.length);
 
         Assertions.assertEquals(TutorialStep.STEP_1_ADD_RECIPE, steps[0]);
         Assertions.assertEquals(TutorialStep.STEP_2_DRAG_TO_SEARCH, steps[1]);
         Assertions.assertEquals(TutorialStep.STEP_3_JUNCTION, steps[2]);
         Assertions.assertEquals(TutorialStep.STEP_4_SHIFT_WIRING, steps[3]);
-        Assertions.assertEquals(TutorialStep.STEP_5_MACHINE_SELECTOR, steps[4]);
-        Assertions.assertEquals(TutorialStep.STEP_6_MACHINE_CONFIG, steps[5]);
-        Assertions.assertEquals(TutorialStep.STEP_7_GROUP_FRAME, steps[6]);
-        Assertions.assertEquals(TutorialStep.STEP_8_COMPOUND_MODULE, steps[7]);
-        Assertions.assertEquals(TutorialStep.STEP_9_SHARED_MACHINE, steps[8]);
-        Assertions.assertEquals(TutorialStep.STEP_10_BOM_INSPECTION, steps[9]);
-        Assertions.assertEquals(TutorialStep.STEP_11_FOLDER_BROWSER, steps[10]);
-        Assertions.assertEquals(TutorialStep.COMPLETED, steps[11]);
+        Assertions.assertEquals(TutorialStep.STEP_5_JUNCTION_ETA, steps[4]);
+        Assertions.assertEquals(TutorialStep.STEP_6_MACHINE_SELECTOR, steps[5]);
+        Assertions.assertEquals(TutorialStep.STEP_7_MACHINE_CONFIG, steps[6]);
+        Assertions.assertEquals(TutorialStep.STEP_8_GROUP_FRAME, steps[7]);
+        Assertions.assertEquals(TutorialStep.STEP_9_COMPOUND_MODULE, steps[8]);
+        Assertions.assertEquals(TutorialStep.STEP_10_SHARED_MACHINE, steps[9]);
+        Assertions.assertEquals(TutorialStep.STEP_11_BOM_INSPECTION, steps[10]);
+        Assertions.assertEquals(TutorialStep.STEP_12_JUNCTION_SUPPLY, steps[11]);
+        Assertions.assertEquals(TutorialStep.STEP_13_FOLDER_BROWSER, steps[12]);
+        Assertions.assertEquals(TutorialStep.COMPLETED, steps[13]);
 
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < 13; i++) {
             Assertions.assertEquals(i + 1, steps[i].getStepNumber());
         }
-        Assertions.assertEquals(12, steps[11].getStepNumber());
+        Assertions.assertEquals(14, steps[13].getStepNumber());
     }
 
     @Test
@@ -137,47 +139,53 @@ public class TutorialStepTest {
         com.gtceu.calcboard.api.storage.BoardManager bm = com.gtceu.calcboard.api.storage.BoardManager.getInstance();
         bm.resetToDefault();
 
-        // 1. Test Basic Tutorial ends at Step 8
+        // 1. Test Basic Tutorial ends at Step 9
         mgr.startTutorial(null);
         Assertions.assertEquals(com.gtceu.calcboard.client.gui.tutorial.TutorialManager.TutorialMode.BASIC, mgr.getMode());
         Assertions.assertEquals(TutorialStep.STEP_1_ADD_RECIPE, mgr.getCurrentStep());
 
-        // Fast-forward to step 8
-        for (int i = 0; i < 7; i++) {
+        // Fast-forward to step 9
+        for (int i = 0; i < 8; i++) {
             mgr.nextStep();
         }
-        Assertions.assertEquals(TutorialStep.STEP_8_COMPOUND_MODULE, mgr.getCurrentStep());
-        mgr.nextStep(); // Should complete, not go to Step 9!
+        Assertions.assertEquals(TutorialStep.STEP_9_COMPOUND_MODULE, mgr.getCurrentStep());
+        mgr.nextStep(); // Should complete, not go to Step 10!
         Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
         mgr.stopTutorial();
 
-        // 2. Test Advanced Tutorial starts at Step 9 with 3 cutter nodes
+        // 2. Test Advanced Tutorial starts at Step 10 with 3 cutter nodes
         mgr.startAdvancedTutorial(null);
         Assertions.assertEquals(com.gtceu.calcboard.client.gui.tutorial.TutorialManager.TutorialMode.ADVANCED, mgr.getMode());
-        Assertions.assertEquals(TutorialStep.STEP_9_SHARED_MACHINE, mgr.getCurrentStep());
+        Assertions.assertEquals(TutorialStep.STEP_10_SHARED_MACHINE, mgr.getCurrentStep());
 
         com.gtceu.calcboard.api.storage.BoardPage advPage = mgr.getTutorialPage();
         Assertions.assertNotNull(advPage);
         Assertions.assertEquals(3, advPage.getGraph().getNodes().size(), "Advanced tutorial should initialize 3 cutter nodes!");
 
-        // Step 9 -> Step 10
+        // Step 10 -> Step 11 (BOM Inspection)
         mgr.nextStep();
-        Assertions.assertEquals(TutorialStep.STEP_10_BOM_INSPECTION, mgr.getCurrentStep());
+        Assertions.assertEquals(TutorialStep.STEP_11_BOM_INSPECTION, mgr.getCurrentStep());
 
-        // Step 10 -> Step 11
+        // Step 11 -> Step 12 (Junction Supply)
         mgr.nextStep();
-        Assertions.assertEquals(TutorialStep.STEP_11_FOLDER_BROWSER, mgr.getCurrentStep());
+        Assertions.assertEquals(TutorialStep.STEP_12_JUNCTION_SUPPLY, mgr.getCurrentStep());
+        Assertions.assertTrue(advPage.getGraph().getNodes().stream().anyMatch(com.gtceu.calcboard.api.model.RecipeNode::isReroute), "Step 12 should introduce a reroute junction node");
 
-        // Step 11 -> Completed (via nextStep)
+        // Step 12 -> Step 13 (Folder Browser)
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.STEP_13_FOLDER_BROWSER, mgr.getCurrentStep());
+
+        // Step 13 -> Completed (via nextStep)
         mgr.nextStep();
         Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
         mgr.stopTutorial();
 
         // 3. Test onFolderBrowserOpened trigger
         mgr.startAdvancedTutorial(null);
-        mgr.nextStep(); // to Step 10
         mgr.nextStep(); // to Step 11
-        Assertions.assertEquals(TutorialStep.STEP_11_FOLDER_BROWSER, mgr.getCurrentStep());
+        mgr.nextStep(); // to Step 12
+        mgr.nextStep(); // to Step 13
+        Assertions.assertEquals(TutorialStep.STEP_13_FOLDER_BROWSER, mgr.getCurrentStep());
         mgr.onFolderBrowserOpened();
         Assertions.assertEquals(TutorialStep.COMPLETED, mgr.getCurrentStep());
         mgr.stopTutorial();
@@ -190,11 +198,11 @@ public class TutorialStepTest {
         bm.resetToDefault();
 
         mgr.startTutorial(null);
-        // Advance to Step 5
-        for (int i = 0; i < 4; i++) {
+        // Advance to Step 6 (Machine Selector)
+        for (int i = 0; i < 5; i++) {
             mgr.nextStep();
         }
-        Assertions.assertEquals(TutorialStep.STEP_5_MACHINE_SELECTOR, mgr.getCurrentStep());
+        Assertions.assertEquals(TutorialStep.STEP_6_MACHINE_SELECTOR, mgr.getCurrentStep());
 
         com.gtceu.calcboard.api.storage.BoardPage tutPage = mgr.getTutorialPage();
         Assertions.assertNotNull(tutPage);
@@ -213,7 +221,7 @@ public class TutorialStepTest {
 
         // Simulate machine switch to EBF
         mgr.onMachineSwitched(furnace, ebfId);
-        Assertions.assertEquals(TutorialStep.STEP_6_MACHINE_CONFIG, mgr.getCurrentStep());
+        Assertions.assertEquals(TutorialStep.STEP_7_MACHINE_CONFIG, mgr.getCurrentStep());
 
         mgr.stopTutorial();
     }

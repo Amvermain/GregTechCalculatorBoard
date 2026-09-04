@@ -117,14 +117,14 @@ public class CanvasStickyNoteRenderer {
 
                 // [✕ Delete]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.note.tooltip_delete")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.note.tooltip_delete")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [🎨 Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
                     return;
                 }
             }

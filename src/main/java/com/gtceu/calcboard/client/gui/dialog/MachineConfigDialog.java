@@ -519,23 +519,22 @@ public class MachineConfigDialog {
 
     public static void appendAdvancedTooltipDebugInfo(List<Component> tooltip, MachineAddon addon) {
         if (addon == null || tooltip == null) return;
-        var mc = Minecraft.getInstance();
-        if (mc != null && mc.options != null && mc.options.advancedItemTooltips) {
+        if (BoardManager.getInstance().isShowDebugInfo()) {
             tooltip.add(Component.literal("§8§m------------------------"));
-            tooltip.add(Component.literal("§7[F3+H Debug] §8ID: §7" + addon.getId()));
+            tooltip.add(Component.literal("§7[Debug] §8ID: §7" + addon.getId()));
             if (addon.getItemIcon() != null) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8Icon: §e" + addon.getItemIcon()));
+                tooltip.add(Component.literal("§7[Debug] §8Icon: §e" + addon.getItemIcon()));
             }
             if (addon.getCategory() != null) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8Category: §d" + addon.getCategory().name()));
+                tooltip.add(Component.literal("§7[Debug] §8Category: §d" + addon.getCategory().name()));
             }
             if (addon.getDiscoverySource() != null && !addon.getDiscoverySource().isEmpty()) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8Provenance / Origin:"));
+                tooltip.add(Component.literal("§7[Debug] §8Provenance / Origin:"));
                 tooltip.add(Component.literal(" §b↳ " + addon.getDiscoverySource()));
             }
             ItemStack sample = addon.getRenderItemStack();
             if (sample != null && !sample.isEmpty() && sample.hasTag()) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8NBT: §d" + sample.getTag().toString()));
+                tooltip.add(Component.literal("§7[Debug] §8NBT: §d" + sample.getTag().toString()));
             }
         }
     }

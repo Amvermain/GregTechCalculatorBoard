@@ -80,7 +80,19 @@ public class MultiblockBOMDialog {
         this.dirty = true;
 
         Font font = Minecraft.getInstance().font;
-        this.searchBox = new EditBox(font, 0, 0, 120, 14, Component.literal(""));
+        int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int screenH = parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        int dialogW = Math.min(DIALOG_WIDTH, screenW - 16);
+        int dialogH = Math.min(DIALOG_HEIGHT, screenH - 16);
+        int dialogX = (screenW - dialogW) / 2;
+        int dialogY = (screenH - dialogH) / 2;
+        int bannerY = dialogY + 25;
+        int sidebarY = bannerY + 22 + 4;
+        int mainX = dialogX + SIDEBAR_WIDTH + 14;
+        int row1Y = sidebarY + 1;
+        int row2Y = row1Y + 17;
+
+        this.searchBox = new EditBox(font, mainX, row2Y, 120, 14, Component.literal(""));
         this.searchBox.setMaxLength(256);
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.placeholder"));
         this.searchBox.setResponder(text -> {
@@ -104,15 +116,13 @@ public class MultiblockBOMDialog {
     private void updateSummaryIfNeeded() {
         if (dirty || cachedSummary == null) {
             List<BoardPage> allPages = BoardManager.getInstance().getPages();
-            List<RecipeNode> targetNodes = new ArrayList<>();
-            List<com.gtceu.calcboard.api.model.CanvasGroupFrame> targetFrames = new ArrayList<>();
+            List<MultiblockBOMSummary> pageSummaries = new ArrayList<>();
             for (BoardPage p : allPages) {
                 if (selectedPageIds.contains(p.getId()) && p.getGraph() != null) {
-                    targetNodes.addAll(p.getGraph().getNodes());
-                    targetFrames.addAll(p.getGraph().getFrames());
+                    pageSummaries.add(MultiblockBOMCalculator.calculateBOM(p.getGraph(), dualLowerTierEnergyHatches));
                 }
             }
-            cachedSummary = MultiblockBOMCalculator.calculateBOM(targetNodes, targetFrames, dualLowerTierEnergyHatches);
+            cachedSummary = MultiblockBOMSummary.merge(pageSummaries);
             dirty = false;
         }
     }
@@ -322,7 +332,7 @@ public class MultiblockBOMDialog {
         graphics.renderOutline(dualX, row1Y, dualW, 14, dualLowerTierEnergyHatches ? 0xFFFFAA00 : 0xFF3A4B62);
         graphics.drawCenteredString(font, (dualLowerTierEnergyHatches ? "§6⚡ " : "§7⚡ ") + dualStr, dualX + dualW / 2, row1Y + 3, 0xFFFFFFFF);
 
-        // Row 2: Search Box + Item Count Info
+        // Row 2: Search Box + Clear Button + Item Count Info
         int row2Y = row1Y + 17;
         if (searchBox != null) {
             searchBox.setX(x);
@@ -330,6 +340,13 @@ public class MultiblockBOMDialog {
             searchBox.setWidth(120);
             searchBox.setHeight(14);
             searchBox.render(graphics, mouseX, mouseY, 0);
+
+            if (!searchQuery.isEmpty()) {
+                int clearBtnX = x + 106;
+                int clearBtnY = row2Y + 2;
+                boolean clearHover = mouseX >= clearBtnX && mouseX <= clearBtnX + 10 && mouseY >= clearBtnY && mouseY <= clearBtnY + 10;
+                graphics.drawString(font, clearHover ? "§c✕" : "§7✕", clearBtnX, clearBtnY + 1, 0xFFFFFFFF, false);
+            }
         }
 
         // Filter items
@@ -478,6 +495,13 @@ public class MultiblockBOMDialog {
             return true;
         }
 
+        // Click outside dialog closes it
+        if (mouseX < dialogX || mouseX > dialogX + dialogW || mouseY < dialogY || mouseY > dialogY + dialogH) {
+            playClickSound();
+            close();
+            return true;
+        }
+
         // Action Buttons: [📋 Copy] and [⭐ Register in EMI]
         int bannerY = dialogY + 25;
         Font font = Minecraft.getInstance().font;
@@ -597,8 +621,27 @@ public class MultiblockBOMDialog {
         // Search Box click
         int row2Y = row1Y + 17;
         if (searchBox != null) {
-            searchBox.mouseClicked(mouseX, mouseY, button);
-            if (mouseX >= mainX && mouseX <= mainX + 120 && mouseY >= row2Y && mouseY <= row2Y + 14) {
+            searchBox.setX(mainX);
+            searchBox.setY(row2Y);
+            searchBox.setWidth(120);
+            searchBox.setHeight(14);
+
+            // Clear button click [✕]
+            if (!searchQuery.isEmpty()) {
+                int clearBtnX = mainX + 106;
+                int clearBtnY = row2Y + 2;
+                if (mouseX >= clearBtnX && mouseX <= clearBtnX + 10 && mouseY >= clearBtnY && mouseY <= clearBtnY + 10) {
+                    playClickSound();
+                    searchBox.setValue("");
+                    searchBox.setFocused(true);
+                    return true;
+                }
+            }
+
+            boolean inSearchBox = mouseX >= mainX && mouseX <= mainX + 120 && mouseY >= row2Y && mouseY <= row2Y + 14;
+            searchBox.setFocused(inSearchBox);
+            if (inSearchBox) {
+                searchBox.mouseClicked(mouseX, mouseY, button);
                 return true;
             }
         }
@@ -678,15 +721,16 @@ public class MultiblockBOMDialog {
             return true;
         }
         if (searchBox != null && searchBox.isFocused()) {
-            searchBox.keyPressed(keyCode, scanCode, modifiers);
-            return true;
+            if (searchBox.keyPressed(keyCode, scanCode, modifiers)) {
+                return true;
+            }
         }
         return true;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
         if (!visible) return false;
-        if (searchBox != null && searchBox.isFocused()) {
+        if (searchBox != null) {
             return searchBox.charTyped(codePoint, modifiers);
         }
         return false;

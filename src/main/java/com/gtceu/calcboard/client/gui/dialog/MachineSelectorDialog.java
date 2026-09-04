@@ -478,7 +478,7 @@ public class MachineSelectorDialog {
                 tooltip.add(Component.literal("§e[Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.apply_machine_preset").getString()));
             }
 
-            graphics.renderTooltip(font, tooltip, Optional.empty(), mouseX, mouseY);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
         }
     }
 

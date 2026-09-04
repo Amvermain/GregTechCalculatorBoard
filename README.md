@@ -19,116 +19,55 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 
 ## Features
 
-### 1. Unified Pluggable Recipe Viewer SPI (EMI, JEI, & Vanilla)
-- **Multi-Mod Recipe Viewer Compatibility**: Automatically integrates with **EMI**, **JEI (Just Enough Items)**, and **JEI++ (Just Enough Calculation / BoM)**, selecting the optimal viewer adapter at runtime.
-- **Favorites Dock Panel (`[⭐ Favorites (N) ▶]`)**: Collapsible left sidebar for instant 1-click or drag-and-drop node placement from bookmarked recipes.
-- **Native Recipe Transfer (`[+]` Button)**: Click EMI's native `[+]` button while viewing recipes to immediately add and open the node on the active board canvas.
-- **Pure Vanilla Fallback**: Fallback adapter operates offline without recipe viewer mods using Minecraft's native `RecipeManager`.
+### 1. Intuitive Node Canvas & Smart Flowcharting
+- **Pluggable Recipe Viewer Integration**: Native integration with **EMI**, **JEI**, and **JEI++** via pluggable SPI, plus an offline pure vanilla fallback. Add recipes via the collapsible **Favorites Dock (`[⭐ Favorites (N) ▶]`)** or click EMI's native `[+]` button.
+- **Contextual Drag-to-Search & Auto-Wiring**: Drag wires from any port onto empty canvas to instantly search matching producer or consumer recipes and auto-connect with integer ratio matching (`Shift`).
+- **In-Place Recipe Switching**: Switch recipes on existing nodes with one click (`[🔄 Switch Recipe]`) without severing compatible wire connections (`IngredientStack.getId()`).
+- **Port Multi-Selection & Wire Bundling**: Marquee port selection box, `Ctrl`/`Shift` multi-select, and bundle dragging with real-time multi-bezier curve rendering.
+- **Port Hiding & Selective Restore**: Right-click ports to hide unused I/O ports for compact machine cards, with one-click restore via hidden count badge.
+- **Canvas Navigation & Subgraphs**: 16px grid snapping (`G`), quick page switcher (`Ctrl + K`), folder tree drawer, compound submodules (`Ctrl + Shift + G`), visual group frames (`Ctrl + G`), and full Undo/Redo (`Ctrl + Z` / `Ctrl + Y`).
 
-### 2. In-Place Alternative Recipe Switching
-- **One-Click Recipe Switcher**: Switch recipes on existing nodes without deletion via `[🔄 Switch Recipe]` in `MachineConfigDialog` or right-click context menu.
-- **Smart Wire Preservation**: Automatically preserves incoming/outgoing wire connections for matching item and fluid ports (`IngredientStack.getId()`).
-- **Undo / Redo Support**: Fully integrated with the delta history stack (`Ctrl + Z` / `Ctrl + Y`).
-
-### 3. Multiblock & Factory Bill of Materials (BOM) System
-- **Automated Structural Solver (`B` Hotkey / `[📦 BOM]`)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across single pages, shared machine pool frames, or nested compound modules.
-- **Hierarchical Compound Scaling & Traceability**: Recursively resolves nested subgraphs inside Compound Modules proportionally scaled by parent machine counts, and resolves singleblock machines into voltage-tiered item forms with detailed process usage traces (`usedByMachines`).
-- **Hybrid Hatch Override**: Real-time dual lower-tier energy hatch toggling (`⚡ 1x Normal ↔ 2x 1-Tier Lower`) and dynamic casing block deductions.
-- **1-Click Recipe Tree Target**: Export shopping lists directly into EMI Recipe Tree or JEI++ calculation goals, or copy formatted text to clipboard.
-
-### 4. Target Batch Production ETA (Estimated Time) System
-- **Batch Quantity Goals**: Define target production quantities (e.g. `100x`, `1,000x`, `10 B`) on goal and reroute nodes.
-- **Real-Time Inflow ETA**: Calculates estimated duration (`ET: 24m 52s`) based on upstream rates, displaying total batch energy (EU) and raw material requirements.
-
-### 5. Multiplayer Shared Team Workspaces
-- **Real-Time Collaboration**: Share and edit factory flowcharts collaboratively with team members on dedicated servers.
-- **FTB Teams, Phoenix Guilds & Vanilla Scoreboard Integration**: Automatically maps team permissions, roles, and memberships.
-- **Granular Per-Page Edit Locks & Presence**: Acquires temporary edit locks during node/canvas interaction to prevent concurrent overwrite collisions, with live teammate presence indicators.
-- **Frictionless Auto-Sync**: 3-second inactivity debounced auto-commit and screen exit saving, accompanied by revision history logs and personal forking (`Personal Board`).
-
-### 6. Parametric Recipe Search & Contextual Auto-Wiring
-- **Boolean & Parametric Search Engine**: Filter recipes using multi-token AND (`&`/space), OR (`|`), NOT (`!`), `@mod`, `#tags`, `[machine_category]`, and exact `"quotes"`.
-- **Drag-to-Search & Auto-Wire**: Drag from any port onto empty canvas to query matching consumers or producers, and spawn the machine pre-wired with optional ratio-matching (`Shift`).
-
-### 7. Multi-Mod Energy & Mechanics Support
+### 2. Deep GregTech & Multi-Mod Calculation Engine
 - **GregTech CEu Modern**: Full ULV~MAX voltage tiers, Standard/Perfect/Lossless overclocking, subtick CPS batching, and dual energy hatch support.
-- **Create & Create: New Age**: Kinetic generator calculations (Water Wheels, Windmills, Steam Engines in SU/RPM), electric motors, generator coils, and magnet rings.
-- **Thermal Series**: Dynamo RF/t generation, augment multipliers, and tier upgrade kits.
-- **Systeams & Steam Boilers**: Steam boiler mB/s output, steam dynamos, and LP/HP steam machine consumption modeling.
+- **Hardware Addons & Multiblocks**: Deductive calculation for heating coils (temperature & duration bonuses), parallel hatches, configurable maintenance hatches, and turbine rotors.
+- **Multi-Mod Energy Systems**: Kinetic calculations for **Create** & **Create: New Age** (SU, RPM, generator coils), RF/t dynamos & tier kits for **Thermal Series**, and steam consumption modeling for **Systeams** / Boilers.
+- **Master Anchor & Auto-Ratio Sizing**: Designate bottleneck machines as Base Anchors to automatically scale all upstream production chains backwards using integer ceiling.
 
-### 8. Shared Machine Pool (Time-Sharing Frame)
-- **Time-Shared Machine Pooling**: Group multiple recipes into a shared machine pool (`CanvasGroupFrame.isSharedMachineFrame`) to model a single physical machine executing multiple recipes across time.
-- **Duty Cycle & Required Machine Solving**: Computes cumulative duty (`Total Duty %`) and quantized required machines (`Ceil`), rendering live header badges and comprehensive breakdown tooltips.
+### 3. Factory Multiblock BOM & Shared Machine Pools
+- **Automated Multiblock Bill of Materials (BOM)**: Aggregates all multiblock and singleblock construction requirements (casings, coils, hatches, controllers) across pages, frames, and compound modules (`B` hotkey). Export shopping lists directly to EMI Recipe Tree, JEI++, or clipboard.
+- **Shared Machine Pools (Time-Sharing Frame)**: Group multiple recipes sharing physical machines into a pool frame (`Ctrl + Shift + S`). Automatically calculates cumulative duty cycles (`Total Duty %`), quantized machine counts (`Ceil`), and de-duplicated multiblock BOM.
 - **Hardware Config Synchronization**: Synchronize voltage tiers, overclock modes, parallel counts, and addons across all enclosed machines from the frame header.
-- **De-duplicated Multiblock BOM**: Accurately accounts shared multiblock structures once in the BOM calculation.
 
-### 9. Port Multi-Selection & Bundle Batch Wiring UX
-- **Marquee Port Selection**: Drag a selection box over machine cards to selectively grab multiple input or output ports without selecting entire cards.
-- **Explorer-Style Multi-Select**: `Ctrl + Click` to toggle individual ports, `Shift + Click` to select port ranges.
-- **Multi-Wire Bundle Dragging**: Drag from multiple selected ports to bundle wires with real-time multi-bezier curve rendering.
-- **Junction Node Generation & Frame Auto-Wiring**: Drop on empty canvas to spawn vertical aligned junction nodes, or drop onto a Shared Machine Pool to automatically wire matching machines and spawn missing recipe cards with hardware sync and auto-expanding bounds.
-- **Secondary Input Preference Matching**: Intelligently prioritizes matching secondary inputs/fluids (e.g. Lubricant vs Water) when auto-spawning recipes in machine pools.
-- **One-Click Auto-Fit Frame**: Header `[⛶]` button and double-click to instantly auto-fit frame bounds to enclosed contents.
+### 4. AE2 Integration & Target Batch Production ETA
+- **AE2 Autocrafting Integration**: Bind board pages directly to AE2 Processing Patterns (`[💠 Bind AE2 Pattern]`). Displays calculated completion times (ETA) and bottleneck overlays directly on AE2's Crafting Confirmation screen (`CraftConfirmScreen`).
+- **DAG Pipeline & Critical Path ETA**: Evaluates multi-tier autocrafting jobs over a directed acyclic graph (DAG), accounting for machine parallelism, batch counts, and stage pipeline delays.
+- **Target Batch Quantity & Real-Time ETA**: Define batch goals (e.g. `100x`, `1,000x`, `10 B`) on goal and reroute nodes to compute remaining completion time, total energy (EU), and raw material requirements.
 
-### 10. I/O Port Hiding & Selective Restore
-- **Hide Unused Ports**: Right-click any input/output port to sever existing wires and hide unwanted ports, keeping complex multi-output machine cards compact and clutter-free.
-- **Hidden Ports Badge & Popup**: Displays a pill badge (e.g. `2 Outputs hidden`, `3 Ports hidden`) on the machine card. Clicking the badge opens a dropdown popup to selectively unhide ports with a single click.
+### 5. Real-Time Multiplayer Team Workspaces
+- **Live Team Collaboration**: Design factory blueprints concurrently with teammates on dedicated servers with sub-second synchronization.
+- **Team System Integration**: Native support for **FTB Teams**, **Phoenix Guilds**, and **Vanilla Scoreboard Teams**.
+- **Edit Concurrency Control**: Automatic per-page edit locks and live teammate presence indicators prevent concurrent overwrite collisions, backed by automated background saving and revision history forks.
 
-### 11. Smart Inline Text Editing Engine
-- **Rich Text Control**: All inline editable fields (machine name, machine count, parallel count, target batch quantity) support native cursor positioning, Shift/drag selection, Ctrl+A select all, and Ctrl+C/V/X clipboard operations.
-- **Word-Level Navigation**: Navigate and delete words rapidly using Ctrl + Arrow Keys and Ctrl + Backspace/Delete.
-
-### 12. Accessibility & Canvas Controls
-- **5-Level UI Font Scale**: Adjust machine configuration dialog size (`0.75x`, `0.85x`, `1.0x`, `1.15x`, `1.30x`) via `[Aa 1.0x]`, mouse wheel, or `+`/`-` keys.
-- **Uniform Global Fluid Units**: Toggle canvas fluid rates between `Auto`, `Always mB`, and `Always B` via the toolbar button or `Shift+T`.
-- **Page Tab Overflow Navigation**: Smoothly click `«`, `»` or scroll mouse wheel across multiple board pages without edge clipping.
-- **Level of Detail (LOD) Rendering**: Lightweight 2D rendering when zoomed out maintains high performance on large graphs with 1,200+ nodes.
-- **Singleplayer Pause Toggle**: Switch between `Pause: ON` and `Pause: OFF` to choose whether the game world freezes while planning lines.
-
-### 13. Multi-Tab Presets & Compound Modules
-- **Multi-Tab Pages**: Create, switch, rename, and manage independent calculation flowcharts per production branch.
-- **Compound Modules (`Ctrl + G`)**: Collapse sub-graphs into a single module card with automatic internal byproduct encapsulation, proportional scaling, and 1-click restoration (`Expand`).
-
-### 14. Undo, Redo, & Clipboard System
-- **History Stack**: Full `Ctrl + Z` (Undo) and `Ctrl + Y` / `Ctrl + Shift + Z` (Redo) support across node, wire, grouping, and property modifications.
-- **Clipboard & Box Selection**: Marquee box selection, batch dragging, Cut (`Ctrl + X`), Copy (`Ctrl + C`), Paste (`Ctrl + V`), and Duplicate (`Ctrl + D`).
-
-### 15. Base Anchor & Auto Ratio Sizing
-- Designate any bottleneck or target machine as the Base Anchor (`Anchor`).
-- **Auto Ratio**: Scales all upstream machines backwards to satisfy the anchor's input requirement using integer ceiling ($1, 2, 3...$), ensuring $\text{Supply} \ge \text{Demand}$.
-
-### 16. Dynamic Addon & Hardware Optimization
-- **Dynamic Runtime Indexing**: Automatically discovers coils, rotors, hatches, and machines from any installed GTCEu addon or modpack at runtime without hardcoding.
-- **Heating Coils**: Accounts for coil temperatures (Cupronickel 1800K to Trinium 9000K+), duration modifiers, and speed penalties.
-- **Parallel Hatches**: Supports standard and constant-power (Absolute) parallel hatches with direct numeric input and mouse wheel scaling.
-- **Configurable Maintenance Hatches**: Supports Max Speed (0.9x duration) and Max Eco (1.1x duration) modes.
-
-### 17. Applied Energistics 2 (AE2) Integration & Autocrafting Plan ETA
-- **1:1 Page-to-Pattern Binding**: Bind any flowchart sub-page directly to an AE2 Processing Pattern (`[💠 Bind AE2 Pattern]`) or generate board pages directly from the Pattern Encoding Terminal.
-- **DAG Pipeline & Critical Path ETA**: Evaluates multi-tier autocrafting jobs over a directed acyclic graph (DAG), accounting for machine parallelism, batch counts, and stage pipeline delays to calculate exact completion times.
-- **Crafting Confirmation UI Overlay**: Renders an unobtrusive header banner with calculated total ETA, total energy, and bottleneck drill-down badges directly on AE2's Crafting Confirmation Screen (`CraftConfirmScreen`) prior to starting jobs.
-
-### 18. Precision Flow Modeling & Usability Suite
-- **16px Grid Snapping**: Toggle discrete $16\text{px}$ coordinate snapping (`G` key or HUD checkbox) for nodes, frames, and sticky notes.
-- **Hierarchical Page Drawer (`PageBrowserDrawer`)**: Manage dozens of canvas pages inside collapsible virtual folder trees (`folderPath`) with real-time text search and drag-and-drop relocation.
-- **Quick Page Switcher (`Ctrl + K`)**: IDE-style fuzzy search popup to instantly jump between canvas pages across complex project workspaces.
-- **Infinite & Fixed-Rate External Supply (`SupplyMode`)**: Configure Junction nodes to infinite supply ($\infty$) or specified rates ($R_{\text{ext}}$), blocking unwarranted upstream demand and offsetting raw input deficits in summary calculations.
-- **Machine Hardware Template Cloner (`TemplateCloneDialog`)**: Extract tier, parallel, overclock, and addon configurations into named reusable templates and batch-inject them across selected nodes.
-### 19. Responsive UI Suite & Adaptive Hardware Catalog
-- **Adaptive Responsive Toolbar (`ToolbarWidget`)**: Dynamically contracts board title (`GT Board`, `📟`) and collapses trailing buttons into a `[...]` overflow dropdown menu on narrow resolutions, with automatic padding to prevent minimap overlap.
-- **Dynamic Addon Catalog & Compact List View (`AddonCatalogView`)**: Automatically scales catalog grid rows (2~5 rows) based on dialog height, with a 1-click `[▦ / ☰]` toggle to switch into a 20px high-density list view displaying 10+ addons without scrolling.
-- **Dedicated Board GUI Scale Decoupling**: Independent virtual viewport scale transforms allow customizing board UI size without altering global Minecraft GUI scales.
-
-### 20. Flow Saturation Wire Animation & Byproduct Void Sink System
-- **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with amber pulsing glow outlines indicating starved bottleneck machines.
-- **Configurable Animation Modes**: Toggle between Rate Modulated, Uniform Pulse, and Disabled in Board Settings (`[⚙ Settings]`).
-- **Junction Void Sink (`SupplyMode.VOID_SINK`)**: Configure Junction nodes into infinite void sinks to burn/absorb excess byproducts, isolating downstream consumers and preventing artificial upstream demand spikes.
-- **Port-Level Void Marking**: `Alt + Right-Click` on machine output ports to exclude surplus byproducts from final net production summaries without severing topology.
-- **One-Click Summary Overlay Voiding**: Click `[🗑️]` on net product rows in `SummaryOverlay` to mark byproducts as voided, with collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore.
+### 6. Advanced Flow Analytics & Responsive UX
+- **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with pulsing glow outlines indicating starved bottleneck machines.
+- **Junction Void Sink & Port-Level Voiding**: Configure Junction nodes into infinite void sinks (`SupplyMode.VOID_SINK`) or `Alt + Right-Click` output ports to absorb surplus byproducts and exclude them from net production summaries without severing topology.
+- **Responsive Toolbar & Adaptive UI**: Adaptive toolbar contracts title and collapses overflow buttons on compact screens, high-density addon list view (`[▦ / ☰]`), 5-level UI font scaling (`[Aa 1.0x]`), and Level-of-Detail (LOD) rendering for large graphs (1,200+ nodes).
 
 ---
 
 ## Controls & Shortcuts
+
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Pan / Zoom Canvas** | Right/Middle Click + Drag / Mouse Wheel | Move around and zoom in/out (zooms to cursor) |
+| **Quick Add Recipe** | `Space` or Double-Click on canvas | Open recipe browser / search dialog |
+| **Hotkey Guide HUD** | `H` | Toggle in-game overlay showing all context hotkeys |
+| **Multiblock BOM Dialog** | `B` | Open factory bill of materials breakdown |
+| **Quick Page Switcher** | `Ctrl + K` | Fuzzy search and instantly switch between board pages |
+| **Undo / Redo** | `Ctrl + Z` / `Ctrl + Y` (or `Ctrl + Shift + Z`) | Step backward or forward through edit history |
+
+<details>
+<summary><b>Full Controls & Shortcuts Cheatsheet (Click to expand)</b></summary>
 
 | Action | Key / Mouse |
 | :--- | :--- |
@@ -168,6 +107,8 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Blueprint Text Export / Import | Click [Share] / [Import] on top toolbar |
 | Recipe / Uses Lookup | Hover over port and press R (Recipes) or U (Uses) |
 | Scroll Tabs & Toolbar | Mouse Wheel or click [«] / [»] overflow indicators |
+
+</details>
 
 ---
 

@@ -36,14 +36,16 @@ public class UiFormattingTest {
         Assertions.assertEquals(2, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_2_DRAG_TO_SEARCH.getStepNumber());
         Assertions.assertEquals(3, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_3_JUNCTION.getStepNumber());
         Assertions.assertEquals(4, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_4_SHIFT_WIRING.getStepNumber());
-        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_MACHINE_SELECTOR.getStepNumber());
-        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_MACHINE_CONFIG.getStepNumber());
-        Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_GROUP_FRAME.getStepNumber());
-        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_COMPOUND_MODULE.getStepNumber());
-        Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_9_SHARED_MACHINE.getStepNumber());
-        Assertions.assertEquals(10, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_10_BOM_INSPECTION.getStepNumber());
-        Assertions.assertEquals(11, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_11_FOLDER_BROWSER.getStepNumber());
-        Assertions.assertEquals(12, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
+        Assertions.assertEquals(5, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_5_JUNCTION_ETA.getStepNumber());
+        Assertions.assertEquals(6, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_6_MACHINE_SELECTOR.getStepNumber());
+        Assertions.assertEquals(7, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_7_MACHINE_CONFIG.getStepNumber());
+        Assertions.assertEquals(8, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_8_GROUP_FRAME.getStepNumber());
+        Assertions.assertEquals(9, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_9_COMPOUND_MODULE.getStepNumber());
+        Assertions.assertEquals(10, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_10_SHARED_MACHINE.getStepNumber());
+        Assertions.assertEquals(11, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_11_BOM_INSPECTION.getStepNumber());
+        Assertions.assertEquals(12, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_12_JUNCTION_SUPPLY.getStepNumber());
+        Assertions.assertEquals(13, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_13_FOLDER_BROWSER.getStepNumber());
+        Assertions.assertEquals(14, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.COMPLETED.getStepNumber());
     }
 
     @Test

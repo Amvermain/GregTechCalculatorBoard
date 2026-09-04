@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui;
 import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.type.BoardGuiScale;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
@@ -478,6 +479,29 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public double toCanvasY(double screenY) { return (screenY - panY) / zoom; }
     public double toScreenX(double canvasX) { return canvasX * zoom + panX; }
     public double toScreenY(double canvasY) { return canvasY * zoom + panY; }
+
+    public double getLastMouseX() { return lastMouseX; }
+    public double getLastMouseY() { return lastMouseY; }
+
+    public static double[] getNextNodeCenterPosition() {
+        BoardViewportTransform transform = getCurrentTransform();
+        if (transform != null && transform.isScaled()) {
+            return getNextNodeCenterPosition(transform.getVirtualWidth(), transform.getVirtualHeight());
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.screen instanceof BoardScreen bs) {
+            return getNextNodeCenterPosition(bs.width, bs.height);
+        }
+        if (mc != null && mc.getWindow() != null) {
+            BoardGuiScale pref = BoardManager.getInstance().getBoardGuiScale();
+            int gameGuiScale = Math.max(1, (int) Math.round(mc.getWindow().getGuiScale()));
+            int eff = pref.resolveEffectiveScale(gameGuiScale, mc.getWindow().getWidth(), mc.getWindow().getHeight());
+            int sw = Math.max(320, (int) Math.floor((double) mc.getWindow().getWidth() / eff));
+            int sh = Math.max(240, (int) Math.floor((double) mc.getWindow().getHeight() / eff));
+            return getNextNodeCenterPosition(sw, sh);
+        }
+        return getNextNodeCenterPosition(800, 600);
+    }
 
     public static double[] getNextNodeCenterPosition(int screenW, int screenH) {
         double canvasCenterX = (screenW / 2.0 - lastPanX) / lastZoom - 100.0;

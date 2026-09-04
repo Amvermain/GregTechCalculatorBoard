@@ -54,6 +54,7 @@ public class BoardManager {
     private double harmonizeSurplusTolerance = 0.02;
     private boolean gridSnapEnabled = false;
     private int gridSnapSize = 16;
+    private boolean showDebugInfo = false;
 
     private final Map<String, IBoardStorageExtension> storageExtensions = new ConcurrentHashMap<>();
     private final Map<String, CompoundTag> pendingExtensionTags = new ConcurrentHashMap<>();
@@ -115,6 +116,7 @@ public class BoardManager {
         this.harmonizeSurplusTolerance = 0.02;
         this.gridSnapEnabled = false;
         this.gridSnapSize = 16;
+        this.showDebugInfo = false;
         com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
         for (IBoardStorageExtension ext : this.storageExtensions.values()) {
             ext.onReset();
@@ -332,6 +334,18 @@ public class BoardManager {
 
     public void setGridSnapSize(int gridSnapSize) {
         this.gridSnapSize = Math.max(8, Math.min(64, gridSnapSize));
+    }
+
+    public boolean isShowDebugInfo() {
+        return showDebugInfo;
+    }
+
+    public void setShowDebugInfo(boolean showDebugInfo) {
+        this.showDebugInfo = showDebugInfo;
+    }
+
+    public void toggleDebugInfo() {
+        this.showDebugInfo = !this.showDebugInfo;
     }
 
     public static BoardManager getInstance() {
@@ -765,6 +779,7 @@ public class BoardManager {
             rootTag.putDouble("harmonizeSurplusTolerance", getHarmonizeSurplusTolerance());
             rootTag.putBoolean("gridSnapEnabled", isGridSnapEnabled());
             rootTag.putInt("gridSnapSize", getGridSnapSize());
+            rootTag.putBoolean("showDebugInfo", isShowDebugInfo());
             rootTag.put("categoryPresets", com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().serializeNBT());
             for (Map.Entry<String, IBoardStorageExtension> entry : this.storageExtensions.entrySet()) {
                 CompoundTag extTag = entry.getValue().serialize();
@@ -893,6 +908,9 @@ public class BoardManager {
                 }
                 if (rootTag.contains("gridSnapSize")) {
                     this.gridSnapSize = rootTag.getInt("gridSnapSize");
+                }
+                if (rootTag.contains("showDebugInfo")) {
+                    this.showDebugInfo = rootTag.getBoolean("showDebugInfo");
                 }
                 if (rootTag.contains("categoryPresets", Tag.TAG_COMPOUND)) {
                     com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().deserializeNBT(rootTag.getCompound("categoryPresets"));

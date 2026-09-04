@@ -6,6 +6,7 @@ import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
@@ -453,14 +454,14 @@ public class ToolbarWidget {
                 List<Component> lines = Arrays.stream(raw.split("\n"))
                         .<Component>map(Component::literal)
                         .toList();
-                graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+                BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
             } else {
-                graphics.renderTooltip(font, Component.translatable(tooltipKey), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable(tooltipKey), mouseX, mouseY, screen.width, screen.height);
             }
         } else if (isTitleHovered) {
-            graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.tooltip.open_settings"), mouseX, mouseY);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.tooltip.open_settings"), mouseX, mouseY, screen.width, screen.height);
         } else if (overflowHover && !overflowMenuOpen) {
-            graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.toolbar.more"), mouseX, mouseY);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.toolbar.more"), mouseX, mouseY, screen.width, screen.height);
         }
     }
 

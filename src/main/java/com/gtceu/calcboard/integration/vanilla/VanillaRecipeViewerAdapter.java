@@ -98,11 +98,19 @@ public class VanillaRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     @Override
     public Object getHoveredPreviewIngredient(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, int screenW, int screenH) {
-        return null;
+        return RecipeHoverPreviewRenderer.getHoveredIngredient(sr, dialogX, dialogY, dialogW, dialogH, hoveredRowY, mouseX, mouseY, screenW, screenH);
     }
 
     @Override
     public boolean handleHoveredIngredientClick(Object hoveredIngredient, EditBox searchBox) {
+        if (hoveredIngredient instanceof IngredientStack is) {
+            String name = is.getDisplayName();
+            if (searchBox != null && name != null && !name.isEmpty()) {
+                searchBox.setValue(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.stripFormatting(name).trim());
+                searchBox.setFocused(true);
+                return true;
+            }
+        }
         return false;
     }
 

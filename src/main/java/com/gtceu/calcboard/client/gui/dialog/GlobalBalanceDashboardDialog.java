@@ -232,7 +232,7 @@ public class GlobalBalanceDashboardDialog {
             contributionPopup.render(graphics, screenWidth, screenHeight, mouseX, mouseY);
         } else {
             // Render Tooltips
-            renderTooltips(graphics, font, mouseX, mouseY);
+            renderTooltips(graphics, font, mouseX, mouseY, screenWidth, screenHeight);
         }
     }
 
@@ -489,7 +489,7 @@ public class GlobalBalanceDashboardDialog {
         }
     }
 
-    private void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+    private void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY, int screenWidth, int screenHeight) {
         if (hoveredPower && cachedSummary != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§6⚡ " + Component.translatable("gui.gtcalcboard.global_balance.modal_title").getString()));
@@ -500,7 +500,7 @@ public class GlobalBalanceDashboardDialog {
             tooltip.add(Component.literal(String.format(Locale.ROOT, "§a+Gen: §f%,.2f EU/t", cachedSummary.totalGeneratedEUt())));
             tooltip.add(Component.literal(String.format(Locale.ROOT, "§c-Drain: §f%,.2f EU/t", cachedSummary.totalConsumedEUt())));
             tooltip.add(Component.literal(String.format(Locale.ROOT, "§e= Net: §f%,.2f EU/t (%,.2fA %s)", netEUt, amps, tier.getName())));
-            graphics.renderTooltip(font, tooltip, Optional.empty(), mouseX, mouseY);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
             return;
         }
 
@@ -510,7 +510,7 @@ public class GlobalBalanceDashboardDialog {
             for (Map.Entry<String, Integer> entry : cachedSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
-            graphics.renderTooltip(font, tooltip, Optional.empty(), mouseX, mouseY);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
             return;
         }
 
@@ -521,7 +521,7 @@ public class GlobalBalanceDashboardDialog {
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.global_balance.net_rate").getString() + ": §f" + ratePrefix + exactRateStr));
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.global_balance.click_drilldown_hint").getString()));
-            graphics.renderTooltip(font, tooltip, Optional.empty(), mouseX, mouseY);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
         }
     }
 

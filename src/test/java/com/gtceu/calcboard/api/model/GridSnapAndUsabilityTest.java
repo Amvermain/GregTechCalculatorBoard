@@ -53,4 +53,35 @@ public class GridSnapAndUsabilityTest {
         node.setCustomParallel(0);
         Assertions.assertEquals(4, node.getTotalParallel());
     }
+
+    @Test
+    public void testBoardManagerDebugInfoPersistence() throws IOException {
+        BoardManager bm = BoardManager.getInstance();
+        bm.resetToDefault();
+
+        Assertions.assertFalse(bm.isShowDebugInfo(), "Debug info must be disabled by default");
+
+        bm.toggleDebugInfo();
+        Assertions.assertTrue(bm.isShowDebugInfo());
+
+        bm.toggleDebugInfo();
+        Assertions.assertFalse(bm.isShowDebugInfo());
+
+        bm.setShowDebugInfo(true);
+
+        File tempFile = Files.createTempFile("gtcalc_board_debug_test", ".nbt").toFile();
+        try {
+            bm.saveToFile(tempFile);
+
+            bm.resetToDefault();
+            Assertions.assertFalse(bm.isShowDebugInfo(), "resetToDefault must reset showDebugInfo to false");
+
+            bm.loadFromFile(tempFile);
+            Assertions.assertTrue(bm.isShowDebugInfo(), "loadFromFile must restore showDebugInfo state");
+        } finally {
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+        }
+    }
 }

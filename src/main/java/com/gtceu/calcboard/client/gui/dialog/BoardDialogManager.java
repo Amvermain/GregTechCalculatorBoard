@@ -267,14 +267,14 @@ public class BoardDialogManager {
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.mouseClicked(mouseX, mouseY, button);
         }
+        if (searchDialog != null && searchDialog.isVisible()) {
+            return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
+        }
         if (machineSelectorDialog != null && machineSelectorDialog.isVisible()) {
             return machineSelectorDialog.mouseClicked(mouseX, mouseY, button);
         }
         if (machineConfigDialog != null && machineConfigDialog.isVisible()) {
             return machineConfigDialog.mouseClicked(mouseX, mouseY, button);
-        }
-        if (searchDialog != null && searchDialog.isVisible()) {
-            return searchDialog.mouseClicked(mouseX, mouseY, button, width, height);
         }
         if (frameEditDialog != null && frameEditDialog.isVisible()) {
             return frameEditDialog.mouseClicked(mouseX, mouseY, button);

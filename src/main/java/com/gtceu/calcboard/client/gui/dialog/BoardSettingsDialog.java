@@ -8,6 +8,7 @@ import com.gtceu.calcboard.api.type.RateTimeUnit;
 import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
 import com.gtceu.calcboard.api.type.WireColorPreset;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
@@ -264,6 +265,11 @@ public class BoardSettingsDialog {
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
                 Component.translatable("gui.gtcalcboard.settings.grid_snap").getString(),
                 bm.isGridSnapEnabled());
+        rowY += rowH + 2;
+
+        drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
+                Component.translatable("gui.gtcalcboard.settings.show_debug_info").getString(),
+                bm.isShowDebugInfo());
     }
 
     private void renderUnitsTab(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, BoardManager bm) {
@@ -386,7 +392,7 @@ public class BoardSettingsDialog {
                 graphics.drawCenteredString(font, "✔", palX + palSize / 2, rowY + 5, 0xFF000000);
             }
             if (hover) {
-                graphics.renderTooltip(font, p.getDisplayName(), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, p.getDisplayName(), mouseX, mouseY, parent.width, parent.height);
             }
             palX += palSize + 6;
         }
@@ -408,7 +414,7 @@ public class BoardSettingsDialog {
                 graphics.drawCenteredString(font, "✔", palX + palSize / 2, rowY + 5, 0xFF000000);
             }
             if (hover) {
-                graphics.renderTooltip(font, p.getDisplayName(), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, p.getDisplayName(), mouseX, mouseY, parent.width, parent.height);
             }
             palX += palSize + 6;
         }
@@ -627,6 +633,13 @@ public class BoardSettingsDialog {
 
         if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
             bm.setGridSnapEnabled(!bm.isGridSnapEnabled());
+            onSettingsChanged();
+            return;
+        }
+        rowY += rowH + 2;
+
+        if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
+            bm.setShowDebugInfo(!bm.isShowDebugInfo());
             onSettingsChanged();
         }
     }

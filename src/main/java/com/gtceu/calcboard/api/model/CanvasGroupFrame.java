@@ -103,10 +103,11 @@ public class CanvasGroupFrame {
         return frame;
     }
 
-    public List<RecipeNode> getEnclosedNodes(FlowGraph graph) {
+    public List<RecipeNode> getEnclosedNodes(Collection<RecipeNode> nodes) {
         List<RecipeNode> result = new ArrayList<>();
-        if (graph == null) return result;
-        for (RecipeNode n : graph.getNodes()) {
+        if (nodes == null) return result;
+        for (RecipeNode n : nodes) {
+            if (n == null) continue;
             double nw = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
             double nh = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
             double cx = n.getPosX() + nw / 2.0;
@@ -116,6 +117,11 @@ public class CanvasGroupFrame {
             }
         }
         return result;
+    }
+
+    public List<RecipeNode> getEnclosedNodes(FlowGraph graph) {
+        if (graph == null) return Collections.emptyList();
+        return getEnclosedNodes(graph.getNodes());
     }
 
     public List<CanvasStickyNote> getEnclosedNotes(FlowGraph graph) {

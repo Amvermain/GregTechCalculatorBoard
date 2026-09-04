@@ -14,6 +14,7 @@ import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -1328,6 +1329,49 @@ public class MultiblockBOMTest {
         Assertions.assertEquals("Lv Forge Hammer", fhEntry.displayName());
         Assertions.assertTrue(fhEntry.usedByMachines().contains("Forge Hammer (자갈) (x1)"));
         Assertions.assertTrue(fhEntry.usedByMachines().contains("Forge Hammer (모래) (x1)"));
+    }
+
+    @Test
+    @DisplayName("BOMItemEntry and MultiblockStructurePart prioritize deductive display names over raw formatting")
+    void testBOMItemEntryDisplayNameDeductivePriority() {
+        ResourceLocation casingId = ResourceLocation.tryParse("gtceu:inert_machine_casing");
+
+        MultiblockBOMSummary.BOMItemEntry entryWithFallback = new MultiblockBOMSummary.BOMItemEntry(
+                casingId,
+                "Chemically Inert PTFE Machine Casing",
+                16,
+                0,
+                16,
+                PartCategory.CASING,
+                List.of("LCR")
+        );
+        Assertions.assertEquals("Chemically Inert PTFE Machine Casing", entryWithFallback.displayName());
+
+        MultiblockBOMSummary.BOMItemEntry entryWithoutFallback = new MultiblockBOMSummary.BOMItemEntry(
+                casingId,
+                "",
+                16,
+                0,
+                16,
+                PartCategory.CASING,
+                List.of("LCR")
+        );
+        Assertions.assertEquals("Inert Machine Casing", entryWithoutFallback.displayName());
+
+        MultiblockStructurePart part = new MultiblockStructurePart(
+                casingId,
+                "Chemically Inert PTFE Machine Casing",
+                16,
+                PartCategory.CASING
+        );
+        Assertions.assertEquals("Chemically Inert PTFE Machine Casing", part.displayName());
+
+        Assertions.assertTrue(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName("Chemically Inert PTFE Machine Casing"));
+        Assertions.assertTrue(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName("화학적으로 불활성인 PTFE 기계 케이싱"));
+        Assertions.assertFalse(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName("block.gtceu.inert_machine_casing"));
+        Assertions.assertFalse(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName("item.gtceu.inert_machine_casing"));
+        Assertions.assertFalse(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(null));
+        Assertions.assertFalse(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName("   "));
     }
 }
 
