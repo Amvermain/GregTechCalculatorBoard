@@ -6,8 +6,10 @@ import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
@@ -18,12 +20,17 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Searchable machine addon catalog view supporting dynamic responsive row layouts
+ * and one-click grid/list view mode toggling.
+ */
 public class AddonCatalogView {
 
     private final MachineConfigDialog dialog;
@@ -40,14 +47,16 @@ public class AddonCatalogView {
 
     public void init() {
         Minecraft mc = Minecraft.getInstance();
-        this.searchBox = new EditBox(mc.font, 0, 0, 160, 14, Component.translatable("gui.gtcalcboard.config.search_hint"));
-        this.searchBox.setMaxLength(256);
-        this.searchBox.setHint(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.config.search_hint")));
-        this.searchBox.setValue("");
-        this.searchBox.setResponder(text -> {
-            this.catalogScroll = 0;
-            invalidateCache();
-        });
+        if (mc != null && mc.font != null) {
+            this.searchBox = new EditBox(mc.font, 0, 0, 160, 14, Component.translatable("gui.gtcalcboard.config.search_hint"));
+            this.searchBox.setMaxLength(256);
+            this.searchBox.setHint(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.config.search_hint")));
+            this.searchBox.setValue("");
+            this.searchBox.setResponder(text -> {
+                this.catalogScroll = 0;
+                invalidateCache();
+            });
+        }
         this.catalogScroll = 0;
         this.categoryScrollX = 0;
         invalidateCache();
@@ -71,7 +80,9 @@ public class AddonCatalogView {
         List<AddonCategory> allCats = getAllCategoriesForFilter(node);
         int targetIdx = (targetCat != null && targetCat.equals(AddonCategory.CUSTOM)) ? (allCats.size() - 1) : allCats.indexOf(targetCat);
         if (targetIdx < 0) return;
-        Font font = Minecraft.getInstance().font;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) return;
+        Font font = mc.font;
         int chipLeft = 0;
         for (int i = 0; i < targetIdx; i++) {
             chipLeft += font.width(getCategoryLabel(allCats.get(i))) + 12 + 4;
@@ -170,7 +181,7 @@ public class AddonCatalogView {
             cx += bw + 4;
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         if (maxCategoryScrollX > 0 && categoryScrollX < maxCategoryScrollX - 2) {
             graphics.drawString(font, "▶", startX + availW - 6, startY + 4, 0xFFFFAA00, false);
@@ -204,7 +215,8 @@ public class AddonCatalogView {
                 if (!adapter.isAddonCompatible(node, resetCard)) continue;
                 if (dialog.getSelectedCategory() != null && !resetCard.getCategory().equals(dialog.getSelectedCategory())) continue;
                 if (dialog.getSelectedCategory() == null && rel != null && !rel.contains(resetCard.getCategory())) continue;
-                if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || "기본".contains(q) || "none".contains(q)) {
+                String resetBtnText = Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString().toLowerCase();
+                if (q.isEmpty() || resetCard.getName().toLowerCase().contains(q) || "reset".contains(q) || "standard".contains(q) || resetBtnText.contains(q) || "none".contains(q)) {
                     filtered.add(resetCard);
                 }
             }
@@ -228,9 +240,36 @@ public class AddonCatalogView {
             filtered.add(addon);
         }
         filtered.sort((a, b) -> {
+            boolean aReset = "gtceu:rotor_standard".equals(a.getId()) || "gtceu:reflector_none".equals(a.getId());
+            boolean bReset = "gtceu:rotor_standard".equals(b.getId()) || "gtceu:reflector_none".equals(b.getId());
+            if (aReset != bReset) return aReset ? -1 : 1;
+
+            if (a.getCategory() == MachineAddon.Category.REFLECTOR && b.getCategory() == MachineAddon.Category.REFLECTOR) {
+                int tA = (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon ra) ? ra.getReflectorTier() : 0;
+                int tB = (b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon rb) ? rb.getReflectorTier() : 0;
+                if (tA != tB) return Integer.compare(tA, tB);
+            }
+
+            if (a.getCategory() == MachineAddon.Category.COIL && b.getCategory() == MachineAddon.Category.COIL) {
+                int tempA = (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon ca) ? ca.getCoilTemperature() : 0;
+                int tempB = (b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon cb) ? cb.getCoilTemperature() : 0;
+                if (tempA != tempB) return Integer.compare(tempA, tempB);
+            }
+
             if (a.getParallelMultiplier() != b.getParallelMultiplier()) {
                 return Integer.compare(a.getParallelMultiplier(), b.getParallelMultiplier());
             }
+
+            if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon ha && b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon hb) {
+                if (ha.getTier() != null && hb.getTier() != null && ha.getTier().ordinal() != hb.getTier().ordinal()) {
+                    return Integer.compare(ha.getTier().ordinal(), hb.getTier().ordinal());
+                }
+            } else if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon ea && b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eb) {
+                if (ea.getTier() != null && eb.getTier() != null && ea.getTier().ordinal() != eb.getTier().ordinal()) {
+                    return Integer.compare(ea.getTier().ordinal(), eb.getTier().ordinal());
+                }
+            }
+
             return a.getName().compareToIgnoreCase(b.getName());
         });
         this.cachedFilteredCatalog = filtered;
@@ -247,19 +286,41 @@ public class AddonCatalogView {
 
         List<MachineAddon> filtered = getFilteredCatalog(node);
         int totalCards = filtered.size();
-        int cols = 3;
-        int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
-        int visibleRows = 2;
+
+        boolean isListView = BoardManager.getInstance().isAddonCatalogListView();
+        int scrollbarW = 6;
+        int gridW = width - scrollbarW - 2;
+
+        int cols;
+        int visibleRows;
+        int cardW;
+        int cardH;
+
+        if (isListView) {
+            cols = 1;
+            cardH = 20;
+            visibleRows = Math.max(4, (height - 22) / (cardH + 2));
+            cardW = gridW;
+        } else {
+            cardH = 50;
+            int minCardW = 120;
+            cols = Math.max(3, (gridW + 4) / (minCardW + 4));
+            visibleRows = Math.max(2, (height - 22) / (cardH + 4));
+            cardW = (gridW - ((cols - 1) * 4)) / cols;
+        }
+
         int cardsPerPage = cols * visibleRows;
+        int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
         int maxScroll = Math.max(0, maxRows - visibleRows);
         if (catalogScroll > maxScroll) catalogScroll = maxScroll;
 
         int totalPages = Math.max(1, (int) Math.ceil((double) totalCards / (double) cardsPerPage));
         int currentPage = Math.min(totalPages, (int) Math.ceil((double) (catalogScroll + visibleRows) / (double) visibleRows));
 
+        int viewBtnW = 16;
         int navW = (totalPages > 1) ? 76 : 0;
         int pillSpace = 100;
-        int searchW = width - pillSpace - navW - 12;
+        int searchW = Math.max(50, width - pillSpace - navW - viewBtnW - 16);
 
         if (searchBox != null) {
             searchBox.setX(startX + 2);
@@ -277,8 +338,19 @@ public class AddonCatalogView {
             }
         }
 
+        // View Mode Toggle Button [▦ / ☰]
+        int viewBtnX = startX + searchW + 4;
+        boolean viewHov = mouseX >= viewBtnX && mouseX <= viewBtnX + viewBtnW && mouseY >= startY && mouseY <= startY + 14;
+        graphics.fill(viewBtnX, startY, viewBtnX + viewBtnW, startY + 14, viewHov ? 0xFF3D4558 : 0xFF222733);
+        graphics.renderOutline(viewBtnX, startY, viewBtnW, 14, viewHov ? 0xFF58D3FF : 0xFF333A48);
+        graphics.drawCenteredString(font, isListView ? "☰" : "▦", viewBtnX + viewBtnW / 2, startY + 3, viewHov ? 0xFF58D3FF : 0xFFCCCCCC);
+        if (viewHov) {
+            String viewModeKey = isListView ? "gui.gtcalcboard.config.view_mode.list" : "gui.gtcalcboard.config.view_mode.grid";
+            dialog.setDeferredTooltip(List.of(Component.translatable(viewModeKey)));
+        }
+
         if (totalPages > 1) {
-            int navX = startX + searchW + 6;
+            int navX = viewBtnX + viewBtnW + 4;
             boolean prevHov = mouseX >= navX && mouseX <= navX + 14 && mouseY >= startY && mouseY <= startY + 14;
             graphics.fill(navX, startY, navX + 14, startY + 14, prevHov ? 0xFF3D4558 : 0xFF222733);
             graphics.renderOutline(navX, startY, 14, 14, prevHov ? 0xFF58D3FF : 0xFF333A48);
@@ -296,15 +368,12 @@ public class AddonCatalogView {
         renderIndexerStatusPill(graphics, font, startX + width - 2, startY, mouseX, mouseY);
 
         int gridStartY = startY + 18;
-        int scrollbarW = (maxScroll > 0) ? 6 : 0;
-        int gridW = width - scrollbarW - 2;
-        int cardW = (gridW - ((cols - 1) * 4)) / cols;
-        int cardH = 50;
 
         if (maxScroll > 0) {
             int sbX = startX + width - 5;
             int sbY = gridStartY;
-            int sbH = visibleRows * (cardH + 4) - 4;
+            int rowSpacing = isListView ? (cardH + 2) : (cardH + 4);
+            int sbH = visibleRows * rowSpacing - 4;
             graphics.fill(sbX, sbY, sbX + 4, sbY + sbH, 0xFF141720);
             graphics.renderOutline(sbX, sbY, 4, sbH, 0xFF2A3140);
 
@@ -348,14 +417,15 @@ public class AddonCatalogView {
 
         MachineAddon hoveredAddon = null;
 
-        for (int i = 0; i < cols * visibleRows; i++) {
+        for (int i = 0; i < cardsPerPage; i++) {
             int cardIndex = (catalogScroll * cols) + i;
             if (cardIndex >= totalCards) break;
 
             int col = i % cols;
             int row = i / cols;
-            int bx = startX + col * (cardW + 4);
-            int by = gridStartY + row * (cardH + 4);
+            int rowSpacing = isListView ? (cardH + 2) : (cardH + 4);
+            int bx = isListView ? (startX + 2) : (startX + col * (cardW + 4));
+            int by = gridStartY + row * rowSpacing;
 
             boolean hover = mouseX >= bx && mouseX <= bx + cardW && mouseY >= by && mouseY <= by + cardH;
             MachineAddon addon = filtered.get(cardIndex);
@@ -371,8 +441,8 @@ public class AddonCatalogView {
             }
 
             boolean isThermal = addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT;
-            boolean isUpgradeKit = RecipeNode.isThermalUpgradeKit(addon);
-            long totalThermalReg = node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && !RecipeNode.isThermalUpgradeKit(a)).count();
+            boolean isUpgradeKit = addon.isThermalUpgradeKit();
+            long totalThermalReg = node.getAddons().stream().filter(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && !a.isThermalUpgradeKit()).count();
             boolean isThermalFull = isThermal && !isUpgradeKit && totalThermalReg >= 3;
 
             int fillCol = isInstalled ? (hover ? 0xFF2A2026 : 0xFF1C3247) : (hover ? 0xFF273142 : 0xFF202430);
@@ -386,54 +456,76 @@ public class AddonCatalogView {
             graphics.renderOutline(bx, by, cardW, cardH, borderCol);
 
             ItemStack sample = addon.getRenderItemStack();
-            if (sample != null && !sample.isEmpty()) {
-                graphics.renderItem(sample, bx + 4, by + (cardH - 16) / 2);
-            }
-
-            if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-                if (installedCount > 1) {
-                    graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
-                } else if (installedCount == 1) {
-                    graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+            if (isListView) {
+                // Compact 1-Row Renderer
+                if (sample != null && !sample.isEmpty()) {
+                    graphics.renderItem(sample, bx + 2, by + 2);
                 }
-            } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                int maxSlots = getMaxHatchSlotsAllowed(node, addon);
-                int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, addon);
-                if (installedCount > 1) {
-                    graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - (installedCount >= 10 ? 36 : 28), by + 4, 0xFFFFFFFF, false);
-                } else if (installedCount == 1) {
-                    graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
-                } else if (sameTypeTotal >= maxSlots) {
-                    graphics.drawString(font, "§8" + sameTypeTotal + "/" + maxSlots, bx + cardW - 24, by + 4, 0xFF888888, false);
+                String nameStr = font.plainSubstrByWidth(addon.getName(), cardW - 100);
+                graphics.drawString(font, nameStr, bx + 22, by + 6, isInstalled ? 0xFF55FF88 : 0xFFE0E0E0, false);
+
+                String badge = dialog.formatAddonBadge(addon);
+                if (!badge.isEmpty()) {
+                    graphics.drawString(font, badge, bx + cardW - 65, by + 6, 0xFFFFFFFF, false);
                 }
-            } else if (isThermal && !isUpgradeKit) {
-                if (installedCount > 1) {
-                    graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
-                } else if (installedCount == 1) {
-                    graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
-                } else if (isThermalFull) {
-                    graphics.drawString(font, "§83/3", bx + cardW - 18, by + 4, 0xFF888888, false);
+
+                if (isInstalled) {
+                    graphics.drawString(font, hover ? "§c✖" : (installedCount > 1 ? "§a✔x" + installedCount : "§a✔"), bx + cardW - 16, by + 6, 0xFFFFFFFF, false);
+                } else {
+                    graphics.drawString(font, hover ? "§a+" : "§7+", bx + cardW - 14, by + 6, 0xFFFFFFFF, false);
                 }
-            } else if (isInstalled) {
-                graphics.drawString(font, hover ? "§c✖" : "§a✔", bx + cardW - 11, by + 4, 0xFFFFFFFF, false);
+            } else {
+                // Standard Grid Card Renderer
+                if (sample != null && !sample.isEmpty()) {
+                    graphics.renderItem(sample, bx + 4, by + (cardH - 16) / 2);
+                }
+
+                if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
+                    if (installedCount > 1) {
+                        graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
+                    } else if (installedCount == 1) {
+                        graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+                    }
+                } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
+                    int maxSlots = getMaxHatchSlotsAllowed(node, addon);
+                    int sameTypeTotal = getTotalInstalledHatchesOfSameType(node, addon);
+                    if (installedCount > 1) {
+                        graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - (installedCount >= 10 ? 36 : 28), by + 4, 0xFFFFFFFF, false);
+                    } else if (installedCount == 1) {
+                        graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+                    } else if (sameTypeTotal >= maxSlots) {
+                        graphics.drawString(font, "§8" + sameTypeTotal + "/" + maxSlots, bx + cardW - 24, by + 4, 0xFF888888, false);
+                    }
+                } else if (isThermal && !isUpgradeKit) {
+                    if (installedCount > 1) {
+                        graphics.drawString(font, "§a✔x" + installedCount, bx + cardW - 28, by + 4, 0xFFFFFFFF, false);
+                    } else if (installedCount == 1) {
+                        graphics.drawString(font, hover ? "§a+§7/§c-" : "§a✔", bx + cardW - (hover ? 18 : 11), by + 4, 0xFFFFFFFF, false);
+                    } else if (isThermalFull) {
+                        graphics.drawString(font, "§83/3", bx + cardW - 18, by + 4, 0xFF888888, false);
+                    }
+                } else if (isInstalled) {
+                    graphics.drawString(font, hover ? "§c✖" : "§a✔", bx + cardW - 11, by + 4, 0xFFFFFFFF, false);
+                }
+
+                String aName = addon.getName();
+                aName = aName.replace("Turbine Rotor", "Rotor")
+                        .replace("Reflector", "Refl.")
+                        .replace("Maintenance", "Maint.")
+                        .replace("Advanced", "Adv.")
+                        .replace("Borealic", "Boreal.")
+                        .replace("Complex", "Compl.");
+                if (font.width(aName) > cardW - 36) {
+                    aName = font.plainSubstrByWidth(aName, Math.max(16, cardW - 36 - font.width("..."))) + "...";
+                }
+                graphics.drawString(font, "§f" + aName, bx + 24, by + 5, 0xFFFFFFFF, false);
+
+                String statsStr = dialog.formatAddonBadge(addon);
+                graphics.drawString(font, statsStr, bx + 24, by + 19, 0xFFCCCCCC, false);
+
+                String subTitle = font.plainSubstrByWidth(MachineConfigDialog.getAddonSubtitle(addon, node), cardW - 28);
+                graphics.drawString(font, subTitle, bx + 24, by + 33, 0xFF888888, false);
             }
-
-            String aName = addon.getName();
-            aName = aName.replace("Reflector", "Refl.")
-                    .replace("Maintenance", "Maint.")
-                    .replace("Advanced", "Adv.")
-                    .replace("Borealic", "Boreal.")
-                    .replace("Complex", "Compl.");
-            if (font.width(aName) > cardW - 36) {
-                aName = font.plainSubstrByWidth(aName, Math.max(16, cardW - 36 - font.width("..."))) + "...";
-            }
-            graphics.drawString(font, "§f" + aName, bx + 24, by + 5, 0xFFFFFFFF, false);
-
-            String statsStr = dialog.formatAddonBadge(addon);
-            graphics.drawString(font, statsStr, bx + 24, by + 19, 0xFFCCCCCC, false);
-
-            String subTitle = font.plainSubstrByWidth(MachineConfigDialog.getAddonSubtitle(addon, node), cardW - 28);
-            graphics.drawString(font, subTitle, bx + 24, by + 33, 0xFF888888, false);
 
             if (hover) {
                 hoveredAddon = addon;
@@ -455,7 +547,7 @@ public class AddonCatalogView {
                 tooltip.add(Component.literal("§eLeft-Click: §aAdd 1 Hatch"));
                 tooltip.add(Component.literal("§eShift + Left-Click: §aFill All (" + maxSlots + "x)"));
                 tooltip.add(Component.literal("§eRight-Click: §cRemove 1 Hatch"));
-            } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains("장착") || c.getString().contains("제거"))) {
+            } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains(Component.translatable("gui.gtcalcboard.config.install").getString()) || c.getString().contains(Component.translatable("gui.gtcalcboard.config.remove").getString()))) {
                 if (isInst) {
                     tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
                 } else {
@@ -507,16 +599,38 @@ public class AddonCatalogView {
     public boolean mouseClicked(double mX, double mY, int button, RecipeNode node, int startX, int startY, int width, int height, BoardScreen parent) {
         List<MachineAddon> filtered = getFilteredCatalog(node);
         int totalCards = filtered.size();
-        int cols = 3;
-        int visibleRows = 2;
+
+        boolean isListView = BoardManager.getInstance().isAddonCatalogListView();
+        int scrollbarW = 6;
+        int gridW = width - scrollbarW - 2;
+
+        int cols;
+        int visibleRows;
+        int cardW;
+        int cardH;
+
+        if (isListView) {
+            cols = 1;
+            cardH = 20;
+            visibleRows = Math.max(4, (height - 22) / (cardH + 2));
+            cardW = gridW;
+        } else {
+            cardH = 50;
+            int minCardW = 120;
+            cols = Math.max(3, (gridW + 4) / (minCardW + 4));
+            visibleRows = Math.max(2, (height - 22) / (cardH + 4));
+            cardW = (gridW - ((cols - 1) * 4)) / cols;
+        }
+
         int cardsPerPage = cols * visibleRows;
         int maxRows = (int) Math.ceil((double) totalCards / (double) cols);
         int maxScroll = Math.max(0, maxRows - visibleRows);
         int totalPages = Math.max(1, (int) Math.ceil((double) totalCards / (double) cardsPerPage));
 
+        int viewBtnW = 16;
         int navW = (totalPages > 1) ? 76 : 0;
         int pillSpace = 100;
-        int searchW = width - pillSpace - navW - 12;
+        int searchW = Math.max(50, width - pillSpace - navW - viewBtnW - 16);
 
         if (searchBox != null) {
             searchBox.setX(startX + 2);
@@ -538,8 +652,21 @@ public class AddonCatalogView {
             if (clicked) return true;
         }
 
+        // View Mode Toggle Button
+        int viewBtnX = startX + searchW + 4;
+        if (mX >= viewBtnX && mX <= viewBtnX + viewBtnW && mY >= startY && mY <= startY + 14) {
+            boolean nextView = !BoardManager.getInstance().isAddonCatalogListView();
+            BoardManager.getInstance().setAddonCatalogListView(nextView);
+            BoardManager.getInstance().saveForCurrentContext();
+            catalogScroll = 0;
+            Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+            );
+            return true;
+        }
+
         if (totalPages > 1) {
-            int navX = startX + searchW + 6;
+            int navX = viewBtnX + viewBtnW + 4;
             if (mX >= navX && mX <= navX + 14 && mY >= startY && mY <= startY + 14) {
                 if (catalogScroll > 0) {
                     catalogScroll = Math.max(0, catalogScroll - visibleRows);
@@ -555,15 +682,12 @@ public class AddonCatalogView {
         }
 
         int gridStartY = startY + 18;
-        int scrollbarW = (maxScroll > 0) ? 6 : 0;
-        int gridW = width - scrollbarW - 2;
-        int cardW = (gridW - ((cols - 1) * 4)) / cols;
-        int cardH = 50;
 
         if (maxScroll > 0) {
             int sbX = startX + width - 8;
             int sbY = gridStartY;
-            int sbH = visibleRows * (cardH + 4) - 4;
+            int rowSpacing = isListView ? (cardH + 2) : (cardH + 4);
+            int sbH = visibleRows * rowSpacing - 4;
             if (mX >= sbX && mX <= sbX + 8 && mY >= sbY && mY <= sbY + sbH) {
                 float clickRatio = (float) (mY - sbY) / (float) sbH;
                 catalogScroll = Math.max(0, Math.min(maxScroll, (int) Math.round(clickRatio * maxScroll)));
@@ -572,14 +696,15 @@ public class AddonCatalogView {
         }
 
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
-        for (int i = 0; i < cols * 2; i++) {
+        for (int i = 0; i < cardsPerPage; i++) {
             int cardIndex = (catalogScroll * cols) + i;
             if (cardIndex >= totalCards) break;
 
             int col = i % cols;
             int row = i / cols;
-            int bx = startX + col * (cardW + 4);
-            int by = gridStartY + row * (cardH + 4);
+            int rowSpacing = isListView ? (cardH + 2) : (cardH + 4);
+            int bx = isListView ? (startX + 2) : (startX + col * (cardW + 4));
+            int by = gridStartY + row * rowSpacing;
 
             if (mX >= bx && mX <= bx + cardW && mY >= by && mY <= by + cardH) {
                 MachineAddon addon = filtered.get(cardIndex);
@@ -639,8 +764,16 @@ public class AddonCatalogView {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, RecipeNode node, int startX, int startY, int width, int height) {
         List<MachineAddon> filtered = getFilteredCatalog(node);
-        int maxRows = (int) Math.ceil((double) filtered.size() / 3.0);
-        int maxScroll = Math.max(0, maxRows - 2);
+        boolean isListView = BoardManager.getInstance().isAddonCatalogListView();
+        int scrollbarW = 6;
+        int gridW = width - scrollbarW - 2;
+        int cols = isListView ? 1 : Math.max(3, (gridW + 4) / 124);
+        int cardH = isListView ? 20 : 50;
+        int rowSpacing = isListView ? (cardH + 2) : (cardH + 4);
+        int visibleRows = isListView ? Math.max(4, (height - 22) / rowSpacing) : Math.max(2, (height - 22) / rowSpacing);
+
+        int maxRows = (int) Math.ceil((double) filtered.size() / (double) cols);
+        int maxScroll = Math.max(0, maxRows - visibleRows);
         if (maxScroll > 0) {
             catalogScroll = Math.max(0, Math.min(maxScroll, catalogScroll - (int) Math.signum(delta)));
             return true;
@@ -690,20 +823,9 @@ public class AddonCatalogView {
             default -> 1;
         };
 
-        boolean isDT = false;
         ResourceLocation mbId = node.getMachineIcon();
         if (mbId == null || !MultiblockDetector.isMultiblock(mbId)) {
             mbId = node.getMultiblockWorkstation();
-        }
-        if (mbId != null && mbId.getPath().contains("distillation_tower")) {
-            isDT = true;
-        }
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("distillation_tower")) {
-            isDT = true;
-        }
-
-        if (isDT && (type == GTHatchAddon.HatchType.FLUID_OUTPUT || type == GTHatchAddon.HatchType.DUAL_OUTPUT)) {
-            return Math.max(1, reqCount);
         }
 
         if (mbId != null) {

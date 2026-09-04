@@ -22,10 +22,12 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Basic Wiring**: Verify spline wire connects when clicking an output port (green) $\rightarrow$ input port (blue).
 - [ ] **✨ Shift + Connect (1:1 Auto-Ratio Matching)**:
   - [ ] Holding `Shift` while connecting analyzes source production vs target consumption, automatically scaling target machine count 1:1 (e.g., 500 mB/s source $\rightarrow$ 100 mB/s consumer scales machine count to **5.0**).
-- [ ] **Reroute Junctions**:
+- [ ] **Reroute Junctions & Target Batch ET/DT**:
   - [ ] **Double-clicking** an existing wire immediately inserts a zero-cost [🔀 Reroute Junction] node.
   - [ ] Flow and item distribution split correctly through junction nodes to multiple consumers.
   - [ ] `Shift + Connect` from junction nodes calculates ratios based on diverted flow.
+  - [ ] **Target Batch Quantity (ET / DT)**: Clicking the bottom badge on a junction opens the inline target batch editor. Setting a quantity displays real-time Estimated Completion Time (`ET: xx.xs`) or Depletion Time (`DT: xx.xs`).
+  - [ ] **Junction Supply & Reset**: Right-clicking opens supply mode dialog (Infinite/Fixed Rate); `Shift + Right-Click` resets target batch quantity to 0.
 - [ ] **Wire Cutting**: Right-clicking a wire or clicking a connected socket port severs the connection immediately.
 - [ ] **Drag-to-Search**:
   - [ ] Dragging from a port into empty canvas displays a 4-button quick action marker (🔍 Search, ➕ Junction, 📋 Copy, etc.).
@@ -204,10 +206,16 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 
 ---
 
-## 5. Multiblock Construction BOM (Multiblock Construction BOM)
+## 5. Multiblock & Factory BOM Calculation (Multiblock & Factory BOM)
 
 - [ ] **3D Structure Auto-Scanning**:
   - [ ] Accurately aggregates casings, heating coils, hatches/busses, and controllers for all placed multiblocks.
+- [ ] **Hierarchical Compound Module BOM Scaling**:
+  - [ ] Recursively compounds parent module machine counts ($P_{\text{child}} = P_{\text{parent}} \times M_{\text{module}}$) to scale nested sub-machine and multiblock part counts accurately.
+- [ ] **Shared Machine Pool Frame Duty Aggregation**:
+  - [ ] Calculates cumulative duty cycles across enclosed machines sharing physical hardware, quantizing to integral machines ($\lceil \sum \text{Duty} \rceil$) to prevent duplicate BOM parts.
+- [ ] **Singleblock Voltage Tier Item Resolution & Usage Trace**:
+  - [ ] Dynamically resolves singleblock machines into tier-specific items (e.g. `gtceu:lv_rock_breaker`) and lists contributing processes in `usedByMachines`.
 - [ ] **Dual Hatch Optimization**:
   - [ ] Toggling between `1x Regular Tier Hatch` vs `2x Lower Tier Hatches` dynamically updates BoM items.
 - [ ] **Material Filtering & Stack Breakdown**:
@@ -247,9 +255,15 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 
 ## 7. UI/UX, Internationalization & Dialogs (i18n & Dialogs)
 
-- [ ] **Interactive 15s Tutorial**:
-  - [ ] 7-step guided highlight tour (Node placement $\rightarrow$ Module packaging) operates smoothly.
+- [ ] **Interactive Onboarding Tutorial & Advanced Tutorial (14 Steps)**:
+  - [ ] 9-step basic guided highlight tour (Node placement $\rightarrow$ Junction Target Batch & ET calculation $\rightarrow$ Machine Selector $\rightarrow$ Module packaging) operates smoothly.
+  - [ ] Advanced tutorial includes Step 10 (Shared Machine Pool), Step 11 (BOM Inspection), Step 12 (Junction Supply Mode $\infty$ / Flow Limit & Depletion Time DT), and Step 13 (Folder Browser & File Management).
   - [ ] Tutorial completion toast and badge award.
+- [ ] **Shared Machine Multiblock BOM Aggregation (`MultiblockBOMCalculator`)**:
+  - [ ] Shared Machine Pools (`CanvasGroupFrame`) group identical multiblocks and quantize to ceiling machine count, avoiding duplicated casing/coil/hatch BOM counts.
+- [ ] **EMI Slot Hover Highlighting & Tooltip Depth Buffer (Z-Index) Integrity**:
+  - [ ] Hovering slots inside EMI preview/recipe dialogs synchronously highlights corresponding input/output ports and wires on the board canvas.
+  - [ ] Tooltips rendered over EMI slots or board widgets render with cleared depth buffer and high Z-index translation, preventing 3D item models from clipping through tooltip backgrounds.
 - [ ] **Global Balance Dashboard (`B` Key)**:
   - [ ] Factory-wide raw input and net product balance sheets aggregate accurately.
 - [ ] **Board Settings Modal (`[⚙ Settings]`)**:
@@ -258,9 +272,9 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Checkbox selection for selective multi-port resource linking.
 - [ ] **Blueprint Metadata & Import Preview (`[📥] / [📤]`)**:
   - [ ] Title/description/tags metadata and pre-import node/material summaries.
-- [ ] **i18n Consistency**:
-  - [ ] `en_us.json` and `ko_kr.json` format tokens (`%s`, `%d`) match with zero missing translation keys.
-  - [ ] `testI18nCompletenessAndConsistency` unit test passes.
+- [ ] **i18n Consistency (4 Languages)**:
+  - [ ] `en_us.json`, `ko_kr.json`, `zh_cn.json`, and `ru_ru.json` format tokens (`%s`, `%d`) match with zero missing translation keys.
+  - [ ] `check_i18n.py` and `testI18nCompletenessAndConsistency` unit test pass 100%.
 
 ---
 

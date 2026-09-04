@@ -155,7 +155,8 @@ public class SysteamsBoilerTest {
         // 4. Verify GUI Header and Tooltip match the in-game display
         var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(evBoiler);
         String formattedStats = adapter.formatEnergyStats(evBoiler, PowerDisplayMode.EUT);
-        Assertions.assertTrue(formattedStats.contains("576") && formattedStats.contains("Steam"), "Header should format 576k/s Steam: " + formattedStats);
+        Assertions.assertTrue(formattedStats.contains("576") && formattedStats.contains("Steam"), "Header should format 576 Steam: " + formattedStats);
+        Assertions.assertTrue(formattedStats.contains("B/s") || formattedStats.contains("mB/s"), "Header must include fluid unit: " + formattedStats);
 
         List<net.minecraft.network.chat.Component> tooltip = adapter.buildEnergyTooltip(evBoiler);
         String tooltipFullText = tooltip.stream().map(net.minecraft.network.chat.Component::getString).reduce("", (a, b) -> a + "\n" + b);
@@ -272,7 +273,7 @@ public class SysteamsBoilerTest {
         dynamo.setEnergyType(EnergyType.ELECTRIC_FE);
         dynamo.setGenerator(true);
         dynamo.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:diamond"), "Diamond", 1.0));
-        dynamo.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
+        dynamo.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
 
         Assertions.assertTrue(com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(dynamo));
 
@@ -310,28 +311,28 @@ public class SysteamsBoilerTest {
     @Test
     public void testBoilerFluidAlternativesSync() {
         com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager.setGlobalRecipesForTesting(List.of(
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_1", null, "Steam", "systeams", "systeams:boiling", "Boiling", "", "",
                         new ResourceLocation[]{ResourceLocation.tryParse("minecraft:water")},
                         new ResourceLocation[]{ResourceLocation.tryParse("gtceu:steam")},
                         new String[]{"Water"}, new String[]{"Steam"}, true
                 ),
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_2", null, "Warm Steam", "systeams", "systeams:boiling", "Boiling", "", "",
                         new ResourceLocation[]{ResourceLocation.tryParse("gtceu:steam")},
-                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:warm_steam")},
+                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:steamier")},
                         new String[]{"Steam"}, new String[]{"Warm Steam"}, true
                 ),
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_3", null, "Hot Steam", "systeams", "systeams:boiling", "Boiling", "", "",
-                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:warm_steam")},
-                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:hot_steam")},
+                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:steamier")},
+                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:steamiest")},
                         new String[]{"Warm Steam"}, new String[]{"Hot Steam"}, true
                 ),
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "mock_boil_4", null, "Superhot Steam", "systeams", "systeams:boiling", "Boiling", "", "",
-                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:hot_steam")},
-                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:superhot_steam")},
+                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:steamiest")},
+                        new ResourceLocation[]{ResourceLocation.tryParse("systeams:steamiester")},
                         new String[]{"Hot Steam"}, new String[]{"Superhot Steam"}, true
                 )
         ));
@@ -347,12 +348,12 @@ public class SysteamsBoilerTest {
         waterIn.setAlternatives(List.of(
                 ResourceLocation.tryParse("minecraft:water"),
                 ResourceLocation.tryParse("gtceu:steam"),
-                ResourceLocation.tryParse("systeams:warm_steam"),
-                ResourceLocation.tryParse("systeams:hot_steam")
+                ResourceLocation.tryParse("systeams:steamier"),
+                ResourceLocation.tryParse("systeams:steamiest")
         ));
         boiler.addInput(waterIn);
         boiler.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 150000.0));
-        boiler.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
+        boiler.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, 300000.0);
 
         com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(boiler, ResourceLocation.tryParse("gtceu:steam"));
 
@@ -362,20 +363,20 @@ public class SysteamsBoilerTest {
 
         IngredientStack currentOut = boiler.getOutputs().get(0);
         Assertions.assertNotNull(currentOut);
-        Assertions.assertEquals(ResourceLocation.tryParse("systeams:warm_steam"), currentOut.getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("systeams:steamier"), currentOut.getId());
         Assertions.assertEquals("Warm Steam", currentOut.getDisplayName());
         Assertions.assertTrue(currentOut.getAmount() > 0);
 
-        com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(boiler, ResourceLocation.tryParse("systeams:warm_steam"));
+        com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(boiler, ResourceLocation.tryParse("systeams:steamier"));
 
         currentOut = boiler.getOutputs().get(0);
-        Assertions.assertEquals(ResourceLocation.tryParse("systeams:hot_steam"), currentOut.getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("systeams:steamiest"), currentOut.getId());
         Assertions.assertEquals("Hot Steam", currentOut.getDisplayName());
 
-        com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(boiler, ResourceLocation.tryParse("systeams:hot_steam"));
+        com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(boiler, ResourceLocation.tryParse("systeams:steamiest"));
 
         currentOut = boiler.getOutputs().get(0);
-        Assertions.assertEquals(ResourceLocation.tryParse("systeams:superhot_steam"), currentOut.getId());
+        Assertions.assertEquals(ResourceLocation.tryParse("systeams:steamiester"), currentOut.getId());
         Assertions.assertEquals("Superhot Steam", currentOut.getDisplayName());
     }
 
@@ -446,9 +447,9 @@ public class SysteamsBoilerTest {
 
         ResourceLocation diamondId = ResourceLocation.tryParse("minecraft:diamond");
         ResourceLocation steamId = ResourceLocation.tryParse("gtceu:steam");
-        ResourceLocation warmSteamId = ResourceLocation.tryParse("systeams:warm_steam");
-        ResourceLocation hotSteamId = ResourceLocation.tryParse("systeams:hot_steam");
-        ResourceLocation superhotSteamId = ResourceLocation.tryParse("systeams:superhot_steam");
+        ResourceLocation warmSteamId = ResourceLocation.tryParse("systeams:steamier");
+        ResourceLocation hotSteamId = ResourceLocation.tryParse("systeams:steamiest");
+        ResourceLocation superhotSteamId = ResourceLocation.tryParse("systeams:steamiester");
 
         // Boiler 1: [Diamond, Water] -> [Steam] (Count: 1)
         RecipeNode b1 = new RecipeNode("b1", "Boiler 1", 20.0, 0.0, GTVoltageTier.LV);

@@ -23,6 +23,7 @@ public class DeletePageConfirmDialog {
     private int targetPageIndex = -1;
     private String targetPageId = null;
     private String targetPageName = "";
+    private List<String> targetMultiplePageIds = null;
     private boolean isTeamPage = false;
 
     public DeletePageConfirmDialog(BoardScreen parent) {
@@ -33,6 +34,16 @@ public class DeletePageConfirmDialog {
         this.targetPageIndex = pageIndex;
         this.targetPageId = null;
         this.targetPageName = pageName != null ? pageName : "Page " + (pageIndex + 1);
+        this.targetMultiplePageIds = null;
+        this.isTeamPage = false;
+        this.visible = true;
+    }
+
+    public void openMultiple(List<String> pageIds) {
+        this.targetPageIndex = -1;
+        this.targetPageId = null;
+        this.targetPageName = "";
+        this.targetMultiplePageIds = pageIds != null ? new java.util.ArrayList<>(pageIds) : null;
         this.isTeamPage = false;
         this.visible = true;
     }
@@ -41,6 +52,7 @@ public class DeletePageConfirmDialog {
         this.targetPageIndex = -1;
         this.targetPageId = pageId;
         this.targetPageName = pageName != null ? pageName : "Team Page";
+        this.targetMultiplePageIds = null;
         this.isTeamPage = true;
         this.visible = true;
     }
@@ -50,6 +62,7 @@ public class DeletePageConfirmDialog {
         this.targetPageIndex = -1;
         this.targetPageId = null;
         this.targetPageName = "";
+        this.targetMultiplePageIds = null;
         this.isTeamPage = false;
     }
 
@@ -82,7 +95,12 @@ public class DeletePageConfirmDialog {
         graphics.drawString(font, "§c[!] " + Component.translatable("gui.gtcalcboard.page_delete.title").getString(), modalX + 12, modalY + 10, 0xFFFFFFFF, false);
 
         // Description / Warning Text (supporting explicit \n and auto word wrap)
-        String desc = Component.translatable("gui.gtcalcboard.page_delete.desc", targetPageName).getString();
+        String desc;
+        if (targetMultiplePageIds != null && !targetMultiplePageIds.isEmpty()) {
+            desc = Component.translatable("gui.gtcalcboard.dialog.delete_multiple_pages_desc", String.valueOf(targetMultiplePageIds.size())).getString();
+        } else {
+            desc = Component.translatable("gui.gtcalcboard.page_delete.desc", targetPageName).getString();
+        }
         desc = desc.replace("\\n", "\n");
         List<net.minecraft.util.FormattedCharSequence> allLines = new java.util.ArrayList<>();
         for (String paragraph : desc.split("\n")) {
@@ -160,23 +178,36 @@ public class DeletePageConfirmDialog {
         if (isTeamPage && targetPageId != null) {
             UUID teamId = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance().getCurrentTeamId();
             com.gtceu.calcboard.network.NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SDeleteTeamPagePacket(teamId, targetPageId));
+        } else if (targetMultiplePageIds != null && !targetMultiplePageIds.isEmpty()) {
+            BoardManager.getInstance().getPages().removeIf(p -> targetMultiplePageIds.contains(p.getId()));
+            if (BoardManager.getInstance().getPages().isEmpty()) {
+                BoardManager.getInstance().addPage("Page 1");
+            }
+            int activeIdx = Math.max(0, Math.min(BoardManager.getInstance().getActivePageIndex(), BoardManager.getInstance().getPages().size() - 1));
+            BoardManager.getInstance().switchPage(activeIdx);
+            syncCameraToActivePage();
+            parent.rebuildWidgets();
         } else if (targetPageIndex >= 0) {
             BoardManager.getInstance().removePage(targetPageIndex);
-            com.gtceu.calcboard.api.storage.BoardPage active = BoardManager.getInstance().getActivePage();
-            if (active != null) {
-                parent.setPanX(active.getPanX());
-                parent.setPanY(active.getPanY());
-                parent.setZoom(active.getZoom());
-                BoardScreen.lastPanX = active.getPanX();
-                BoardScreen.lastPanY = active.getPanY();
-                BoardScreen.lastZoom = active.getZoom();
-            }
+            syncCameraToActivePage();
             parent.rebuildWidgets();
         }
         close();
         Minecraft.getInstance().getSoundManager().play(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F)
         );
+    }
+
+    private void syncCameraToActivePage() {
+        com.gtceu.calcboard.api.storage.BoardPage active = BoardManager.getInstance().getActivePage();
+        if (active != null) {
+            parent.setPanX(active.getPanX());
+            parent.setPanY(active.getPanY());
+            parent.setZoom(active.getZoom());
+            BoardScreen.lastPanX = active.getPanX();
+            BoardScreen.lastPanY = active.getPanY();
+            BoardScreen.lastZoom = active.getZoom();
+        }
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

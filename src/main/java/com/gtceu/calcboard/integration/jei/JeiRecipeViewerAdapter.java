@@ -7,8 +7,8 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.forge.ForgeTypes;
@@ -219,16 +219,27 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
 
     @Override
     public Object getHoveredPreviewIngredient(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, int screenW, int screenH) {
-        return null;
+        return RecipeHoverPreviewRenderer.getHoveredIngredient(sr, dialogX, dialogY, dialogW, dialogH, hoveredRowY, mouseX, mouseY, screenW, screenH);
     }
 
     @Override
     public boolean handleHoveredIngredientClick(Object hoveredIngredient, EditBox searchBox) {
+        if (hoveredIngredient instanceof IngredientStack is) {
+            String name = is.getDisplayName();
+            if (searchBox != null && name != null && !name.isEmpty()) {
+                searchBox.setValue(RecipeSearchEngine.stripFormatting(name).trim());
+                searchBox.setFocused(true);
+                return true;
+            }
+        }
         return false;
     }
 
     @Override
     public boolean handleHoveredIngredientLookup(Object hoveredIngredient, boolean isRecipes) {
+        if (hoveredIngredient instanceof IngredientStack is) {
+            return isRecipes ? displayRecipes(is) : displayUses(is);
+        }
         return false;
     }
 
@@ -403,9 +414,7 @@ public class JeiRecipeViewerAdapter implements IRecipeViewerAdapter {
                                 RecipeNode node = JeiRecipeConverter.convert(wrapper);
                                 if (node != null) {
                                     Minecraft mc = Minecraft.getInstance();
-                                    int screenW = mc.getWindow().getGuiScaledWidth();
-                                    int screenH = mc.getWindow().getGuiScaledHeight();
-                                    double[] pos = com.gtceu.calcboard.client.gui.BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+                                    double[] pos = com.gtceu.calcboard.client.gui.BoardScreen.getNextNodeCenterPosition();
                                     node.setPosX(pos[0]);
                                     node.setPosY(pos[1]);
                                     com.gtceu.calcboard.api.storage.BoardManager.getInstance().getActiveGraph().addNode(node);

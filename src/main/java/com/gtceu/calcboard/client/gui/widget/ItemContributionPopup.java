@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 
 import com.gtceu.calcboard.api.solver.GlobalBalanceSummary;
 import com.gtceu.calcboard.api.model.IngredientStack;
@@ -95,7 +96,7 @@ public class ItemContributionPopup {
         maxScrollY = Math.max(0, totalListHeight - listH);
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
-        graphics.enableScissor(px + 4, listY, px + POPUP_WIDTH - 4, listY + listH);
+        BoardScissorHelper.enableScissor(graphics, px + 4, listY, px + POPUP_WIDTH - 4, listY + listH);
 
         int curY = listY - (int) scrollY;
         if (contributions == null || contributions.isEmpty()) {
@@ -109,7 +110,7 @@ public class ItemContributionPopup {
             }
         }
 
-        graphics.disableScissor();
+        BoardScissorHelper.disableScissor(graphics);
 
         // Footer Separator & Net Rate Summary
         int footerY = py + POPUP_HEIGHT - 30;

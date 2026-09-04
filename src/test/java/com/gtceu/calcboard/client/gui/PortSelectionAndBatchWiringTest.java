@@ -325,8 +325,8 @@ public class PortSelectionAndBatchWiringTest {
         templateCutter.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:lubricant"), "Lubricant", 10.0)); // Template uses Lubricant!
 
         // Candidate 1: Topaz Geode + Water
-        com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe srWater =
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+        com.gtceu.calcboard.api.model.SearchableRecipe srWater =
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "recipe_water", "Topaz Geode (Water)", "gtceu", "gtceu:cutter", "Cutter",
                         "topaz water", "topaz_gem",
                         new ResourceLocation[]{ResourceLocation.tryParse("gtceu:topaz_geode"), ResourceLocation.tryParse("minecraft:water")},
@@ -335,8 +335,8 @@ public class PortSelectionAndBatchWiringTest {
                 );
 
         // Candidate 2: Topaz Geode + Lubricant
-        com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe srLubricant =
-                new com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe(
+        com.gtceu.calcboard.api.model.SearchableRecipe srLubricant =
+                new com.gtceu.calcboard.api.model.SearchableRecipe(
                         "recipe_lubricant", "Topaz Geode (Lubricant)", "gtceu", "gtceu:cutter", "Cutter",
                         "topaz lubricant", "topaz_gem",
                         new ResourceLocation[]{ResourceLocation.tryParse("gtceu:topaz_geode"), ResourceLocation.tryParse("gtceu:lubricant")},
@@ -348,7 +348,7 @@ public class PortSelectionAndBatchWiringTest {
         com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager.setGlobalRecipesForTesting(java.util.List.of(srWater, srLubricant));
 
         // findRecipeForInput should pick Candidate 2 (Lubricant) because template uses Lubricant!
-        com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe chosen =
+        com.gtceu.calcboard.api.model.SearchableRecipe chosen =
                 com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.findRecipeForInput(templateCutter, ResourceLocation.tryParse("gtceu:topaz_geode"));
 
         Assertions.assertNotNull(chosen);

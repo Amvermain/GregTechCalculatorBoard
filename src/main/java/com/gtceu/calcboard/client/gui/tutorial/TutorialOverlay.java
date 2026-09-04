@@ -19,46 +19,23 @@ public class TutorialOverlay {
         if (!mgr.isActive()) return;
 
         TutorialStep step = mgr.getCurrentStep();
+        CardLayout layout = computeLayout(font, step, screenW, screenH);
 
-        // 1. Draw Tutorial Bottom Banner Card
-        int bannerW = Math.min(540, screenW - 40);
-        int bannerH = 75;
-        int bannerX = (screenW - bannerW) / 2;
-        int bannerY = screenH - bannerH - 12;
+        graphics.fill(layout.bannerX, layout.bannerY, layout.bannerX + layout.bannerW, layout.bannerY + layout.bannerH, 0xF5161C26);
+        graphics.renderOutline(layout.bannerX, layout.bannerY, layout.bannerW, layout.bannerH, 0xFF00E676);
+        graphics.renderOutline(layout.bannerX + 1, layout.bannerY + 1, layout.bannerW - 2, layout.bannerH - 2, 0x8800E676);
 
-        // Card background & borders
-        graphics.fill(bannerX, bannerY, bannerX + bannerW, bannerY + bannerH, 0xF5161C26);
-        graphics.renderOutline(bannerX, bannerY, bannerW, bannerH, 0xFF00E676);
-        graphics.renderOutline(bannerX + 1, bannerY + 1, bannerW - 2, bannerH - 2, 0x8800E676);
+        graphics.drawString(font, layout.title, layout.bannerX + 10, layout.bannerY + 8, 0xFFFFFFFF, false);
 
-        // Header Title
-        int totalSteps = TutorialStep.values().length - 1;
-        String stepTag = step != TutorialStep.COMPLETED 
-            ? String.format("§a🎓 [Step %d/%d] ", step.getStepNumber(), totalSteps) 
-            : "§a🎉 " + Component.translatable("gui.gtcalcboard.tutorial.completed_tag").getString() + " ";
-        String titleStr = stepTag + Component.translatable(step.getTitleKey()).getString();
-        graphics.drawString(font, titleStr, bannerX + 10, bannerY + 8, 0xFFFFFFFF, false);
-
-        // Description lines
-        String descStr = Component.translatable(step.getDescKey()).getString();
-        List<net.minecraft.util.FormattedCharSequence> lines = font.split(Component.literal("§7" + descStr), bannerW - 140);
-        for (int l = 0; l < Math.min(3, lines.size()); l++) {
-            graphics.drawString(font, lines.get(l), bannerX + 10, bannerY + 22 + l * 11, 0xFFCCCCCC, false);
+        for (int l = 0; l < layout.lines.size(); l++) {
+            graphics.drawString(font, layout.lines.get(l), layout.bannerX + 10, layout.bannerY + 22 + l * 11, 0xFFCCCCCC, false);
         }
 
-        int btnW = 60;
-        int btnH = 18;
-        int nextBtnX = bannerX + bannerW - btnW - 10;
-        int nextBtnY = bannerY + bannerH - btnH - 8;
-
-        int skipBtnX = nextBtnX - btnW - 6;
-        int skipBtnY = nextBtnY;
-
         if (step != TutorialStep.COMPLETED) {
-            drawTutorialBtn(graphics, font, Component.translatable("gui.gtcalcboard.tutorial.skip").getString(), skipBtnX, skipBtnY, btnW, btnH, mouseX, mouseY, 0xFF888888);
-            drawTutorialBtn(graphics, font, Component.translatable("gui.gtcalcboard.tutorial.next").getString(), nextBtnX, nextBtnY, btnW, btnH, mouseX, mouseY, 0xFF00E676);
+            drawTutorialBtn(graphics, font, layout.skipText, layout.skipBtnX, layout.skipBtnY, layout.skipBtnW, layout.skipBtnH, mouseX, mouseY, 0xFF888888);
+            drawTutorialBtn(graphics, font, layout.nextText, layout.nextBtnX, layout.nextBtnY, layout.nextBtnW, layout.nextBtnH, mouseX, mouseY, 0xFF00E676);
         } else {
-            drawTutorialBtn(graphics, font, Component.translatable("gui.gtcalcboard.tutorial.finish").getString(), nextBtnX, nextBtnY, btnW, btnH, mouseX, mouseY, 0xFF55FFFF);
+            drawTutorialBtn(graphics, font, layout.nextText, layout.nextBtnX, layout.nextBtnY, layout.nextBtnW, layout.nextBtnH, mouseX, mouseY, 0xFF55FFFF);
         }
     }
 
@@ -66,21 +43,12 @@ public class TutorialOverlay {
         TutorialManager mgr = TutorialManager.getInstance();
         if (!mgr.isActive() || button != 0) return false;
 
-        int bannerW = Math.min(540, screenW - 40);
-        int bannerH = 75;
-        int bannerX = (screenW - bannerW) / 2;
-        int bannerY = screenH - bannerH - 12;
+        TutorialStep step = mgr.getCurrentStep();
+        Font font = Minecraft.getInstance().font;
+        CardLayout layout = computeLayout(font, step, screenW, screenH);
 
-        int btnW = 60;
-        int btnH = 18;
-        int nextBtnX = bannerX + bannerW - btnW - 10;
-        int nextBtnY = bannerY + bannerH - btnH - 8;
-
-        int skipBtnX = nextBtnX - btnW - 6;
-        int skipBtnY = nextBtnY;
-
-        if (mouseX >= nextBtnX && mouseX <= nextBtnX + btnW && mouseY >= nextBtnY && mouseY <= nextBtnY + btnH) {
-            if (mgr.getCurrentStep() == TutorialStep.COMPLETED) {
+        if (isInside(mouseX, mouseY, layout.nextBtnX, layout.nextBtnY, layout.nextBtnW, layout.nextBtnH)) {
+            if (step == TutorialStep.COMPLETED) {
                 mgr.stopTutorial();
             } else {
                 mgr.nextStep();
@@ -88,15 +56,77 @@ public class TutorialOverlay {
             return true;
         }
 
-        if (mgr.getCurrentStep() != TutorialStep.COMPLETED) {
-            if (mouseX >= skipBtnX && mouseX <= skipBtnX + btnW && mouseY >= skipBtnY && mouseY <= skipBtnY + btnH) {
-                mgr.stopTutorial();
-                return true;
-            }
+        if (step != TutorialStep.COMPLETED && isInside(mouseX, mouseY, layout.skipBtnX, layout.skipBtnY, layout.skipBtnW, layout.skipBtnH)) {
+            mgr.stopTutorial();
+            return true;
         }
 
         return false;
     }
+
+    private static CardLayout computeLayout(Font font, TutorialStep step, int screenW, int screenH) {
+        int bannerW = Math.min(580, screenW - 32);
+        int totalSteps = TutorialStep.values().length - 1;
+        String stepTag = step != TutorialStep.COMPLETED 
+            ? String.format("§a🎓 [Step %d/%d] ", step.getStepNumber(), totalSteps) 
+            : "§a🎉 " + Component.translatable("gui.gtcalcboard.tutorial.completed_tag").getString() + " ";
+        String title = stepTag + Component.translatable(step.getTitleKey()).getString();
+
+        String nextText = step != TutorialStep.COMPLETED
+            ? Component.translatable("gui.gtcalcboard.tutorial.next").getString()
+            : Component.translatable("gui.gtcalcboard.tutorial.finish").getString();
+        String skipText = Component.translatable("gui.gtcalcboard.tutorial.skip").getString();
+
+        int btnH = 18;
+        int nextBtnW = Math.max(64, font.width(nextText) + 16);
+        int skipBtnW = Math.max(54, font.width(skipText) + 16);
+
+        int buttonsTotalW = (step != TutorialStep.COMPLETED ? skipBtnW + 6 : 0) + nextBtnW;
+        int textW = Math.max(160, bannerW - buttonsTotalW - 24);
+
+        String descStr = Component.translatable(step.getDescKey()).getString();
+        List<net.minecraft.util.FormattedCharSequence> lines = font.split(Component.literal("§7" + descStr), textW);
+
+        int contentH = 22 + lines.size() * 11 + 10;
+        int bannerH = Math.max(72, contentH);
+        int bannerX = (screenW - bannerW) / 2;
+        int bannerY = screenH - bannerH - 12;
+
+        int nextBtnX = bannerX + bannerW - nextBtnW - 10;
+        int nextBtnY = bannerY + bannerH - btnH - 8;
+        int skipBtnX = nextBtnX - skipBtnW - 6;
+        int skipBtnY = nextBtnY;
+
+        return new CardLayout(
+            bannerX, bannerY, bannerW, bannerH,
+            title, lines,
+            nextText, nextBtnX, nextBtnY, nextBtnW, btnH,
+            skipText, skipBtnX, skipBtnY, skipBtnW, btnH
+        );
+    }
+
+    private static boolean isInside(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
+    }
+
+    private record CardLayout(
+        int bannerX,
+        int bannerY,
+        int bannerW,
+        int bannerH,
+        String title,
+        List<net.minecraft.util.FormattedCharSequence> lines,
+        String nextText,
+        int nextBtnX,
+        int nextBtnY,
+        int nextBtnW,
+        int nextBtnH,
+        String skipText,
+        int skipBtnX,
+        int skipBtnY,
+        int skipBtnW,
+        int skipBtnH
+    ) {}
 
     private static NodeWidget findWidget(BoardScreen screen, String nodeId) {
         if (nodeId == null || screen == null) return null;

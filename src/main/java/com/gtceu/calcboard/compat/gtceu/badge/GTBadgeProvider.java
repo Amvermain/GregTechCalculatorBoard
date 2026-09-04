@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.property.NodePropertyStore;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.NumberFormatUtil;
+import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.network.chat.Component;
@@ -26,7 +27,7 @@ public final class GTBadgeProvider {
     public static void registerAll() {
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
-            long startEU = store.get(NodeProperties.FUSION_START_EU);
+            long startEU = store.get(GTCEuProperties.FUSION_START_EU);
             boolean isFusionCat = node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion_reactor");
             if (startEU <= 0 && !isFusionCat && !node.isFusion()) return List.of();
 
@@ -71,7 +72,7 @@ public final class GTBadgeProvider {
         // 2. Cleanroom Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
-            String cleanroom = store.get(NodeProperties.CLEANROOM_TYPE);
+            String cleanroom = store.get(GTCEuProperties.CLEANROOM_TYPE);
             if (cleanroom == null || cleanroom.isEmpty()) return List.of();
 
             String label = cleanroom.toLowerCase(Locale.ROOT).contains("sterile") ? "☣ Sterile" : "🧹 Cleanroom";
@@ -85,7 +86,7 @@ public final class GTBadgeProvider {
         // 3. Fusion Reflector Badge Provider
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
-            int reqTier = store.get(NodeProperties.REQUIRED_REFLECTOR_TIER);
+            int reqTier = store.get(GTCEuProperties.REQUIRED_REFLECTOR_TIER);
             int instTier = node.getInstalledReflectorTier();
             if (reqTier <= 0 && instTier <= 0) return List.of();
 
@@ -132,6 +133,48 @@ public final class GTBadgeProvider {
                         Component.literal("§c❌ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString())
                 );
                 return List.of(new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
+            }
+            return List.of();
+        });
+
+        // 5. Heating Coil Badge Provider
+        NodeBadgeRegistry.register((node, store) -> {
+            if (node == null || store == null) return List.of();
+            int reqTemp = store.get(GTCEuProperties.EBF_TEMPERATURE);
+            if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
+
+            boolean isCoilMb = node.isMultiblock() && (com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(node.getMachineIcon()) || com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId()));
+            int instTemp = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getInstalledCoilTemperature(node);
+
+            if (reqTemp <= 0 && instTemp <= 0 && !isCoilMb) return List.of();
+
+            if (reqTemp > 0) {
+                if (instTemp >= reqTemp) {
+                    String badgeText = String.format(Locale.ROOT, "♨ %,dK", instTemp);
+                    List<Component> tooltip = List.of(
+                            Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.coil_valid_title").getString()),
+                            Component.literal(String.format(Locale.ROOT, "§7Installed Coil: §a%,d K", instTemp)),
+                            Component.literal(String.format(Locale.ROOT, "§7Required Temp: §f%,d K", reqTemp)),
+                            Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.coil_met").getString())
+                    );
+                    return List.of(new NodeBadge(badgeText, 0xFFFFAA00, 0xEE3D2E1E, 0xFFFFAA00, tooltip));
+                } else {
+                    String badgeText = String.format(Locale.ROOT, "♨ ⚠ %,dK", instTemp);
+                    List<Component> tooltip = List.of(
+                            Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.coil_missing_title").getString()),
+                            Component.literal(String.format(Locale.ROOT, "§7Required Temp: §c%,d K", reqTemp)),
+                            Component.literal(String.format(Locale.ROOT, "§7Installed Coil: §e%,d K", instTemp)),
+                            Component.literal("§c❌ " + String.format(Locale.ROOT, Component.translatable("gui.gtcalcboard.coil_missing_desc").getString(), reqTemp))
+                    );
+                    return List.of(new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
+                }
+            } else if (instTemp > 0 && isCoilMb) {
+                String badgeText = String.format(Locale.ROOT, "♨ %,dK", instTemp);
+                List<Component> tooltip = List.of(
+                        Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.coil_installed_title").getString()),
+                        Component.literal(String.format(Locale.ROOT, "§7Installed Coil: §e%,d K", instTemp))
+                );
+                return List.of(new NodeBadge(badgeText, 0xFFFFAA00, 0xEE3D2E1E, 0xFFFFAA00, tooltip));
             }
             return List.of();
         });

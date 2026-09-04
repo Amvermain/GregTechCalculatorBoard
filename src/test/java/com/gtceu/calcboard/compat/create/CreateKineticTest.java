@@ -8,6 +8,7 @@ import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import net.minecraft.resources.ResourceLocation;
@@ -67,11 +68,11 @@ public class CreateKineticTest {
 
     @Test
     public void testVirtualKineticSearchRecipes() {
-        List<RecipeSearchEngine.SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
+        List<SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
         Assertions.assertFalse(virtualRecipes.isEmpty());
 
         boolean foundLargeWaterWheel = false;
-        for (RecipeSearchEngine.SearchableRecipe sr : virtualRecipes) {
+        for (SearchableRecipe sr : virtualRecipes) {
             if (sr.displayName().equals("Large Water Wheel")) {
                 foundLargeWaterWheel = true;
                 Assertions.assertTrue(sr.inputSearchIndex().contains("kinetic") || sr.outputSearchIndex().contains("kinetic"));
@@ -137,19 +138,19 @@ public class CreateKineticTest {
         node.setEnergyType(EnergyType.KINETIC_SU);
         node.setRpm(32);
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(64, node.getRpm());
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(128, node.getRpm());
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(256, node.getRpm());
 
-        node.cycleRpm(1);
+        CreateProperties.cycleRpm(node, 1);
         Assertions.assertEquals(4, node.getRpm());
 
-        node.cycleRpm(-1);
+        CreateProperties.cycleRpm(node, -1);
         Assertions.assertEquals(256, node.getRpm());
     }
 
@@ -285,7 +286,7 @@ public class CreateKineticTest {
         Assertions.assertEquals(1024.0, stirling.getBaseEUt(), 0.001);
 
         // 5. Virtual Search includes Create New Age items
-        List<RecipeSearchEngine.SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
+        List<SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
         boolean foundCoil = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Generator Coil"));
         boolean foundBrushes = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Carbon Brushes"));
         boolean foundMotor = virtualRecipes.stream().anyMatch(sr -> sr.displayName().equals("Basic Motor"));
@@ -297,25 +298,25 @@ public class CreateKineticTest {
 
     @Test
     public void testKineticRecipeSearchAndFavoriteMatching() {
-        List<RecipeSearchEngine.SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
+        List<SearchableRecipe> virtualRecipes = CreateModAdapter.getVirtualKineticSearchRecipes();
 
         // 1. Search by "<su"
         RecipeSearchEngine.ParsedQuery querySu = RecipeSearchEngine.parseQuery("<su");
-        List<RecipeSearchEngine.SearchableRecipe> matchesSu = virtualRecipes.stream()
+        List<SearchableRecipe> matchesSu = virtualRecipes.stream()
                 .filter(sr -> RecipeSearchEngine.matches(sr, querySu))
                 .toList();
         Assertions.assertTrue(matchesSu.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
 
         // 2. Search by "<stress"
         RecipeSearchEngine.ParsedQuery queryStress = RecipeSearchEngine.parseQuery("<stress");
-        List<RecipeSearchEngine.SearchableRecipe> matchesStress = virtualRecipes.stream()
+        List<SearchableRecipe> matchesStress = virtualRecipes.stream()
                 .filter(sr -> RecipeSearchEngine.matches(sr, queryStress))
                 .toList();
         Assertions.assertTrue(matchesStress.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
 
         // 3. Search by "large water wheel"
         RecipeSearchEngine.ParsedQuery queryLww = RecipeSearchEngine.parseQuery("large water wheel");
-        List<RecipeSearchEngine.SearchableRecipe> matchesLww = virtualRecipes.stream()
+        List<SearchableRecipe> matchesLww = virtualRecipes.stream()
                 .filter(sr -> RecipeSearchEngine.matches(sr, queryLww))
                 .toList();
         Assertions.assertTrue(matchesLww.stream().anyMatch(sr -> sr.displayName().equals("Large Water Wheel")));
@@ -334,7 +335,7 @@ public class CreateKineticTest {
         node.setMachineIcon(ResourceLocation.tryParse("vintageimprovements:vibrating_table"));
 
         // 1. Must be recognized as Create Kinetic Machine
-        Assertions.assertTrue(node.isCreateMachine(), "Vintage Improvements must be recognized as Create kinetic machine");
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node), "Vintage Improvements must be recognized as Create kinetic machine");
         Assertions.assertEquals(EnergyType.KINETIC_SU, node.getEnergyType());
 
         // 2. Default RPM is 32 RPM (speedFactor 1.0x) -> 128 SU Impact, 5.0s duration
@@ -358,7 +359,7 @@ public class CreateKineticTest {
         lathe.setRecipeCategoryId(ResourceLocation.tryParse("vintageimprovements:lathe"));
         lathe.setMachineIcon(ResourceLocation.tryParse("vintageimprovements:lathe"));
 
-        Assertions.assertTrue(lathe.isCreateMachine());
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(lathe));
         Assertions.assertEquals(EnergyType.KINETIC_SU, lathe.getEnergyType());
         Assertions.assertEquals(256.0, lathe.getSingleMachineEUt(), 0.001);
     }

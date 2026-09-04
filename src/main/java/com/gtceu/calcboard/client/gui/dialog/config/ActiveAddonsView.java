@@ -43,7 +43,7 @@ public class ActiveAddonsView {
         int maxActiveScroll = Math.max(0, activeAddons.size() - 10);
         if (scrollOffset > maxActiveScroll) scrollOffset = maxActiveScroll;
 
-        String activeCountLabel = "§b⚡ " + Component.translatable("gui.gtcalcboard.config.active_addons", String.valueOf(activeAddons.size())).getString();
+        String activeCountLabel = "§b" + Component.translatable("gui.gtcalcboard.config.active_addons", String.valueOf(activeAddons.size())).getString();
         graphics.drawString(font, activeCountLabel, x + 10, y + 73, 0xFFD0D6E4, false);
 
         if (!activeAddons.isEmpty()) {

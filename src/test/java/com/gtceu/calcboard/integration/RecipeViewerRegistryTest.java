@@ -3,6 +3,7 @@ package com.gtceu.calcboard.integration;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
 
 import com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter;
@@ -54,7 +55,7 @@ public class RecipeViewerRegistryTest {
             }
 
             @Override
-            public java.util.List<com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe> collectSearchableRecipes() {
+            public java.util.List<SearchableRecipe> collectSearchableRecipes() {
                 return java.util.Collections.emptyList();
             }
 
@@ -87,15 +88,15 @@ public class RecipeViewerRegistryTest {
             public void toggleFavorite(Object viewerRecipe) {}
 
             @Override
-            public int[] calculatePreviewBounds(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int screenW, int screenH) {
+            public int[] calculatePreviewBounds(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int screenW, int screenH) {
                 return new int[]{0, 0, 100, 100};
             }
 
             @Override
-            public void renderPreviewCard(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, float partialTick, int screenW, int screenH) {}
+            public void renderPreviewCard(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, float partialTick, int screenW, int screenH) {}
 
             @Override
-            public Object getHoveredPreviewIngredient(com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, int screenW, int screenH) {
+            public Object getHoveredPreviewIngredient(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, int screenW, int screenH) {
                 return null;
             }
 
@@ -140,16 +141,16 @@ public class RecipeViewerRegistryTest {
             @Override public boolean isAvailable() { return true; }
             @Override public boolean isRecipeBakingComplete() { return true; }
             @Override public void runWhenReady(Runnable callback) { if (callback != null) callback.run(); }
-            @Override public java.util.List<RecipeSearchEngine.SearchableRecipe> collectSearchableRecipes() { return java.util.Collections.emptyList(); }
+            @Override public java.util.List<SearchableRecipe> collectSearchableRecipes() { return java.util.Collections.emptyList(); }
             @Override public RecipeNode convertToNode(Object viewerRecipe) { return null; }
             @Override public boolean displayRecipes(IngredientStack ingredient) { return false; }
             @Override public boolean displayUses(IngredientStack ingredient) { return false; }
             @Override public java.util.Set<net.minecraft.resources.ResourceLocation> getFavoriteRecipeIds() { return java.util.Collections.emptySet(); }
             @Override public boolean isFavorite(Object viewerRecipe) { return false; }
             @Override public void toggleFavorite(Object viewerRecipe) {}
-            @Override public int[] calculatePreviewBounds(RecipeSearchEngine.SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int screenW, int screenH) { return new int[]{0, 0, 100, 100}; }
-            @Override public void renderPreviewCard(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, RecipeSearchEngine.SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, float partialTick, int screenW, int screenH) {}
-            @Override public Object getHoveredPreviewIngredient(RecipeSearchEngine.SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, int screenW, int screenH) { return null; }
+            @Override public int[] calculatePreviewBounds(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int screenW, int screenH) { return new int[]{0, 0, 100, 100}; }
+            @Override public void renderPreviewCard(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, float partialTick, int screenW, int screenH) {}
+            @Override public Object getHoveredPreviewIngredient(SearchableRecipe sr, int dialogX, int dialogY, int dialogW, int dialogH, int hoveredRowY, int mouseX, int mouseY, int screenW, int screenH) { return null; }
             @Override public boolean handleHoveredIngredientClick(Object hoveredIngredient, net.minecraft.client.gui.components.EditBox searchBox) { return false; }
             @Override public boolean handleHoveredIngredientLookup(Object hoveredIngredient, boolean isRecipes) { return false; }
             @Override public int renderRowIcon(net.minecraft.client.gui.GuiGraphics graphics, net.minecraft.client.gui.Font font, Object viewerRecipe, int listX, int rowY, net.minecraft.resources.ResourceLocation matchedOutputId, String matchedOutputName) { return 0; }

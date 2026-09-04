@@ -13,6 +13,10 @@ Unified search dialog for finding recipes across tens of thousands of entries in
   - `&` / space (AND), `|` (OR), `!` (NOT)
   - `@gtceu` (Mod ID), `#logs` (Item Tag), `[chemical_reactor]` (Category ID), `"exact"` (Exact match)
 * **Drag to Search**: Dragging from an open socket onto empty canvas automatically filters recipes that consume or produce that material.
+* **Scrollbar Interaction State Machine (ADR-012)**:
+  - **Track Click Jump**: Clicking empty track area instantly jumps scroll position proportionally.
+  - **Thumb Dragging**: Captures mouse dragging state globally, providing continuous, smooth scrolling even if the cursor leaves dialog bounds.
+  - **Mouse Wheel Acceleration**: Precise discrete row stepping ($48\text{px}$) per wheel tick.
 
 ### 1.1 `RecipeSearchDialog` UI Wireframe
 
@@ -142,6 +146,15 @@ Modal for toggling specific recipe categories or blacklisting entire machine typ
     </div>
   </div>
 </div>
+
+### 3.1.1 Adaptive Responsive Toolbar & Overflow Menu (`ToolbarWidget`, ADR-017)
+* **3-Tier Adaptive Title Truncation**: Automatically compresses title text based on window width to maximize button space:
+  - $\ge 560\text{px}$: Full title `"§6GT Calculator Board §7⚙"`
+  - $420\sim 559\text{px}$: Short title `"§6GT Board §7⚙"` (1:1 localized via `gui.gtcalcboard.title_short`)
+  - $< 420\text{px}$: Micro icon `"§6📟 §7⚙"`
+* **Compact $22\text{px}$ Icon Mode**: Dynamically switches buttons to compact square icon buttons according to display mode (`AUTO`, `COMPACT`, `FULL`).
+* **Overflow `[...]` Dropdown Menu**: Wraps buttons exceeding available toolbar width into an overflow popup menu rather than clipping them off-screen.
+* **Minimap Collision Prevention Padding**: Automatically reserves $16\text{px}$ right-hand padding to prevent overlapping JourneyMap or other HUD minimaps.
 
 ---
 
@@ -348,10 +361,50 @@ Rendered at the top of all UI layers (bottom-center `screenHeight - 48px`) with 
 
 ## 6. Interactive Onboarding Tutorials (`tutorial/*`)
 
-Guides newcomers through fundamental workflows (node creation, wiring, ratio balancing, compound modules) via pulsing highlight borders and instructional popups.
+Guides newcomers through fundamental workflows (node creation, wiring, ratio balancing, compound modules, machine switching, and shared machine pools) via pulsing highlight borders and instructional popups.
 
 * **`TutorialManager`**: Singleton tutorial state tracker detecting milestone completion.
 * **`TutorialOverlay`**: Renders pulse glow rings around target widgets/ports and instructions.
+
+### 6.1 14-Step Interactive Tutorial Progression Sequence
+ 
+ The onboarding tutorial is structured into a 14-step progression (`TutorialStep`), split into a Basic Tutorial (Steps 1–9) for beginners and an Advanced Tutorial (Steps 10–13) for power users:
+
+| Step | Identifier | Track | Milestone Objective & Completion Trigger |
+| :---: | :--- | :---: | :--- |
+| **Step 1** | `STEP_1_ADD_RECIPE` | Basic | Click toolbar recipe search button and place a node on canvas |
+| **Step 2** | `STEP_2_DRAG_TO_SEARCH` | Basic | Drag wire from boiler output socket to connect to steam turbine input socket |
+| **Step 3** | `STEP_3_JUNCTION` | Basic | Click steam connection wire to automatically insert a reroute Junction node |
+| **Step 4** | `STEP_4_SHIFT_WIRING` | Basic | Connect with `Shift + Drag` to practice automatic 1:1 ratio matching (Auto-Ratio) |
+| **Step 5** | `STEP_5_JUNCTION_ETA` | Basic | Click junction bottom badge ➔ set target batch (1,000 mB) and inspect real-time Estimated Time (`ET: xx.xs`) |
+| **Step 6** | `STEP_6_MACHINE_SELECTOR` | Basic | Click machine card icon ➔ switch furnace to EBF via `MachineSelectorDialog` and verify capability badges |
+| **Step 7** | `STEP_7_MACHINE_CONFIG` | Basic | Open machine config modal (`C` key) to inspect voltage tiers, heating coils, and overclock stats |
+| **Step 8** | `STEP_8_GROUP_FRAME` | Basic | Drag-select nodes and create a Canvas Group Frame |
+| **Step 9** | `STEP_9_COMPOUND_MODULE`| Basic | Click frame collapse button to compact/expand a modular compound node (Basic tutorial completes) |
+| **Step 10** | `STEP_10_SHARED_MACHINE` | Advanced | Group 3 cutters into a Shared Machine Pool frame to verify quantized machine counts and time-sharing duty (`Total Duty %`) |
+| **Step 11** | `STEP_11_BOM_INSPECTION` | Advanced | Click toolbar `[📦 BOM]` button to inspect multiblock materials bill with quantized shared machine structures |
+| **Step 12** | `STEP_12_JUNCTION_SUPPLY` | Advanced | Right-click junction node ➔ set external supply mode (Infinite Supply $\infty$ / Flow Limit) and inspect feedstock Depletion Time (`DT: xx.xs`) |
+| **Step 13** | `STEP_13_FOLDER_BROWSER` | Advanced | Click toolbar `[📁]` button to open hierarchical page browser drawer and manage canvas pages (Advanced tutorial completes) |
+| **Step 14** | `COMPLETED` | Complete | Tutorial sequence completed and achievement badge awarded |
+
+---
+
+## 7. Hierarchical Page Browser Drawer (`PageBrowserDrawer`) (ADR-012)
+
+Slide-in sidebar navigation drawer for managing multi-canvas workspaces organized into expandable directory folder trees:
+
+* **Virtual Directory Tree**: Expandable/collapsible folder hierarchy based on `folderPath` with real-time text search.
+* **Drag-and-Drop Page Organization**: Drag page entries into target folders for instant path restructuring and persistent NBT synchronization.
+* **Context Actions**: Right-click actions for creating new pages/folders, renaming, duplicating, and deleting pages.
+
+---
+
+## 8. Keyboard Quick Page Switcher (`QuickPageSwitcherDialog`) (ADR-012)
+
+IDE-style lightweight modal activated via `Ctrl + K` for instant fuzzy searching across page titles and directory paths:
+
+* **Fuzzy Search & Substring Highlighting**: Instant prefix and subsequence matching across page names and folder paths.
+* **Keyboard Flow**: `↑` / `↓` navigation, `Enter` to switch pages instantly, `Esc` to dismiss.
 
 ---
 

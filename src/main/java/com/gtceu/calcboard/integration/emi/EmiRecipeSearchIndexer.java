@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.integration.emi;
 
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
 import dev.emi.emi.api.stack.EmiIngredient;
@@ -22,8 +22,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class EmiRecipeSearchIndexer {
 
     private record StackSearchData(String name, String searchText) {}
-    private static final Map<ResourceLocation, StackSearchData> STACK_DATA_CACHE = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, String> STACK_NAME_CACHE = new ConcurrentHashMap<>(4096);
+    private static final Map<ResourceLocation, StackSearchData> STACK_DATA_CACHE = new ConcurrentHashMap<>(4096);
     private static final Map<EmiRecipeCategory, String> CATEGORY_WS_TEXT_CACHE = new ConcurrentHashMap<>();
+    private static final Map<EmiRecipeCategory, String> CATEGORY_NAME_CACHE = new ConcurrentHashMap<>();
 
     private EmiRecipeSearchIndexer() {}
 
@@ -48,12 +50,15 @@ public final class EmiRecipeSearchIndexer {
                     modId = cat.getId().getNamespace().toLowerCase(Locale.ROOT).intern();
                 }
             }
-            try {
-                Component catComp = cat.getName();
-                if (catComp != null) {
-                    categoryName = catComp.getString().intern();
-                }
-            } catch (Throwable ignored) {}
+            categoryName = CATEGORY_NAME_CACHE.computeIfAbsent(cat, c -> {
+                try {
+                    Component catComp = c.getName();
+                    if (catComp != null) {
+                        return catComp.getString().intern();
+                    }
+                } catch (Throwable ignored) {}
+                return "";
+            });
         }
 
         StringBuilder inSb = new StringBuilder();
@@ -234,6 +239,19 @@ public final class EmiRecipeSearchIndexer {
         });
     }
 
+    public static String getStackDisplayName(EmiStack stack) {
+        if (stack == null) return "";
+        ResourceLocation id = stack.getId();
+        if (id == null) return "";
+        return STACK_NAME_CACHE.computeIfAbsent(id, k -> {
+            try {
+                Component comp = stack.getName();
+                if (comp != null) return comp.getString();
+            } catch (Throwable ignored) {}
+            return id.getPath();
+        });
+    }
+
     private static void indexStackCompact(EmiStack stack, StringBuilder sb, List<ResourceLocation> ids, List<String> names) {
         if (stack == null) return;
         ResourceLocation id = stack.getId();
@@ -242,11 +260,7 @@ public final class EmiRecipeSearchIndexer {
         ids.add(id);
         StackSearchData data = STACK_DATA_CACHE.get(id);
         if (data == null) {
-            String n = "";
-            try {
-                Component comp = stack.getName();
-                if (comp != null) n = comp.getString();
-            } catch (Throwable ignored) {}
+            String n = getStackDisplayName(stack);
 
             StringBuilder ssb = new StringBuilder();
             ssb.append(' ').append(id.toString().toLowerCase(Locale.ROOT));
@@ -271,8 +285,9 @@ public final class EmiRecipeSearchIndexer {
         try {
             if (recipe.getOutputs() != null && !recipe.getOutputs().isEmpty()) {
                 var firstOut = recipe.getOutputs().get(0);
-                if (firstOut != null && firstOut.getName() != null) {
-                    return firstOut.getName().getString();
+                if (firstOut != null) {
+                    String n = getStackDisplayName(firstOut);
+                    if (!n.isEmpty()) return n;
                 }
             }
         } catch (Throwable ignored) {}
@@ -287,7 +302,9 @@ public final class EmiRecipeSearchIndexer {
     }
 
     public static void clearCaches() {
+        STACK_NAME_CACHE.clear();
         STACK_DATA_CACHE.clear();
         CATEGORY_WS_TEXT_CACHE.clear();
+        CATEGORY_NAME_CACHE.clear();
     }
 }

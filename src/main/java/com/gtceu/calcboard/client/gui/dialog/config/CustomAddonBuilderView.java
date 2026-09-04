@@ -25,9 +25,11 @@ public class CustomAddonBuilderView {
 
     public void init() {
         Minecraft mc = Minecraft.getInstance();
-        this.customNameBox = new EditBox(mc.font, 0, 0, 160, 14, Component.translatable("gui.gtcalcboard.config.custom_name_hint"));
-        this.customNameBox.setMaxLength(64);
-        this.customNameBox.setValue(Component.translatable("gui.gtcalcboard.config.custom_name_default").getString());
+        if (mc != null && mc.font != null) {
+            this.customNameBox = new EditBox(mc.font, 0, 0, 160, 14, Component.translatable("gui.gtcalcboard.config.custom_name_hint"));
+            this.customNameBox.setMaxLength(64);
+            this.customNameBox.setValue(Component.translatable("gui.gtcalcboard.config.custom_name_default").getString());
+        }
         this.customDurationMult = 1.0;
         this.customEutMult = 1.0;
         this.customParallelMult = 1;

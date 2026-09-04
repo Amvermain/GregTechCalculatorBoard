@@ -96,13 +96,26 @@ public final class GTCEuBOMHelper {
 
         if (def == null) {
             ResourceLocation machineId = node.getMachineIcon();
+            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            if (adapter != null) {
+                ResourceLocation tieredWs = adapter.getWorkstationForTier(node, tier);
+                if (tieredWs != null) {
+                    machineId = tieredWs;
+                }
+            }
+            boolean isMachine = adapter != null && adapter.isLikelyMachineOrStructure(node, machineId);
+            if (!isMachine) {
+                return list;
+            }
             if (machineId != null) {
-                String controllerName = node.getName() != null && !node.getName().isBlank() ? node.getName() : machineId.getPath();
+                String controllerName = resolveDisplayName(machineId, com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(machineId.getPath()));
                 list.add(new MultiblockStructurePart(machineId, controllerName, 1, PartCategory.CONTROLLER));
             }
-            ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
-            if (ehId != null) {
-                list.add(new MultiblockStructurePart(ehId, formatDisplayName(ehId), dualLowerTierEnergyHatches ? 2 : 1, PartCategory.HATCH_BUS));
+            if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
+                ResourceLocation ehId = resolveEnergyHatchId(tier, dualLowerTierEnergyHatches);
+                if (ehId != null) {
+                    list.add(new MultiblockStructurePart(ehId, resolveDisplayName(ehId, formatDisplayName(ehId)), dualLowerTierEnergyHatches ? 2 : 1, PartCategory.HATCH_BUS));
+                }
             }
             for (MachineAddon addon : node.getAddons()) {
                 if (addon != null && addon.getItemIcon() != null) {
@@ -320,7 +333,7 @@ public final class GTCEuBOMHelper {
                     if (ehId != null) {
                         list.add(new MultiblockStructurePart(
                             ehId,
-                            formatDisplayName(ehId),
+                            resolveDisplayName(ehId, formatDisplayName(ehId)),
                             count,
                             PartCategory.HATCH_BUS
                         ));
@@ -336,14 +349,15 @@ public final class GTCEuBOMHelper {
                     int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
                     if (neededBuses > 0) {
                         ResourceLocation busId = isSteamBus ? part.itemId() : resolveInputBusId(tier);
-                        list.add(new MultiblockStructurePart(busId != null ? busId : part.itemId(), formatDisplayName(busId != null ? busId : part.itemId()), neededBuses, PartCategory.HATCH_BUS));
+                        ResourceLocation targetId = busId != null ? busId : part.itemId();
+                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededBuses, PartCategory.HATCH_BUS));
                     }
                 } else {
                     int baseRequiredBuses = (int) Math.ceil((double) itemInCount / (double) Math.max(1, slotsPerBus));
                     int count = Math.max(part.amount(), baseRequiredBuses);
                     ResourceLocation busId = isSteamBus ? part.itemId() : resolveInputBusId(tier);
                     if (busId != null) {
-                        list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), count, PartCategory.HATCH_BUS));
+                        list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), count, PartCategory.HATCH_BUS));
                     } else {
                         list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
                     }
@@ -356,14 +370,15 @@ public final class GTCEuBOMHelper {
                     int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
                     if (neededBuses > 0) {
                         ResourceLocation busId = isSteamBus ? part.itemId() : resolveOutputBusId(tier);
-                        list.add(new MultiblockStructurePart(busId != null ? busId : part.itemId(), formatDisplayName(busId != null ? busId : part.itemId()), neededBuses, PartCategory.HATCH_BUS));
+                        ResourceLocation targetId = busId != null ? busId : part.itemId();
+                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededBuses, PartCategory.HATCH_BUS));
                     }
                 } else {
                     int baseRequiredBuses = (int) Math.ceil((double) itemOutCount / (double) Math.max(1, slotsPerBus));
                     int count = Math.max(part.amount(), baseRequiredBuses);
                     ResourceLocation busId = isSteamBus ? part.itemId() : resolveOutputBusId(tier);
                     if (busId != null) {
-                        list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), count, PartCategory.HATCH_BUS));
+                        list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), count, PartCategory.HATCH_BUS));
                     } else {
                         list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
                     }
@@ -374,13 +389,14 @@ public final class GTCEuBOMHelper {
                 if (hasCustomFluidIn) {
                     if (neededFluidIn > 0) {
                         ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveInputHatchId(tier);
-                        list.add(new MultiblockStructurePart(hatchId != null ? hatchId : part.itemId(), formatDisplayName(hatchId != null ? hatchId : part.itemId()), neededFluidIn, PartCategory.HATCH_BUS));
+                        ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
+                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededFluidIn, PartCategory.HATCH_BUS));
                     }
                 } else {
                     int count = Math.max(part.amount(), fluidInCount);
                     ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveInputHatchId(tier);
                     if (hatchId != null) {
-                        list.add(new MultiblockStructurePart(hatchId, formatDisplayName(hatchId), count, PartCategory.HATCH_BUS));
+                        list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), count, PartCategory.HATCH_BUS));
                     } else {
                         list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
                     }
@@ -391,13 +407,14 @@ public final class GTCEuBOMHelper {
                 if (hasCustomFluidOut) {
                     if (neededFluidOut > 0) {
                         ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveOutputHatchId(tier);
-                        list.add(new MultiblockStructurePart(hatchId != null ? hatchId : part.itemId(), formatDisplayName(hatchId != null ? hatchId : part.itemId()), neededFluidOut, PartCategory.HATCH_BUS));
+                        ResourceLocation targetId = hatchId != null ? hatchId : part.itemId();
+                        list.add(new MultiblockStructurePart(targetId, resolveDisplayName(targetId, formatDisplayName(targetId)), neededFluidOut, PartCategory.HATCH_BUS));
                     }
                 } else {
                     int count = Math.max(part.amount(), fluidOutCount);
                     ResourceLocation hatchId = isSteamHatch ? part.itemId() : resolveOutputHatchId(tier);
                     if (hatchId != null) {
-                        list.add(new MultiblockStructurePart(hatchId, formatDisplayName(hatchId), count, PartCategory.HATCH_BUS));
+                        list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), count, PartCategory.HATCH_BUS));
                     } else {
                         list.add(new MultiblockStructurePart(part.itemId(), part.displayName(), count, PartCategory.HATCH_BUS));
                     }
@@ -509,7 +526,7 @@ public final class GTCEuBOMHelper {
                 if (ehId != null) {
                     list.add(new MultiblockStructurePart(
                         ehId,
-                        formatDisplayName(ehId),
+                        resolveDisplayName(ehId, formatDisplayName(ehId)),
                         count,
                         PartCategory.HATCH_BUS
                     ));
@@ -524,7 +541,7 @@ public final class GTCEuBOMHelper {
             int neededBuses = (int) Math.ceil((double) neededItemIn / (double) Math.max(1, slotsPerBus));
             ResourceLocation busId = isSteamBus ? ResourceLocation.tryParse("gtceu:lp_steam_input_bus") : resolveInputBusId(tier);
             if (busId != null && neededBuses > 0) {
-                list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), neededBuses, PartCategory.HATCH_BUS));
+                list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), neededBuses, PartCategory.HATCH_BUS));
             }
         }
 
@@ -535,7 +552,7 @@ public final class GTCEuBOMHelper {
             int neededBuses = (int) Math.ceil((double) neededItemOut / (double) Math.max(1, slotsPerBus));
             ResourceLocation busId = isSteamBus ? ResourceLocation.tryParse("gtceu:lp_steam_output_bus") : resolveOutputBusId(tier);
             if (busId != null && neededBuses > 0) {
-                list.add(new MultiblockStructurePart(busId, formatDisplayName(busId), neededBuses, PartCategory.HATCH_BUS));
+                list.add(new MultiblockStructurePart(busId, resolveDisplayName(busId, formatDisplayName(busId)), neededBuses, PartCategory.HATCH_BUS));
             }
         }
 
@@ -544,7 +561,7 @@ public final class GTCEuBOMHelper {
             boolean isSteamHatch = def.supportsAbility("STEAM_IMPORT_FLUIDS");
             ResourceLocation hatchId = isSteamHatch ? ResourceLocation.tryParse("gtceu:lp_steam_input_hatch") : resolveInputHatchId(tier);
             if (hatchId != null) {
-                list.add(new MultiblockStructurePart(hatchId, formatDisplayName(hatchId), neededFluidIn, PartCategory.HATCH_BUS));
+                list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), neededFluidIn, PartCategory.HATCH_BUS));
             }
         }
 
@@ -553,7 +570,7 @@ public final class GTCEuBOMHelper {
             boolean isSteamHatch = def.supportsAbility("STEAM_EXPORT_FLUIDS");
             ResourceLocation hatchId = isSteamHatch ? ResourceLocation.tryParse("gtceu:lp_steam_output_hatch") : resolveOutputHatchId(tier);
             if (hatchId != null) {
-                list.add(new MultiblockStructurePart(hatchId, formatDisplayName(hatchId), neededFluidOut, PartCategory.HATCH_BUS));
+                list.add(new MultiblockStructurePart(hatchId, resolveDisplayName(hatchId, formatDisplayName(hatchId)), neededFluidOut, PartCategory.HATCH_BUS));
             }
         }
 
@@ -673,18 +690,12 @@ public final class GTCEuBOMHelper {
 
     private static String resolveDisplayName(ResourceLocation id, String fallback) {
         if (id == null) return fallback;
-        try {
-            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                return new net.minecraft.world.item.ItemStack(item).getHoverName().getString();
-            }
-        } catch (Throwable ignored) {}
-        return fallback != null && !fallback.isBlank() ? fallback : formatDisplayName(id);
+        return com.gtceu.calcboard.api.bom.BOMDisplayNameResolver.resolve(id, fallback);
     }
 
     private static String formatDisplayName(ResourceLocation id) {
         if (id == null) return "";
-        return MultiblockStructureCatalog.formatMachineName(id.getPath());
+        return com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(id.getPath());
     }
 }
 

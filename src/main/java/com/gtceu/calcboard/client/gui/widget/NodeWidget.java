@@ -61,9 +61,16 @@ public class NodeWidget {
         invalidateCache();
     }
 
+    private final com.gtceu.calcboard.client.gui.render.NodeCardTextCache textCache = new com.gtceu.calcboard.client.gui.render.NodeCardTextCache();
+
+    public com.gtceu.calcboard.client.gui.render.NodeCardTextCache getTextCache() {
+        return textCache;
+    }
+
     public void invalidateCache() {
         this.cachedInputRates = null;
         this.cachedOutputRates = null;
+        this.textCache.markDirty();
         if (parent != null) {
             parent.markSummaryDirty();
         }
@@ -405,6 +412,26 @@ public class NodeWidget {
         );
     }
 
+    public void toggleOutputPortVoid(int portIndex) {
+        if (parent != null && !parent.ensureEditPermission()) return;
+        if (portIndex < 0 || portIndex >= node.getOutputs().size()) return;
+        boolean currentlyVoided = node.isOutputPortVoided(portIndex);
+        node.setOutputPortVoided(portIndex, !currentlyVoided);
+        invalidateCache();
+        if (parent != null) {
+            parent.markSummaryDirty();
+        }
+        Minecraft.getInstance().getSoundManager().play(
+            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, currentlyVoided ? 0.8F : 1.3F
+            )
+        );
+    }
+
+    public static boolean isVoidToggleModifier() {
+        return Screen.hasControlDown() || Screen.hasAltDown() || Screen.hasShiftDown();
+    }
+
     public IngredientStack getHoveredIngredient(double canvasMouseX, double canvasMouseY) {
         int inIdx = getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
         if (inIdx >= 0 && inIdx < node.getInputs().size()) {
@@ -518,13 +545,20 @@ public class NodeWidget {
 
         int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
         int maxIdx = GTVoltageTier.values().length - 1;
-        if (node.isTurbine() && !node.isMultiblock()) {
-            maxIdx = GTVoltageTier.HV.ordinal();
+        if (node.isTurbine()) {
+            if (node.isMultiblock()) {
+                GTVoltageTier baseTier = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineBaseTier(node);
+                if (baseTier != null) {
+                    minIdx = Math.max(minIdx, baseTier.ordinal());
+                }
+            } else {
+                maxIdx = GTVoltageTier.HV.ordinal();
+            }
         }
 
         boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
 
-        if (node.supportsSteamMode()) {
+        if (!node.isMultiblock() && node.supportsSteamMode()) {
             SteamMode curSteam = node.getSteamMode();
             if (curSteam == SteamMode.LOW_PRESSURE) {
                 if (direction > 0) {
@@ -625,7 +659,9 @@ public class NodeWidget {
             return false;
         }
 
-        int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
+        int curIdx = node.isLargeTurbine()
+                ? com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderTier(node).ordinal()
+                : (node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal());
         int newIdx = curIdx + direction;
 
         if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
@@ -646,6 +682,9 @@ public class NodeWidget {
         GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
 
         node.setTargetTier(newTier);
+        if (node.isLargeTurbine()) {
+            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setRotorHolderTier(node, newTier);
+        }
         if (!node.isMultiblock()) {
             ResourceLocation sbWs = node.getWorkstationForTier(newTier);
             if (sbWs != null) {
@@ -741,6 +780,10 @@ public class NodeWidget {
             }
             int outPort = getHoveredOutputPortIndex(mouseX, mouseY);
             if (outPort >= 0) {
+                if (isVoidToggleModifier()) {
+                    toggleOutputPortVoid(outPort);
+                    return true;
+                }
                 hidePortAndDisconnectWires(false, outPort);
                 return true;
             }
@@ -780,19 +823,24 @@ public class NodeWidget {
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.8F)
                         );
                         return true;
+                    } else {
+                        if (parent != null) {
+                            parent.openJunctionSupplyDialog(node);
+                            Minecraft.getInstance().getSoundManager().play(
+                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+                            );
+                            return true;
+                        }
                     }
                 }
             }
             return false;
         }
 
-        // Machine Icon Click -> Toggle Multiblock / Singleblock mode
+        // Machine Icon Click -> Open Machine / Controller Selector Dialog
         if (button == 0 && isMachineIconHovered(mouseX, mouseY)) {
-            if (node.hasMultiblockOption()) {
-                boolean newMb = !node.isMultiblock();
-                node.setMultiblock(newMb);
-                if (parent != null) parent.markSummaryDirty();
-                invalidateCache();
+            if (parent != null) {
+                parent.openMachineSelectorDialog(node);
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
                 );

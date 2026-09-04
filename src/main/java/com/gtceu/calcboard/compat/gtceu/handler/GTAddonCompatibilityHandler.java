@@ -16,6 +16,7 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import com.gtceu.calcboard.compat.gtceu.physics.GTTurbinePhysics;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
 import com.gtceu.calcboard.compat.start.StarTTurbineHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -70,10 +71,7 @@ public final class GTAddonCompatibilityHandler {
         }
 
         boolean isTurbine = node.isTurbine();
-        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0
-                || (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion"))
-                || (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("fusion"))
-                || (node.getName() != null && node.getName().toLowerCase(Locale.ROOT).contains("fusion"));
+        boolean isFusion = com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.isFusion(node);
         boolean isMb = node.isMultiblock() || node.hasMultiblockOption() || isFusion;
 
         if (isTurbine) {
@@ -122,9 +120,12 @@ public final class GTAddonCompatibilityHandler {
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = def.coilSlotCount() > 0 || def.supportsAbility("HEATING_COILS") || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
+                        || MultiblockDetector.isCoilMultiblock(mbId)
+                        || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             } else {
-                supportsCoil = node.canUseCoils() || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
+                        || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             }
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
@@ -177,10 +178,7 @@ public final class GTAddonCompatibilityHandler {
         }
 
         boolean isGen = node.isGenerator();
-        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0
-                || (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion"))
-                || (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("fusion"))
-                || (node.getName() != null && node.getName().toLowerCase(Locale.ROOT).contains("fusion"));
+        boolean isFusion = com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.isFusion(node);
 
         if (addon.getCategory() == MachineAddon.Category.ROTOR) {
             return node.isTurbine() && node.isMultiblock();
@@ -236,7 +234,15 @@ public final class GTAddonCompatibilityHandler {
             if (mbId != null) {
                 var def = MultiblockStructureCatalog.getStructure(mbId);
                 if (def != null) {
-                    if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("INPUT_LASER") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")) {
+                    if (addon instanceof GTEnergyHatchAddon eh) {
+                        if (eh.isLaser()) {
+                            if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_LASER")) return false;
+                        } else if (eh.isSubstation()) {
+                            if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")) return false;
+                        } else {
+                            if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_ENERGY")) return false;
+                        }
+                    } else if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("INPUT_LASER") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")) {
                         return false;
                     }
                     if (def.energyHatchSlotCount() == 0 && (MultiblockDetector.isSteamMultiblock(mbId) || isGen)) return false;
@@ -318,6 +324,15 @@ public final class GTAddonCompatibilityHandler {
             if (addon.getId().equals("gtceu:batch_processing")) {
                 return !isGen && node.isMultiblock() && MultiblockDetector.supportsBatchMode(node.getMachineIcon(), node.getAvailableWorkstations());
             }
+            if (addon.getId().equals("gtceu:throughput_boosting")) {
+                return !isGen && node.isMultiblock() && MultiblockDetector.supportsThroughputBoosting(node.getMachineIcon());
+            }
+            if (addon.getId().equals("gtceu:bulk_processing")) {
+                return !isGen && node.isMultiblock() && MultiblockDetector.supportsBulkProcessing(node.getMachineIcon());
+            }
+            if (addon.getId().equals("gtceu:overpressure_autoclave")) {
+                return !isGen && node.isMultiblock() && MultiblockDetector.supportsOverpressure(node.getMachineIcon());
+            }
             if (addon.getItemIcon() != null) {
                 ResourceLocation target = addon.getItemIcon();
                 if (node.getMachineIcon() != null && node.getMachineIcon().equals(target)) return true;
@@ -325,7 +340,7 @@ public final class GTAddonCompatibilityHandler {
                 if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().equals(target)) return true;
                 return false;
             }
-            return !isGen && node.isMultiblock();
+            return false;
         }
 
         return true;
@@ -550,20 +565,7 @@ public final class GTAddonCompatibilityHandler {
             return;
         }
         if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT || a.getId().equals(addon.getId()));
-            if (addon.getId().equals("gtceu:spt_lubricant_boosting")) {
-                node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && in.getId().getPath().contains("tungsten_disulfide"));
-                node.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:tungsten_disulfide"), "Tungsten Disulfide", 277.77777777777777, 1.0));
-            } else if (addon.getId().equals("gtceu:spt_coolant_boosting")) {
-                node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && (in.getId().getPath().contains("helium_3") || in.getId().getPath().contains("superstate")));
-                node.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:superstate_helium_3"), "Superstate Helium 3", 694.4444444444445, 1.0));
-            } else if (addon.getId().equals("gtceu:npt_lubricant_boosting")) {
-                node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && in.getId().getPath().contains("tungsten_disulfide"));
-                node.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:tungsten_disulfide"), "Tungsten Disulfide", 694.4444444444445, 1.0));
-            } else if (addon.getId().equals("gtceu:npt_coolant_boosting")) {
-                node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && (in.getId().getPath().contains("bec_og") || in.getId().getPath().contains("bose_einstein") || in.getId().getPath().contains("oganesson")));
-                node.getInputs().add(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:bec_og"), "Oganesson Stabilized BEC", 222.22222222222223, 1.0));
-            }
+            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
             node.getAddons().add(addon);
             return;
         }
@@ -579,18 +581,27 @@ public final class GTAddonCompatibilityHandler {
         if (node == null || addon == null) return;
         if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
             updateNodeTierFromEnergyHatches(node);
+            if (com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(node)) {
+                List<GTEnergyHatchAddon> remaining = node.getAddons().stream()
+                        .filter(a -> a instanceof GTEnergyHatchAddon)
+                        .map(a -> (GTEnergyHatchAddon) a)
+                        .toList();
+                if (!remaining.isEmpty()) {
+                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, remaining.get(0).getTier());
+                    int totalAmps = remaining.stream().mapToInt(GTEnergyHatchAddon::getAmperage).sum();
+                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, totalAmps);
+                } else {
+                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, node.getTargetTier() != null ? node.getTargetTier() : GTVoltageTier.EV);
+                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, 1);
+                }
+            }
         } else if (addon.getCategory() == MachineAddon.Category.ROTOR) {
             node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
             node.setRotorEfficiency(100);
             node.setRotorPower(100);
-            node.setRotorName("Standard (100%)");
             GTTurbinePhysics.autoCalculateTurbineParallel(node);
-        } else if (addon.getId().equals("gtceu:spt_lubricant_boosting") || addon.getId().equals("gtceu:npt_lubricant_boosting")) {
-            node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && in.getId().getPath().contains("tungsten_disulfide"));
-        } else if (addon.getId().equals("gtceu:spt_coolant_boosting")) {
-            node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && (in.getId().getPath().contains("helium_3") || in.getId().getPath().contains("superstate")));
-        } else if (addon.getId().equals("gtceu:npt_coolant_boosting")) {
-            node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && (in.getId().getPath().contains("bec_og") || in.getId().getPath().contains("bose_einstein") || in.getId().getPath().contains("oganesson")));
+        } else if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
+            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
         }
     }
 
@@ -619,21 +630,22 @@ public final class GTAddonCompatibilityHandler {
             }
         }
 
-        GTVoltageTier capacityTier = GTVoltageTier.getMaxTierProvided(totalEUtCapacity);
-
         if (hatches.size() == 2 && hatches.get(0).getTier() == hatches.get(1).getTier()) {
             GTVoltageTier base = hatches.get(0).getTier();
             GTVoltageTier dualTier = base.ordinal() < GTVoltageTier.MAX.ordinal()
                     ? GTVoltageTier.getByIndex(base.ordinal() + 1)
                     : base;
-            node.setTargetTier(capacityTier.ordinal() > dualTier.ordinal() ? capacityTier : dualTier);
+            node.setTargetTier(dualTier);
             return;
         }
 
-        if (capacityTier.ordinal() > maxSingleHatchTier.ordinal()) {
-            node.setTargetTier(capacityTier);
-        } else {
-            node.setTargetTier(maxSingleHatchTier);
+        node.setTargetTier(maxSingleHatchTier);
+
+        if (com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(node)) {
+            GTEnergyHatchAddon primary = hatches.get(0);
+            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, primary.getTier());
+            int totalAmps = hatches.stream().mapToInt(GTEnergyHatchAddon::getAmperage).sum();
+            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, totalAmps);
         }
     }
 
@@ -657,14 +669,5 @@ public final class GTAddonCompatibilityHandler {
 
     public static void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
         if (addon == null || tooltip == null) return;
-        if (addon.getId().equals("gtceu:spt_lubricant_boosting")) {
-            tooltip.add(Component.literal("§e⚡ +25% EU/t §7(1,000 B/h Tungsten Disulfide)"));
-        } else if (addon.getId().equals("gtceu:spt_coolant_boosting")) {
-            tooltip.add(Component.literal("§b⚡ +50% EU/t §7(2,500 B/h Superstate Helium-3)"));
-        } else if (addon.getId().equals("gtceu:npt_lubricant_boosting")) {
-            tooltip.add(Component.literal("§e⚡ +25% EU/t §7(2,500 B/h Tungsten Disulfide)"));
-        } else if (addon.getId().equals("gtceu:npt_coolant_boosting")) {
-            tooltip.add(Component.literal("§d⚡ +50% EU/t §7(800 B/h Oganesson Stabilized BEC)"));
-        }
     }
 }

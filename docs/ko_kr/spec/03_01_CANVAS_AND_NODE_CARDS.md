@@ -16,6 +16,23 @@ $$\text{ScreenX} = (\text{CanvasX} \times \text{Zoom}) + \text{PanX}, \quad \tex
 * **팬(Pan) 제어**: 마우스 우클릭 드래그 또는 휠 클릭 드래그
 * **그리드 간격**: $20\text{px} \times \text{Zoom}$ 단위 도트 배경 렌더링
 
+### 1.2 전용 가상 뷰포트 배율 변환 (Dedicated Virtual Viewport Transform, ADR-017)
+마인크래프트 전역 GUI Scale($G$)과 독립적인 보드 전용 가상 배율($B$)을 적용하기 위해 `BoardViewportTransform`을 통해 2단계 좌표 투영을 수행합니다.
+
+$$S = \frac{B}{G}, \quad x_{\text{virtual}} = \frac{x_{\text{raw}}}{S}, \quad y_{\text{virtual}} = \frac{y_{\text{raw}}}{S}$$
+$$W_{\text{virtual}} = \frac{W_{\text{window}}}{S}, \quad H_{\text{virtual}} = \frac{H_{\text{window}}}{S}$$
+
+* **마우스 역투영**: 마인크래프트 화면 마우스 이벤트 $(m_x, m_y)$를 가상 해상도 $(m_x / S, m_y / S)$로 변환한 후 캔버스 좌표 $(CanvasX, CanvasY)$로 투영합니다.
+* **배율 모드 지원**: `AUTO(0)` (화면 크기 기준 자동 1~4x 산출), `SCALE_1X(1)` ~ `SCALE_4X(4)` 수동 고정.
+
+### 1.3 16px 정밀 격자 스냅 (Grid Snap) 및 좌표 양자화 (ADR-012)
+노드, 프레임, 스티키 노트의 드래그 이동 및 크기 조절 시 $16\text{px}$ 단위의 정밀 양자화(Quantization)를 적용합니다.
+
+$$x_{\text{snapped}} = \text{round}\left(\frac{x}{16.0}\right) \times 16.0, \quad y_{\text{snapped}} = \text{round}\left(\frac{y}{16.0}\right) \times 16.0$$
+
+* **HUD 토글 및 단축키**: `G` 키 또는 좌하단 HUD 토글 버튼을 통해 격자 스냅 활성화/비활성화 전환.
+* **사용자 설정 영속화**: `BoardSettingsDialog` 및 클라이언트 NBT에 스냅 활성화 상태를 저장.
+
 ---
 
 ## 2. 3차 베지어 와이어 렌더링 (`ConnectionRenderer`)
@@ -32,12 +49,38 @@ $$B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad (t \in [0
 * **결손 (Deficit)**: `0xFFEF4444` (레드), 원자재 부족 경고 점멸
 * **초과 (Surplus)**: `0xFF10B981` (에메랄드), 안전 잉여
 
+### 2.3 처리량 포화도 기반 와이어 펄스 도트 렌더링 (Rate-Based Flow Modulation, ADR-018)
+연결선 내부를 이동하는 펄스 도트에 공급 포화율($R_e = \text{Supply} / \text{Demand}$)을 투영하여 유량 흐름 및 병목을 실시간 렌더링합니다:
+
+1. **포화율 ($R_e$) 산출**:
+   $$R_e = \begin{cases} 
+   1.0 & \text{if } \text{DemandRate} \le 0.0001 \\
+   0.0 & \text{if } \text{SupplyRate} \le 0.0001 \\
+   \min\left(1.0, \, \frac{\text{SupplyRate}}{\text{DemandRate}}\right) & \text{otherwise}
+   \end{cases}$$
+
+2. **듀티 사이클 간헐적 정지 (Duty Cycle Stutter)**:
+   전역 주기 $T = 1600\text{ ms}$, 기준 시간 $\tau = (t_{\text{now}} \pmod T) / T \in [0, 1)$:
+   $$t_{\text{eff}} = \begin{cases} 
+   \frac{\tau}{R_e} & \text{if } \tau < R_e \quad (\text{정상 주행 구간}) \\
+   1.0 & \text{if } \tau \ge R_e \quad (\text{원료 결핍 대기 정지 구간})
+   \end{cases}$$
+
+3. **동적 3단계 RGB 보간 (Color Interpolation)**:
+   $$C(R_e) = \begin{cases} 
+   (0.22, 0.74, 0.97) \quad [\text{Cyan Blue}] & \text{if } R_e \ge 1.0 \\
+   \text{Lerp}\left(\text{Amber}, \text{Cyan}, \frac{R_e - 0.5}{0.5}\right) & \text{if } 0.5 \le R_e < 1.0 \\
+   \text{Lerp}\left(\text{Crimson}, \text{Amber}, \frac{R_e}{0.5}\right) & \text{if } 0.0 < R_e < 0.5
+   \end{cases}$$
+
 ---
 
 ## 3. 고성능 렌더링 파이프라인 및 공간 분할 색인
 
-### 3.1 Single-Pass Batch Rendering
-프레임당 다수의 개별 드로우콜 및 `glClear`를 배제하고, 화면에 보이는 뷰포트 영역(Culling Box) 내의 노드와 와이어만을 선별하여 단일 지오메트리 패스로 일괄 렌더링합니다.
+### 3.1 Two-Pass Z-Order 렌더링 및 `glClear` 노드 깊이 격리 (ADR-014)
+* **결함 없는 아이템 깊이 버퍼 격리**: 3D 아이템 모델과 2D 배경/텍스트 간의 Z-clipping 간섭을 방지하기 위해 노드 단위로 `bufferSource().endBatch()` 및 `RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX)`를 적용하여 깊이 버퍼를 완전 격리합니다.
+* **Two-Pass Z-Order 렌더링**: 비선택 노드를 1차 패스에서 먼저 그리고, 선택 및 조작 중인 노드(`isNodeSelected`)를 지연 큐에 수집하여 2차 패스에서 최상단에 렌더링함으로써 레이어링 순서를 엄격히 보장합니다.
+* **$O(1)$ 포트 통계 캐싱 및 텍스트 캐시 (`NodeCardTextCache`)**: 노드 카드 타이틀 절삭, 포트 수치 및 파워 레이블 포맷팅을 dirty 플래그 기반으로 캐싱하여 렌더링 오버헤드를 극소화합니다.
 
 ### 3.2 $128 \times 128$ AABB 균일 그리드 공간 분할 와이어 색인 (`WireSpatialIndex`)
 1,000개 이상의 복잡한 와이어 네트워크에서 마우스 호버 및 클릭 감지를 $O(E)$ 전수 검사에서 **$O(\log E)$ 공간 분할 색인**으로 최적화합니다.
@@ -243,6 +286,24 @@ flowchart LR
   - `Ctrl + C` (복사), `Ctrl + X` (잘라내기), `Ctrl + V` (붙여넣기) 지원.
   - 헤드리스/테스트 환경을 위한 격리된 Fallback 클립보드 버퍼 내장.
 * **단축키 격리**: 인라인 편집 중 발생하는 모든 키 입력은 상위 캔버스 글로벌 단축키로 누출되지 않고 에디터 내부에서 완전 소비.
+
+---
+
+## 7. 원료 결핍 경고 외곽선 및 보이드 렌더링 명세 (ADR-018, ADR-019)
+
+### 7.1 결핍 노드(Input Starvation) 병목 경고 외곽선
+- **판정 조건**: 기계가 정상 가동 중($\text{machineCount} > 0$)이지만 가시 입력 포트 중 하나라도 유량 공급 포화율 $R_e < 1.0$인 경우 결핍 노드로 판정합니다.
+- **시각적 피드백**: 노드 카드 외곽에 호박색 펄스 글로우(`0xFFF59E0B`, Amber Pulse)를 렌더링하여 공정 전체의 병목 지점을 캔버스에서 즉시 식별할 수 있습니다.
+- **툴팁 연동**: 결핍 노드 카드 호버 시 `병목 감지: 원료 공급 부족` 경고 배지가 표시됩니다.
+
+### 7.2 보이드 싱크 정션 및 보이드 포트 렌더링
+- **`VOID_SINK` 정션 노드**: 카드 테두리를 보라색(`0xFFA855F7`)으로 렌더링하고, 헤더에 `VOID` 상태 배지를 부착합니다.
+- **보이드 지정된 출력 포트 (`isOutputPortVoided`)**:
+  - 포트 소켓 색상을 보라색(`0xFFA855F7`)으로 렌더링하고 테두리를 강조합니다.
+  - 슬롯 텍스트 및 유량 라벨을 보라색(`0xFFC084FC`)으로 전환합니다.
+- **단축키 및 인터랙션**:
+  - **`Alt + 우클릭`**: 기계 카드의 출력 포트 아이콘을 `Alt + 우클릭`하여 배관을 분리하지 않고 즉시 보이드 상태를 토글합니다.
+  - **호버 툴팁 안내**: 포트 호버 시 현재 원료 충족률(%)과 보이드 여부(`[∅] 보이드 처리됨`) 및 `[Alt+우클릭]: 보이드 처리 토글` 단축키 가이드가 표시됩니다.
 
 ---
 

@@ -24,10 +24,23 @@ public class CanvasStickyNoteRenderer {
     public static final int BTN_SPACING = 2;
 
     public static void renderNotes(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, java.util.Set<String> selectedNoteIds) {
+        renderNotes(graphics, graph, canvasMouseX, canvasMouseY, selectedNoteIds, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY);
+    }
+
+    public static void renderNotes(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, java.util.Set<String> selectedNoteIds,
+                                   double screenLeft, double screenRight, double screenTop, double screenBottom) {
         if (graph == null || graph.getStickyNotes().isEmpty()) return;
 
         Font font = Minecraft.getInstance().font;
         for (CanvasStickyNote note : graph.getStickyNotes()) {
+            if (note == null) continue;
+            double nx = note.getPosX();
+            double ny = note.getPosY();
+            double nw = note.getWidth();
+            double nh = note.getHeight();
+            if (nx + nw < screenLeft || nx > screenRight || ny + nh < screenTop || ny > screenBottom) {
+                continue;
+            }
             boolean isSelected = selectedNoteIds != null && selectedNoteIds.contains(note.getId());
             renderSingleNote(graphics, font, note, canvasMouseX, canvasMouseY, isSelected);
         }
@@ -104,14 +117,14 @@ public class CanvasStickyNoteRenderer {
 
                 // [✕ Delete]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.note.tooltip_delete")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.note.tooltip_delete")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [🎨 Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
                     return;
                 }
             }

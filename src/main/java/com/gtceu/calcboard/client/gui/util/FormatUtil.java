@@ -100,13 +100,13 @@ public final class FormatUtil {
                 if (abs >= 10_000.0) {
                     return formatCompactNumber(scaledRate) + " mB" + suffix;
                 } else if (abs >= 100.0) {
-                    return String.format(Locale.ROOT, "%.1f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 1, " mB", suffix);
                 } else if (abs >= 1.0) {
-                    return String.format(Locale.ROOT, "%.2f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 2, " mB", suffix);
                 } else if (abs >= 0.01) {
-                    return String.format(Locale.ROOT, "%.3f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 3, " mB", suffix);
                 } else if (abs >= 0.0001) {
-                    return String.format(Locale.ROOT, "%.4f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 4, " mB", suffix);
                 } else {
                     return formatCompactNumber(scaledRate) + " mB" + suffix;
                 }
@@ -116,13 +116,13 @@ public final class FormatUtil {
                 if (absB >= 10_000.0) {
                     return formatCompactNumber(scaledB) + " B" + suffix;
                 } else if (absB >= 100.0) {
-                    return String.format(Locale.ROOT, "%.1f B%s", scaledB, suffix).replaceAll("\\.?0+ B" + suffix, " B" + suffix);
+                    return formatWithTrimmedZeros(scaledB, 1, " B", suffix);
                 } else if (absB >= 1.0) {
-                    return String.format(Locale.ROOT, "%.2f B%s", scaledB, suffix).replaceAll("\\.?0+ B" + suffix, " B" + suffix);
+                    return formatWithTrimmedZeros(scaledB, 2, " B", suffix);
                 } else if (absB >= 0.01) {
-                    return String.format(Locale.ROOT, "%.3f B%s", scaledB, suffix).replaceAll("\\.?0+ B" + suffix, " B" + suffix);
+                    return formatWithTrimmedZeros(scaledB, 3, " B", suffix);
                 } else if (absB >= 0.0001) {
-                    return String.format(Locale.ROOT, "%.4f B%s", scaledB, suffix).replaceAll("\\.?0+ B" + suffix, " B" + suffix);
+                    return formatWithTrimmedZeros(scaledB, 4, " B", suffix);
                 } else {
                     return formatCompactNumber(scaledB) + " B" + suffix;
                 }
@@ -132,11 +132,11 @@ public final class FormatUtil {
                 } else if (abs >= 10.0) {
                     return String.format(Locale.ROOT, "%.0f mB%s", scaledRate, suffix);
                 } else if (abs >= 1.0) {
-                    return String.format(Locale.ROOT, "%.1f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 1, " mB", suffix);
                 } else if (abs >= 0.01) {
-                    return String.format(Locale.ROOT, "%.3f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 3, " mB", suffix);
                 } else if (abs >= 0.0001) {
-                    return String.format(Locale.ROOT, "%.4f mB%s", scaledRate, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
+                    return formatWithTrimmedZeros(scaledRate, 4, " mB", suffix);
                 } else {
                     return formatCompactNumber(scaledRate) + " mB" + suffix;
                 }
@@ -145,17 +145,44 @@ public final class FormatUtil {
             if (abs >= 10_000.0) {
                 return formatCompactNumber(scaledRate) + suffix;
             } else if (abs >= 100.0) {
-                return String.format(Locale.ROOT, "%.1f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
+                return formatWithTrimmedZeros(scaledRate, 1, "", suffix);
             } else if (abs >= 1.0) {
-                return String.format(Locale.ROOT, "%.2f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
+                return formatWithTrimmedZeros(scaledRate, 2, "", suffix);
             } else if (abs >= 0.01) {
-                return String.format(Locale.ROOT, "%.3f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
+                return formatWithTrimmedZeros(scaledRate, 3, "", suffix);
             } else if (abs >= 0.0001) {
-                return String.format(Locale.ROOT, "%.4f%s", scaledRate, suffix).replaceAll("\\.?0+" + suffix, suffix);
+                return formatWithTrimmedZeros(scaledRate, 4, "", suffix);
             } else {
                 return formatCompactNumber(scaledRate) + suffix;
             }
         }
+    }
+
+    private static String formatWithTrimmedZeros(double value, int decimals, String unit, String suffix) {
+        String numStr = switch (decimals) {
+            case 1 -> String.format(Locale.ROOT, "%.1f", value);
+            case 2 -> String.format(Locale.ROOT, "%.2f", value);
+            case 3 -> String.format(Locale.ROOT, "%.3f", value);
+            case 4 -> String.format(Locale.ROOT, "%.4f", value);
+            default -> String.format(Locale.ROOT, "%.2f", value);
+        };
+        int dot = numStr.indexOf('.');
+        if (dot >= 0) {
+            int end = numStr.length();
+            while (end > dot) {
+                char c = numStr.charAt(end - 1);
+                if (c == '0') {
+                    end--;
+                } else if (c == '.') {
+                    end--;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            numStr = numStr.substring(0, end);
+        }
+        return numStr + unit + suffix;
     }
 
     public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit) {

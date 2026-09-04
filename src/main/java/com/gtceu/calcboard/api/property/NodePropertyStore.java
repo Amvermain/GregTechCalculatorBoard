@@ -14,8 +14,19 @@ import java.util.*;
 public class NodePropertyStore {
 
     private final Map<NodePropertyKey<?>, Object> values = new LinkedHashMap<>();
+    private Runnable changeListener;
 
     public NodePropertyStore() {}
+
+    public void setChangeListener(Runnable changeListener) {
+        this.changeListener = changeListener;
+    }
+
+    private void notifyChanged() {
+        if (changeListener != null) {
+            changeListener.run();
+        }
+    }
 
     /**
      * Retrieves the property value, returning the key's default value if absent.
@@ -49,6 +60,7 @@ public class NodePropertyStore {
         } else {
             values.put(key, value);
         }
+        notifyChanged();
     }
 
     /**
@@ -59,12 +71,34 @@ public class NodePropertyStore {
         return values.containsKey(key);
     }
 
+    public boolean hasById(String keyId) {
+        NodePropertyKey<?> key = NodeProperties.getById(keyId);
+        return key != null && has(key);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T getById(String keyId, T defaultValue) {
+        NodePropertyKey<?> key = NodeProperties.getById(keyId);
+        if (key == null) return defaultValue;
+        Object val = values.get(key);
+        return val != null ? (T) val : defaultValue;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> void setById(String keyId, T value) {
+        NodePropertyKey<T> key = (NodePropertyKey<T>) NodeProperties.getById(keyId);
+        if (key != null) {
+            set(key, value);
+        }
+    }
+
     /**
      * Removes the property entry.
      */
     public <T> void remove(NodePropertyKey<T> key) {
         if (key != null) {
             values.remove(key);
+            notifyChanged();
         }
     }
 
@@ -73,6 +107,7 @@ public class NodePropertyStore {
      */
     public void clear() {
         values.clear();
+        notifyChanged();
     }
 
     public void copyFrom(NodePropertyStore other) {
@@ -80,6 +115,7 @@ public class NodePropertyStore {
         if (other != null) {
             values.putAll(other.values);
         }
+        notifyChanged();
     }
 
     public boolean isEmpty() {

@@ -290,6 +290,46 @@ public class HistoryTest {
         assertEquals(GTVoltageTier.LuV, node.getTargetTier());
         assertEquals(1.0, node.getMachineCount(), 0.0001);
     }
+
+    @Test
+    public void testSetMachineIconCommandUndoRedo() {
+        ResourceLocation singleWs = ResourceLocation.tryParse("gtceu:lv_chemical_reactor");
+        ResourceLocation multiWs = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        RecipeNode node = RecipeNode.create(singleWs, "Chemical Reactor", 100.0, 30.0, GTVoltageTier.LV);
+        node.getAvailableWorkstations().add(multiWs);
+        node.setMultiblock(false);
+        node.setParallel(1);
+        graph.addNode(node);
+
+        // Record switching from singleblock to multiblock controller
+        ResourceLocation oldIcon = node.getMachineIcon();
+        boolean oldMb = node.isMultiblock();
+        int oldPar = node.getParallel();
+        var oldSteam = node.getSteamMode();
+        var oldTier = node.getTargetTier();
+
+        node.setMachineIcon(multiWs);
+        node.setMultiblock(true);
+        node.setParallel(8);
+
+        historyManager.record(new BoardCommand.SetMachineIconCommand(node, oldIcon, multiWs, oldMb, oldPar, oldSteam, oldTier));
+
+        assertEquals(multiWs, node.getMachineIcon());
+        assertTrue(node.isMultiblock());
+        assertEquals(8, node.getParallel());
+
+        // Undo
+        historyManager.undo(graph);
+        assertEquals(singleWs, node.getMachineIcon());
+        assertFalse(node.isMultiblock());
+        assertEquals(1, node.getParallel());
+
+        // Redo
+        historyManager.redo(graph);
+        assertEquals(multiWs, node.getMachineIcon());
+        assertTrue(node.isMultiblock());
+        assertEquals(8, node.getParallel());
+    }
 }
 
 

@@ -1,13 +1,18 @@
 package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -18,6 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Overlay panel widget displaying real-time power balance, machine statistics,
+ * external raw materials, and net products for the active board page.
+ */
 public class SummaryOverlay {
     public static final int WIDTH = 240;
     private boolean collapsed = false;
@@ -30,6 +39,10 @@ public class SummaryOverlay {
     private boolean hoveredPower = false;
     private boolean hoveredStress = false;
     private boolean hoveredFusion = false;
+    private boolean voidedCollapsed = false;
+    private IngredientStack hoveredActionStack = null;
+    private boolean hoveredActionIsRestore = false;
+    private boolean hoveredVoidHeader = false;
     private BalanceSummary lastSummary = null;
 
     public boolean isCollapsed() {
@@ -49,6 +62,13 @@ public class SummaryOverlay {
         BoardManager.getInstance().setSummaryOverlayCollapsed(this.collapsed);
     }
 
+    public static int getEffectiveWidth(int screenWidth) {
+        if (screenWidth < 520) {
+            return Math.min(WIDTH, Math.max(160, screenWidth - 160));
+        }
+        return WIDTH;
+    }
+
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {
         this.lastSummary = summary;
         Font font = Minecraft.getInstance().font;
@@ -56,7 +76,8 @@ public class SummaryOverlay {
         graphics.pose().pushPose();
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        int x = screenWidth - WIDTH - 10;
+        int effectiveW = getEffectiveWidth(screenWidth);
+        int x = screenWidth - effectiveW - 10;
         int y = 66;
         int height = screenHeight - 74;
         hoveredStack = null;
@@ -75,16 +96,22 @@ public class SummaryOverlay {
             return;
         }
 
+        hoveredStack = null;
+        hoveredRate = 0.0;
+        hoveredActionStack = null;
+        hoveredActionIsRestore = false;
+        hoveredVoidHeader = false;
+
         // Panel Background
-        graphics.fill(x, y, x + WIDTH, y + height, 0xEE1A1E26);
-        graphics.renderOutline(x, y, WIDTH, height, 0xFF3D4455);
+        graphics.fill(x, y, x + effectiveW, y + height, 0xEE1A1E26);
+        graphics.renderOutline(x, y, effectiveW, height, 0xFF3D4455);
 
         // 1. Fixed Header Title
-        graphics.fill(x, y, x + WIDTH, y + 22, 0xFF242934);
+        graphics.fill(x, y, x + effectiveW, y + 22, 0xFF242934);
         graphics.drawString(font, "§6⚡ " + Component.translatable("gui.gtcalcboard.summary").getString(), x + 8, y + 7, 0xFFFFFFFF, false);
 
         // Collapse button [>>]
-        graphics.drawString(font, "»", x + WIDTH - 16, y + 7, 0xFFAAAAAA, false);
+        graphics.drawString(font, "»", x + effectiveW - 16, y + 7, 0xFFAAAAAA, false);
 
         // 2. Fixed Total Power, Stress & Machines Section
         int curHeaderY = y + 26;
@@ -99,9 +126,9 @@ public class SummaryOverlay {
             String eutStr = BoardManager.getInstance().getPowerDisplayMode().formatSummaryPower(summary.totalEUt(), summary.highestVoltageTier());
             int pLabelW = font.width(pLabel) + 6;
             int eutW = font.width(eutStr);
-            if (pLabelW + eutW <= WIDTH - 16) {
+            if (pLabelW + eutW <= effectiveW - 16) {
                 graphics.drawString(font, pLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
-                graphics.drawString(font, eutStr, x + WIDTH - 8 - eutW, curHeaderY, 0xFFFFFFFF, false);
+                graphics.drawString(font, eutStr, x + effectiveW - 8 - eutW, curHeaderY, 0xFFFFFFFF, false);
                 curHeaderY += 13;
                 powerH = 13;
             } else {
@@ -113,23 +140,21 @@ public class SummaryOverlay {
             }
         }
 
-        // Kinetic Stress (SU) Line
-        int stressY = curHeaderY;
+        // Stress Capacity Line
         boolean showSU = Math.abs(summary.totalSU()) > 0.001;
+        int stressY = curHeaderY;
         if (showSU) {
-            String suLabel = "§6" + Component.translatable("gui.gtcalcboard.total_stress").getString();
-            String suValStr = summary.totalSU() >= 0
-                    ? String.format("§a+%,.0f SU", summary.totalSU())
-                    : String.format("§c-%,.0f SU", -summary.totalSU());
-            int suLabelW = font.width(suLabel) + 6;
-            graphics.drawString(font, suLabel, x + 8, curHeaderY, 0xFFFFAA00, false);
-            graphics.drawString(font, suValStr, x + 8 + suLabelW, curHeaderY, 0xFFFFFFFF, false);
+            String sLabel = "§6" + Component.translatable("gui.gtcalcboard.total_stress").getString();
+            String sValStr = String.format("§f%,.0f SU", summary.totalSU());
+            int sLabelW = font.width(sLabel) + 6;
+            graphics.drawString(font, sLabel, x + 8, curHeaderY, 0xFFFFFFFF, false);
+            graphics.drawString(font, sValStr, x + 8 + sLabelW, curHeaderY, 0xFFFFFFFF, false);
             curHeaderY += 13;
         }
 
-        // Fusion Startup Ignition Energy Line
-        int fusionY = curHeaderY;
+        // Fusion Startup Energy Line
         boolean showFusion = summary.totalFusionStartupEU() > 0;
+        int fusionY = curHeaderY;
         if (showFusion) {
             String fLabel = "§d⚛ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer").getString();
             String fValStr = "§f" + FormatUtil.formatCompactNumber(summary.totalFusionStartupEU()) + " EU";
@@ -146,28 +171,30 @@ public class SummaryOverlay {
         graphics.drawString(font, mLabel, x + 8, machinesY, 0xFFFFFFFF, false);
         graphics.drawString(font, mCountStr, x + 8 + mLabelW, machinesY, 0xFFFFFFFF, false);
 
-        hoveredMachines = mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
-        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= powerY - 2 && mouseY <= powerY + powerH;
-        hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
-        hoveredFusion = showFusion && mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= fusionY - 2 && mouseY <= fusionY + 12;
+        hoveredMachines = mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= machinesY - 2 && mouseY <= machinesY + 12;
+        hoveredPower = showEU && mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= powerY - 2 && mouseY <= powerY + powerH;
+        hoveredStress = showSU && mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= stressY - 2 && mouseY <= stressY + 12;
+        hoveredFusion = showFusion && mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= fusionY - 2 && mouseY <= fusionY + 12;
 
         // Top separator below power & machines
         int headerBottom = machinesY + 14;
-        graphics.fill(x + 8, headerBottom, x + WIDTH - 8, headerBottom + 1, 0xFF353C4D);
+        graphics.fill(x + 8, headerBottom, x + effectiveW - 8, headerBottom + 1, 0xFF353C4D);
 
-        // 3. Scrollable Content Area (Raw Inputs + Net Outputs)
+        // 3. Scrollable Content Area (Raw Inputs + Net Outputs + Voided Outputs)
         int contentY = headerBottom + 4;
         int contentH = (y + height) - contentY - 4;
 
         // Calculate total content height
         int rawCount = summary.rawInputs().isEmpty() ? 1 : summary.rawInputs().size();
         int netCount = summary.netOutputs().isEmpty() ? 1 : summary.netOutputs().size();
-        int totalContentH = 16 + (rawCount * 16) + 12 + 16 + (netCount * 16) + 8;
+        int voidCount = summary.hasVoidedOutputs() ? (voidedCollapsed ? 0 : summary.voidedOutputs().size()) : 0;
+        int voidHeaderH = summary.hasVoidedOutputs() ? 22 : 0;
+        int totalContentH = 16 + (rawCount * 16) + 12 + 16 + (netCount * 16) + voidHeaderH + (voidCount * 16) + 8;
 
         maxScrollY = Math.max(0, totalContentH - contentH);
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
-        graphics.enableScissor(x + 1, contentY, x + WIDTH - 1, contentY + contentH);
+        BoardScissorHelper.enableScissor(graphics, x + 1, contentY, x + effectiveW - 1, contentY + contentH);
 
         int curY = contentY - (int) scrollY;
 
@@ -181,7 +208,7 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), -entry.getValue(), 0xFFFF5555, mouseX, mouseY, contentY, contentH, effectiveW, false, false);
                 }
                 curY += 16;
             }
@@ -198,17 +225,38 @@ public class SummaryOverlay {
         } else {
             for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
                 if (curY >= contentY - 16 && curY <= contentY + contentH) {
-                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH);
+                    renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFF55FF55, mouseX, mouseY, contentY, contentH, effectiveW, false, true);
                 }
                 curY += 16;
             }
         }
 
-        graphics.disableScissor();
+        // Section C: Voided Byproducts
+        if (summary.hasVoidedOutputs()) {
+            curY += 8;
+            String voidSymbol = voidedCollapsed ? "▶ " : "▼ ";
+            String voidHeader = "§d\uD83D\uDDD1 " + Component.translatable("gui.gtcalcboard.voided_outputs").getString() + " §7" + voidSymbol;
+            graphics.drawString(font, voidHeader, x + 8, curY, 0xFFFFFFFF, false);
+            if (mouseX >= x + 8 && mouseX <= x + effectiveW - 8 && mouseY >= curY - 2 && mouseY <= curY + 12 && mouseY >= contentY && mouseY <= contentY + contentH) {
+                hoveredVoidHeader = true;
+            }
+            curY += 14;
+
+            if (!voidedCollapsed) {
+                for (Map.Entry<IngredientStack, Double> entry : summary.voidedOutputs().entrySet()) {
+                    if (curY >= contentY - 16 && curY <= contentY + contentH) {
+                        renderSummaryRow(graphics, font, x, curY, entry.getKey(), entry.getValue(), 0xFFC084FC, mouseX, mouseY, contentY, contentH, effectiveW, true, true);
+                    }
+                    curY += 16;
+                }
+            }
+        }
+
+        BoardScissorHelper.disableScissor(graphics);
 
         // 4. Render Scrollbar if needed
         if (maxScrollY > 0) {
-            int sbX = x + WIDTH - 5;
+            int sbX = x + effectiveW - 5;
             int sbTrackY = contentY;
             int sbTrackH = contentH;
             graphics.fill(sbX, sbTrackY, sbX + 3, sbTrackY + sbTrackH, 0x55000000);
@@ -221,22 +269,39 @@ public class SummaryOverlay {
         graphics.pose().popPose();
     }
 
-    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH) {
-        IngredientRenderer.render(graphics, stack, x + 8, y - 2);
+    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW) {
+        renderSummaryRow(graphics, font, x, y, stack, rate, rateColor, mouseX, mouseY, contentY, contentH, panelW, false, false);
+    }
 
-        String name = stack.getDisplayName();
-        if (name.length() > 13) {
-            name = name.substring(0, 11) + "..";
-        }
-        graphics.drawString(font, "§f" + name, x + 26, y + 2, 0xFFFFFFFF, false);
+    private void renderSummaryRow(GuiGraphics graphics, Font font, int x, int y, IngredientStack stack, double rate, int rateColor, int mouseX, int mouseY, int contentY, int contentH, int panelW, boolean isVoidSection, boolean hasActionButton) {
+        IngredientRenderer.render(graphics, stack, x + 8, y - 2);
 
         String ratePrefix = rate > 0 ? "+" : "";
         String rateStr = ratePrefix + formatRate(rate, stack.isFluid());
         int rateW = font.width(rateStr);
-        graphics.drawString(font, rateStr, x + WIDTH - 10 - rateW, y + 2, rateColor, false);
+
+        int textPaddingRight = hasActionButton ? 18 : 0;
+        graphics.drawString(font, rateStr, x + panelW - 10 - rateW - textPaddingRight, y + 2, rateColor, false);
+
+        int maxNameW = Math.max(20, panelW - rateW - 46 - textPaddingRight);
+        String name = font.plainSubstrByWidth(stack.getDisplayName(), maxNameW);
+        graphics.drawString(font, "§f" + name, x + 26, y + 2, 0xFFFFFFFF, false);
+
+        if (hasActionButton) {
+            int btnX = x + panelW - 22;
+            int btnY = y;
+            boolean btnHover = mouseX >= btnX && mouseX <= btnX + 14 && mouseY >= btnY && mouseY <= btnY + 13 && mouseY >= contentY && mouseY <= contentY + contentH;
+            if (btnHover) {
+                graphics.fill(btnX - 1, btnY - 1, btnX + 14, btnY + 13, 0x44FFFFFF);
+                hoveredActionStack = stack;
+                hoveredActionIsRestore = isVoidSection;
+            }
+            String btnIcon = isVoidSection ? "§a↩" : "§d🗑";
+            graphics.drawString(font, btnIcon, btnX + 2, btnY + 2, 0xFFFFFFFF, false);
+        }
 
         // Check if hovered
-        if (mouseX >= x + 8 && mouseX <= x + WIDTH - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
+        if (mouseX >= x + 8 && mouseX <= x + panelW - 8 && mouseY >= y && mouseY <= y + 14 && mouseY >= contentY && mouseY <= contentY + contentH) {
             hoveredStack = stack;
             hoveredRate = rate;
         }
@@ -253,7 +318,7 @@ public class SummaryOverlay {
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7EU/t: §f%,.2f EU/t", totEUt)));
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §f%,.4fA %s", amps, tier.getName())));
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.power_mode_hint").getString()));
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
@@ -267,7 +332,7 @@ public class SummaryOverlay {
                 tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Stress Deficit: §c-%,.0f SU", -totSU)));
                 tooltip.add(Component.literal("§4⚠ " + Component.translatable("gui.gtcalcboard.tooltip.overstressed").getString()));
             }
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
@@ -287,7 +352,7 @@ public class SummaryOverlay {
             }
             tooltip.add(Component.literal("§8§m------------------------"));
             tooltip.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.fusion_start_buffer_desc").getString()));
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
@@ -297,7 +362,13 @@ public class SummaryOverlay {
             for (Map.Entry<String, Integer> entry : lastSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
+            return;
+        }
+
+        if (hoveredActionStack != null) {
+            String actKey = hoveredActionIsRestore ? "gui.gtcalcboard.tooltip.unmark_void" : "gui.gtcalcboard.tooltip.mark_as_void";
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, List.of(Component.translatable(actKey)), mouseX, mouseY);
             return;
         }
 
@@ -308,7 +379,7 @@ public class SummaryOverlay {
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7Rate: §f" + ratePrefix + exactRateStr));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
         }
     }
 
@@ -319,11 +390,12 @@ public class SummaryOverlay {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
         if (collapsed) return false;
 
-        int x = screenWidth - WIDTH - 10;
+        int effectiveW = getEffectiveWidth(screenWidth);
+        int x = screenWidth - effectiveW - 10;
         int y = 66;
         int height = screenHeight - 74;
 
-        if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + height) {
+        if (mouseX >= x && mouseX <= x + effectiveW && mouseY >= y && mouseY <= y + height) {
             if (maxScrollY > 0) {
                 scrollY = Math.max(0, Math.min(maxScrollY, scrollY - (delta * 18.0)));
                 return true;
@@ -345,11 +417,25 @@ public class SummaryOverlay {
             return false;
         }
 
-        int x = screenWidth - WIDTH - 10;
+        int effectiveW = getEffectiveWidth(screenWidth);
+        int x = screenWidth - effectiveW - 10;
         int y = 66;
 
+        // Void Section Header Click -> collapse/expand void section
+        if (hoveredVoidHeader && button == 0) {
+            voidedCollapsed = !voidedCollapsed;
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F));
+            return true;
+        }
+
+        // Action Button Click (Void or Restore)
+        if (hoveredActionStack != null && button == 0) {
+            executeVoidAction(hoveredActionStack, hoveredActionIsRestore);
+            return true;
+        }
+
         // Header click -> collapse/expand
-        if (mouseX >= x && mouseX <= x + WIDTH && mouseY >= y && mouseY <= y + 22) {
+        if (mouseX >= x && mouseX <= x + effectiveW && mouseY >= y && mouseY <= y + 22) {
             toggle();
             return true;
         }
@@ -363,6 +449,42 @@ public class SummaryOverlay {
             return true;
         }
         return false;
+    }
+
+    private void executeVoidAction(IngredientStack stack, boolean restore) {
+        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
+            if (!bs.ensureEditPermission()) return;
+            FlowGraph graph = bs.getGraph();
+            if (graph == null) return;
+            boolean changed = false;
+            for (RecipeNode node : graph.getNodes()) {
+                if (node == null || node.isReroute()) continue;
+                for (int i = 0; i < node.getOutputs().size(); i++) {
+                    IngredientStack out = node.getOutputs().get(i);
+                    if (out != null && out.equals(stack)) {
+                        if (restore) {
+                            if (node.isOutputPortVoided(i)) {
+                                node.setOutputPortVoided(i, false);
+                                changed = true;
+                            }
+                        } else {
+                            if (!node.isOutputPortVoided(i)) {
+                                node.setOutputPortVoided(i, true);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (changed) {
+                bs.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                        SoundEvents.UI_BUTTON_CLICK, restore ? 1.4F : 0.9F
+                    )
+                );
+            }
+        }
     }
 }
 

@@ -15,6 +15,9 @@ import net.minecraftforge.registries.ForgeRegistries;
  */
 public final class IngredientRenderer {
 
+    private static final java.util.Map<net.minecraft.world.item.Item, ItemStack> ITEM_STACK_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<net.minecraft.world.level.material.Fluid, net.minecraftforge.fluids.FluidStack> FLUID_STACK_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
     private IngredientRenderer() {}
 
     /**
@@ -45,7 +48,8 @@ public final class IngredientRenderer {
         } else {
             var item = ForgeRegistries.ITEMS.getValue(id);
             if (item != null && item != Items.AIR) {
-                graphics.renderItem(new ItemStack(item), x, y);
+                ItemStack itemStack = ITEM_STACK_CACHE.computeIfAbsent(item, ItemStack::new);
+                graphics.renderItem(itemStack, x, y);
             } else {
                 graphics.fill(x, y, x + 16, y + 16, 0xFF888888);
             }
@@ -57,7 +61,7 @@ public final class IngredientRenderer {
             var fluid = ForgeRegistries.FLUIDS.getValue(id);
             if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
                 var ext = net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions.of(fluid);
-                net.minecraftforge.fluids.FluidStack fs = new net.minecraftforge.fluids.FluidStack(fluid, 1000);
+                net.minecraftforge.fluids.FluidStack fs = FLUID_STACK_CACHE.computeIfAbsent(fluid, f -> new net.minecraftforge.fluids.FluidStack(f, 1000));
                 ResourceLocation stillTexture = ext.getStillTexture(fs);
                 if (stillTexture == null) {
                     stillTexture = ext.getStillTexture();
@@ -101,7 +105,6 @@ public final class IngredientRenderer {
             dev.emi.emi.api.stack.EmiStack emiStack = com.gtceu.calcboard.integration.emi.EmiStackHelper.toEmiStack(stack);
             if (!emiStack.isEmpty()) {
                 emiStack.render(graphics, x, y, 0, dev.emi.emi.api.stack.EmiIngredient.RENDER_ICON);
-                RenderSystem.disableDepthTest();
                 return true;
             }
             return false;

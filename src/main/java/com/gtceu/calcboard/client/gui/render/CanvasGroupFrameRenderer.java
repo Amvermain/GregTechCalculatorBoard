@@ -36,11 +36,24 @@ public class CanvasGroupFrameRenderer {
     }
 
     public static void renderFrames(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, String activeEditingFrameId, java.util.Set<String> selectedFrameIds) {
+        renderFrames(graphics, graph, canvasMouseX, canvasMouseY, activeEditingFrameId, selectedFrameIds, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY);
+    }
+
+    public static void renderFrames(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, String activeEditingFrameId, java.util.Set<String> selectedFrameIds,
+                                    double screenLeft, double screenRight, double screenTop, double screenBottom) {
         if (graph == null || graph.getFrames().isEmpty()) return;
 
         Font font = Minecraft.getInstance().font;
 
         for (CanvasGroupFrame frame : graph.getFrames()) {
+            if (frame == null) continue;
+            double fx = frame.getPosX();
+            double fy = frame.getPosY();
+            double fw = frame.getWidth();
+            double fh = frame.getHeight();
+            if (fx + fw < screenLeft || fx > screenRight || fy + fh < screenTop || fy > screenBottom) {
+                continue;
+            }
             boolean isSelected = selectedFrameIds != null && selectedFrameIds.contains(frame.getId());
             renderSingleFrame(graphics, font, graph, frame, canvasMouseX, canvasMouseY, frame.getId().equals(activeEditingFrameId), isSelected);
         }
@@ -85,13 +98,12 @@ public class CanvasGroupFrameRenderer {
         int titleCol = 0xFFFFFFFF;
         String prefix = frame.isSharedMachineFrame() ? "🔗 " : (frame.isCompoundFrame() ? "📦 " : "");
         String displayTitle = prefix + title;
-        graphics.drawString(font, displayTitle, x + 6, y + 5, titleCol, true);
+
+        int btnCount = (frame.isSharedMachineFrame() ? 4 : 3) + 1;
+        int rightButtonsBoundary = x + w - (BTN_SIZE * btnCount + BTN_SPACING * (btnCount - 1) + 8);
 
         // Shared Machine Frame Load Badge & Incompatible Warning
         if (frame.isSharedMachineFrame()) {
-            int titleWidth = font.width(displayTitle);
-            int badgeStartX = x + 6 + titleWidth + 6;
-
             double duty = frame.computeTotalMachineDuty(graph);
             int reqMachines = frame.computeRequiredMachines(graph);
             boolean isCompatible = frame.isMachineCompatible(graph);
@@ -104,21 +116,50 @@ public class CanvasGroupFrameRenderer {
             int badgeW = font.width(dutyText) + 8;
             int badgeH = 12;
             int badgeY = y + 6;
+            int warnW = (!isCompatible) ? 14 : 0;
+            int totalBadgeW = badgeW + warnW;
 
-            int btnCount = (frame.isSharedMachineFrame() ? 4 : 3) + 1;
-            int rightButtonsBoundary = x + w - (BTN_SIZE * btnCount + BTN_SPACING * (btnCount - 1) + 10);
-            if (badgeStartX + badgeW < rightButtonsBoundary) {
+            int idealBadgeStartX = x + 6 + font.width(displayTitle) + 6;
+            int badgeStartX;
+            int maxTitleW;
+
+            if (idealBadgeStartX + totalBadgeW <= rightButtonsBoundary) {
+                badgeStartX = idealBadgeStartX;
+                maxTitleW = font.width(displayTitle);
+            } else {
+                badgeStartX = Math.max(x + 6, rightButtonsBoundary - totalBadgeW - 3);
+                maxTitleW = Math.max(0, badgeStartX - (x + 6) - 4);
+            }
+
+            // Render Title (truncated with ellipsis if needed to never hide the badge)
+            if (maxTitleW > 0) {
+                String clippedTitle = displayTitle;
+                if (font.width(displayTitle) > maxTitleW) {
+                    clippedTitle = font.plainSubstrByWidth(displayTitle, Math.max(0, maxTitleW - font.width("..."))) + "...";
+                }
+                graphics.drawString(font, clippedTitle, x + 6, y + 5, titleCol, true);
+            }
+
+            // Render Duty Badge (guaranteed visibility)
+            if (badgeStartX + badgeW <= x + w - 4) {
                 graphics.fill(badgeStartX, badgeY, badgeStartX + badgeW, badgeY + badgeH, badgeBg);
                 graphics.renderOutline(badgeStartX, badgeY, badgeW, badgeH, badgeBorder);
                 graphics.drawString(font, dutyText, badgeStartX + 4, badgeY + 2, badgeTextCol, false);
 
                 if (!isCompatible) {
                     int warnX = badgeStartX + badgeW + 4;
-                    if (warnX + 14 < rightButtonsBoundary) {
-                        graphics.drawString(font, "⚠️", warnX, badgeY + 1, 0xFFEF4444, false);
+                    if (warnX + 12 <= rightButtonsBoundary + 4) {
+                        graphics.drawString(font, "\u26A0", warnX, badgeY + 1, 0xFFEF4444, false);
                     }
                 }
             }
+        } else {
+            int maxTitleW = rightButtonsBoundary - (x + 6) - 4;
+            String clippedTitle = displayTitle;
+            if (maxTitleW > 0 && font.width(displayTitle) > maxTitleW) {
+                clippedTitle = font.plainSubstrByWidth(displayTitle, Math.max(0, maxTitleW - font.width("..."))) + "...";
+            }
+            graphics.drawString(font, clippedTitle, x + 6, y + 5, titleCol, true);
         }
 
         // 4. Header Action Buttons (Right-aligned)
@@ -203,28 +244,28 @@ public class CanvasGroupFrameRenderer {
 
                 // [✕ Delete]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [📦 Collapse]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§b📦 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b📦 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [⛶ Auto-Fit]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_autofit")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_autofit")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [🎨 Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
                     return;
                 }
 
@@ -232,7 +273,7 @@ public class CanvasGroupFrameRenderer {
                 if (frame.isSharedMachineFrame()) {
                     curBtnX -= (BTN_SIZE + BTN_SPACING);
                     if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                        graphics.renderTooltip(font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
+                        BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
                         return;
                     }
                 }
@@ -263,10 +304,10 @@ public class CanvasGroupFrameRenderer {
                     }
 
                     if (!isCompatible) {
-                        tooltipLines.add(Component.literal("§c⚠️ ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
+                        tooltipLines.add(Component.literal("§c\u26A0 ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
                     }
 
-                    graphics.renderComponentTooltip(font, tooltipLines, mouseX, mouseY);
+                    BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY);
                     return;
                 }
             }

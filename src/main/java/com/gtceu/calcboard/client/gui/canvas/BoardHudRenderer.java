@@ -23,11 +23,23 @@ import java.util.List;
 public class BoardHudRenderer {
 
     public static void renderGridBackground(GuiGraphics graphics, int width, int height, double panX, double panY, double zoom) {
-        int dotSpacing = (int) (24 * zoom);
-        if (dotSpacing < 10) return;
+        int baseGridSize = com.gtceu.calcboard.api.storage.BoardManager.getInstance().getGridSnapSize();
+        if (baseGridSize <= 0) baseGridSize = 16;
 
-        int startX = (int) (panX % dotSpacing);
-        int startY = (int) (panY % dotSpacing);
+        int visualStep = baseGridSize;
+        while (visualStep * zoom < 36.0) {
+            visualStep *= 2;
+        }
+
+        double minCanvasX = -panX / zoom;
+        double minCanvasY = -panY / zoom;
+        double maxCanvasX = (width - panX) / zoom;
+        double maxCanvasY = (height - panY) / zoom;
+
+        long startX = (long) Math.floor(minCanvasX / visualStep) * visualStep;
+        long endX = (long) Math.ceil(maxCanvasX / visualStep) * visualStep;
+        long startY = (long) Math.floor(minCanvasY / visualStep) * visualStep;
+        long endY = (long) Math.ceil(maxCanvasY / visualStep) * visualStep;
 
         Matrix4f pose = graphics.pose().last().pose();
         graphics.flush();
@@ -41,15 +53,27 @@ public class BoardHudRenderer {
         BufferBuilder buffer = tesselator.getBuilder();
         buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        float a = 0x22 / 255.0f;
-        float r = 1.0f, g = 1.0f, b = 1.0f;
+        float a = 0x2E / 255.0f;
+        float r = 0.85f, g = 0.90f, b = 1.0f;
 
-        for (int x = startX; x < width; x += dotSpacing) {
-            for (int y = startY; y < height; y += dotSpacing) {
-                buffer.vertex(pose, x, y, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x + 1, y, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x + 1, y + 1, 0.0f).color(r, g, b, a).endVertex();
-                buffer.vertex(pose, x, y + 1, 0.0f).color(r, g, b, a).endVertex();
+        for (long cx = startX; cx <= endX; cx += visualStep) {
+            float sx = (float) (cx * zoom + panX);
+            if (sx < -2 || sx > width + 2) continue;
+
+            boolean isMajorX = (cx % (baseGridSize * 4) == 0);
+
+            for (long cy = startY; cy <= endY; cy += visualStep) {
+                float sy = (float) (cy * zoom + panY);
+                if (sy < -2 || sy > height + 2) continue;
+
+                boolean majorDot = isMajorX && (cy % (baseGridSize * 4) == 0);
+                float dotAlpha = majorDot ? (0x55 / 255.0f) : a;
+                float dotSize = majorDot ? 1.5f : 1.0f;
+
+                buffer.vertex(pose, sx, sy, 0.0f).color(r, g, b, dotAlpha).endVertex();
+                buffer.vertex(pose, sx + dotSize, sy, 0.0f).color(r, g, b, dotAlpha).endVertex();
+                buffer.vertex(pose, sx + dotSize, sy + dotSize, 0.0f).color(r, g, b, dotAlpha).endVertex();
+                buffer.vertex(pose, sx, sy + dotSize, 0.0f).color(r, g, b, dotAlpha).endVertex();
             }
         }
 

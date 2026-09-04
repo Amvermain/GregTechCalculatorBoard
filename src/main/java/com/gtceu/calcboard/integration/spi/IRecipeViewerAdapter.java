@@ -1,11 +1,9 @@
 package com.gtceu.calcboard.integration.spi;
 
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
-
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.bom.MultiblockBOMSummary;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;

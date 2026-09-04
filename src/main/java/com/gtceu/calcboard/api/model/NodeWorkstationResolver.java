@@ -149,4 +149,14 @@ public final class NodeWorkstationResolver {
         }
         return false;
     }
+
+    public static ResourceLocation resolveLocationFromName(String name) {
+        if (name == null || name.isEmpty()) return null;
+        if (name.contains(":")) {
+            return ResourceLocation.tryParse(name.trim());
+        }
+        String base = name.contains(" (") ? name.substring(0, name.indexOf(" (")) : name;
+        String sanitized = base.toLowerCase(Locale.ROOT).trim().replace(" ", "_");
+        return ResourceLocation.tryParse("gtceu:" + sanitized);
+    }
 }

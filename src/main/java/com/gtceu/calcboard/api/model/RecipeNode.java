@@ -11,6 +11,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.NodeThreadingConfig;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
@@ -38,17 +39,21 @@ public class RecipeNode {
     private double machineCount;
     private int parallel;
     private OverclockMode overclockMode;
+    private int customParallel = 0;
 
     // Inputs and outputs
     private final List<IngredientStack> inputs = new ArrayList<>();
     private final List<IngredientStack> outputs = new ArrayList<>();
     private final java.util.Set<Integer> hiddenInputIndices = new java.util.LinkedHashSet<>();
     private final java.util.Set<Integer> hiddenOutputIndices = new java.util.LinkedHashSet<>();
+    private final java.util.Set<Integer> voidedOutputIndices = new java.util.LinkedHashSet<>();
 
     // Master base node for Auto Ratio
     private boolean isBaseNode = false;
     private boolean isGenerator = false;
     private final NodePropertyStore properties = new NodePropertyStore();
+    private transient OverclockMode.OverclockResult cachedOverclockResult = null;
+    private transient boolean overclockDirty = true;
 
     // Canvas position & Dimensions
     private double posX;
@@ -63,8 +68,10 @@ public class RecipeNode {
     private double efficiency = 1.0;
     private EnergyType energyType = null;
 
-    // Reroute / Junction Node Abstraction (RFC-001)
+    // Reroute / Junction Node Abstraction (RFC-001, RFC-012)
     private boolean isReroute = false;
+    private SupplyMode supplyMode = SupplyMode.NONE;
+    private double externalSupplyRate = 0.0;
 
     // Horizontal Flip / Directionality (Left-to-Right vs Right-to-Left)
     private boolean isFlipped = false;
@@ -94,8 +101,6 @@ public class RecipeNode {
     private boolean isMultiblock = false;
     private NodeThreadingConfig threadingConfig;
 
-    public static final int[] STANDARD_RPMS = {4, 8, 16, 32, 64, 128, 256};
-
     public RecipeNode(String id, String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
         this.id = id != null ? id : UUID.randomUUID().toString();
         this.name = name;
@@ -109,6 +114,7 @@ public class RecipeNode {
         this.isGenerator = false;
         this.efficiency = 1.0;
         this.isMultiblock = false;
+        this.properties.setChangeListener(this::markOverclockDirty);
     }
 
     public static RecipeNode create(ResourceLocation machineId, String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
@@ -125,16 +131,7 @@ public class RecipeNode {
     }
 
     public static RecipeNode create(String name, double baseDurationTicks, double baseEUt, GTVoltageTier recipeTier) {
-        ResourceLocation loc = null;
-        if (name != null && !name.isEmpty()) {
-            if (name.contains(":")) {
-                loc = ResourceLocation.tryParse(name.trim());
-            } else {
-                String base = name.contains(" (") ? name.substring(0, name.indexOf(" (")) : name;
-                String sanitized = base.toLowerCase(Locale.ROOT).trim().replace(" ", "_");
-                loc = ResourceLocation.tryParse("gtceu:" + sanitized);
-            }
-        }
+        ResourceLocation loc = NodeWorkstationResolver.resolveLocationFromName(name);
         return create(loc, name, baseDurationTicks, baseEUt, recipeTier);
     }
 
@@ -205,6 +202,7 @@ public class RecipeNode {
         if (adapter != null) {
             adapter.onMachineIconChanged(this, oldIcon, machineIcon);
         }
+        markOverclockDirty();
     }
 
     public double getBaseDurationTicks() {
@@ -213,6 +211,7 @@ public class RecipeNode {
 
     public void setBaseDurationTicks(double baseDurationTicks) {
         this.baseDurationTicks = Math.max(0.0, baseDurationTicks);
+        markOverclockDirty();
     }
 
     public double getBaseEUt() {
@@ -221,6 +220,7 @@ public class RecipeNode {
 
     public void setBaseEUt(double baseEUt) {
         this.baseEUt = Math.max(0.0, baseEUt);
+        markOverclockDirty();
     }
 
     public GTVoltageTier getRecipeTier() {
@@ -229,6 +229,7 @@ public class RecipeNode {
 
     public void setRecipeTier(GTVoltageTier recipeTier) {
         this.recipeTier = recipeTier != null ? recipeTier : GTVoltageTier.ULV;
+        markOverclockDirty();
     }
 
     public GTVoltageTier getTargetTier() {
@@ -238,7 +239,7 @@ public class RecipeNode {
     public void setTargetTier(GTVoltageTier targetTier) {
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
         this.targetTier = adapter.sanitizeTargetTier(this, targetTier);
-        if (!isMultiblock && (steamMode == null || !steamMode.isSteam()) && (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon))) {
+        if (!isMultiblock && !isTurbine() && (steamMode == null || !steamMode.isSteam()) && (machineIcon == null || !MultiblockDetector.isMultiblock(machineIcon))) {
             ResourceLocation ws = getWorkstationForTier(this.targetTier);
             if (ws != null) {
                 setMachineIcon(ws);
@@ -247,6 +248,7 @@ public class RecipeNode {
         if (isTurbine()) {
             autoCalculateTurbineParallel();
         }
+        markOverclockDirty();
     }
 
     public ResourceLocation getWorkstationForTier(GTVoltageTier tier) {
@@ -263,6 +265,7 @@ public class RecipeNode {
 
     public void setMachineCount(double machineCount) {
         this.machineCount = Math.max(0.01, machineCount);
+        markOverclockDirty();
     }
 
     public int getParallel() {
@@ -271,6 +274,7 @@ public class RecipeNode {
 
     public void setParallel(int parallel) {
         this.parallel = Math.max(1, parallel);
+        markOverclockDirty();
     }
 
     public OverclockMode getOverclockMode() {
@@ -279,6 +283,7 @@ public class RecipeNode {
 
     public void setOverclockMode(OverclockMode overclockMode) {
         this.overclockMode = overclockMode != null ? overclockMode : OverclockMode.STANDARD;
+        markOverclockDirty();
     }
 
     public boolean isBaseNode() {
@@ -290,11 +295,16 @@ public class RecipeNode {
     }
 
     public boolean isGenerator() {
+        if (com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(machineIcon)
+                || com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilRecipeCategory(recipeCategoryId)) {
+            return false;
+        }
         return isGenerator;
     }
 
     public void setGenerator(boolean generator) {
         this.isGenerator = generator;
+        markOverclockDirty();
     }
 
     public NodePropertyStore getProperties() {
@@ -372,6 +382,43 @@ public class RecipeNode {
         this.isReroute = reroute;
     }
 
+    public SupplyMode getSupplyMode() {
+        return supplyMode != null ? supplyMode : SupplyMode.NONE;
+    }
+
+    public void setSupplyMode(SupplyMode supplyMode) {
+        this.supplyMode = supplyMode != null ? supplyMode : SupplyMode.NONE;
+    }
+
+    public boolean isExternalSupply() {
+        return isReroute && getSupplyMode().isExternal();
+    }
+
+    public boolean isInfiniteSupply() {
+        return isReroute && getSupplyMode() == SupplyMode.INFINITE;
+    }
+
+    public boolean isVoidSink() {
+        return isReroute && getSupplyMode().isSink();
+    }
+
+    public double getExternalSupplyRate() {
+        return externalSupplyRate;
+    }
+
+    public void setExternalSupplyRate(double externalSupplyRate) {
+        this.externalSupplyRate = Math.max(0.0, externalSupplyRate);
+    }
+
+    public int getCustomParallel() {
+        return customParallel;
+    }
+
+    public void setCustomParallel(int customParallel) {
+        this.customParallel = Math.max(0, customParallel);
+        markOverclockDirty();
+    }
+
     public void bindRerouteIngredient(IngredientStack stack) {
         if (!isReroute || stack == null) return;
         inputs.clear();
@@ -379,6 +426,9 @@ public class RecipeNode {
         inputs.add(stack.copy());
         outputs.add(stack.copy());
         this.name = stack.getDisplayName();
+        if (stack.getAmount() > 0.0) {
+            setTargetBatchAmount(stack.getAmount());
+        }
     }
 
     public void unbindRerouteIngredient() {
@@ -386,6 +436,10 @@ public class RecipeNode {
         inputs.clear();
         outputs.clear();
         this.name = "Reroute";
+    }
+
+    public IngredientStack getRerouteIngredient() {
+        return !outputs.isEmpty() ? outputs.get(0) : null;
     }
 
     public double getTargetBatchAmount() {
@@ -406,6 +460,14 @@ public class RecipeNode {
 
     public void setTargetBatchTimeSec(double seconds) {
         properties.set(NodeProperties.TARGET_BATCH_TIME_SEC, Math.max(0.0, seconds));
+    }
+
+    public boolean isOutputPort() {
+        return properties.get(NodeProperties.IS_OUTPUT_PORT);
+    }
+
+    public void setOutputPort(boolean isOutput) {
+        properties.set(NodeProperties.IS_OUTPUT_PORT, isOutput);
     }
 
     public boolean isModule() {
@@ -489,6 +551,32 @@ public class RecipeNode {
         hiddenOutputIndices.clear();
     }
 
+    public boolean isOutputPortVoided(int index) {
+        return voidedOutputIndices.contains(index);
+    }
+
+    public void setOutputPortVoided(int index, boolean voided) {
+        if (index >= 0 && index < outputs.size()) {
+            if (voided) {
+                voidedOutputIndices.add(index);
+            } else {
+                voidedOutputIndices.remove(index);
+            }
+        }
+    }
+
+    public void clearVoidedOutputPorts() {
+        voidedOutputIndices.clear();
+    }
+
+    public java.util.Set<Integer> getVoidedOutputIndices() {
+        return java.util.Collections.unmodifiableSet(voidedOutputIndices);
+    }
+
+    public int getVoidedOutputCount() {
+        return voidedOutputIndices.size();
+    }
+
     public java.util.Set<Integer> getHiddenInputIndices() {
         return java.util.Collections.unmodifiableSet(hiddenInputIndices);
     }
@@ -558,11 +646,6 @@ public class RecipeNode {
         this.recipeCategoryId = recipeCategoryId;
     }
 
-    public static boolean isThermalUpgradeKit(MachineAddon addon) {
-        if (addon == null) return false;
-        return addon.isThermalUpgradeKit();
-    }
-
     public static boolean isMultiblockWorkstation(ResourceLocation ws) {
         return NodeWorkstationResolver.isMultiblockWorkstation(ws);
     }
@@ -582,6 +665,7 @@ public class RecipeNode {
         } else {
             addons.add(addon);
         }
+        markOverclockDirty();
     }
 
     public void removeSingleAddon(String addonId) {
@@ -596,10 +680,12 @@ public class RecipeNode {
                 break;
             }
         }
+        markOverclockDirty();
     }
 
     public void removeAddon(String addonId) {
         addons.removeIf(a -> a.getId().equals(addonId));
+        markOverclockDirty();
     }
 
     public boolean removeOneAddon(String addonId) {
@@ -607,6 +693,7 @@ public class RecipeNode {
         for (int i = 0; i < addons.size(); i++) {
             if (addons.get(i).getId().equals(addonId)) {
                 addons.remove(i);
+                markOverclockDirty();
                 return true;
             }
         }
@@ -615,6 +702,7 @@ public class RecipeNode {
 
     public void clearAddons() {
         addons.clear();
+        markOverclockDirty();
     }
 
     public double getCombinedDurationMultiplier() {
@@ -656,6 +744,7 @@ public class RecipeNode {
         SteamMode oldMode = this.steamMode;
         this.steamMode = steamMode != null ? steamMode : SteamMode.NONE;
         syncSteamInputSlot(oldMode, this.steamMode);
+        markOverclockDirty();
     }
 
     public boolean supportsSteamMode() {
@@ -690,28 +779,28 @@ public class RecipeNode {
     }
 
     public int getRecipeTemperature() {
-        return properties.get(NodeProperties.EBF_TEMPERATURE);
+        return properties.getById("ebf_temperature", 0);
     }
 
     public void setRecipeTemperature(int recipeTemperature) {
-        properties.set(NodeProperties.EBF_TEMPERATURE, Math.max(0, recipeTemperature));
+        properties.setById("ebf_temperature", Math.max(0, recipeTemperature));
     }
 
     public int getBoilerThrottle() {
-        int t = properties.get(NodeProperties.BOILER_THROTTLE);
+        int t = properties.getById("boiler_throttle", 100);
         return Math.max(25, Math.min(100, t));
     }
 
     public void setBoilerThrottle(int throttle) {
-        properties.set(NodeProperties.BOILER_THROTTLE, Math.max(25, Math.min(100, throttle)));
+        properties.setById("boiler_throttle", Math.max(25, Math.min(100, throttle)));
     }
 
     public long getEuToStart() {
-        return properties.get(NodeProperties.FUSION_START_EU);
+        return properties.getById("fusion_start_eu", 0L);
     }
 
     public void setEuToStart(long euToStart) {
-        properties.set(NodeProperties.FUSION_START_EU, Math.max(0L, euToStart));
+        properties.setById("fusion_start_eu", Math.max(0L, euToStart));
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
         this.targetTier = adapter.sanitizeTargetTier(this, this.targetTier);
     }
@@ -788,11 +877,11 @@ public class RecipeNode {
     }
 
     public int getRequiredReflectorTier() {
-        return properties.get(NodeProperties.REQUIRED_REFLECTOR_TIER);
+        return properties.getById("required_reflector_tier", 0);
     }
 
     public void setRequiredReflectorTier(int tier) {
-        properties.set(NodeProperties.REQUIRED_REFLECTOR_TIER, Math.max(0, tier));
+        properties.setById("required_reflector_tier", Math.max(0, tier));
     }
 
     public int getInstalledReflectorTier() {
@@ -829,6 +918,9 @@ public class RecipeNode {
         if (this.isMultiblock == multiblock) return;
         this.isMultiblock = multiblock;
         if (multiblock) {
+            if (this.steamMode != null && this.steamMode.isSteam()) {
+                this.steamMode = com.gtceu.calcboard.api.type.SteamMode.NONE;
+            }
             if (this.parallel <= 1) {
                 int defPar = ModAdapterRegistry.getAdapterForNode(this).getDefaultParallel(this);
                 if (defPar > 1) {
@@ -857,6 +949,7 @@ public class RecipeNode {
                     || a.getCategory() == MachineAddon.Category.THREADING
                     || a.getCategory() == MachineAddon.Category.PARALLEL);
         }
+        markOverclockDirty();
     }
 
     public boolean hasMultiblockOption() {
@@ -884,57 +977,36 @@ public class RecipeNode {
     }
 
     public int getRpm() {
-        int cur = properties.get(NodeProperties.KINETIC_RPM);
+        int cur = properties.getById("kinetic_rpm", 32);
         return cur > 0 ? cur : 32;
     }
 
     public void setRpm(int rpm) {
-        properties.set(NodeProperties.KINETIC_RPM, Math.max(1, Math.min(256, rpm)));
-    }
-
-    public void cycleRpm(int direction) {
-        int cur = getRpm();
-        int closestIdx = 3;
-        int minDiff = Integer.MAX_VALUE;
-        for (int i = 0; i < STANDARD_RPMS.length; i++) {
-            int diff = Math.abs(STANDARD_RPMS[i] - cur);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestIdx = i;
-            }
-        }
-        int nextIdx = closestIdx + direction;
-        if (nextIdx < 0) nextIdx = STANDARD_RPMS.length - 1;
-        else if (nextIdx >= STANDARD_RPMS.length) nextIdx = 0;
-        setRpm(STANDARD_RPMS[nextIdx]);
-    }
-
-    public boolean isCreateMachine() {
-        return ModCompatHelper.isCreateMachine(this);
+        properties.setById("kinetic_rpm", Math.max(1, Math.min(256, rpm)));
     }
 
     public int getRotorEfficiency() {
-        return properties.get(NodeProperties.TURBINE_ROTOR_EFFICIENCY);
+        return properties.getById("rotor_efficiency", 100);
     }
 
     public void setRotorEfficiency(int rotorEfficiency) {
-        properties.set(NodeProperties.TURBINE_ROTOR_EFFICIENCY, Math.max(1, Math.min(100000, rotorEfficiency)));
+        properties.setById("rotor_efficiency", Math.max(1, Math.min(100000, rotorEfficiency)));
     }
 
     public int getRotorPower() {
-        return properties.get(NodeProperties.TURBINE_ROTOR_POWER);
+        return properties.getById("rotor_power", 100);
     }
 
     public void setRotorPower(int rotorPower) {
-        properties.set(NodeProperties.TURBINE_ROTOR_POWER, Math.max(1, Math.min(1000000, rotorPower)));
+        properties.setById("rotor_power", Math.max(1, Math.min(1000000, rotorPower)));
     }
 
     public String getRotorName() {
-        return properties.get(NodeProperties.TURBINE_ROTOR_NAME);
+        return properties.getById("rotor_name", "Standard (100%)");
     }
 
     public void setRotorName(String rotorName) {
-        properties.set(NodeProperties.TURBINE_ROTOR_NAME, rotorName != null ? rotorName : "Standard (100%)");
+        properties.setById("rotor_name", rotorName != null ? rotorName : "Standard (100%)");
     }
 
     public boolean isLargeTurbine() {
@@ -954,14 +1026,28 @@ public class RecipeNode {
     }
 
     public int getTierDelta() {
-        return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());
+        if (targetTier == null || recipeTier == null) return 0;
+        int delta = targetTier.ordinal() - recipeTier.ordinal();
+        if (recipeTier == GTVoltageTier.ULV) {
+            delta--;
+        }
+        return Math.max(0, delta);
+    }
+
+    public void markOverclockDirty() {
+        this.overclockDirty = true;
+        this.cachedOverclockResult = null;
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PreCalculation(this));
-        } catch (Throwable ignored) {}
-        return ModAdapterRegistry.getAdapterForNode(this).computeOverclock(this, targetTier, isGenerator);
+        if (overclockDirty || cachedOverclockResult == null) {
+            try {
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PreCalculation(this));
+            } catch (Throwable ignored) {}
+            cachedOverclockResult = ModAdapterRegistry.getAdapterForNode(this).computeOverclock(this, targetTier, isGenerator);
+            overclockDirty = false;
+        }
+        return cachedOverclockResult;
     }
 
     public double getEffectiveDurationSeconds() {
@@ -969,6 +1055,9 @@ public class RecipeNode {
     }
 
     public int getTotalParallel() {
+        if (customParallel > 0) {
+            return customParallel;
+        }
         return ModAdapterRegistry.getAdapterForNode(this).computeEffectiveParallel(this);
     }
 

@@ -26,13 +26,18 @@ flowchart TB
         ACTIVE_LIST["Active Addons (Coil, Hatch, etc.)"] ~~~ STATS_BADGE["Duration, Power, Parallel Multipliers"] ~~~ DEL_BTN["[✕] 1-Click Remove"]
     end
 
-    subgraph Section3["4. Addon Catalog Browser"]
+    subgraph Section3["4. Addon Catalog Browser (AddonCatalogView)"]
         direction LR
-        TABS["Category Tabs: Coils, Hatches, etc."] ~~~ SEARCH["Real-time Search Filter"] ~~~ CHIP_GRID["Smart Chip Grid (1-Click Install)"]
+        TABS["Category Tabs: Coils, Hatches, etc."] ~~~ VIEW_MODE["[▦ Grid / ☰ List] View Toggle"] ~~~ DYNAMIC_ROWS["Available Height Dynamic Rows (2~5 rows)"]
     end
 
     Header --> Section1 --> Section2 --> Section3
 ```
+
+### 1.1 Dynamic Adaptive Catalog View (`AddonCatalogView`, ADR-017)
+* **Variable Row Adaptive Layout**: Deprecates static $3 \times 2$ layouts in favor of dynamic row count calculation based on available dialog vertical space ($\text{rows} = \text{clamp}(\lfloor \text{availH} / 54 \rfloor, 2, 5)$).
+* **One-Click $20\text{px}$ Compact List View (`[▦ / ☰]`)**: Provides a dense single-line list mode displaying 10+ addons without scrolling for rapid side-by-side comparison.
+* **Preference Persistence**: Automatically remembers and persists user view mode selection (grid vs list) in `BoardManager` and client NBT.
 
 ---
 
@@ -107,25 +112,26 @@ flowchart TB
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Maintenance</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Turbine Rotors</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Thermal</span>
+          <span style="background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">Traits</span>
           <span style="background: #1e293b; color: #a855f7; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">+ Custom</span>
         </div>
         <!-- Search & Catalog Chips Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; max-height: 90px; overflow-y: hidden;">
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">Kanthal Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">2,700 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Throughput Boost</span>
+            <span style="color: #38bdf8; font-size: 9px;">4x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">Nichrome Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">3,600 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Bulk Processing</span>
+            <span style="color: #38bdf8; font-size: 9px;">16x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">RTM Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">4,500 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Overpressure</span>
+            <span style="color: #f59e0b; font-size: 9px;">8x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">HSS-G Coil Block</span>
-            <span style="color: #f59e0b; font-size: 9px;">5,400 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">Batch Mode</span>
+            <span style="color: #10b981; font-size: 9px;">1x</span>
           </div>
         </div>
       </div>
@@ -167,6 +173,32 @@ Provides 5 preset UI scaling levels for `MachineConfigDialog` across high-DPI di
   - `[Aa 1.0x]` Header Button: Left-click (cycle zoom in), Right-click (cycle zoom out), Mouse wheel scroll.
   - Keyboard Hotkeys: `+` / `Numpad +` (zoom in), `-` / `Numpad -` (zoom out).
   - Center-anchored matrix transformation and virtual mouse unprojection guarantee 100% pixel-perfect button hit detection.
+
+---
+
+## 5. Junction Node External & Infinite Supply Modal (`JunctionSupplyDialog`) (ADR-012)
+
+Modal dialog opened by right-clicking a Junction/Reroute node to configure external resource supply modes (`SupplyMode`) and flow rates.
+
+* **Supply Mode Selector**:
+  - `[ Normal ]` (`SupplyMode.NONE`): Standard pass-through relying solely on upstream connected production.
+  - `[ ∞ Infinite Supply ]` (`SupplyMode.INFINITE`): Marks the node as an infinite external source (water pump, bedrock vein, etc.), blocking upstream demand propagation. Renders an $\infty$ badge on the card header.
+  - `[ Fixed Rate ]` (`SupplyMode.FIXED_RATE`): Enables the per-second external supply rate ($R_{\text{ext}}$) input field.
+* **Precision Number Input & Unit Formatting**:
+  - Direct floating-point text editing with validation.
+  - Automatic unit label binding: `items/s` (items) and `mB/s` (fluids).
+  - Committing via `Enter` or `[OK]` executes a `ModifyNodePropertyCommand` with immediate graph recalculation and Undo history tracking.
+
+---
+
+## 6. Machine Hardware Template Cloner Modal (`TemplateCloneDialog`) (ADR-012)
+
+Injects pre-configured hardware configuration templates (`MachineHardwareTemplate`) into single or multi-selected machine nodes.
+
+* **Core Features**:
+  - **Capture from Current Node**: Encapsulates tier, parallel count, overclock mode, addons, and threading from the source node into a named preset.
+  - **Template Library Browser**: Inspect, rename, apply, or delete saved hardware templates.
+  - **One-Click Batch Application**: Injects hardware settings across all selected nodes while safely preserving their individual recipe input/output signatures and baseline voltage requirements.
 
 ---
 

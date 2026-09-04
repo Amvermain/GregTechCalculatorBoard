@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
 import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
@@ -20,8 +21,8 @@ import com.gtceu.calcboard.client.gui.search.RecipeFilterDialog;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchCacheManager;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.ParsedQuery;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchQueryEngine;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 
@@ -77,6 +78,8 @@ public class RecipeSearchDialog {
     private int lastMouseX = 0;
     private int lastMouseY = 0;
     private long lastObservedGlobalVersion = -1;
+    private boolean isDraggingScrollBar = false;
+    private double dragGrabOffsetY = 0;
 
     public static void registerFavoritesListener(Runnable listener) {
         RecipeSearchCacheManager.registerFavoritesListener(listener);
@@ -382,9 +385,9 @@ public class RecipeSearchDialog {
                 List<Component> lines = java.util.Arrays.stream(raw.split("\n"))
                         .<Component>map(Component::literal)
                         .toList();
-                graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+                BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screenWidth, screenHeight);
             } else {
-                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.search.help_tooltip"), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.search.help_tooltip"), mouseX, mouseY, screenWidth, screenHeight);
             }
         }
 
@@ -395,7 +398,7 @@ public class RecipeSearchDialog {
         graphics.drawCenteredString(font, showFavoritesOnly ? "⭐" : "☆", favBtnX + topBtnW / 2, y + 34, showFavoritesOnly ? 0xFFFFD700 : 0xFF94A3B8);
 
         if (favHover && !filterDialog.isVisible()) {
-            graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.filter.favorites_tooltip"), mouseX, mouseY);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.filter.favorites_tooltip"), mouseX, mouseY, screenWidth, screenHeight);
         }
 
         // Category Filter Button [⚙]
@@ -411,9 +414,9 @@ public class RecipeSearchDialog {
                 List<Component> lines = java.util.Arrays.stream(raw.split("\n"))
                         .<Component>map(Component::literal)
                         .toList();
-                graphics.renderTooltip(font, lines, java.util.Optional.empty(), mouseX, mouseY);
+                BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screenWidth, screenHeight);
             } else {
-                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.filter.btn_tooltip"), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.filter.btn_tooltip"), mouseX, mouseY, screenWidth, screenHeight);
             }
         }
 
@@ -655,7 +658,7 @@ public class RecipeSearchDialog {
             tooltipLines.add(Component.literal("§7" + Component.translatable(hoveredItem.descKey()).getString()));
             tooltipLines.add(Component.literal("§8----------------------"));
             tooltipLines.add(Component.literal("§e💡 " + Component.translatable("gui.gtcalcboard.search.prefix.click_hint").getString()));
-            graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, parent.width, parent.height);
         }
     }
 
@@ -707,11 +710,7 @@ public class RecipeSearchDialog {
             int[] bounds = RecipeHoverPreviewRenderer.calculatePreviewBounds(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, screenWidth, screenHeight);
             if (bounds != null && mouseX >= bounds[0] && mouseX <= bounds[0] + bounds[2] && mouseY >= bounds[1] && mouseY <= bounds[1] + bounds[3]) {
                 var hoveredIngredient = RecipeHoverPreviewRenderer.getHoveredIngredient(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, (int) mouseX, (int) mouseY, screenWidth, screenHeight);
-                if (hoveredIngredient != null) {
-                    if (com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().handleHoveredIngredientClick(hoveredIngredient, searchBox)) {
-                        return true;
-                    }
-                }
+                handlePreviewCardClick(hoveredIngredient, button);
                 return true;
             }
         }
@@ -767,8 +766,19 @@ public class RecipeSearchDialog {
             return true;
         }
 
-        searchBox.mouseClicked(mouseX, mouseY, button);
-        searchBox.setFocused(true);
+        // Search Box click
+        int topBtnW = 20;
+        int searchBoxW = dialogW - 24 - (topBtnW * 3) - 9;
+        int searchBoxX = x + 12;
+        int searchBoxY = y + 30;
+        int searchBoxH = 16;
+        if (mouseX >= searchBoxX && mouseX <= searchBoxX + searchBoxW && mouseY >= searchBoxY && mouseY <= searchBoxY + searchBoxH) {
+            searchBox.setFocused(true);
+            searchBox.mouseClicked(mouseX, mouseY, button);
+            return true;
+        } else {
+            searchBox.setFocused(false);
+        }
 
         // Click anywhere on a row in the list to select & add that recipe
         int listX = x + 12;
@@ -776,6 +786,29 @@ public class RecipeSearchDialog {
         int listW = dialogW - 24;
         int listH = dialogH - 60;
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
+        int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
+
+        // Scrollbar track / thumb click check
+        if (maxScroll > 0 && button == 0) {
+            int scrollTrackH = listH - 4;
+            int barH = Math.max(16, (int) ((double) visibleRows / filteredRecipes.size() * scrollTrackH));
+            int barY = listY + 2 + (int) ((double) scrollOffset / maxScroll * (scrollTrackH - barH));
+            int barX = listX + listW - 4;
+
+            if (mouseX >= barX - 4 && mouseX <= barX + 8 && mouseY >= listY + 2 && mouseY <= listY + 2 + scrollTrackH) {
+                if (mouseY >= barY && mouseY <= barY + barH) {
+                    isDraggingScrollBar = true;
+                    dragGrabOffsetY = mouseY - barY;
+                } else {
+                    double relativeY = mouseY - (listY + 2) - barH / 2.0;
+                    double ratio = relativeY / Math.max(1.0, scrollTrackH - barH);
+                    scrollOffset = Math.max(0, Math.min(maxScroll, (int) Math.round(ratio * maxScroll)));
+                    isDraggingScrollBar = true;
+                    dragGrabOffsetY = barH / 2.0;
+                }
+                return true;
+            }
+        }
 
         for (int i = 0; i < visibleRows; i++) {
             int index = scrollOffset + i;
@@ -877,6 +910,9 @@ public class RecipeSearchDialog {
         }
 
         RecipeNode node = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
+        if (node == null && sr.recipe() instanceof com.gtceu.calcboard.integration.jei.JeiRecipeWrapper<?> jrw) {
+            node = com.gtceu.calcboard.integration.jei.JeiRecipeConverter.convert(jrw);
+        }
         if (node != null) {
             node.setPosX(spawnX);
             node.setPosY(spawnY);
@@ -902,6 +938,12 @@ public class RecipeSearchDialog {
             }
 
             parent.markSummaryDirty();
+            setVisible(false);
+        } else {
+            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn(
+                    "[GTCalcBoard] [UI] Failed to convert recipe to RecipeNode: {}",
+                    sr.displayName()
+            );
             setVisible(false);
         }
     }
@@ -1020,7 +1062,12 @@ public class RecipeSearchDialog {
         if ((keyCode == 82 || keyCode == 85) && stickyHoverRecipe != null) { // R or U
             int dialogW = Math.min(380, parent.width - 24);
             int dialogH = Math.min(280, parent.height - 24);
-            int x = (parent.width - dialogW) / 2;
+            int sideW = 104;
+            int gap = 6;
+            boolean hasSideSpace = parent.width >= (dialogW + sideW + gap + 16);
+            int totalW = hasSideSpace ? (dialogW + sideW + gap) : dialogW;
+            int startX = (parent.width - totalW) / 2;
+            int x = hasSideSpace ? (startX + sideW + gap) : startX;
             int y = (parent.height - dialogH) / 2;
 
             var hoveredIngredient = RecipeHoverPreviewRenderer.getHoveredIngredient(stickyHoverRecipe, x, y, dialogW, dialogH, stickyHoverRowY, lastMouseX, lastMouseY, parent.width, parent.height);
@@ -1042,6 +1089,50 @@ public class RecipeSearchDialog {
             return filterDialog.charTyped(codePoint, modifiers);
         }
         return searchBox.charTyped(codePoint, modifiers);
+    }
+
+    public boolean mouseDragged(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        if (!visible || !isDraggingScrollBar || button != 0) return false;
+
+        int dialogW = Math.min(380, screenWidth - 24);
+        int dialogH = Math.min(280, screenHeight - 24);
+        int listH = dialogH - 60;
+        int visibleRows = Math.max(1, listH / ROW_HEIGHT);
+        int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
+        if (maxScroll <= 0) return false;
+
+        int sideW = 104;
+        int gap = 6;
+        boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
+        int y = (screenHeight - dialogH) / 2;
+        int listY = y + 52;
+        int scrollTrackH = listH - 4;
+        int barH = Math.max(16, (int) ((double) visibleRows / filteredRecipes.size() * scrollTrackH));
+
+        double relativeY = mouseY - (listY + 2) - dragGrabOffsetY;
+        double ratio = relativeY / Math.max(1.0, scrollTrackH - barH);
+        scrollOffset = Math.max(0, Math.min(maxScroll, (int) Math.round(ratio * maxScroll)));
+        return true;
+    }
+
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (isDraggingScrollBar && button == 0) {
+            isDraggingScrollBar = false;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handlePreviewCardClick(Object hoveredIngredient, int button) {
+        if (hoveredIngredient == null) return false;
+        var adapter = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
+        if (button == 0) {
+            return adapter.handleHoveredIngredientClick(hoveredIngredient, searchBox);
+        }
+        if (button == 1) {
+            return adapter.handleHoveredIngredientLookup(hoveredIngredient, false);
+        }
+        return false;
     }
 }
 

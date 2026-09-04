@@ -1,6 +1,8 @@
 package com.gtceu.calcboard.compat;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -20,6 +22,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -30,6 +33,11 @@ import java.util.List;
  * Unit tests for Machine Addons, Turbine Rotors, Heating Coils, Parallel Hatches, and Thermal Augments.
  */
 public class MachineAddonTest {
+
+    @BeforeEach
+    void setUp() {
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
+    }
 
     @Test
     public void testMachineAddonsAndAbsoluteParallelHatch() {
@@ -119,11 +127,11 @@ public class MachineAddonTest {
         Assertions.assertEquals(333, turbine.getParallel());
         Assertions.assertEquals(10649.0, turbine.getSingleMachineEUt(), 0.001);
 
-        // 3. Downgrade Rotor Holder to HV (2,048 base) with Titanium -> capped at 2,662 EU/t (84 parallel)
+        // 3. For Gas Turbine (Base Tier: EV), attempting to set HV clamps to the minimum base tier EV -> 5,324 EU/t (167 parallel)
         turbine.setTargetTier(GTVoltageTier.HV);
         turbine.autoCalculateTurbineParallel();
-        Assertions.assertEquals(84, turbine.getParallel());
-        Assertions.assertEquals(2662.0, turbine.getSingleMachineEUt(), 0.001);
+        Assertions.assertEquals(167, turbine.getParallel());
+        Assertions.assertEquals(5324.0, turbine.getSingleMachineEUt(), 0.001);
 
         // 4. Upgrade Rotor Holder to LuV (16,384 base) with Titanium -> 21,299 EU/t (666 parallel)
         turbine.setTargetTier(GTVoltageTier.LuV);
@@ -712,7 +720,7 @@ public class MachineAddonTest {
         MachineAddon abyssalKit = ThermalAugmentHelper.parseThermalAugmentTag(tier48Root, "Abyssal Upgrade Kit", ResourceLocation.tryParse("thermal_extra:abyssal_upgrade_kit"));
         Assertions.assertNotNull(abyssalKit);
         Assertions.assertEquals(48, abyssalKit.getParallelMultiplier());
-        Assertions.assertTrue(RecipeNode.isThermalUpgradeKit(abyssalKit));
+        Assertions.assertTrue(abyssalKit.isThermalUpgradeKit());
 
         // 3. Test Multi-Cycle Injector with 1.60x Fuel Energy (DoubleTag DynEnergy)
         CompoundTag mci160Aug = new CompoundTag();
@@ -1144,6 +1152,208 @@ public class MachineAddonTest {
         adapter.handleInstallAddon(dynamo, arc, true);
         Assertions.assertEquals(4, dynamo.getAddons().size());
         Assertions.assertEquals(2, dynamo.getAddons().stream().filter(a -> a.getId().equals(arc.getId())).count());
+    }
+
+    @Test
+    public void testSuperCrackerAutoEquipsThroughputBoostingAndDisallowsArbitraryInstallation() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+
+        // 1. Setup Cracker node
+        RecipeNode crackerNode = RecipeNode.create("Cracking Unit", 20.0, 100.0, GTVoltageTier.HV);
+        crackerNode.setMultiblock(true);
+        crackerNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:cracker"));
+        crackerNode.setMachineIcon(ResourceLocation.tryParse("gtceu:cracker"));
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(crackerNode);
+
+        MachineAddon boost = MachineAddonCatalog.getInstance().getAddon("gtceu:throughput_boosting");
+        Assertions.assertNotNull(boost, "Throughput boosting addon must be present in catalog");
+
+        // Standard Cracker does NOT have throughput boosting trait -> cannot install arbitrarily
+        Assertions.assertFalse(adapter.isAddonCompatible(crackerNode, boost), "Standard Cracker must NOT allow throughput boosting trait");
+
+        // 2. Switch machine to Super Cracker (SDF) -> Throughput Boosting must auto-equip!
+        adapter.onMachineIconChanged(crackerNode, ResourceLocation.tryParse("gtceu:cracker"), ResourceLocation.tryParse("gtceu:super_cracker"));
+        crackerNode.setMachineIcon(ResourceLocation.tryParse("gtceu:super_cracker"));
+
+        Assertions.assertTrue(crackerNode.getAddons().stream().anyMatch(a -> a.getId().equals("gtceu:throughput_boosting")), "Super Cracker must auto-equip Throughput Boosting");
+        Assertions.assertEquals(4, crackerNode.getTotalParallel(), "Super Cracker throughput boosting provides 4x parallel");
+        Assertions.assertEquals(1.6, crackerNode.getCombinedDurationMultiplier(), 0.001, "Duration multiplier must be 1.6x");
+        Assertions.assertEquals(0.95, crackerNode.getCombinedEutMultiplier(), 0.001, "EUt multiplier must be 0.95x");
+
+        // 3. Switch back to standard Cracker -> Throughput Boosting must be purged automatically
+        adapter.onMachineIconChanged(crackerNode, ResourceLocation.tryParse("gtceu:super_cracker"), ResourceLocation.tryParse("gtceu:cracker"));
+        crackerNode.setMachineIcon(ResourceLocation.tryParse("gtceu:cracker"));
+
+        Assertions.assertFalse(crackerNode.getAddons().stream().anyMatch(a -> a.getId().equals("gtceu:throughput_boosting")), "Standard Cracker must purge Throughput Boosting");
+        Assertions.assertEquals(1, crackerNode.getTotalParallel(), "Parallel must reset to 1x");
+    }
+
+    @Test
+    public void testSuperCrackerCoilCapabilityAndModifier() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        ResourceLocation sdfId = ResourceLocation.tryParse("gtceu:super_cracker");
+
+        // 1. MultiblockDetector must recognize super_cracker as a coil multiblock
+        Assertions.assertTrue(MultiblockDetector.isCoilMultiblock(sdfId), "SDF Super Cracker must be recognized as a coil multiblock");
+
+        // 2. Setup Super Cracker Node
+        RecipeNode sdfNode = RecipeNode.create("Fractional Disruption Furnace [SDF]", 20.0, 100.0, GTVoltageTier.HV);
+        sdfNode.setMultiblock(true);
+        sdfNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:cracker"));
+        sdfNode.setMachineIcon(sdfId);
+
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(sdfNode);
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> cats = adapter.getApplicableAddonCategories(sdfNode);
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL), "Applicable categories for SDF Cracker must include COIL");
+
+        // 3. Equip Kanthal Coil (Cracking Energy: 90%)
+        MachineAddon kanthal = new MachineAddon("gtceu:kanthal_coil_block", "Kanthal Coil", com.gtceu.calcboard.api.catalog.AddonCategory.COIL, "", null);
+        kanthal.setCoilTemperature(2700);
+        kanthal.setCrackingEnergyPercent(90);
+
+        Assertions.assertTrue(adapter.isAddonCompatible(sdfNode, kanthal), "Kanthal coil must be compatible with SDF Cracker");
+        adapter.handleInstallAddon(sdfNode, kanthal, false);
+
+        // Cracking Unit coil discount: 90% (0.90x EU)
+        Assertions.assertEquals(0.90, sdfNode.getCombinedEutMultiplier(), 0.001, "SDF Cracker with Kanthal Coil must receive 0.90x EU discount");
+    }
+
+    @Test
+    public void testAlloyBlastSmelterVariantsCoilsAndTraits() {
+        MachineAddonCatalog.getInstance().ensureFastLoaded();
+        ResourceLocation catId = ResourceLocation.tryParse("gtceu:super_abs");
+        ResourceLocation hamId = ResourceLocation.tryParse("gtceu:mega_abs");
+        ResourceLocation loafId = ResourceLocation.tryParse("gtceu:ultimate_abs");
+
+        // 1. Multiblock & Coil checks
+        Assertions.assertTrue(MultiblockDetector.isMultiblock(catId), "CAT must be recognized as multiblock");
+        Assertions.assertTrue(MultiblockDetector.isMultiblock(hamId), "HAM must be recognized as multiblock");
+        Assertions.assertTrue(MultiblockDetector.isMultiblock(loafId), "LOAF must be recognized as multiblock");
+
+        Assertions.assertTrue(MultiblockDetector.isCoilMultiblock(catId), "CAT must be recognized as coil multiblock");
+        Assertions.assertTrue(MultiblockDetector.isCoilMultiblock(hamId), "HAM must be recognized as coil multiblock");
+        Assertions.assertTrue(MultiblockDetector.isCoilMultiblock(loafId), "LOAF must be recognized as coil multiblock");
+
+        // 2. Setup ABS Recipe Node
+        RecipeNode absNode = RecipeNode.create("Alloy Blast Smelter", 20.0, 100.0, GTVoltageTier.HV);
+        absNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:alloy_blast_smelter"));
+        absNode.setMachineIcon(catId);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(absNode);
+
+        // Switch to CAT -> Auto-equips Throughput Boosting & supports Coil
+        adapter.onMachineIconChanged(absNode, ResourceLocation.tryParse("gtceu:alloy_blast_smelter"), catId);
+        Assertions.assertTrue(absNode.isMultiblock(), "Node must remain multiblock after switching to CAT");
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> catCategories = adapter.getApplicableAddonCategories(absNode);
+        Assertions.assertTrue(catCategories.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL), "CAT must have COIL tab");
+        Assertions.assertTrue(catCategories.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT), "CAT must have TRAITS tab");
+        Assertions.assertTrue(absNode.getAddons().stream().anyMatch(a -> a.getId().equals("gtceu:throughput_boosting")), "CAT must auto-equip Throughput Boosting");
+
+        // Switch to HAM -> Purges Throughput Boosting, supports Parallel Hatch & Coil
+        absNode.setMachineIcon(hamId);
+        Assertions.assertTrue(absNode.isMultiblock(), "Node must remain multiblock after switching to HAM");
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> hamCategories = adapter.getApplicableAddonCategories(absNode);
+        Assertions.assertTrue(hamCategories.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL), "HAM must have COIL tab");
+        Assertions.assertFalse(absNode.getAddons().stream().anyMatch(a -> a.getId().equals("gtceu:throughput_boosting")), "HAM must purge Throughput Boosting");
+
+        // Switch to LOAF -> Supports Throughput Boosting, Bulk Processing, Batch Mode, Parallel Hatch & Coil
+        absNode.setMachineIcon(loafId);
+        Assertions.assertTrue(absNode.isMultiblock(), "Node must remain multiblock after switching to LOAF");
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> loafCategories = adapter.getApplicableAddonCategories(absNode);
+        Assertions.assertTrue(loafCategories.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL), "LOAF must have COIL tab");
+        Assertions.assertTrue(loafCategories.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL), "LOAF must have PARALLEL tab");
+        Assertions.assertTrue(loafCategories.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT), "LOAF must have TRAITS tab");
+        Assertions.assertTrue(MultiblockDetector.supportsBulkProcessing(loafId), "LOAF must support Bulk Processing");
+        Assertions.assertTrue(MultiblockDetector.supportsThroughputBoosting(loafId), "LOAF must support Throughput Boosting");
+        Assertions.assertTrue(MultiblockDetector.supportsBatchMode(loafId), "LOAF must support Batch Mode");
+
+        MachineAddon bulkAddon = new MachineAddon("gtceu:bulk_processing", "Bulk Processing", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        bulkAddon.setParallelMultiplier(16);
+        bulkAddon.setDurationMultiplier(13.0);
+        Assertions.assertTrue(adapter.isAddonCompatible(absNode, bulkAddon), "LOAF must be compatible with Bulk Processing addon");
+
+        adapter.onAddonInstalled(absNode, bulkAddon);
+        Assertions.assertTrue(absNode.getAddons().contains(bulkAddon), "LOAF must equip Bulk Processing");
+        // Stacking traits: Throughput Boosting (4x Par, 1.6x Dur) + Bulk Processing (16x Par, 13x Dur) = 64x Par, 20.8x Dur
+        Assertions.assertEquals(64, absNode.getCombinedParallelMultiplier(), "Stacked traits must provide 64x parallel");
+        Assertions.assertEquals(20.8, absNode.getCombinedDurationMultiplier(), 0.001, "Stacked traits must scale duration by 20.8x");
+
+        // Isolate Bulk Processing by removing Throughput Boosting
+        absNode.getAddons().removeIf(a -> a.getId().equals("gtceu:throughput_boosting"));
+        Assertions.assertEquals(16, absNode.getCombinedParallelMultiplier(), "Bulk Processing alone must provide 16x parallel");
+        Assertions.assertEquals(13.0, absNode.getCombinedDurationMultiplier(), 0.001, "Bulk Processing alone must scale duration by 13x");
+    }
+
+    @Test
+    public void testRecipeModifierReflectionUnpacking() {
+        // Mock a MachineDefinition with a RecipeModifier field (or getRecipeModifier method)
+        class MockIdentifiedModifier {
+            private final String id;
+            MockIdentifiedModifier(String id) { this.id = id; }
+            public String getId() { return id; }
+        }
+
+        class MockRecipeModifierList {
+            private final Object[] modifiers;
+            MockRecipeModifierList(Object... modifiers) { this.modifiers = modifiers; }
+            public Object[] modifiers() { return modifiers; }
+        }
+
+        class MockMachineDefinition {
+            private final Object recipeModifier;
+            MockMachineDefinition(Object recipeModifier) { this.recipeModifier = recipeModifier; }
+            public Object getRecipeModifier() { return recipeModifier; }
+        }
+
+        MockRecipeModifierList modList = new MockRecipeModifierList(
+                new MockIdentifiedModifier("parallel_hatch"),
+                new MockIdentifiedModifier("ebf_oc"),
+                new MockIdentifiedModifier("throughput_boosting"),
+                new MockIdentifiedModifier("bulk_processing"),
+                new MockIdentifiedModifier("batch_mode")
+        );
+
+        MockMachineDefinition mockDef = new MockMachineDefinition(modList);
+        List<Object> extracted = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getRecipeModifiers(mockDef);
+        Assertions.assertEquals(5, extracted.size(), "All 5 modifiers must be flattened and extracted");
+
+        List<String> names = extracted.stream()
+                .map(com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge::getRecipeModifierName)
+                .toList();
+
+        Assertions.assertTrue(names.contains("PARALLEL_HATCH"));
+        Assertions.assertTrue(names.contains("EBF_OC"));
+        Assertions.assertTrue(names.contains("THROUGHPUT_BOOSTING"));
+        Assertions.assertTrue(names.contains("BULK_PROCESSING"));
+        Assertions.assertTrue(names.contains("BATCH_MODE"));
+    }
+
+    @Test
+    public void testMultiSmelterVsAlloyBlastSmelterCoilParallelDeduction() {
+        ResourceLocation multiSmelterId = ResourceLocation.tryParse("gtceu:multi_smelter");
+        ResourceLocation absId = ResourceLocation.tryParse("gtceu:alloy_blast_smelter");
+
+        // Register multi_smelter as coil parallel multiblock deterministically
+        MultiblockDetector.registerCoilParallelMultiblock(multiSmelterId);
+
+        Assertions.assertTrue(MultiblockDetector.isCoilParallelMultiblock(multiSmelterId), "multi_smelter must be recognized as coil parallel");
+        Assertions.assertFalse(MultiblockDetector.isCoilParallelMultiblock(absId), "alloy_blast_smelter must NOT be misidentified as coil parallel");
+
+        RecipeNode absNode = RecipeNode.create("Alloy Blast Smelter", 280.0, 100.0, GTVoltageTier.HV);
+        absNode.setMultiblock(true);
+        absNode.setParallel(64);
+        absNode.setMachineIcon(absId);
+
+        MachineAddon bulk = new MachineAddon("gtceu:bulk_processing", "Bulk", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
+        bulk.setParallelMultiplier(16);
+        bulk.setDurationMultiplier(13.0);
+        absNode.addAddon(bulk);
+
+        // Effective parallel must be 64 * 16 = 1024
+        Assertions.assertEquals(1024, absNode.getTotalParallel(), "ABS with 64x parallel hatch + 16x Bulk Processing must yield 1024 total parallel");
+        // Effective duration must be 280 * 13 = 3640 ticks (182.0s)
+        Assertions.assertEquals(182.0, absNode.getEffectiveDurationSeconds(), 0.001);
+        // CPS = (20 / 3640) * 1024 = 5.62637 cycles/sec
+        Assertions.assertEquals(5.62637, absNode.getCyclesPerSecond(), 0.001);
     }
 }
 

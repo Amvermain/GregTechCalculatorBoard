@@ -45,6 +45,7 @@ public class NodeTargetBatchEditor {
                 if (widget.getParent() != null) {
                     widget.getParent().markSummaryDirty();
                 }
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onTargetBatchConfigured(node, parsed);
             }
         } catch (Exception ignored) {}
 

@@ -44,7 +44,20 @@ public final class GTCEuCoilModifierHelper {
         public static final CoilMachineSpec GENERIC = new CoilMachineSpec(CoilMachineKind.GENERIC, CustomCoilMultiplier.DEFAULT);
     }
 
+    private static final Class<?> COIL_WORKABLE_CLS;
     private static final Map<ResourceLocation, CoilMachineSpec> SPEC_CACHE = new ConcurrentHashMap<>();
+
+    static {
+        Class<?> cls = null;
+        try {
+            cls = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.CoilWorkableElectricMultiblockMachine");
+        } catch (Throwable t) {
+            try {
+                cls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine");
+            } catch (Throwable ignored) {}
+        }
+        COIL_WORKABLE_CLS = cls;
+    }
 
     public static CoilMachineSpec getCoilMachineSpec(ResourceLocation machineId) {
         if (machineId == null) return CoilMachineSpec.GENERIC;
@@ -53,10 +66,7 @@ public final class GTCEuCoilModifierHelper {
 
     private static CoilMachineSpec inspectMachineDefinition(ResourceLocation machineId) {
         try {
-            Class<?> gtRegistriesCls = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries");
-            Object machinesRegistry = gtRegistriesCls.getField("MACHINES").get(null);
-            Method mGet = machinesRegistry.getClass().getMethod("get", ResourceLocation.class);
-            Object def = mGet.invoke(machinesRegistry, machineId);
+            Object def = GTCEuReflectionBridge.getMachineDefinition(machineId);
             if (def == null) return inspectFallback(machineId);
 
             // 1. Inspect registered recipeModifiers function objects
@@ -83,26 +93,11 @@ public final class GTCEuCoilModifierHelper {
 
     private static CoilMachineKind inspectRecipeModifiers(Object def) {
         try {
-            Method mGetModifiers = null;
-            for (Method m : def.getClass().getMethods()) {
-                if (m.getName().equals("getRecipeModifiers") && m.getParameterCount() == 0) {
-                    mGetModifiers = m;
-                    break;
-                }
-            }
-            if (mGetModifiers != null) {
-                mGetModifiers.setAccessible(true);
-                Object modifiersObj = mGetModifiers.invoke(def);
-                if (modifiersObj instanceof Object[] arr) {
-                    for (Object mod : arr) {
-                        CoilMachineKind k = classifyModifierObject(mod);
-                        if (k != null) return k;
-                    }
-                } else if (modifiersObj instanceof Iterable<?> it) {
-                    for (Object mod : it) {
-                        CoilMachineKind k = classifyModifierObject(mod);
-                        if (k != null) return k;
-                    }
+            List<Object> modifiers = GTCEuReflectionBridge.getRecipeModifiers(def);
+            if (modifiers != null) {
+                for (Object mod : modifiers) {
+                    CoilMachineKind k = classifyModifierObject(mod);
+                    if (k != null) return k;
                 }
             }
         } catch (Throwable ignored) {}
@@ -111,58 +106,32 @@ public final class GTCEuCoilModifierHelper {
 
     private static CoilMachineKind classifyModifierObject(Object modifier) {
         if (modifier == null) return null;
-        try {
-            Class<?> gtModifiersCls = Class.forName("com.gregtechceu.gtceu.common.data.GTRecipeModifiers");
-            for (Field f : gtModifiersCls.getFields()) {
-                Object stdMod = f.get(null);
-                if (stdMod != null && (stdMod == modifier || stdMod.equals(modifier))) {
-                    String fName = f.getName().toUpperCase(Locale.ROOT);
-                    if (fName.contains("ELECTRIC_BLAST_FURNACE") || fName.contains("EBF")) return CoilMachineKind.BLAST_FURNACE;
-                    if (fName.contains("PYROLYSE_OVEN") || fName.contains("PYROLYSE")) return CoilMachineKind.PYROLYSE_OVEN;
-                    if (fName.contains("CRACKING_UNIT") || fName.contains("CRACKING") || fName.contains("CRACKER")) return CoilMachineKind.CRACKING_UNIT;
-                    if (fName.contains("CHEMICAL_PLANT") || fName.contains("CHEMICAL_REACTOR") || fName.contains("LCR")) return CoilMachineKind.CHEMICAL_REACTOR;
-                    if (fName.contains("MULTI_SMELTER") || fName.contains("SMELTER")) return CoilMachineKind.MULTI_SMELTER;
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        String modStr = modifier.getClass().getName().toLowerCase(Locale.ROOT) + " " + modifier.toString().toLowerCase(Locale.ROOT);
-        if (modStr.contains("blast") || modStr.contains("ebf")) return CoilMachineKind.BLAST_FURNACE;
-        if (modStr.contains("pyrolyse")) return CoilMachineKind.PYROLYSE_OVEN;
-        if (modStr.contains("crack")) return CoilMachineKind.CRACKING_UNIT;
-        if (modStr.contains("chemical")) return CoilMachineKind.CHEMICAL_REACTOR;
-        if (modStr.contains("smelter")) return CoilMachineKind.MULTI_SMELTER;
-
+        String modId = GTCEuReflectionBridge.getRecipeModifierName(modifier);
+        if (modId != null) {
+            if ("EBF_OC".equals(modId) || "ELECTRIC_BLAST_FURNACE".equals(modId)) return CoilMachineKind.BLAST_FURNACE;
+            if ("PYROLYSE_OVEN_OC".equals(modId) || "PYROLYSE_OVEN".equals(modId)) return CoilMachineKind.PYROLYSE_OVEN;
+            if ("CRACKER_OC".equals(modId) || "CRACKING_UNIT".equals(modId)) return CoilMachineKind.CRACKING_UNIT;
+            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_PLANT".equals(modId)) return CoilMachineKind.CHEMICAL_REACTOR;
+            if ("MULTI_SMELLTER_PARALLEL".equals(modId) || "MULTI_SMELTER_PARALLEL".equals(modId) || "MULTI_SMELTER".equals(modId)) return CoilMachineKind.MULTI_SMELTER;
+        }
         return null;
     }
 
     private static Class<?> extractMachineClass(Object def) {
-        try {
-            for (Field f : def.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                Object val = f.get(def);
-                if (val instanceof Class<?> c) return c;
-            }
-        } catch (Throwable ignored) {}
-        return null;
+        return GTCEuReflectionBridge.getMachineClass(def);
     }
 
     private static CoilMachineKind classifyByMachineClass(Class<?> machineClass) {
         if (machineClass == null) return CoilMachineKind.GENERIC;
-        String name = machineClass.getName().toLowerCase(Locale.ROOT);
-
-        if (name.contains("electricblastfurnace") || name.contains("blastfurnace")) return CoilMachineKind.BLAST_FURNACE;
-        if (name.contains("pyrolyseoven") || name.contains("pyrolyse")) return CoilMachineKind.PYROLYSE_OVEN;
-        if (name.contains("crackingunit") || name.contains("cracker")) return CoilMachineKind.CRACKING_UNIT;
-        if (name.contains("chemicalplant") || name.contains("chemicalreactor")) return CoilMachineKind.CHEMICAL_REACTOR;
-        if (name.contains("multismelter") || name.contains("smeltermachine")) return CoilMachineKind.MULTI_SMELTER;
-
-        try {
-            Class<?> coilWorkableCls = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.CoilWorkableElectricMultiblockMachine");
-            if (coilWorkableCls.isAssignableFrom(machineClass)) {
-                return CoilMachineKind.CUSTOM_COIL_MULTIBLOCK;
-            }
-        } catch (Throwable ignored) {}
+        if (COIL_WORKABLE_CLS != null && COIL_WORKABLE_CLS.isAssignableFrom(machineClass)) {
+            String name = machineClass.getSimpleName().toLowerCase(Locale.ROOT);
+            if (name.contains("blastfurnace") || name.contains("ebf")) return CoilMachineKind.BLAST_FURNACE;
+            if (name.contains("pyrolyse")) return CoilMachineKind.PYROLYSE_OVEN;
+            if (name.contains("cracking") || name.contains("cracker")) return CoilMachineKind.CRACKING_UNIT;
+            if (name.contains("chemical") || name.contains("reactor") || name.contains("plant")) return CoilMachineKind.CHEMICAL_REACTOR;
+            if (name.contains("smelter")) return CoilMachineKind.MULTI_SMELTER;
+            return CoilMachineKind.CUSTOM_COIL_MULTIBLOCK;
+        }
 
         return CoilMachineKind.GENERIC;
     }
@@ -196,13 +165,13 @@ public final class GTCEuCoilModifierHelper {
         if (id == null) return CoilMachineSpec.GENERIC;
         String path = id.getPath().toLowerCase(Locale.ROOT);
 
-        if (path.contains("blast_furnace") || path.contains("ebf")) {
+        if (path.contains("blast") || path.contains("ebf") || path.contains("abs") || path.contains("alloy_blast")) {
             return new CoilMachineSpec(CoilMachineKind.BLAST_FURNACE, CustomCoilMultiplier.DEFAULT);
         }
         if (path.contains("pyrolyse")) {
             return new CoilMachineSpec(CoilMachineKind.PYROLYSE_OVEN, CustomCoilMultiplier.DEFAULT);
         }
-        if (path.contains("cracker") || path.contains("cracking")) {
+        if (path.contains("cracker") || path.contains("cracking") || path.contains("super_cracker")) {
             return new CoilMachineSpec(CoilMachineKind.CRACKING_UNIT, CustomCoilMultiplier.DEFAULT);
         }
         if (path.contains("chemical") || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {
@@ -223,12 +192,14 @@ public final class GTCEuCoilModifierHelper {
             targetId = node.getMultiblockWorkstation();
         }
         if (targetId == null && node.getRecipeCategoryId() != null) {
-            targetId = node.getRecipeCategoryId();
+            var cap = com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix.getInstance().getCapability(node.getRecipeCategoryId());
+            if (cap != null && cap.defaultWorkstation() != null) {
+                targetId = cap.defaultWorkstation();
+            } else {
+                targetId = node.getRecipeCategoryId();
+            }
         }
-        if (targetId == null && node.getName() != null) {
-            String sanitized = node.getName().toLowerCase(Locale.ROOT).replace(" ", "_");
-            targetId = ResourceLocation.tryParse("gtceu:" + sanitized);
-        }
+        if (targetId == null) return;
 
         CoilMachineSpec spec = getCoilMachineSpec(targetId);
         int reqTemp = node.getRecipeTemperature();

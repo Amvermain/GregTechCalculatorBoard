@@ -211,9 +211,21 @@ public class SysteamsModAdapter implements IModAdapter {
             }
         }
         if (steamRate > 0) {
-            return String.format(java.util.Locale.ROOT, "§b♨ +%,.1f/s Steam", steamRate);
+            return String.format(java.util.Locale.ROOT, "§b♨ +%s Steam", formatSteamRate(steamRate));
         }
         return "§6♨";
+    }
+
+    private String formatSteamRate(double steamRate) {
+        try {
+            return com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(steamRate, true);
+        } catch (Throwable t) {
+            if (steamRate >= 1000.0) {
+                return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate / 1000.0) + " B/s";
+            } else {
+                return com.gtceu.calcboard.api.util.NumberFormatUtil.formatCompactNumber(steamRate) + " mB/s";
+            }
+        }
     }
 
     @Override
@@ -241,14 +253,37 @@ public class SysteamsModAdapter implements IModAdapter {
         return tooltipLines;
     }
 
+    private static final java.util.Set<ResourceLocation> WATER_FLUID_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("minecraft:water"),
+            ResourceLocation.tryParse("minecraft:flowing_water")
+    );
+    private static final java.util.Set<ResourceLocation> STEAM_FLUID_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("gtceu:steam"),
+            ResourceLocation.tryParse("thermal:steam"),
+            ResourceLocation.tryParse("systeams:steamier"),
+            ResourceLocation.tryParse("systeams:steamiest"),
+            ResourceLocation.tryParse("systeams:steamiester"),
+            ResourceLocation.tryParse("systeams:steamiestest")
+    );
+
+    private static boolean isWaterFluid(ResourceLocation id) {
+        if (id == null) return false;
+        return WATER_FLUID_IDS.contains(id) || id.getPath().equals("water");
+    }
+
+    private static boolean isSteamFluid(ResourceLocation id) {
+        if (id == null) return false;
+        return STEAM_FLUID_IDS.contains(id) || id.getPath().equals("steam");
+    }
+
     @Override
     public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
         if (node == null || stack == null) return defaultRate;
         double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
-        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+        if (isInput && stack.isFluid() && isWaterFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
-        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+        if (!isInput && stack.isFluid() && isSteamFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
         return defaultRate;
@@ -258,10 +293,10 @@ public class SysteamsModAdapter implements IModAdapter {
     public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
         if (node == null || stack == null) return defaultRate;
         double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
-        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+        if (isInput && stack.isFluid() && isWaterFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
-        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+        if (!isInput && stack.isFluid() && isSteamFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
         return defaultRate;

@@ -11,19 +11,19 @@ GTCalcBoard의 UI 계층은 마인크래프트의 렌더링 파이프라인과 �
 
 ```mermaid
 flowchart TB
-    subgraph Viewport["1. 뷰포트 & 캔버스 코어"]
+    subgraph Viewport["1. 뷰포트 & 렌더링 파이프라인 (BoardScreen / Render)"]
         direction LR
-        BS["BoardScreen<br/>(2D 카메라, 줌/팬, 화면 맞춤)"] ~~~ CIH["CanvasInteractionHandler<br/>(PanZoom / Selection / QuickAdd)"] ~~~ CR["ConnectionRenderer<br/>(베지어 와이어 & WireSpatialIndex)"] ~~~ NCR["NodeCardRenderer<br/>(노드 카드 & 게이지)"]
+        BS["BoardScreen<br/>(화면 오케스트레이터 & 라우터)"] ~~~ BDM["BoardDialogManager<br/>(모달 생명주기 & 라우팅)"] ~~~ BCR["BoardCanvasRenderer<br/>(Two-Pass Z-Order & glClear 격리)"] ~~~ BVT["BoardViewportTransform<br/>(가상 GUI Scale 좌표 변환)"] ~~~ CIH["CanvasInteractionHandler<br/>(Pan / Zoom / Selection / QuickAdd)"]
     end
 
-    subgraph Dialogs["2. 대화상자 & 설정 모달"]
+    subgraph Dialogs["2. 대화상자 & 설정 모달 (dialog.*)"]
         direction LR
-        MCD["MachineConfigDialog<br/>(병렬 제어, 애드온 랙)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(전역 밸런스 대시보드)"] ~~~ BSD["BoardSettingsDialog<br/>(환경설정 & 비율 한도)"] ~~~ BPD["BlueprintDialogs<br/>(가져오기/내보내기)"] ~~~ RSD["RecipeSearch & Filter<br/>(CacheManager & QueryEngine)"]
+        MCD["MachineConfigDialog<br/>(병렬 제어, 가변 행 카탈로그)"] ~~~ GBD["GlobalBalanceDashboardDialog<br/>(전역 밸런스 대시보드)"] ~~~ BSD["BoardSettingsDialog<br/>(환경설정 & GUI Scale)"] ~~~ BPD["BlueprintDialogs<br/>(가져오기/내보내기)"] ~~~ RSD["RecipeSearch & Filter<br/>(CacheManager & QueryEngine)"]
     end
 
-    subgraph Nav["3. 네비게이션 & 도구"]
+    subgraph Nav["3. 네비게이션 & 도구 (widget.*)"]
         direction LR
-        TBW["ToolbarWidget<br/>(하단 빠른 실행 툴바)"] ~~~ PTB["PageTabBarWidget<br/>(개인/팀 탭 바)"] ~~~ HUD["HotkeyHudWidget<br/>(단축키 안내 HUD)"] ~~~ GD["GuideDialog & BoardToast<br/>(인게임 가이드 & 토스트)"] ~~~ TUT["TutorialManager & Overlay<br/>(인터랙티브 튜토리얼)"]
+        TBW["ToolbarWidget<br/>(반응형 툴바 & 오버플로우 메뉴)"] ~~~ PTB["PageTabBarWidget<br/>(개인/팀 탭 바)"] ~~~ HUD["HotkeyHudWidget<br/>(단축키 안내 HUD)"] ~~~ SO["SummaryOverlay<br/>(반응형 결산 오버레이)"] ~~~ GD["GuideDialog & BoardToast<br/>(가이드북 & 토스트)"]
     end
 
     Viewport --> Dialogs

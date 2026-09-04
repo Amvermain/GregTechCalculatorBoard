@@ -111,9 +111,9 @@ public class AutoConnectFilterTest {
 
         ResourceLocation diamondId = ResourceLocation.tryParse("minecraft:diamond");
         ResourceLocation steamId = ResourceLocation.tryParse("gtceu:steam");
-        ResourceLocation warmSteamId = ResourceLocation.tryParse("systeams:warm_steam");
-        ResourceLocation hotSteamId = ResourceLocation.tryParse("systeams:hot_steam");
-        ResourceLocation superheatedSteamId = ResourceLocation.tryParse("systeams:superheated_steam");
+        ResourceLocation warmSteamId = ResourceLocation.tryParse("systeams:steamier");
+        ResourceLocation hotSteamId = ResourceLocation.tryParse("systeams:steamiest");
+        ResourceLocation superheatedSteamId = ResourceLocation.tryParse("systeams:steamiester");
 
         // 1. Diamond Junction (Source Hub)
         RecipeNode diamondJunc = RecipeNode.createReroute(0, 0);

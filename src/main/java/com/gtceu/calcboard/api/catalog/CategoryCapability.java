@@ -68,7 +68,8 @@ public record CategoryCapability(
             return cats;
         }
 
-        if (isTurbine || node.isTurbine()) {
+        boolean isTurbineNode = (isTurbine && (node.getMachineIcon() == null || MultiblockDetector.isTurbineMachine(node.getMachineIcon()))) || node.isTurbine();
+        if (isTurbineNode) {
             if (node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption) {
                 cats.add(AddonCategory.ROTOR);
                 cats.add(AddonCategory.MAINTENANCE);
@@ -82,7 +83,7 @@ public record CategoryCapability(
         }
 
         boolean isMb = node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption;
-        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0 || (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion"));
+        boolean isFusion = node.isFusion() || node.getRequiredReflectorTier() > 0;
 
         if (isFusion) {
             cats.add(AddonCategory.REFLECTOR);
@@ -108,9 +109,12 @@ public record CategoryCapability(
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = def.coilSlotCount() > 0 || def.supportsAbility("HEATING_COILS") || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
+                        || MultiblockDetector.isCoilMultiblock(mbId)
+                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             } else {
-                supportsCoil = canUseCoils || node.canUseCoils() || MultiblockDetector.isCoilMultiblock(mbId);
+                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
+                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             }
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);

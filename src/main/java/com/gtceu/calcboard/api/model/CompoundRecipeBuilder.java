@@ -16,13 +16,18 @@ public final class CompoundRecipeBuilder {
 
     public record LayerSpec(
             String layerName,
+            ResourceLocation machineIcon,
             double durationTicks,
             double eut,
             List<IngredientStack> inputs,
             List<IngredientStack> outputs
     ) {
+        public LayerSpec(String layerName, double durationTicks, double eut, List<IngredientStack> inputs, List<IngredientStack> outputs) {
+            this(layerName, null, durationTicks, eut, inputs, outputs);
+        }
+
         public LayerSpec(String layerName, List<IngredientStack> inputs, List<IngredientStack> outputs) {
-            this(layerName, 0.0, 0.0, inputs, outputs);
+            this(layerName, null, 0.0, 0.0, inputs, outputs);
         }
     }
 
@@ -64,7 +69,8 @@ public final class CompoundRecipeBuilder {
             double nodeDuration = spec.durationTicks() > 0.0 ? spec.durationTicks() : baseDurationTicks;
             double nodeEUt = spec.eut() > 0.0 ? spec.eut() : baseEUt;
 
-            RecipeNode node = RecipeNode.create(machineIcon, nodeName, nodeDuration, nodeEUt, recipeTier);
+            ResourceLocation nodeIcon = spec.machineIcon() != null ? spec.machineIcon() : machineIcon;
+            RecipeNode node = RecipeNode.create(nodeIcon, nodeName, nodeDuration, nodeEUt, recipeTier);
             if (i == 0) {
                 masterId = node.getId();
             }

@@ -40,7 +40,7 @@ public final class RecipePropertyExtractorPipeline {
                     else if (recipeDataTag.contains("temperature")) temp = recipeDataTag.getInt("temperature");
                 }
                 if (temp > 0) {
-                    store.set(NodeProperties.EBF_TEMPERATURE, temp);
+                    store.setById("ebf_temperature", temp);
                 }
             }
         });
@@ -153,10 +153,10 @@ public final class RecipePropertyExtractorPipeline {
                 }
 
                 if (euToStart > 0) {
-                    store.set(NodeProperties.FUSION_START_EU, euToStart);
+                    store.setById("fusion_start_eu", euToStart);
                 }
                 if (minReflectorTier > 0) {
-                    store.set(NodeProperties.REQUIRED_REFLECTOR_TIER, minReflectorTier);
+                    store.setById("required_reflector_tier", minReflectorTier);
                 }
             }
         });
@@ -179,7 +179,7 @@ public final class RecipePropertyExtractorPipeline {
                 if (recipeDataTag != null && recipeDataTag.contains("cleanroom")) {
                     String cleanroom = recipeDataTag.getString("cleanroom");
                     if (cleanroom != null && !cleanroom.isEmpty()) {
-                        store.set(NodeProperties.CLEANROOM_TYPE, cleanroom);
+                        store.setById("cleanroom_type", cleanroom);
                     }
                 }
             }
@@ -199,8 +199,8 @@ public final class RecipePropertyExtractorPipeline {
 
             @Override
             public void extract(Object backingRecipe, CompoundTag recipeDataTag, ResourceLocation categoryId, NodePropertyStore store) {
-                if (!store.has(NodeProperties.KINETIC_RPM)) {
-                    store.set(NodeProperties.KINETIC_RPM, 32);
+                if (!store.hasById("kinetic_rpm")) {
+                    store.setById("kinetic_rpm", 32);
                 }
             }
         });

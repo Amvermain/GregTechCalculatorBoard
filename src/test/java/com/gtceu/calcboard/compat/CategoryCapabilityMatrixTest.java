@@ -58,11 +58,12 @@ public class CategoryCapabilityMatrixTest {
         Assertions.assertTrue(cap.hasMultiblockOption());
         Assertions.assertTrue(cap.canUseCoils());
 
-        RecipeNode singleNode = RecipeNode.create("Chemical Reactor (Rubber)", 20.0, 30.0, GTVoltageTier.LV);
-        singleNode.setRecipeCategoryId(crCat);
-        singleNode.setMultiblock(false);
+        RecipeNode lcrNode = RecipeNode.create("Large Chemical Reactor (Rubber)", 20.0, 30.0, GTVoltageTier.LV);
+        lcrNode.setRecipeCategoryId(crCat);
+        lcrNode.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
+        lcrNode.setMultiblock(true);
 
-        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(singleNode);
+        List<com.gtceu.calcboard.api.catalog.AddonCategory> activeCats = cap.getActiveCategoriesForNode(lcrNode);
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL));
         Assertions.assertTrue(activeCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.PARALLEL));
     }
@@ -242,6 +243,27 @@ public class CategoryCapabilityMatrixTest {
         // 5. Multiblock -> Singleblock switch (restores EV icon)
         node.setMultiblock(false);
         Assertions.assertEquals(ResourceLocation.tryParse("gtceu:ev_chemical_reactor"), node.getMachineIcon());
+    }
+
+    @Test
+    void testVoidExcavationDoesNotSupportHeatingCoilEvenWithStaticCoilBlocks() {
+        ResourceLocation voidCat = ResourceLocation.tryParse("gtceu:void_excavation");
+        CategoryCapability cap = matrix.getCapability(voidCat);
+
+        Assertions.assertNotNull(cap);
+        Assertions.assertFalse(cap.canUseCoils(), "Void Excavation / Void Miner must NOT support heating coils even if static coil blocks are part of structure");
+
+        RecipeNode voidNode = RecipeNode.create("Void Excavation", 20.0, 1000.0, GTVoltageTier.EV);
+        voidNode.setRecipeCategoryId(voidCat);
+        voidNode.setMachineIcon(ResourceLocation.tryParse("gtceu:void_extractor"));
+        voidNode.setMultiblock(true);
+
+        List<AddonCategory> activeCats = cap.getActiveCategoriesForNode(voidNode);
+        Assertions.assertFalse(activeCats.contains(AddonCategory.COIL), "Coil category must not be active for Void Extractor");
+        Assertions.assertFalse(voidNode.canUseCoils(), "RecipeNode.canUseCoils must return false for Void Extractor");
+        Assertions.assertFalse(MultiblockDetector.isCoilMultiblock(ResourceLocation.tryParse("gtceu:void_extractor")), "void_extractor must not be coil multiblock");
+        Assertions.assertFalse(MultiblockDetector.isCoilMultiblock(ResourceLocation.tryParse("gtceu:void_miner")), "void_miner must not be coil multiblock");
+        Assertions.assertFalse(MultiblockDetector.isCoilMultiblock(ResourceLocation.tryParse("gtceu:void_excavator")), "void_excavator must not be coil multiblock");
     }
 }
 

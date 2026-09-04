@@ -26,13 +26,18 @@ flowchart TB
         ACTIVE_LIST["장착된 칩 목록 (코일, 해치 등)"] ~~~ STATS_BADGE["시간/전력 승수, 병렬 뱃지"] ~~~ DEL_BTN["[✕] 1클릭 애드온 제거"]
     end
 
-    subgraph Section3["4. 애드온 카탈로그 브라우저"]
+    subgraph Section3["4. 애드온 카탈로그 브라우저 (AddonCatalogView)"]
         direction LR
-        TABS["카테고리 탭: 코일, 해치, 로터 등"] ~~~ SEARCH["실시간 애드온 검색"] ~~~ CHIP_GRID["스마트 칩 그리드 (1클릭 장착)"]
+        TABS["카테고리 탭: 코일, 해치, 로터 등"] ~~~ VIEW_MODE["[▦ 그리드 / ☰ 리스트] 뷰 토글"] ~~~ DYNAMIC_ROWS["가용 높이 기반 동적 행수 (2~5행)"]
     end
 
     Header --> Section1 --> Section2 --> Section3
 ```
+
+### 1.1 동적 반응형 카탈로그 뷰 (`AddonCatalogView`, ADR-017)
+* **가변 행 동적 레이아웃**: 고정 $3 \times 2$ 그리드를 탈피하고, 다이얼로그 가용 높이에 따라 표시 행 수를 동적으로 계산합니다 ($\text{rows} = \text{clamp}(\lfloor \text{availH} / 54 \rfloor, 2, 5)$).
+* **원클릭 $20\text{px}$ 컴팩트 리스트 뷰 (`[▦ / ☰]`)**: 헤더의 뷰 토글 버튼을 통해 고밀도 텍스트/아이콘 일렬 리스트 모드로 즉시 전환하여 한 화면에서 10개 이상의 애드온을 스크롤 없이 비교/장착할 수 있습니다.
+* **뷰 모드 영속화**: 사용자의 뷰 선호도(그리드/리스트)는 `BoardManager` 및 NBT에 자동 저장됩니다.
 
 ---
 
@@ -107,25 +112,26 @@ flowchart TB
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">유지보수</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">터빈 로터</span>
           <span style="background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">써멀 증강</span>
+          <span style="background: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">멀티 특성</span>
           <span style="background: #1e293b; color: #a855f7; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;">+ 커스텀</span>
         </div>
         <!-- Search & Catalog Chips Grid -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; max-height: 90px; overflow-y: hidden;">
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">칸탈 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">2,700 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">처리량 증폭 (Boost)</span>
+            <span style="color: #38bdf8; font-size: 9px;">4x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">니크롬 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">3,600 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">벌크 처리 (Bulk)</span>
+            <span style="color: #38bdf8; font-size: 9px;">16x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">RTM 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">4,500 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">과승 가압 (Overpressure)</span>
+            <span style="color: #f59e0b; font-size: 9px;">8x Par</span>
           </div>
           <div style="background: #14171e; border: 1px solid #334155; border-radius: 3px; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
-            <span style="color: #cbd5e1; font-size: 11px;">HSS-G 코일 블록</span>
-            <span style="color: #f59e0b; font-size: 9px;">5,400 K</span>
+            <span style="color: #cbd5e1; font-size: 11px;">배치 모드 (Batch)</span>
+            <span style="color: #10b981; font-size: 9px;">1x</span>
           </div>
         </div>
       </div>
@@ -167,6 +173,32 @@ flowchart TB
   - 다이얼로그 우측 상단 `[Aa 1.0x]` 버튼: 좌클릭 순환 확대, 우클릭 순환 축소, 마우스 휠 스크롤 조절.
   - 키보드 단축키: `+` (확대), `-` (축소).
   - 중심점 Matrix Scaling & Virtual Mouse 역변환을 통해 레이아웃 왜곡 없이 100% 정밀한 클릭 판정 보장.
+
+---
+
+## 5. 정션 노드 외부 및 무한 공급 설정 모달 (`JunctionSupplyDialog`) (ADR-012)
+
+정션(Junction/Reroute) 노드 우클릭 시 호출되는 모달로, 외부 자원 공급 모드(`SupplyMode`) 및 공급 속도를 설정합니다.
+
+* **공급 모드 선택**:
+  - `[ 일반 ]` (`SupplyMode.NONE`): 상류 연결 기계의 생산 유량에만 의존.
+  - `[ ∞ 무한 공급 ]` (`SupplyMode.INFINITE`): 외부 무한 자원 공급원(물 펌프, 무한 자원 풀 등)으로 지정하여 상류 요구량 역전파를 완전 차단. 노드 카드 상단에 $\infty$ 뱃지 렌더링.
+  - `[ 고정 공급 ]` (`SupplyMode.FIXED_RATE`): 초당 고정 공급량($R_{\text{ext}}$) 입력 필드 활성화.
+* **정밀 수치 입력 및 단위 환산**:
+  - 텍스트 입력창을 통한 정밀 실수(Double) 입력 지원.
+  - 단위 토글: `items/s` (아이템) 및 `mB/s` (유체) 단위 자동 인식 및 표시.
+  - 확인(`Enter` / `[확인]` 버튼) 시 `ModifyNodePropertyCommand`를 통해 즉시 그래프 재연산 및 Undo 스택 등록.
+
+---
+
+## 6. 기계 하드웨어 템플릿 복제 다이얼로그 (`TemplateCloneDialog`) (ADR-012)
+
+단일 또는 다중 선택된 기계 노드에 대해 미리 정의된 하드웨어 프리셋 템플릿(`MachineHardwareTemplate`)을 원클릭으로 주입·적용합니다.
+
+* **주요 기능**:
+  - **현재 노드로부터 템플릿 생성**: 대상 노드의 티어, 병렬, 오버클럭, 애드온 사양을 캡슐화하여 신규 템플릿으로 저장.
+  - **템플릿 라이브러리 브라우저**: 저장된 하드웨어 템플릿 목록 탐색, 이름 변경 및 삭제.
+  - **원클릭 일괄 적용**: 선택된 단일 노드 또는 다중 선택 노드군 전체에 하드웨어 구성을 일괄 주입하면서도 각 노드의 고유 레시피 입출력 및 최소 요구 전압 티어를 안전하게 보존.
 
 ---
 

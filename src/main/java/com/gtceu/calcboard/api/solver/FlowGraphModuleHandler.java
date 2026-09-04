@@ -39,24 +39,41 @@ public final class FlowGraphModuleHandler {
 
         if (selectedNodes.isEmpty()) return null;
 
+        // Ensure full graph is evaluated so nodes hold valid, active efficiencies and flows
+        FlowGraphSolver.computeSummary(graph);
+
         Set<String> selectedIdSet = new HashSet<>();
         for (RecipeNode n : selectedNodes) selectedIdSet.add(n.getId());
 
-        // 1. Create subGraph with selected nodes and their internal connections
+        FlowGraph subGraph = buildSubGraph(selectedNodes, graph.getConnections(), selectedIdSet);
+        BalanceSummary summary = FlowGraphSolver.computeSummaryPreservingEfficiencies(subGraph);
+
+        RecipeNode moduleNode = createModuleNode(selectedNodes, summary, moduleName, subGraph);
+        transferFramesAndNotes(graph, subGraph, primaryFrame, selectedNodes, selectedIdSet);
+
+        List<FlowGraph.ConnectionEdge> externalEdges = new ArrayList<>();
+        allocateModulePortsAndRewireEdges(graph, subGraph, selectedNodes, selectedIdSet, summary, moduleNode, externalEdges);
+
+        updateGraphWithModule(graph, selectedNodes, moduleNode, externalEdges);
+        return moduleNode;
+    }
+
+    private record PortKey(String nodeId, int portIndex) {}
+
+    private static FlowGraph buildSubGraph(List<RecipeNode> selectedNodes, List<FlowGraph.ConnectionEdge> edges, Set<String> selectedIdSet) {
         FlowGraph subGraph = new FlowGraph();
         for (RecipeNode n : selectedNodes) {
             subGraph.addNode(n);
         }
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+        for (FlowGraph.ConnectionEdge edge : edges) {
             if (selectedIdSet.contains(edge.fromNodeId()) && selectedIdSet.contains(edge.toNodeId())) {
                 subGraph.addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
             }
         }
+        return subGraph;
+    }
 
-        // 2. Calculate balance summary for subGraph
-        BalanceSummary summary = FlowGraphSolver.computeSummary(subGraph);
-
-        // 3. Compute centroid position
+    private static RecipeNode createModuleNode(List<RecipeNode> selectedNodes, BalanceSummary summary, String moduleName, FlowGraph subGraph) {
         double sumX = 0, sumY = 0;
         for (RecipeNode n : selectedNodes) {
             sumX += n.getPosX();
@@ -65,77 +82,45 @@ public final class FlowGraphModuleHandler {
         double centerX = sumX / selectedNodes.size();
         double centerY = sumY / selectedNodes.size();
 
-        // 4. Create Module RecipeNode
         String name = (moduleName != null && !moduleName.trim().isEmpty()) ? moduleName.trim() : "Compound Module";
         double baseEUt = Math.max(1.0, Math.abs(summary.totalEUt()));
         boolean isGen = summary.totalEUt() < -0.001;
         GTVoltageTier tier = summary.highestVoltageTier();
 
-        // Standard 1.0 second duration (20 ticks) base for modules
         RecipeNode moduleNode = RecipeNode.create(name, 20.0, baseEUt, tier);
         moduleNode.setModule(true);
         moduleNode.setSubGraph(subGraph);
         moduleNode.setContainedMachineCount(summary.totalMachineCount());
         moduleNode.setGenerator(isGen);
         moduleNode.setPos(centerX, centerY);
-        moduleNode.setCardWidth(230); // Default wider card for compound modules
+        moduleNode.setCardWidth(230);
+        return moduleNode;
+    }
 
-        // 5. Determine frames to capture into subGraph (preserving outer enclosing frames)
+    private static void transferFramesAndNotes(
+            FlowGraph graph,
+            FlowGraph subGraph,
+            CanvasGroupFrame primaryFrame,
+            List<RecipeNode> selectedNodes,
+            Set<String> selectedIdSet
+    ) {
         List<CanvasGroupFrame> capturedFrames = new ArrayList<>();
         if (primaryFrame != null) {
             capturedFrames.add(primaryFrame);
             for (CanvasGroupFrame f : graph.getFrames()) {
-                if (!f.equals(primaryFrame)) {
-                    // Check if f is strictly inside primaryFrame
-                    if (f.getPosX() >= primaryFrame.getPosX() - 5
-                            && f.getPosY() >= primaryFrame.getPosY() - 5
-                            && f.getPosX() + f.getWidth() <= primaryFrame.getPosX() + primaryFrame.getWidth() + 5
-                            && f.getPosY() + f.getHeight() <= primaryFrame.getPosY() + primaryFrame.getHeight() + 5) {
-                        capturedFrames.add(f);
-                    }
+                if (!f.equals(primaryFrame) && isFrameStrictlyInside(f, primaryFrame)) {
+                    capturedFrames.add(f);
                 }
             }
         } else {
-            // Find candidate frames whose enclosed nodes are completely contained in selectedIdSet
-            List<CanvasGroupFrame> candidateFrames = new ArrayList<>();
-            for (CanvasGroupFrame f : graph.getFrames()) {
-                List<RecipeNode> enclosed = f.getEnclosedNodes(graph);
-                if (!enclosed.isEmpty()) {
-                    boolean allSelected = true;
-                    for (RecipeNode n : enclosed) {
-                        if (!selectedIdSet.contains(n.getId())) {
-                            allSelected = false;
-                            break;
-                        }
-                    }
-                    if (allSelected) {
-                        candidateFrames.add(f);
-                    }
-                }
-            }
-
+            List<CanvasGroupFrame> candidateFrames = findCandidateFrames(graph, selectedIdSet);
             if (!candidateFrames.isEmpty()) {
-                // Find candidate with smallest area (innermost) that tightly wraps the selection
-                CanvasGroupFrame tightestFrame = null;
-                double minArea = Double.MAX_VALUE;
-                for (CanvasGroupFrame cf : candidateFrames) {
-                    double area = cf.getWidth() * cf.getHeight();
-                    if (area < minArea) {
-                        minArea = area;
-                        tightestFrame = cf;
-                    }
-                }
+                CanvasGroupFrame tightestFrame = findTightestFrame(candidateFrames);
                 if (tightestFrame != null) {
                     capturedFrames.add(tightestFrame);
                     for (CanvasGroupFrame cf : candidateFrames) {
-                        if (!cf.equals(tightestFrame)) {
-                            // If cf is inside tightestFrame
-                            if (cf.getPosX() >= tightestFrame.getPosX() - 5
-                                    && cf.getPosY() >= tightestFrame.getPosY() - 5
-                                    && cf.getPosX() + cf.getWidth() <= tightestFrame.getPosX() + tightestFrame.getWidth() + 5
-                                    && cf.getPosY() + cf.getHeight() <= tightestFrame.getPosY() + tightestFrame.getHeight() + 5) {
-                                capturedFrames.add(cf);
-                            }
+                        if (!cf.equals(tightestFrame) && isFrameStrictlyInside(cf, tightestFrame)) {
+                            capturedFrames.add(cf);
                         }
                     }
                 }
@@ -148,21 +133,7 @@ public final class FlowGraphModuleHandler {
         }
 
         if (!selectedNodes.isEmpty()) {
-            double selMinX = Double.MAX_VALUE, selMinY = Double.MAX_VALUE;
-            double selMaxX = -Double.MAX_VALUE, selMaxY = -Double.MAX_VALUE;
-            for (RecipeNode n : selectedNodes) {
-                selMinX = Math.min(selMinX, n.getPosX());
-                selMinY = Math.min(selMinY, n.getPosY());
-                selMaxX = Math.max(selMaxX, n.getPosX() + n.getCardWidth());
-                selMaxY = Math.max(selMaxY, n.getPosY() + (n.getCardHeight() > 0 ? n.getCardHeight() : 160));
-            }
-            for (CanvasStickyNote note : graph.getStickyNotes()) {
-                if (note.getPosX() >= selMinX - 10 && note.getPosY() >= selMinY - 10
-                        && note.getPosX() + note.getWidth() <= selMaxX + 10
-                        && note.getPosY() + note.getHeight() <= selMaxY + 10) {
-                    capturedNotes.add(note);
-                }
-            }
+            capturedNotes.addAll(findSpatiallyEnclosedNotes(graph, selectedNodes));
         }
 
         for (CanvasGroupFrame f : capturedFrames) {
@@ -173,94 +144,239 @@ public final class FlowGraphModuleHandler {
             graph.removeStickyNote(note);
             subGraph.addStickyNote(note);
         }
+    }
 
-        // Add net external inputs and record port origins
-        for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
-            IngredientStack original = entry.getKey();
-            double ratePerSec = entry.getValue();
-            IngredientStack netIn = original.isFluid()
-                ? IngredientStack.fluid(original.getId(), original.getDisplayName(), ratePerSec, 1.0)
-                : IngredientStack.item(original.getId(), original.getDisplayName(), ratePerSec, 1.0);
-            moduleNode.addInput(netIn);
+    private static boolean isFrameStrictlyInside(CanvasGroupFrame inner, CanvasGroupFrame outer) {
+        return inner.getPosX() >= outer.getPosX() - 5
+                && inner.getPosY() >= outer.getPosY() - 5
+                && inner.getPosX() + inner.getWidth() <= outer.getPosX() + outer.getWidth() + 5
+                && inner.getPosY() + inner.getHeight() <= outer.getPosY() + outer.getHeight() + 5;
+    }
 
-            List<RecipeNode.PortOrigin> origins = new ArrayList<>();
-            for (RecipeNode sn : selectedNodes) {
-                for (int pInIdx = 0; pInIdx < sn.getInputs().size(); pInIdx++) {
-                    if (sn.getInputs().get(pInIdx).equals(original)) {
-                        origins.add(new RecipeNode.PortOrigin(sn.getId(), pInIdx));
+    private static List<CanvasGroupFrame> findCandidateFrames(FlowGraph graph, Set<String> selectedIdSet) {
+        List<CanvasGroupFrame> candidateFrames = new ArrayList<>();
+        for (CanvasGroupFrame f : graph.getFrames()) {
+            List<RecipeNode> enclosed = f.getEnclosedNodes(graph);
+            if (!enclosed.isEmpty()) {
+                boolean allSelected = true;
+                for (RecipeNode n : enclosed) {
+                    if (!selectedIdSet.contains(n.getId())) {
+                        allSelected = false;
+                        break;
                     }
                 }
-            }
-            moduleNode.getModuleInputOrigins().add(origins);
-        }
-
-        // Add net external outputs and record port origins
-        for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
-            IngredientStack original = entry.getKey();
-            double ratePerSec = entry.getValue();
-            IngredientStack netOut = original.isFluid()
-                ? IngredientStack.fluid(original.getId(), original.getDisplayName(), ratePerSec, 1.0)
-                : IngredientStack.item(original.getId(), original.getDisplayName(), ratePerSec, 1.0);
-            moduleNode.addOutput(netOut);
-
-            List<RecipeNode.PortOrigin> origins = new ArrayList<>();
-            for (RecipeNode sn : selectedNodes) {
-                for (int pOutIdx = 0; pOutIdx < sn.getOutputs().size(); pOutIdx++) {
-                    if (sn.getOutputs().get(pOutIdx).equals(original)) {
-                        origins.add(new RecipeNode.PortOrigin(sn.getId(), pOutIdx));
-                    }
+                if (allSelected) {
+                    candidateFrames.add(f);
                 }
             }
-            moduleNode.getModuleOutputOrigins().add(origins);
         }
+        return candidateFrames;
+    }
 
-        // 5. External connections rewiring
-        List<FlowGraph.ConnectionEdge> externalEdges = new ArrayList<>();
+    private static CanvasGroupFrame findTightestFrame(List<CanvasGroupFrame> frames) {
+        CanvasGroupFrame tightest = null;
+        double minArea = Double.MAX_VALUE;
+        for (CanvasGroupFrame f : frames) {
+            double area = f.getWidth() * f.getHeight();
+            if (area < minArea) {
+                minArea = area;
+                tightest = f;
+            }
+        }
+        return tightest;
+    }
+
+    private static Set<CanvasStickyNote> findSpatiallyEnclosedNotes(FlowGraph graph, List<RecipeNode> selectedNodes) {
+        Set<CanvasStickyNote> notes = new HashSet<>();
+        double selMinX = Double.MAX_VALUE, selMinY = Double.MAX_VALUE;
+        double selMaxX = -Double.MAX_VALUE, selMaxY = -Double.MAX_VALUE;
+        for (RecipeNode n : selectedNodes) {
+            selMinX = Math.min(selMinX, n.getPosX());
+            selMinY = Math.min(selMinY, n.getPosY());
+            selMaxX = Math.max(selMaxX, n.getPosX() + n.getCardWidth());
+            selMaxY = Math.max(selMaxY, n.getPosY() + (n.getCardHeight() > 0 ? n.getCardHeight() : 160));
+        }
+        for (CanvasStickyNote note : graph.getStickyNotes()) {
+            if (note.getPosX() >= selMinX - 10 && note.getPosY() >= selMinY - 10
+                    && note.getPosX() + note.getWidth() <= selMaxX + 10
+                    && note.getPosY() + note.getHeight() <= selMaxY + 10) {
+                notes.add(note);
+            }
+        }
+        return notes;
+    }
+
+    private static void allocateModulePortsAndRewireEdges(
+            FlowGraph graph,
+            FlowGraph subGraph,
+            List<RecipeNode> selectedNodes,
+            Set<String> selectedIdSet,
+            BalanceSummary summary,
+            RecipeNode moduleNode,
+            List<FlowGraph.ConnectionEdge> externalEdges
+    ) {
+        Map<PortKey, Integer> inPortMap = new LinkedHashMap<>();
+        Map<PortKey, Integer> outPortMap = new LinkedHashMap<>();
+
+        allocateIncomingBoundaryPorts(graph, moduleNode, selectedIdSet, inPortMap, externalEdges);
+        allocateOutgoingBoundaryPorts(graph, moduleNode, selectedIdSet, outPortMap, externalEdges);
+
+        allocateUnconnectedNetInputs(summary, selectedNodes, moduleNode, inPortMap);
+        allocateUnconnectedNetOutputs(summary, selectedNodes, moduleNode, outPortMap);
+
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             boolean fromSelected = selectedIdSet.contains(edge.fromNodeId());
             boolean toSelected = selectedIdSet.contains(edge.toNodeId());
-
-            if (fromSelected && !toSelected) {
-                // Outgoing wire from module to outside
-                RecipeNode origFrom = graph.findNodeById(edge.fromNodeId());
-                if (origFrom != null && edge.outputIndex() < origFrom.getOutputs().size()) {
-                    IngredientStack outStack = origFrom.getOutputs().get(edge.outputIndex());
-                    // Find matching output port on moduleNode
-                    for (int mOutIdx = 0; mOutIdx < moduleNode.getOutputs().size(); mOutIdx++) {
-                        if (moduleNode.getOutputs().get(mOutIdx).equals(outStack)) {
-                            externalEdges.add(new FlowGraph.ConnectionEdge(moduleNode.getId(), mOutIdx, edge.toNodeId(), edge.inputIndex()));
-                            break;
-                        }
-                    }
-                }
-            } else if (!fromSelected && toSelected) {
-                // Incoming wire from outside into module
-                RecipeNode origTo = graph.findNodeById(edge.toNodeId());
-                if (origTo != null && edge.inputIndex() < origTo.getInputs().size()) {
-                    IngredientStack inStack = origTo.getInputs().get(edge.inputIndex());
-                    // Find matching input port on moduleNode
-                    for (int mInIdx = 0; mInIdx < moduleNode.getInputs().size(); mInIdx++) {
-                        if (moduleNode.getInputs().get(mInIdx).equals(inStack)) {
-                            externalEdges.add(new FlowGraph.ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), moduleNode.getId(), mInIdx));
-                            break;
-                        }
-                    }
-                }
-            } else if (!fromSelected && !toSelected) {
-                // Unrelated wire outside
+            if (!fromSelected && !toSelected) {
                 externalEdges.add(edge);
             }
         }
+    }
 
-        // 6. Update this graph
+    private static void allocateIncomingBoundaryPorts(
+            FlowGraph graph,
+            RecipeNode moduleNode,
+            Set<String> selectedIdSet,
+            Map<PortKey, Integer> inPortMap,
+            List<FlowGraph.ConnectionEdge> externalEdges
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            boolean fromSelected = selectedIdSet.contains(edge.fromNodeId());
+            boolean toSelected = selectedIdSet.contains(edge.toNodeId());
+            if (!fromSelected && toSelected) {
+                PortKey key = new PortKey(edge.toNodeId(), edge.inputIndex());
+                int modulePortIdx;
+                if (!inPortMap.containsKey(key)) {
+                    RecipeNode targetNode = graph.findNodeById(edge.toNodeId());
+                    if (targetNode != null && edge.inputIndex() < targetNode.getInputs().size()) {
+                        IngredientStack orig = targetNode.getInputs().get(edge.inputIndex());
+                        double reqRate = targetNode.getInputSlotRate(edge.inputIndex(), true);
+                        IngredientStack portStack = orig.isFluid()
+                                ? IngredientStack.fluid(orig.getId(), orig.getDisplayName(), reqRate, 1.0)
+                                : IngredientStack.item(orig.getId(), orig.getDisplayName(), reqRate, 1.0);
+                        modulePortIdx = moduleNode.getInputs().size();
+                        moduleNode.addInput(portStack);
+                        moduleNode.getModuleInputOrigins().add(new ArrayList<>(List.of(
+                                new RecipeNode.PortOrigin(edge.toNodeId(), edge.inputIndex())
+                        )));
+                        inPortMap.put(key, modulePortIdx);
+                    } else {
+                        continue;
+                    }
+                } else {
+                    modulePortIdx = inPortMap.get(key);
+                }
+                externalEdges.add(new FlowGraph.ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), moduleNode.getId(), modulePortIdx));
+            }
+        }
+    }
+
+    private static void allocateOutgoingBoundaryPorts(
+            FlowGraph graph,
+            RecipeNode moduleNode,
+            Set<String> selectedIdSet,
+            Map<PortKey, Integer> outPortMap,
+            List<FlowGraph.ConnectionEdge> externalEdges
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            boolean fromSelected = selectedIdSet.contains(edge.fromNodeId());
+            boolean toSelected = selectedIdSet.contains(edge.toNodeId());
+            if (fromSelected && !toSelected) {
+                PortKey key = new PortKey(edge.fromNodeId(), edge.outputIndex());
+                int modulePortIdx;
+                if (!outPortMap.containsKey(key)) {
+                    RecipeNode sourceNode = graph.findNodeById(edge.fromNodeId());
+                    if (sourceNode != null && edge.outputIndex() < sourceNode.getOutputs().size()) {
+                        IngredientStack orig = sourceNode.getOutputs().get(edge.outputIndex());
+                        double prodRate = sourceNode.getOutputSlotRate(edge.outputIndex(), true);
+                        IngredientStack portStack = orig.isFluid()
+                                ? IngredientStack.fluid(orig.getId(), orig.getDisplayName(), prodRate, 1.0)
+                                : IngredientStack.item(orig.getId(), orig.getDisplayName(), prodRate, 1.0);
+                        modulePortIdx = moduleNode.getOutputs().size();
+                        moduleNode.addOutput(portStack);
+                        moduleNode.getModuleOutputOrigins().add(new ArrayList<>(List.of(
+                                new RecipeNode.PortOrigin(edge.fromNodeId(), edge.outputIndex())
+                        )));
+                        outPortMap.put(key, modulePortIdx);
+                    } else {
+                        continue;
+                    }
+                } else {
+                    modulePortIdx = outPortMap.get(key);
+                }
+                externalEdges.add(new FlowGraph.ConnectionEdge(moduleNode.getId(), modulePortIdx, edge.toNodeId(), edge.inputIndex()));
+            }
+        }
+    }
+
+    private static void allocateUnconnectedNetInputs(
+            BalanceSummary summary,
+            List<RecipeNode> selectedNodes,
+            RecipeNode moduleNode,
+            Map<PortKey, Integer> inPortMap
+    ) {
+        for (Map.Entry<IngredientStack, Double> entry : summary.rawInputs().entrySet()) {
+            IngredientStack original = entry.getKey();
+            List<RecipeNode.PortOrigin> unassignedOrigins = new ArrayList<>();
+            for (RecipeNode sn : selectedNodes) {
+                for (int pInIdx = 0; pInIdx < sn.getInputs().size(); pInIdx++) {
+                    if (sn.getInputs().get(pInIdx).equals(original) && !inPortMap.containsKey(new PortKey(sn.getId(), pInIdx))) {
+                        unassignedOrigins.add(new RecipeNode.PortOrigin(sn.getId(), pInIdx));
+                    }
+                }
+            }
+
+            if (!unassignedOrigins.isEmpty()) {
+                double ratePerSec = entry.getValue();
+                IngredientStack netIn = original.isFluid()
+                        ? IngredientStack.fluid(original.getId(), original.getDisplayName(), ratePerSec, 1.0)
+                        : IngredientStack.item(original.getId(), original.getDisplayName(), ratePerSec, 1.0);
+                moduleNode.addInput(netIn);
+                moduleNode.getModuleInputOrigins().add(unassignedOrigins);
+            }
+        }
+    }
+
+    private static void allocateUnconnectedNetOutputs(
+            BalanceSummary summary,
+            List<RecipeNode> selectedNodes,
+            RecipeNode moduleNode,
+            Map<PortKey, Integer> outPortMap
+    ) {
+        for (Map.Entry<IngredientStack, Double> entry : summary.netOutputs().entrySet()) {
+            IngredientStack original = entry.getKey();
+            List<RecipeNode.PortOrigin> unassignedOrigins = new ArrayList<>();
+            for (RecipeNode sn : selectedNodes) {
+                for (int pOutIdx = 0; pOutIdx < sn.getOutputs().size(); pOutIdx++) {
+                    if (sn.getOutputs().get(pOutIdx).equals(original) && !outPortMap.containsKey(new PortKey(sn.getId(), pOutIdx))) {
+                        unassignedOrigins.add(new RecipeNode.PortOrigin(sn.getId(), pOutIdx));
+                    }
+                }
+            }
+
+            if (!unassignedOrigins.isEmpty()) {
+                double ratePerSec = entry.getValue();
+                IngredientStack netOut = original.isFluid()
+                        ? IngredientStack.fluid(original.getId(), original.getDisplayName(), ratePerSec, 1.0)
+                        : IngredientStack.item(original.getId(), original.getDisplayName(), ratePerSec, 1.0);
+                moduleNode.addOutput(netOut);
+                moduleNode.getModuleOutputOrigins().add(unassignedOrigins);
+            }
+        }
+    }
+
+    private static void updateGraphWithModule(
+            FlowGraph graph,
+            List<RecipeNode> selectedNodes,
+            RecipeNode moduleNode,
+            List<FlowGraph.ConnectionEdge> externalEdges
+    ) {
         for (RecipeNode n : selectedNodes) {
             graph.removeNode(n);
         }
         graph.addNode(moduleNode);
         graph.getConnections().clear();
         graph.getConnections().addAll(externalEdges);
-
-        return moduleNode;
     }
 
     /**

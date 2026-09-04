@@ -30,6 +30,7 @@ import java.util.List;
 public class ThermalModAdapter implements IModAdapter {
 
     static {
+        ThermalProperties.init();
         com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.THERMAL_AUGMENT, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon(id, name, desc, icon));
     }
 
@@ -63,8 +64,10 @@ public class ThermalModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getMachineIcon() != null && node.getMachineIcon().getNamespace().equalsIgnoreCase("gtceu") && node.getMachineIcon().getPath().contains("boiler")) {
-            return false;
+        if (node.getMachineIcon() != null && "gtceu".equalsIgnoreCase(node.getMachineIcon().getNamespace())) {
+            if (com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isBoilerRecipe(node)) {
+                return false;
+            }
         }
         return ThermalAugmentHelper.isThermalMachine(node);
     }
@@ -232,14 +235,37 @@ public class ThermalModAdapter implements IModAdapter {
         return EnergyType.ELECTRIC_FE;
     }
 
+    private static final java.util.Set<ResourceLocation> WATER_FLUID_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("minecraft:water"),
+            ResourceLocation.tryParse("minecraft:flowing_water")
+    );
+    private static final java.util.Set<ResourceLocation> STEAM_FLUID_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("gtceu:steam"),
+            ResourceLocation.tryParse("thermal:steam"),
+            ResourceLocation.tryParse("systeams:steamier"),
+            ResourceLocation.tryParse("systeams:steamiest"),
+            ResourceLocation.tryParse("systeams:steamiester"),
+            ResourceLocation.tryParse("systeams:steamiestest")
+    );
+
+    private static boolean isWaterFluid(ResourceLocation id) {
+        if (id == null) return false;
+        return WATER_FLUID_IDS.contains(id) || id.getPath().equals("water");
+    }
+
+    private static boolean isSteamFluid(ResourceLocation id) {
+        if (id == null) return false;
+        return STEAM_FLUID_IDS.contains(id) || id.getPath().equals("steam");
+    }
+
     @Override
     public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
         if (node == null || stack == null) return defaultRate;
         double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
-        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+        if (isInput && stack.isFluid() && isWaterFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
-        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+        if (!isInput && stack.isFluid() && isSteamFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
         return defaultRate;
@@ -249,10 +275,10 @@ public class ThermalModAdapter implements IModAdapter {
     public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
         if (node == null || stack == null) return defaultRate;
         double fuelEnergyMult = Math.max(0.01, node.getCombinedDurationMultiplier());
-        if (isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("water")) {
+        if (isInput && stack.isFluid() && isWaterFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
-        if (!isInput && stack.isFluid() && stack.getId() != null && stack.getId().getPath().contains("steam")) {
+        if (!isInput && stack.isFluid() && isSteamFluid(stack.getId())) {
             return defaultRate * fuelEnergyMult;
         }
         return defaultRate;

@@ -70,7 +70,7 @@ public class CreateModGuiHandler implements IModGuiHandler {
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
-            node.cycleRpm(button == 1 ? -1 : 1);
+            com.gtceu.calcboard.compat.create.CreateProperties.cycleRpm(node, button == 1 ? -1 : 1);
             if (widget.getParent() != null) widget.getParent().markSummaryDirty();
             widget.invalidateCache();
             Minecraft.getInstance().getSoundManager().play(
@@ -85,7 +85,7 @@ public class CreateModGuiHandler implements IModGuiHandler {
     public boolean handleControlScroll(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, double delta) {
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
-            node.cycleRpm(delta > 0 ? 1 : -1);
+            com.gtceu.calcboard.compat.create.CreateProperties.cycleRpm(node, delta > 0 ? 1 : -1);
             if (widget.getParent() != null) widget.getParent().markSummaryDirty();
             widget.invalidateCache();
             Minecraft.getInstance().getSoundManager().play(

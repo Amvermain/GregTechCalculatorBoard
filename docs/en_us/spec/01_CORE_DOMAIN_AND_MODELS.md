@@ -76,10 +76,15 @@ classDiagram
         +double efficiency
         +Set~Integer~ hiddenInputIndices
         +Set~Integer~ hiddenOutputIndices
+        +Set~Integer~ voidedOutputIndices
+        +SupplyMode supplyMode
         +hideInputPort(int) void
         +unhideInputPort(int) void
         +hideOutputPort(int) void
         +unhideOutputPort(int) void
+        +isOutputPortVoided(int) boolean
+        +setOutputPortVoided(int, boolean) void
+        +isVoidSink() boolean
         +getVisibleInputIndices() List~Integer~
         +getVisibleOutputIndices() List~Integer~
         +getTotalHiddenCount() int
@@ -96,6 +101,7 @@ classDiagram
   - `RecipeNode` is a pure calculation domain entity across all supported mods (Create, Thermal, GTCEu, Vanilla, etc.).
   - Contains no hardcoded mod branches; machine icon change handling (`setMachineIcon`), physical energy type resolution (`getEnergyType`), single machine power computation (`computeSingleMachinePower`), node operational validation (`validateNode`), and multiblock BOM calculation (`buildMultiblockBOM`) are delegated dynamically via `ModAdapterRegistry.getAdapterForNode(this)`.
 * **`hiddenInputIndices` / `hiddenOutputIndices`**: Set of integer port indices hidden by the user to reduce visual clutter on cards. Persisted via `RecipeNodeSerializer`. Renderers and wire solvers invoke `getVisibleInputIndices()` / `getVisibleOutputIndices()` to filter rendered and active ports.
+* **`voidedOutputIndices` & `isVoidSink()` (ADR-019)**: Set of output port indices excluded from net product summary, and query method for Junction void sink (`SupplyMode.VOID_SINK`). Integrated with mass balance solvers (`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`) to void surplus byproducts while prioritizing downstream consumers.
 * **`isFlipped`**: Horizontally inverts the input (left) and output (right) socket ports to eliminate wire crossings in complex flowcharts.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: Machine utilization computed by solvers (`FlowGraphSolver`, `MassBalanceSolver`) subject to upstream supply limits and closed-loop cycles.
 * **`calculateEffectiveOutputRates()`**: Computes per-second output flow combining machine count, parallel multiplier, overclocking, sub-tick batching, addon compounding, and byproduct tier chance boosts.
@@ -176,6 +182,44 @@ To preserve `RecipeNode` as a pure POJO domain model, rate integration and works
 
 ---
 
+### 1.8 `SupplyMode` & External Flow Model (ADR-012)
+Defines infinite resource supply or specified fixed per-second rates for Junction nodes and raw material ingress points.
+
+```java
+public enum SupplyMode {
+    NONE,         // No external supply (relies entirely on connected upstream node flow)
+    INFINITE,     // Infinite resource supply (blocks upstream demand propagation, satisfies 100% downstream demand)
+    FIXED_RATE    // Fixed rate supply (supplies up to externalSupplyRate items/s or mB/s)
+}
+```
+
+* **`RecipeNode` External Supply Properties**:
+  - `supplyMode` (`SupplyMode`, default `NONE`): External supply mode of the node.
+  - `externalSupplyRate` (`double`, default `0.0`): Fixed external supply rate in items/s or mB/s when in `FIXED_RATE` mode.
+  - `customParallel` (`int`, default `0`): User-specified custom manual parallel count.
+
+---
+
+### 1.9 `BoardPage` Hierarchical Folder & AE2 Binding Model (ADR-008, ADR-012)
+Categorizes multi-canvas pages in a workspace using virtual hierarchical folder paths (`folderPath`) and supports 1:1 binding to AE2 processing pattern IDs (`ae2PatternId`).
+
+```java
+public class BoardPage {
+    private final String id;
+    private String name;
+    private String folderPath;           // Hierarchical directory path (e.g. "Chemical/Polymers")
+    private ResourceLocation ae2PatternId; // 1:1 bound AE2 processing pattern ID
+    private final FlowGraph graph;
+    private final List<CanvasGroupFrame> frames;
+    private final List<CanvasStickyNote> stickyNotes;
+}
+```
+
+* **Hierarchical Folder Path (`folderPath`)**: Slash-delimited virtual directory path integrated with `PageBrowserDrawer` for managing hundreds of pages in expandable folder trees.
+* **AE2 Pattern ID Binding (`ae2PatternId`)**: Binds the entire flowchart process to an AE2 processing pattern for precision pipeline ETA evaluation and live autocrafting monitoring.
+
+---
+
 ## 2. Deterministic Capability Matrix (`CategoryCapabilityMatrix`)
 
 An $O(1)$ immutable global cache built during game initialization via deductive analysis to eliminate heuristic tooltip string parsing.
@@ -201,11 +245,31 @@ flowchart LR
     end
 ```
 
+### 2.1 Hardware Addon Categories & Multiblock Trait Addons (`AddonCategory`, `MachineAddon`)
+Classifies hardware chips expanding physical machine capabilities into standardized categories:
+
+* **`AddonCategory`**:
+  - `COIL`: Heating Coil Blocks (EBF temperature bonuses and energy discounts)
+  - `PARALLEL`: Parallel Control Hatches (4x to 256x parallels)
+  - `MAINTENANCE`: Maintenance Hatches (10% duration reductions, etc.)
+  - `ROTOR`: Large Turbine Rotors (efficiency & flow rate multipliers)
+  - `REFLECTOR`: Fusion Reflectors (tier-dependent slowdown multipliers)
+  - `ENERGY_HATCH` / `HATCH_BUS`: Multiblock power and I/O buses
+  - `THREADING`: Threading Helices (multi-pipeline throughput)
+  - `THERMAL_AUGMENT`: Thermal Series augments and upgrade kits
+  - `MULTIBLOCK_TRAIT`: GTCEu multiblock intrinsic traits
+  - `CUSTOM`: User-defined custom hardware multipliers
+* **GTCEu Multiblock Intrinsic Traits (`MULTIBLOCK_TRAIT`)**:
+  - `THROUGHPUT_BOOSTING`: 4x Parallels, 1.6x Duration, 0.95x EU (Pyrolyse Oven, Super Cracker)
+  - `BULK_PROCESSING`: 16x Parallels, 13x Duration (23% effective speedup)
+  - `BATCH_MODE`: Enables multi-recipe batch processing without penalty
+  - `OVERPRESSURE`: 8x Parallels, 1.5x Duration, 1.25x EU (Autoclave)
+
 ---
 
-## 3. Compound Module System (`FlowGraphModuleHandler`)
+## 3. Compound Modules & Progressive Assembly (`FlowGraphModuleHandler`, `CompoundRecipeBuilder`)
 
-Packages multi-node subgraphs into a single compact compound module card (`Ctrl+G`) or expands them back into full subgraphs.
+Packages multi-node subgraphs into a single compact compound module card (`Ctrl+G`) or expands them back into full subgraphs, and builds chained cards for Create Sequenced Assembly recipes.
 
 ```mermaid
 flowchart LR
@@ -226,6 +290,7 @@ flowchart LR
 1. **Boundary I/O Promotion**: Intermediate wires between internal nodes are encapsulated; only external feedstock and end-products are promoted to outer card socket ports.
 2. **Wire Remapping**: External `ConnectionEdge` instances are remapped to the newly created compound card ports.
 3. **Proportional Scaling**: Changing machine count on the compound card proportionally scales all internal machine counts and flow rates.
+4. **Distinct Sequenced Assembly Machine Icons (`CompoundRecipeBuilder.LayerSpec`)**: Automatically extracts and assigns distinct machine icons (Deployer, Spout, Mechanical Press, Mechanical Saw) for each intermediate step in Create Sequenced Assembly compound cards.
 
 ---
 
@@ -289,6 +354,77 @@ Remembers preferred machine models, voltage tiers, parallel factors, overclock m
 * **Preset Manager (`CategoryMachinePresetManager`)**:
   - Singleton in-memory registry and NBT persistence manager (`serializeNBT` / `deserializeNBT`).
   - Provides CRUD interfaces via `BoardSettingsDialog` and `MachineConfigDialog`.
+
+## 9. Search Domain Model & Headless Recipe Provider SPI (`SearchableRecipe`, `ILevelRecipeProvider`) (ADR-009)
+
+Decouples recipe indexing, searching, and instantiation from the client GUI layer, enabling pure core domain and headless/dedicated server operations.
+
+* **`SearchableRecipe` (Lightweight Search Record)**:
+  ```java
+  public record SearchableRecipe(
+      ResourceLocation id,
+      ResourceLocation categoryId,
+      String displayName,
+      List<IngredientStack> inputs,
+      List<IngredientStack> outputs,
+      double durationTicks,
+      double eut,
+      GTVoltageTier tier,
+      Object rawRecipe
+  )
+  ```
+* **`ILevelRecipeProvider` (Headless Recipe Provider SPI)**:
+  - Abstraction interface providing `SearchableRecipe` instances from vanilla `Level.getRecipeManager()` when client-side recipe viewers (EMI/JEI) are absent or in dedicated server environments.
+  - Enables zero-GUI-dependency $O(1)$ recipe indexing and domain node spawning.
+
+---
+
+## 10. Machine Hardware Template Model (`MachineHardwareTemplate`) (ADR-012)
+
+Encapsulates machine hardware configurations (tier, parallel count, overclock mode, installed addons, threading config, and node properties) into an independent preset template for one-click cloning and multi-selection application across nodes.
+
+```java
+public class MachineHardwareTemplate {
+    private String id;
+    private String name;
+    private GTVoltageTier targetTier;
+    private int parallel;
+    private OverclockMode overclockMode;
+    private SteamMode steamMode;
+    private List<MachineAddon> addons;
+    private NodePropertyStore properties;
+    private NodeThreadingConfig threadingConfig;
+
+    public void applyTo(RecipeNode targetNode) { ... }
+    public static MachineHardwareTemplate fromNode(String name, RecipeNode sourceNode) { ... }
+}
+```
+
+* **Hardware Extraction (`fromNode`)**: Copies tier, parallel, addons, and property store from a source node to generate an immutable template.
+* **Hardware Injection (`applyTo`)**: Injects hardware specifications into a target node while preserving its recipe inputs/outputs and baseline recipe tier requirement ($\text{recipeTier}$).
+
+---
+
+## 11. Flow Control & Visualization Enums (SupplyMode, WireAnimationMode) (ADR-018, ADR-019)
+
+### 11.1 `SupplyMode` (Junction Node Supply Mode Enum)
+Defines external supply and byproduct voiding behaviors for Junction (reroute) nodes:
+
+| Mode (SupplyMode) | Serialized Key | Translation Key | Description |
+| :--- | :--- | :--- | :--- |
+| `NONE` | `NONE` | `gui.gtcalcboard.junction.supply_mode.none` | Standard pass-through relay between upstream and downstream ports |
+| `INFINITE` | `INFINITE` | `gui.gtcalcboard.junction.supply_mode.infinite` | Infinite supply mode (assumes limitless external input; blocks backward demand) |
+| `FIXED_RATE` | `FIXED_RATE` | `gui.gtcalcboard.junction.supply_mode.fixed_rate` | Fixed external supply rate mode (injects user-configured flow rate) |
+| `VOID_SINK` | `VOID_SINK` | `gui.gtcalcboard.junction.supply_mode.void_sink` | **Void Sink Mode** (absorbs & deletes surplus flow; isolates backward demand; strictly prioritizes downstream machines in 1:N branches) |
+
+### 11.2 `WireAnimationMode` (Wire Flow Animation Mode Enum)
+Controls pulse dot rendering behaviors on canvas connection wires:
+
+| Mode (WireAnimationMode) | Config Index | Translation Key | Behavior & Visualization |
+| :--- | :--- | :--- | :--- |
+| `RATE_MODULATED` | `0` | `gui.gtcalcboard.wire_anim.rate_modulated` | **Rate Modulated (Default)**: Speed modulation, duty cycle stutter/stall, and 3-stage RGB interpolation (Cyan $\to$ Amber $\to$ Crimson) based on saturation ratio ($R = \text{Supply}/\text{Demand}$). Pulsing amber glow on starved machines |
+| `UNIFORM` | `1` | `gui.gtcalcboard.wire_anim.uniform` | **Uniform Pulse**: Constant travel speed and single color irrespective of flow rates |
+| `DISABLED` | `2` | `gui.gtcalcboard.wire_anim.disabled` | **Disabled**: Pulse dot rendering skipped on wires |
 
 ---
 

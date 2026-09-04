@@ -1,5 +1,12 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
+import com.gregtechceu.gtceu.api.GTCEuAPI;
+import com.gregtechceu.gtceu.api.machine.MultiblockMachineDefinition;
+import com.gregtechceu.gtceu.api.pattern.BlockPattern;
+import com.gregtechceu.gtceu.api.pattern.TraceabilityPredicate;
+import com.gregtechceu.gtceu.api.pattern.predicates.PredicateBlocks;
+import com.gregtechceu.gtceu.api.pattern.predicates.PredicateStates;
+import com.gregtechceu.gtceu.api.pattern.predicates.SimplePredicate;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -7,17 +14,56 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
-/**
- * Deterministic runtime reflection scanner for GTCEu Modern BlockPattern and TraceabilityPredicate.
- * Extracts all supported PartAbility types and candidate structure blocks without heuristics.
- */
 public final class GTCEuPatternScanner {
 
     private GTCEuPatternScanner() {}
+
+    private static final Field BLOCK_MATCHES_FIELD;
+    private static final Field CANDIDATES_FIELD;
+    private static final Method PART_ABILITY_IS_APPLICABLE;
+    private static final Map<Object, String> KNOWN_PART_ABILITIES = new IdentityHashMap<>();
+    private static final Field STAT_BLOCKS_FIELD;
+
+    static {
+        Field fMatches = null;
+        try {
+            fMatches = BlockPattern.class.getDeclaredField("blockMatches");
+            fMatches.setAccessible(true);
+        } catch (Throwable ignored) {}
+        BLOCK_MATCHES_FIELD = fMatches;
+
+        Field fCand = null;
+        try {
+            fCand = SimplePredicate.class.getField("candidates");
+        } catch (Throwable ignored) {}
+        CANDIDATES_FIELD = fCand;
+
+        Method mIsApplicable = null;
+        try {
+            Class<?> partAbilityCls = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.PartAbility");
+            mIsApplicable = partAbilityCls.getMethod("isApplicable", Block.class);
+            for (Field f : partAbilityCls.getFields()) {
+                if (Modifier.isStatic(f.getModifiers()) && partAbilityCls.isAssignableFrom(f.getType())) {
+                    Object abilityObj = f.get(null);
+                    if (abilityObj != null) {
+                        KNOWN_PART_ABILITIES.put(abilityObj, f.getName().toUpperCase(Locale.ROOT));
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        PART_ABILITY_IS_APPLICABLE = mIsApplicable;
+
+        Field fStat = null;
+        try {
+            Class<?> statBlocksCls = Class.forName("com.startechnology.start_core.machine.threading.StarTThreadingStatBlocks");
+            fStat = statBlocksCls.getField("statBlocks");
+        } catch (Throwable ignored) {}
+        STAT_BLOCKS_FIELD = fStat;
+    }
 
     public record PatternScanResult(
             Set<String> allowedAbilities,
@@ -30,285 +76,225 @@ public final class GTCEuPatternScanner {
     }
 
     public static PatternScanResult scanPattern(Object machineDef) {
-        if (machineDef == null) return PatternScanResult.EMPTY;
-
-        try {
-            Set<String> abilities = new HashSet<>();
-            Set<ResourceLocation> candidateBlocks = new HashSet<>();
-            int maxEnergy = 0;
-            int maxMaint = 0;
-            int maxParallel = 0;
-
-            Object pattern = extractBlockPattern(machineDef);
-            if (pattern != null) {
-                // 1. Scan pattern predicate map (where clauses)
-                Map<?, ?> predicatesMap = extractPredicatesMap(pattern);
-                if (predicatesMap != null) {
-                    for (Object predicateObj : predicatesMap.values()) {
-                        if (predicateObj == null) continue;
-                        inspectPredicate(predicateObj, abilities, candidateBlocks);
-                    }
-                }
-            }
-
-            // 2. Deduce abilities from MultiblockMachineDefinition recipeTypes and generator properties
-            enrichFromMachineDefinition(machineDef, abilities);
-
-            return new PatternScanResult(
-                    Collections.unmodifiableSet(abilities),
-                    Collections.unmodifiableSet(candidateBlocks),
-                    maxEnergy,
-                    maxMaint,
-                    maxParallel
-            );
-        } catch (Throwable ignored) {
+        if (!(machineDef instanceof MultiblockMachineDefinition multiDef)) {
             return PatternScanResult.EMPTY;
         }
+
+        Set<String> abilities = new HashSet<>();
+        Set<ResourceLocation> candidateBlocks = new HashSet<>();
+
+        scanPatternFactory(multiDef, abilities, candidateBlocks);
+        enrichFromMachineDefinition(multiDef, abilities);
+
+        return new PatternScanResult(
+                Collections.unmodifiableSet(abilities),
+                Collections.unmodifiableSet(candidateBlocks),
+                0, 0, 0
+        );
     }
 
-    private static Object extractBlockPattern(Object machineDef) {
+    private static void scanPatternFactory(MultiblockMachineDefinition multiDef, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (multiDef.getPatternFactory() == null) return;
+        BlockPattern pattern = multiDef.getPatternFactory().get();
+        if (pattern == null) return;
+
+        TraceabilityPredicate[][][] matches = extractBlockMatches(pattern);
+        if (matches != null) {
+            scanGrid(matches, abilities, candidateBlocks);
+        }
+    }
+
+    private static TraceabilityPredicate[][][] extractBlockMatches(BlockPattern pattern) {
+        if (BLOCK_MATCHES_FIELD == null) return null;
         try {
-            for (Method m : machineDef.getClass().getMethods()) {
-                if (m.getParameterCount() == 0 && (m.getName().equals("getPattern") || m.getName().equals("getStructurePattern"))) {
-                    m.setAccessible(true);
-                    Object res = m.invoke(machineDef);
-                    if (res != null) return res;
-                }
+            return (TraceabilityPredicate[][][]) BLOCK_MATCHES_FIELD.get(pattern);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void scanGrid(TraceabilityPredicate[][][] grid, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        for (TraceabilityPredicate[][] plane : grid) {
+            if (plane != null) scanPlane(plane, abilities, candidateBlocks);
+        }
+    }
+
+    private static void scanPlane(TraceabilityPredicate[][] plane, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        for (TraceabilityPredicate[] row : plane) {
+            if (row != null) scanRow(row, abilities, candidateBlocks);
+        }
+    }
+
+    private static void scanRow(TraceabilityPredicate[] row, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        for (TraceabilityPredicate pred : row) {
+            if (pred != null) scanTraceabilityPredicate(pred, abilities, candidateBlocks);
+        }
+    }
+
+    private static void scanTraceabilityPredicate(TraceabilityPredicate pred, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        scanSimpleList(pred.common, abilities, candidateBlocks);
+        scanSimpleList(pred.limited, abilities, candidateBlocks);
+    }
+
+    private static void scanSimpleList(List<SimplePredicate> list, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (list == null) return;
+        for (SimplePredicate sp : list) {
+            if (sp != null) scanSimplePredicate(sp, abilities, candidateBlocks);
+        }
+    }
+
+    private static void scanSimplePredicate(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (sp.type != null && !sp.type.isBlank()) {
+            abilities.add(sp.type.toUpperCase(Locale.ROOT));
+        }
+
+        if (sp instanceof PredicateBlocks pb) {
+            scanBlocksArray(pb.blocks, abilities, candidateBlocks);
+            return;
+        }
+
+        if (sp instanceof PredicateStates ps) {
+            scanStatesArray(ps.states, abilities, candidateBlocks);
+            return;
+        }
+
+        scanCandidatesSupplier(sp, abilities, candidateBlocks);
+    }
+
+    private static void scanBlocksArray(Block[] blocks, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (blocks == null) return;
+        for (Block b : blocks) {
+            scanBlock(b, abilities, candidateBlocks);
+        }
+    }
+
+    private static void scanStatesArray(BlockState[] states, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (states == null) return;
+        for (BlockState bs : states) {
+            if (bs != null) scanBlock(bs.getBlock(), abilities, candidateBlocks);
+        }
+    }
+
+    private static void scanCandidatesSupplier(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (CANDIDATES_FIELD == null) return;
+        try {
+            Object rawSupplier = CANDIDATES_FIELD.get(sp);
+            if (!(rawSupplier instanceof Supplier<?> supplier)) return;
+            Object rawInfos = supplier.get();
+            if (!(rawInfos instanceof Object[] arr)) return;
+
+            for (Object item : arr) {
+                if (item != null) scanCandidateItem(item, abilities, candidateBlocks);
             }
         } catch (Throwable ignored) {}
+    }
 
+    private static void scanCandidateItem(Object item, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (item instanceof Block b) {
+            scanBlock(b, abilities, candidateBlocks);
+            return;
+        }
+        if (item instanceof BlockState bs) {
+            scanBlock(bs.getBlock(), abilities, candidateBlocks);
+            return;
+        }
         try {
-            for (Field f : machineDef.getClass().getDeclaredFields()) {
-                if (f.getName().toLowerCase(Locale.ROOT).contains("pattern")) {
-                    f.setAccessible(true);
-                    Object val = f.get(machineDef);
-                    if (val instanceof Function<?, ?> func) {
-                        try {
-                            @SuppressWarnings("unchecked")
-                            Function<Object, Object> pFunc = (Function<Object, Object>) func;
-                            Object res = pFunc.apply(machineDef);
-                            if (res != null) return res;
-                        } catch (Throwable ignored) {}
-                    } else if (val != null) {
-                        return val;
-                    }
-                }
+            Method mGetBlockState = item.getClass().getMethod("getBlockState");
+            Object bState = mGetBlockState.invoke(item);
+            if (bState instanceof BlockState bs) {
+                scanBlock(bs.getBlock(), abilities, candidateBlocks);
             }
         } catch (Throwable ignored) {}
-
-        return null;
     }
 
-    private static Map<?, ?> extractPredicatesMap(Object pattern) {
-        if (pattern == null) return null;
-        for (Field f : pattern.getClass().getDeclaredFields()) {
-            if (Map.class.isAssignableFrom(f.getType())) {
-                f.setAccessible(true);
-                try {
-                    Object map = f.get(pattern);
-                    if (map instanceof Map<?, ?> m && !m.isEmpty()) {
-                        return m;
-                    }
-                } catch (Throwable ignored) {}
-            }
+    private static void scanBlock(Block b, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+        if (b == null) return;
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(b);
+        if (id != null && !id.getPath().equals("air")) {
+            candidateBlocks.add(id);
         }
-        for (Method m : pattern.getClass().getMethods()) {
-            if (m.getParameterCount() == 0 && Map.class.isAssignableFrom(m.getReturnType())) {
-                try {
-                    m.setAccessible(true);
-                    Object map = m.invoke(pattern);
-                    if (map instanceof Map<?, ?> resMap && !resMap.isEmpty()) {
-                        return resMap;
-                    }
-                } catch (Throwable ignored) {}
-            }
+
+        if (GTCEuAPI.HEATING_COILS.containsKey(b)) {
+            abilities.add("HEATING_COILS");
         }
-        return null;
+
+        matchPartAbilities(b, abilities);
     }
 
-    private static void inspectPredicate(Object pred, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
-        if (pred == null) return;
-        Class<?> cls = pred.getClass();
-        String clsName = cls.getName().toLowerCase(Locale.ROOT);
-
-        // 1. Check for PartAbility fields/methods
-        for (Field f : cls.getDeclaredFields()) {
-            f.setAccessible(true);
+    private static void matchPartAbilities(Block b, Set<String> abilities) {
+        if (PART_ABILITY_IS_APPLICABLE == null || KNOWN_PART_ABILITIES.isEmpty()) return;
+        for (Map.Entry<Object, String> entry : KNOWN_PART_ABILITIES.entrySet()) {
             try {
-                Object val = f.get(pred);
-                if (val != null) {
-                    extractAbilityFromObject(val, abilities);
-                    extractBlocksFromObject(val, candidateBlocks);
+                Object isApp = PART_ABILITY_IS_APPLICABLE.invoke(entry.getKey(), b);
+                if (isApp instanceof Boolean bool && bool) {
+                    abilities.add(entry.getValue());
                 }
             } catch (Throwable ignored) {}
         }
-
-        for (Method m : cls.getMethods()) {
-            if (m.getParameterCount() == 0) {
-                try {
-                    String mName = m.getName().toLowerCase(Locale.ROOT);
-                    if (mName.contains("ability") || mName.contains("abilities") || mName.contains("part")) {
-                        m.setAccessible(true);
-                        Object res = m.invoke(pred);
-                        extractAbilityFromObject(res, abilities);
-                    } else if (mName.contains("block") || mName.contains("candidate") || mName.contains("state")) {
-                        m.setAccessible(true);
-                        Object res = m.invoke(pred);
-                        extractBlocksFromObject(res, candidateBlocks);
-                    }
-                } catch (Throwable ignored) {}
-            }
-        }
-
-        // Recursively inspect inner / chained predicates (e.g. OrPredicate, AndPredicate)
-        if (clsName.contains("or") || clsName.contains("and") || clsName.contains("composite") || clsName.contains("chain")) {
-            for (Field f : cls.getDeclaredFields()) {
-                if (f.getType().isArray() || Collection.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    try {
-                        Object container = f.get(pred);
-                        if (container instanceof Object[] arr) {
-                            for (Object inner : arr) inspectPredicate(inner, abilities, candidateBlocks);
-                        } else if (container instanceof Iterable<?> it) {
-                            for (Object inner : it) inspectPredicate(inner, abilities, candidateBlocks);
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-        }
     }
 
-    private static void extractAbilityFromObject(Object obj, Set<String> abilities) {
-        if (obj == null) return;
-        if (obj instanceof Enum<?> e) {
-            abilities.add(e.name().toUpperCase(Locale.ROOT));
-        } else if (obj instanceof Iterable<?> it) {
-            for (Object item : it) extractAbilityFromObject(item, abilities);
-        } else if (obj.getClass().isArray()) {
-            for (Object item : (Object[]) obj) extractAbilityFromObject(item, abilities);
-        } else {
-            try {
-                Method mGetName = obj.getClass().getMethod("getName");
-                Object nameRes = mGetName.invoke(obj);
-                if (nameRes != null) {
-                    abilities.add(nameRes.toString().trim().toUpperCase(Locale.ROOT));
-                }
-            } catch (Throwable ignored) {}
-            try {
-                Method mName = obj.getClass().getMethod("name");
-                Object nameRes = mName.invoke(obj);
-                if (nameRes != null) {
-                    abilities.add(nameRes.toString().trim().toUpperCase(Locale.ROOT));
-                }
-            } catch (Throwable ignored) {}
-
-            String str = obj.toString().toUpperCase(Locale.ROOT);
-            if (str.contains("INPUT_ENERGY") || str.contains("IMPORT_ITEMS") || str.contains("EXPORT_ITEMS")
-                    || str.contains("IMPORT_FLUIDS") || str.contains("EXPORT_FLUIDS") || str.contains("MAINTENANCE")
-                    || str.contains("PARALLEL_HATCH") || str.contains("ROTOR_HOLDER") || str.contains("MUFFLER")
-                    || str.contains("LASER") || str.contains("SUBSTATION") || str.contains("OPTICAL")
-                    || str.contains("COMPUTATION") || str.contains("STEAM")
-                    || str.contains("THREADING") || str.contains("THREAD") || str.contains("HELIX")) {
-                for (String token : str.split("[,\\s\\[\\]()]+")) {
-                    if (!token.isBlank()) abilities.add(token);
-                }
-            }
+    private static void enrichFromMachineDefinition(MultiblockMachineDefinition multiDef, Set<String> abilities) {
+        if (GTCEuReflectionBridge.isCoilWorkableClass(GTCEuReflectionBridge.getMachineClass(multiDef))) {
+            abilities.add("HEATING_COILS");
         }
+        enrichModifierAbilities(multiDef, abilities);
+        enrichIoAbilities(multiDef, abilities);
+        enrichStarTThreading(multiDef, abilities);
     }
 
-    private static void extractBlocksFromObject(Object obj, Set<ResourceLocation> candidateBlocks) {
-        if (obj == null) return;
-        if (obj instanceof Block b) {
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(b);
-            if (id != null && !id.getPath().equals("air")) candidateBlocks.add(id);
-        } else if (obj instanceof BlockState bs) {
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(bs.getBlock());
-            if (id != null && !id.getPath().equals("air")) candidateBlocks.add(id);
-        } else if (obj instanceof Supplier<?> s) {
-            try {
-                Object res = s.get();
-                extractBlocksFromObject(res, candidateBlocks);
-            } catch (Throwable ignored) {}
-        } else if (obj instanceof Iterable<?> it) {
-            for (Object item : it) extractBlocksFromObject(item, candidateBlocks);
-        } else if (obj.getClass().isArray()) {
-            for (Object item : (Object[]) obj) extractBlocksFromObject(item, candidateBlocks);
-        } else {
-            String objName = obj.getClass().getName().toLowerCase(Locale.ROOT);
-            if (objName.contains("startthreading") || objName.contains("threadingstats")) {
-                try {
-                    Class<?> statBlocksCls = Class.forName("com.startechnology.start_core.machine.threading.StarTThreadingStatBlocks");
-                    Field fStatBlocks = statBlocksCls.getField("statBlocks");
-                    Object list = fStatBlocks.get(null);
-                    if (list instanceof Iterable<?> it) {
-                        for (Object entry : it) {
-                            if (entry instanceof Supplier<?> sup) {
-                                Object b = sup.get();
-                                if (b instanceof Block block) {
-                                    ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
-                                    if (id != null) candidateBlocks.add(id);
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-            }
-        }
-    }
-
-    private static void enrichFromMachineDefinition(Object machineDef, Set<String> abilities) {
-        if (machineDef == null) return;
-        try {
-            boolean hasRecipeTypes = false;
-            for (Method m : machineDef.getClass().getMethods()) {
-                if (m.getParameterCount() == 0 && (m.getName().equals("getRecipeTypes") || m.getName().equals("getRecipeType"))) {
-                    m.setAccessible(true);
-                    Object rTypes = m.invoke(machineDef);
-                    if (rTypes != null) {
-                        if (rTypes.getClass().isArray() && ((Object[]) rTypes).length > 0) {
-                            hasRecipeTypes = true;
-                        } else if (rTypes instanceof Collection<?> col && !col.isEmpty()) {
-                            hasRecipeTypes = true;
-                        } else if (!rTypes.getClass().isArray()) {
-                            hasRecipeTypes = true;
-                        }
-                    }
-                }
-            }
-
-            boolean isGen = false;
-            for (Method m : machineDef.getClass().getMethods()) {
-                if (m.getParameterCount() == 0 && (m.getName().equals("isGenerator") || m.getName().equals("isGeneratorMachine"))) {
-                    m.setAccessible(true);
-                    Object res = m.invoke(machineDef);
-                    if (res instanceof Boolean b && b) {
-                        isGen = true;
-                    }
-                }
-            }
-
-            // Check if machine definition or modifiers indicate threading capability
-            try {
-                Method mModifiers = machineDef.getClass().getMethod("getRecipeModifiers");
-                Object mods = mModifiers.invoke(machineDef);
-                if (mods != null && mods.toString().toUpperCase(Locale.ROOT).contains("THREADING")) {
-                    abilities.add("THREADING");
-                }
-            } catch (Throwable ignored) {}
-
-            if (hasRecipeTypes) {
-                abilities.add("IMPORT_ITEMS");
-                abilities.add("EXPORT_ITEMS");
-                abilities.add("IMPORT_FLUIDS");
-                abilities.add("EXPORT_FLUIDS");
-                abilities.add("MAINTENANCE");
+    private static void enrichModifierAbilities(MultiblockMachineDefinition multiDef, Set<String> abilities) {
+        List<Object> modifiers = GTCEuReflectionBridge.getRecipeModifiers(multiDef);
+        if (modifiers == null || modifiers.isEmpty()) return;
+        for (Object mod : modifiers) {
+            if (mod == null) continue;
+            String modId = GTCEuReflectionBridge.getRecipeModifierName(mod);
+            if (modId == null) continue;
+            if ("PARALLEL_HATCH".equals(modId) || "ABSOLUTE_PARALLEL".equals(modId)) {
                 abilities.add("PARALLEL_HATCH");
-                if (isGen) {
-                    abilities.add("OUTPUT_ENERGY");
-                } else {
-                    abilities.add("INPUT_ENERGY");
-                }
             }
-        } catch (Throwable ignored) {}
+            if ("BATCH_MODE".equals(modId)) abilities.add("BATCH_MODE");
+            if ("EBF_OC".equals(modId) || "EBF_OVERCLOCK".equals(modId) || "ELECTRIC_BLAST_FURNACE".equals(modId)
+                    || "HELL_FORGE_OC".equals(modId)
+                    || "CRACKER_OC".equals(modId) || "CRACKER_OVERCLOCK".equals(modId) || "CRACKING_UNIT".equals(modId)
+                    || "PYROLYSE_OVEN_OC".equals(modId) || "PYROLYSE_OVEN_OVERCLOCK".equals(modId) || "PYROLYSE_OVEN".equals(modId)) {
+                abilities.add("HEATING_COILS");
+            }
+            if ("MULTI_SMELLTER_PARALLEL".equals(modId) || "MULTI_SMELTER_PARALLEL".equals(modId) || "MULTI_SMELTER".equals(modId)) {
+                abilities.add("COIL_PARALLEL");
+                abilities.add("HEATING_COILS");
+            }
+            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_REACTOR_OVERCLOCK".equals(modId) || "CHEMICAL_PLANT".equals(modId)
+                    || "VACUUM_CHEMICAL_REACTION_CHAMBER".equals(modId)) {
+                abilities.add("HEATING_COILS");
+            }
+            if ("THROUGHPUT_BOOSTING".equals(modId)) abilities.add("THROUGHPUT_BOOSTING");
+            if ("OVERPRESSURE".equals(modId)) abilities.add("OVERPRESSURE");
+            if ("BULK_PROCESSING".equals(modId)) abilities.add("BULK_PROCESSING");
+            if ("THREADING".equals(modId) || "THREADING_MACHINE".equals(modId)) abilities.add("THREADING");
+            if ("REFLECTOR_FUSION_REACTOR".equals(modId)) abilities.add("REFLECTOR");
+        }
+    }
+
+    private static void enrichIoAbilities(MultiblockMachineDefinition multiDef, Set<String> abilities) {
+        if (multiDef.getRecipeTypes() == null || multiDef.getRecipeTypes().length == 0) return;
+
+        abilities.add("IMPORT_ITEMS");
+        abilities.add("EXPORT_ITEMS");
+        abilities.add("IMPORT_FLUIDS");
+        abilities.add("EXPORT_FLUIDS");
+        abilities.add("MAINTENANCE");
+
+        if (multiDef.isGenerator()) {
+            abilities.add("OUTPUT_ENERGY");
+        } else {
+            abilities.add("INPUT_ENERGY");
+        }
+    }
+
+    private static void enrichStarTThreading(MultiblockMachineDefinition multiDef, Set<String> abilities) {
+        if (STAT_BLOCKS_FIELD == null) return;
+        String clsName = multiDef.getClass().getName().toLowerCase(Locale.ROOT);
+        if (!clsName.contains("threading")) return;
+        abilities.add("THREADING");
     }
 }

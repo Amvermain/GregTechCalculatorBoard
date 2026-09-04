@@ -76,10 +76,15 @@ classDiagram
         +double efficiency
         +Set~Integer~ hiddenInputIndices
         +Set~Integer~ hiddenOutputIndices
+        +Set~Integer~ voidedOutputIndices
+        +SupplyMode supplyMode
         +hideInputPort(int) void
         +unhideInputPort(int) void
         +hideOutputPort(int) void
         +unhideOutputPort(int) void
+        +isOutputPortVoided(int) boolean
+        +setOutputPortVoided(int, boolean) void
+        +isVoidSink() boolean
         +getVisibleInputIndices() List~Integer~
         +getVisibleOutputIndices() List~Integer~
         +getTotalHiddenCount() int
@@ -96,6 +101,7 @@ classDiagram
   - `RecipeNode`는 모든 모드(Create, Thermal, GTCEu, Vanilla 등)를 아우르는 **순수 계산 도메인 데이터 엔티티**입니다.
   - 특정 모드 전용 필드나 하드코딩된 분기를 일체 보유하지 않으며, 머신 아이콘 변경 이벤트(`setMachineIcon`), 물리적 에너지 형태 결정(`getEnergyType`), 단일 기계 소비/발전량 연산(`computeSingleMachinePower`), 노드 가동 유효성 검증(`validateNode`), 멀티블록 BOM 산출(`buildMultiblockBOM`) 등 모드 특화 동작은 `ModAdapterRegistry.getAdapterForNode(this)`를 통해 동적으로 위임됩니다.
 * **`hiddenInputIndices` / `hiddenOutputIndices`**: 사용자가 카드의 복잡도를 줄이기 위해 비활성화/숨김 처리한 입출력 포트의 인덱스 집합. `RecipeNodeSerializer`를 통해 직렬화/역직렬화되며, 렌더러와 와이어 솔버는 `getVisibleInputIndices()` / `getVisibleOutputIndices()`를 참조하여 가시 포트만 배선 및 렌더링.
+* **`voidedOutputIndices` & `isVoidSink()` (ADR-019)**: 순 생산품 결산에서 제외할 출력 포트 인덱스 세트 및 정션 노드의 보이드 싱크(`SupplyMode.VOID_SINK`) 판별 메서드. 유량 수지 솔버(`FlowBalanceMatrixSolver`, `FlowSummaryAggregator`)와 연동되어 다운스트림 정상 기계의 실수요 충족 후 남은 순 잉여 부산물을 결산에서 폐기 처리.
 * **`isFlipped`**: 노드의 입력(좌)/출력(우) 포트 렌더링 방향을 좌우 수평 반전하여 복잡한 플로우차트의 배선 교차 최소화.
 * **`efficiency` ($\eta \in [0.0, 1.0]$)**: 솔버(`FlowGraphSolver`, `MassBalanceSolver`)에 의해 상류 원자재 공급 제약 및 폐루프 순환 밸런스 하에서 계산된 기계의 실제 가동률.
 * **`calculateEffectiveOutputRates()`**: 기계 대수, 병렬치, 오버클럭, 서브틱, 애드온 승수 및 티어 부산물 확률 부스트가 합성된 1초당 아이템/유체 생산 유량을 계산.
@@ -177,6 +183,44 @@ public class NodePropertyStore {
 
 ---
 
+### 1.8 `SupplyMode` 및 외부 공급 유량 모델 (ADR-012)
+정션(Junction) 노드 및 원자재 공급점에 대해 무한 공급(Infinite) 또는 지정된 초당 고정 공급량(Fixed Rate)을 정의합니다.
+
+```java
+public enum SupplyMode {
+    NONE,         // 외부 공급 없음 (상류 연결 노드의 생산 유량에만 의존)
+    INFINITE,     // 무한 자원 공급 (상류 요구량 전파를 차단하고 하류 수요를 100% 충족)
+    FIXED_RATE    // 초당 고정 수량 공급 (지정된 externalSupplyRate 만큼 공급 충당)
+}
+```
+
+* **`RecipeNode` 외부 공급 속성**:
+  - `supplyMode` (`SupplyMode`, 기본값 `NONE`): 노드의 외부 공급 모드.
+  - `externalSupplyRate` (`double`, 기본값 `0.0`): `FIXED_RATE` 모드 시 초당 고정 공급 수량 (단위: items/s 또는 mB/s).
+  - `customParallel` (`int`, 기본값 `0`): 사용자가 수동 지정한 커스텀 병렬 수치.
+
+---
+
+### 1.9 `BoardPage` 계층형 디렉터리 및 AE2 바인딩 모델 (ADR-008, ADR-012)
+워크스페이스 내 다중 캔버스 페이지를 계층형 폴더 경로(`folderPath`)로 분류하고, AE2 패턴 ID(`ae2PatternId`)와 1:1 바인딩을 지원합니다.
+
+```java
+public class BoardPage {
+    private final String id;
+    private String name;
+    private String folderPath;           // 계층형 폴더 경로 (예: "Chemical/Polymers")
+    private ResourceLocation ae2PatternId; // 1:1 바인딩된 AE2 가공 패턴 ID
+    private final FlowGraph graph;
+    private final List<CanvasGroupFrame> frames;
+    private final List<CanvasStickyNote> stickyNotes;
+}
+```
+
+* **계층형 폴더 경로 (`folderPath`)**: Windows 탐색기 방식의 슬래시(`/`) 구분자 기반 가상 디렉터리 트리. `PageBrowserDrawer`와 연동하여 수백 개의 페이지를 트리 계층으로 탐색 및 일괄 정리.
+* **AE2 패턴 ID 바인딩 (`ae2PatternId`)**: 해당 페이지의 공정 전체를 AE2 가공 패턴과 1:1 매핑하여, ME 오토크래프팅 실행 시 정밀 파이프라인 ETA 연산 및 모니터링 연동.
+
+---
+
 ## 2. 결정론적 수용 능력 매트릭스 (`CategoryCapabilityMatrix`)
 
 불안정한 텍스트 툴팁 파싱 휴리스틱을 전면 배제하고, 게임 로딩 시 연역적 분석을 통해 빌드된 $O(1)$ 글로벌 불변 캐시 시스템입니다.
@@ -202,11 +246,31 @@ flowchart LR
     end
 ```
 
+### 2.1 하드웨어 애드온 카테고리 및 멀티블록 고유 특성 (`AddonCategory`, `MachineAddon`)
+기계의 물리적 능력을 확장하는 애드온 칩을 표준 카테고리로 분류하여 관리합니다:
+
+* **`AddonCategory`**:
+  - `COIL`: 가열 코일 블록 (EBF 등 온도/에너지 할인)
+  - `PARALLEL`: 병렬 제어 해치 (4x ~ 256x 병렬)
+  - `MAINTENANCE`: 유지보수 해치 (가동 시간 10% 단축 등)
+  - `ROTOR`: 대형 터빈 로터 (발전 효율 및 유량 배율)
+  - `REFLECTOR`: 핵융합 반사판 (티어별 감속 배율)
+  - `ENERGY_HATCH` / `HATCH_BUS`: 멀티블록 에너지 및 입출력 버스
+  - `THREADING`: 스레딩 헬릭스 (다중 파이프라인 수용)
+  - `THERMAL_AUGMENT`: 써멀 시리즈 증강 및 업그레이드 킷
+  - `MULTIBLOCK_TRAIT`: GTCEu 멀티블록 고유 특성 애드온
+  - `CUSTOM`: 사용자 정의 수동 애드온 (임의 배율 지정)
+* **GTCEu 멀티블록 고유 특성 애드온 (`MULTIBLOCK_TRAIT`)**:
+  - `THROUGHPUT_BOOSTING` (처리량 증폭): 4배 병렬, 가동 시간 1.6배, 전력 0.95배 (파이롤라이즈 오븐, 슈퍼 크래커 등)
+  - `BULK_PROCESSING` (벌크 처리): 16배 병렬, 가동 시간 13배 (23% 실효 가속)
+  - `BATCH_MODE` (배치 모드): 패널티 없이 다회차 레시피 일괄 가동 지원
+  - `OVERPRESSURE` (과압 가압): 8배 병렬, 가동 시간 1.5배, 전력 1.25배 (오토클레이브 등)
+
 ---
 
-## 3. 복합 모듈 시스템 (`FlowGraphModuleHandler`)
+## 3. 복합 모듈 및 순차 조립 시스템 (`FlowGraphModuleHandler`, `CompoundRecipeBuilder`)
 
-다수의 복잡한 노드 그래프를 단일 복합 모듈 카드(`RecipeNode`)로 패키징(`Ctrl+G`)하거나 원래 서브그래프로 복원(`펼치기`)합니다.
+다수의 복잡한 노드 그래프를 단일 복합 모듈 카드(`RecipeNode`)로 패키징(`Ctrl+G`)하거나 원래 서브그래프로 복원(`펼치기`)하며, Create 순차 조립 공정을 체인 카드로 합성합니다.
 
 ```mermaid
 flowchart LR
@@ -227,6 +291,7 @@ flowchart LR
 1. **경계 I/O 자동 승격 (Boundary I/O Promotion)**: 내부 노드 간의 중간 연결선은 은닉되고, 외부와 연결된 원자재/최종 제품만 모듈 외곽 포트로 자동 승격.
 2. **와이어 리매핑 (Wire Remapping)**: 외부에서 연결되어 있던 와이어의 `ConnectionEdge`가 신규 모듈 카드 포트로 재배선.
 3. **비례 스케일링 (Proportional Scaling)**: 모듈 카드의 기계 대수를 변경하면 내부 하위 그래프의 모든 기계 대수와 유량이 동일 비율로 연동 스케일링.
+4. **순차 조립 단계별 기계 아이콘 추출 (`CompoundRecipeBuilder.LayerSpec`)**: Create 순차 조립(Sequenced Assembly) 공정의 각 단계(Deployer, Spout, Mechanical Press, Mechanical Saw)별 독립 머신 아이콘을 추출하여 계층 카드에 개별 렌더링.
 
 ---
 
@@ -291,6 +356,77 @@ public record PortRef(String nodeId, boolean isInput, int portIndex) {}
 * **프리셋 매니저 (`CategoryMachinePresetManager`)**:
   - 싱글톤 패턴 기반의 인메모리 레지스트리 및 NBT 영속화 관리 (`serializeNBT` / `deserializeNBT`).
   - 보드 설정 다이얼로그(`BoardSettingsDialog`) 및 머신 설정 다이얼로그(`MachineConfigDialog`)를 통한 CRUD 인터페이스 제공.
+
+## 9. 검색 도메인 모델 및 헤드리스 레시피 제공자 SPI (`SearchableRecipe`, `ILevelRecipeProvider`) (ADR-009)
+
+클라이언트 GUI 계층에 종속되지 않고 순수 코어 도메인 및 헤드리스/전용 서버 환경에서 레시피를 검색·색인·인스턴스화할 수 있도록 분리된 표준 모델 및 SPI입니다.
+
+* **`SearchableRecipe` (경량 검색 불변 레코드)**:
+  ```java
+  public record SearchableRecipe(
+      ResourceLocation id,
+      ResourceLocation categoryId,
+      String displayName,
+      List<IngredientStack> inputs,
+      List<IngredientStack> outputs,
+      double durationTicks,
+      double eut,
+      GTVoltageTier tier,
+      Object rawRecipe
+  )
+  ```
+* **`ILevelRecipeProvider` (헤드리스 레시피 제공자 SPI)**:
+  - EMI, JEI 등 클라이언트 전용 모드가 비활성화되었거나 전용 서버 환경일 때 바닐라 `Level.getRecipeManager()` 기반으로 `SearchableRecipe` 목록을 제공하는 추상화 인터페이스.
+  - GUI 의존성 없는 $O(1)$ 레시피 인스턴스화 및 도메인 노드 생성 지원.
+
+---
+
+## 10. 기계 하드웨어 템플릿 모델 (`MachineHardwareTemplate`) (ADR-012)
+
+기계의 하드웨어 구성(티어, 병렬, 오버클럭 모드, 장착 애드온, 쓰레딩 및 특수 노드 프로퍼티)을 독립된 프리셋 템플릿으로 캡슐화하여, 다른 노드나 다중 선택 노드에 원클릭으로 주입·복제할 수 있도록 지원합니다.
+
+```java
+public class MachineHardwareTemplate {
+    private String id;
+    private String name;
+    private GTVoltageTier targetTier;
+    private int parallel;
+    private OverclockMode overclockMode;
+    private SteamMode steamMode;
+    private List<MachineAddon> addons;
+    private NodePropertyStore properties;
+    private NodeThreadingConfig threadingConfig;
+
+    public void applyTo(RecipeNode targetNode) { ... }
+    public static MachineHardwareTemplate fromNode(String name, RecipeNode sourceNode) { ... }
+}
+```
+
+* **하드웨어 구성 추출 (`fromNode`)**: 소스 노드로부터 티어, 병렬, 애드온 및 확장 속성을 복사하여 불변 템플릿 생성.
+* **하드웨어 일괄 주입 (`applyTo`)**: 타겟 노드의 고유 레시피 입출력 및 최소 요구 전압 티어($\text{recipeTier}$)를 안전하게 보존하면서 하드웨어 사양을 주입.
+
+---
+
+## 11. 유량 제어 및 시각화 열거형 모델 (SupplyMode, WireAnimationMode) (ADR-018, ADR-019)
+
+### 11.1 `SupplyMode` (정션 노드 공급 모드 열거형)
+캔버스 상의 중계 정션(Reroute Node)의 유량 공급 및 소각 모드를 정의합니다:
+
+| 모드 (SupplyMode) | 직렬화 키 | 번역 키 | 설명 |
+| :--- | :--- | :--- | :--- |
+| `NONE` | `NONE` | `gui.gtcalcboard.junction.supply_mode.none` | 기본 중계/패스스루 모드 (상류/하류 유량 직접 중계) |
+| `INFINITE` | `INFINITE` | `gui.gtcalcboard.junction.supply_mode.infinite` | 무한 공급 모드 (외부 무한 원자재 공급 가정, 역방향 수요 차단) |
+| `FIXED_RATE` | `FIXED_RATE` | `gui.gtcalcboard.junction.supply_mode.fixed_rate` | 고정 외부 공급량 지정 모드 (사용자 정의 수치만큼 공급) |
+| `VOID_SINK` | `VOID_SINK` | `gui.gtcalcboard.junction.supply_mode.void_sink` | **보이드 싱크 모드** (잉여 유량 무한 흡수 및 소각, 역방향 수요 전파 차단, 1:N 분기 시 정상 기계 실수요 충족 후 잔여분만 흡수) |
+
+### 11.2 `WireAnimationMode` (와이어 흐름 애니메이션 모드 열거형)
+계산기 보드의 연결선(Wire) 펄스 도트 렌더링 동작을 제어합니다:
+
+| 모드 (WireAnimationMode) | 설정 인덱스 | 번역 키 | 동작 및 시각화 특성 |
+| :--- | :--- | :--- | :--- |
+| `RATE_MODULATED` | `0` | `gui.gtcalcboard.wire_anim.rate_modulated` | **포화도 연동 (기본값)**: 공급 포화율($R = \text{Supply}/\text{Demand}$) 기반 듀티 사이클 간헐적 정지 및 3단계 RGB 보간(Cyan $\to$ Amber $\to$ Crimson). 결핍 노드 경고 외곽선 연동 |
+| `UNIFORM` | `1` | `gui.gtcalcboard.wire_anim.uniform` | **단순 펄스**: 유량과 무관하게 균일한 속도와 단일 색상으로 도트 주행 |
+| `DISABLED` | `2` | `gui.gtcalcboard.wire_anim.disabled` | **비활성화**: 연결선 내부 펄스 도트 렌더링 생략 |
 
 ---
 

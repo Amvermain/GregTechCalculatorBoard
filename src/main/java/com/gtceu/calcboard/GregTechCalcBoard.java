@@ -29,11 +29,22 @@ public class GregTechCalcBoard {
         com.gtceu.calcboard.integration.emi.ModMenus.MENUS.register(modBus);
         modBus.addListener(this::commonSetup);
 
+        context.registerConfig(
+                net.minecraftforge.fml.config.ModConfig.Type.CLIENT,
+                com.gtceu.calcboard.config.CalcBoardClientConfig.SPEC,
+                "gtcalcboard-client.toml"
+        );
+
         MinecraftForge.EVENT_BUS.register(this);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(NetworkHandler::init);
+    }
+
+    @SubscribeEvent
+    public void onRegisterCommands(net.minecraftforge.event.RegisterCommandsEvent event) {
+        com.gtceu.calcboard.server.command.CalcBoardServerCommands.register(event.getDispatcher());
     }
 
     @SubscribeEvent

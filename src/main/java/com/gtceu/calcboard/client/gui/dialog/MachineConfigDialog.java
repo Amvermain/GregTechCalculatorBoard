@@ -14,6 +14,8 @@ import com.gtceu.calcboard.client.gui.dialog.config.ThreadingHelixView;
 import com.gtceu.calcboard.api.preset.CategoryMachinePreset;
 import com.gtceu.calcboard.api.preset.CategoryMachinePresetManager;
 import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
@@ -63,8 +65,16 @@ public class MachineConfigDialog {
     private long lastObservedCatalogVersion = -1;
     private List<Component> deferredTooltip = null;
 
-    private static final int DIALOG_WIDTH = 480;
-    private static final int DIALOG_HEIGHT = 295;
+    public static final int DIALOG_WIDTH = 500;
+    public static final int DIALOG_HEIGHT = 295;
+
+    public static int getEffectiveDialogWidth(int screenWidth) {
+        return Math.min(680, Math.max(DIALOG_WIDTH, screenWidth - 24));
+    }
+
+    public static int getEffectiveDialogHeight(int screenHeight) {
+        return Math.min(480, Math.max(DIALOG_HEIGHT, screenHeight - 24));
+    }
 
     public MachineConfigDialog(BoardScreen parent) {
         this.parent = parent;
@@ -72,6 +82,10 @@ public class MachineConfigDialog {
         this.addonCatalogView = new AddonCatalogView(this);
         this.customAddonBuilderView = new CustomAddonBuilderView(this);
         this.threadingHelixView = new ThreadingHelixView(this);
+    }
+
+    public BoardScreen getParent() {
+        return parent;
     }
 
     public ActiveAddonsView getActiveAddonsView() {
@@ -144,18 +158,21 @@ public class MachineConfigDialog {
         invalidateFilteredCatalog();
 
         Minecraft mc = Minecraft.getInstance();
-        this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
-        this.parallelBox.setMaxLength(6);
-        this.parallelBox.setValue(String.valueOf(node.getParallel()));
-        this.parallelBox.setResponder(text -> {
-            try {
-                int p = Integer.parseInt(text.trim());
-                if (p >= 1 && p <= 100000) {
-                    node.setParallel(p);
-                    if (parent != null) parent.markSummaryDirty();
-                }
-            } catch (NumberFormatException ignored) {}
-        });
+        if (mc != null && mc.font != null) {
+            this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
+            this.parallelBox.setMaxLength(6);
+            this.parallelBox.setValue(String.valueOf(node.getTotalParallel()));
+            this.parallelBox.setResponder(text -> {
+                try {
+                    int p = Integer.parseInt(text.trim());
+                    if (p >= 1 && p <= 100000) {
+                        node.setParallel(p);
+                        node.setCustomParallel(p);
+                        if (parent != null) parent.markSummaryDirty();
+                    }
+                } catch (NumberFormatException ignored) {}
+            });
+        }
 
         syncThreadingAddons(node);
     }
@@ -279,8 +296,8 @@ public class MachineConfigDialog {
         graphics.pose().scale(scale, scale, 1.0f);
         graphics.pose().translate(-cx, -cy, 0);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -326,6 +343,13 @@ public class MachineConfigDialog {
             String toggleText = isMb ? "§a" + Component.translatable("gui.gtcalcboard.config.multiblock_mode").getString()
                     : "§7" + Component.translatable("gui.gtcalcboard.config.singleblock_mode").getString();
             graphics.drawCenteredString(font, font.plainSubstrByWidth(toggleText, toggleW - 4), toggleX + toggleW / 2, y + 7, 0xFFFFFFFF);
+            if (toggleHover) {
+                this.deferredTooltip = List.of(
+                        Component.literal(isMb ? "§a🏛 " : "§7🏭 ").append(Component.translatable(isMb ? "gui.gtcalcboard.config.multiblock_mode" : "gui.gtcalcboard.config.singleblock_mode")),
+                        Component.literal("§7[Click]: §f" + Component.translatable(isMb ? "gui.gtcalcboard.tooltip.switch_to_singleblock" : "gui.gtcalcboard.tooltip.switch_to_multiblock").getString()),
+                        Component.literal("§e[Right-Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString())
+                );
+            }
         }
 
         // Switch Recipe Button
@@ -341,7 +365,7 @@ public class MachineConfigDialog {
         // Category Machine Default Preset Button
         ResourceLocation catId = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId() : node.getMachineIcon();
         boolean hasPreset = (catId != null && CategoryMachinePresetManager.getInstance().hasPreset(catId));
-        int presetBtnW = 68;
+        int presetBtnW = 76;
         int presetBtnH = 16;
         int presetBtnX = switchBtnX - presetBtnW - 4;
         boolean presetHover = virtualMouseX >= presetBtnX && virtualMouseX <= presetBtnX + presetBtnW && virtualMouseY >= y + 3 && virtualMouseY <= y + 3 + presetBtnH;
@@ -377,18 +401,24 @@ public class MachineConfigDialog {
             }
         }
 
-        String title = "⚙ " + Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()).getString();
+        String title = "⚙ " + node.getName();
         int maxTitleW = presetBtnX - (x + 8) - 6;
+        boolean titleHover = virtualMouseX >= x + 8 && virtualMouseX <= presetBtnX - 6 && virtualMouseY >= y + 4 && virtualMouseY <= y + 20;
         if (font.width(title) > maxTitleW) {
             title = font.plainSubstrByWidth(title, Math.max(16, maxTitleW - font.width("..."))) + "...";
         }
         graphics.drawString(font, title, x + 8, y + 7, 0xFFE0E6F0, false);
+        if (titleHover) {
+            this.deferredTooltip = List.of(
+                    Component.literal("⚙ ").append(Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()))
+            );
+        }
 
         // SECTION 1: Base Parallel Header Area
         graphics.fill(x + 6, y + 26, x + dialogW - 6, y + 66, 0xFF1E222D);
         graphics.renderOutline(x + 6, y + 26, dialogW - 12, 40, 0xFF353C4D);
         var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
-        guiHandler.renderDialogHeader(graphics, font, node, x, y, dialogW, virtualMouseX, virtualMouseY, partialTicks, parallelBox, parent);
+        guiHandler.renderDialogHeader(this, graphics, font, node, x, y, dialogW, virtualMouseX, virtualMouseY, partialTicks, parallelBox, parent);
 
         // SECTION 2: Active Addons Tray View
         activeAddonsView.render(graphics, font, node, x, y, dialogW, virtualMouseX, virtualMouseY, parent);
@@ -423,15 +453,15 @@ public class MachineConfigDialog {
             com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 1000);
-            graphics.renderComponentTooltip(font, deferredTooltip, mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, deferredTooltip, mouseX, mouseY, screenWidth, screenHeight);
             graphics.pose().popPose();
         }
     }
 
     public void enableScaledScissor(GuiGraphics graphics, int x1, int y1, int x2, int y2) {
         float scale = currentFontScale.getScale();
-        int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-        int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        int screenW = parent.width;
+        int screenH = parent.height;
         int cx = screenW / 2;
         int cy = screenH / 2;
 
@@ -440,7 +470,7 @@ public class MachineConfigDialog {
         int sx2 = (int) Math.ceil((x2 - cx) * scale + cx);
         int sy2 = (int) Math.ceil((y2 - cy) * scale + cy);
 
-        graphics.enableScissor(Math.max(0, sx1), Math.max(0, sy1), Math.min(screenW, sx2), Math.min(screenH, sy2));
+        BoardScissorHelper.enableScissor(graphics, Math.max(0, sx1), Math.max(0, sy1), Math.min(screenW, sx2), Math.min(screenH, sy2));
     }
 
     public String formatAddonBadge(MachineAddon addon) {
@@ -489,34 +519,34 @@ public class MachineConfigDialog {
 
     public static void appendAdvancedTooltipDebugInfo(List<Component> tooltip, MachineAddon addon) {
         if (addon == null || tooltip == null) return;
-        var mc = Minecraft.getInstance();
-        if (mc != null && mc.options != null && mc.options.advancedItemTooltips) {
+        if (BoardManager.getInstance().isShowDebugInfo()) {
             tooltip.add(Component.literal("§8§m------------------------"));
-            tooltip.add(Component.literal("§7[F3+H Debug] §8ID: §7" + addon.getId()));
+            tooltip.add(Component.literal("§7[Debug] §8ID: §7" + addon.getId()));
             if (addon.getItemIcon() != null) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8Icon: §e" + addon.getItemIcon()));
+                tooltip.add(Component.literal("§7[Debug] §8Icon: §e" + addon.getItemIcon()));
             }
             if (addon.getCategory() != null) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8Category: §d" + addon.getCategory().name()));
+                tooltip.add(Component.literal("§7[Debug] §8Category: §d" + addon.getCategory().name()));
             }
             if (addon.getDiscoverySource() != null && !addon.getDiscoverySource().isEmpty()) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8Provenance / Origin:"));
+                tooltip.add(Component.literal("§7[Debug] §8Provenance / Origin:"));
                 tooltip.add(Component.literal(" §b↳ " + addon.getDiscoverySource()));
             }
             ItemStack sample = addon.getRenderItemStack();
             if (sample != null && !sample.isEmpty() && sample.hasTag()) {
-                tooltip.add(Component.literal("§7[F3+H Debug] §8NBT: §d" + sample.getTag().toString()));
+                tooltip.add(Component.literal("§7[Debug] §8NBT: §d" + sample.getTag().toString()));
             }
         }
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return mouseClicked(mouseX, mouseY, button, getScreenWidth(), getScreenHeight());
+    }
+
+    public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible || node == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
-
         float scale = currentFontScale.getScale();
         int cx = screenWidth / 2;
         int cy = screenHeight / 2;
@@ -524,8 +554,8 @@ public class MachineConfigDialog {
         int mX = (int) Math.round((mouseX - cx) / scale + cx);
         int mY = (int) Math.round((mouseY - cy) / scale + cy);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
 
@@ -554,6 +584,14 @@ public class MachineConfigDialog {
         int toggleW = 84;
         int toggleX = fontBtnX - toggleW - 4;
         if (node.hasMultiblockOption() && mX >= toggleX && mX <= toggleX + toggleW && mY >= y + 3 && mY <= y + 19) {
+            if (button == 1) {
+                // Right-Click: Open Machine & Controller Selector Dialog
+                if (parent != null) {
+                    parent.openMachineSelectorDialog(node);
+                    mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F));
+                }
+                return true;
+            }
             boolean nextMb = !node.isMultiblock();
             node.setMultiblock(nextMb);
             if (nextMb) {
@@ -594,7 +632,7 @@ public class MachineConfigDialog {
         }
 
         // Category Machine Default Preset Button Click
-        int presetBtnW = 68;
+        int presetBtnW = 76;
         int presetBtnH = 16;
         int presetBtnX = switchBtnX - presetBtnW - 4;
         if (mX >= presetBtnX && mX <= presetBtnX + presetBtnW && mY >= y + 3 && mY <= y + 3 + presetBtnH) {
@@ -689,11 +727,11 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (!visible || node == null) return false;
+        return mouseScrolled(mouseX, mouseY, delta, getScreenWidth(), getScreenHeight());
+    }
 
-        Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
+        if (!visible || node == null) return false;
 
         float scale = currentFontScale.getScale();
         int cx = screenWidth / 2;
@@ -702,10 +740,18 @@ public class MachineConfigDialog {
         int mX = (int) Math.round((mouseX - cx) / scale + cx);
         int mY = (int) Math.round((mouseY - cy) / scale + cy);
 
-        int dialogW = DIALOG_WIDTH;
-        int dialogH = DIALOG_HEIGHT;
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
         int x = (screenWidth - dialogW) / 2;
         int y = (screenHeight - dialogH) / 2;
+
+        // SECTION 1: Header GUI Handler Scroll
+        if (mY >= y + 26 && mY <= y + 68 && mX >= x + 6 && mX <= x + dialogW - 6) {
+            var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
+            if (guiHandler.handleDialogHeaderScroll(this, node, x, y, dialogW, mX, mY, delta)) {
+                return true;
+            }
+        }
 
         // Category Filter Chip Scroll
         if (mY >= y + 128 && mY <= y + 148 && mX >= x + 10 && mX <= x + dialogW - 10) {
@@ -777,10 +823,73 @@ public class MachineConfigDialog {
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return mouseDragged(mouseX, mouseY, button, dragX, dragY, getScreenWidth(), getScreenHeight());
+    }
+
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY, int screenWidth, int screenHeight) {
+        if (!visible || node == null) return false;
+
+        float scale = currentFontScale.getScale();
+        int cx = screenWidth / 2;
+        int cy = screenHeight / 2;
+
+        int mX = (int) Math.round((mouseX - cx) / scale + cx);
+        int mY = (int) Math.round((mouseY - cy) / scale + cy);
+
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
+        int x = (screenWidth - dialogW) / 2;
+        int y = (screenHeight - dialogH) / 2;
+
+        var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
+        if (guiHandler.handleDialogHeaderDrag(this, node, x, y, dialogW, mX, mY, button, dragX / scale, dragY / scale)) {
+            return true;
+        }
+
         return visible;
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        return mouseReleased(mouseX, mouseY, button, getScreenWidth(), getScreenHeight());
+    }
+
+    public boolean mouseReleased(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        if (!visible || node == null) return false;
+
+        float scale = currentFontScale.getScale();
+        int cx = screenWidth / 2;
+        int cy = screenHeight / 2;
+
+        int mX = (int) Math.round((mouseX - cx) / scale + cx);
+        int mY = (int) Math.round((mouseY - cy) / scale + cy);
+
+        int dialogW = getEffectiveDialogWidth(screenWidth);
+        int dialogH = getEffectiveDialogHeight(screenHeight);
+        int x = (screenWidth - dialogW) / 2;
+        int y = (screenHeight - dialogH) / 2;
+
+        var guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
+        if (guiHandler.handleDialogHeaderRelease(this, node, x, y, dialogW, mX, mY, button, parallelBox, parent)) {
+            invalidateFilteredCatalog();
+            return true;
+        }
+
         return visible;
+    }
+
+    private int getScreenWidth() {
+        if (parent != null && parent.width > 0) {
+            return parent.width;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc.getWindow() != null ? mc.getWindow().getGuiScaledWidth() : DIALOG_WIDTH;
+    }
+
+    private int getScreenHeight() {
+        if (parent != null && parent.height > 0) {
+            return parent.height;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        return mc.getWindow() != null ? mc.getWindow().getGuiScaledHeight() : DIALOG_HEIGHT;
     }
 }

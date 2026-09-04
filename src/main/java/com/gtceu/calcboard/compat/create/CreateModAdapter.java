@@ -9,7 +9,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.network.chat.Component;
@@ -29,6 +29,10 @@ public class CreateModAdapter implements IModAdapter {
 
     public static final String MOD_ID = "create";
     public static final String MOD_ID_ADDITION = "createaddition";
+
+    static {
+        CreateProperties.init();
+    }
 
     @Override
     public String getModId() {
@@ -66,7 +70,7 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        return node.isCreateMachine();
+        return com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node);
     }
 
     @Override
@@ -221,8 +225,8 @@ public class CreateModAdapter implements IModAdapter {
         return com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.createKineticGeneratorNode(itemId, displayName);
     }
 
-    public static List<RecipeSearchEngine.SearchableRecipe> getVirtualKineticSearchRecipes() {
-        List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>(CreateRecipeHandler.getVirtualKineticSearchRecipes());
+    public static List<SearchableRecipe> getVirtualKineticSearchRecipes() {
+        List<SearchableRecipe> list = new ArrayList<>(CreateRecipeHandler.getVirtualKineticSearchRecipes());
         list.addAll(com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.getVirtualSearchRecipes());
         return list;
     }

@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.render;
 
+import com.gtceu.calcboard.api.type.WireAnimationMode;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -13,6 +14,9 @@ public class ConnectionRenderer {
 
     private static BufferBuilder ACTIVE_BATCH_BUFFER = null;
     private static Matrix4f ACTIVE_BATCH_POSE = null;
+
+    private static final float[] SCRATCH_CP = new float[4];
+    private static final float[] SCRATCH_RGB = new float[3];
 
     public static void beginBatch(GuiGraphics graphics) {
         ACTIVE_BATCH_POSE = graphics.pose().last().pose();
@@ -58,43 +62,43 @@ public class ConnectionRenderer {
     public static void addBezierToBatch(float x1, float y1, float x2, float y2, float dir1X, float dir2X, int color, float thickness) {
         if (ACTIVE_BATCH_BUFFER == null || ACTIVE_BATCH_POSE == null) return;
 
-        float[] cp = new float[4];
-        computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, cp);
-        float cx1 = cp[0], cy1 = cp[1], cx2 = cp[2], cy2 = cp[3];
+        computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, SCRATCH_CP);
+        float cx1 = SCRATCH_CP[0], cy1 = SCRATCH_CP[1], cx2 = SCRATCH_CP[2], cy2 = SCRATCH_CP[3];
 
         float chord = (float) Math.hypot(x2 - x1, y2 - y1);
         float net = (float) (Math.hypot(cx1 - x1, cy1 - y1) + Math.hypot(cx2 - cx1, cy2 - cy1) + Math.hypot(x2 - cx2, y2 - cy2));
         float arcLen = (chord + net) * 0.5f;
 
         int numPoints = Math.max(16, Math.min(32, (int) (arcLen / 16.0f)));
-        float[] px = new float[numPoints + 1];
-        float[] py = new float[numPoints + 1];
-
-        for (int i = 0; i <= numPoints; i++) {
-            float t = (float) i / numPoints;
-            float it = 1.0f - t;
-            px[i] = it * it * it * x1 + 3 * it * it * t * cx1 + 3 * it * t * t * cx2 + t * t * t * x2;
-            py[i] = it * it * it * y1 + 3 * it * it * t * cy1 + 3 * it * t * t * cy2 + t * t * t * y2;
-        }
-
         float halfThick = thickness * 0.5f;
         float a = ((color >> 24) & 0xFF) / 255.0f;
         float r = ((color >> 16) & 0xFF) / 255.0f;
         float g = ((color >> 8) & 0xFF) / 255.0f;
         float b = (color & 0xFF) / 255.0f;
 
-        for (int i = 0; i < numPoints; i++) {
-            float segDx = px[i + 1] - px[i];
-            float segDy = py[i + 1] - py[i];
+        float prevX = x1;
+        float prevY = y1;
+
+        for (int i = 1; i <= numPoints; i++) {
+            float t = (float) i / numPoints;
+            float it = 1.0f - t;
+            float currX = it * it * it * x1 + 3 * it * it * t * cx1 + 3 * it * t * t * cx2 + t * t * t * x2;
+            float currY = it * it * it * y1 + 3 * it * it * t * cy1 + 3 * it * t * t * cy2 + t * t * t * y2;
+
+            float segDx = currX - prevX;
+            float segDy = currY - prevY;
             float len = (float) Math.hypot(segDx, segDy);
             if (len < 0.001f) len = 1.0f;
             float nx = -segDy / len * halfThick;
             float ny = segDx / len * halfThick;
 
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i] + nx, py[i] + ny, 0.0f).color(r, g, b, a).endVertex();
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i + 1] + nx, py[i + 1] + ny, 0.0f).color(r, g, b, a).endVertex();
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i + 1] - nx, py[i + 1] - ny, 0.0f).color(r, g, b, a).endVertex();
-            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, px[i] - nx, py[i] - ny, 0.0f).color(r, g, b, a).endVertex();
+            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, prevX + nx, prevY + ny, 0.0f).color(r, g, b, a).endVertex();
+            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, currX + nx, currY + ny, 0.0f).color(r, g, b, a).endVertex();
+            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, currX - nx, currY - ny, 0.0f).color(r, g, b, a).endVertex();
+            ACTIVE_BATCH_BUFFER.vertex(ACTIVE_BATCH_POSE, prevX - nx, prevY - ny, 0.0f).color(r, g, b, a).endVertex();
+
+            prevX = currX;
+            prevY = currY;
         }
     }
 
@@ -114,8 +118,12 @@ public class ConnectionRenderer {
         endBatch();
     }
 
-    public static void renderPulseDotsBatch(GuiGraphics graphics, java.util.List<float[]> wires) {
-        if (wires == null || wires.isEmpty()) return;
+    public static void renderPulseDotsBatch(GuiGraphics graphics, it.unimi.dsi.fastutil.floats.FloatList wires) {
+        renderPulseDotsBatch(graphics, wires, WireAnimationMode.RATE_MODULATED);
+    }
+
+    public static void renderPulseDotsBatch(GuiGraphics graphics, it.unimi.dsi.fastutil.floats.FloatList wires, WireAnimationMode mode) {
+        if (wires == null || wires.isEmpty() || mode == WireAnimationMode.DISABLED) return;
 
         Matrix4f pose = graphics.pose().last().pose();
         graphics.flush();
@@ -129,34 +137,34 @@ public class ConnectionRenderer {
         BufferBuilder buffer = tesselator.getBuilder();
         buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        float pulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
-        float it = 1.0f - pulseTime;
+        float basePulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
+        int stride = (wires.size() % 7 == 0) ? 7 : 6;
+        int totalWires = wires.size() / stride;
+        int count = Math.min(totalWires, 80);
 
-        float[] cp = new float[4];
-        int count = Math.min(wires.size(), 80);
         for (int w = 0; w < count; w++) {
-            float[] wire = wires.get(w);
-            float x1 = wire[0], y1 = wire[1], x2 = wire[2], y2 = wire[3];
-            float dir1X = wire.length >= 6 ? wire[4] : 1.0f;
-            float dir2X = wire.length >= 6 ? wire[5] : -1.0f;
+            int offset = w * stride;
+            float x1 = wires.getFloat(offset);
+            float y1 = wires.getFloat(offset + 1);
+            float x2 = wires.getFloat(offset + 2);
+            float y2 = wires.getFloat(offset + 3);
+            float dir1X = wires.getFloat(offset + 4);
+            float dir2X = wires.getFloat(offset + 5);
+            float ratio = stride >= 7 ? wires.getFloat(offset + 6) : 1.0f;
 
-            computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, cp);
-            float cx1 = cp[0], cy1 = cp[1], cx2 = cp[2], cy2 = cp[3];
+            float pulseTime = computeEffectivePulseTime(basePulseTime, ratio, mode);
+            if (pulseTime < 0.0f) continue;
 
+            computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, SCRATCH_CP);
+            float cx1 = SCRATCH_CP[0], cy1 = SCRATCH_CP[1], cx2 = SCRATCH_CP[2], cy2 = SCRATCH_CP[3];
+
+            float it = 1.0f - pulseTime;
             float dotX = it * it * it * x1 + 3 * it * it * pulseTime * cx1 + 3 * it * pulseTime * pulseTime * cx2 + pulseTime * pulseTime * pulseTime * x2;
             float dotY = it * it * it * y1 + 3 * it * it * pulseTime * cy1 + 3 * it * pulseTime * pulseTime * cy2 + pulseTime * pulseTime * pulseTime * y2;
 
-            // Outer glow quad (0x88FFFFFF)
-            buffer.vertex(pose, dotX - 3.5f, dotY - 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-            buffer.vertex(pose, dotX + 3.5f, dotY - 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-            buffer.vertex(pose, dotX + 3.5f, dotY + 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-            buffer.vertex(pose, dotX - 3.5f, dotY + 3.5f, 0.0f).color(1.0f, 1.0f, 1.0f, 0.53f).endVertex();
-
-            // Inner core quad (0xFFFFFFFF)
-            buffer.vertex(pose, dotX - 2.0f, dotY - 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
-            buffer.vertex(pose, dotX + 2.0f, dotY - 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
-            buffer.vertex(pose, dotX + 2.0f, dotY + 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
-            buffer.vertex(pose, dotX - 2.0f, dotY + 2.0f, 0.0f).color(1.0f, 1.0f, 1.0f, 1.0f).endVertex();
+            computePulseRgb(ratio, mode, SCRATCH_RGB);
+            renderPulseQuad(buffer, pose, dotX, dotY, 3.5f, SCRATCH_RGB[0], SCRATCH_RGB[1], SCRATCH_RGB[2], 0.53f);
+            renderPulseQuad(buffer, pose, dotX, dotY, 2.0f, Math.min(1.0f, SCRATCH_RGB[0] + 0.3f), Math.min(1.0f, SCRATCH_RGB[1] + 0.3f), Math.min(1.0f, SCRATCH_RGB[2] + 0.3f), 1.0f);
         }
 
         tesselator.end();
@@ -164,14 +172,108 @@ public class ConnectionRenderer {
         RenderSystem.disableBlend();
     }
 
+    public static void renderPulseDotsBatch(GuiGraphics graphics, java.util.List<float[]> wires) {
+        renderPulseDotsBatch(graphics, wires, WireAnimationMode.RATE_MODULATED);
+    }
+
+    public static void renderPulseDotsBatch(GuiGraphics graphics, java.util.List<float[]> wires, WireAnimationMode mode) {
+        if (wires == null || wires.isEmpty() || mode == WireAnimationMode.DISABLED) return;
+
+        Matrix4f pose = graphics.pose().last().pose();
+        graphics.flush();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+        RenderSystem.disableDepthTest();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder buffer = tesselator.getBuilder();
+        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+
+        float basePulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
+        int count = Math.min(wires.size(), 80);
+
+        for (int w = 0; w < count; w++) {
+            float[] wire = wires.get(w);
+            float x1 = wire[0], y1 = wire[1], x2 = wire[2], y2 = wire[3];
+            float dir1X = wire.length >= 6 ? wire[4] : 1.0f;
+            float dir2X = wire.length >= 6 ? wire[5] : -1.0f;
+            float ratio = wire.length >= 7 ? wire[6] : 1.0f;
+
+            float pulseTime = computeEffectivePulseTime(basePulseTime, ratio, mode);
+            if (pulseTime < 0.0f) continue;
+
+            computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, SCRATCH_CP);
+            float cx1 = SCRATCH_CP[0], cy1 = SCRATCH_CP[1], cx2 = SCRATCH_CP[2], cy2 = SCRATCH_CP[3];
+
+            float it = 1.0f - pulseTime;
+            float dotX = it * it * it * x1 + 3 * it * it * pulseTime * cx1 + 3 * it * pulseTime * pulseTime * cx2 + pulseTime * pulseTime * pulseTime * x2;
+            float dotY = it * it * it * y1 + 3 * it * it * pulseTime * cy1 + 3 * it * pulseTime * pulseTime * cy2 + pulseTime * pulseTime * pulseTime * y2;
+
+            computePulseRgb(ratio, mode, SCRATCH_RGB);
+            renderPulseQuad(buffer, pose, dotX, dotY, 3.5f, SCRATCH_RGB[0], SCRATCH_RGB[1], SCRATCH_RGB[2], 0.53f);
+            renderPulseQuad(buffer, pose, dotX, dotY, 2.0f, Math.min(1.0f, SCRATCH_RGB[0] + 0.3f), Math.min(1.0f, SCRATCH_RGB[1] + 0.3f), Math.min(1.0f, SCRATCH_RGB[2] + 0.3f), 1.0f);
+        }
+
+        tesselator.end();
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
+    }
+
+    public static float computeEffectivePulseTime(float baseTime, float ratio, WireAnimationMode mode) {
+        if (mode != WireAnimationMode.RATE_MODULATED) {
+            return baseTime;
+        }
+        if (ratio <= 0.001f) {
+            return -1.0f;
+        }
+        if (baseTime < ratio) {
+            return baseTime / ratio;
+        }
+        return 1.0f;
+    }
+
+    public static void computePulseRgb(float ratio, WireAnimationMode mode, float[] outRgb) {
+        if (mode != WireAnimationMode.RATE_MODULATED) {
+            outRgb[0] = 1.0f;
+            outRgb[1] = 1.0f;
+            outRgb[2] = 1.0f;
+            return;
+        }
+        if (ratio >= 1.0f) {
+            outRgb[0] = 0.22f;
+            outRgb[1] = 0.74f;
+            outRgb[2] = 0.97f;
+            return;
+        }
+        if (ratio >= 0.5f) {
+            float t = (ratio - 0.5f) / 0.5f;
+            outRgb[0] = 0.96f + t * (0.22f - 0.96f);
+            outRgb[1] = 0.62f + t * (0.74f - 0.62f);
+            outRgb[2] = 0.04f + t * (0.97f - 0.04f);
+            return;
+        }
+        float t = Math.max(0.0f, ratio / 0.5f);
+        outRgb[0] = 0.94f + t * (0.96f - 0.94f);
+        outRgb[1] = 0.27f + t * (0.62f - 0.27f);
+        outRgb[2] = 0.27f + t * (0.04f - 0.27f);
+    }
+
+    private static void renderPulseQuad(BufferBuilder buffer, Matrix4f pose, float cx, float cy, float radius, float r, float g, float b, float a) {
+        buffer.vertex(pose, cx - radius, cy - radius, 0.0f).color(r, g, b, a).endVertex();
+        buffer.vertex(pose, cx + radius, cy - radius, 0.0f).color(r, g, b, a).endVertex();
+        buffer.vertex(pose, cx + radius, cy + radius, 0.0f).color(r, g, b, a).endVertex();
+        buffer.vertex(pose, cx - radius, cy + radius, 0.0f).color(r, g, b, a).endVertex();
+    }
+
     public static boolean isPointNearBezier(float x1, float y1, float x2, float y2, double px, double py, double maxDist) {
         return isPointNearBezier(x1, y1, x2, y2, 1.0f, -1.0f, px, py, maxDist);
     }
 
     public static boolean isPointNearBezier(float x1, float y1, float x2, float y2, float dir1X, float dir2X, double px, double py, double maxDist) {
-        float[] cp = new float[4];
-        computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, cp);
-        float cx1 = cp[0], cy1 = cp[1], cx2 = cp[2], cy2 = cp[3];
+        computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, SCRATCH_CP);
+        float cx1 = SCRATCH_CP[0], cy1 = SCRATCH_CP[1], cx2 = SCRATCH_CP[2], cy2 = SCRATCH_CP[3];
 
         float minX = Math.min(Math.min(x1, x2), Math.min(cx1, cx2)) - (float) maxDist - 8f;
         float maxX = Math.max(Math.max(x1, x2), Math.max(cx1, cx2)) + (float) maxDist + 8f;

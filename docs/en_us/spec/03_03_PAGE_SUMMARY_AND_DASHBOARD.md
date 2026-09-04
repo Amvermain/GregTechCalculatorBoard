@@ -73,6 +73,14 @@ Positioned on the right side of the screen as a persistent or collapsible panel,
   </div>
 </div>
 
+### 1.2 Voided Byproducts Management & One-Click Void/Restore UI (ADR-019)
+- **Net Products Row Void Button `[🗑️]`**:
+  - Hovering over any item/fluid row in the Net Products section reveals a `[🗑️]` (Trash Can) button on the right edge.
+  - Clicking marks the corresponding output port across all active machine cards generating that substance with `setOutputPortVoided(true)`, immediately removing it from net products into the void section.
+- **Collapsible `🗑️ Voided Byproducts` Section**:
+  - Automatically renders below the Net Products section with a purple header whenever 1 or more surplus byproducts are voided.
+  - Hovering over any voided row reveals a `[↩️]` (Restore) button to unmark the port and restore the byproduct back into the Net Products summary with 1 click.
+
 ---
 
 ## 2. Global Balance Dashboard Dialog (`GlobalBalanceDashboardDialog`)
@@ -217,6 +225,9 @@ Opened via hotkey `M` or `Shift + B` (and the `[📦 BOM]` toolbar button), this
 * **Category Tab Filtering**: `All`, `Casings`, `Coils`, `Hatches & Buses`, `Controllers`.
 * **Stack Unit Formatting**: Automatically displays quantities in standard inventory stack notation (e.g. `3 stacks + 48 (240 items)`).
 * **Dual Energy Hatch Toggle**: `⚡ 1x Normal Energy Hatch ↔ 2x 1-Tier Lower Energy Hatches` for real-time parts substitution.
+* **Hierarchical Compound Module Scaling**: Recursively compounds parent module machine counts ($M_{\text{module}}$) to scale nested sub-machine and multiblock part counts accurately.
+* **Shared Machine Pool Frame Duty Aggregation**: Calculates cumulative duty cycles across enclosed machines sharing physical hardware, quantizing to integral machines ($\lceil \sum \text{Duty} \rceil$) to prevent duplicate BOM parts.
+* **Singleblock Voltage Tier Item Resolution & Usage Trace**: Dynamically resolves singleblock machines into tier-specific items (e.g. `gtceu:lv_rock_breaker`) and lists contributing processes in `usedByMachines`.
 * **One-Click EMI Integration (`[★ Register in EMI]`)**: Registers the full bill of materials as a virtual recipe root in EMI for seamless recipe ingredient tracking.
 * **Clipboard Export (`[📋 Copy List]`)**: Copies the formatted bill of materials list to the system clipboard.
 

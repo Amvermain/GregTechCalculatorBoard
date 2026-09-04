@@ -318,8 +318,9 @@ public class GTCEuThreadingTest {
         adapter.handleInstallAddon(dtNode, ev16a, false);
         adapter.handleInstallAddon(dtNode, iv1a, false);
 
-        // Effective tier for speed overclocking becomes LuV!
-        Assertions.assertEquals(GTVoltageTier.LuV, dtNode.getTargetTier());
+        // Physical voltage tier is strictly IV (highest single hatch tier among EV and IV)
+        Assertions.assertEquals(GTVoltageTier.IV, dtNode.getTargetTier());
+        Assertions.assertEquals(40960L, com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.getMaxEUtCapacity(dtNode));
 
         var bomAsym = com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(java.util.List.of(dtNode), false);
         boolean hasEV16A = bomAsym.aggregatedItems().stream().anyMatch(item -> item.itemId().equals(ResourceLocation.tryParse("gtceu:ev_energy_input_hatch_16a")));

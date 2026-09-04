@@ -69,9 +69,9 @@ public class DomainModelEncapsulationTest {
         RecipeNode node = RecipeNode.deserializeNBT(legacyTag);
 
         Assertions.assertEquals(128, node.getRpm());
-        Assertions.assertEquals(128, node.getProperties().get(NodeProperties.KINETIC_RPM));
-        Assertions.assertEquals(120, node.getProperties().get(NodeProperties.TURBINE_ROTOR_EFFICIENCY));
-        Assertions.assertEquals(150, node.getProperties().get(NodeProperties.TURBINE_ROTOR_POWER));
+        Assertions.assertEquals(128, node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.KINETIC_RPM));
+        Assertions.assertEquals(120, node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.TURBINE_ROTOR_EFFICIENCY));
+        Assertions.assertEquals(150, node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.TURBINE_ROTOR_POWER));
     }
 
     @Test
@@ -79,7 +79,7 @@ public class DomainModelEncapsulationTest {
     void testPhysicsSubmodules() {
         // Boiler Physics
         RecipeNode boiler = RecipeNode.create(ResourceLocation.tryParse("gtceu:bronze_boiler"), "Bronze Boiler", 20, 30, null);
-        boiler.getProperties().set(NodeProperties.BOILER_THROTTLE, 80);
+        boiler.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.BOILER_THROTTLE, 80);
 
         Assertions.assertTrue(GTBoilerPhysics.isBoilerRecipe(boiler));
         double speed = GTBoilerPhysics.getBoilerSpeedMultiplier(boiler);

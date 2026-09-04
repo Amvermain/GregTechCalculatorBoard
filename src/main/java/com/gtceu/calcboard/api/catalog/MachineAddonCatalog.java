@@ -101,14 +101,12 @@ public class MachineAddonCatalog {
             return;
         }
 
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
-            try {
-                String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
-                if (currentLang != null && !currentLang.isEmpty()) {
-                    lastLanguageCode = currentLang;
-                }
-            } catch (Throwable ignored) {}
-        }
+        try {
+            String currentLang = DynamicAddonCrawler.getLevelRecipeProvider().getSelectedLanguage();
+            if (currentLang != null && !currentLang.isEmpty()) {
+                lastLanguageCode = currentLang;
+            }
+        } catch (Throwable ignored) {}
 
         List<MachineAddon> fastList = DynamicAddonCrawler.crawlFastRegistries();
         synchronized (allAddons) {
@@ -203,19 +201,17 @@ public class MachineAddonCatalog {
     private boolean wasRecipeReady = false;
 
     public List<MachineAddon> getAllAddons() {
-        if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
-            try {
-                String currentLang = com.gtceu.calcboard.client.ClientLevelHelper.getSelectedLanguage();
-                if (currentLang != null && !currentLang.isEmpty()) {
-                    if (lastLanguageCode.isEmpty()) {
-                        lastLanguageCode = currentLang;
-                    } else if (!currentLang.equals(lastLanguageCode)) {
-                        lastLanguageCode = currentLang;
-                        isDirty = true;
-                    }
+        try {
+            String currentLang = DynamicAddonCrawler.getLevelRecipeProvider().getSelectedLanguage();
+            if (currentLang != null && !currentLang.isEmpty()) {
+                if (lastLanguageCode.isEmpty()) {
+                    lastLanguageCode = currentLang;
+                } else if (!currentLang.equals(lastLanguageCode)) {
+                    lastLanguageCode = currentLang;
+                    isDirty = true;
                 }
-            } catch (Throwable ignored) {}
-        }
+            }
+        } catch (Throwable ignored) {}
 
         if (isDirty || !isFastLoaded) {
             ensureFastLoaded();
@@ -235,6 +231,16 @@ public class MachineAddonCatalog {
         return getAllAddons().stream()
                 .filter(a -> a.getCategory().equals(category))
                 .collect(Collectors.toList());
+    }
+
+    public MachineAddon getAddon(String id) {
+        if (id == null) return null;
+        for (MachineAddon addon : getAllAddons()) {
+            if (addon != null && id.equals(addon.getId())) {
+                return addon;
+            }
+        }
+        return null;
     }
 
     public void registerCustomAddon(MachineAddon customAddon) {

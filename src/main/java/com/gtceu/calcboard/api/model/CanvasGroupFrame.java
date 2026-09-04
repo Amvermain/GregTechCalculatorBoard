@@ -30,6 +30,7 @@ public class CanvasGroupFrame {
 
     public static final double HEADER_HEIGHT = 24.0;
     public static final double MIN_WIDTH = 120.0;
+    public static final double MIN_SHARED_FRAME_WIDTH = 250.0;
     public static final double MIN_HEIGHT = 80.0;
     public static final double DEFAULT_PADDING = 24.0;
 
@@ -102,10 +103,11 @@ public class CanvasGroupFrame {
         return frame;
     }
 
-    public List<RecipeNode> getEnclosedNodes(FlowGraph graph) {
+    public List<RecipeNode> getEnclosedNodes(Collection<RecipeNode> nodes) {
         List<RecipeNode> result = new ArrayList<>();
-        if (graph == null) return result;
-        for (RecipeNode n : graph.getNodes()) {
+        if (nodes == null) return result;
+        for (RecipeNode n : nodes) {
+            if (n == null) continue;
             double nw = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);
             double nh = n.getCardHeight() > 0 ? n.getCardHeight() : (n.isReroute() ? 32 : 160);
             double cx = n.getPosX() + nw / 2.0;
@@ -115,6 +117,11 @@ public class CanvasGroupFrame {
             }
         }
         return result;
+    }
+
+    public List<RecipeNode> getEnclosedNodes(FlowGraph graph) {
+        if (graph == null) return Collections.emptyList();
+        return getEnclosedNodes(graph.getNodes());
     }
 
     public List<CanvasStickyNote> getEnclosedNotes(FlowGraph graph) {
@@ -153,7 +160,8 @@ public class CanvasGroupFrame {
         if (count > 0) {
             this.posX = minX - padding;
             this.posY = minY - padding - HEADER_HEIGHT;
-            this.width = Math.max(MIN_WIDTH, (maxX - minX) + padding * 2);
+            double minW = isSharedMachineFrame ? MIN_SHARED_FRAME_WIDTH : MIN_WIDTH;
+            this.width = Math.max(minW, (maxX - minX) + padding * 2);
             this.height = Math.max(MIN_HEIGHT, (maxY - minY) + padding * 2 + HEADER_HEIGHT);
         }
     }
@@ -335,12 +343,18 @@ public class CanvasGroupFrame {
         this.posY = posY;
     }
 
+    public void setPos(double posX, double posY) {
+        this.posX = posX;
+        this.posY = posY;
+    }
+
     public double getWidth() {
         return width;
     }
 
     public void setWidth(double width) {
-        this.width = Math.max(MIN_WIDTH, width);
+        double minW = isSharedMachineFrame ? MIN_SHARED_FRAME_WIDTH : MIN_WIDTH;
+        this.width = Math.max(minW, width);
     }
 
     public double getHeight() {

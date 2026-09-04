@@ -114,4 +114,26 @@ public class NodeParallelEditor {
         widget.getNode().setParallel(next);
         widget.invalidateCache();
     }
+
+    public void setMaxParallel() {
+        var node = widget.getNode();
+        if (node == null) return;
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        int maxPar = adapter != null ? adapter.getMaxParallelCapacity(node) : 1;
+        if (maxPar >= 1) {
+            int oldVal = node.getParallel();
+            if (oldVal != maxPar) {
+                node.setParallel(maxPar);
+                if (widget.getParent() != null) {
+                    widget.getParent().recordCommand(BoardCommand.ModifyPropertyCommand.parallel(
+                        node.getId(),
+                        oldVal,
+                        maxPar
+                    ));
+                    widget.getParent().markSummaryDirty();
+                }
+                widget.invalidateCache();
+            }
+        }
+    }
 }

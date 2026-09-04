@@ -11,7 +11,8 @@ import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 
-import java.util.ArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+
 import java.util.List;
 
 /**
@@ -20,6 +21,13 @@ import java.util.List;
 public class CanvasWireRenderer {
 
     private final WireSpatialIndex wireSpatialIndex = new WireSpatialIndex();
+    private final FloatArrayList visibleWiresBuffer = new FloatArrayList();
+    private final float[] scratchCp = new float[4];
+    private boolean spatialDirty = true;
+
+    public void markDirty() {
+        this.spatialDirty = true;
+    }
 
     public WireSpatialIndex getWireSpatialIndex() {
         return wireSpatialIndex;
@@ -36,6 +44,7 @@ public class CanvasWireRenderer {
     }
 
     public void updateSpatialIndex(BoardScreen screen, FlowGraph graph) {
+        if (!spatialDirty) return;
         wireSpatialIndex.clear();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
@@ -54,6 +63,7 @@ public class CanvasWireRenderer {
                 }
             }
         }
+        spatialDirty = false;
     }
 
     public void renderWires(GuiGraphics graphics, BoardScreen screen, FlowGraph graph,
@@ -65,7 +75,7 @@ public class CanvasWireRenderer {
         FlowGraph.ConnectionEdge hoveredEdge = findHoveredWire(canvasMouseX, canvasMouseY, 6.0);
 
         ConnectionRenderer.beginBatch(graphics);
-        List<float[]> visibleWires = new ArrayList<>();
+        visibleWiresBuffer.clear();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
             RecipeNode toNode = graph.findNodeById(edge.toNodeId());
@@ -81,13 +91,12 @@ public class CanvasWireRenderer {
                     float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
                     float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
 
-                    float[] cp = new float[4];
-                    ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, cp);
+                    ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, scratchCp);
 
-                    float minX = Math.min(Math.min(x1, x2), Math.min(cp[0], cp[2])) - 16.0f;
-                    float maxX = Math.max(Math.max(x1, x2), Math.max(cp[0], cp[2])) + 16.0f;
-                    float minY = Math.min(Math.min(y1, y2), Math.min(cp[1], cp[3])) - 16.0f;
-                    float maxY = Math.max(Math.max(y1, y2), Math.max(cp[1], cp[3])) + 16.0f;
+                    float minX = Math.min(Math.min(x1, x2), Math.min(scratchCp[0], scratchCp[2])) - 16.0f;
+                    float maxX = Math.max(Math.max(x1, x2), Math.max(scratchCp[0], scratchCp[2])) + 16.0f;
+                    float minY = Math.min(Math.min(y1, y2), Math.min(scratchCp[1], scratchCp[3])) - 16.0f;
+                    float maxY = Math.max(Math.max(y1, y2), Math.max(scratchCp[1], scratchCp[3])) + 16.0f;
                     if (maxX < screenLeft || minX > screenRight || maxY < screenTop || minY > screenBottom) {
                         continue;
                     }
@@ -98,7 +107,14 @@ public class CanvasWireRenderer {
                     int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : defWireColor);
                     float wireThick = isWireGlowing ? 3.5f : 2.0f;
                     ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
-                    visibleWires.add(new float[]{x1, y1, x2, y2, fromDirX, toDirX});
+                    float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
+                    visibleWiresBuffer.add(x1);
+                    visibleWiresBuffer.add(y1);
+                    visibleWiresBuffer.add(x2);
+                    visibleWiresBuffer.add(y2);
+                    visibleWiresBuffer.add(fromDirX);
+                    visibleWiresBuffer.add(toDirX);
+                    visibleWiresBuffer.add(satRatio);
                 }
             }
         }
@@ -149,8 +165,18 @@ public class CanvasWireRenderer {
         ConnectionRenderer.endBatch();
 
         // Draw animated flow pulse dots (Single-batch GPU rendering)
-        if (zoom >= 0.28 && BoardManager.getInstance().isShowWirePulseAnimation()) {
-            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWires);
+        var animMode = BoardManager.getInstance().getWireAnimationMode();
+        if (zoom >= 0.28 && animMode != com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED) {
+            ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWiresBuffer, animMode);
         }
+    }
+
+    private static float calculateSaturationRatio(FlowGraph graph, RecipeNode toNode, int inputIndex) {
+        if (graph == null || toNode == null) return 1.0f;
+        var stats = graph.getInputPortStats(toNode, inputIndex);
+        if (stats == null || !stats.isConnected()) return 1.0f;
+        if (stats.requiredOrProducedRate() <= 0.0001) return 1.0f;
+        if (stats.connectedRate() <= 0.0001) return 0.0f;
+        return (float) Math.min(1.0, stats.connectedRate() / stats.requiredOrProducedRate());
     }
 }

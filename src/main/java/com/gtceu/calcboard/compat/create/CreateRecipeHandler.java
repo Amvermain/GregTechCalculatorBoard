@@ -7,7 +7,7 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -34,7 +34,7 @@ public class CreateRecipeHandler {
         }
         if (catId != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
             if ("create_new_age".equals(catId.getNamespace())) return false; // Handled by CreateNewAge
-            if (catId.getPath().contains("liquid_burning")) return false; // Liquid burner produces FE from fuel
+            if ("liquid_burning".equals(catId.getPath())) return false; // Liquid burner produces FE from fuel
             details.energyType = EnergyType.KINETIC_SU;
             details.tier = GTVoltageTier.ULV;
 
@@ -56,37 +56,64 @@ public class CreateRecipeHandler {
                 }
             }
 
-            String path = catId.getPath().toLowerCase(Locale.ROOT);
+            KineticCategorySpec spec = resolveCategorySpec(catId.getPath().toLowerCase(Locale.ROOT));
             if (duration <= 0) {
-                if (path.contains("splashing") || path.contains("washing") || path.contains("haunting") || path.contains("smoking") || path.contains("blasting")) {
-                    duration = 150; // Create FanProcessing standard default is 150 ticks (7.5s)
-                } else if (path.contains("pressing") || path.contains("compacting") || path.contains("curving")) {
-                    duration = 200; // Create Press / Curving default is 200 ticks (10.0s)
-                } else if (path.contains("crushing") || path.contains("milling") || path.contains("vibrating") || path.contains("centrifugation")) {
-                    duration = 100; // Create Crushing/Milling/Vibrating default is 100 ticks (5.0s)
-                } else {
-                    duration = 100;
-                }
+                duration = spec.defaultDurationTicks();
             }
             details.durationTicks = duration;
+            details.eut = spec.baseStressAt32Rpm();
 
-            if (path.contains("hammering")) {
-                details.eut = 512.0; // 16x RPM at 32 RPM (Helve Hammer)
-            } else if (path.contains("crushing") || path.contains("pressing") || path.contains("compacting") || path.contains("rolling")
-                    || path.contains("curving") || path.contains("lathe") || path.contains("turning") || path.contains("laser_cutting")
-                    || path.contains("centrifugation") || path.contains("pressurizing")) {
-                details.eut = 256.0; // 8x RPM at 32 RPM
-            } else if (path.contains("polishing")) {
-                details.eut = 64.0;  // 2x RPM at 32 RPM
-            } else {
-                details.eut = 128.0; // 4x RPM at 32 RPM (milling, mixing, cutting, fan washing, vibrating, spring coiling, vacuumizing)
-            }
             double durationSec = details.durationTicks / 20.0;
             double suPerBatch = details.eut * durationSec;
             details.extraInputs.add(IngredientStack.stressUnit(suPerBatch));
             return true;
         }
         return false;
+    }
+
+    private record KineticCategorySpec(int defaultDurationTicks, double baseStressAt32Rpm) {}
+
+    private static final java.util.Map<String, KineticCategorySpec> CATEGORY_SPEC_MAP = new java.util.HashMap<>();
+    static {
+        KineticCategorySpec fanSpec = new KineticCategorySpec(150, 128.0);
+        CATEGORY_SPEC_MAP.put("splashing", fanSpec);
+        CATEGORY_SPEC_MAP.put("washing", fanSpec);
+        CATEGORY_SPEC_MAP.put("haunting", fanSpec);
+        CATEGORY_SPEC_MAP.put("smoking", fanSpec);
+        CATEGORY_SPEC_MAP.put("blasting", fanSpec);
+
+        KineticCategorySpec pressSpec = new KineticCategorySpec(200, 256.0);
+        CATEGORY_SPEC_MAP.put("pressing", pressSpec);
+        CATEGORY_SPEC_MAP.put("compacting", pressSpec);
+        CATEGORY_SPEC_MAP.put("curving", pressSpec);
+
+        CATEGORY_SPEC_MAP.put("hammering", new KineticCategorySpec(100, 512.0));
+
+        KineticCategorySpec heavySpec = new KineticCategorySpec(100, 256.0);
+        CATEGORY_SPEC_MAP.put("crushing", heavySpec);
+        CATEGORY_SPEC_MAP.put("rolling", heavySpec);
+        CATEGORY_SPEC_MAP.put("lathe", heavySpec);
+        CATEGORY_SPEC_MAP.put("turning", heavySpec);
+        CATEGORY_SPEC_MAP.put("laser_cutting", heavySpec);
+        CATEGORY_SPEC_MAP.put("pressurizing", heavySpec);
+
+        CATEGORY_SPEC_MAP.put("polishing", new KineticCategorySpec(100, 64.0));
+
+        KineticCategorySpec mediumSpec = new KineticCategorySpec(100, 128.0);
+        CATEGORY_SPEC_MAP.put("milling", mediumSpec);
+        CATEGORY_SPEC_MAP.put("vibrating", mediumSpec);
+        CATEGORY_SPEC_MAP.put("centrifugation", mediumSpec);
+    }
+
+    private static KineticCategorySpec resolveCategorySpec(String categoryPath) {
+        if (categoryPath != null) {
+            for (java.util.Map.Entry<String, KineticCategorySpec> entry : CATEGORY_SPEC_MAP.entrySet()) {
+                if (categoryPath.contains(entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return new KineticCategorySpec(100, 128.0);
     }
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
@@ -190,11 +217,11 @@ public class CreateRecipeHandler {
         return null;
     }
 
-    public static List<RecipeSearchEngine.SearchableRecipe> getVirtualKineticSearchRecipes() {
+    public static List<SearchableRecipe> getVirtualKineticSearchRecipes() {
         if (!ModCompatHelper.isCreateLoaded() && !ModCompatHelper.isCreateAdditionsLoaded()) {
             return Collections.emptyList();
         }
-        List<RecipeSearchEngine.SearchableRecipe> list = new ArrayList<>();
+        List<SearchableRecipe> list = new ArrayList<>();
         String catId = "create:kinetic_generation";
         String catName = Component.translatable("category.gtcalcboard.create_kinetic").getString();
         if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
@@ -299,7 +326,7 @@ public class CreateRecipeHandler {
                 String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
                 String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
 
-                list.add(new RecipeSearchEngine.SearchableRecipe(
+                list.add(new SearchableRecipe(
                         node,
                         displayName,
                         modId.intern(),

@@ -88,12 +88,12 @@ graph LR
 
 | 서브패키지 | 주요 컴포넌트 | 전담 역할 및 기능 |
 | :--- | :--- | :--- |
-| `compat.gtceu` | `GTCEuModAdapter`<br/>`physics.GTBoilerPhysics`<br/>`physics.GTTurbinePhysics`<br/>`physics.GTMultiblockBOMResolver`<br/>`helper.* (Coil, Parallel, Reflector, Hatch)` | • GT 멀티블록 물리, 발열 코일/터빈 로터/병렬·유지보수 해치 연역<br/>• 전압 티어 오버클럭 및 순수 헤드리스 툴팁 데이터 생성<br/>• 스팀 모드(LP/HP) 및 멀티블록 자동 구성 및 제약 검증<br/>• 멀티블록 청사진 기반 BOM 및 해치 오버라이드 산출 |
-| `compat.create` | `CreateModAdapter`<br/>`CreateRecipeHandler` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• RPM 속도 제어 및 Stress Unit (SU) 물리 연산 |
+| `compat.gtceu` | `GTCEuModAdapter`<br/>`helper.GTCEuMachineAnalyzer`<br/>`helper.GTCEuReflectionBridge`<br/>`physics.GTBoilerPhysics`<br/>`physics.GTTurbinePhysics`<br/>`physics.GTMultiblockBOMResolver`<br/>`helper.* (Coil, Parallel, Reflector, Hatch)` | • `GTCEuMachineAnalyzer`: 단일 진실 공급원(SSOT) 기반 기계/멀티블록 능력 및 특성 결정론적 분석<br/>• GT 멀티블록 물리, 발열 코일/터빈 로터/병렬·유지보수 해치 연역<br/>• 전압 티어 오버클럭 및 순수 헤드리스 툴팁 데이터 생성<br/>• 스팀 모드(LP/HP) 및 멀티블록 자동 구성 및 제약 검증<br/>• 멀티블록 청사진 기반 BOM 및 해치 오버라이드 산출 |
+| `compat.create` | `CreateModAdapter`<br/>`CreateRecipeHandler`<br/>`CreateSequencedRecipeExtractor` | • 키네틱 발전기(대형 수차, 풍차, 스팀 엔진 등) 가상 레시피 생성<br/>• `CreateSequencedRecipeExtractor`: 순차 조립 단계별 기계 아이콘(Deployer, Spout, Press, Saw) 개별 추출<br/>• RPM 속도 제어 및 Stress Unit (SU) 물리 연산 |
 | `compat.createnewage` | `CreateNewAgeModAdapter`<br/>`CreateNewAgeRecipeHandler` | • 전기 모터(FE ➔ SU) 및 발전기(SU ➔ FE) 가상 레시피 생성<br/>• 자석 강도 합성 및 회전력/전력 상호 변환 효율 연산 |
 | `compat.thermal` | `ThermalModAdapter`<br/>`ThermalAugmentHelper`<br/>`ThermalRecipeHandler` | • 써멀 증강 및 커스텀 키트(`AugmentData` NBT) 연역 추출<br/>• 다이내모 발전량(RF/t) 및 기계 소요 시간 계수 합성 |
-| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁/수지 연산<br/>• 복합 연료 증기 열효율 및 생산량 변환 |
-| `compat.start` | `StarTModAdapter`<br/>`StarTTurbineHelper` | • Star Technology 초고압 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 멀티블록 제약 검증 |
+| `compat.systeams` | `SysteamsModAdapter`<br/>`SysteamsRecipeHandler` | • 스팀 보일러(Steam mB/s) 및 스팀 다이내모 툴팁/수지 연산<br/>• 복합 연료 증기 열효율 및 다단계 증기 티어(Water ➔ Steam ➔ Warm ➔ Hot ➔ Superhot ➔ Plasma) 변환<br/>• Systeams 등록 유체 ID(`steamier`, `steamiest`, `steamiester`, `steamiestest`) 및 런타임 보일러 레시피 매니저 리플렉션(`boil`/`getBoiledFluid`, `fluidOut`/`fluid`) 유연 호환 지원 |
+| `compat.start` | `StarTModAdapter`<br/>`StarTReflectionBridge`<br/>`StarTTurbineHelper` | • `StarTReflectionBridge`: Star Technology Core 레시피 모디파이어 및 기계 능력 격리 연역<br/>• Star Technology 초고압 플라즈마 터빈(SPT/NPT) 및 다중 나선 구조 지원<br/>• SPT/NPT 전용 특성 애드온 호환성 및 멀티블록 제약 검증 |
 | `compat.vanilla` | `VanillaModAdapter` | • 표준 싱글블록 및 비특화 모드 기본 폴백 처리 |
 
 ---
@@ -105,7 +105,7 @@ GTCalcBoard는 모드팩 커스텀 환경에서의 안정성을 위해 3단계 �
 ```mermaid
 flowchart TD
     subgraph ThreeStep["3단계 결정론적 연역 체계"]
-        STEP1["1단계: 공식 API 및 런타임 리플렉션<br/>(MachineDefinition, ICoilType, SysteamsConfig 등)"]
+        STEP1["1단계: 공식 API 및 런타임 리플렉션<br/>(GTCEuMachineAnalyzer, StarTReflectionBridge, MachineDefinition, ICoilType 등)"]
         STEP2["2단계: 모드 내부 객체/물리 시뮬레이션<br/>(OverclockingLogic, Kinetic Stress, Magnet Formula)"]
         STEP3["3단계: 결정론적 NBT 수치 & 공식 TagKey<br/>(AugmentData Float/Int 태그, Forge/Thermal 태그)"]
     end

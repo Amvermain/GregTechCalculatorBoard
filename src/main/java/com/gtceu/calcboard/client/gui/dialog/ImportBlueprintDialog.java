@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.storage.BlueprintMetadata;
 import com.gtceu.calcboard.api.storage.BlueprintPackage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 
@@ -52,8 +53,8 @@ public class ImportBlueprintDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 330;
         int dialogH = 225;
         int x = (screenWidth - dialogW) / 2;
@@ -180,7 +181,7 @@ public class ImportBlueprintDialog {
             graphics.renderOutline(iconInX - 1, inY - 1, 18, 18, 0xFF445566);
             IngredientRenderer.render(graphics, stack, iconInX, inY);
             if (mouseX >= iconInX && mouseX <= iconInX + 16 && mouseY >= inY && mouseY <= inY + 16) {
-                graphics.renderTooltip(font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY, screenWidth, screenHeight);
             }
             iconInX += 20;
         }
@@ -196,7 +197,7 @@ public class ImportBlueprintDialog {
             graphics.renderOutline(iconOutX - 1, outY - 1, 18, 18, 0xFF445566);
             IngredientRenderer.render(graphics, stack, iconOutX, outY);
             if (mouseX >= iconOutX && mouseX <= iconOutX + 16 && mouseY >= outY && mouseY <= outY + 16) {
-                graphics.renderTooltip(font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY, screenWidth, screenHeight);
             }
             iconOutX += 20;
         }
@@ -235,8 +236,8 @@ public class ImportBlueprintDialog {
         if (!visible || currentPackage == null) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 330;
         int dialogH = 225;
         int x = (screenWidth - dialogW) / 2;
@@ -347,5 +348,13 @@ public class ImportBlueprintDialog {
         BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.import_success", String.valueOf(currentPackage.getGraph().getNodes().size()))));
         mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.1F));
         close();
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }

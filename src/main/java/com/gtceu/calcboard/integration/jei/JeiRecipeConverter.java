@@ -28,11 +28,24 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Converts JEI recipes and categories into standard RecipeNode domain models.
  */
 public class JeiRecipeConverter {
+
+    private static final Map<ResourceLocation, ResourceLocation> VANILLA_CATEGORY_ICON_FALLBACKS = Map.of(
+            ResourceLocation.tryParse("minecraft:smelting"), ResourceLocation.tryParse("minecraft:furnace"),
+            ResourceLocation.tryParse("minecraft:blasting"), ResourceLocation.tryParse("minecraft:blast_furnace"),
+            ResourceLocation.tryParse("minecraft:smoking"), ResourceLocation.tryParse("minecraft:smoker"),
+            ResourceLocation.tryParse("minecraft:crafting"), ResourceLocation.tryParse("minecraft:crafting_table"),
+            ResourceLocation.tryParse("minecraft:stonecutting"), ResourceLocation.tryParse("minecraft:stonecutter"),
+            ResourceLocation.tryParse("minecraft:smithing"), ResourceLocation.tryParse("minecraft:smithing_table"),
+            ResourceLocation.tryParse("minecraft:brewing"), ResourceLocation.tryParse("minecraft:brewing_stand"),
+            ResourceLocation.tryParse("minecraft:campfire_cooking"), ResourceLocation.tryParse("minecraft:campfire"),
+            ResourceLocation.tryParse("minecraft:anvil"), ResourceLocation.tryParse("minecraft:anvil")
+    );
 
     public static <T> RecipeNode convert(JeiRecipeWrapper<T> wrapper) {
         if (wrapper == null) return null;
@@ -242,21 +255,7 @@ public class JeiRecipeConverter {
             if (ForgeRegistries.ITEMS.containsKey(catId)) {
                 icon = catId;
             } else {
-                if (catId.getPath().contains("smelt") || catId.getPath().contains("furnace")) {
-                    icon = ResourceLocation.tryParse("minecraft:furnace");
-                } else if (catId.getPath().contains("blast")) {
-                    icon = ResourceLocation.tryParse("minecraft:blast_furnace");
-                } else if (catId.getPath().contains("smok")) {
-                    icon = ResourceLocation.tryParse("minecraft:smoker");
-                } else if (catId.getPath().contains("craft")) {
-                    icon = ResourceLocation.tryParse("minecraft:crafting_table");
-                } else if (catId.getPath().contains("stonecut")) {
-                    icon = ResourceLocation.tryParse("minecraft:stonecutter");
-                } else if (catId.getPath().contains("smith")) {
-                    icon = ResourceLocation.tryParse("minecraft:smithing_table");
-                } else {
-                    icon = catId;
-                }
+                icon = VANILLA_CATEGORY_ICON_FALLBACKS.getOrDefault(catId, catId);
             }
         }
         if (icon != null) {
@@ -305,6 +304,22 @@ public class JeiRecipeConverter {
             if (out != null && out.getId() != null && !EmiRecipeConverter.isDummyConditionMarker(out.getId())) {
                 node.addOutput(out);
             }
+        }
+
+        // Auto-provision Heating Coil if temperature is required
+        int reqTemp = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE);
+        if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
+        if (reqTemp > 0) {
+            var coil = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getCoilForTemperature(reqTemp);
+            if (coil != null) {
+                com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.installCoil(node, coil);
+            }
+        }
+
+        // Auto-provision Fusion Reflector if required
+        int reqReflector = node.getProperties().get(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.REQUIRED_REFLECTOR_TIER);
+        if (reqReflector > 0) {
+            com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper.installReflector(node, reqReflector);
         }
 
         if (preferredWorkstation == null) {

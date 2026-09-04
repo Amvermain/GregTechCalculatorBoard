@@ -182,6 +182,19 @@ public final class RecipeNodeSerializer {
         if (!node.getHiddenOutputIndices().isEmpty()) {
             tag.putIntArray("hiddenOutputs", node.getHiddenOutputIndices().stream().mapToInt(Integer::intValue).toArray());
         }
+        if (!node.getVoidedOutputIndices().isEmpty()) {
+            tag.putIntArray("voidedOutputs", node.getVoidedOutputIndices().stream().mapToInt(Integer::intValue).toArray());
+        }
+
+        if (node.getSupplyMode() != com.gtceu.calcboard.api.type.SupplyMode.NONE) {
+            tag.putString("supplyMode", node.getSupplyMode().name());
+        }
+        if (node.getExternalSupplyRate() > 0.0) {
+            tag.putDouble("externalSupplyRate", node.getExternalSupplyRate());
+        }
+        if (node.getCustomParallel() > 0) {
+            tag.putInt("customParallel", node.getCustomParallel());
+        }
 
         return tag;
     }
@@ -210,24 +223,24 @@ public final class RecipeNodeSerializer {
         }
 
         // Backward compatibility for legacy saves and blueprints
-        if (tag.contains("recipeTemperature") && !node.getProperties().has(NodeProperties.EBF_TEMPERATURE)) {
+        if (tag.contains("recipeTemperature") && !node.getProperties().hasById("ebf_temperature")) {
             node.setRecipeTemperature(tag.getInt("recipeTemperature"));
         }
-        if (tag.contains("rpm") && !node.getProperties().has(NodeProperties.KINETIC_RPM)) {
+        if (tag.contains("rpm") && !node.getProperties().hasById("kinetic_rpm")) {
             node.setRpm(tag.getInt("rpm"));
         }
-        if (tag.contains("rotorEfficiency") && !node.getProperties().has(NodeProperties.TURBINE_ROTOR_EFFICIENCY)) {
+        if (tag.contains("rotorEfficiency") && !node.getProperties().hasById("rotor_efficiency")) {
             node.setRotorEfficiency(tag.getInt("rotorEfficiency"));
         }
-        if (tag.contains("rotorPower") && !node.getProperties().has(NodeProperties.TURBINE_ROTOR_POWER)) {
+        if (tag.contains("rotorPower") && !node.getProperties().hasById("rotor_power")) {
             node.setRotorPower(tag.getInt("rotorPower"));
         }
-        if (tag.contains("rotorName") && !node.getProperties().has(NodeProperties.TURBINE_ROTOR_NAME)) {
+        if (tag.contains("rotorName") && !node.getProperties().hasById("rotor_name")) {
             node.setRotorName(tag.getString("rotorName"));
         }
-        if (tag.contains("fusionStartEU") && !node.getProperties().has(NodeProperties.FUSION_START_EU)) {
+        if (tag.contains("fusionStartEU") && !node.getProperties().hasById("fusion_start_eu")) {
             node.setEuToStart(tag.getLong("fusionStartEU"));
-        } else if (tag.contains("euToStart") && !node.getProperties().has(NodeProperties.FUSION_START_EU)) {
+        } else if (tag.contains("euToStart") && !node.getProperties().hasById("fusion_start_eu")) {
             node.setEuToStart(tag.getLong("euToStart"));
         }
 
@@ -369,6 +382,23 @@ public final class RecipeNodeSerializer {
             for (int idx : tag.getIntArray("hiddenOutputs")) {
                 node.hideOutputPort(idx);
             }
+        }
+        if (tag.contains("voidedOutputs")) {
+            for (int idx : tag.getIntArray("voidedOutputs")) {
+                node.setOutputPortVoided(idx, true);
+            }
+        }
+
+        if (tag.contains("supplyMode")) {
+            try {
+                node.setSupplyMode(com.gtceu.calcboard.api.type.SupplyMode.valueOf(tag.getString("supplyMode")));
+            } catch (Throwable ignored) {}
+        }
+        if (tag.contains("externalSupplyRate")) {
+            node.setExternalSupplyRate(tag.getDouble("externalSupplyRate"));
+        }
+        if (tag.contains("customParallel")) {
+            node.setCustomParallel(tag.getInt("customParallel"));
         }
 
         return node;

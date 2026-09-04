@@ -1,14 +1,13 @@
 package com.gtceu.calcboard.client.gui.search;
 
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 
 /**
  * Manages the static global recipe cache, background indexing lifecycles,
@@ -17,6 +16,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class RecipeSearchCacheManager {
 
     public record RecipeLoadingProgress(int currentPhase, int totalPhases, String phaseKey, String detail) {}
+
+    private static final ExecutorService INDEX_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "GTCalcBoard-RecipeIndexer");
+        t.setDaemon(true);
+        t.setPriority(Thread.MIN_PRIORITY);
+        return t;
+    });
 
     private static final List<SearchableRecipe> GLOBAL_RECIPES = Collections.synchronizedList(new ArrayList<>());
     private static final List<Runnable> ON_COMPLETE_CALLBACKS = Collections.synchronizedList(new ArrayList<>());
@@ -195,6 +201,6 @@ public final class RecipeSearchCacheManager {
             } finally {
                 IS_CACHING = false;
             }
-        });
+        }, INDEX_EXECUTOR);
     }
 }

@@ -46,8 +46,8 @@ public class ExportToTeamDialog {
 
         Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 300;
         int dialogH = 140;
         int x = (screenWidth - dialogW) / 2;
@@ -102,8 +102,8 @@ public class ExportToTeamDialog {
         if (!visible) return false;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenWidth = mc.getWindow().getGuiScaledWidth();
-        int screenHeight = mc.getWindow().getGuiScaledHeight();
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
         int dialogW = 300;
         int dialogH = 140;
         int x = (screenWidth - dialogW) / 2;
@@ -164,6 +164,14 @@ public class ExportToTeamDialog {
         String commitMsg = "Exported from personal board: " + pageTitle;
         com.gtceu.calcboard.client.team.ClientChunkedStreamHelper.commitPageSafely(teamId, pageId, pageTitle, rev, commitMsg, compressed, nodeCount, 0, 0);
         BoardToast.show("gui.gtcalcboard.toast.exported_to_team", pageTitle);
+    }
+
+    private int getScreenWidth() {
+        return screen != null && screen.width > 0 ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    private int getScreenHeight() {
+        return screen != null && screen.height > 0 ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
     }
 }
 

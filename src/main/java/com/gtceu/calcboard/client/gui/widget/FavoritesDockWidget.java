@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.search.RecipeFilterConfig;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
+import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.model.IngredientStack;
@@ -394,7 +395,7 @@ public class FavoritesDockWidget {
                     maxScrollY = Math.max(0, totalH - listH);
                     scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
-                    graphics.enableScissor(getDockX(), listY, getDockX() + EXPANDED_WIDTH, listY + listH);
+                    BoardScissorHelper.enableScissor(graphics, getDockX(), listY, getDockX() + EXPANDED_WIDTH, listY + listH);
 
                     for (int i = 0; i < favorites.size(); i++) {
                         dev.emi.emi.runtime.EmiFavorite fav = favorites.get(i);
@@ -437,7 +438,7 @@ public class FavoritesDockWidget {
                         }
                     }
 
-                    graphics.disableScissor();
+                    BoardScissorHelper.disableScissor(graphics);
 
                     if (maxScrollY > 0) {
                         int scrollBarH = Math.max(10, (int) ((float) listH / totalH * listH));
@@ -482,7 +483,7 @@ public class FavoritesDockWidget {
             subMaxScrollY = Math.max(0, totalH - listH);
             subScrollY = Math.max(0, Math.min(subMaxScrollY, subScrollY));
 
-            graphics.enableScissor(subX, listY, subX + subW, listY + listH);
+            BoardScissorHelper.enableScissor(graphics, subX, listY, subX + subW, listY + listH);
             hoveredFlyoutRecipe = null;
 
             ResourceLocation preferredWs = null;
@@ -543,7 +544,7 @@ public class FavoritesDockWidget {
                 graphics.drawCenteredString(font, "➕", addBtnX + 9, addBtnY + 4, 0xFFFFFFFF);
             }
 
-            graphics.disableScissor();
+            BoardScissorHelper.disableScissor(graphics);
 
             if (subMaxScrollY > 0) {
                 int scrollBarH = Math.max(10, (int) ((float) listH / totalH * listH));
@@ -556,8 +557,8 @@ public class FavoritesDockWidget {
         private void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
             if (isDragging) return;
 
-            int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-            int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+            int screenW = screen.width;
+            int screenH = screen.height;
 
             if (activePreviewRecipe != null && activeFlyoutFavorite != null) {
                 int subX = getDockX() + EXPANDED_WIDTH + 3;
@@ -584,7 +585,7 @@ public class FavoritesDockWidget {
                     tooltip.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.favorites_dock.hover_flyout_hint").getString()));
                     tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.favorites_dock.click_hint").getString()));
                     tooltip.add(Component.literal("§c" + Component.translatable("gui.gtcalcboard.favorites_dock.remove_hint").getString()));
-                    graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+                    com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenW, screenH);
                 }
             }
         }
@@ -689,11 +690,10 @@ public class FavoritesDockWidget {
             dev.emi.emi.api.recipe.EmiRecipe activeEmi = (activePreviewRecipe != null) ? activePreviewRecipe : (hoveredFavorite != null && hoveredFavorite.getRecipe() != null ? hoveredFavorite.getRecipe() : null);
             if (activeEmi == null) return false;
 
-            Minecraft mc = Minecraft.getInstance();
-            int screenW = mc.getWindow().getGuiScaledWidth();
-            int screenH = mc.getWindow().getGuiScaledHeight();
-            double mouseX = mc.mouseHandler.xpos() * screenW / mc.getWindow().getScreenWidth();
-            double mouseY = mc.mouseHandler.ypos() * screenH / mc.getWindow().getScreenHeight();
+            int screenW = screen.width;
+            int screenH = screen.height;
+            double mouseX = screen.getLastMouseX();
+            double mouseY = screen.getLastMouseY();
 
             int subX = getDockX() + EXPANDED_WIDTH + 3;
             int previewAnchorX = (activeFlyoutFavorite != null) ? (subX + SUB_WIDTH + 6) : (getDockX() + EXPANDED_WIDTH + 6);
@@ -861,9 +861,7 @@ public class FavoritesDockWidget {
                     double canvasY = screen.toCanvasY(mouseY);
                     spawnRecipeNode(draggingFlyoutRecipe, canvasX, canvasY);
                 } else {
-                    int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-                    int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
-                    double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+                    double[] pos = BoardScreen.getNextNodeCenterPosition(screen.width, screen.height);
                     spawnRecipeNode(draggingFlyoutRecipe, pos[0], pos[1]);
                 }
                 draggingFlyoutRecipe = null;
@@ -879,9 +877,7 @@ public class FavoritesDockWidget {
                     spawnFavoriteNode(draggingFavorite, canvasX, canvasY);
                 } else {
                     if (draggingFavorite.getRecipe() != null) {
-                        int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-                        int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
-                        double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+                        double[] pos = BoardScreen.getNextNodeCenterPosition(screen.width, screen.height);
                         spawnFavoriteNode(draggingFavorite, pos[0], pos[1]);
                     } else {
                         activeFlyoutFavorite = draggingFavorite;

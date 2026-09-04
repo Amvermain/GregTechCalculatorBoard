@@ -39,6 +39,15 @@ public interface IModGuiHandler {
     /**
      * Renders Section 1 (Top Header / Machine Base Settings) inside MachineConfigDialog.
      */
+    default void renderDialogHeader(MachineConfigDialog dialog, GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int dialogW,
+                                    int mouseX, int mouseY, float partialTicks,
+                                    EditBox parallelBox, BoardScreen parent) {
+        renderDialogHeader(graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
+    }
+
+    /**
+     * Renders Section 1 (Top Header / Machine Base Settings) inside MachineConfigDialog (legacy fallback).
+     */
     default void renderDialogHeader(GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int dialogW,
                                     int mouseX, int mouseY, float partialTicks,
                                     EditBox parallelBox, BoardScreen parent) {}
@@ -49,6 +58,23 @@ public interface IModGuiHandler {
     default boolean handleDialogHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
                                             double mouseX, double mouseY, int button,
                                             EditBox parallelBox, BoardScreen parent) {
+        return false;
+    }
+
+    /**
+     * Handles mouse drag on Section 1 header inside MachineConfigDialog.
+     */
+    default boolean handleDialogHeaderDrag(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                           double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return false;
+    }
+
+    /**
+     * Handles mouse release on Section 1 header inside MachineConfigDialog.
+     */
+    default boolean handleDialogHeaderRelease(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                              double mouseX, double mouseY, int button,
+                                              EditBox parallelBox, BoardScreen parent) {
         return false;
     }
 
