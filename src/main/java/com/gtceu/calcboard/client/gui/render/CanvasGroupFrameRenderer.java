@@ -96,7 +96,7 @@ public class CanvasGroupFrameRenderer {
                     : Component.translatable("gui.gtcalcboard.default_frame_name").getString();
         }
         int titleCol = 0xFFFFFFFF;
-        String prefix = frame.isSharedMachineFrame() ? "🔗 " : (frame.isCompoundFrame() ? "📦 " : "");
+        String prefix = frame.isSharedMachineFrame() ? "↔ " : (frame.isCompoundFrame() ? "▦ " : "");
         String displayTitle = prefix + title;
 
         int btnCount = (frame.isSharedMachineFrame() ? 4 : 3) + 1;
@@ -163,7 +163,7 @@ public class CanvasGroupFrameRenderer {
         }
 
         // 4. Header Action Buttons (Right-aligned)
-        // [⚙ Config] [🎨 Color] [⛶ Auto-Fit] [📦 Collapse] [✕ Delete]
+        // [⚙ Config] [✦ Color] [⛶ Auto-Fit] [▦ Collapse] [✕ Delete]
         int btnY = y + 4;
         int curBtnX = x + w - BTN_SIZE - 5;
 
@@ -172,10 +172,10 @@ public class CanvasGroupFrameRenderer {
         drawIconButton(graphics, font, "✕", curBtnX, btnY, BTN_SIZE, BTN_SIZE, delHover, 0xFFFF5555, 0x55FF0000);
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-        // [📦 Collapse to Module]
+        // [▦ Collapse to Module]
         boolean colHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
         boolean isColGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isFrameCollapseButtonGlowing(frame.getId());
-        drawIconButton(graphics, font, "📦", curBtnX, btnY, BTN_SIZE, BTN_SIZE, colHover, 0xFF60A5FA, 0x553B82F6, isColGlowing);
+        drawIconButton(graphics, font, "▦", curBtnX, btnY, BTN_SIZE, BTN_SIZE, colHover, 0xFF60A5FA, 0x553B82F6, isColGlowing);
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
         // [⛶ Auto-Fit to Contents]
@@ -183,7 +183,7 @@ public class CanvasGroupFrameRenderer {
         drawIconButton(graphics, font, "⛶", curBtnX, btnY, BTN_SIZE, BTN_SIZE, fitHover, 0xFF34D399, 0x55059669);
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-        // [🎨 Color Picker]
+        // [✦ Color Picker]
         boolean colorHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
         drawColorCycleButton(graphics, curBtnX, btnY, BTN_SIZE, BTN_SIZE, colorHover, color);
 
@@ -249,9 +249,9 @@ public class CanvasGroupFrameRenderer {
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-                // [📦 Collapse]
+                // [▦ Collapse]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b📦 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
@@ -263,9 +263,9 @@ public class CanvasGroupFrameRenderer {
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-                // [🎨 Color]
+                // [✦ Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e✦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
                     return;
                 }
 
@@ -285,7 +285,7 @@ public class CanvasGroupFrameRenderer {
                     boolean isCompatible = frame.isMachineCompatible(graph);
 
                     List<Component> tooltipLines = new ArrayList<>();
-                    tooltipLines.add(Component.literal("§b🔗 " + frame.getTitle() + " §7(").append(Component.translatable("gui.gtcalcboard.frame.shared_machine_tag")).append(Component.literal("§7)")));
+                    tooltipLines.add(Component.literal("§b↔ " + frame.getTitle() + " §7(").append(Component.translatable("gui.gtcalcboard.frame.shared_machine_tag")).append(Component.literal("§7)")));
                     tooltipLines.add(Component.translatable("gui.gtcalcboard.frame.total_duty_tooltip",
                             String.format(Locale.ROOT, "%.1f%%", totalDuty * 100.0),
                             String.valueOf(reqMachines)));
@@ -420,7 +420,7 @@ public class CanvasGroupFrameRenderer {
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-            // [📦 Collapse]
+            // [▦ Collapse]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return FrameAction.COLLAPSE;
             }
@@ -432,7 +432,7 @@ public class CanvasGroupFrameRenderer {
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-            // [🎨 Color]
+            // [✦ Color]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return FrameAction.COLOR;
             }

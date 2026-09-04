@@ -136,6 +136,7 @@
   - [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (오토크래프팅 패턴 바인딩 & DAG 완료 시간 연산)
   - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
   - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  - [Greate](https://curseforge.com/minecraft/mc-mods/greate) (티어별 키네틱 기계 및 샤프트 연동)
   - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
   - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 - **멀티플레이어 팀 동기화 (선택)**:
@@ -151,7 +152,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.1.0.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.1.jar` 경로에 생성됩니다.
 
 ---
 

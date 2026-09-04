@@ -69,7 +69,7 @@ public class RecentSavesDialog {
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Title
-        String title = "📜 " + Component.translatable("gui.gtcalcboard.dialog.recent_saves_title").getString();
+        String title = "▪ " + Component.translatable("gui.gtcalcboard.dialog.recent_saves_title").getString();
         graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
 
         // Close button

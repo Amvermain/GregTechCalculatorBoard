@@ -563,24 +563,22 @@ public class GTCEuModAdapter implements IModAdapter {
 
         if (result.size() > 1) {
             result.sort((a, b) -> {
-                // 1. Direct category match priority
                 if (catId != null) {
                     String catPath = catId.getPath().toLowerCase(Locale.ROOT);
                     boolean aMatch = a.getPath().toLowerCase(Locale.ROOT).contains(catPath);
                     boolean bMatch = b.getPath().toLowerCase(Locale.ROOT).contains(catPath);
-                    if (aMatch && !bMatch) return -1;
-                    if (!aMatch && bMatch) return 1;
+                    if (aMatch != bMatch) return aMatch ? -1 : 1;
                 }
 
-                // 2. Power / Voltage tier progression order (Ascending)
                 GTVoltageTier tierA = extractVoltageTierFromIcon(a);
                 GTVoltageTier tierB = extractVoltageTierFromIcon(b);
-                if (tierA != null && tierB != null) {
-                    int tierCmp = Integer.compare(tierA.ordinal(), tierB.ordinal());
-                    if (tierCmp != 0) return tierCmp;
+                int tA = tierA != null ? tierA.ordinal() : -1;
+                int tB = tierB != null ? tierB.ordinal() : -1;
+                if (tA != tB) {
+                    return Integer.compare(tA, tB);
                 }
 
-                return 0;
+                return a.toString().compareTo(b.toString());
             });
         }
 

@@ -5,6 +5,49 @@
 </p>
 
 
+## [2.2.0-alpha.1] - 2026-09-05
+
+### Added
+- **Greate Mod Compatibility & Kinetic Tier Integration**:
+  - Added native integration for the **Greate** mod (Create + GregTech addon), bringing kinetic processing lines directly into the calculator board.
+  - Full support for all 10 kinetic machine tiers: Andesite (ULV), Steel (LV), Aluminium (MV), Stainless Steel (HV), Titanium (EV), Tungstensteel (IV), Chrome (LuV), Iridium (ZPM), Osmium (UV), and Neutronium (UHV).
+  - Dedicated recipe handling and speed/stress calculations for Greate Mills, Crushers, Mixers, Presses, and Saws.
+  - Integrated circuit configuration (1-24) support and validation for recipes requiring circuit settings.
+  - Shaft torque capacity validation: machine nodes display warning indicators when total required stress exceeds the safe capacity of the connected shaft tier.
+- **High-Speed Recipe Animation Batching & Multiplier Badges**:
+  - Ultra-fast recipes with cycle times under 1.0s (such as 0.05s centrifuges or extreme overclocks) now automatically bundle into smooth visual bursts at a stable 1.0s interval.
+  - Flow particle pulses display multiplier badges (e.g., `2x`, `5x`, `20x`) reflecting the batched cycle count, maintaining clear readability and fluid 60 FPS rendering performance without particle overlap.
+- **Junction Priority Flow Routing & Accumulation Buffers**:
+  - **Fixed Rate Priority Routing**: Output connections from junction nodes can now be assigned a fixed flow limit. The flow solver fulfills fixed-rate priority consumer lines first before balancing remaining flows among unconstrained consumers.
+  - **Accumulation Buffer Mode**: Junction nodes can be toggled into Accumulation Buffer mode with a configurable target batch size. The system calculates the charge duration and duty cycle, preventing false-positive starvation warnings for downstream machines running on intermittent periodic batches.
+  - Input slots receiving buffered batch flows display an amber hourglass indicator (⏳) and a detailed tooltip explaining the intermittent duty cycle.
+  - Redesigned the Junction Supply Dialog with a dedicated flow allocation table, fixed limit inputs, and accumulation buffer settings.
+
+### Changed & Improved
+- **Orthogonal Dual-Stream Wire Flow Modulation**:
+  - Decoupled incoming feed line animations from outgoing product lines:
+    - Input lines lacking sufficient supply emit an amber-to-crimson warning pulse to clearly indicate feed starvation.
+    - Outgoing product lines from partially starved machines travel smoothly at speeds reduced proportionally to actual machine operating efficiency, accurately representing physical production rates rather than displaying false error pulses.
+- **Page Tab Bar Width Calculation & Icon Alignment**:
+  - Included pin and AE2 status icon prefixes into the exact tab width calculation in `PageTabBarWidget`, preventing title text clipping and hover hitbox drift across open tabs.
+- **Hardware Addon Catalog Ordering**:
+  - Added dedicated catalog comparator prioritizing reset cards, category priority, coil temperatures, and hatch tiers in machine addon selection dialogs.
+- **Four-Language Localization Synchronization (i18n)**:
+  - Synchronized 27 new translation keys across English, Korean, Russian, and Simplified Chinese covering Greate kinetic machine tiers, shaft overload warnings, circuit badges, junction priority routing, and batch accumulation buffers.
+
+### Fixed
+- **Star Technology Reflector Fusion Reactor Overclock Boost Scaling**:
+  - Fixed an issue where equipping higher-tier reflectors (e.g. T3 or T4 on recipes requiring T2 like Duranium) on Reflector Fusion Reactors failed to apply overclock boosts, keeping production rates fixed at base speed (14.40s, 10 mB/s, 0 OC).
+  - The calculation engine now accounts for the excess reflector tier delta (Installed Tier - Required Tier) and applies GTCEu 2:2 Perfect Overclocking (halving duration and doubling EU/t per tier delta), matching Star Technology's in-game behavior. Added reflector overclock boost indicators (+N OC, Nx speed) to reflector badge tooltips.
+- **Star Technology Throughput Boosting (TPB) Machine Duration Integer Tick Truncation**:
+  - Fixed an issue where machines with duration multipliers such as Star Technology's Industrial Accumulation Vessel (Throughput Boosting: 1.6x duration, 4x parallel) calculated fractional ticks (e.g. 2 ticks * 1.6 = 3.2 ticks -> 0.16s) instead of integer ticks (3 ticks -> 0.15s, 26.67 B/s).
+  - The calculation engine now truncates post-overclock machine duration to integer ticks using floor rounding, aligning with GTCEu Modern's recipe execution engine.
+- **Star Technology Large Chemical Reactor (LCR) Coil Buff Environment Isolation**:
+  - Fixed an issue where Star Technology's custom heating coil speed bonus and energy discount (`Chemical Reactor: 100% Spd, 95% Energy`) were erroneously applied to Large Chemical Reactors across all modpacks (including vanilla GTCEu Modern and TFG), causing calculation discrepancies and confusing coil tooltips.
+  - Coil speed and energy bonuses for Large Chemical Reactors are now strictly isolated to environments where Star Technology is loaded (`ModCompatHelper.isStarTLoaded()`), treating LCRs in vanilla GTCEu as standard multiblocks without false coil bonuses and hiding the chemical reactor line from coil tooltips.
+- **Create & Greate Secondary Workstation Precedence**:
+  - Resolved an issue in `EmiRecipeConverter` where Create Basin and Blaze Burner blocks were erroneously selected as the primary workstation icon for mixer and press recipes instead of the actual mechanical machine.
+
 ## [2.1.0] - 2026-09-04
 
 ### Added
@@ -276,7 +319,7 @@
 
 ### Added
 - **Automatic Fusion Reactor Controller Matching (`GTCEuModAdapter`, `GTAddonCompatibilityHandler`, `EmiRecipeConverter`, `JeiRecipeConverter`)**:
-  - When importing recipes for Fusion Reactors (Mk1, Mk2, Mk3), the controller workstation matching the recipe's minimum required voltage tier (e.g. 180M EU $\rightarrow$ ZPM Mk2) is now strictly prioritized and assigned as the default machine icon upon creation.
+  - When importing recipes for Fusion Reactors (Mk1, Mk2, Mk3), the controller workstation matching the recipe's minimum required voltage tier (e.g. 180M EU -> ZPM Mk2) is now strictly prioritized and assigned as the default machine icon upon creation.
 
 ### Changed & Improved
 - **Machine Configuration Dialog Layout & Label Optimization (`MachineConfigDialog`, `GTCEuModGuiHandler`, `AddonCatalogView`)**:

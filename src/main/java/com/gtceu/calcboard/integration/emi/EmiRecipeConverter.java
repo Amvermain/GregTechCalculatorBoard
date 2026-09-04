@@ -31,6 +31,22 @@ import java.util.Map;
 
 public class EmiRecipeConverter {
 
+    private static final Class<?> CREATE_BASIN_BLOCK_CLASS;
+    private static final Class<?> CREATE_BLAZE_BURNER_BLOCK_CLASS;
+
+    static {
+        Class<?> basinCls = null;
+        Class<?> burnerCls = null;
+        try {
+            basinCls = Class.forName("com.simibubi.create.content.processing.basin.BasinBlock");
+        } catch (Throwable ignored) {}
+        try {
+            burnerCls = Class.forName("com.simibubi.create.content.processing.burner.BlazeBurnerBlock");
+        } catch (Throwable ignored) {}
+        CREATE_BASIN_BLOCK_CLASS = basinCls;
+        CREATE_BLAZE_BURNER_BLOCK_CLASS = burnerCls;
+    }
+
     public static RecipeNode convert(EmiRecipe recipe) {
         return convert(recipe, null);
     }
@@ -96,12 +112,12 @@ public class EmiRecipeConverter {
         List<ResourceLocation> allWs = findAllWorkstations(recipe);
         node.getAvailableWorkstations().clear();
         for (ResourceLocation ws : allWs) {
-            if (ws != null && !isDummyConditionMarker(ws)) {
+            if (ws != null && !isIgnoredWorkstation(ws)) {
                 node.getAvailableWorkstations().add(ws);
             }
         }
         ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe);
-        if (icon != null) {
+        if (icon != null && !isIgnoredWorkstation(icon)) {
             node.setMachineIcon(icon);
             if (!node.getAvailableWorkstations().contains(icon)) {
                 node.getAvailableWorkstations().add(0, icon);
@@ -135,6 +151,23 @@ public class EmiRecipeConverter {
             } else if (details.durationTicks > 0 && details.eut > 0) {
                 node.getProperties().set(com.gtceu.calcboard.compat.thermal.ThermalProperties.THERMAL_BASE_ENERGY_RF, details.durationTicks * details.eut);
             }
+        }
+
+        boolean isGreate = (catId != null && catId.getNamespace().equals("greate"))
+                || (recipe.getId() != null && recipe.getId().getNamespace().equals("greate"))
+                || details.circuitNumber >= 0
+                || !"NONE".equalsIgnoreCase(details.heatCondition);
+
+        if (isGreate) {
+            int initTier = details.tier != null ? details.tier.ordinal() : 0;
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE, true);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.MACHINE_TIER, initTier);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.REQUIRED_RECIPE_TIER, initTier);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.CIRCUIT_NUMBER, details.circuitNumber);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.HEAT_CONDITION, details.heatCondition);
+            node.setTargetTier(GTVoltageTier.getByIndex(initTier));
+            node.setRpm(256);
+            com.gtceu.calcboard.compat.greate.GreateMachineHelper.syncMachineIconToTier(node, initTier);
         }
 
         for (EmiIngredient input : recipe.getInputs()) {
@@ -393,13 +426,30 @@ public class EmiRecipeConverter {
         return false;
     }
 
+    public static boolean isIgnoredWorkstation(ResourceLocation id) {
+        if (id == null) return true;
+        if (isDummyConditionMarker(id)) return true;
+        try {
+            net.minecraft.world.item.Item item = ForgeRegistries.ITEMS.getValue(id);
+            if (item instanceof net.minecraft.world.item.BlockItem bi) {
+                net.minecraft.world.level.block.Block block = bi.getBlock();
+                if (CREATE_BASIN_BLOCK_CLASS != null && CREATE_BASIN_BLOCK_CLASS.isInstance(block)) {
+                    return true;
+                }
+                if (CREATE_BLAZE_BURNER_BLOCK_CLASS != null && CREATE_BLAZE_BURNER_BLOCK_CLASS.isInstance(block)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     public static ResourceLocation findMachineIcon(EmiRecipe recipe) {
         if (recipe == null) return null;
 
-        // 1. Try all workstations from recipe and category
         List<ResourceLocation> allWs = findAllWorkstations(recipe);
         for (ResourceLocation ws : allWs) {
-            if (ws != null && !isDummyConditionMarker(ws)) {
+            if (ws != null && !isDummyConditionMarker(ws) && !isIgnoredWorkstation(ws)) {
                 return ws;
             }
         }
@@ -689,29 +739,105 @@ public class EmiRecipeConverter {
     public static Object unwrapBackingRecipe(EmiRecipe recipe) {
         if (recipe == null) return null;
         Object backing = recipe.getBackingRecipe();
-        if (backing != null) return backing;
+        if (backing != null) {
+            return unwrapInnerRecipe(backing);
+        }
 
+        Object unwrapped = scanFieldsForRecipe(recipe);
+        if (unwrapped != null) {
+            return unwrapped;
+        }
+
+        return lookupRecipeFromRecipeManager(recipe);
+    }
+
+    private static Object scanFieldsForRecipe(EmiRecipe recipe) {
         Class<?> cur = recipe.getClass();
         while (cur != null && cur != Object.class) {
-            for (String mName : new String[]{"getRecipe", "recipe", "getGTRecipe", "gtRecipe", "getOriginalRecipe", "originalRecipe", "getValue", "value"}) {
-                try {
-                    Method m = cur.getDeclaredMethod(mName);
-                    m.setAccessible(true);
-                    Object res = m.invoke(recipe);
-                    if (res != null && res != recipe) return res;
-                } catch (Throwable ignored) {}
-            }
             for (String fName : new String[]{"recipe", "gtRecipe", "backingRecipe", "originalRecipe", "target", "source", "value", "delegate"}) {
                 try {
                     Field f = cur.getDeclaredField(fName);
                     f.setAccessible(true);
                     Object res = f.get(recipe);
-                    if (res != null && res != recipe) return res;
+                    if (res != null && res != recipe) {
+                        return unwrapInnerRecipe(res);
+                    }
+                } catch (Throwable ignored) {}
+            }
+            for (String mName : new String[]{"getRecipe", "recipe", "getGTRecipe", "gtRecipe", "getOriginalRecipe", "originalRecipe", "getValue", "value"}) {
+                try {
+                    Method m = cur.getDeclaredMethod(mName);
+                    m.setAccessible(true);
+                    Object res = m.invoke(recipe);
+                    if (res != null && res != recipe) {
+                        return unwrapInnerRecipe(res);
+                    }
+                } catch (Throwable ignored) {}
+            }
+            for (Field f : cur.getDeclaredFields()) {
+                try {
+                    f.setAccessible(true);
+                    Object val = f.get(recipe);
+                    if (val != null && val != recipe && val instanceof net.minecraft.world.item.crafting.Recipe<?>) {
+                        return unwrapInnerRecipe(val);
+                    }
                 } catch (Throwable ignored) {}
             }
             cur = cur.getSuperclass();
         }
         return null;
+    }
+
+    private static Object lookupRecipeFromRecipeManager(EmiRecipe recipe) {
+        ResourceLocation id = recipe.getId();
+        if (id == null) return null;
+
+        try {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc == null || mc.level == null) return null;
+            net.minecraft.world.item.crafting.RecipeManager rm = mc.level.getRecipeManager();
+            if (rm == null) return null;
+
+            var direct = rm.byKey(id);
+            if (direct.isPresent()) {
+                return unwrapInnerRecipe(direct.get());
+            }
+
+            String path = id.getPath();
+            if (path.contains("automatic_packing/")) {
+                String stripped = path.replace("automatic_packing/", "");
+                ResourceLocation cleanId = ResourceLocation.tryParse(id.getNamespace() + ":" + stripped);
+                if (cleanId != null) {
+                    var cleanRecipe = rm.byKey(cleanId);
+                    if (cleanRecipe.isPresent()) {
+                        return unwrapInnerRecipe(cleanRecipe.get());
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    private static Object unwrapInnerRecipe(Object obj) {
+        if (obj == null) return null;
+        Object cur = obj;
+        for (int i = 0; i < 3; i++) {
+            boolean unwrapped = false;
+            Class<?> cl = cur.getClass();
+            for (String mName : new String[]{"getRecipe", "value", "recipe"}) {
+                try {
+                    Method m = cl.getMethod(mName);
+                    Object next = m.invoke(cur);
+                    if (next != null && next != cur) {
+                        cur = next;
+                        unwrapped = true;
+                        break;
+                    }
+                } catch (Throwable ignored) {}
+            }
+            if (!unwrapped) break;
+        }
+        return cur;
     }
 
     public static class RecipeDetails {
@@ -721,6 +847,8 @@ public class EmiRecipeConverter {
         public boolean isGenerator = false;
         public com.gtceu.calcboard.api.type.EnergyType energyType = com.gtceu.calcboard.api.type.EnergyType.NONE;
         public int backingRecipeTemp = 0;
+        public int circuitNumber = -1;
+        public String heatCondition = "NONE";
         public List<IngredientStack> extraInputs = new ArrayList<>();
         public List<IngredientStack> extraOutputs = new ArrayList<>();
         public boolean overrideOutputs = false;

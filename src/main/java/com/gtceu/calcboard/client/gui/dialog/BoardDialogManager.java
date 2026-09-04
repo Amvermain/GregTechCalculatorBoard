@@ -357,6 +357,9 @@ public class BoardDialogManager {
         if (autoConnectDialog != null && autoConnectDialog.isVisible()) {
             return autoConnectDialog.mouseScrolled(mouseX, mouseY, delta);
         }
+        if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
+            return junctionSupplyDialog.mouseScrolled(mouseX, mouseY, delta);
+        }
         return false;
     }
 

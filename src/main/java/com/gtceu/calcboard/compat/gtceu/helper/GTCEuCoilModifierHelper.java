@@ -2,6 +2,8 @@ package com.gtceu.calcboard.compat.gtceu.helper;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.compat.start.StarTReflectionBridge;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
@@ -17,6 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class GTCEuCoilModifierHelper {
 
     private GTCEuCoilModifierHelper() {}
+
+    private static boolean isStarTCoilReactor() {
+        return ModCompatHelper.isStarTLoaded();
+    }
 
     public enum CoilMachineKind {
         BLAST_FURNACE,
@@ -62,6 +68,10 @@ public final class GTCEuCoilModifierHelper {
     public static CoilMachineSpec getCoilMachineSpec(ResourceLocation machineId) {
         if (machineId == null) return CoilMachineSpec.GENERIC;
         return SPEC_CACHE.computeIfAbsent(machineId, GTCEuCoilModifierHelper::inspectMachineDefinition);
+    }
+
+    public static void clearCache() {
+        SPEC_CACHE.clear();
     }
 
     private static CoilMachineSpec inspectMachineDefinition(ResourceLocation machineId) {
@@ -111,7 +121,9 @@ public final class GTCEuCoilModifierHelper {
             if ("EBF_OC".equals(modId) || "ELECTRIC_BLAST_FURNACE".equals(modId)) return CoilMachineKind.BLAST_FURNACE;
             if ("PYROLYSE_OVEN_OC".equals(modId) || "PYROLYSE_OVEN".equals(modId)) return CoilMachineKind.PYROLYSE_OVEN;
             if ("CRACKER_OC".equals(modId) || "CRACKING_UNIT".equals(modId)) return CoilMachineKind.CRACKING_UNIT;
-            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_PLANT".equals(modId)) return CoilMachineKind.CHEMICAL_REACTOR;
+            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_PLANT".equals(modId)) {
+                return isStarTCoilReactor() ? CoilMachineKind.CHEMICAL_REACTOR : CoilMachineKind.GENERIC;
+            }
             if ("MULTI_SMELLTER_PARALLEL".equals(modId) || "MULTI_SMELTER_PARALLEL".equals(modId) || "MULTI_SMELTER".equals(modId)) return CoilMachineKind.MULTI_SMELTER;
         }
         return null;
@@ -128,7 +140,9 @@ public final class GTCEuCoilModifierHelper {
             if (name.contains("blastfurnace") || name.contains("ebf")) return CoilMachineKind.BLAST_FURNACE;
             if (name.contains("pyrolyse")) return CoilMachineKind.PYROLYSE_OVEN;
             if (name.contains("cracking") || name.contains("cracker")) return CoilMachineKind.CRACKING_UNIT;
-            if (name.contains("chemical") || name.contains("reactor") || name.contains("plant")) return CoilMachineKind.CHEMICAL_REACTOR;
+            if (name.contains("chemical") || name.contains("reactor") || name.contains("plant")) {
+                return isStarTCoilReactor() ? CoilMachineKind.CHEMICAL_REACTOR : CoilMachineKind.GENERIC;
+            }
             if (name.contains("smelter")) return CoilMachineKind.MULTI_SMELTER;
             return CoilMachineKind.CUSTOM_COIL_MULTIBLOCK;
         }
@@ -175,7 +189,9 @@ public final class GTCEuCoilModifierHelper {
             return new CoilMachineSpec(CoilMachineKind.CRACKING_UNIT, CustomCoilMultiplier.DEFAULT);
         }
         if (path.contains("chemical") || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {
-            return new CoilMachineSpec(CoilMachineKind.CHEMICAL_REACTOR, CustomCoilMultiplier.DEFAULT);
+            return isStarTCoilReactor()
+                    ? new CoilMachineSpec(CoilMachineKind.CHEMICAL_REACTOR, CustomCoilMultiplier.DEFAULT)
+                    : CoilMachineSpec.GENERIC;
         }
         if (path.contains("smelter")) {
             return new CoilMachineSpec(CoilMachineKind.MULTI_SMELTER, CustomCoilMultiplier.DEFAULT);

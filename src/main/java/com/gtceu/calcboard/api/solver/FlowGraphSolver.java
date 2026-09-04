@@ -140,6 +140,22 @@ public final class FlowGraphSolver {
     public static void autoRatioHarmonized(FlowGraph graph, RecipeNode anchor) {
         FlowBalanceMatrixSolver.autoRatioHarmonized(graph, anchor);
     }
+
+    /**
+     * Finds any connected upstream buffer node for a specific consumer input port.
+     */
+    public static RecipeNode findConnectedBufferNode(FlowGraph graph, RecipeNode consumer, int inputIndex) {
+        if (graph == null || consumer == null) return null;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(consumer.getId()) && edge.inputIndex() == inputIndex) {
+                RecipeNode p = graph.findNodeById(edge.fromNodeId());
+                if (p != null && p.isJunctionBuffer()) {
+                    return p;
+                }
+            }
+        }
+        return null;
+    }
 }
 
 

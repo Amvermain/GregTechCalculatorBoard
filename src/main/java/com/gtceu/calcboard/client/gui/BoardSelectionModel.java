@@ -298,7 +298,7 @@ public class BoardSelectionModel {
             TutorialManager.getInstance().onNodeRemoved(n);
         }
 
-        BoardToast.show(Component.literal("§c🗑 ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))));
+        BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))));
     }
 
     public void copySelection(BoardScreen screen) {

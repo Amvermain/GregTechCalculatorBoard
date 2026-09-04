@@ -3,6 +3,7 @@ package com.gtceu.calcboard.compat;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeModAdapter;
+import com.gtceu.calcboard.compat.greate.GreateModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.start.StarTModAdapter;
 import com.gtceu.calcboard.compat.systeams.SysteamsModAdapter;
@@ -38,6 +39,7 @@ public class ModAdapterRegistry {
         register(new CreateNewAgeModAdapter());  // Priority 105 (intercepts Create: New Age motors & generator coils)
         register(new ThermalModAdapter());       // Priority 100
         register(new GTCEuModAdapter());         // Priority 100
+        register(new GreateModAdapter());        // Priority 95 (intercepts Greate tiered kinetic machinery)
         register(new CreateModAdapter());        // Priority 90
         register(FALLBACK_ADAPTER);               // Priority 0
 

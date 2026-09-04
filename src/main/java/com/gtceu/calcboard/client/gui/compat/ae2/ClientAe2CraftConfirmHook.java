@@ -247,7 +247,7 @@ public class ClientAe2CraftConfirmHook {
             displayBName = displayBName.substring(0, displayBName.length() - 3) + "...";
         }
 
-        String fullStr = "§e🔗 " + displayBName + " §a↗";
+        String fullStr = "§e↔ " + displayBName + " §a↗";
         int btnW = font.width(fullStr) + 6;
         int btnH = 10;
         int btnX = panelX + 4;

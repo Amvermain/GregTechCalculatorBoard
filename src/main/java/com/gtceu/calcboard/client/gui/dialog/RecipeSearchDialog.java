@@ -93,9 +93,17 @@ public class RecipeSearchDialog {
         RecipeSearchCacheManager.notifyFavoritesChanged();
     }
 
-    private static final int DIALOG_WIDTH = 360;
-    private static final int DIALOG_HEIGHT = 280;
+    private static final int BASE_DIALOG_WIDTH = 460;
+    private static final int BASE_DIALOG_HEIGHT = 300;
     private static final int ROW_HEIGHT = 32;
+
+    public static int getDialogWidth(int screenWidth) {
+        return Math.min(BASE_DIALOG_WIDTH, screenWidth - 24);
+    }
+
+    public static int getDialogHeight(int screenHeight) {
+        return Math.min(BASE_DIALOG_HEIGHT, screenHeight - 24);
+    }
 
     public record PrefixGuideItem(
             String prefix,
@@ -119,7 +127,7 @@ public class RecipeSearchDialog {
     public RecipeSearchDialog(BoardScreen parent) {
         this.parent = parent;
         Font font = Minecraft.getInstance().font;
-        this.searchBox = new EditBox(font, 0, 0, DIALOG_WIDTH - 48, 16, Component.translatable("gui.gtcalcboard.search"));
+        this.searchBox = new EditBox(font, 0, 0, BASE_DIALOG_WIDTH - 48, 16, Component.translatable("gui.gtcalcboard.search"));
         this.searchBox.setMaxLength(256);
         this.searchBox.setResponder(this::onSearchQueryChanged);
         this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
@@ -315,8 +323,8 @@ public class RecipeSearchDialog {
         graphics.pose().translate(0, 0, 600);
 
         Font font = Minecraft.getInstance().font;
-        int dialogW = Math.min(380, screenWidth - 24);
-        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogW = getDialogWidth(screenWidth);
+        int dialogH = getDialogHeight(screenHeight);
         int sideW = 104;
         int gap = 6;
         boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
@@ -341,7 +349,7 @@ public class RecipeSearchDialog {
         graphics.fill(x, y, x + dialogW, y + 24, 0xFF282E3B);
         String headerTitle;
         if (switchTargetNode != null) {
-            headerTitle = "§e🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.title", switchTargetNode.getName()).getString();
+            headerTitle = "§e⟲ " + Component.translatable("gui.gtcalcboard.switch_recipe.title", switchTargetNode.getName()).getString();
         } else if (contextualWireTarget != null) {
             String stackName = contextualWireTarget.sourceStack != null ? contextualWireTarget.sourceStack.getDisplayName() : "Item";
             if (!contextualWireTarget.sourceIsInput) {
@@ -526,19 +534,29 @@ public class RecipeSearchDialog {
                         .renderRowIcon(graphics, font, sr.recipe(), listX, rowY, matchedId, matchedName);
 
                 String rName = sr.displayName();
-                if (matchedName != null && !matchedName.isEmpty() && !matchedName.equalsIgnoreCase(rName)) {
-                    rName = matchedName + " §7(" + rName + ")";
-                }
-
-                String catText = !sr.categoryName().isEmpty() ? "§7[" + sr.categoryName() + "§7] " : (!sr.categoryId().isEmpty() ? "§7[" + sr.categoryId() + "§7] " : "");
+                String catText = !sr.categoryName().isEmpty() ? "§7[" + sr.categoryName() + "§7]" : (!sr.categoryId().isEmpty() ? "§7[" + sr.categoryId() + "§7]" : "");
                 String star = isDefault ? "§6★ " : "";
                 String genericBadge = !sr.isSupported() ? "§6[" + Component.translatable("gui.gtcalcboard.search.badge.unsupported").getString() + "] " : "";
-                String fullRowText = star + genericBadge + catText + (isDefault ? "§b" : "§f") + rName;
+
+                String line1 = star + genericBadge + (isDefault ? "§b" : "§f") + rName;
+
+                String genInfo = resolveGenerationInfo(sr);
+                String line2;
+                if (genInfo != null) {
+                    line2 = catText.isEmpty() ? genInfo : (catText + " " + genInfo);
+                } else if (matchedName != null && !matchedName.isEmpty() && !matchedName.equalsIgnoreCase(rName)) {
+                    line2 = catText.isEmpty() ? ("§8➔ §e" + matchedName) : (catText + " §8➔ §e" + matchedName);
+                } else {
+                    line2 = catText;
+                }
 
                 int textStartX = listX + Math.max(58, renderedIconWidth + 4);
                 int maxTextW = (btnX - 24) - textStartX;
                 if (maxTextW > 20) {
-                    graphics.drawString(font, font.plainSubstrByWidth(fullRowText, maxTextW), textStartX, rowY + 12, isDefault ? 0xFF38BDF8 : 0xFFFFFFFF, false);
+                    graphics.drawString(font, font.plainSubstrByWidth(line1, maxTextW), textStartX, rowY + 6, isDefault ? 0xFF38BDF8 : 0xFFFFFFFF, false);
+                    if (!line2.isEmpty()) {
+                        graphics.drawString(font, font.plainSubstrByWidth(line2, maxTextW), textStartX, rowY + 18, 0xFFAAAAAA, false);
+                    }
                 }
 
                 // Star favorite indicator / toggle next to Add button
@@ -556,7 +574,7 @@ public class RecipeSearchDialog {
                 graphics.fill(btnX, btnY, btnX + btnW, btnY + btnH, btnHover ? 0xFF2A6840 : 0xFF1E4D2F);
                 graphics.renderOutline(btnX, btnY, btnW, btnH, 0xFF359050);
                 String btnText = (switchTargetNode != null)
-                        ? ("🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.apply").getString())
+                        ? ("⟲ " + Component.translatable("gui.gtcalcboard.switch_recipe.apply").getString())
                         : ("➕ " + Component.translatable("gui.gtcalcboard.add_btn").getString());
                 graphics.drawCenteredString(font, btnText, btnX + btnW / 2, btnY + 5, 0xFFFFFFFF);
             }
@@ -657,7 +675,7 @@ public class RecipeSearchDialog {
             tooltipLines.add(Component.literal("§6§l" + Component.translatable(hoveredItem.labelKey()).getString()));
             tooltipLines.add(Component.literal("§7" + Component.translatable(hoveredItem.descKey()).getString()));
             tooltipLines.add(Component.literal("§8----------------------"));
-            tooltipLines.add(Component.literal("§e💡 " + Component.translatable("gui.gtcalcboard.search.prefix.click_hint").getString()));
+            tooltipLines.add(Component.literal("§e★ " + Component.translatable("gui.gtcalcboard.search.prefix.click_hint").getString()));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, parent.width, parent.height);
         }
     }
@@ -669,8 +687,8 @@ public class RecipeSearchDialog {
             return filterDialog.mouseClicked(mouseX, mouseY, button, screenWidth, screenHeight);
         }
 
-        int dialogW = Math.min(380, screenWidth - 24);
-        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogW = getDialogWidth(screenWidth);
+        int dialogH = getDialogHeight(screenHeight);
         int sideW = 104;
         int gap = 6;
         boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
@@ -1033,7 +1051,7 @@ public class RecipeSearchDialog {
         if (filterDialog.isVisible()) {
             return filterDialog.mouseScrolled(mouseX, mouseY, delta, parent.width, parent.height);
         }
-        int dialogH = Math.min(280, parent.height - 24);
+        int dialogH = getDialogHeight(parent.height);
         int listH = dialogH - 60;
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
@@ -1060,8 +1078,8 @@ public class RecipeSearchDialog {
         }
         // R / U recipe lookup over preview card ingredient
         if ((keyCode == 82 || keyCode == 85) && stickyHoverRecipe != null) { // R or U
-            int dialogW = Math.min(380, parent.width - 24);
-            int dialogH = Math.min(280, parent.height - 24);
+            int dialogW = getDialogWidth(parent.width);
+            int dialogH = getDialogHeight(parent.height);
             int sideW = 104;
             int gap = 6;
             boolean hasSideSpace = parent.width >= (dialogW + sideW + gap + 16);
@@ -1094,8 +1112,8 @@ public class RecipeSearchDialog {
     public boolean mouseDragged(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
         if (!visible || !isDraggingScrollBar || button != 0) return false;
 
-        int dialogW = Math.min(380, screenWidth - 24);
-        int dialogH = Math.min(280, screenHeight - 24);
+        int dialogW = getDialogWidth(screenWidth);
+        int dialogH = getDialogHeight(screenHeight);
         int listH = dialogH - 60;
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
@@ -1133,6 +1151,29 @@ public class RecipeSearchDialog {
             return adapter.handleHoveredIngredientLookup(hoveredIngredient, false);
         }
         return false;
+    }
+
+    private static String resolveGenerationInfo(SearchableRecipe sr) {
+        if (sr.recipe() instanceof RecipeNode rn && rn.isGenerator()) {
+            String unit = (rn.getEnergyType() != null) ? rn.getEnergyType().getUnitLabel() : "EU";
+            String rate = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(rn.getBaseEUt(), false);
+            return "§a(+" + rate + " " + unit + ")";
+        }
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
+            return EmiGenHelper.getEmiGenInfo(sr.recipe());
+        }
+        return null;
+    }
+
+    private static class EmiGenHelper {
+        private static String getEmiGenInfo(Object recipe) {
+            if (recipe instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg && kg.isGenerator()) {
+                String unit = (kg.getEnergyType() != null) ? kg.getEnergyType().getUnitLabel() : "SU";
+                String rate = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(kg.getEut(), false);
+                return "§a(+" + rate + " " + unit + ")";
+            }
+            return null;
+        }
     }
 }
 

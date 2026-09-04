@@ -25,7 +25,7 @@ import java.util.Locale;
 /**
  * Mod Adapter facade for Create kinetic generators and processing machinery.
  */
-public class CreateModAdapter implements IModAdapter {
+public class CreateModAdapter extends AbstractKineticModAdapter {
 
     public static final String MOD_ID = "create";
     public static final String MOD_ID_ADDITION = "createaddition";
@@ -63,6 +63,7 @@ public class CreateModAdapter implements IModAdapter {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace();
         if (ns.equals("create_new_age")) return false; // Dedicated CreateNewAgeModAdapter handles this
+        if (ns.equals("greate")) return false; // Dedicated GreateModAdapter handles this
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(ns)) return true;
         return "gtcalcboard".equals(ns) && "kinetic_generation".equals(categoryId.getPath());
     }
@@ -70,6 +71,8 @@ public class CreateModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && "greate".equals(node.getMachineIcon().getNamespace())) return false;
+        if (node.getRecipeCategoryId() != null && "greate".equals(node.getRecipeCategoryId().getNamespace())) return false;
         return com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(node);
     }
 
@@ -119,93 +122,6 @@ public class CreateModAdapter implements IModAdapter {
 
     @Override
     public void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
-    }
-
-    public static boolean isFanProcessingRecipe(RecipeNode node) {
-        if (node == null) return false;
-        ResourceLocation catId = node.getRecipeCategoryId();
-        if (catId != null) {
-            String path = catId.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("splashing") || path.contains("washing") || path.contains("haunting") || path.contains("smoking") || path.contains("blasting")) {
-                return true;
-            }
-        }
-        ResourceLocation icon = node.getMachineIcon();
-        if (icon != null) {
-            String path = icon.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("encased_fan") || path.contains("fan")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
-        int rpm = node.getRpm();
-        double baseDuration = node.getBaseDurationTicks();
-        double basePower = node.getBaseEUt();
-
-        boolean isFanProcessing = isFanProcessingRecipe(node);
-
-        // 32 RPM is the baseline standard speed (1.0x)
-        double speedFactor = Math.max(0.01, rpm / 32.0);
-
-        double durationTicks;
-        double batchesPerTick;
-        if (isFanProcessing) {
-            // In Create mod, Fan processing (blasting/washing/smoking/haunting) duration is fixed in-world.
-            // RPM only affects airflow distance/range, NOT processing speed!
-            durationTicks = Math.max(1.0, baseDuration);
-            batchesPerTick = 1.0;
-        } else {
-            double rawDuration = baseDuration / speedFactor;
-            durationTicks = Math.max(1.0, rawDuration);
-            batchesPerTick = (rawDuration < 1.0 && rawDuration > 0.0) ? (1.0 / rawDuration) : 1.0;
-        }
-
-        double effectivePower;
-        if (isGenerator) {
-            effectivePower = basePower;
-        } else {
-            effectivePower = basePower * speedFactor;
-        }
-
-        return new OverclockMode.OverclockResult(durationTicks, effectivePower, batchesPerTick, 0);
-    }
-
-    @Override
-    public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
-        if (node == null) return "";
-        double suRate = node.getEffectiveTotalEUt();
-        return node.isGenerator()
-                ? String.format(Locale.ROOT, "§6+%,.0f SU", suRate)
-                : String.format(Locale.ROOT, "§e%,.0f SU", suRate);
-    }
-
-    @Override
-    public List<Component> buildEnergyTooltip(RecipeNode node) {
-        List<Component> tooltipLines = new ArrayList<>();
-        if (node == null) return tooltipLines;
-        double totSU = node.getEffectiveTotalEUt();
-        if (node.isGenerator()) {
-            tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
-        } else {
-            tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
-        }
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
-        tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
-        if (isFanProcessingRecipe(node)) {
-            tooltipLines.add(Component.translatable("gui.gtcalcboard.tooltip.fan_fixed_duration_hint"));
-        }
-        return tooltipLines;
-    }
-
-    @Override
-    public EnergyType getEnergyType(RecipeNode node) {
-        return EnergyType.KINETIC_SU;
     }
 
     @Override

@@ -6,9 +6,14 @@ import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import org.joml.Matrix4f;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class ConnectionRenderer {
 
@@ -137,10 +142,13 @@ public class ConnectionRenderer {
         BufferBuilder buffer = tesselator.getBuilder();
         buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        float basePulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
-        int stride = (wires.size() % 7 == 0) ? 7 : 6;
+        long now = System.currentTimeMillis();
+        int stride = (wires.size() % 9 == 0) ? 9 : ((wires.size() % 7 == 0) ? 7 : 6);
         int totalWires = wires.size() / stride;
         int count = Math.min(totalWires, 80);
+
+        List<float[]> badgePositions = new ArrayList<>();
+        List<String> badgeTexts = new ArrayList<>();
 
         for (int w = 0; w < count; w++) {
             int offset = w * stride;
@@ -151,8 +159,20 @@ public class ConnectionRenderer {
             float dir1X = wires.getFloat(offset + 4);
             float dir2X = wires.getFloat(offset + 5);
             float ratio = stride >= 7 ? wires.getFloat(offset + 6) : 1.0f;
+            float fromEff = stride >= 9 ? wires.getFloat(offset + 7) : 1.0f;
+            float badgeCode = stride >= 9 ? wires.getFloat(offset + 8) : 1.0f;
 
-            float pulseTime = computeEffectivePulseTime(basePulseTime, ratio, mode);
+            float periodMs;
+            if (badgeCode == -1.0f) {
+                periodMs = ParticleBatchingEngine.computeBufferAnimationPeriodMs(fromEff);
+            } else if (fromEff < 0.999f && fromEff > 0.0f) {
+                periodMs = ParticleBatchingEngine.computeDeratedTravelPeriodMs(fromEff);
+            } else {
+                periodMs = (float) ParticleBatchingEngine.BASE_TRAVEL_PERIOD_MS;
+            }
+            float wirePulseTime = (now % (long) periodMs) / periodMs;
+
+            float pulseTime = computeEffectivePulseTime(wirePulseTime, ratio, mode);
             if (pulseTime < 0.0f) continue;
 
             computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, SCRATCH_CP);
@@ -165,11 +185,21 @@ public class ConnectionRenderer {
             computePulseRgb(ratio, mode, SCRATCH_RGB);
             renderPulseQuad(buffer, pose, dotX, dotY, 3.5f, SCRATCH_RGB[0], SCRATCH_RGB[1], SCRATCH_RGB[2], 0.53f);
             renderPulseQuad(buffer, pose, dotX, dotY, 2.0f, Math.min(1.0f, SCRATCH_RGB[0] + 0.3f), Math.min(1.0f, SCRATCH_RGB[1] + 0.3f), Math.min(1.0f, SCRATCH_RGB[2] + 0.3f), 1.0f);
+
+            if (badgeCode > 1.0f) {
+                badgePositions.add(new float[]{dotX, dotY});
+                badgeTexts.add(((int) badgeCode) + "x");
+            } else if (badgeCode == -1.0f) {
+                badgePositions.add(new float[]{dotX, dotY});
+                badgeTexts.add("Bx");
+            }
         }
 
         tesselator.end();
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
+
+        renderBadges(graphics, badgePositions, badgeTexts);
     }
 
     public static void renderPulseDotsBatch(GuiGraphics graphics, java.util.List<float[]> wires) {
@@ -191,8 +221,11 @@ public class ConnectionRenderer {
         BufferBuilder buffer = tesselator.getBuilder();
         buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        float basePulseTime = (System.currentTimeMillis() % 1600L) / 1600.0f;
+        long now = System.currentTimeMillis();
         int count = Math.min(wires.size(), 80);
+
+        List<float[]> badgePositions = new ArrayList<>();
+        List<String> badgeTexts = new ArrayList<>();
 
         for (int w = 0; w < count; w++) {
             float[] wire = wires.get(w);
@@ -200,8 +233,20 @@ public class ConnectionRenderer {
             float dir1X = wire.length >= 6 ? wire[4] : 1.0f;
             float dir2X = wire.length >= 6 ? wire[5] : -1.0f;
             float ratio = wire.length >= 7 ? wire[6] : 1.0f;
+            float fromEff = wire.length >= 8 ? wire[7] : 1.0f;
+            float badgeCode = wire.length >= 9 ? wire[8] : 1.0f;
 
-            float pulseTime = computeEffectivePulseTime(basePulseTime, ratio, mode);
+            float periodMs;
+            if (badgeCode == -1.0f) {
+                periodMs = ParticleBatchingEngine.computeBufferAnimationPeriodMs(fromEff);
+            } else if (fromEff < 0.999f && fromEff > 0.0f) {
+                periodMs = ParticleBatchingEngine.computeDeratedTravelPeriodMs(fromEff);
+            } else {
+                periodMs = (float) ParticleBatchingEngine.BASE_TRAVEL_PERIOD_MS;
+            }
+            float wirePulseTime = (now % (long) periodMs) / periodMs;
+
+            float pulseTime = computeEffectivePulseTime(wirePulseTime, ratio, mode);
             if (pulseTime < 0.0f) continue;
 
             computeControlPoints(x1, y1, x2, y2, dir1X, dir2X, SCRATCH_CP);
@@ -214,11 +259,36 @@ public class ConnectionRenderer {
             computePulseRgb(ratio, mode, SCRATCH_RGB);
             renderPulseQuad(buffer, pose, dotX, dotY, 3.5f, SCRATCH_RGB[0], SCRATCH_RGB[1], SCRATCH_RGB[2], 0.53f);
             renderPulseQuad(buffer, pose, dotX, dotY, 2.0f, Math.min(1.0f, SCRATCH_RGB[0] + 0.3f), Math.min(1.0f, SCRATCH_RGB[1] + 0.3f), Math.min(1.0f, SCRATCH_RGB[2] + 0.3f), 1.0f);
+
+            if (badgeCode > 1.0f) {
+                badgePositions.add(new float[]{dotX, dotY});
+                badgeTexts.add(((int) badgeCode) + "x");
+            } else if (badgeCode == -1.0f) {
+                badgePositions.add(new float[]{dotX, dotY});
+                badgeTexts.add("Bx");
+            }
         }
 
         tesselator.end();
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
+
+        renderBadges(graphics, badgePositions, badgeTexts);
+    }
+
+    private static void renderBadges(GuiGraphics graphics, List<float[]> positions, List<String> texts) {
+        if (positions.isEmpty()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) return;
+        Font font = mc.font;
+        for (int i = 0; i < positions.size(); i++) {
+            float[] pos = positions.get(i);
+            graphics.pose().pushPose();
+            graphics.pose().translate(pos[0] + 5.0f, pos[1] - 4.0f, 0.0f);
+            graphics.pose().scale(0.6f, 0.6f, 1.0f);
+            graphics.drawString(font, texts.get(i), 0, 0, 0xFFFFD700, true);
+            graphics.pose().popPose();
+        }
     }
 
     public static float computeEffectivePulseTime(float baseTime, float ratio, WireAnimationMode mode) {

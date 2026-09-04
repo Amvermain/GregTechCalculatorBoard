@@ -136,6 +136,7 @@ GregTech Calculator Board is completely optional on both client and server sides
   - [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2) (Autocrafting pattern binding & DAG ETA evaluation)
   - [Create](https://curseforge.com/minecraft/mc-mods/create) (0.5.1 / 6.0+)
   - [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  - [Greate](https://curseforge.com/minecraft/mc-mods/greate) (Tiered kinetic machine & shaft integration)
   - [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) (Expansion, Foundation, Cultivation)
   - [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 - **Optional Team Synchronization**:
@@ -151,7 +152,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.1.jar`.
 
 ---
 

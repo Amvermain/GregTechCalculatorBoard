@@ -264,7 +264,7 @@ public class StarTModAdapter extends GTCEuModAdapter {
         } else if (lub) {
             tt.add(net.minecraft.network.chat.Component.literal("§e" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_passive_desc", passMult).getString()));
             tt.add(net.minecraft.network.chat.Component.literal("§7• WS₂ (" + (curModel == com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.NPT ? "2,500" : "1,000") + " mB/hr)"));
-            tt.add(net.minecraft.network.chat.Component.literal("§a💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_hint_full", activeFluid, fullMult).getString()));
+            tt.add(net.minecraft.network.chat.Component.literal("§a★ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_hint_full", activeFluid, fullMult).getString()));
         } else {
             tt.add(net.minecraft.network.chat.Component.literal("§c" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_desc", noneMult).getString()));
             tt.add(net.minecraft.network.chat.Component.literal("§7• " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.turbine_boost_none_warn").getString()));

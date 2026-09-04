@@ -55,7 +55,7 @@ public class PageTabBarWidget {
 
         int browserBtnW = 22;
         int leftMargin = screen.getDynamicLeftMargin() + browserBtnW + 4;
-        int totalWidth = calculateTotalWidth(pageTitles, font);
+        int totalWidth = calculateTotalWidth(pageTitles, font, activeIdx, isTeam);
         int navBtnW = 16;
         int rightPadding = 16;
         this.maxScrollX = Math.max(0, (totalWidth + rightPadding) - (screen.width - leftMargin));
@@ -94,21 +94,17 @@ public class PageTabBarWidget {
         boolean isDrawerOpen = screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen();
         graphics.fill(brX, tabY, brX + browserBtnW, tabY + TAB_HEIGHT, isDrawerOpen ? 0xFF2A4A38 : (brHover ? 0xFF2A364C : 0xFF1C2230));
         graphics.renderOutline(brX, tabY, browserBtnW, TAB_HEIGHT, isDrawerOpen ? 0xFF55FF88 : (brHover ? 0xFF5588DD : 0xFF353C4D));
-        graphics.drawCenteredString(font, isDrawerOpen ? "§a📁" : "§f📑", brX + browserBtnW / 2, tabY + 5, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, isDrawerOpen ? "§a≡" : "§f≡", brX + browserBtnW / 2, tabY + 5, 0xFFFFFFFF);
     }
 
     private int renderTabList(GuiGraphics graphics, Font font, List<String> pageTitles, int activeIdx, boolean isTeam, int leftMargin, int tabY, int mouseX, int mouseY, float partialTicks) {
         int curX = leftMargin;
-        BoardManager bmLocal = !isTeam ? BoardManager.getInstance() : null;
-        List<BoardPage> openPages = bmLocal != null ? bmLocal.getOpenPages() : List.of();
 
         for (int i = 0; i < pageTitles.size(); i++) {
             String pageName = pageTitles.get(i);
             boolean isActive = (i == activeIdx);
-            boolean isPinned = (i < openPages.size()) && openPages.get(i).isPinned();
-
-            int textW = font.width(pageName);
-            int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
+            String prefix = resolveTabPrefix(i, isActive, isTeam);
+            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size());
 
             double virtualMouseX = mouseX + scrollX;
             boolean hover = virtualMouseX >= curX && virtualMouseX <= curX + tabW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
@@ -117,9 +113,6 @@ public class PageTabBarWidget {
             int border = isActive ? 0xFF55FF88 : (hover ? 0xFF5577AA : 0xFF3D4455);
             graphics.fill(curX, tabY, curX + tabW, tabY + TAB_HEIGHT, bg);
             graphics.renderOutline(curX, tabY, tabW, TAB_HEIGHT, border);
-
-            boolean isAe2 = (i < openPages.size()) && com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(openPages.get(i).getId());
-            String prefix = isAe2 ? (isPinned ? "§b⚡📌 " : "§b⚡ ") : (isPinned ? (isActive ? "§a📌 " : "§e📌 ") : (isActive ? "§a📑 " : "§7📄 "));
 
             if (editingPageIndex == i && renameBox != null) {
                 renameBox.setX(curX + 16);
@@ -183,7 +176,7 @@ public class PageTabBarWidget {
 
         int browserBtnW = 22;
         int leftMargin = screen.getDynamicLeftMargin() + browserBtnW + 4;
-        int totalWidth = calculateTotalWidth(pageTitles, font);
+        int totalWidth = calculateTotalWidth(pageTitles, font, activeIdx, isTeam);
         int navBtnW = 16;
         int rightPadding = 16;
         this.maxScrollX = Math.max(0, (totalWidth + rightPadding) - (screen.width - leftMargin));
@@ -198,8 +191,10 @@ public class PageTabBarWidget {
 
         for (int i = 0; i < pageTitles.size(); i++) {
             String pageName = pageTitles.get(i);
-            int textW = font.width(pageName);
-            int tabW = textW + (pageTitles.size() > 1 ? 26 : 16);
+            boolean isActive = (i == activeIdx);
+            String prefix = resolveTabPrefix(i, isActive, isTeam);
+            int textW = font.width(prefix + pageName);
+            int tabW = computeTabWidth(font, pageName, prefix, pageTitles.size());
 
             if (virtualMouseX >= curX && virtualMouseX <= curX + tabW) {
                 return handleTabItemClick(i, pageName, activeIdx, isTeam, teamState, button, virtualMouseX, curX, tabW, textW, tabY);
@@ -564,13 +559,40 @@ public class PageTabBarWidget {
         screen.rebuildWidgets();
     }
 
-    private int calculateTotalWidth(List<String> titles, Font font) {
+    private int calculateTotalWidth(List<String> titles, Font font, int activeIdx, boolean isTeam) {
         int width = 0;
-        for (String title : titles) {
-            int textW = font.width(title);
-            width += textW + (titles.size() > 1 ? 26 : 16) + 3;
+        for (int i = 0; i < titles.size(); i++) {
+            String prefix = resolveTabPrefix(i, i == activeIdx, isTeam);
+            width += computeTabWidth(font, titles.get(i), prefix, titles.size()) + 3;
         }
         return width;
+    }
+
+    private String resolveTabPrefix(int index, boolean isActive, boolean isTeam) {
+        if (isTeam) return "";
+        BoardManager bm = BoardManager.getInstance();
+        List<BoardPage> openPages = bm.getOpenPages();
+        if (index >= openPages.size()) return "";
+        BoardPage page = openPages.get(index);
+        boolean isPinned = page.isPinned();
+        boolean isAe2 = com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(page.getId());
+        return getTabPrefix(isAe2, isPinned, isActive);
+    }
+
+    private int computeTabWidth(Font font, String pageName, String prefix, int totalTabCount) {
+        int textW = font.width(prefix + pageName);
+        return textW + (totalTabCount > 1 ? 26 : 16);
+    }
+
+    private String getTabPrefix(boolean isAe2, boolean isPinned, boolean isActive) {
+        if (isAe2 && isPinned) {
+            return "§b⚡§e★ ";
+        } else if (isAe2) {
+            return "§b⚡ ";
+        } else if (isPinned) {
+            return isActive ? "§a★ " : "§e★ ";
+        }
+        return "";
     }
 
     private void playClickSound() {

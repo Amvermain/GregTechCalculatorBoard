@@ -125,7 +125,7 @@ public class PageBrowserDrawer {
     }
 
     private void renderHeader(GuiGraphics graphics, Font font, int topY, int mouseX, int mouseY) {
-        graphics.drawString(font, "§6📁 " + Component.translatable("gui.gtcalcboard.browser.title").getString(), 12, topY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6≡ " + Component.translatable("gui.gtcalcboard.browser.title").getString(), 12, topY + 8, 0xFFFFFFFF, false);
 
         int btnY = topY + 6;
         int closeX = DRAWER_WIDTH - 20;
@@ -136,17 +136,17 @@ public class PageBrowserDrawer {
         boolean addFolderHover = mouseX >= addFolderX && mouseX <= addFolderX + 20 && mouseY >= btnY && mouseY <= btnY + 14;
         graphics.fill(addFolderX, btnY, addFolderX + 20, btnY + 14, addFolderHover ? 0xFF2A364C : 0xFF1C2230);
         graphics.renderOutline(addFolderX, btnY, 20, 14, addFolderHover ? 0xFF5588DD : 0xFF353C4D);
-        graphics.drawString(font, "§b+📁", addFolderX + 2, btnY + 3, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§b+≡", addFolderX + 2, btnY + 3, 0xFFFFFFFF, false);
 
         boolean addPageHover = mouseX >= addPageX && mouseX <= addPageX + 20 && mouseY >= btnY && mouseY <= btnY + 14;
         graphics.fill(addPageX, btnY, addPageX + 20, btnY + 14, addPageHover ? 0xFF2A4C36 : 0xFF1C3024);
         graphics.renderOutline(addPageX, btnY, 20, 14, addPageHover ? 0xFF55FF88 : 0xFF356B48);
-        graphics.drawString(font, "§a+📄", addPageX + 2, btnY + 3, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§a+▪", addPageX + 2, btnY + 3, 0xFFFFFFFF, false);
 
         boolean importHover = mouseX >= importX && mouseX <= importX + 20 && mouseY >= btnY && mouseY <= btnY + 14;
         graphics.fill(importX, btnY, importX + 20, btnY + 14, importHover ? 0xFF3D3A2A : 0xFF26241C);
         graphics.renderOutline(importX, btnY, 20, 14, importHover ? 0xFFFFDD55 : 0xFF66582B);
-        graphics.drawString(font, "§e📥", importX + 3, btnY + 3, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e«", importX + 3, btnY + 3, 0xFFFFFFFF, false);
 
         boolean closeHover = mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= btnY && mouseY <= btnY + 14;
         graphics.drawString(font, "§c✕", closeX + 2, btnY + 3, closeHover ? 0xFFFF6666 : 0xFFAAAAAA, false);
@@ -214,7 +214,7 @@ public class PageBrowserDrawer {
         int indent = (node.depth - 1) * 10 + 6;
         String toggleIcon = isCollapsed ? "▶ " : "▼ ";
         String nameColor = isSelected ? "§b" : "§e";
-        graphics.drawString(font, nameColor + toggleIcon + "📁 " + node.simpleName + " §8(" + node.getTotalPageCount() + ")", listX + indent, curY + 4, 0xFFFFFFFF, false);
+        graphics.drawString(font, nameColor + toggleIcon + "≡ " + node.simpleName + " §8(" + node.getTotalPageCount() + ")", listX + indent, curY + 4, 0xFFFFFFFF, false);
 
         return curY + 18;
     }
@@ -238,21 +238,21 @@ public class PageBrowserDrawer {
         }
 
         boolean pinHover = mouseX >= listX + indent && mouseX <= listX + indent + 10 && mouseY >= curY + 3 && mouseY <= curY + 15;
-        String pinStr = page.isPinned() ? "§e📌" : (pinHover ? "§7📌" : "§8•");
+        String pinStr = page.isPinned() ? "§e★" : (pinHover ? "§7★" : "§8·");
         graphics.drawString(font, pinStr, listX + indent, curY + 5, 0xFFFFFFFF, false);
 
         ItemStack icon = page.getEffectiveRepresentativeIcon();
         if (!icon.isEmpty()) {
             graphics.renderItem(icon, listX + indent + 12, curY + 2);
         } else {
-            graphics.drawString(font, "§7📄", listX + indent + 12, curY + 5, 0xFFFFFFFF, false);
+            graphics.drawString(font, "§7▪", listX + indent + 12, curY + 5, 0xFFFFFFFF, false);
         }
 
         boolean isAe2 = com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(page.getId());
         String nameColor = isSelected ? "§b" : (isActive ? "§a" : (isAe2 ? "§b" : "§f"));
         int nameX = listX + indent + 30;
         int maxNameW = listW - (indent + 34);
-        String prefixTag = isAe2 ? "§b[AE2] " : "";
+        String prefixTag = isAe2 && !page.getName().startsWith("[AE2]") ? "§b[AE2] " : "";
         String trimmedName = font.plainSubstrByWidth(prefixTag + page.getName(), maxNameW);
         graphics.drawString(font, nameColor + trimmedName, nameX, curY + 6, 0xFFFFFFFF, false);
 
@@ -266,21 +266,21 @@ public class PageBrowserDrawer {
         if (draggingFolder != null) {
             String simpleName = draggingFolder.contains("/") ? draggingFolder.substring(draggingFolder.lastIndexOf('/') + 1) : draggingFolder;
             if (totalSelectedCount > 1 && selectedFolderPaths.contains(draggingFolder)) {
-                ghostText = "§b📁 " + Component.translatable("gui.gtcalcboard.browser.drag_multiple_ghost",
+                ghostText = "§b≡ " + Component.translatable("gui.gtcalcboard.browser.drag_multiple_ghost",
                         simpleName,
                         String.valueOf(totalSelectedCount - 1),
                         String.valueOf(totalSelectedCount)).getString();
             } else {
-                ghostText = "§e📁 " + simpleName;
+                ghostText = "§e≡ " + simpleName;
             }
         } else {
             if (totalSelectedCount > 1 && selectedPageIds.contains(draggingPage.getId())) {
-                ghostText = "§b📄 " + Component.translatable("gui.gtcalcboard.browser.drag_multiple_ghost",
+                ghostText = "§b▪ " + Component.translatable("gui.gtcalcboard.browser.drag_multiple_ghost",
                         draggingPage.getName(),
                         String.valueOf(totalSelectedCount - 1),
                         String.valueOf(totalSelectedCount)).getString();
             } else {
-                ghostText = "§a📄 " + draggingPage.getName();
+                ghostText = "§a▪ " + draggingPage.getName();
             }
         }
         int gw = font.width(ghostText) + 16;
@@ -363,7 +363,7 @@ public class PageBrowserDrawer {
                 List<BoardPage> selectedPages = getSelectedPagesList();
                 boolean anyPinned = selectedPages.stream().anyMatch(BoardPage::isPinned);
                 String pinKey = anyPinned ? "gui.gtcalcboard.browser.unpin_multiple_pages" : "gui.gtcalcboard.browser.pin_multiple_pages";
-                items.add(new ContextMenuItem("§e📌 " + Component.translatable(pinKey, String.valueOf(selectedPages.size())).getString(), () -> {
+                items.add(new ContextMenuItem("§e★ " + Component.translatable(pinKey, String.valueOf(selectedPages.size())).getString(), () -> {
                     boolean newPinState = !anyPinned;
                     for (BoardPage p : selectedPages) {
                         p.setPinned(newPinState);
@@ -385,7 +385,7 @@ public class PageBrowserDrawer {
             }));
         } else if (contextPage != null) {
             String pinKey = contextPage.isPinned() ? "gui.gtcalcboard.browser.unpin" : "gui.gtcalcboard.browser.pin";
-            items.add(new ContextMenuItem("§e📌 " + Component.translatable(pinKey).getString(), () -> {
+            items.add(new ContextMenuItem("§e★ " + Component.translatable(pinKey).getString(), () -> {
                 contextPage.setPinned(!contextPage.isPinned());
                 contextMenuOpen = false;
             }));
@@ -409,7 +409,7 @@ public class PageBrowserDrawer {
                 setOpen(false);
             }));
         } else if (contextFolder != null && !contextFolder.isEmpty()) {
-            items.add(new ContextMenuItem("§e📁 " + Component.translatable("gui.gtcalcboard.browser.new_subfolder").getString(), () -> {
+            items.add(new ContextMenuItem("§e≡ " + Component.translatable("gui.gtcalcboard.browser.new_subfolder").getString(), () -> {
                 promptMode = PromptMode.NEW_SUBFOLDER;
                 promptTargetFolder = contextFolder;
                 Font font = Minecraft.getInstance().font;
@@ -418,7 +418,7 @@ public class PageBrowserDrawer {
                 promptBox.setFocused(true);
                 contextMenuOpen = false;
             }));
-            items.add(new ContextMenuItem("§6📤 " + Component.translatable("gui.gtcalcboard.browser.export_folder").getString(), () -> {
+            items.add(new ContextMenuItem("§6» " + Component.translatable("gui.gtcalcboard.browser.export_folder").getString(), () -> {
                 screen.openExportFolderDialog(contextFolder);
                 contextMenuOpen = false;
                 setOpen(false);

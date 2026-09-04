@@ -454,6 +454,34 @@ public class RecipeNode {
         return getTargetBatchAmount() > 0.0001;
     }
 
+    public boolean isJunctionBuffer() {
+        return isReroute && properties.get(NodeProperties.JUNCTION_IS_BUFFER);
+    }
+
+    public void setJunctionBuffer(boolean isBuffer) {
+        properties.set(NodeProperties.JUNCTION_IS_BUFFER, isBuffer);
+    }
+
+    public double getJunctionBufferSize() {
+        return properties.get(NodeProperties.JUNCTION_BUFFER_SIZE);
+    }
+
+    public void setJunctionBufferSize(double size) {
+        properties.set(NodeProperties.JUNCTION_BUFFER_SIZE, Math.max(0.0, size));
+    }
+
+    public double getJunctionChargeDuration(FlowGraph graph) {
+        if (!isJunctionBuffer() || graph == null) return 0.0;
+        double bufferSize = getJunctionBufferSize();
+        if (bufferSize <= 0.0001) return 0.0;
+        var stats = graph.getInputPortStats(this, 0);
+        double inRate = (stats != null && stats.isConnected()) ? stats.connectedRate() : 0.0;
+        if (inRate <= 0.0001 && isExternalSupply()) {
+            inRate = getExternalSupplyRate();
+        }
+        return inRate > 0.0001 ? bufferSize / inRate : 0.0;
+    }
+
     public double getTargetBatchTimeSec() {
         return properties.get(NodeProperties.TARGET_BATCH_TIME_SEC);
     }

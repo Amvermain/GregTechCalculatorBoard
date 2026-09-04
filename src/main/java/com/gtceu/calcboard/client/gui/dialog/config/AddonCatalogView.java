@@ -239,39 +239,7 @@ public class AddonCatalogView {
             }
             filtered.add(addon);
         }
-        filtered.sort((a, b) -> {
-            boolean aReset = "gtceu:rotor_standard".equals(a.getId()) || "gtceu:reflector_none".equals(a.getId());
-            boolean bReset = "gtceu:rotor_standard".equals(b.getId()) || "gtceu:reflector_none".equals(b.getId());
-            if (aReset != bReset) return aReset ? -1 : 1;
-
-            if (a.getCategory() == MachineAddon.Category.REFLECTOR && b.getCategory() == MachineAddon.Category.REFLECTOR) {
-                int tA = (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon ra) ? ra.getReflectorTier() : 0;
-                int tB = (b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon rb) ? rb.getReflectorTier() : 0;
-                if (tA != tB) return Integer.compare(tA, tB);
-            }
-
-            if (a.getCategory() == MachineAddon.Category.COIL && b.getCategory() == MachineAddon.Category.COIL) {
-                int tempA = (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon ca) ? ca.getCoilTemperature() : 0;
-                int tempB = (b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon cb) ? cb.getCoilTemperature() : 0;
-                if (tempA != tempB) return Integer.compare(tempA, tempB);
-            }
-
-            if (a.getParallelMultiplier() != b.getParallelMultiplier()) {
-                return Integer.compare(a.getParallelMultiplier(), b.getParallelMultiplier());
-            }
-
-            if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon ha && b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon hb) {
-                if (ha.getTier() != null && hb.getTier() != null && ha.getTier().ordinal() != hb.getTier().ordinal()) {
-                    return Integer.compare(ha.getTier().ordinal(), hb.getTier().ordinal());
-                }
-            } else if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon ea && b instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eb) {
-                if (ea.getTier() != null && eb.getTier() != null && ea.getTier().ordinal() != eb.getTier().ordinal()) {
-                    return Integer.compare(ea.getTier().ordinal(), eb.getTier().ordinal());
-                }
-            }
-
-            return a.getName().compareToIgnoreCase(b.getName());
-        });
+        filtered.sort(AddonCatalogComparator.INSTANCE);
         this.cachedFilteredCatalog = filtered;
         return filtered;
     }

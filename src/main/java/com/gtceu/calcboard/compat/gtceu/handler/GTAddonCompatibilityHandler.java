@@ -507,6 +507,11 @@ public final class GTAddonCompatibilityHandler {
                 node.setMachineIcon(mbWs);
             }
         }
+        applyAddonInstallation(node, addon);
+        node.markOverclockDirty();
+    }
+
+    private static void applyAddonInstallation(RecipeNode node, MachineAddon addon) {
         if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
             if (addon.getId().contains("upgrade_kit") || addon.getId().contains("tier_kit")) {
                 node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && (a.getId().contains("upgrade_kit") || a.getId().contains("tier_kit")));
@@ -603,6 +608,7 @@ public final class GTAddonCompatibilityHandler {
         } else if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
             node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
         }
+        node.markOverclockDirty();
     }
 
     public static void updateNodeTierFromEnergyHatches(RecipeNode node) {

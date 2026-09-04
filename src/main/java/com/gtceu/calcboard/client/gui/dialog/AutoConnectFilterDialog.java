@@ -292,7 +292,7 @@ public class AutoConnectFilterDialog {
 
         // 3. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
-        graphics.drawString(font, "§e🔗 " + Component.translatable("gui.gtcalcboard.dialog.auto_connect.title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e↔ " + Component.translatable("gui.gtcalcboard.dialog.auto_connect.title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeX = dialogX + dialogW - 20;

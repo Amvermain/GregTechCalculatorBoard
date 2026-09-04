@@ -39,7 +39,10 @@ public class GregTechCalcBoard {
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(NetworkHandler::init);
+        event.enqueueWork(() -> {
+            NetworkHandler.init();
+            WorkspaceLockManager.getInstance();
+        });
     }
 
     @SubscribeEvent
@@ -49,6 +52,10 @@ public class GregTechCalcBoard {
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        WorkspaceLockManager.getInstance().clearAll();
+        try {
+            WorkspaceLockManager.getInstance().clearAll();
+        } catch (Throwable t) {
+            LOGGER.warn("[GTCalcBoard] Failed to clear workspace locks on server stopping", t);
+        }
     }
 }

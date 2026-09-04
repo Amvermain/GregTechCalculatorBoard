@@ -196,6 +196,11 @@ public final class RecipeNodeSerializer {
             tag.putInt("customParallel", node.getCustomParallel());
         }
 
+        CompoundTag propsTag = node.getProperties().serializeNBT();
+        if (!propsTag.isEmpty()) {
+            tag.put("properties", propsTag);
+        }
+
         return tag;
     }
 
@@ -401,9 +406,10 @@ public final class RecipeNodeSerializer {
             node.setCustomParallel(tag.getInt("customParallel"));
         }
 
+        if (tag.contains("properties", Tag.TAG_COMPOUND)) {
+            node.getProperties().deserializeNBT(tag.getCompound("properties"));
+        }
+
         return node;
     }
 }
-
-
-

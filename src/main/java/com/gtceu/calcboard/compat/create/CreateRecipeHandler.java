@@ -138,81 +138,99 @@ public class CreateRecipeHandler {
         return fallback != null ? fallback : (itemId != null ? itemId.getPath() : "");
     }
 
+    private static RecipeNode buildKineticNode(ResourceLocation itemId, String name, double fallbackCap, int fallbackRpm, GTVoltageTier tier) {
+        CreateStressHelper.KineticStats stats = CreateStressHelper.deduceGeneratorStats(itemId, fallbackCap, fallbackRpm);
+        return buildDynamicKineticNode(itemId, name, stats.capacityPerRpm(), stats.rpm(), stats.greateTier(), false);
+    }
+
+    private static RecipeNode buildDynamicKineticNode(ResourceLocation itemId, String name, double capPerRpm, int rpm, int tier, boolean isSteam) {
+        double totalSu = capPerRpm * rpm;
+        RecipeNode node = RecipeNode.create(name != null ? name : (itemId != null ? itemId.getPath() : ""), 20.0, totalSu, GTVoltageTier.LV);
+        node.setEnergyType(EnergyType.KINETIC_SU);
+        node.setGenerator(true);
+        node.setRpm(rpm);
+        node.getProperties().set(CreateProperties.BASE_GENERATOR_RPM, rpm);
+        node.setMachineIcon(itemId);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
+        node.addOutput(IngredientStack.stressUnit(totalSu));
+        if (tier >= 0) {
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE, true);
+            node.getProperties().set(com.gtceu.calcboard.compat.greate.GreateProperties.MACHINE_TIER, tier);
+        }
+        if (isSteam) {
+            double steamMbPerSec = CreateStressHelper.calculateSteamConsumption(tier);
+            node.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", steamMbPerSec, 1.0));
+        }
+        return node;
+    }
+
     public static RecipeNode createKineticGeneratorNode(ResourceLocation itemId, String displayName) {
         if (itemId == null) return null;
         String path = itemId.getPath();
         String namespace = itemId.getNamespace();
         String name = getItemDisplayName(itemId, displayName);
 
+        net.minecraft.world.level.block.Block block = CreateStressHelper.findBlock(itemId);
+        int tier = CreateStressHelper.getGreateTier(block);
+        boolean isSteam = CreateStressHelper.isSteamEngine(block);
+
+        if (isSteam) {
+            double totalSu = CreateStressHelper.calculateSteamEngineTotalSu(tier);
+            int rpm = (tier < 0) ? 64 : 16;
+            double cap = totalSu / rpm;
+            return buildDynamicKineticNode(itemId, name, cap, rpm, tier, true);
+        }
+
+        double cap = CreateStressHelper.getCapacity(block, 0.0);
+        if (cap > 0.0) {
+            int rpm = CreateStressHelper.getGeneratedRpm(block, 16);
+            return buildDynamicKineticNode(itemId, name, cap, rpm, tier, false);
+        }
+
         if (namespace.equals("create")) {
-            if (path.equals("large_water_wheel")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Large Water Wheel", 20.0, 512.0, GTVoltageTier.LV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
-                node.addOutput(IngredientStack.stressUnit(512.0));
-                return node;
-            } else if (path.equals("water_wheel")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Water Wheel", 20.0, 256.0, GTVoltageTier.LV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
-                node.addOutput(IngredientStack.stressUnit(256.0));
-                return node;
-            } else if (path.equals("windmill_bearing")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Windmill Bearing", 20.0, 512.0, GTVoltageTier.LV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
-                node.addOutput(IngredientStack.stressUnit(512.0));
-                return node;
-            } else if (path.equals("steam_engine")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Steam Engine", 20.0, 2048.0, GTVoltageTier.LV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
-                node.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 200.0, 1.0));
-                node.addOutput(IngredientStack.stressUnit(2048.0));
-                return node;
-            } else if (path.equals("hand_crank")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Hand Crank", 20.0, 256.0, GTVoltageTier.LV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
-                node.addOutput(IngredientStack.stressUnit(256.0));
-                return node;
-            } else if (path.equals("creative_motor")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Creative Motor", 20.0, 16384.0, GTVoltageTier.LV);
-                node.setEnergyType(EnergyType.KINETIC_SU);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("create:kinetic_generation"));
-                node.addOutput(IngredientStack.stressUnit(16384.0));
-                return node;
-            }
+            return createCreateFallbackNode(itemId, path, name);
         } else if (namespace.equals("createaddition")) {
-            if (path.equals("alternator")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Alternator", 20.0, 256.0, GTVoltageTier.ULV);
-                node.setEnergyType(EnergyType.ELECTRIC_FE);
-                node.setGenerator(true);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("createaddition:alternator"));
-                node.addInput(IngredientStack.stressUnit(256.0));
-                return node;
-            } else if (path.equals("electric_motor")) {
-                RecipeNode node = RecipeNode.create(name != null ? name : "Electric Motor", 20.0, 512.0, GTVoltageTier.ULV);
-                node.setEnergyType(EnergyType.ELECTRIC_FE);
-                node.setGenerator(false);
-                node.setMachineIcon(itemId);
-                node.setRecipeCategoryId(ResourceLocation.tryParse("createaddition:electric_motor"));
-                node.addOutput(IngredientStack.stressUnit(1024.0));
-                return node;
-            }
+            return createCreateAdditionNode(itemId, path, name);
+        }
+        return null;
+    }
+
+    private static RecipeNode createCreateFallbackNode(ResourceLocation itemId, String path, String name) {
+        if (path.equals("large_water_wheel")) {
+            return buildKineticNode(itemId, name != null ? name : "Large Water Wheel", 128.0, 4, GTVoltageTier.LV);
+        } else if (path.equals("water_wheel")) {
+            return buildKineticNode(itemId, name != null ? name : "Water Wheel", 32.0, 8, GTVoltageTier.LV);
+        } else if (path.equals("windmill_bearing")) {
+            return buildKineticNode(itemId, name != null ? name : "Windmill Bearing", 32.0, 16, GTVoltageTier.LV);
+        } else if (path.equals("steam_engine")) {
+            RecipeNode node = buildKineticNode(itemId, name != null ? name : "Steam Engine", 32.0, 64, GTVoltageTier.LV);
+            node.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 320.0, 1.0));
+            return node;
+        } else if (path.equals("hand_crank")) {
+            return buildKineticNode(itemId, name != null ? name : "Hand Crank", 16.0, 16, GTVoltageTier.LV);
+        } else if (path.equals("creative_motor")) {
+            return buildKineticNode(itemId, name != null ? name : "Creative Motor", 1024.0, 16, GTVoltageTier.LV);
+        }
+        return null;
+    }
+
+    private static RecipeNode createCreateAdditionNode(ResourceLocation itemId, String path, String name) {
+        if (path.equals("alternator")) {
+            RecipeNode node = RecipeNode.create(name != null ? name : "Alternator", 20.0, 256.0, GTVoltageTier.ULV);
+            node.setEnergyType(EnergyType.ELECTRIC_FE);
+            node.setGenerator(true);
+            node.setMachineIcon(itemId);
+            node.setRecipeCategoryId(ResourceLocation.tryParse("createaddition:alternator"));
+            node.addInput(IngredientStack.stressUnit(256.0));
+            return node;
+        } else if (path.equals("electric_motor")) {
+            RecipeNode node = RecipeNode.create(name != null ? name : "Electric Motor", 20.0, 512.0, GTVoltageTier.ULV);
+            node.setEnergyType(EnergyType.ELECTRIC_FE);
+            node.setGenerator(false);
+            node.setMachineIcon(itemId);
+            node.setRecipeCategoryId(ResourceLocation.tryParse("createaddition:electric_motor"));
+            node.addOutput(IngredientStack.stressUnit(1024.0));
+            return node;
         }
         return null;
     }
@@ -223,126 +241,149 @@ public class CreateRecipeHandler {
         }
         List<SearchableRecipe> list = new ArrayList<>();
         String catId = "create:kinetic_generation";
-        String catName = Component.translatable("category.gtcalcboard.create_kinetic").getString();
-        if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
-            catName = "Create Kinetic";
+        String catName = getKineticCategoryName();
+
+        List<CreateStressHelper.DiscoveredGenerator> discovered = CreateStressHelper.discoverGenerators();
+        if (!discovered.isEmpty()) {
+            for (CreateStressHelper.DiscoveredGenerator gen : discovered) {
+                RecipeNode node = createKineticGeneratorNode(gen.id(), null);
+                if (node != null) {
+                    list.add(buildSearchableRecipe(node, gen.id(), catId, catName));
+                }
+            }
+        } else {
+            addFallbackSearchRecipes(list, catId, catName);
         }
 
+        addCreateAdditionSearchRecipes(list, catId, catName);
+        return list;
+    }
+
+    private static String getKineticCategoryName() {
+        String catName = Component.translatable("category.gtcalcboard.create_kinetic").getString();
+        if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
+            return "Create Kinetic";
+        }
+        return catName;
+    }
+
+    private static void addFallbackSearchRecipes(List<SearchableRecipe> list, String catId, String catName) {
         ResourceLocation[] items = {
                 ResourceLocation.tryParse("create:large_water_wheel"),
                 ResourceLocation.tryParse("create:water_wheel"),
                 ResourceLocation.tryParse("create:windmill_bearing"),
                 ResourceLocation.tryParse("create:steam_engine"),
                 ResourceLocation.tryParse("create:hand_crank"),
-                ResourceLocation.tryParse("create:creative_motor"),
-                ResourceLocation.tryParse("createaddition:alternator"),
-                ResourceLocation.tryParse("createaddition:electric_motor")
+                ResourceLocation.tryParse("create:creative_motor")
         };
-
         String[] fallbackNames = {
                 "Large Water Wheel",
                 "Water Wheel",
                 "Windmill Bearing",
                 "Steam Engine",
                 "Hand Crank",
-                "Creative Motor",
-                "Alternator",
-                "Electric Motor"
+                "Creative Motor"
         };
-
         for (int i = 0; i < items.length; i++) {
-            if (items[i] == null) continue;
-            String itemMod = items[i].getNamespace();
-            if ("create".equals(itemMod) && !ModCompatHelper.isCreateLoaded()) continue;
-            if ("createaddition".equals(itemMod) && !ModCompatHelper.isCreateAdditionsLoaded()) continue;
-            try {
-                var regItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(items[i]);
-                if (regItem != null && regItem != net.minecraft.world.item.Items.AIR && com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(regItem, null)) {
-                    continue;
-                }
-            } catch (Throwable ignored) {}
             RecipeNode node = createKineticGeneratorNode(items[i], fallbackNames[i]);
             if (node != null) {
-                String displayName = node.getName();
-                String modId = items[i].getNamespace();
-
-                List<String> outputNames = new ArrayList<>();
-                List<String> outputIds = new ArrayList<>();
-                for (IngredientStack out : node.getOutputs()) {
-                    outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
-                    if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
-                    if (out.isStressUnit()) {
-                        outputNames.add("stress");
-                        outputNames.add("unit");
-                        outputNames.add("units");
-                        outputNames.add("su");
-                        outputNames.add("su/s");
-                        outputNames.add("kinetic");
-                        outputNames.add("스트레스");
-                    }
-                }
-                outputNames.add(displayName.toLowerCase(Locale.ROOT));
-                outputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
-                if (items[i] != null) {
-                    outputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
-                    outputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
-                }
-
-                List<String> inputNames = new ArrayList<>();
-                List<String> inputIds = new ArrayList<>();
-                for (IngredientStack in : node.getInputs()) {
-                    inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
-                    if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
-                    if (in.isStressUnit()) {
-                        inputNames.add("stress");
-                        inputNames.add("unit");
-                        inputNames.add("units");
-                        inputNames.add("su");
-                        inputNames.add("su/s");
-                        inputNames.add("kinetic");
-                        inputNames.add("스트레스");
-                    }
-                }
-                inputNames.add(displayName.toLowerCase(Locale.ROOT));
-                inputNames.add(fallbackNames[i].toLowerCase(Locale.ROOT));
-                if (items[i] != null) {
-                    inputIds.add(items[i].toString().toLowerCase(Locale.ROOT));
-                    inputIds.add(items[i].getPath().toLowerCase(Locale.ROOT));
-                }
-
-                String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
-                String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + fallbackNames[i].toLowerCase(Locale.ROOT) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create su").trim();
-
-                List<ResourceLocation> inIdsList = new ArrayList<>();
-                for (IngredientStack in : node.getInputs()) {
-                    if (in.getId() != null) inIdsList.add(in.getId());
-                }
-                List<ResourceLocation> outIdsList = new ArrayList<>();
-                for (IngredientStack out : node.getOutputs()) {
-                    if (out.getId() != null) outIdsList.add(out.getId());
-                }
-                ResourceLocation[] inArr = inIdsList.isEmpty() ? null : inIdsList.toArray(new ResourceLocation[0]);
-                ResourceLocation[] outArr = outIdsList.isEmpty() ? null : outIdsList.toArray(new ResourceLocation[0]);
-                String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
-                String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
-
-                list.add(new SearchableRecipe(
-                        node,
-                        displayName,
-                        modId.intern(),
-                        catId.intern(),
-                        catName.intern(),
-                        inputSearchIndex,
-                        outputSearchIndex,
-                        inArr,
-                        outArr,
-                        inNamesArr,
-                        outNamesArr
-                ));
+                list.add(buildSearchableRecipe(node, items[i], catId, catName));
             }
         }
-        return list;
     }
+
+    private static void addCreateAdditionSearchRecipes(List<SearchableRecipe> list, String catId, String catName) {
+        if (!ModCompatHelper.isCreateAdditionsLoaded()) return;
+        ResourceLocation[] caItems = {
+                ResourceLocation.tryParse("createaddition:alternator"),
+                ResourceLocation.tryParse("createaddition:electric_motor")
+        };
+        String[] caNames = {"Alternator", "Electric Motor"};
+        for (int i = 0; i < caItems.length; i++) {
+            RecipeNode node = createKineticGeneratorNode(caItems[i], caNames[i]);
+            if (node != null) {
+                list.add(buildSearchableRecipe(node, caItems[i], catId, catName));
+            }
+        }
+    }
+
+    private static SearchableRecipe buildSearchableRecipe(RecipeNode node, ResourceLocation itemId, String catId, String catName) {
+        String displayName = node.getName();
+        String modId = itemId != null ? itemId.getNamespace() : "create";
+
+        List<String> outputNames = new ArrayList<>();
+        List<String> outputIds = new ArrayList<>();
+        for (IngredientStack out : node.getOutputs()) {
+            outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
+            if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
+            if (out.isStressUnit()) {
+                outputNames.add("stress");
+                outputNames.add("unit");
+                outputNames.add("units");
+                outputNames.add("su");
+                outputNames.add("su/s");
+                outputNames.add("kinetic");
+                outputNames.add("스트레스");
+            }
+        }
+        outputNames.add(displayName.toLowerCase(Locale.ROOT));
+        if (itemId != null) {
+            outputIds.add(itemId.toString().toLowerCase(Locale.ROOT));
+            outputIds.add(itemId.getPath().toLowerCase(Locale.ROOT));
+        }
+
+        List<String> inputNames = new ArrayList<>();
+        List<String> inputIds = new ArrayList<>();
+        for (IngredientStack in : node.getInputs()) {
+            inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
+            if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
+            if (in.isStressUnit()) {
+                inputNames.add("stress");
+                inputNames.add("unit");
+                inputNames.add("units");
+                inputNames.add("su");
+                inputNames.add("su/s");
+                inputNames.add("kinetic");
+                inputNames.add("스트레스");
+            }
+        }
+        inputNames.add(displayName.toLowerCase(Locale.ROOT));
+        if (itemId != null) {
+            inputIds.add(itemId.toString().toLowerCase(Locale.ROOT));
+            inputIds.add(itemId.getPath().toLowerCase(Locale.ROOT));
+        }
+
+        String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
+        String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create su").trim();
+
+        List<ResourceLocation> inIdsList = new ArrayList<>();
+        for (IngredientStack in : node.getInputs()) {
+            if (in.getId() != null) inIdsList.add(in.getId());
+        }
+        List<ResourceLocation> outIdsList = new ArrayList<>();
+        for (IngredientStack out : node.getOutputs()) {
+            if (out.getId() != null) outIdsList.add(out.getId());
+        }
+        ResourceLocation[] inArr = inIdsList.isEmpty() ? null : inIdsList.toArray(new ResourceLocation[0]);
+        ResourceLocation[] outArr = outIdsList.isEmpty() ? null : outIdsList.toArray(new ResourceLocation[0]);
+        String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
+        String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
+
+        return new SearchableRecipe(
+                node,
+                displayName,
+                modId.intern(),
+                catId.intern(),
+                catName.intern(),
+                inputSearchIndex,
+                outputSearchIndex,
+                inArr,
+                outArr,
+                inNamesArr,
+                outNamesArr
+        );
+    }
+
 
     public static double getDynamicStressCapacity(net.minecraft.world.level.block.Block block, double fallback) {
         if (block == null) return fallback;

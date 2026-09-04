@@ -47,7 +47,7 @@ public class WelcomeTutorialDialog {
         graphics.renderOutline(modalX + 1, modalY + 1, modalW - 2, modalH - 2, 0x8800E676);
 
         // Title
-        String title = "§a🎓 " + Component.translatable("gui.gtcalcboard.welcome.title").getString();
+        String title = "§a▶ " + Component.translatable("gui.gtcalcboard.welcome.title").getString();
         var titleLines = font.split(Component.literal(title), modalW - 24);
         int curY = modalY + 12;
         for (var tl : titleLines) {

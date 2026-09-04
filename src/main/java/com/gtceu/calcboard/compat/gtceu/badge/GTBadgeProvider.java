@@ -14,6 +14,7 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -75,9 +76,9 @@ public final class GTBadgeProvider {
             String cleanroom = store.get(GTCEuProperties.CLEANROOM_TYPE);
             if (cleanroom == null || cleanroom.isEmpty()) return List.of();
 
-            String label = cleanroom.toLowerCase(Locale.ROOT).contains("sterile") ? "☣ Sterile" : "🧹 Cleanroom";
+            String label = cleanroom.toLowerCase(Locale.ROOT).contains("sterile") ? "☣ Sterile" : "★ Cleanroom";
             List<Component> tooltip = List.of(
-                    Component.literal("§b🧹 Cleanroom Required"),
+                    Component.literal("§b★ Cleanroom Required"),
                     Component.literal("§7Type: §f" + cleanroom)
             );
             return List.of(new NodeBadge(label, 0xFF55FFFF, 0xEE1E2D3D, 0xFF55FFFF, tooltip));
@@ -93,12 +94,16 @@ public final class GTBadgeProvider {
             if (reqTier > 0) {
                 if (instTier >= reqTier) {
                     String badgeText = "✦ T" + instTier;
-                    List<Component> tooltip = List.of(
-                            Component.literal("§b✦ " + Component.translatable("gui.gtcalcboard.reflector_valid_title").getString()),
-                            Component.literal(String.format(Locale.ROOT, "§7Installed Reflector: §aTier %d", instTier)),
-                            Component.literal(String.format(Locale.ROOT, "§7Required Reflector: §fTier %d", reqTier)),
-                            Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.reflector_met").getString())
-                    );
+                    List<Component> tooltip = new ArrayList<>();
+                    tooltip.add(Component.literal("§b✦ " + Component.translatable("gui.gtcalcboard.reflector_valid_title").getString()));
+                    tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Installed Reflector: §aTier %d", instTier)));
+                    tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Required Reflector: §fTier %d", reqTier)));
+                    int boost = instTier - reqTier;
+                    if (boost > 0) {
+                        int speed = 1 << boost;
+                        tooltip.add(Component.literal(String.format(Locale.ROOT, "§e⚡ " + Component.translatable("gui.gtcalcboard.reflector_boost_tooltip", boost, speed).getString())));
+                    }
+                    tooltip.add(Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.reflector_met").getString()));
                     return List.of(new NodeBadge(badgeText, 0xFF55FFFF, 0xEE1E3D3D, 0xFF55FFFF, tooltip));
                 } else {
                     String badgeText = Component.translatable("gui.gtcalcboard.node_badge.reflector_required", reqTier).getString();

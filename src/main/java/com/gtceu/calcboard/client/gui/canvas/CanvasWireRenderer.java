@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
+import com.gtceu.calcboard.client.gui.render.ParticleBatchingEngine;
 import com.gtceu.calcboard.client.gui.render.WireSpatialIndex;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
@@ -27,6 +28,7 @@ public class CanvasWireRenderer {
 
     public void markDirty() {
         this.spatialDirty = true;
+        ParticleBatchingEngine.clearCache();
     }
 
     public WireSpatialIndex getWireSpatialIndex() {
@@ -101,13 +103,16 @@ public class CanvasWireRenderer {
                         continue;
                     }
 
+                    float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
                     boolean isHovered = edge.equals(hoveredEdge);
                     boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
                     int defWireColor = BoardManager.getInstance().getWireColor();
-                    int lineColor = isHovered ? 0xFFFF3366 : (isWireGlowing ? TutorialManager.getGlowBorderColor(0xFF55FF88) : defWireColor);
-                    float wireThick = isWireGlowing ? 3.5f : 2.0f;
-                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, lineColor, wireThick);
-                    float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
+                    WireStyle wireStyle = resolveWireStyle(isHovered, isWireGlowing, satRatio, defWireColor);
+                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, wireStyle.color(), wireStyle.thickness());
+
+                    float fromEff = resolveFromEfficiency(graph, fromNode);
+                    float badgeCode = resolveBadgeCode(fromNode);
+
                     visibleWiresBuffer.add(x1);
                     visibleWiresBuffer.add(y1);
                     visibleWiresBuffer.add(x2);
@@ -115,6 +120,8 @@ public class CanvasWireRenderer {
                     visibleWiresBuffer.add(fromDirX);
                     visibleWiresBuffer.add(toDirX);
                     visibleWiresBuffer.add(satRatio);
+                    visibleWiresBuffer.add(fromEff);
+                    visibleWiresBuffer.add(badgeCode);
                 }
             }
         }
@@ -178,5 +185,52 @@ public class CanvasWireRenderer {
         if (stats.requiredOrProducedRate() <= 0.0001) return 1.0f;
         if (stats.connectedRate() <= 0.0001) return 0.0f;
         return (float) Math.min(1.0, stats.connectedRate() / stats.requiredOrProducedRate());
+    }
+
+    private record WireStyle(int color, float thickness) {}
+
+    private static WireStyle resolveWireStyle(
+            boolean isHovered,
+            boolean isWireGlowing,
+            float satRatio,
+            int defWireColor
+    ) {
+        if (isHovered) {
+            return new WireStyle(0xFFFF3366, 2.0f);
+        }
+        if (isWireGlowing) {
+            return new WireStyle(TutorialManager.getGlowBorderColor(0xFF55FF88), 3.5f);
+        }
+        if (satRatio < 0.9999f && BoardManager.getInstance().getWireAnimationMode() == com.gtceu.calcboard.api.type.WireAnimationMode.RATE_MODULATED) {
+            float timeSec = (System.currentTimeMillis() % 60000L) / 1000.0f;
+            float alpha = ParticleBatchingEngine.computePulseAlpha(satRatio, timeSec);
+            int alphaInt = Math.max(30, Math.min(255, (int) (alpha * 255.0f)));
+            int rgb = (satRatio < 0.5f) ? 0xEF4444 : 0xF59E0B;
+            return new WireStyle((alphaInt << 24) | rgb, 2.5f);
+        }
+        return new WireStyle(defWireColor, 2.0f);
+    }
+
+    private static float resolveFromEfficiency(FlowGraph graph, RecipeNode fromNode) {
+        if (fromNode.isJunctionBuffer()) {
+            return (float) fromNode.getJunctionChargeDuration(graph);
+        }
+        if (fromNode.isReroute()) {
+            return 1.0f;
+        }
+        return (float) fromNode.getEfficiency();
+    }
+
+    private static float resolveBadgeCode(RecipeNode fromNode) {
+        if (fromNode.isJunctionBuffer()) {
+            return -1.0f;
+        }
+        if (!fromNode.isReroute()) {
+            int mult = ParticleBatchingEngine.getBatchMultiplier(fromNode);
+            if (mult > 1) {
+                return (float) mult;
+            }
+        }
+        return 1.0f;
     }
 }

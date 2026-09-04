@@ -199,7 +199,7 @@ public class SummaryOverlay {
         int curY = contentY - (int) scrollY;
 
         // Section A: Raw Inputs
-        graphics.drawString(font, "§c📥 " + Component.translatable("gui.gtcalcboard.raw_inputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§c« " + Component.translatable("gui.gtcalcboard.raw_inputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
         if (summary.rawInputs().isEmpty()) {
@@ -216,7 +216,7 @@ public class SummaryOverlay {
 
         // Section B: Net Outputs
         curY += 8;
-        graphics.drawString(font, "§a📤 " + Component.translatable("gui.gtcalcboard.net_outputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§a» " + Component.translatable("gui.gtcalcboard.net_outputs").getString(), x + 8, curY, 0xFFFFFFFF, false);
         curY += 14;
 
         if (summary.netOutputs().isEmpty()) {
@@ -296,7 +296,7 @@ public class SummaryOverlay {
                 hoveredActionStack = stack;
                 hoveredActionIsRestore = isVoidSection;
             }
-            String btnIcon = isVoidSection ? "§a↩" : "§d🗑";
+            String btnIcon = isVoidSection ? "§a↩" : "§d✖";
             graphics.drawString(font, btnIcon, btnX + 2, btnY + 2, 0xFFFFFFFF, false);
         }
 
@@ -358,7 +358,7 @@ public class SummaryOverlay {
 
         if (hoveredMachines && lastSummary != null && !lastSummary.machineBreakdown().isEmpty()) {
             List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
+            tooltip.add(Component.literal("§6▦ " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
             for (Map.Entry<String, Integer> entry : lastSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }

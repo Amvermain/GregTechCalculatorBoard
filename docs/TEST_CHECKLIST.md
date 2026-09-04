@@ -28,6 +28,10 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Shift + Connect` from junction nodes calculates ratios based on diverted flow.
   - [ ] **Target Batch Quantity (ET / DT)**: Clicking the bottom badge on a junction opens the inline target batch editor. Setting a quantity displays real-time Estimated Completion Time (`ET: xx.xs`) or Depletion Time (`DT: xx.xs`).
   - [ ] **Junction Supply & Reset**: Right-clicking opens supply mode dialog (Infinite/Fixed Rate); `Shift + Right-Click` resets target batch quantity to 0.
+  - [ ] **Junction Priority Split & Fixed Limit (ADR-020)**: Flow Allocation tab in junction dialog allows setting per-line fixed flow caps, allocating fixed limits first before distributing remainder proportionally.
+  - [ ] **Junction Accumulation Buffer (ADR-020)**: Batch Buffer mode calculates charge duration $T_{\text{charge}} = B / Q_{\text{in}}$, displaying buffer badge `Bx` and preventing false-positive downstream starvation.
+  - [ ] **Particle Animation Batching (ADR-020)**: Fast recipes under 1.0s clamp animation cycle to $T \ge 1.0\text{s}$ with `Mx` badge overlay.
+  - [ ] **Orthogonal Dual-Stream Modulation (ADR-020)**: Incoming deficit wires pulse with warning brightness ($f = 1.0 + 3.0(1-\phi)\text{Hz}$), while outgoing wires smoothly derate speed ($v = v_{\text{base}} \times \eta$) to convey machine cycle delay.
 - [ ] **Wire Cutting**: Right-clicking a wire or clicking a connected socket port severs the connection immediately.
 - [ ] **Drag-to-Search**:
   - [ ] Dragging from a port into empty canvas displays a 4-button quick action marker (🔍 Search, ➕ Junction, 📋 Copy, etc.).
@@ -135,6 +139,7 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Fusion Reactor Physics (`GTFusionHelper`)**:
   - [ ] Start EU ignition tiering (Mk1 $\le 160\text{M}$, Mk2 $\le 320\text{M}$, Mk3 $\le 640\text{M}$, Mk4/Mk5).
   - [ ] Special Fusion Overclock: **$2\times\text{ Power}, 2\times\text{ Speed}$ (Energy Factor 2.0, Speed Factor 2.0)**.
+  - [ ] **Reflector Overclock Boost**: When installed reflector tier exceeds recipe requirement ($\Delta\text{Reflector} = \text{InstalledTier} - \text{RequiredTier} > 0$), grant $\Delta\text{Reflector}$ additional 2:2 perfect overclock tiers ($2\times\text{ Speed}, 2\times\text{ EU/t}$ per tier, e.g. T2 required + T3 installed $\rightarrow 2\times\text{ Speed}$, T4 installed $\rightarrow 4\times\text{ Speed}$).
 
 ### 3.2 Create
 - [ ] **RPM-Based Non-Linear Scaling**:

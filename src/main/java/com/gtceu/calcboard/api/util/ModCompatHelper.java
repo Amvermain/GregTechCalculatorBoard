@@ -31,6 +31,16 @@ public class ModCompatHelper {
         return isModLoaded("systeams");
     }
 
+    public static boolean isStarTLoaded() {
+        if (TEST_OVERRIDES.containsKey("start_core")) {
+            return Boolean.TRUE.equals(TEST_OVERRIDES.get("start_core"));
+        }
+        if (TEST_OVERRIDES.containsKey("start")) {
+            return Boolean.TRUE.equals(TEST_OVERRIDES.get("start"));
+        }
+        return isModLoaded("start_core") || isModLoaded("gtceu_start") || isModLoaded("start");
+    }
+
     public static boolean isCreateLoaded() {
         return isModLoaded("create");
     }
@@ -47,10 +57,15 @@ public class ModCompatHelper {
         return isModLoaded("vintageimprovements") || isModLoaded("vintage_improvements") || isModLoaded("create_vintage_improvements") || isModLoaded("vintage");
     }
 
+    public static boolean isGreateLoaded() {
+        return isModLoaded("greate");
+    }
+
     public static boolean isCreateFamilyNamespace(String namespace) {
         if (namespace == null) return false;
         String lower = namespace.toLowerCase(java.util.Locale.ROOT);
         return lower.equals("create")
+                || lower.equals("greate")
                 || lower.equals("createaddition")
                 || lower.equals("create_new_age")
                 || lower.equals("vintageimprovements")

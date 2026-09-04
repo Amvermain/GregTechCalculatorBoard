@@ -93,7 +93,7 @@ public class NodeCardTextCache {
 
     private void updateTitle(RecipeNode node, int cardW, int titleX, int x, int headerBtnMargin, boolean isOperational) {
         String baseTitle = (!isOperational ? "§c⚠ " : "")
-                + (node.isModule() ? "§d📦 " : (node.isFusion() ? "§d⚛ " : (node.isBaseNode() ? "§6★ " : (node.isGenerator() ? "§a⚡ " : ""))))
+                + (node.isModule() ? "§d▦ " : (node.isFusion() ? "§d⚛ " : (node.isBaseNode() ? "§6★ " : (node.isGenerator() ? "§a⚡ " : ""))))
                 + node.getName();
         int maxTitleChars = Math.max(8, (cardW - (titleX - x) - headerBtnMargin) / 6);
         if (baseTitle.length() > maxTitleChars) {
@@ -110,7 +110,7 @@ public class NodeCardTextCache {
         if (!isOperational) {
             this.rightInfoStr = String.format(Locale.ROOT, "§c%.2fs §7(§c0/s§7)", durationSec);
         } else if (node.isModule()) {
-            this.rightInfoStr = "§d§l[📦 " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
+            this.rightInfoStr = "§d§l[▦ " + Component.translatable("gui.gtcalcboard.module").getString() + "]";
         } else {
             this.rightInfoStr = String.format(Locale.ROOT, "§b%.2fs §7(§f%s/s§7)", durationSec, NumberFormatUtil.formatCompactNumber(effCps));
         }
@@ -122,13 +122,41 @@ public class NodeCardTextCache {
         if (node.getEnergyType() == EnergyType.NONE) {
             powerStr = Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
         } else if (!isOperational) {
-            GTVoltageTier tier = node.getTargetTier();
-            String tierName = tier != null ? tier.getName() : "LV";
-            powerStr = "§c0.0 EU/t §7(0A " + tierName + ")";
+            powerStr = formatUnoperationalPower(node);
         } else {
             powerStr = adapter.formatEnergyStats(node, BoardManager.getInstance().getPowerDisplayMode());
         }
         this.fittedPowerStr = font.plainSubstrByWidth(powerStr, maxPowerW);
+    }
+
+    private String formatUnoperationalPower(RecipeNode node) {
+        EnergyType energyType = node.getEnergyType();
+        if (energyType == EnergyType.KINETIC_SU) {
+            if (node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE)) {
+                int mTier = Math.max(0, node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.MACHINE_TIER));
+                int rTier = Math.max(0, node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.REQUIRED_RECIPE_TIER));
+                double cap = com.gtceu.calcboard.compat.greate.GreateProperties.getShaftCapacityForTier(mTier);
+                IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+                double stress = adapter.computeOverclock(node, node.getTargetTier(), false).eut() * node.getMachineCount() * node.getCombinedEutMultiplier();
+                if (stress > cap) {
+                    return String.format(Locale.ROOT, "§c%,.0f / %,.0f SU", stress, cap);
+                }
+                if (mTier < rTier) {
+                    return "§c0 SU §7(Req: " + com.gtceu.calcboard.compat.greate.GreateProperties.getTierName(rTier) + ")";
+                }
+                return String.format(Locale.ROOT, "§c0 / %,.0f SU", cap);
+            }
+            return "§c0 SU";
+        }
+        if (energyType == EnergyType.ELECTRIC_FE) {
+            return "§c0 FE/t";
+        }
+        if (energyType == EnergyType.HEAT_OR_SELF) {
+            return "§c0 mB/t Steam";
+        }
+        GTVoltageTier tier = node.getTargetTier();
+        String tierName = tier != null ? tier.getName() : "LV";
+        return "§c0.0 EU/t §7(0A " + tierName + ")";
     }
 
     private void updateBadges(RecipeNode node) {
@@ -232,8 +260,9 @@ public class NodeCardTextCache {
         boolean isConnected = stats != null && stats.isConnected();
         boolean isBalanced = stats != null && stats.isBalanced();
         boolean isDeficit = stats != null && stats.isInputDeficit();
+        boolean isBuffered = graph != null && graph.findConnectedBufferNode(node, inOrigIdx) != null;
 
-        int portColor = !isOperational ? 0xFF77333B : (!isConnected ? 0xFF5599FF : (isBalanced ? 0xFF55FF88 : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
+        int portColor = !isOperational ? 0xFF77333B : (!isConnected ? 0xFF5599FF : (isBalanced ? 0xFF55FF88 : (isDeficit ? (isBuffered ? 0xFFFFD700 : 0xFFFFAA33) : 0xFF55FFFF)));
 
         if (!isOperational) {
             return new RawPortData("§c-" + FormatUtil.formatRate(0.0, in), 0xFFFF7777, portColor);
@@ -244,7 +273,7 @@ public class NodeCardTextCache {
         if (isBalanced) {
             return new RawPortData("§a" + FormatUtil.formatRate(rate, in) + " §2✔", 0xFFFFFFFF, portColor);
         }
-        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit), 0xFFFFFFFF, portColor);
+        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit, isBuffered), 0xFFFFFFFF, portColor);
     }
 
     private RawPortData computeOutputPortData(NodeWidget widget, FlowGraph graph, RecipeNode node, IngredientStack out, int outOrigIdx, boolean isOperational) {

@@ -208,7 +208,6 @@ public class MachineSelectorDialog {
             }
         }
 
-        // Sort: Multiblocks first, then Steam, then Singleblocks sorted by Tier (ULV -> OpV)
         allEntries.sort((a, b) -> {
             if (a.isMultiblock() != b.isMultiblock()) {
                 return a.isMultiblock() ? -1 : 1;
@@ -216,10 +215,14 @@ public class MachineSelectorDialog {
             if (a.isSteam() != b.isSteam()) {
                 return a.isSteam() ? -1 : 1;
             }
-            if (a.tier() != null && b.tier() != null) {
-                return Integer.compare(a.tier().ordinal(), b.tier().ordinal());
+            int tierA = a.tier() != null ? a.tier().ordinal() : -1;
+            int tierB = b.tier() != null ? b.tier().ordinal() : -1;
+            if (tierA != tierB) {
+                return Integer.compare(tierA, tierB);
             }
-            return a.displayName().compareToIgnoreCase(b.displayName());
+            int nameCmp = a.displayName().compareToIgnoreCase(b.displayName());
+            if (nameCmp != 0) return nameCmp;
+            return a.id().toString().compareTo(b.id().toString());
         });
     }
 

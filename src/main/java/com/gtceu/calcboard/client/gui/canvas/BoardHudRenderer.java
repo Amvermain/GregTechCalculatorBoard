@@ -92,36 +92,36 @@ public class BoardHudRenderer {
         graphics.fill((int)(qx - 47), (int)(qy - 13), (int)(qx + 48), (int)(qy + 13), 0xDD0F172A);
         graphics.renderOutline((int)(qx - 47), (int)(qy - 13), 95, 26, 0x88334155);
 
-        // 1. [🔍] Search Recipe (Emerald)
+        // 1. [?] Search Recipe (Emerald)
         int searchBg = searchHovered ? 0xEE10B981 : 0xBB059669;
         int searchBorder = searchHovered ? 0xFF6EE7B7 : 0xCC10B981;
         graphics.fill((int)(qx - 44), (int)(qy - 10), (int)(qx - 24), (int)(qy + 10), searchBg);
         graphics.renderOutline((int)(qx - 44), (int)(qy - 10), 20, 20, searchBorder);
-        String searchIcon = "🔍";
+        String searchIcon = "?";
         graphics.drawString(font, searchIcon, (int)(qx - 34 - font.width(searchIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
 
-        // 2. [🔀] Insert Junction (Sky/Cyan)
+        // 2. [↔] Insert Junction (Sky/Cyan)
         int juncBg = junctionHovered ? 0xEE0284C7 : 0xBB0369A1;
         int juncBorder = junctionHovered ? 0xFF7DD3FC : 0xCC0284C7;
         graphics.fill((int)(qx - 21), (int)(qy - 10), (int)(qx - 1), (int)(qy + 10), juncBg);
         graphics.renderOutline((int)(qx - 21), (int)(qy - 10), 20, 20, juncBorder);
-        String juncIcon = "🔀";
+        String juncIcon = "↔";
         graphics.drawString(font, juncIcon, (int)(qx - 11 - font.width(juncIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
 
-        // 3. [🖼] Group Frame (Purple/Violet)
+        // 3. [▦] Group Frame (Purple/Violet)
         int frameBg = frameHovered ? 0xEE8B5CF6 : 0xBB6D28D9;
         int frameBorder = frameHovered ? 0xFFC4B5FD : 0xCC7C3AED;
         graphics.fill((int)(qx + 2), (int)(qy - 10), (int)(qx + 22), (int)(qy + 10), frameBg);
         graphics.renderOutline((int)(qx + 2), (int)(qy - 10), 20, 20, frameBorder);
-        String frameIcon = "🖼";
+        String frameIcon = "▦";
         graphics.drawString(font, frameIcon, (int)(qx + 12 - font.width(frameIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
 
-        // 4. [📝] Sticky Note / Memo (Amber/Gold)
+        // 4. [▪] Sticky Note / Memo (Amber/Gold)
         int noteBg = noteHovered ? 0xEEF59E0B : 0xBBB45309;
         int noteBorder = noteHovered ? 0xFFFDE68A : 0xCCD97706;
         graphics.fill((int)(qx + 25), (int)(qy - 10), (int)(qx + 45), (int)(qy + 10), noteBg);
         graphics.renderOutline((int)(qx + 25), (int)(qy - 10), 20, 20, noteBorder);
-        String noteIcon = "📝";
+        String noteIcon = "▪";
         graphics.drawString(font, noteIcon, (int)(qx + 35 - font.width(noteIcon) / 2.0f), (int)(qy - 4), 0xFFFFFFFF, false);
     }
 

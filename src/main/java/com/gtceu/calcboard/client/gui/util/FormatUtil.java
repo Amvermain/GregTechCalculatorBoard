@@ -186,6 +186,10 @@ public final class FormatUtil {
     }
 
     public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit) {
+        return formatConnectedInput(supplied, required, stack, isDeficit, false);
+    }
+
+    public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit, boolean isBuffered) {
         if (stack != null && stack.isStressUnit()) {
             double scaledSup = supplied * activeTimeUnit.getFactor();
             double scaledReq = required * activeTimeUnit.getFactor();
@@ -194,15 +198,21 @@ public final class FormatUtil {
             String supStr = formatCompactNumber(scaledSup);
             String reqStr = formatCompactNumber(scaledReq);
             if (isDeficit) {
-                return "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
+                return isBuffered
+                        ? "§6+" + supStr + " §7-" + reqStr + unit + " §e⏳"
+                        : "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
             } else {
                 return "§b+" + supStr + " §7-" + reqStr + unit + " §b+";
             }
         }
-        return formatConnectedInput(supplied, required, stack != null && stack.isFluid(), isDeficit);
+        return formatConnectedInput(supplied, required, stack != null && stack.isFluid(), isDeficit, isBuffered);
     }
 
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit) {
+        return formatConnectedInput(supplied, required, isFluid, isDeficit, false);
+    }
+
+    public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit, boolean isBuffered) {
         double scaledSup = supplied * activeTimeUnit.getFactor();
         double scaledReq = required * activeTimeUnit.getFactor();
         String suffix = activeTimeUnit.getSuffix();
@@ -235,8 +245,9 @@ public final class FormatUtil {
         }
 
         if (isDeficit) {
-            // Deficit: Supply in Gold/Orange (+), Machine Demand in Red (-), Warning symbol
-            return "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
+            return isBuffered
+                    ? "§6+" + supStr + " §7-" + reqStr + unit + " §e⏳"
+                    : "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
         } else {
             // Surplus: Supply in Cyan (+), Machine Demand in Light Gray (-), Plus symbol
             return "§b+" + supStr + " §7-" + reqStr + unit + " §b+";

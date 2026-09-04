@@ -64,7 +64,7 @@ public class ExportToTeamDialog {
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Title
-        String title = "📤 " + Component.translatable("gui.gtcalcboard.dialog.export_to_team_title").getString();
+        String title = "» " + Component.translatable("gui.gtcalcboard.dialog.export_to_team_title").getString();
         graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
 
         String subtitle = Component.translatable("gui.gtcalcboard.dialog.export_to_team_sub").getString();
@@ -85,7 +85,7 @@ public class ExportToTeamDialog {
         boolean h2 = mouseX >= btn1X && mouseX <= btn1X + btnW && mouseY >= btn2Y && mouseY <= btn2Y + btnH;
         graphics.fill(btn1X, btn2Y, btn1X + btnW, btn2Y + btnH, h2 ? 0xFF3D4558 : 0xFF282D3B);
         graphics.renderOutline(btn1X, btn2Y, btnW, btnH, 0xFF4F5B73);
-        graphics.drawCenteredString(font, "📝 " + Component.translatable("gui.gtcalcboard.dialog.btn_export_overwrite").getString(), btn1X + btnW / 2, btn2Y + 7, 0xFFE0E6F0);
+        graphics.drawCenteredString(font, "▪ " + Component.translatable("gui.gtcalcboard.dialog.btn_export_overwrite").getString(), btn1X + btnW / 2, btn2Y + 7, 0xFFE0E6F0);
 
         // Cancel
         int cancelY = btn2Y + 26;

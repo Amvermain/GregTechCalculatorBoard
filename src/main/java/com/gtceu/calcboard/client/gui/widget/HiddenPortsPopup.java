@@ -135,7 +135,7 @@ public class HiddenPortsPopup {
             graphics.drawString(font, name, px + 60, rowY + 5, isHover ? 0xFFFFFF55 : 0xFFE0E0E0, false);
 
             // Unhide button / icon [+]
-            graphics.drawString(font, "§a👁", px + pw - 14, rowY + 5, 0xFF55FF55, false);
+            graphics.drawString(font, "§a●", px + pw - 14, rowY + 5, 0xFF55FF55, false);
 
             rowY += 20;
         }

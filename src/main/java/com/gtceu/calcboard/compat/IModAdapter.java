@@ -186,6 +186,7 @@ public interface IModAdapter {
             node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
         }
         node.getAddons().add(addon);
+        node.markOverclockDirty();
     }
 
     /**
@@ -193,6 +194,7 @@ public interface IModAdapter {
      */
     default void onAddonRemoved(RecipeNode node, MachineAddon addon) {
         if (node == null || addon == null) return;
+        node.markOverclockDirty();
     }
 
     /**
@@ -421,7 +423,7 @@ public interface IModAdapter {
         }
         if (addon.getCategory().equals(AddonCategory.HATCH_BUS)) {
             if (addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon h) {
-                if (h.isME()) return "§d📡 ME Automation";
+                if (h.isME()) return "§d⚡ ME Automation";
                 if (h.getHatchType().isFluid()) {
                     return String.format("§b%,d mB/slot", h.getTankCapacityMB() / Math.max(1, h.getSlotCapacity()));
                 }
@@ -451,19 +453,19 @@ public interface IModAdapter {
         if (addon == null || tooltip == null) return;
         if (addon.getCategory().equals(AddonCategory.ENERGY_HATCH) && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon eh) {
             tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ Max Voltage: %s (%,d EU/t, %,dA)", eh.getTier().getName(), eh.getTier().getVoltage(), eh.getAmperage())));
-            if (eh.isLaser()) tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§d📡 High-density Laser Target Input (%,dA)", eh.getAmperage())));
-            if (eh.isSubstation()) tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b🏢 Substation High-amperage Input (%,dA)", eh.getAmperage())));
+            if (eh.isLaser()) tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§d⚡ High-density Laser Target Input (%,dA)", eh.getAmperage())));
+            if (eh.isSubstation()) tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b▦ Substation High-amperage Input (%,dA)", eh.getAmperage())));
         }
         if (addon.getCategory().equals(AddonCategory.HATCH_BUS) && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon h) {
             if (h.isME()) {
-                tooltip.add(net.minecraft.network.chat.Component.literal("§d📡 ME Network Automation Integration"));
+                tooltip.add(net.minecraft.network.chat.Component.literal("§d⚡ ME Network Automation Integration"));
                 tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7Provides %d integrated virtual recipe slots", h.getSlotCapacity())));
             } else if (h.getHatchType().isFluid()) {
-                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b📦 Fluid Slots: %d", h.getSlotCapacity())));
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§b▦ Fluid Slots: %d", h.getSlotCapacity())));
                 tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7Tank Capacity: %,d mB (%,d mB / slot)", h.getTankCapacityMB(), h.getTankCapacityMB() / Math.max(1, h.getSlotCapacity()))));
                 tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ Voltage Tier: %s", h.getTier().getName())));
             } else {
-                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7📦 Item Inventory Slots: %d", h.getSlotCapacity())));
+                tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§7▦ Item Inventory Slots: %d", h.getSlotCapacity())));
                 tooltip.add(net.minecraft.network.chat.Component.literal(String.format("§e⚡ Voltage Tier: %s", h.getTier().getName())));
             }
         }
@@ -493,14 +495,14 @@ public interface IModAdapter {
         }
         if (addon.getCategory() == MachineAddon.Category.HATCH_BUS && addon instanceof com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon h) {
             if (h.isME()) {
-                return "§d📡 ME";
+                return "§d⚡ ME";
             }
             if (h.getHatchType().isFluid()) {
                 return h.getSlotCapacity() > 1
-                        ? String.format("§b📦 %dx Fluid", h.getSlotCapacity())
-                        : String.format("§b📦 %s Fluid", h.getTier().getName());
+                        ? String.format("§b▦ %dx Fluid", h.getSlotCapacity())
+                        : String.format("§b▦ %s Fluid", h.getTier().getName());
             }
-            return String.format("§7📦 %s (%d)", h.getTier().getName(), h.getSlotCapacity());
+            return String.format("§7▦ %s (%d)", h.getTier().getName(), h.getSlotCapacity());
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
             return String.format("§6♨ %d K", addon.getCoilTemperature());

@@ -53,7 +53,9 @@ The mod is completely standalone and fully optional on both client and server:
 * **Edit Concurrency Control**: Automatic per-page edit locks and live teammate presence indicators prevent concurrent overwrite collisions, backed by automated background saving and revision history forks.
 
 #### 6. Flow Saturation Wire Animation & Byproduct Void Sink System
-* **Flow Saturation Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios ($R = \text{Supply} / \text{Demand}$), with amber pulsing glow outlines indicating starved bottleneck machines.
+* **Dual-Stream Wire Modulation**: Dynamically modulates wire pulse animation speeds, stalls (duty cycle stutter), and RGB colors (Cyan -> Amber -> Crimson) based on real-time supply saturation ratios (Supply / Demand), with amber pulsing glow outlines indicating starved bottleneck machines.
+* **High-Speed Particle Batching**: Ultra-fast recipe animations (under 1.0s) automatically batch into synchronized visual bursts with multiplier badges (e.g. `2x`, `5x`) to maintain 60 FPS rendering clarity without visual clutter.
+* **Junction Flow Prioritization & Accumulation Buffers**: Route fixed supply quotas to priority branches before balancing remaining flows, and toggle accumulation buffer mode on junctions to model batch discharge and intermittent duty-cycle consumers without false-positive deficit warnings.
 * **Junction Void Sink (`SupplyMode.VOID_SINK`)**: Configure Junction nodes into infinite void sinks to absorb/delete surplus byproducts, isolating downstream consumers and preventing upstream demand spikes.
 * **Port-Level Void Marking**: `Alt + Right-Click` on machine output ports to exclude surplus byproducts from final net production summaries without severing topology.
 * **One-Click Summary Voiding**: Click `[🗑️]` on net product rows in `SummaryOverlay` to mark byproducts as voided, with collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore.
@@ -71,7 +73,7 @@ The mod is completely standalone and fully optional on both client and server:
 * **Supported Tech & Automation Mods**:
   * [GregTech CEu Modern](https://curseforge.com/minecraft/mc-mods/gregtech-ceu-modern) (1.7.0+ or Star Technology forks)
   * [Applied Energistics 2 (AE2)](https://curseforge.com/minecraft/mc-mods/applied-energistics-2)
-  * [Create](https://curseforge.com/minecraft/mc-mods/create) & [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age)
+  * [Create](https://curseforge.com/minecraft/mc-mods/create), [Create: New Age](https://curseforge.com/minecraft/mc-mods/create-new-age) & [Greate](https://curseforge.com/minecraft/mc-mods/greate)
   * [Thermal Series](https://curseforge.com/minecraft/mc-mods/thermal-expansion) & [Systeams](https://curseforge.com/minecraft/mc-mods/systeams)
 * **Multiplayer Team Integration**:
   * [FTB Teams](https://curseforge.com/minecraft/mc-mods/ftb-teams-forge) / [Phoenix Guilds](https://curseforge.com/minecraft/mc-mods/phoenix-guilds)

@@ -61,7 +61,7 @@ public class CoilModifierDeductionTest {
     }
 
     @Test
-    @DisplayName("Test Chemical Reactor Speed and Energy Multipliers")
+    @DisplayName("Test Chemical Reactor Speed and Energy Multipliers Isolated to StarT")
     public void testChemicalReactorMultipliers() {
         RecipeNode node = new RecipeNode("node-chem", "Chem Node", 10.0, 120.0, GTVoltageTier.MV);
         node.setMachineIcon(ResourceLocation.tryParse("gtceu:large_chemical_reactor"));
@@ -69,9 +69,24 @@ public class CoilModifierDeductionTest {
         CoilHelper.CoilStats stats = new CoilHelper.CoilStats(2700, 200, 80, 125, 80, 32);
         GTCoilAddon coil = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, stats);
 
-        MachineAddon tailored = CoilHelper.tailorCoilAddon(coil, node);
-        Assertions.assertEquals(0.8, tailored.getDurationMultiplier(), 0.001);
-        Assertions.assertEquals(0.8, tailored.getEutMultiplier(), 0.001);
+        // 1. In vanilla GTCEu environment (StarT not loaded), LCR does NOT receive coil buffs
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", false);
+        MachineAddon vanillaTailored = CoilHelper.tailorCoilAddon(coil, node);
+        Assertions.assertEquals(1.0, vanillaTailored.getDurationMultiplier(), 0.001);
+        Assertions.assertEquals(1.0, vanillaTailored.getEutMultiplier(), 0.001);
+
+        // 2. In Star Technology environment, LCR receives coil speed/energy multipliers
+        try {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", true);
+            MachineAddon startTailored = CoilHelper.tailorCoilAddon(coil, node);
+            Assertions.assertEquals(0.8, startTailored.getDurationMultiplier(), 0.001);
+            Assertions.assertEquals(0.8, startTailored.getEutMultiplier(), 0.001);
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
     }
 
     @Test

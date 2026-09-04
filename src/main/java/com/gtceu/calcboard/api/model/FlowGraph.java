@@ -34,23 +34,41 @@ public class FlowGraph {
         String fromNodeId,
         int outputIndex,
         String toNodeId,
-        int inputIndex
+        int inputIndex,
+        double fixedFlowLimit
     ) {
+        public ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex) {
+            this(fromNodeId, outputIndex, toNodeId, inputIndex, 0.0);
+        }
+
+        public boolean hasFixedLimit() {
+            return fixedFlowLimit > 0.0001;
+        }
+
+        public ConnectionEdge withFixedLimit(double limit) {
+            return new ConnectionEdge(fromNodeId, outputIndex, toNodeId, inputIndex, Math.max(0.0, limit));
+        }
+
         public CompoundTag serializeNBT() {
             CompoundTag tag = new CompoundTag();
             tag.putString("fromNode", fromNodeId);
             tag.putInt("outIdx", outputIndex);
             tag.putString("toNode", toNodeId);
             tag.putInt("inIdx", inputIndex);
+            if (hasFixedLimit()) {
+                tag.putDouble("fixedLimit", fixedFlowLimit);
+            }
             return tag;
         }
 
         public static ConnectionEdge deserializeNBT(CompoundTag tag) {
+            double fixedLimit = tag.contains("fixedLimit") ? tag.getDouble("fixedLimit") : 0.0;
             return new ConnectionEdge(
                 tag.getString("fromNode"),
                 tag.getInt("outIdx"),
                 tag.getString("toNode"),
-                tag.getInt("inIdx")
+                tag.getInt("inIdx"),
+                fixedLimit
             );
         }
     }
@@ -276,21 +294,44 @@ public class FlowGraph {
         invalidatePortStatsCache();
     }
 
-    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
-        for (ConnectionEdge edge : connections) {
-            if (edge.fromNodeId.equals(fromNodeId) && edge.outputIndex == outIdx
-                && edge.toNodeId.equals(toNodeId) && edge.inputIndex == inIdx) {
+    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx, double fixedFlowLimit) {
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx
+                && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) {
+                if (Math.abs(edge.fixedFlowLimit() - fixedFlowLimit) > 0.0001) {
+                    connections.set(i, edge.withFixedLimit(fixedFlowLimit));
+                    invalidatePortStatsCache();
+                }
                 return;
             }
         }
-        connections.add(new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx));
+        connections.add(new ConnectionEdge(fromNodeId, outIdx, toNodeId, inIdx, fixedFlowLimit));
         invalidatePortStatsCache();
+    }
+
+    public void addConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+        addConnection(fromNodeId, outIdx, toNodeId, inIdx, 0.0);
     }
 
     public void addConnection(ConnectionEdge edge) {
         if (edge != null) {
-            addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex());
+            addConnection(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), edge.fixedFlowLimit());
         }
+    }
+
+    public boolean setConnectionFixedLimit(ConnectionEdge targetEdge, double fixedLimit) {
+        if (targetEdge == null) return false;
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(targetEdge.fromNodeId()) && edge.outputIndex() == targetEdge.outputIndex()
+                && edge.toNodeId().equals(targetEdge.toNodeId()) && edge.inputIndex() == targetEdge.inputIndex()) {
+                connections.set(i, edge.withFixedLimit(fixedLimit));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
     }
 
     public void removeConnection(ConnectionEdge edge) {
@@ -304,12 +345,19 @@ public class FlowGraph {
             RecipeNode from = findNodeById(edge.fromNodeId());
             RecipeNode to = findNodeById(edge.toNodeId());
             if (from == null || to == null) return true;
-            if (edge.outputIndex() < 0 || edge.outputIndex() >= from.getOutputs().size()) return true;
-            if (edge.inputIndex() < 0 || edge.inputIndex() >= to.getInputs().size()) return true;
+            if (edge.outputIndex() < 0 || (!from.isReroute() && edge.outputIndex() >= from.getOutputs().size())) return true;
+            if (edge.inputIndex() < 0 || (!to.isReroute() && edge.inputIndex() >= to.getInputs().size())) return true;
 
-            IngredientStack outStack = from.getOutputs().get(edge.outputIndex());
-            IngredientStack inStack = to.getInputs().get(edge.inputIndex());
-            if (outStack == null || inStack == null) return true;
+            IngredientStack outStack = from.isReroute()
+                    ? (from.getOutputs().isEmpty() ? null : from.getOutputs().get(0))
+                    : from.getOutputs().get(edge.outputIndex());
+            IngredientStack inStack = to.isReroute()
+                    ? (to.getInputs().isEmpty() ? null : to.getInputs().get(0))
+                    : to.getInputs().get(edge.inputIndex());
+            if (outStack == null || inStack == null) {
+                if (from.isReroute() || to.isReroute()) return false;
+                return true;
+            }
             if (outStack.getId() == null || inStack.getId() == null) return true;
 
             // Fluid vs Item compatibility check
@@ -556,6 +604,23 @@ public class FlowGraph {
             }
         }
         return -1;
+    }
+
+    public boolean setConnectionFixedLimit(String fromNodeId, int outputIndex, String toNodeId, int inputIndex, double limit) {
+        for (int i = 0; i < connections.size(); i++) {
+            ConnectionEdge edge = connections.get(i);
+            if (edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outputIndex
+                    && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inputIndex) {
+                connections.set(i, edge.withFixedLimit(limit));
+                invalidatePortStatsCache();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public RecipeNode findConnectedBufferNode(RecipeNode consumer, int inputIndex) {
+        return FlowGraphSolver.findConnectedBufferNode(this, consumer, inputIndex);
     }
 }
 

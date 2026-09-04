@@ -30,10 +30,14 @@ public class CreateKineticTest {
         Assertions.assertEquals("Large Water Wheel", node.getName());
         Assertions.assertEquals(EnergyType.KINETIC_SU, node.getEnergyType());
         Assertions.assertTrue(node.isGenerator());
+        Assertions.assertEquals(4, node.getRpm());
         Assertions.assertEquals(512.0, node.getBaseEUt(), 0.001);
         Assertions.assertEquals(512.0, node.getSingleMachineEUt(), 0.001);
         Assertions.assertEquals(1.0, node.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(ResourceLocation.tryParse("create:large_water_wheel"), node.getMachineIcon());
+
+        node.setRpm(8);
+        Assertions.assertEquals(1024.0, node.getSingleMachineEUt(), 0.001);
     }
 
     @Test
@@ -362,6 +366,39 @@ public class CreateKineticTest {
         Assertions.assertTrue(com.gtceu.calcboard.api.util.ModCompatHelper.isCreateMachine(lathe));
         Assertions.assertEquals(EnergyType.KINETIC_SU, lathe.getEnergyType());
         Assertions.assertEquals(256.0, lathe.getSingleMachineEUt(), 0.001);
+    }
+
+    @Test
+    public void testCreateStressHelperFallbacks() {
+        CreateStressHelper.KineticStats stats = CreateStressHelper.deduceGeneratorStats(
+                ResourceLocation.tryParse("create:large_water_wheel"),
+                128.0,
+                4
+        );
+        Assertions.assertEquals(128.0, stats.capacityPerRpm(), 0.001);
+        Assertions.assertEquals(4, stats.rpm());
+        Assertions.assertEquals(512.0, stats.totalSu(), 0.001);
+    }
+
+    @Test
+    public void testSteamEngineTierCalculations() {
+        Assertions.assertEquals(2048.0, CreateStressHelper.calculateSteamEngineTotalSu(-1), 0.001);
+        Assertions.assertEquals(320.0, CreateStressHelper.calculateSteamConsumption(-1), 0.001);
+
+        Assertions.assertEquals(32.0, CreateStressHelper.calculateSteamEngineTotalSu(0), 0.001);
+        Assertions.assertEquals(80.0, CreateStressHelper.calculateSteamConsumption(0), 0.001);
+
+        Assertions.assertEquals(128.0, CreateStressHelper.calculateSteamEngineTotalSu(1), 0.001);
+        Assertions.assertEquals(320.0, CreateStressHelper.calculateSteamConsumption(1), 0.001);
+
+        Assertions.assertEquals(512.0, CreateStressHelper.calculateSteamEngineTotalSu(2), 0.001);
+        Assertions.assertEquals(1280.0, CreateStressHelper.calculateSteamConsumption(2), 0.001);
+
+        Assertions.assertEquals(2048.0, CreateStressHelper.calculateSteamEngineTotalSu(3), 0.001);
+        Assertions.assertEquals(5120.0, CreateStressHelper.calculateSteamConsumption(3), 0.001);
+
+        Assertions.assertEquals(8192.0, CreateStressHelper.calculateSteamEngineTotalSu(4), 0.001);
+        Assertions.assertEquals(20480.0, CreateStressHelper.calculateSteamConsumption(4), 0.001);
     }
 }
 

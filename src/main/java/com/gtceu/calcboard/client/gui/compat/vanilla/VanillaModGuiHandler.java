@@ -26,7 +26,7 @@ public class VanillaModGuiHandler implements IModGuiHandler {
 
     @Override
     public void renderCardControls(GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY, boolean isGlowing) {
-        String bannerText = "🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
+        String bannerText = "~ " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
         int bannerW = cardW - 12;
         NodeCardRenderer.drawBtn(graphics, font, bannerText, x + 6, row2Y, bannerW, 14, mouseX, mouseY, 0xFF88D49E, false, false);
     }

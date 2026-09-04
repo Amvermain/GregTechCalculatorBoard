@@ -104,7 +104,7 @@ public class ExportBlueprintDialog {
 
         // Title bar
         graphics.fill(x, y, x + dialogW, y + 22, 0xFF222634);
-        String header = "📤 " + Component.translatable("gui.gtcalcboard.dialog.export_bp_title").getString();
+        String header = "» " + Component.translatable("gui.gtcalcboard.dialog.export_bp_title").getString();
         graphics.drawString(font, header, x + 10, y + 7, 0xFFFFFFFF, false);
 
         // Open Folder button in title bar
@@ -115,7 +115,7 @@ public class ExportBlueprintDialog {
         boolean folderHover = mouseX >= folderBtnX && mouseX <= folderBtnX + folderBtnW && mouseY >= folderBtnY && mouseY <= folderBtnY + folderBtnH;
         graphics.fill(folderBtnX, folderBtnY, folderBtnX + folderBtnW, folderBtnY + folderBtnH, folderHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(folderBtnX, folderBtnY, folderBtnW, folderBtnH, 0xFF355580);
-        graphics.drawCenteredString(font, "📂 " + Component.translatable("gui.gtcalcboard.dialog.btn_open_folder").getString(), folderBtnX + folderBtnW / 2, folderBtnY + 4, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "≡ " + Component.translatable("gui.gtcalcboard.dialog.btn_open_folder").getString(), folderBtnX + folderBtnW / 2, folderBtnY + 4, 0xFF66DDFF);
 
         // Close button (X)
         int closeBtnX = x + dialogW - 18;
@@ -231,7 +231,7 @@ public class ExportBlueprintDialog {
         boolean copyHover = mouseX >= copyBtnX && mouseX <= copyBtnX + copyBtnW && mouseY >= btnY && mouseY <= btnY + copyBtnH;
         graphics.fill(copyBtnX, btnY, copyBtnX + copyBtnW, btnY + copyBtnH, copyHover ? 0xFF2A6840 : 0xFF1E4D2F);
         graphics.renderOutline(copyBtnX, btnY, copyBtnW, copyBtnH, 0xFF359050);
-        graphics.drawCenteredString(font, "📋 " + Component.translatable("gui.gtcalcboard.dialog.btn_copy_clipboard").getString(), copyBtnX + copyBtnW / 2, btnY + 6, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "» " + Component.translatable("gui.gtcalcboard.dialog.btn_copy_clipboard").getString(), copyBtnX + copyBtnW / 2, btnY + 6, 0xFFFFFFFF);
 
         // 2. Save to Disk
         int saveDiskBtnX = copyBtnX + copyBtnW + 6;
@@ -240,7 +240,7 @@ public class ExportBlueprintDialog {
         boolean saveDiskHover = mouseX >= saveDiskBtnX && mouseX <= saveDiskBtnX + saveDiskBtnW && mouseY >= btnY && mouseY <= btnY + saveDiskBtnH;
         graphics.fill(saveDiskBtnX, btnY, saveDiskBtnX + saveDiskBtnW, btnY + saveDiskBtnH, saveDiskHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(saveDiskBtnX, btnY, saveDiskBtnW, saveDiskBtnH, 0xFF355580);
-        graphics.drawCenteredString(font, "💾 " + Component.translatable("gui.gtcalcboard.dialog.btn_save_to_disk").getString(), saveDiskBtnX + saveDiskBtnW / 2, btnY + 6, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "✓ " + Component.translatable("gui.gtcalcboard.dialog.btn_save_to_disk").getString(), saveDiskBtnX + saveDiskBtnW / 2, btnY + 6, 0xFF66DDFF);
 
         // 3. Cancel Button
         int cancelBtnX = saveDiskBtnX + saveDiskBtnW + 6;
@@ -392,7 +392,7 @@ public class ExportBlueprintDialog {
         File savedFile = com.gtceu.calcboard.api.storage.BlueprintFileManager.saveBlueprint(title, pkg);
 
         if (savedFile != null) {
-            BoardToast.show(Component.literal("§a💾 ").append(Component.translatable("message.gtcalcboard.disk_save_success", savedFile.getName())));
+            BoardToast.show(Component.literal("§a✓ ").append(Component.translatable("message.gtcalcboard.disk_save_success", savedFile.getName())));
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
             close();
         } else {

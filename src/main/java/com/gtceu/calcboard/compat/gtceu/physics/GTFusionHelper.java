@@ -58,4 +58,12 @@ public final class GTFusionHelper {
                 : (fTier == 3 ? GTVoltageTier.UV 
                 : (fTier == 4 ? GTVoltageTier.UEV : GTVoltageTier.UXV)));
     }
+
+    public static int getReflectorOverclockDelta(RecipeNode node) {
+        if (node == null || !isFusion(node)) return 0;
+        int req = node.getRequiredReflectorTier();
+        if (req <= 0) return 0;
+        int inst = node.getInstalledReflectorTier();
+        return Math.max(0, inst - req);
+    }
 }

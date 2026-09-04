@@ -119,7 +119,7 @@ public class DiskBlueprintsDialog {
 
         // Title bar
         graphics.fill(x, y, x + DIALOG_W, y + 22, 0xFF222634);
-        String header = "💾 " + Component.translatable("gui.gtcalcboard.dialog.disk_bp_title").getString();
+        String header = "✓ " + Component.translatable("gui.gtcalcboard.dialog.disk_bp_title").getString();
         graphics.drawString(font, header, x + 10, y + 7, 0xFFFFFFFF, false);
 
         // Open Folder button in title bar
@@ -130,7 +130,7 @@ public class DiskBlueprintsDialog {
         boolean folderHover = mouseX >= folderBtnX && mouseX <= folderBtnX + folderBtnW && mouseY >= folderBtnY && mouseY <= folderBtnY + folderBtnH;
         graphics.fill(folderBtnX, folderBtnY, folderBtnX + folderBtnW, folderBtnY + folderBtnH, folderHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(folderBtnX, folderBtnY, folderBtnW, folderBtnH, 0xFF355580);
-        graphics.drawCenteredString(font, "📂 " + Component.translatable("gui.gtcalcboard.dialog.btn_open_folder").getString(), folderBtnX + folderBtnW / 2, folderBtnY + 4, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "≡ " + Component.translatable("gui.gtcalcboard.dialog.btn_open_folder").getString(), folderBtnX + folderBtnW / 2, folderBtnY + 4, 0xFF66DDFF);
 
         // Close button (X)
         int closeBtnX = x + DIALOG_W - 18;
@@ -154,7 +154,7 @@ public class DiskBlueprintsDialog {
         boolean refreshHover = mouseX >= refreshBtnX && mouseX <= refreshBtnX + refreshBtnW && mouseY >= refreshBtnY && mouseY <= refreshBtnY + refreshBtnH;
         graphics.fill(refreshBtnX, refreshBtnY, refreshBtnX + refreshBtnW, refreshBtnY + refreshBtnH, refreshHover ? 0xFF3D4558 : 0xFF282D3B);
         graphics.renderOutline(refreshBtnX, refreshBtnY, refreshBtnW, refreshBtnH, 0xFF4F5B73);
-        graphics.drawCenteredString(font, "🔄 " + Component.translatable("gui.gtcalcboard.dialog.btn_refresh").getString(), refreshBtnX + refreshBtnW / 2, refreshBtnY + 4, 0xFFE0E6F0);
+        graphics.drawCenteredString(font, "⟲ " + Component.translatable("gui.gtcalcboard.dialog.btn_refresh").getString(), refreshBtnX + refreshBtnW / 2, refreshBtnY + 4, 0xFFE0E6F0);
 
         // List Area
         int listY = y + 46;
@@ -196,8 +196,6 @@ public class DiskBlueprintsDialog {
                         : String.format(Locale.ROOT, "⚙ %d", nodeCount);
                 graphics.drawString(font, "§7" + stats, x + 16, itemY + 25, 0xFFAAAAAA, false);
 
-                // Action Buttons on Item
-                // 1. Load (📥)
                 int loadBtnX = x + DIALOG_W - 130;
                 int loadBtnY = itemY + 6;
                 int loadBtnW = 38;
@@ -205,18 +203,16 @@ public class DiskBlueprintsDialog {
                 boolean loadHover = mouseX >= loadBtnX && mouseX <= loadBtnX + loadBtnW && mouseY >= loadBtnY && mouseY <= loadBtnY + loadBtnH;
                 graphics.fill(loadBtnX, loadBtnY, loadBtnX + loadBtnW, loadBtnY + loadBtnH, loadHover ? 0xFF2A6840 : 0xFF1E4D2F);
                 graphics.renderOutline(loadBtnX, loadBtnY, loadBtnW, loadBtnH, 0xFF359050);
-                graphics.drawCenteredString(font, "📥", loadBtnX + loadBtnW / 2, loadBtnY + 7, 0xFFFFFFFF);
+                graphics.drawCenteredString(font, "«", loadBtnX + loadBtnW / 2, loadBtnY + 7, 0xFFFFFFFF);
 
-                // 2. Copy Code (📋)
                 int copyBtnX = loadBtnX + loadBtnW + 4;
                 int copyBtnW = 38;
                 int copyBtnH = 22;
                 boolean copyHover = mouseX >= copyBtnX && mouseX <= copyBtnX + copyBtnW && mouseY >= loadBtnY && mouseY <= loadBtnY + copyBtnH;
                 graphics.fill(copyBtnX, loadBtnY, copyBtnX + copyBtnW, loadBtnY + copyBtnH, copyHover ? 0xFF2B4466 : 0xFF1C2C44);
                 graphics.renderOutline(copyBtnX, loadBtnY, copyBtnW, copyBtnH, 0xFF355580);
-                graphics.drawCenteredString(font, "📋", copyBtnX + copyBtnW / 2, loadBtnY + 7, 0xFF66DDFF);
+                graphics.drawCenteredString(font, "»", copyBtnX + copyBtnW / 2, loadBtnY + 7, 0xFF66DDFF);
 
-                // 3. Delete (🗑)
                 int delBtnX = copyBtnX + copyBtnW + 4;
                 int delBtnW = 28;
                 int delBtnH = 22;
@@ -224,7 +220,7 @@ public class DiskBlueprintsDialog {
                 boolean delHover = mouseX >= delBtnX && mouseX <= delBtnX + delBtnW && mouseY >= loadBtnY && mouseY <= loadBtnY + delBtnH;
                 graphics.fill(delBtnX, loadBtnY, delBtnX + delBtnW, loadBtnY + delBtnH, isPendingDel ? 0xFF992222 : (delHover ? 0xFF662222 : 0xFF3D1C1C));
                 graphics.renderOutline(delBtnX, loadBtnY, delBtnW, delBtnH, isPendingDel ? 0xFFFF4444 : 0xFF773B3B);
-                graphics.drawCenteredString(font, isPendingDel ? "✔?" : "🗑", delBtnX + delBtnW / 2, loadBtnY + 7, isPendingDel ? 0xFFFF8888 : 0xFFFF6B6B);
+                graphics.drawCenteredString(font, isPendingDel ? "✔?" : "✖", delBtnX + delBtnW / 2, loadBtnY + 7, isPendingDel ? 0xFFFF8888 : 0xFFFF6B6B);
             }
 
             // Scroll indicator if needed
@@ -245,7 +241,7 @@ public class DiskBlueprintsDialog {
         boolean saveCurHover = mouseX >= saveCurBtnX && mouseX <= saveCurBtnX + saveCurBtnW && mouseY >= btmY && mouseY <= btmY + saveCurBtnH;
         graphics.fill(saveCurBtnX, btmY, saveCurBtnX + saveCurBtnW, btmY + saveCurBtnH, saveCurHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(saveCurBtnX, btmY, saveCurBtnW, saveCurBtnH, 0xFF355580);
-        graphics.drawCenteredString(font, "💾 " + Component.translatable("gui.gtcalcboard.dialog.btn_save_current_to_disk").getString(), saveCurBtnX + saveCurBtnW / 2, btmY + 5, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "✓ " + Component.translatable("gui.gtcalcboard.dialog.btn_save_current_to_disk").getString(), saveCurBtnX + saveCurBtnW / 2, btmY + 5, 0xFF66DDFF);
 
         int closeBottomBtnX = x + DIALOG_W - 74;
         int closeBottomBtnW = 62;
@@ -316,13 +312,13 @@ public class DiskBlueprintsDialog {
             int loadBtnW = 38;
             int loadBtnH = 22;
 
-            // Load (📥)
+            // Load («)
             if (mouseX >= loadBtnX && mouseX <= loadBtnX + loadBtnW && mouseY >= loadBtnY && mouseY <= loadBtnY + loadBtnH) {
                 loadBlueprintEntry(entry);
                 return true;
             }
 
-            // Copy Code (📋)
+            // Copy Code (»)
             int copyBtnX = loadBtnX + loadBtnW + 4;
             int copyBtnW = 38;
             if (mouseX >= copyBtnX && mouseX <= copyBtnX + copyBtnW && mouseY >= loadBtnY && mouseY <= loadBtnY + loadBtnH) {
@@ -330,7 +326,7 @@ public class DiskBlueprintsDialog {
                 return true;
             }
 
-            // Delete (🗑)
+            // Delete (✖)
             int delBtnX = copyBtnX + copyBtnW + 4;
             int delBtnW = 28;
             if (mouseX >= delBtnX && mouseX <= delBtnX + delBtnW && mouseY >= loadBtnY && mouseY <= loadBtnY + loadBtnH) {
@@ -338,7 +334,7 @@ public class DiskBlueprintsDialog {
                     BlueprintFileManager.deleteBlueprint(entry.file());
                     pendingDeleteFile = null;
                     refreshList();
-                    BoardToast.show(Component.literal("§c🗑 ").append(Component.translatable("message.gtcalcboard.blueprint_deleted", entry.fileName())));
+                    BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.blueprint_deleted", entry.fileName())));
                     mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.0F));
                 } else {
                     pendingDeleteFile = entry.file();

@@ -167,7 +167,7 @@ public class NodeCardRenderer {
             graphics.drawString(font, textCache.getTitle(), titleX, y + 6, textCache.getTitleColor(), false);
         }
 
-        // 3. Module Expand Button [⤢] (if module) OR Switch Recipe Button [🔄] (if standard machine)
+        // 3. Module Expand Button [⤢] (if module) OR Switch Recipe Button [⟲] (if standard machine)
         if (node.isModule()) {
             int expandX = x + cardW - 72;
             int expandY = y + 2;
@@ -183,7 +183,7 @@ public class NodeCardRenderer {
             int switchBorder = switchHover ? 0xFF5B9BD5 : 0xFF35587A;
             graphics.fill(switchX, switchY, switchX + 16, switchY + 16, switchBg);
             graphics.renderOutline(switchX, switchY, 16, 16, switchBorder);
-            graphics.drawCenteredString(font, "🔄", switchX + 8, switchY + 4, switchHover ? 0xFFFFFFFF : 0xFF88CCFF);
+            graphics.drawCenteredString(font, "⟲", switchX + 8, switchY + 4, switchHover ? 0xFFFFFFFF : 0xFF88CCFF);
         }
 
         // 4. Direction / Flip Button [➔] or [⬅]
@@ -196,7 +196,7 @@ public class NodeCardRenderer {
         graphics.renderOutline(flipX, flipY, 16, 16, flipBorder);
         graphics.drawCenteredString(font, node.isFlipped() ? "⬅" : "➔", flipX + 8, flipY + 4, flipHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        // 5. Target Base Node Toggle Button [🎯]
+        // 5. Target Base Node Toggle Button [⌖]
         int targetX = x + cardW - 36;
         int targetY = y + 2;
         boolean isTargetGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isNodeBaseTargetButtonGlowing(node.getId());
@@ -208,7 +208,7 @@ public class NodeCardRenderer {
         if (isTargetGlowing) {
             graphics.renderOutline(targetX - 1, targetY - 1, 18, 18, targetBorder & 0x77FFFFFF);
         }
-        graphics.drawCenteredString(font, "🎯", targetX + 8, targetY + 4, (node.isBaseNode() || isTargetGlowing) ? 0xFFFFEE55 : 0xFFAAAAAA);
+        graphics.drawCenteredString(font, "⌖", targetX + 8, targetY + 4, (node.isBaseNode() || isTargetGlowing) ? 0xFFFFEE55 : 0xFFAAAAAA);
 
         // 6. Close/Delete Button [X]
         int closeX = x + cardW - 18;
@@ -267,7 +267,7 @@ public class NodeCardRenderer {
 
         if (node.isModule()) {
             // Module Contained Machines Badge on the right (compact)
-            String machinesBadge = String.format("§d📦 %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
+            String machinesBadge = String.format("§d▦ %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
             int badgeW = font.width(machinesBadge);
             graphics.drawString(font, machinesBadge, x + cardW - 6 - badgeW, ctrlY + 3, 0xFFFFFFFF, false);
         } else if (!node.getAddons().isEmpty()) {
@@ -564,7 +564,7 @@ public class NodeCardRenderer {
         graphics.renderOutline(x, y, cardW, height, outlineColor);
 
         // Header Title (compact)
-        String title = (node.isModule() ? "📦 " : (node.isBaseNode() ? "★ " : (node.isGenerator() ? "⚡ " : ""))) + node.getName();
+        String title = (node.isModule() ? "▦ " : (node.isBaseNode() ? "★ " : (node.isGenerator() ? "⚡ " : ""))) + node.getName();
         int maxTitleChars = Math.max(6, (cardW - 12) / 6);
         if (title.length() > maxTitleChars) title = title.substring(0, Math.max(2, maxTitleChars - 2)) + "...";
         graphics.drawString(font, title, x + 6, y + 6, node.isModule() ? 0xFFFFB3FF : (node.isBaseNode() ? 0xFFFFE066 : (node.isGenerator() ? 0xFF77FFAA : 0xFFE0E0E0)), false);

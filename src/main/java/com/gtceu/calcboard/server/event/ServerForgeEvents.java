@@ -70,7 +70,11 @@ public class ServerForgeEvents {
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Server stopped. Resetting workspace locks.");
-        WorkspaceLockManager.getInstance().reset();
+        try {
+            WorkspaceLockManager.getInstance().reset();
+        } catch (Throwable t) {
+            GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Failed to reset workspace locks on server stop", t);
+        }
     }
 
     @SubscribeEvent
@@ -78,7 +82,11 @@ public class ServerForgeEvents {
         if (!event.getLevel().isClientSide() && event.getLevel() instanceof ServerLevel serverLevel) {
             if (serverLevel.dimension() == Level.OVERWORLD) {
                 GregTechCalcBoard.LOGGER.info("[GTCalcBoard] [Lifecycle] Overworld unloaded. Resetting workspace locks.");
-                WorkspaceLockManager.getInstance().reset();
+                try {
+                    WorkspaceLockManager.getInstance().reset();
+                } catch (Throwable t) {
+                    GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Failed to reset workspace locks on level unload", t);
+                }
             }
         }
     }

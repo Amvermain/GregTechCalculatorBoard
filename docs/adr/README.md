@@ -48,6 +48,8 @@ stateDiagram-v2
 | **[ADR-017](ADR_017_RESPONSIVE_GUI_SCALE_AND_ADAPTIVE_LAYOUT.md)** | GUI 배율 독립 분리 및 멀티블록 카탈로그·툴바 반응형 레이아웃<br/>*(Dedicated Board GUI Scale Decoupling & Multiblock Catalog Responsive Layout)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.1` | 2026-09-03 | 보드 전용 가상 뷰포트 배율 변환 엔진, 멀티블록 카탈로그 가변 행 및 원클릭 리스트 뷰, 적응형 툴바 및 `[...]` 오버플로우 메뉴 |
 | **[ADR-018](ADR_018_RATE_BASED_WIRE_ANIMATION_AND_BOTTLENECK_VISUALIZATION.md)** | 처리량 포화도 기반 와이어 애니메이션 변조 및 실시간 병목 시각화 명세<br/>*(Rate-Based Wire Flow Modulation & Canvas Bottleneck Visualization)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.2` | 2026-09-04 | Steady-State 포화율($\text{Supply}/\text{Demand}$) 기반 듀티 사이클 간헐적 정지, 3단계 RGB 보간 및 결핍 노드 경고 펄스 연동 |
 | **[ADR-019](ADR_019_BYPRODUCT_VOID_MANAGEMENT_AND_SINK_SYSTEM.md)** | 잉여 부산물 폐기 처리 및 보이드 싱크 시스템 명세<br/>*(Byproduct Void Management & Sink System Specification)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.2` | 2026-09-04 | 캔버스 정션 보이드 싱크(SupplyMode.VOID_SINK), 노드 포트/SummaryOverlay 단위 직접 보이드 마킹(Mark as Void), 유량 수지 차감 엔진 연동 |
+| **[ADR-020](ADR_020_HIGH_SPEED_FLOW_BATCHING_AND_EFFICIENCY_MODULATION.md)** | 고속 레시피 애니메이션 배치, 기계 효율 연동형 출력 와이어 흐름 및 분기 노드 우선 배분/배치 버퍼 명세<br/>*(High-Speed Recipe Animation Batching, Machine Efficiency Outgoing Wire Flow, Priority Split & Junction Batch Buffer Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0` | 2026-09-05 | 1초 미만 고속 레시피 $M$배수 파티클 묶음, 결핍 입력선 경고 펄스 vs 기계 가동률($\eta$) 비례 출력선 감속 직교 분리, 정션 고정 유량 우선 배분 및 배치 누적 버퍼 |
+| **[ADR-021](ADR_021_GREATE_KINETIC_TIER_ADAPTER_INTEGRATION.md)** | Greate 모드 연동을 위한 AbstractKineticModAdapter 계층 분리 및 티어드 회전 운동 기계 어댑터 명세<br/>*(AbstractKineticModAdapter Class Hierarchy Extraction & Greate Tiered Kinetic Machine Adapter Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0` | 2026-09-04 | AbstractKineticModAdapter 추상 클래스 추출, CreateModAdapter 상속 리팩토링, GreateModAdapter(Priority 95) 10단계 티어 매핑, 회로 번호, 샤프트 허용 용량 검증 |
 
 ---
 
@@ -56,7 +58,6 @@ stateDiagram-v2
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 | **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PROPOSED` | `v2.1.0` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
-| **[RFC-020](../RFC_020_HIGH_SPEED_FLOW_BATCHING_AND_EFFICIENCY_MODULATION.md)** | 고속 레시피 애니메이션 배치, 기계 효율 연동형 출력 와이어 흐름 및 분기 노드 우선 배분 명세<br/>*(High-Speed Recipe Animation Batching, Machine Efficiency Outgoing Wire Flow & Priority Split)* | 🟡 `PROPOSED` | `v2.2.0` | 2026-09-04 | 1초 미만 고속 레시피 $M$배수 파티클 묶음, 기계 가동률($\eta$) 비례 출력선 감속 듀티 사이클, 정션 노드 고정 유량 우선 배분 |
 
 
 

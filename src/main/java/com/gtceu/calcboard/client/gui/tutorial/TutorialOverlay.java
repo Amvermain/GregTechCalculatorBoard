@@ -68,8 +68,8 @@ public class TutorialOverlay {
         int bannerW = Math.min(580, screenW - 32);
         int totalSteps = TutorialStep.values().length - 1;
         String stepTag = step != TutorialStep.COMPLETED 
-            ? String.format("§a🎓 [Step %d/%d] ", step.getStepNumber(), totalSteps) 
-            : "§a🎉 " + Component.translatable("gui.gtcalcboard.tutorial.completed_tag").getString() + " ";
+            ? String.format("§a▶ [Step %d/%d] ", step.getStepNumber(), totalSteps) 
+            : "§a★ " + Component.translatable("gui.gtcalcboard.tutorial.completed_tag").getString() + " ";
         String title = stepTag + Component.translatable(step.getTitleKey()).getString();
 
         String nextText = step != TutorialStep.COMPLETED

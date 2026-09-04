@@ -194,7 +194,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
         if (addon == null) return "";
         if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
-            return String.format("🧲 %dx", addon.getMagneticForce());
+            return String.format("⚡ %dx", addon.getMagneticForce());
         }
         return "";
     }
@@ -212,7 +212,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
         if (addon == null || tooltip == null) return;
         int force = addon.getMagneticForce();
-        tooltip.add(Component.literal("§6🧲 ").append(Component.translatable("gui.gtcalcboard.addon.magnetic_force", force)));
+        tooltip.add(Component.literal("§6⚡ ").append(Component.translatable("gui.gtcalcboard.addon.magnetic_force", force)));
 
         long totalMagnets = node.getAddons().stream().filter(a -> a.getCategory().equals(AddonCategory.MAGNET)).count();
         int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();

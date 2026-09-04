@@ -364,7 +364,7 @@ public class BoardSettingsDialog {
         // Helpful Explanatory Text Box
         graphics.fill(x, rowY, x + w - 4, rowY + 68, 0x55111822);
         graphics.renderOutline(x, rowY, w - 4, 68, 0xFF2C394F);
-        graphics.drawString(font, "§e💡 " + Component.translatable("gui.gtcalcboard.settings.ratio_hint_title").getString(), x + 8, rowY + 6, 0xFFFFF176, false);
+        graphics.drawString(font, "§e★ " + Component.translatable("gui.gtcalcboard.settings.ratio_hint_title").getString(), x + 8, rowY + 6, 0xFFFFF176, false);
         graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.ratio_hint_line1").getString(), x + 8, rowY + 20, 0xFFAABBCC, false);
         graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.ratio_hint_line2").getString(), x + 8, rowY + 34, 0xFFAABBCC, false);
         graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.settings.ratio_hint_line3").getString(), x + 8, rowY + 48, 0xFFAABBCC, false);
@@ -816,7 +816,7 @@ public class BoardSettingsDialog {
             boolean clearHover = mouseX >= clearBtnX && mouseX <= clearBtnX + clearBtnW && mouseY >= clearBtnY && mouseY <= clearBtnY + clearBtnH;
             graphics.fill(clearBtnX, clearBtnY, clearBtnX + clearBtnW, clearBtnY + clearBtnH, clearHover ? 0xFF882222 : 0xFF442222);
             graphics.renderOutline(clearBtnX, clearBtnY, clearBtnW, clearBtnH, clearHover ? 0xFFFF6666 : 0xFF883333);
-            graphics.drawCenteredString(font, "🗑 " + Component.translatable("gui.gtcalcboard.settings.clear_all_presets").getString(), clearBtnX + clearBtnW / 2, clearBtnY + 4, 0xFFFFFFFF);
+            graphics.drawCenteredString(font, "✖ " + Component.translatable("gui.gtcalcboard.settings.clear_all_presets").getString(), clearBtnX + clearBtnW / 2, clearBtnY + 4, 0xFFFFFFFF);
         }
 
         int startY = y + 18;
@@ -878,7 +878,7 @@ public class BoardSettingsDialog {
                 }
 
                 if (!preset.getAddons().isEmpty()) {
-                    String addonBadge = "§d📦" + preset.getAddons().size();
+                    String addonBadge = "§d▦" + preset.getAddons().size();
                     graphics.drawString(font, addonBadge, badgeX, rowY + 7, 0xFFFFFFFF, false);
                 }
 
@@ -890,7 +890,7 @@ public class BoardSettingsDialog {
                 boolean delHover = mouseX >= delBtnX && mouseX <= delBtnX + delBtnW && mouseY >= delBtnY && mouseY <= delBtnY + delBtnH;
                 graphics.fill(delBtnX, delBtnY, delBtnX + delBtnW, delBtnY + delBtnH, delHover ? 0xFF882222 : 0xFF3D2020);
                 graphics.renderOutline(delBtnX, delBtnY, delBtnW, delBtnH, delHover ? 0xFFFF4444 : 0xFF663333);
-                graphics.drawCenteredString(font, "🗑", delBtnX + delBtnW / 2, delBtnY + 5, 0xFFFFFFFF);
+                graphics.drawCenteredString(font, "✖", delBtnX + delBtnW / 2, delBtnY + 5, 0xFFFFFFFF);
             }
             rowY += rowH;
         }

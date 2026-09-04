@@ -221,7 +221,7 @@ public final class BoardHotkeyHandler {
                 FormatUtil.setActiveFluidUnitMode(next);
                 BoardManager.getInstance().setFluidUnitMode(next);
                 BoardManager.getInstance().saveForCurrentContext();
-                BoardToast.show(net.minecraft.network.chat.Component.literal("§b💧 ").append(
+                BoardToast.show(net.minecraft.network.chat.Component.literal("§b~ ").append(
                     net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.fluid_unit_changed", net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
                 ));
             } else {
@@ -310,7 +310,7 @@ public final class BoardHotkeyHandler {
             BoardManager.getInstance().saveForCurrentContext();
             boolean enabled = BoardManager.getInstance().isShowDebugInfo();
             String toastKey = enabled ? "gui.gtcalcboard.toast.debug_enabled" : "gui.gtcalcboard.toast.debug_disabled";
-            BoardToast.show(net.minecraft.network.chat.Component.literal(enabled ? "§a🔧 " : "§7🔧 ")
+            BoardToast.show(net.minecraft.network.chat.Component.literal(enabled ? "§a⚙ " : "§7⚙ ")
                     .append(net.minecraft.network.chat.Component.translatable(toastKey)));
             net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F)

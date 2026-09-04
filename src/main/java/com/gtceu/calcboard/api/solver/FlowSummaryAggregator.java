@@ -18,7 +18,13 @@ public final class FlowSummaryAggregator {
     private FlowSummaryAggregator() {}
 
     public static FlowGraphSolver.PortFlowStats getInputPortStats(FlowGraph graph, RecipeNode node, int inputIndex) {
-        if (graph == null || node == null || inputIndex < 0 || inputIndex >= node.getInputs().size()) {
+        if (graph == null || node == null || inputIndex < 0) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (!node.isReroute() && inputIndex >= node.getInputs().size()) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (node.isReroute() && inputIndex != 0) {
             return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
         }
         double req = node.isReroute()
@@ -30,29 +36,8 @@ public final class FlowSummaryAggregator {
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             if (edge.toNodeId().equals(node.getId()) && edge.inputIndex() == inputIndex) {
                 RecipeNode p = graph.findNodeById(edge.fromNodeId());
-                if (p != null && edge.outputIndex() < p.getOutputs().size()) {
-                    double pRate = FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, p, edge.outputIndex(), null);
-
-                    double totalPortDemand = 0.0;
-                    for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                        if (outEdge.fromNodeId().equals(p.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
-                            RecipeNode c = graph.findNodeById(outEdge.toNodeId());
-                            if (c != null && !c.isVoidSink()) {
-                                if (c.isReroute()) {
-                                    totalPortDemand += FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, c, 0, null);
-                                } else if (outEdge.inputIndex() < c.getInputs().size()) {
-                                    totalPortDemand += c.getInputSlotRate(outEdge.inputIndex(), false);
-                                }
-                            }
-                        }
-                    }
-
-                    if (totalPortDemand > 0.0001) {
-                        double share = Math.min(1.0, req / totalPortDemand);
-                        totalSupplied += pRate * share;
-                    } else if (pRate > 0.0001) {
-                        totalSupplied += pRate;
-                    }
+                if (p != null && (p.isReroute() || edge.outputIndex() < p.getOutputs().size())) {
+                    totalSupplied += FlowBalanceMatrixSolver.getEdgeAllocatedFlow(graph, edge, null);
                     count++;
                 }
             }
@@ -61,7 +46,13 @@ public final class FlowSummaryAggregator {
     }
 
     public static FlowGraphSolver.PortFlowStats getOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
-        if (graph == null || node == null || outputIndex < 0 || outputIndex >= node.getOutputs().size()) {
+        if (graph == null || node == null || outputIndex < 0) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (!node.isReroute() && outputIndex >= node.getOutputs().size()) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (node.isReroute() && outputIndex != 0) {
             return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
         }
         double produced = FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, node, outputIndex, null);
@@ -69,36 +60,48 @@ public final class FlowSummaryAggregator {
         double totalDemanded = 0.0;
         int count = 0;
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (edge.fromNodeId().equals(node.getId()) && edge.outputIndex() == outputIndex) {
-                RecipeNode c = graph.findNodeById(edge.toNodeId());
-                if (c != null && !c.isVoidSink()) {
-                    if (c.isReroute()) {
-                        totalDemanded += FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, c, 0, null);
-                    } else if (edge.inputIndex() < c.getInputs().size()) {
-                        double cReq = c.getInputSlotRate(edge.inputIndex(), true);
+            if (!edge.fromNodeId().equals(node.getId()) || edge.outputIndex() != outputIndex) {
+                continue;
+            }
+            RecipeNode c = graph.findNodeById(edge.toNodeId());
+            if (c == null || c.isVoidSink()) {
+                continue;
+            }
+            totalDemanded += resolveConnectedDemand(graph, edge, c, produced);
+            count++;
+        }
+        return new FlowGraphSolver.PortFlowStats(produced, totalDemanded, count, count > 0);
+    }
 
-                        double totalProducerSupply = 0.0;
-                        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
-                            if (inEdge.toNodeId().equals(c.getId()) && inEdge.inputIndex() == edge.inputIndex()) {
-                                RecipeNode p = graph.findNodeById(inEdge.fromNodeId());
-                                if (p != null && inEdge.outputIndex() < p.getOutputs().size()) {
-                                    totalProducerSupply += FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, p, inEdge.outputIndex(), null);
-                                }
-                            }
-                        }
+    private static double resolveConnectedDemand(FlowGraph graph, FlowGraph.ConnectionEdge edge, RecipeNode consumer, double producedRate) {
+        if (edge.hasFixedLimit()) {
+            return edge.fixedFlowLimit();
+        }
+        if (consumer.isReroute()) {
+            return FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, consumer, 0, null);
+        }
+        if (edge.inputIndex() >= consumer.getInputs().size()) {
+            return 0.0;
+        }
+        double cReq = consumer.getInputSlotRate(edge.inputIndex(), true);
+        double totalProducerSupply = calculateTotalSupplyToInputSlot(graph, consumer.getId(), edge.inputIndex());
+        if (totalProducerSupply > 0.0001) {
+            return cReq * (producedRate / totalProducerSupply);
+        }
+        return cReq;
+    }
 
-                        if (totalProducerSupply > 0.0001) {
-                            double share = produced / totalProducerSupply;
-                            totalDemanded += cReq * share;
-                        } else {
-                            totalDemanded += cReq;
-                        }
-                    }
-                    count++;
+    private static double calculateTotalSupplyToInputSlot(FlowGraph graph, String consumerId, int inputIndex) {
+        double supply = 0.0;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (inEdge.toNodeId().equals(consumerId) && inEdge.inputIndex() == inputIndex) {
+                RecipeNode p = graph.findNodeById(inEdge.fromNodeId());
+                if (p != null && (p.isReroute() || inEdge.outputIndex() < p.getOutputs().size())) {
+                    supply += FlowBalanceMatrixSolver.getEffectiveProducerOutputRate(graph, p, inEdge.outputIndex(), null);
                 }
             }
         }
-        return new FlowGraphSolver.PortFlowStats(produced, totalDemanded, count, count > 0);
+        return supply;
     }
 
     /**

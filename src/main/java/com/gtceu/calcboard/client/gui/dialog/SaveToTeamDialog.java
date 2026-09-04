@@ -77,7 +77,7 @@ public class SaveToTeamDialog {
         graphics.renderOutline(x, y, dialogW, dialogH, 0xFF4F5B73);
 
         // Title
-        String title = "💾 " + Component.translatable("gui.gtcalcboard.dialog.save_to_team_title").getString();
+        String title = "✓ " + Component.translatable("gui.gtcalcboard.dialog.save_to_team_title").getString();
         graphics.drawString(font, title, x + 12, y + 10, 0xFFFFFFFF, false);
 
         String subtitle = Component.translatable("gui.gtcalcboard.dialog.save_to_team_sub").getString();
@@ -95,7 +95,7 @@ public class SaveToTeamDialog {
         boolean saveHover = mouseX >= saveBtnX && mouseX <= saveBtnX + saveBtnW && mouseY >= saveBtnY && mouseY <= saveBtnY + saveBtnH;
         graphics.fill(saveBtnX, saveBtnY, saveBtnX + saveBtnW, saveBtnY + saveBtnH, saveHover ? 0xFF2A6840 : 0xFF1E4D2F);
         graphics.renderOutline(saveBtnX, saveBtnY, saveBtnW, saveBtnH, 0xFF359050);
-        graphics.drawCenteredString(font, "💾 " + Component.translatable("gui.gtcalcboard.dialog.btn_save_sync").getString(), saveBtnX + saveBtnW / 2, saveBtnY + 7, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "✓ " + Component.translatable("gui.gtcalcboard.dialog.btn_save_sync").getString(), saveBtnX + saveBtnW / 2, saveBtnY + 7, 0xFFFFFFFF);
 
         // Cancel button
         int cancelBtnX = saveBtnX + saveBtnW + 8;

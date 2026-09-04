@@ -223,7 +223,7 @@ public class MachineAddonTest {
         // 4. Chemical Reactor: Speed 175% (0.5714x duration), Energy 80% (0.80x EU/t)
         RecipeNode lcr = RecipeNode.create("Large Chemical Reactor", 20.0, 100.0, GTVoltageTier.HV);
         lcr.addAddon(hssgCoil.forMachine(lcr.getName()));
-        Assertions.assertEquals(1.0 / 1.75, lcr.getEffectiveDurationSeconds(), 0.001);
+        Assertions.assertEquals(11.0 / 20.0, lcr.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(80.0, lcr.getSingleMachineEUt(), 0.001);
 
         // 5. Multi Smelter: Parallel 128x

@@ -180,7 +180,7 @@ public class BoardActionHandler {
         screen.rebuildWidgets();
 
         String machineName = node.getMachineDisplayName();
-        BoardToast.show(Component.literal("§b🏛 ").append(Component.translatable("message.gtcalcboard.machine_switched", machineName)));
+        BoardToast.show(Component.literal("§b▦ ").append(Component.translatable("message.gtcalcboard.machine_switched", machineName)));
     }
 
     public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) {
@@ -196,7 +196,7 @@ public class BoardActionHandler {
                 widget.invalidateCache();
             }
         }
-        BoardToast.show(Component.literal("§e🔄 ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
+        BoardToast.show(Component.literal("§e⟲ ").append(Component.translatable("message.gtcalcboard.recipe_switched", targetNode.getName())));
     }
 
     public void createFrameFromSelection() {
@@ -245,7 +245,7 @@ public class BoardActionHandler {
         screen.rebuildWidgets();
         screen.markSummaryDirty();
         TutorialManager.getInstance().onSharedMachineFramed();
-        BoardToast.show(Component.literal("§a🔗 ").append(Component.translatable("message.gtcalcboard.shared_frame_created")));
+        BoardToast.show(Component.literal("§a↔ ").append(Component.translatable("message.gtcalcboard.shared_frame_created")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
     }
 
@@ -319,7 +319,7 @@ public class BoardActionHandler {
             screen.markSummaryDirty();
             TutorialManager.getInstance().onModuleGrouped();
 
-            BoardToast.show(Component.literal("§d📦 ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
+            BoardToast.show(Component.literal("§d▦ ").append(Component.translatable("message.gtcalcboard.group_success", String.valueOf(moduleNode.getContainedMachineCount()))));
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F));
         }
     }
@@ -409,7 +409,7 @@ public class BoardActionHandler {
             active.setPanY(40.0);
             active.setZoom(1.0);
         }
-        BoardToast.show(Component.literal("§e🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
+        BoardToast.show(Component.literal("§e⌖ ").append(Component.translatable("gui.gtcalcboard.toast.fit_view_empty")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
     }
 
@@ -486,7 +486,7 @@ public class BoardActionHandler {
             active.setZoom(targetZoom);
         }
 
-        BoardToast.show(Component.literal("§b🎯 ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
+        BoardToast.show(Component.literal("§b⌖ ").append(Component.translatable("gui.gtcalcboard.toast.fit_view")));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F));
     }
 

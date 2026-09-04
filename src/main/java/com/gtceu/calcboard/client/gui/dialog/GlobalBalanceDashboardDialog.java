@@ -149,7 +149,7 @@ public class GlobalBalanceDashboardDialog {
 
         // 3. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
-        graphics.drawString(font, "§6📊 " + Component.translatable("gui.gtcalcboard.global_balance.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6∑ " + Component.translatable("gui.gtcalcboard.global_balance.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeX = dialogX + dialogW - 20;
@@ -178,10 +178,10 @@ public class GlobalBalanceDashboardDialog {
             powerText = "§e⚡ " + Component.translatable("gui.gtcalcboard.global_balance.power_balanced").getString();
             powerColor = 0xFFFFAA00;
         } else if (netEUt > 0) {
-            powerText = "§a⚡ +" + FormatUtil.formatEUt(netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_surplus").getString() + " 🟢)";
+            powerText = "§a⚡ +" + FormatUtil.formatEUt(netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_surplus").getString() + " ●)";
             powerColor = 0xFF55FF55;
         } else {
-            powerText = "§c⚡ -" + FormatUtil.formatEUt(-netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_deficit").getString() + " 🔴)";
+            powerText = "§c⚡ -" + FormatUtil.formatEUt(-netEUt) + " (" + Component.translatable("gui.gtcalcboard.global_balance.power_deficit").getString() + " ●)";
             powerColor = 0xFFFF5555;
         }
 
@@ -197,7 +197,7 @@ public class GlobalBalanceDashboardDialog {
         String countFormatted = cachedSummary.totalMachineCount() >= 100_000
             ? FormatUtil.formatCompactNumber(cachedSummary.totalMachineCount())
             : String.format(Locale.ROOT, "%,d", cachedSummary.totalMachineCount());
-        String machStr = "§6🏭 " + countFormatted + Component.translatable("gui.gtcalcboard.machine_unit").getString();
+        String machStr = "§6▦ " + countFormatted + Component.translatable("gui.gtcalcboard.machine_unit").getString();
         int machW = font.width(machStr);
         int machX = dialogX + dialogW - 18 - machW;
         graphics.drawString(font, machStr, machX, pY, 0xFFFFFFFF, false);
@@ -243,7 +243,7 @@ public class GlobalBalanceDashboardDialog {
 
         // Header Title
         graphics.fill(x, y, x + w, y + 16, 0xCC1C2536);
-        graphics.drawString(font, "§6📑 " + Component.translatable("gui.gtcalcboard.global_balance.included_pages").getString(), x + 6, y + 4, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6▪ " + Component.translatable("gui.gtcalcboard.global_balance.included_pages").getString(), x + 6, y + 4, 0xFFFFFFFF, false);
 
         // Bottom Action Buttons ([Select All] / [Deselect All])
         int btnH = 15;
@@ -381,7 +381,7 @@ public class GlobalBalanceDashboardDialog {
         final double netRate;
         final double producedRate;
         final double consumedRate;
-        final int statusType; // 0: Deficit (🔴), 1: Surplus (🟢), 2: Balanced (🟢/🔵)
+        final int statusType; // 0: Deficit (●), 1: Surplus (●), 2: Balanced (●/●)
 
         BalanceRowItem(IngredientStack stack, double netRate, double producedRate, double consumedRate, int statusType) {
             this.stack = stack;
@@ -451,11 +451,11 @@ public class GlobalBalanceDashboardDialog {
         // 1. Icon
         IngredientRenderer.render(graphics, item.stack, x + 4, y + 1);
 
-        // 2. Rightmost Status Tag: [Deficit 🔴] / [Surplus 🟢] / [Balanced 🟢]
+        // 2. Rightmost Status Tag: [Deficit ●] / [Surplus ●] / [Balanced ●]
         String tagStr = switch (item.statusType) {
-            case 0 -> "§c[" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + " 🔴]";
-            case 1 -> "§a[" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + " 🟢]";
-            default -> "§b[" + Component.translatable("gui.gtcalcboard.global_balance.balanced_tag").getString() + " 🟢]";
+            case 0 -> "§c[" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + " ●]";
+            case 1 -> "§a[" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + " ●]";
+            default -> "§b[" + Component.translatable("gui.gtcalcboard.global_balance.balanced_tag").getString() + " ●]";
         };
         int tagW = font.width(tagStr);
         int tagX = x + w - 6 - tagW;
@@ -506,7 +506,7 @@ public class GlobalBalanceDashboardDialog {
 
         if (hoveredMachines && cachedSummary != null && !cachedSummary.machineBreakdown().isEmpty()) {
             List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
+            tooltip.add(Component.literal("§6▦ " + Component.translatable("gui.gtcalcboard.total_machines_breakdown").getString()));
             for (Map.Entry<String, Integer> entry : cachedSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }

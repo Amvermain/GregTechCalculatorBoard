@@ -109,7 +109,7 @@ public class GuideDialog {
 
         // 2. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
-        graphics.drawString(font, "§e📖 " + Component.translatable("gui.gtcalcboard.guide.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e? " + Component.translatable("gui.gtcalcboard.guide.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeX = dialogX + dialogW - 20;

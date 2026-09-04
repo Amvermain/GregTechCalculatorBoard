@@ -571,10 +571,12 @@ public class CanvasWireInteractionHandler {
         sorted.sort((p1, p2) -> {
             RecipeNode n1 = graph.findNodeById(p1.nodeId());
             RecipeNode n2 = graph.findNodeById(p2.nodeId());
-            if (n1 != null && n2 != null && !n1.getId().equals(n2.getId())) {
-                int cmpY = Double.compare(n1.getPosY(), n2.getPosY());
-                if (cmpY != 0) return cmpY;
-            }
+            double y1 = n1 != null ? n1.getPosY() : 0.0;
+            double y2 = n2 != null ? n2.getPosY() : 0.0;
+            int cmpY = Double.compare(y1, y2);
+            if (cmpY != 0) return cmpY;
+            int nodeCmp = p1.nodeId().compareTo(p2.nodeId());
+            if (nodeCmp != 0) return nodeCmp;
             return Integer.compare(p1.portIndex(), p2.portIndex());
         });
         return sorted;

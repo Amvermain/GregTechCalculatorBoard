@@ -77,4 +77,38 @@ public class HighVoltageOverclockTest {
         Assertions.assertEquals(20.0, oneTickNode.getEffectiveCyclesPerSecond(), 1e-6);
         Assertions.assertEquals(30.0, oneTickNode.getSingleMachineEUt(), 1e-6);
     }
+
+    @Test
+    public void testThroughputBoostingModifierIntegerTickFloor() {
+        ResourceLocation vesselId = ResourceLocation.tryParse("gtceu:industrial_accumulation_vessel");
+        com.gtceu.calcboard.api.catalog.MultiblockDetector.registerThroughputBoostingMultiblock(vesselId);
+
+        RecipeNode barrel = RecipeNode.create("Industrial Accumulation Vessel", 80.0, 15.0, GTVoltageTier.LV);
+        barrel.setMachineIcon(vesselId);
+        barrel.setMultiblock(false);
+        barrel.setTargetTier(GTVoltageTier.LuV);
+
+        IngredientStack water = IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 1000);
+        IngredientStack seaWater = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:sea_water"), "Sea Water", 1000);
+        barrel.addInput(water);
+        barrel.addOutput(seaWater);
+
+        com.gtceu.calcboard.api.catalog.MachineAddon tpbAddon = new com.gtceu.calcboard.api.catalog.MachineAddon(
+                "gtceu:throughput_boosting",
+                "Throughput Boosting",
+                com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT,
+                "",
+                null
+        );
+        tpbAddon.setParallelMultiplier(4);
+        tpbAddon.setDurationMultiplier(1.6);
+        tpbAddon.setEutMultiplier(0.95);
+        barrel.getAddons().add(tpbAddon);
+        barrel.markOverclockDirty();
+
+        Assertions.assertEquals(3.0 / 20.0, barrel.getEffectiveDurationSeconds(), 1e-6);
+        Assertions.assertEquals(3.0, barrel.getOverclockResult().durationTicks(), 1e-6);
+        Assertions.assertEquals(58368.0, barrel.getSingleMachineEUt(), 1e-6);
+        Assertions.assertEquals(20.0 / 3.0 * 4.0 * 1000.0, barrel.getOutputSlotRate(0, true), 1e-4);
+    }
 }

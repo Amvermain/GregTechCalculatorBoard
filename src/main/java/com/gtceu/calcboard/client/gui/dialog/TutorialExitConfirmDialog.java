@@ -79,7 +79,7 @@ public class TutorialExitConfirmDialog {
         graphics.renderOutline(modalX + 1, modalY + 1, modalW - 2, modalH - 2, 0x6600E676);
 
         // Header Title
-        graphics.drawString(font, "§a🎓 " + Component.translatable("gui.gtcalcboard.tutorial.exit_dialog.title").getString(), modalX + 12, modalY + 10, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§a▶ " + Component.translatable("gui.gtcalcboard.tutorial.exit_dialog.title").getString(), modalX + 12, modalY + 10, 0xFFFFFFFF, false);
 
         // Description / Warning Text
         String desc = Component.translatable("gui.gtcalcboard.tutorial.exit_dialog.desc").getString();

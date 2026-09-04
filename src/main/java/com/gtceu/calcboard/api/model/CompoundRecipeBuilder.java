@@ -91,7 +91,7 @@ public final class CompoundRecipeBuilder {
             createdNodes.add(node);
         }
 
-        String frameTitle = "🧩 " + baseMachineName + " (" + totalLayers + "-Layer)";
+        String frameTitle = "▦ " + baseMachineName + " (" + totalLayers + "-Layer)";
         CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes(frameTitle, createdNodes, CanvasGroupFrame.COLOR_PURPLE);
         frame.setCompoundFrame(true);
         frame.setCompoundGroupId(groupId);

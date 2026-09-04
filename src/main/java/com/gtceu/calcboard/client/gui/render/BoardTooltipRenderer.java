@@ -32,6 +32,7 @@ import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Dedicated renderer for hover tooltips across the Calculator Board screen,
@@ -124,7 +125,7 @@ public final class BoardTooltipRenderer {
                     return;
                 }
                 if (widget.isTargetButtonHovered(canvasMouseX, canvasMouseY)) {
-                    renderTooltip(graphics, font, Component.literal("§6🎯 ").append(Component.translatable("gui.gtcalcboard.tooltip.target_base")), mouseX, mouseY, screen.width, screen.height);
+                    renderTooltip(graphics, font, Component.literal("§6⌖ ").append(Component.translatable("gui.gtcalcboard.tooltip.target_base")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
                 if (widget.isFlipButtonHovered(canvasMouseX, canvasMouseY)) {
@@ -137,7 +138,7 @@ public final class BoardTooltipRenderer {
                     return;
                 }
                 if (widget.isSwitchButtonHovered(canvasMouseX, canvasMouseY)) {
-                    renderTooltip(graphics, font, Component.literal("§e🔄 ").append(Component.translatable("gui.gtcalcboard.switch_recipe.button")), mouseX, mouseY, screen.width, screen.height);
+                    renderTooltip(graphics, font, Component.literal("§e⟲ ").append(Component.translatable("gui.gtcalcboard.switch_recipe.button")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
@@ -164,44 +165,13 @@ public final class BoardTooltipRenderer {
                     RecipeNode n = widget.getNode();
                     List<Component> tooltipLines = new ArrayList<>();
                     String mName = n.getMachineDisplayName();
-                    tooltipLines.add(Component.literal((n.isMultiblock() ? "§e🏛 " : "§b⚡ ") + mName));
+                    tooltipLines.add(Component.literal((n.isMultiblock() ? "§e▦ " : "§b⚡ ") + mName));
                     tooltipLines.add(Component.literal("§7[Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString()));
                     renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
 
-                // Voltage Tier / Energy Hatch / Dynamo-Boiler Button Hover Tooltip
-                if (widget.isTierButtonHovered(canvasMouseX, canvasMouseY)) {
-                    RecipeNode n = widget.getNode();
-                    List<Component> tooltipLines = new ArrayList<>();
-                    if (com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(n)) {
-                        boolean isGen = n.isGenerator() || n.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_FE;
-                        if (isGen) {
-                            tooltipLines.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.dynamo_badge").getString()));
-                            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.tooltip.systeams_toggle_to_boiler").getString()));
-                        } else {
-                            tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_badge").getString()));
-                            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.tooltip.systeams_toggle_to_dynamo").getString()));
-                        }
-                    } else if (n.isMultiblock()) {
-                        if (n.isTurbine()) {
-                            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "HV") + ")"));
-                            tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
-                        } else if (!n.isGenerator()) {
-                            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.addon_cat.energy_hatch").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.multiblock_energy_hatch_hint").getString()));
-                        } else {
-                            tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
-                            tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
-                        }
-                    } else if (!n.isMultiblock() && n.supportsSteamMode() && n.getSteamMode() != com.gtceu.calcboard.api.type.SteamMode.NONE) {
-                        tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_tier").getString() + " §7(" + n.getSteamMode().name() + ")"));
-                        tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_steam_tier").getString()));
-                    } else {
-                        tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + (n.getTargetTier() != null ? n.getTargetTier().getName() : "LV") + ")"));
-                        tooltipLines.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
-                    }
-                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
+                if (renderTierButtonTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
                     return;
                 }
 
@@ -244,16 +214,16 @@ public final class BoardTooltipRenderer {
                 boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
 
                 if (searchHovered) {
-                    renderTooltip(graphics, font, Component.literal("§a🔍 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_search")), mouseX, mouseY, screen.width, screen.height);
+                    renderTooltip(graphics, font, Component.literal("§a? ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_search")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 } else if (junctionHovered) {
-                    renderTooltip(graphics, font, Component.literal("§b🔀 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_junction")), mouseX, mouseY, screen.width, screen.height);
+                    renderTooltip(graphics, font, Component.literal("§b↔ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_junction")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 } else if (frameHovered) {
-                    renderTooltip(graphics, font, Component.literal("§d🖼 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_frame")), mouseX, mouseY, screen.width, screen.height);
+                    renderTooltip(graphics, font, Component.literal("§d▦ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_frame")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 } else if (noteHovered) {
-                    renderTooltip(graphics, font, Component.literal("§e📝 ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_note")), mouseX, mouseY, screen.width, screen.height);
+                    renderTooltip(graphics, font, Component.literal("§e▪ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_note")), mouseX, mouseY, screen.width, screen.height);
                     return;
                 }
             }
@@ -268,6 +238,100 @@ public final class BoardTooltipRenderer {
         if (screen.getSummaryOverlay() != null) {
             screen.getSummaryOverlay().renderTooltips(graphics, font, mouseX, mouseY);
         }
+    }
+
+    private static boolean renderTierButtonTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        if (!widget.isTierButtonHovered(canvasMouseX, canvasMouseY)) {
+            return false;
+        }
+
+        RecipeNode n = widget.getNode();
+        List<Component> tooltipLines;
+        if (n.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE)) {
+            tooltipLines = buildGreateTierTooltipLines(n);
+        } else if (com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(n)) {
+            tooltipLines = buildSysteamsTierTooltipLines(n);
+        } else if (n.isMultiblock()) {
+            tooltipLines = buildMultiblockTierTooltipLines(n);
+        } else if (n.supportsSteamMode() && n.getSteamMode() != com.gtceu.calcboard.api.type.SteamMode.NONE) {
+            tooltipLines = buildSteamTierTooltipLines(n);
+        } else {
+            tooltipLines = buildStandardTierTooltipLines(n);
+        }
+
+        renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
+        return true;
+    }
+
+    private static List<Component> buildGreateTierTooltipLines(RecipeNode n) {
+        List<Component> list = new ArrayList<>();
+        int mTier = Math.max(0, n.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.MACHINE_TIER));
+        int rTier = Math.max(0, n.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.REQUIRED_RECIPE_TIER));
+        String tName = com.gtceu.calcboard.compat.greate.GreateProperties.getTierName(mTier);
+        double cap = com.gtceu.calcboard.compat.greate.GreateProperties.getShaftCapacityForTier(mTier);
+
+        list.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.greate.stress_tier").getString() + " §7(" + tName + ")"));
+        list.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.greate.shaft_capacity", String.format(Locale.ROOT, "%,.0f", cap)).getString()));
+
+        if (rTier >= 0) {
+            String reqName = com.gtceu.calcboard.compat.greate.GreateProperties.getTierName(rTier);
+            list.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.greate.tier_deficit_desc", tName, reqName).getString()));
+        }
+
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(n);
+        double stress = adapter.computeOverclock(n, n.getTargetTier(), false).eut() * n.getMachineCount() * n.getCombinedEutMultiplier();
+        if (stress > cap) {
+            list.add(Component.literal(String.format(Locale.ROOT, "§c⚠ " + Component.translatable("gui.gtcalcboard.greate.stress_deficit", String.format(Locale.ROOT, "%,.0f", stress - cap)).getString())));
+        } else {
+            list.add(Component.literal(String.format(Locale.ROOT, "§a✔ " + Component.translatable("gui.gtcalcboard.greate.stress_headroom", String.format(Locale.ROOT, "%,.0f", cap - stress)).getString())));
+        }
+
+        list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
+        return list;
+    }
+
+    private static List<Component> buildSysteamsTierTooltipLines(RecipeNode n) {
+        List<Component> list = new ArrayList<>();
+        boolean isGen = n.isGenerator() || n.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_FE;
+        if (isGen) {
+            list.add(Component.literal("§a⚡ " + Component.translatable("gui.gtcalcboard.dynamo_badge").getString()));
+            list.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.tooltip.systeams_toggle_to_boiler").getString()));
+        } else {
+            list.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_badge").getString()));
+            list.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.tooltip.systeams_toggle_to_dynamo").getString()));
+        }
+        return list;
+    }
+
+    private static List<Component> buildMultiblockTierTooltipLines(RecipeNode n) {
+        List<Component> list = new ArrayList<>();
+        String tierName = n.getTargetTier() != null ? n.getTargetTier().getName() : "LV";
+        if (n.isTurbine()) {
+            list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + tierName + ")"));
+            list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
+        } else if (!n.isGenerator()) {
+            list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.addon_cat.energy_hatch").getString() + " §7(" + tierName + ")"));
+            list.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.multiblock_energy_hatch_hint").getString()));
+        } else {
+            list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + tierName + ")"));
+            list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
+        }
+        return list;
+    }
+
+    private static List<Component> buildSteamTierTooltipLines(RecipeNode n) {
+        List<Component> list = new ArrayList<>();
+        list.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.config.steam_tier").getString() + " §7(" + n.getSteamMode().name() + ")"));
+        list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_steam_tier").getString()));
+        return list;
+    }
+
+    private static List<Component> buildStandardTierTooltipLines(RecipeNode n) {
+        List<Component> list = new ArrayList<>();
+        String tierName = n.getTargetTier() != null ? n.getTargetTier().getName() : "LV";
+        list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + tierName + ")"));
+        list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
+        return list;
     }
 
     private static boolean renderNodeInfoTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
@@ -311,7 +375,7 @@ public final class BoardTooltipRenderer {
         }
 
         List<Component> tooltipLines = new ArrayList<>();
-        tooltipLines.add(Component.literal("§6🏭 " + Component.translatable("gui.gtcalcboard.count").getString()));
+        tooltipLines.add(Component.literal("§6▦ " + Component.translatable("gui.gtcalcboard.count").getString()));
         tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Exact Count: §f%,.4f", widget.getNode().getMachineCount())));
         renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
         return true;
@@ -356,7 +420,7 @@ public final class BoardTooltipRenderer {
             if (rName == null || rName.isEmpty() || rName.startsWith("Standard")) {
                 rName = Component.translatable("gui.gtcalcboard.rotor.standard").getString();
             }
-            tooltipLines.add(Component.literal("§6🌀 " + Component.translatable("gui.gtcalcboard.addon_cat.rotor").getString() + ": §f" + rName));
+            tooltipLines.add(Component.literal("§6~ " + Component.translatable("gui.gtcalcboard.addon_cat.rotor").getString() + ": §f" + rName));
             int eff = n.getRotorEfficiency();
             int pwr = n.getRotorPower();
             int holderBonus = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineHolderEfficiencyBonus(n);
@@ -420,12 +484,12 @@ public final class BoardTooltipRenderer {
         boolean[] hiddenRef = new boolean[]{false};
 
         List<Component> tooltipLines = new ArrayList<>();
-        tooltipLines.add(Component.literal("§b[📥 " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
+        tooltipLines.add(Component.literal("§b[« " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
 
         String reqDisplay = formatPortRate(stats.requiredOrProducedRate(), in.isFluid(), showExact, hiddenRef);
         tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §f" + reqDisplay));
 
-        appendInputPortStats(tooltipLines, stats, in, showExact, hiddenRef);
+        appendInputPortStats(tooltipLines, stats, in, showExact, hiddenRef, graph, widget.getNode(), inIdx);
 
         if (in.getChance() < 1.0) {
             tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", in.getChance() * 100.0))));
@@ -466,7 +530,7 @@ public final class BoardTooltipRenderer {
         boolean[] hiddenRef = new boolean[]{false};
 
         List<Component> tooltipLines = new ArrayList<>();
-        tooltipLines.add(Component.literal("§a[📤 " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
+        tooltipLines.add(Component.literal("§a[» " + Component.translatable("gui.gtcalcboard.output").getString() + "] §f" + out.getDisplayName()));
         if (widget.getNode().isOutputPortVoided(outIdx)) {
             tooltipLines.add(Component.literal("§d[∅] §d" + Component.translatable("gui.gtcalcboard.tooltip.voided_port").getString()));
         }
@@ -554,14 +618,17 @@ public final class BoardTooltipRenderer {
         return compact;
     }
 
-    private static void appendInputPortStats(List<Component> tooltipLines, FlowGraphSolver.PortFlowStats stats, IngredientStack in, boolean showExact, boolean[] hiddenRef) {
+    private static void appendInputPortStats(List<Component> tooltipLines, FlowGraphSolver.PortFlowStats stats, IngredientStack in, boolean showExact, boolean[] hiddenRef, FlowGraph graph, RecipeNode node, int inIdx) {
         if (!stats.isConnected()) {
             tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_raw").getString()));
             return;
         }
 
+        RecipeNode bufferNode = graph != null ? graph.findConnectedBufferNode(node, inIdx) : null;
+        boolean isBuffered = bufferNode != null;
+
         String supDisplay = formatPortRate(stats.connectedRate(), in.isFluid(), showExact, hiddenRef);
-        String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? "§c" : "§b");
+        String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? (isBuffered ? "§e" : "§c") : "§b");
 
         if (stats.isBalanced()) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay + " §7(§a✔ 100%§7)"));
@@ -574,10 +641,21 @@ public final class BoardTooltipRenderer {
             double defPercent = (1.0 - stats.getRatio()) * 100.0;
             String defDisplay = formatPortRate(deficit, in.isFluid(), showExact, hiddenRef);
 
-            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay
-                    + String.format(java.util.Locale.ROOT, " §7(§c%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.fulfilled").getString())));
-            tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + ": §c-" + defDisplay
-                    + String.format(java.util.Locale.ROOT, " §7(-%.1f%%)", defPercent)));
+            if (isBuffered) {
+                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay
+                        + String.format(java.util.Locale.ROOT, " §7(§e%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.fulfilled").getString())));
+                tooltipLines.add(Component.literal("§e⏳ " + Component.translatable("gui.gtcalcboard.tooltip.intermittent_duty_cycle", String.format(java.util.Locale.ROOT, "%.1f%%", stats.getPercent())).getString()));
+                double chargeTime = bufferNode.getJunctionChargeDuration(graph);
+                double batchSize = bufferNode.getJunctionBufferSize();
+                String chargeStr = String.format(java.util.Locale.ROOT, "%.2fs", chargeTime);
+                String batchStr = FormatUtil.formatCompactNumber(batchSize);
+                tooltipLines.add(Component.literal("§7   " + Component.translatable("gui.gtcalcboard.tooltip.buffer_charge_info", chargeStr, batchStr).getString()));
+            } else {
+                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay
+                        + String.format(java.util.Locale.ROOT, " §7(§c%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.fulfilled").getString())));
+                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + ": §c-" + defDisplay
+                        + String.format(java.util.Locale.ROOT, " §7(-%.1f%%)", defPercent)));
+            }
         } else {
             double surplus = stats.connectedRate() - stats.requiredOrProducedRate();
             double surPercent = (stats.getRatio() - 1.0) * 100.0;
@@ -652,6 +730,7 @@ public final class BoardTooltipRenderer {
         boolean isInputSource = !hasSupply && !rNode.isVoidSink() && downstreamDemand > 0.0001;
 
         appendRerouteHeader(rNode, rStack, isInputSource, tooltipLines);
+        appendRerouteBatchBuffer(rNode, rStack, graph, tooltipLines);
         appendRerouteFlowRates(rNode, rStack, graph, upstreamSupply, downstreamDemand, hasSupply, isInputSource, tooltipLines);
         appendRerouteTargetBatch(rNode, rStack, graph, upstreamSupply, downstreamDemand, isInputSource, tooltipLines);
 
@@ -674,12 +753,24 @@ public final class BoardTooltipRenderer {
 
     private static void appendRerouteHeader(RecipeNode rNode, IngredientStack rStack, boolean isInputSource, List<Component> tooltipLines) {
         if (!rNode.hasTargetBatch()) {
-            tooltipLines.add(Component.literal("§6🔀 §f" + rStack.getDisplayName() + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString() + ")"));
+            tooltipLines.add(Component.literal("§6↔ §f" + rStack.getDisplayName() + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString() + ")"));
             return;
         }
         String titleKey = isInputSource ? "gui.gtcalcboard.dt.tooltip.title" : "gui.gtcalcboard.eta.tooltip.title";
-        String icon = isInputSource ? "§b📥" : "§6🎯";
+        String icon = isInputSource ? "§b«" : "§6⌖";
         tooltipLines.add(Component.literal(icon + " §f" + Component.translatable(titleKey).getString() + " §7(" + rStack.getDisplayName() + "§7)"));
+    }
+
+    private static void appendRerouteBatchBuffer(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, List<Component> tooltipLines) {
+        if (!rNode.isJunctionBuffer()) return;
+        double bufSize = rNode.getJunctionBufferSize();
+        double chargeSec = rNode.getJunctionChargeDuration(graph);
+        String sizeStr = FormatUtil.formatBatchAmount(bufSize, rStack != null && rStack.isFluid());
+        tooltipLines.add(Component.literal("§d📦 " + Component.translatable("gui.gtcalcboard.junction.mode_buffer").getString() + ": §f" + sizeStr));
+        if (chargeSec > 0.0) {
+            String durStr = String.format("%.2fs", chargeSec);
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.junction.charge_duration", "§e" + durStr).getString()));
+        }
     }
 
     private static void appendRerouteFlowRates(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, double upstreamSupply, double downstreamDemand, boolean hasSupply, boolean isInputSource, List<Component> tooltipLines) {

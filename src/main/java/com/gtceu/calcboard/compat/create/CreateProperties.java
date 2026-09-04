@@ -12,6 +12,10 @@ public final class CreateProperties {
             NodePropertyKey.ofInt("kinetic_rpm", 32)
     );
 
+    public static final NodePropertyKey<Integer> BASE_GENERATOR_RPM = NodeProperties.register(
+            NodePropertyKey.ofInt("base_generator_rpm", 0)
+    );
+
     public static final int[] STANDARD_RPMS = {4, 8, 16, 32, 64, 128, 256};
 
     private CreateProperties() {}

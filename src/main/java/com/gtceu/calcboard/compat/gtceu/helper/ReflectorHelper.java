@@ -290,6 +290,7 @@ public class ReflectorHelper {
                 node.getAddons().add(addon.copy());
             }
         }
+        node.markOverclockDirty();
     }
 
     public static void cycleReflector(RecipeNode node) {

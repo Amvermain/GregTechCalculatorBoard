@@ -110,7 +110,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         } else {
             GTVoltageTier tier = node.getTargetTier();
             String tierText = (tier != null ? tier.getName() : "LV");
-            if (node.isMultiblock()) tierText = "🏛 " + tierText;
+            if (node.isMultiblock()) tierText = "▦ " + tierText;
             int tierBtnW = Math.max(32, safeFontWidth(tierText, 24) + 8);
             nextCtrlX = x + 6 + tierBtnW + 4;
         }
@@ -223,7 +223,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         } else {
             GTVoltageTier tier = node.getTargetTier();
             String tierText = (tier != null ? tier.getName() : "LV");
-            if (node.isMultiblock()) tierText = "🏛 " + tierText;
+            if (node.isMultiblock()) tierText = "▦ " + tierText;
             int tierBtnW = Math.max(32, safeFontWidth(tierText, 24) + 8);
             nextCtrlX = x + 6 + tierBtnW + 4;
         }
@@ -273,7 +273,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         int nextCtrlX = x + 42;
 
         if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
-            String bannerText = "🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
+            String bannerText = "~ " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
             int bannerW = cardW - 12;
             NodeCardRenderer.drawBtn(graphics, font, bannerText, x + 6, row2Y, bannerW, 14, mouseX, mouseY, 0xFF88D49E, false, false);
             return;
@@ -304,7 +304,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             int tierColor = !isOperational ? 0xFFFF8888 : (tier != null ? tier.getColor() : 0xFFFFFFFF);
             String tierName = (tier != null ? tier.getName() : "LV");
             if (node.isMultiblock()) {
-                tierName = "🏛 " + tierName;
+                tierName = "▦ " + tierName;
             }
             int btnW = Math.max(32, font.width(tierName) + 8);
             NodeCardRenderer.drawBtn(graphics, font, tierName, x + 6, row2Y, btnW, 14, mouseX, mouseY, tierColor, !isOperational, false);
@@ -445,7 +445,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             graphics.drawCenteredString(font, "↺ " + Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString(), resetBtnX + resetBtnW / 2, y + 31, 0xFFFFFFFF);
 
             int maxRotorInfoW = resetBtnX - (x + 10) - 6;
-            String rotorInfo = "§6🌀 §f" + rName + " §7| §b⏱ " + eff + "% §e⚡ " + pwr + "%";
+            String rotorInfo = "§6~ §f" + rName + " §7| §b⏱ " + eff + "% §e⚡ " + pwr + "%";
             if (holderBonus > 0) {
                 rotorInfo += " §a(+" + holderBonus + "% -> " + totalEff + "%)";
             }
@@ -457,7 +457,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
             if (font.width(rotorInfo) > maxRotorInfoW) {
                 String shortRName = rName.replace("Turbine Rotor", "Rotor");
-                rotorInfo = "§6🌀 §f" + shortRName + " §7| §b⏱" + eff + "% §e⚡" + pwr + "%";
+                rotorInfo = "§6~ §f" + shortRName + " §7| §b⏱" + eff + "% §e⚡" + pwr + "%";
                 if (holderBonus > 0) {
                     rotorInfo += " §a(+" + holderBonus + "%→" + totalEff + "%)";
                 }
@@ -549,7 +549,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             } else if (rotorInfoHover) {
                 List<Component> tt = new ArrayList<>();
-                tt.add(Component.literal("§6🌀 §f" + rName));
+                tt.add(Component.literal("§6~ §f" + rName));
                 tt.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.addon.rotor.efficiency").getString(), eff + "%")));
                 tt.add(Component.literal(String.format(Locale.ROOT, "§7" + Component.translatable("gui.gtcalcboard.addon.rotor.power").getString(), pwr + "%")));
                 if (holderBonus > 0) {
@@ -632,12 +632,12 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 graphics.fill(btnX, btnY, btnX + btnW, btnY + 16, active ? 0xFF5D3E1A : (hov ? 0xFF3D4558 : 0xFF282D3B));
                 graphics.renderOutline(btnX, btnY, btnW, 16, active ? bt.getColor() : 0xFF3F4658);
                 String speedLabel = String.format(Locale.ROOT, "%.1fx", bt.getSpeedMultiplier(isLiquid)).replace(".0x", "x");
-                String label = (bt.isMultiblock() ? "🏛 " : "♨ ") + (i == 0 ? "LP (" + speedLabel + ")" : (i == 1 ? "HP (" + speedLabel + ")" : (i == 2 ? "L-Brz" : (i == 3 ? "L-Stl" : (i == 4 ? "L-Ti" : "L-W")))));
+                String label = (bt.isMultiblock() ? "▦ " : "♨ ") + (i == 0 ? "LP (" + speedLabel + ")" : (i == 1 ? "HP (" + speedLabel + ")" : (i == 2 ? "L-Brz" : (i == 3 ? "L-Stl" : (i == 4 ? "L-Ti" : "L-W")))));
                 graphics.drawCenteredString(font, label, btnX + btnW / 2, btnY + 4, active ? bt.getColor() : 0xFFB0B8C8);
             }
             if (hoveredTier != null) {
                 List<Component> tooltip = new ArrayList<>();
-                tooltip.add(Component.literal((hoveredTier.isMultiblock() ? "§6🏛 " : "§6♨ ") + hoveredTier.getDisplayName()));
+                tooltip.add(Component.literal((hoveredTier.isMultiblock() ? "§6▦ " : "§6♨ ") + hoveredTier.getDisplayName()));
                 double thrMult = hoveredTier.isMultiblock() ? (node.getBoilerThrottle() / 100.0) : 1.0;
                 double speed = hoveredTier.getSpeedMultiplier(isLiquid) * thrMult;
                 double steamRate = hoveredTier.getSteamRatePerSec(isLiquid) * thrMult;
@@ -742,7 +742,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
                 String label = getMultiblockShortLabel(mbWs);
                 if (!isTierSufficient) {
-                    label = "🔒 " + label;
+                    label = "✕ " + label;
                 }
                 int textCol = !isTierSufficient ? 0xFFFF8888 : (isSelected ? 0xFF55FF88 : (hov ? 0xFFFFFFFF : 0xFFB0B8C8));
                 graphics.drawCenteredString(font, font.plainSubstrByWidth(label, w - 4), curX + w / 2, y + 40, textCol);
@@ -809,7 +809,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
                 String rLabel = (t == 0) ? Component.translatable("gui.gtcalcboard.reflector.none").getString() : ("✦ T" + t);
                 if (!isSufficient) {
-                    rLabel = "🔒 " + rLabel;
+                    rLabel = "✕ " + rLabel;
                 }
                 int textCol = !isSufficient ? 0xFFFF8888 : (isSelected ? 0xFF55FF88 : (hov ? 0xFFFFFFFF : 0xFFB0B8C8));
                 graphics.drawCenteredString(font, font.plainSubstrByWidth(rLabel, w - 4), rCurX + w / 2, y + 54, textCol);
@@ -835,7 +835,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 List<Component> tt = new ArrayList<>();
                 var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(hoveredController);
                 String fullName = (item != null && item != net.minecraft.world.item.Items.AIR) ? item.getDescription().getString() : hoveredController.getPath();
-                tt.add(Component.literal("§e🏛 " + fullName));
+                tt.add(Component.literal("§e▦ " + fullName));
                 tt.add(Component.literal("§8" + hoveredController));
                 if (hoveredControllerLocked) {
                     tt.add(Component.literal("§c❌ " + hoveredControllerReq));
@@ -896,7 +896,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             int reqCoilTemp = node.getProperties().get(GTCEuProperties.EBF_TEMPERATURE);
             if (reqCoilTemp <= 0) reqCoilTemp = node.getRecipeTemperature();
 
-            String mbHeader = "§b🏛 " + Component.translatable("gui.gtcalcboard.config.multiblock_controller_title").getString() + " & " + Component.translatable("gui.gtcalcboard.config.coil_tier_title").getString();
+            String mbHeader = "§b▦ " + Component.translatable("gui.gtcalcboard.config.multiblock_controller_title").getString() + " & " + Component.translatable("gui.gtcalcboard.config.coil_tier_title").getString();
             graphics.drawString(font, mbHeader, x + 10, y + 28, 0xFFFFFFFF, false);
 
             String parSummary = "§7⚡ " + node.getTotalParallel() + "x Par" + (defPar > 1 ? " (Default " + defPar + "x)" : (node.getTotalParallel() > 1 ? " (Base " + node.getParallel() + "x)" : " (Default 1x)"));
@@ -1020,7 +1020,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
                 String cLabel = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getCoilShortLabel(coil);
                 if (!isSufficient) {
-                    cLabel = "🔒 " + cLabel;
+                    cLabel = "✕ " + cLabel;
                 }
                 int textCol = !isSufficient ? 0xFFFF8888 : (isSelected ? 0xFF55FF88 : (hov ? 0xFFFFFFFF : 0xFFB0B8C8));
                 graphics.drawCenteredString(font, font.plainSubstrByWidth(cLabel, w - 4), cCurX + w / 2, y + 54, textCol);
@@ -1046,7 +1046,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 List<Component> tt = new ArrayList<>();
                 var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(hoveredController);
                 String fullName = (item != null && item != net.minecraft.world.item.Items.AIR) ? item.getDescription().getString() : hoveredController.getPath();
-                tt.add(Component.literal("§e🏛 " + fullName));
+                tt.add(Component.literal("§e▦ " + fullName));
                 tt.add(Component.literal("§8" + hoveredController));
                 if (hoveredController.equals(node.getMachineIcon())) {
                     tt.add(Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.config.active_controller").getString()));
@@ -1099,7 +1099,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             if (mbControllerScroll > maxScroll) mbControllerScroll = maxScroll;
 
             String navIndicator = showNav ? " (" + (mbControllerScroll + 1) + "-" + Math.min(totalCount, mbControllerScroll + visibleCount) + "/" + totalCount + ")" : "";
-            String mbHeader = "§b🏛 " + Component.translatable("gui.gtcalcboard.config.multiblock_controller_title").getString() + "§7" + navIndicator;
+            String mbHeader = "§b▦ " + Component.translatable("gui.gtcalcboard.config.multiblock_controller_title").getString() + "§7" + navIndicator;
             graphics.drawString(font, mbHeader, x + 10, y + 30, 0xFFFFFFFF, false);
 
             String parSummary = "§7⚡ " + node.getTotalParallel() + "x Par" + (defPar > 1 ? " (Default " + defPar + "x)" : (node.getTotalParallel() > 1 ? " (Base " + node.getParallel() + "x)" : " (Default 1x)"));
@@ -1171,7 +1171,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 List<Component> tt = new ArrayList<>();
                 var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(hoveredController);
                 String fullName = (item != null && item != net.minecraft.world.item.Items.AIR) ? item.getDescription().getString() : hoveredController.getPath();
-                tt.add(Component.literal("§e🏛 " + fullName));
+                tt.add(Component.literal("§e▦ " + fullName));
                 tt.add(Component.literal("§8" + hoveredController));
                 boolean active = hoveredController.equals(node.getMachineIcon());
                 if (active) {
@@ -1185,7 +1185,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
     }
 
     private static String getMultiblockShortLabel(ResourceLocation id) {
-        if (id == null) return "🏛 Multi";
+        if (id == null) return "▦ Multi";
         String path = id.getPath().toLowerCase(Locale.ROOT);
         if (path.contains("auxiliary_booster_fusion") || path.contains("auxiliary_fusion") || path.contains("aux_booster")) {
             if (path.contains("mk2") || path.contains("mk_2") || path.contains("ii") || path.contains("aux2") || path.contains("aux_2") || path.contains("uiv")) return "⚡ Aux Mk2";
@@ -1201,14 +1201,14 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         if (path.contains("max_fusion") || path.contains("fusion_reactor_mk6") || path.contains("fusion_mk6") || path.contains("mk_6") || path.contains("mk6") || path.contains("mkvi")) return "⚛ Fusion Mk6";
         if (path.contains("extreme_chemical_reactor") || path.equals("ecr")) return "⚡ ECR";
         if (path.contains("incomprehensible_chemical_reactor") || path.equals("icr")) return "⚡ ICR";
-        if (path.contains("large_chemical_reactor") || path.equals("lcr")) return "🏛 LCR";
+        if (path.contains("large_chemical_reactor") || path.equals("lcr")) return "▦ LCR";
         if (path.contains("super_cracker") || path.contains("sdf")) return "⚡ SDF Cracker";
-        if (path.contains("cracker")) return "🏛 Cracker";
+        if (path.contains("cracker")) return "▦ Cracker";
         if (path.contains("supreme")) return "⚡ Supreme";
         if (path.contains("nyinsane")) return "⚡ Nyinsane";
-        if (path.contains("large_fluid_distillation") || path.contains("large_distillation")) return "🏛 Large DT";
-        if (path.contains("distillation_tower")) return "🏛 Distillation";
-        if (path.contains("yielding_exhaustor") || path.contains("yeast")) return "🧬 Yeast";
+        if (path.contains("large_fluid_distillation") || path.contains("large_distillation")) return "▦ Large DT";
+        if (path.contains("distillation_tower")) return "▦ Distillation";
+        if (path.contains("yielding_exhaustor") || path.contains("yeast")) return "✦ Yeast";
 
         var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
         if (item != null && item != net.minecraft.world.item.Items.AIR) {
@@ -1233,9 +1233,9 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             else if (name.startsWith("Elite ")) name = "Elite " + name.substring(6);
             else if (name.startsWith("Ultimate ")) name = "Ult. " + name.substring(9);
             else if (name.startsWith("Material Processing ")) name = "Mat. Proc. " + name.substring(20);
-            return "🏛 " + name;
+            return "▦ " + name;
         }
-        return "🏛 " + id.getPath();
+        return "▦ " + id.getPath();
     }
 
     @Override

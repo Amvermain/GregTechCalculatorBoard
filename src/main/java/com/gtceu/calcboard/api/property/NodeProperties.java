@@ -43,6 +43,14 @@ public final class NodeProperties {
             NodePropertyKey.ofString("compound_master_node_id", "")
     );
 
+    // Junction Priority Split & Accumulation Buffer Properties (RFC-020)
+    public static final NodePropertyKey<Boolean> JUNCTION_IS_BUFFER = register(
+            NodePropertyKey.ofBoolean("junction_is_buffer", false)
+    );
+    public static final NodePropertyKey<Double> JUNCTION_BUFFER_SIZE = register(
+            NodePropertyKey.ofDouble("junction_buffer_size", 0.0)
+    );
+
     private NodeProperties() {}
 
     public static <T> NodePropertyKey<T> register(NodePropertyKey<T> key) {

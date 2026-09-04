@@ -74,7 +74,7 @@ public class ImportFolderDialog {
 
         // Header
         graphics.fill(x, y, x + dialogW, y + 22, 0xFF222634);
-        String header = "📥 " + Component.translatable("gui.gtcalcboard.dialog.import_folder_title").getString();
+        String header = "« " + Component.translatable("gui.gtcalcboard.dialog.import_folder_title").getString();
         graphics.drawString(font, header, x + 10, y + 7, 0xFFFFFFFF, false);
 
         // Browse Disk Files button in title bar
@@ -85,7 +85,7 @@ public class ImportFolderDialog {
         boolean diskHover = mouseX >= diskBtnX && mouseX <= diskBtnX + diskBtnW && mouseY >= diskBtnY && mouseY <= diskBtnY + diskBtnH;
         graphics.fill(diskBtnX, diskBtnY, diskBtnX + diskBtnW, diskBtnY + diskBtnH, diskHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(diskBtnX, diskBtnY, diskBtnW, diskBtnH, 0xFF355580);
-        graphics.drawCenteredString(font, "📂 " + Component.translatable("gui.gtcalcboard.dialog.btn_disk_files").getString(), diskBtnX + diskBtnW / 2, diskBtnY + 4, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "≡ " + Component.translatable("gui.gtcalcboard.dialog.btn_disk_files").getString(), diskBtnX + diskBtnW / 2, diskBtnY + 4, 0xFF66DDFF);
 
         // Close button
         int closeBtnX = x + dialogW - 18;
@@ -115,13 +115,13 @@ public class ImportFolderDialog {
         boolean pasteHover = mouseX >= pasteBtnX && mouseX <= pasteBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
         graphics.fill(pasteBtnX, btnY, pasteBtnX + btnW, btnY + btnH, pasteHover ? 0xFF2B5270 : 0xFF1A3347);
         graphics.renderOutline(pasteBtnX, btnY, btnW, btnH, pasteHover ? 0xFF4A90E2 : 0xFF2A5A8C);
-        graphics.drawCenteredString(font, "📋 " + Component.translatable("gui.gtcalcboard.dialog.btn_paste_from_clipboard").getString(), pasteBtnX + btnW / 2, btnY + 7, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "» " + Component.translatable("gui.gtcalcboard.dialog.btn_paste_from_clipboard").getString(), pasteBtnX + btnW / 2, btnY + 7, 0xFFFFFFFF);
 
         int diskBrowseBtnX = pasteBtnX + btnW + 12;
         boolean diskBrowseHover = mouseX >= diskBrowseBtnX && mouseX <= diskBrowseBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
         graphics.fill(diskBrowseBtnX, btnY, diskBrowseBtnX + btnW, btnY + btnH, diskBrowseHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(diskBrowseBtnX, btnY, btnW, btnH, diskBrowseHover ? 0xFF66DDFF : 0xFF355580);
-        graphics.drawCenteredString(font, "📂 " + Component.translatable("gui.gtcalcboard.dialog.btn_disk_files").getString(), diskBrowseBtnX + btnW / 2, btnY + 7, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "≡ " + Component.translatable("gui.gtcalcboard.dialog.btn_disk_files").getString(), diskBrowseBtnX + btnW / 2, btnY + 7, 0xFF66DDFF);
     }
 
     private void renderPackagePreviewState(GuiGraphics graphics, Font font, int x, int y, int dialogW, int dialogH, int mouseX, int mouseY) {
@@ -130,8 +130,8 @@ public class ImportFolderDialog {
         int totalNodes = currentPackage.getPages().stream().mapToInt(p -> p.graph() != null ? p.graph().getNodes().size() : 0).sum();
         int totalWires = currentPackage.getPages().stream().mapToInt(p -> p.graph() != null ? p.graph().getConnections().size() : 0).sum();
 
-        graphics.drawString(font, "§e📁 §l" + rootFolder, x + 14, y + 28, 0xFFFFFFFF, false);
-        graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.dialog.bp_author").getString() + ": §f" + currentPackage.getAuthor() + "  §8•  §e⚡ " + totalNodes + " §b〰 " + totalWires, x + 14, y + 42, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e≡ §l" + rootFolder, x + 14, y + 28, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.dialog.bp_author").getString() + ": §f" + currentPackage.getAuthor() + "  §8•  §e⚡ " + totalNodes + " §b~ " + totalWires, x + 14, y + 42, 0xFFFFFFFF, false);
 
         int listX = x + 14;
         int listY = y + 56;
@@ -154,7 +154,7 @@ public class ImportFolderDialog {
             if (icon != null && !icon.isEmpty()) {
                 graphics.renderItem(icon, listX + 4, curY + 1);
             } else {
-                graphics.drawString(font, "§7📄", listX + 4, curY + 4, 0xFFFFFFFF, false);
+                graphics.drawString(font, "§7▪", listX + 4, curY + 4, 0xFFFFFFFF, false);
             }
 
             String pathSuffix = entry.relativeFolderPath().isEmpty() ? "" : " §8(" + entry.relativeFolderPath() + ")";
@@ -173,7 +173,7 @@ public class ImportFolderDialog {
         boolean impHover = mouseX >= listX && mouseX <= listX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
         graphics.fill(listX, btnY, listX + btnW, btnY + btnH, impHover ? 0xFF2D6A4F : 0xFF1B4332);
         graphics.renderOutline(listX, btnY, btnW, btnH, impHover ? 0xFF52B788 : 0xFF2D6A4F);
-        graphics.drawCenteredString(font, "📥 " + Component.translatable("gui.gtcalcboard.dialog.btn_import_folder").getString(), listX + btnW / 2, btnY + 6, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "« " + Component.translatable("gui.gtcalcboard.dialog.btn_import_folder").getString(), listX + btnW / 2, btnY + 6, 0xFFFFFFFF);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {

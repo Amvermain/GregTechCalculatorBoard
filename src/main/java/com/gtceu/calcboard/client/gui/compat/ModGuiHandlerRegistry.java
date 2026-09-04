@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.compat;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.compat.create.CreateModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.createnewage.CreateNewAgeModGuiHandler;
+import com.gtceu.calcboard.client.gui.compat.greate.GreateModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.gtceu.GTCEuModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.systeams.SysteamsModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.thermal.ThermalModGuiHandler;
@@ -27,6 +28,7 @@ public final class ModGuiHandlerRegistry {
         register(new GTCEuModGuiHandler());
         register(new CreateModGuiHandler());
         register(new CreateNewAgeModGuiHandler());
+        register(new GreateModGuiHandler());
         register(new SysteamsModGuiHandler());
         register(new ThermalModGuiHandler());
         register(new VanillaModGuiHandler());

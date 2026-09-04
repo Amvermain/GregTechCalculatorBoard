@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Top-level workspace tab bar widget for switching between [👤 Personal Board] and [👥 Team Board].
+ * Top-level workspace tab bar widget for switching between [▪ Personal Board] and [▪ Team Board].
  * Also renders live team presence and page lock status badges.
  */
 public class WorkspaceTabBarWidget {
@@ -40,9 +40,9 @@ public class WorkspaceTabBarWidget {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 350.0f);
 
-        // 1. [👤 Personal Board] Tab
+        // 1. [Personal Board] Tab
         boolean isLocal = !state.isTeamMode();
-        String personalTxt = "👤 " + Component.translatable("gui.gtcalcboard.workspace.personal").getString();
+        String personalTxt = "● " + Component.translatable("gui.gtcalcboard.workspace.personal").getString();
         int persW = font.width(personalTxt) + 14;
         boolean persHover = mouseX >= curX && mouseX <= curX + persW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2;
 
@@ -52,10 +52,10 @@ public class WorkspaceTabBarWidget {
 
         curX += persW + 4;
 
-        // 2. [👥 Team Board] Tab
+        // 2. [Team Board] Tab
         boolean isTeam = state.isTeamMode();
         String teamName = state.getCurrentTeamName();
-        String teamTxt = "👥 " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString();
+        String teamTxt = "■ " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString();
         int teamW = font.width(teamTxt) + 14;
         boolean teamHover = mouseX >= curX && mouseX <= curX + teamW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2;
 
@@ -85,7 +85,7 @@ public class WorkspaceTabBarWidget {
                 String holder = activePage.getLockHolderName() != null && !activePage.getLockHolderName().isEmpty()
                         ? activePage.getLockHolderName()
                         : state.resolvePlayerName(activePage.getLockHolderUUID());
-                lockBadge = "🔒 " + Component.translatable("gui.gtcalcboard.lock.locked_by", holder).getString();
+                lockBadge = "✕ " + Component.translatable("gui.gtcalcboard.lock.locked_by", holder).getString();
                 lockCol = 0xFFFF6B6B;
                 lockBg = 0xFF421C1C;
             } else {
@@ -137,7 +137,7 @@ public class WorkspaceTabBarWidget {
             String holder = activePage.getLockHolderName() != null && !activePage.getLockHolderName().isEmpty()
                     ? activePage.getLockHolderName()
                     : state.resolvePlayerName(activePage.getLockHolderUUID());
-            lockBadge = "🔒 " + Component.translatable("gui.gtcalcboard.lock.locked_by", holder).getString();
+            lockBadge = "✕ " + Component.translatable("gui.gtcalcboard.lock.locked_by", holder).getString();
         } else {
             lockBadge = "● " + Component.translatable("gui.gtcalcboard.lock.editable").getString();
         }
@@ -176,8 +176,8 @@ public class WorkspaceTabBarWidget {
         int barY = 2;
         int curX = screen.getDynamicLeftMargin();
 
-        // 1. [👤 Personal Board] Tab Click
-        String personalTxt = "👤 " + Component.translatable("gui.gtcalcboard.workspace.personal").getString();
+        // 1. [Personal Board] Tab Click
+        String personalTxt = "● " + Component.translatable("gui.gtcalcboard.workspace.personal").getString();
         int persW = font.width(personalTxt) + 14;
         if (mouseX >= curX && mouseX <= curX + persW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
             if (state.isTeamMode()) {
@@ -193,9 +193,9 @@ public class WorkspaceTabBarWidget {
 
         curX += persW + 4;
 
-        // 2. [👥 Team Board] Tab Click
+        // 2. [Team Board] Tab Click
         String teamName = state.getCurrentTeamName();
-        String teamTxt = "👥 " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString();
+        String teamTxt = "■ " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString();
         int teamW = font.width(teamTxt) + 14;
         if (mouseX >= curX && mouseX <= curX + teamW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
             if (!state.isTeamMode()) {

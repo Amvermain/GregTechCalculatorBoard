@@ -35,6 +35,13 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public void renderCardControls(GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY, boolean isGlowing) {
+        if (node.getEnergyType() == EnergyType.NONE) {
+            String bannerText = "~ " + Component.translatable("gui.gtcalcboard.energy_passive_banner").getString();
+            int bannerW = cardW - 12;
+            NodeCardRenderer.drawBtn(graphics, font, bannerText, x + 6, row2Y, bannerW, 14, mouseX, mouseY, 0xFF88D49E, false, false);
+            return;
+        }
+
         GTVoltageTier tier = node.getTargetTier();
         NodeCardRenderer.drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
 
@@ -90,7 +97,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
         } else {
             GTVoltageTier tier = node.getTargetTier();
             String tierText = (tier != null ? tier.getName() : "LV");
-            if (node.isMultiblock()) tierText = "🏛 " + tierText;
+            if (node.isMultiblock()) tierText = "▦ " + tierText;
             btnW = Math.max(32, safeFontWidth(tierText, 24) + 8);
         }
         return mouseX >= x + 6 && mouseX <= x + 6 + btnW && mouseY >= row2Y && mouseY <= row2Y + 14;
@@ -98,7 +105,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public boolean isSecondaryControlHovered(RecipeNode node, double mouseX, double mouseY) {
-        if (node == null || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || node.getEnergyType() == EnergyType.NONE || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
+        if (node == null || node.getEnergyType() == EnergyType.NONE || node.isGenerator() || node.isFusion() || node.getEnergyType() == EnergyType.HEAT_OR_SELF || (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam())) return false;
         int x = (int) node.getPosX();
         int y = (int) node.getPosY();
         int ctrlY = y + 20 + 6;

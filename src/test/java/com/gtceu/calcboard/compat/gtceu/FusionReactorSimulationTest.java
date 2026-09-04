@@ -320,6 +320,47 @@ public class FusionReactorSimulationTest {
         assertEquals(ResourceLocation.tryParse("start_core:uev_fusion_reactor"), sorted.get(4)); // UEV (Mk4)
         assertEquals(ResourceLocation.tryParse("start_core:uiv_auxiliary_fusion_reactor"), sorted.get(5)); // UIV (Aux 2)
     }
+
+    @Test
+    @DisplayName("Reflector Fusion Reactor applies 2:2 perfect overclock boost when installed reflector tier exceeds recipe requirement")
+    void testReflectorFusionReactorOverclockBoost() {
+        RecipeNode node = RecipeNode.create("Duranium Recipe", 288.0, 32768.0, GTVoltageTier.ZPM);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("start_core:reflector_fusion_reactor"));
+        node.setMachineIcon(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"));
+        node.setRequiredReflectorTier(2);
+        node.setEuToStart(320_000_000L);
+        node.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:duranium"), "Duranium", 144));
+
+        var t2Reflector = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_2", "T2 Reflector", "", null, 2);
+        var t3Reflector = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_3", "T3 Reflector", "", null, 3);
+        var t4Reflector = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_4", "T4 Reflector", "", null, 4);
+
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+
+        adapter.onAddonInstalled(node, t2Reflector);
+        assertEquals(2, node.getInstalledReflectorTier());
+        assertEquals(288.0, node.getOverclockResult().durationTicks(), 0.001);
+        assertEquals(14.40, node.getEffectiveDurationSeconds(), 0.001);
+        assertEquals(32768.0, node.getOverclockResult().eut(), 0.001);
+        assertEquals(0, node.getOverclockResult().overclocks());
+        assertEquals(10.0, node.getOutputSlotRate(0, true), 0.001);
+
+        adapter.onAddonInstalled(node, t3Reflector);
+        assertEquals(3, node.getInstalledReflectorTier());
+        assertEquals(144.0, node.getOverclockResult().durationTicks(), 0.001);
+        assertEquals(7.20, node.getEffectiveDurationSeconds(), 0.001);
+        assertEquals(65536.0, node.getOverclockResult().eut(), 0.001);
+        assertEquals(1, node.getOverclockResult().overclocks());
+        assertEquals(20.0, node.getOutputSlotRate(0, true), 0.001);
+
+        adapter.onAddonInstalled(node, t4Reflector);
+        assertEquals(4, node.getInstalledReflectorTier());
+        assertEquals(72.0, node.getOverclockResult().durationTicks(), 0.001);
+        assertEquals(3.60, node.getEffectiveDurationSeconds(), 0.001);
+        assertEquals(131072.0, node.getOverclockResult().eut(), 0.001);
+        assertEquals(2, node.getOverclockResult().overclocks());
+        assertEquals(40.0, node.getOutputSlotRate(0, true), 0.001);
+    }
 }
 
 

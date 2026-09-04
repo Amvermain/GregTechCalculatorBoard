@@ -247,7 +247,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         if (page != null && page.isLocked() && !state.doesHoldLock(activePageId)) {
             String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
                     ? page.getLockHolderName() : state.resolvePlayerName(page.getLockHolderUUID());
-            BoardToast.show(Component.literal("§c🔒 ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
+            BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VILLAGER_NO, 1.0F));
             return false;
         }

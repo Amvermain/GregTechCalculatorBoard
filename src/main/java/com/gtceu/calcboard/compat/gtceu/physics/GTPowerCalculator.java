@@ -107,12 +107,12 @@ public final class GTPowerCalculator {
         }
 
         if (node.getEnergyType() == EnergyType.NONE) {
-            double durationTicks = Math.max(1.0, node.getBaseDurationTicks() * node.getCombinedDurationMultiplier());
+            double durationTicks = Math.max(1.0, (int) (node.getBaseDurationTicks() * node.getCombinedDurationMultiplier()));
             return new OverclockMode.OverclockResult(durationTicks, 0.0, 1.0, 0);
         }
 
         if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            double durationTicks = Math.max(1.0, node.getBaseDurationTicks() * node.getSteamMode().getDurationMultiplier() * node.getCombinedDurationMultiplier());
+            double durationTicks = Math.max(1.0, (int) (node.getBaseDurationTicks() * node.getSteamMode().getDurationMultiplier() * node.getCombinedDurationMultiplier()));
             return new OverclockMode.OverclockResult(durationTicks, 0.0, 1.0, 0);
         }
 
@@ -190,6 +190,9 @@ public final class GTPowerCalculator {
     }
 
     private static int resolveMaxTierDelta(RecipeNode node) {
+        if (node.isFusion()) {
+            return node.getTierDelta() + GTFusionHelper.getReflectorOverclockDelta(node);
+        }
         int maxTierDelta = node.getTierDelta();
         long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
         if (maxCapacity >= Long.MAX_VALUE || node.getRecipeTier() == null) {
@@ -208,7 +211,7 @@ public final class GTPowerCalculator {
         if (isGenerator && GTTurbineHelper.isLargeTurbine(node)) {
             duration = calculateLargeTurbineDuration(node, baseRes);
         } else {
-            duration = Math.max(1.0, baseRes.durationTicks() * node.getCombinedDurationMultiplier());
+            duration = Math.max(1.0, (int) (baseRes.durationTicks() * node.getCombinedDurationMultiplier()));
         }
         if (node.hasThreading()) {
             duration = Math.max(1.0, duration * node.getThreadingConfig().getFinalDurationMultiplier());
@@ -534,7 +537,7 @@ public final class GTPowerCalculator {
                 if (GTTurbineHelper.isCoolantBoost(node)) {
                     tooltipLines.add(Component.literal("§b❄ " + Component.translatable("gui.gtcalcboard.boost_coolant_active").getString() + " §a(+50%)"));
                 } else if (GTTurbineHelper.isLubricantBoost(node)) {
-                    tooltipLines.add(Component.literal("§e🛢 " + Component.translatable("gui.gtcalcboard.boost_lubricant_active").getString() + " §a(+25%)"));
+                    tooltipLines.add(Component.literal("§e~ " + Component.translatable("gui.gtcalcboard.boost_lubricant_active").getString() + " §a(+25%)"));
                 }
 
                 if (GTTurbineHelper.hasRotorAddon(node)) {

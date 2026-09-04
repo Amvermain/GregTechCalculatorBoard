@@ -129,7 +129,7 @@ public class TemplateCloneDialog {
         graphics.renderOutline(x, y, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF3D4B66);
         graphics.renderOutline(x + 1, y + 1, DIALOG_WIDTH - 2, DIALOG_HEIGHT - 2, 0xFF0F131C);
 
-        graphics.drawString(font, "§6📋 " + Component.translatable("gui.gtcalcboard.template_clone.title").getString(), x + 16, y + 10, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6» " + Component.translatable("gui.gtcalcboard.template_clone.title").getString(), x + 16, y + 10, 0xFFFFFFFF, false);
 
         renderHardwareSummary(graphics, font, x, y);
         renderSearchInputs(graphics, mouseX, mouseY, partialTick, x, y);

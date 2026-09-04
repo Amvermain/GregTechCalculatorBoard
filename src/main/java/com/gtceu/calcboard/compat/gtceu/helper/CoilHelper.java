@@ -259,8 +259,14 @@ public class CoilHelper {
     }
 
     private static String formatCoilDescription(CoilStats stats) {
-        return String.format(Locale.ROOT, "Heat: %d K\nSmelter: %dx Par\nPyrolyse: %d%% Spd\nCracking: %d%% Energy\nChemical Reactor: %d%% Spd, %d%% Energy",
-                stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent(), stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent());
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(Locale.ROOT, "Heat: %d K\nSmelter: %dx Par\nPyrolyse: %d%% Spd\nCracking: %d%% Energy",
+                stats.temperature(), stats.smelterParallel(), stats.pyrolyseSpeedPercent(), stats.crackingEnergyPercent()));
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isStarTLoaded() || com.gtceu.calcboard.compat.start.StarTReflectionBridge.isStarTLoaded()) {
+            sb.append(String.format(Locale.ROOT, "\nChemical Reactor: %d%% Spd, %d%% Energy",
+                    stats.chemicalSpeedPercent(), stats.chemicalEnergyPercent()));
+        }
+        return sb.toString();
     }
 
     public static void discoverGTCEuCoils(List<MachineAddon> list) {

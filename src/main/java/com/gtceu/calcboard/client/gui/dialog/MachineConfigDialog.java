@@ -345,7 +345,7 @@ public class MachineConfigDialog {
             graphics.drawCenteredString(font, font.plainSubstrByWidth(toggleText, toggleW - 4), toggleX + toggleW / 2, y + 7, 0xFFFFFFFF);
             if (toggleHover) {
                 this.deferredTooltip = List.of(
-                        Component.literal(isMb ? "§a🏛 " : "§7🏭 ").append(Component.translatable(isMb ? "gui.gtcalcboard.config.multiblock_mode" : "gui.gtcalcboard.config.singleblock_mode")),
+                        Component.literal(isMb ? "§a▦ " : "§7▦ ").append(Component.translatable(isMb ? "gui.gtcalcboard.config.multiblock_mode" : "gui.gtcalcboard.config.singleblock_mode")),
                         Component.literal("§7[Click]: §f" + Component.translatable(isMb ? "gui.gtcalcboard.tooltip.switch_to_singleblock" : "gui.gtcalcboard.tooltip.switch_to_multiblock").getString()),
                         Component.literal("§e[Right-Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString())
                 );
@@ -359,7 +359,7 @@ public class MachineConfigDialog {
         boolean switchHover = virtualMouseX >= switchBtnX && virtualMouseX <= switchBtnX + switchBtnW && virtualMouseY >= y + 3 && virtualMouseY <= y + 3 + switchBtnH;
         graphics.fill(switchBtnX, y + 3, switchBtnX + switchBtnW, y + 3 + switchBtnH, switchHover ? 0xFF234B6E : 0xFF19344D);
         graphics.renderOutline(switchBtnX, y + 3, switchBtnW, switchBtnH, switchHover ? 0xFF5B9BD5 : 0xFF35587A);
-        String switchText = "§b🔄 " + Component.translatable("gui.gtcalcboard.switch_recipe.short_btn").getString();
+        String switchText = "§b⟲ " + Component.translatable("gui.gtcalcboard.switch_recipe.short_btn").getString();
         graphics.drawCenteredString(font, font.plainSubstrByWidth(switchText, switchBtnW - 4), switchBtnX + switchBtnW / 2, y + 7, 0xFFFFFFFF);
 
         // Category Machine Default Preset Button
@@ -388,11 +388,11 @@ public class MachineConfigDialog {
         } else {
             graphics.fill(presetBtnX, y + 3, presetBtnX + presetBtnW, y + 3 + presetBtnH, presetHover ? 0xFF2F3746 : 0xFF202632);
             graphics.renderOutline(presetBtnX, y + 3, presetBtnW, presetBtnH, presetHover ? 0xFF6B7F9E : 0xFF3D4A5E);
-            String presetText = "§7📌 " + Component.translatable("gui.gtcalcboard.config.preset.set").getString();
+            String presetText = "§7★ " + Component.translatable("gui.gtcalcboard.config.preset.set").getString();
             graphics.drawCenteredString(font, font.plainSubstrByWidth(presetText, presetBtnW - 4), presetBtnX + presetBtnW / 2, y + 7, 0xFFB0C0D8);
             if (presetHover) {
                 this.deferredTooltip = List.of(
-                        Component.literal("§f📌 ").append(Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_title")),
+                        Component.literal("§f★ ").append(Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_title")),
                         Component.translatable("gui.gtcalcboard.config.preset.category", "§b" + (catId != null ? catId.toString() : "Unknown")),
                         Component.literal("§8§m------------------------"),
                         Component.translatable("gui.gtcalcboard.config.preset.tooltip_set_desc"),

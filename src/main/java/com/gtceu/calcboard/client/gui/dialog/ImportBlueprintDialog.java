@@ -72,7 +72,7 @@ public class ImportBlueprintDialog {
 
         // Title bar
         graphics.fill(x, y, x + dialogW, y + 22, 0xFF222634);
-        String header = "📥 " + Component.translatable("gui.gtcalcboard.dialog.import_bp_title").getString();
+        String header = "« " + Component.translatable("gui.gtcalcboard.dialog.import_bp_title").getString();
         graphics.drawString(font, header, x + 10, y + 7, 0xFFFFFFFF, false);
 
         // Browse Disk Files button in title bar
@@ -83,7 +83,7 @@ public class ImportBlueprintDialog {
         boolean diskHover = mouseX >= diskBtnX && mouseX <= diskBtnX + diskBtnW && mouseY >= diskBtnY && mouseY <= diskBtnY + diskBtnH;
         graphics.fill(diskBtnX, diskBtnY, diskBtnX + diskBtnW, diskBtnY + diskBtnH, diskHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(diskBtnX, diskBtnY, diskBtnW, diskBtnH, 0xFF355580);
-        graphics.drawCenteredString(font, "📂 " + Component.translatable("gui.gtcalcboard.dialog.btn_disk_files").getString(), diskBtnX + diskBtnW / 2, diskBtnY + 4, 0xFF66DDFF);
+        graphics.drawCenteredString(font, "≡ " + Component.translatable("gui.gtcalcboard.dialog.btn_disk_files").getString(), diskBtnX + diskBtnW / 2, diskBtnY + 4, 0xFF66DDFF);
 
         // Close button (X)
         int closeBtnX = x + dialogW - 18;
@@ -97,7 +97,7 @@ public class ImportBlueprintDialog {
         // Blueprint Title & Author
         String bpTitle = meta != null && meta.getTitle() != null && !meta.getTitle().isEmpty()
                 ? meta.getTitle() : "Factory Blueprint";
-        graphics.drawString(font, "§e📌 §l" + bpTitle, x + 14, y + 28, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§e★ §l" + bpTitle, x + 14, y + 28, 0xFFFFFFFF, false);
 
         String author = meta != null ? meta.getAuthor() : "";
         if (author != null && !author.isEmpty()) {
@@ -211,14 +211,14 @@ public class ImportBlueprintDialog {
         boolean h1 = mouseX >= btn1X && mouseX <= btn1X + btnW && mouseY >= btn1Y && mouseY <= btn1Y + btnH;
         graphics.fill(btn1X, btn1Y, btn1X + btnW, btn1Y + btnH, h1 ? 0xFF2A6840 : 0xFF1E4D2F);
         graphics.renderOutline(btn1X, btn1Y, btnW, btnH, 0xFF359050);
-        graphics.drawCenteredString(font, "➕ " + Component.translatable("gui.gtcalcboard.dialog.btn_import_new_page").getString(), btn1X + btnW / 2, btn1Y + 7, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "+ " + Component.translatable("gui.gtcalcboard.dialog.btn_import_new_page").getString(), btn1X + btnW / 2, btn1Y + 7, 0xFFFFFFFF);
 
         // Option 2: Overwrite Current Page
         int btn2X = btn1X + btnW + 8;
         boolean h2 = mouseX >= btn2X && mouseX <= btn2X + btnW && mouseY >= btn1Y && mouseY <= btn1Y + btnH;
         graphics.fill(btn2X, btn1Y, btn2X + btnW, btn1Y + btnH, h2 ? 0xFF3D4558 : 0xFF282D3B);
         graphics.renderOutline(btn2X, btn1Y, btnW, btnH, 0xFF4F5B73);
-        graphics.drawCenteredString(font, "📝 " + Component.translatable("gui.gtcalcboard.dialog.btn_import_overwrite").getString(), btn2X + btnW / 2, btn1Y + 7, 0xFFE0E6F0);
+        graphics.drawCenteredString(font, "▪ " + Component.translatable("gui.gtcalcboard.dialog.btn_import_overwrite").getString(), btn2X + btnW / 2, btn1Y + 7, 0xFFE0E6F0);
 
         // Cancel button
         int cancelY = btn1Y + 26;

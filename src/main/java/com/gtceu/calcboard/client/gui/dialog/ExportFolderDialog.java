@@ -92,7 +92,7 @@ public class ExportFolderDialog {
 
         // Header
         graphics.fill(x, y, x + dialogW, y + 22, 0xFF222634);
-        String header = "📤 " + Component.translatable("gui.gtcalcboard.dialog.export_folder_title").getString();
+        String header = "» " + Component.translatable("gui.gtcalcboard.dialog.export_folder_title").getString();
         graphics.drawString(font, header, x + 10, y + 7, 0xFFFFFFFF, false);
 
         int closeBtnX = x + dialogW - 18;
@@ -127,10 +127,10 @@ public class ExportFolderDialog {
             if (icon != null && !icon.isEmpty()) {
                 graphics.renderItem(icon, listX + 4, curY + 1);
             } else {
-                graphics.drawString(font, "§7📄", listX + 4, curY + 4, 0xFFFFFFFF, false);
+                graphics.drawString(font, "§7▪", listX + 4, curY + 4, 0xFFFFFFFF, false);
             }
 
-            String pathSuffix = entry.relativeFolderPath().isEmpty() ? "" : " §8(📁 " + entry.relativeFolderPath() + ")";
+            String pathSuffix = entry.relativeFolderPath().isEmpty() ? "" : " §8(≡ " + entry.relativeFolderPath() + ")";
             graphics.drawString(font, "§f" + entry.name() + pathSuffix, listX + 24, curY + 5, 0xFFFFFFFF, false);
 
             int n = entry.graph() != null ? entry.graph().getNodes().size() : 0;
@@ -155,13 +155,13 @@ public class ExportFolderDialog {
         boolean clipHover = mouseX >= clipBtnX && mouseX <= clipBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
         graphics.fill(clipBtnX, btnY, clipBtnX + btnW, btnY + btnH, clipHover ? 0xFF2B5270 : 0xFF1A3347);
         graphics.renderOutline(clipBtnX, btnY, btnW, btnH, clipHover ? 0xFF4A90E2 : 0xFF2A5A8C);
-        graphics.drawCenteredString(font, "📋 " + Component.translatable("gui.gtcalcboard.dialog.btn_copy_clipboard").getString(), clipBtnX + btnW / 2, btnY + 6, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "» " + Component.translatable("gui.gtcalcboard.dialog.btn_copy_clipboard").getString(), clipBtnX + btnW / 2, btnY + 6, 0xFFFFFFFF);
 
         int saveBtnX = x + dialogW - 14 - btnW;
         boolean saveHover = mouseX >= saveBtnX && mouseX <= saveBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
         graphics.fill(saveBtnX, btnY, saveBtnX + btnW, btnY + btnH, saveHover ? 0xFF2D6A4F : 0xFF1B4332);
         graphics.renderOutline(saveBtnX, btnY, btnW, btnH, saveHover ? 0xFF52B788 : 0xFF2D6A4F);
-        graphics.drawCenteredString(font, "💾 " + Component.translatable("gui.gtcalcboard.dialog.btn_save_to_disk").getString(), saveBtnX + btnW / 2, btnY + 6, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "✓ " + Component.translatable("gui.gtcalcboard.dialog.btn_save_to_disk").getString(), saveBtnX + btnW / 2, btnY + 6, 0xFFFFFFFF);
 
         graphics.pose().popPose();
     }

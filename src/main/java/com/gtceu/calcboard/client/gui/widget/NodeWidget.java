@@ -484,7 +484,7 @@ public class NodeWidget {
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
         int cardW = getWidth();
-        String machinesBadge = String.format("§d📦 %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
+        String machinesBadge = String.format("§d▦ %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
         int badgeW = Minecraft.getInstance().font.width(machinesBadge);
         int badgeX = x + cardW - 6 - badgeW;
         return mouseX >= badgeX - 4 && mouseX <= x + cardW && mouseY >= ctrlY && mouseY <= ctrlY + 16;
@@ -848,7 +848,7 @@ public class NodeWidget {
             }
         }
 
-        // Switch Recipe Button [🔄]
+        // Switch Recipe Button [⟲]
         if (isSwitchButtonHovered(mouseX, mouseY)) {
             if (parent != null) {
                 parent.openRecipeSwitchDialog(node);
@@ -904,7 +904,7 @@ public class NodeWidget {
             return true;
         }
 
-        // Target Base Node Toggle Button [🎯]
+        // Target Base Node Toggle Button [⌖]
         if (isTargetButtonHovered(mouseX, mouseY)) {
             boolean nowBase = !node.isBaseNode();
             parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.baseAnchor(node.getId(), !nowBase, nowBase));
@@ -914,7 +914,7 @@ public class NodeWidget {
 
             Minecraft mc = Minecraft.getInstance();
             if (nowBase) {
-                BoardToast.show(Component.literal("§6🎯 ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())));
+                BoardToast.show(Component.literal("§6⌖ ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())));
                 mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.2F));
             } else {
                 BoardToast.show(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")));

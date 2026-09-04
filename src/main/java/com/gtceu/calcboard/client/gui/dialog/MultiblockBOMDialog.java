@@ -153,7 +153,7 @@ public class MultiblockBOMDialog {
         // 3. Top Title Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xDD182232);
         graphics.fill(dialogX, dialogY + 23, dialogX + dialogW, dialogY + 24, 0xFF2A364D);
-        graphics.drawString(font, "§6📋 " + Component.translatable("gui.gtcalcboard.bom.title").getString(), dialogX + 8, dialogY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6» " + Component.translatable("gui.gtcalcboard.bom.title").getString(), dialogX + 8, dialogY + 8, 0xFFFFFFFF, false);
 
         // Close Button [✕]
         int closeBtnX = dialogX + dialogW - 20;
@@ -168,20 +168,20 @@ public class MultiblockBOMDialog {
         graphics.fill(dialogX + 1, bannerY, dialogX + dialogW - 1, bannerY + bannerH, 0xAA141C28);
         graphics.fill(dialogX + 1, bannerY + bannerH - 1, dialogX + dialogW - 1, bannerY + bannerH, 0xFF222E40);
 
-        String multiCountStr = "§6🏛 " + Component.translatable("gui.gtcalcboard.bom.total_multiblocks", cachedSummary.totalMultiblockCount()).getString();
+        String multiCountStr = "§6▦ " + Component.translatable("gui.gtcalcboard.bom.total_multiblocks", cachedSummary.totalMultiblockCount()).getString();
         graphics.drawString(font, multiCountStr, dialogX + 10, bannerY + 7, 0xFFFFFFFF, false);
 
-        String uniqueBlocksStr = "§b📦 " + Component.translatable("gui.gtcalcboard.bom.total_unique_blocks", cachedSummary.totalUniqueItemTypes()).getString();
+        String uniqueBlocksStr = "§b▦ " + Component.translatable("gui.gtcalcboard.bom.total_unique_blocks", cachedSummary.totalUniqueItemTypes()).getString();
         graphics.drawString(font, uniqueBlocksStr, dialogX + 10 + font.width(multiCountStr) + 14, bannerY + 7, 0xFFFFFFFF, false);
 
-        // Quick action buttons in Banner: [📋 Copy List] and [⭐ Register in EMI/JEI]
+        // Quick action buttons in Banner: [» Copy List] and [⭐ Register in EMI/JEI]
         int copyBtnW = font.width(Component.translatable("gui.gtcalcboard.bom.copy_clipboard").getString()) + 14;
         int copyBtnX = dialogX + dialogW - 10 - copyBtnW;
         int copyBtnY = bannerY + 3;
         boolean copyHover = mouseX >= copyBtnX && mouseX <= copyBtnX + copyBtnW && mouseY >= copyBtnY && mouseY <= copyBtnY + 16;
         graphics.fill(copyBtnX, copyBtnY, copyBtnX + copyBtnW, copyBtnY + 16, copyHover ? 0xFF2B4466 : 0xFF1C2C44);
         graphics.renderOutline(copyBtnX, copyBtnY, copyBtnW, 16, copyHover ? 0xFF55AAFF : 0xFF355580);
-        graphics.drawCenteredString(font, "§b📋 " + Component.translatable("gui.gtcalcboard.bom.copy_clipboard").getString(), copyBtnX + copyBtnW / 2, copyBtnY + 4, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "§b» " + Component.translatable("gui.gtcalcboard.bom.copy_clipboard").getString(), copyBtnX + copyBtnW / 2, copyBtnY + 4, 0xFFFFFFFF);
 
         var activeViewer = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter();
         if (activeViewer.isBoMGoalRegistrationSupported()) {
@@ -227,7 +227,7 @@ public class MultiblockBOMDialog {
         // Sidebar Header
         int titleH = 16;
         graphics.fill(x, y, x + w, y + titleH, 0xFF18202C);
-        graphics.drawString(font, "§6📑 " + Component.translatable("gui.gtcalcboard.global_balance.included_pages").getString(), x + 4, y + 4, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6▪ " + Component.translatable("gui.gtcalcboard.global_balance.included_pages").getString(), x + 4, y + 4, 0xFFFFFFFF, false);
 
         // Bottom Action Buttons: [All] / [None]
         int btnH = 14;
@@ -502,7 +502,7 @@ public class MultiblockBOMDialog {
             return true;
         }
 
-        // Action Buttons: [📋 Copy] and [⭐ Register in EMI]
+        // Action Buttons: [» Copy] and [⭐ Register in EMI]
         int bannerY = dialogY + 25;
         Font font = Minecraft.getInstance().font;
 
@@ -739,7 +739,7 @@ public class MultiblockBOMDialog {
     private void copyToClipboard() {
         if (cachedSummary == null) return;
         StringBuilder sb = new StringBuilder();
-        sb.append("# 📋 Multiblock Construction Bill of Materials (BOM)\n");
+        sb.append("# » Multiblock Construction Bill of Materials (BOM)\n");
         sb.append(String.format(Locale.ROOT, "Total Multiblocks: %d | Unique Blocks: %d\n\n", cachedSummary.totalMultiblockCount(), cachedSummary.totalUniqueItemTypes()));
         sb.append("| Block Name | Total Required | Stacks | Used In |\n");
         sb.append("| :--- | :--- | :--- | :--- |\n");

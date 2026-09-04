@@ -108,7 +108,7 @@ public class VanillaModAdapter implements IModAdapter {
     @Override
     public List<Component> buildEnergyTooltip(RecipeNode node) {
         List<Component> tooltipLines = new ArrayList<>();
-        tooltipLines.add(Component.literal("§a🍃 " + Component.translatable("gui.gtcalcboard.energy_passive_stat").getString()));
+        tooltipLines.add(Component.literal("§a~ " + Component.translatable("gui.gtcalcboard.energy_passive_stat").getString()));
         tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.2fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         return tooltipLines;
     }
