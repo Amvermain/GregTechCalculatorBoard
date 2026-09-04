@@ -3,7 +3,6 @@ package com.gtceu.calcboard.api.bom;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
 import java.util.Locale;
@@ -98,48 +97,11 @@ public record MultiblockBOMSummary(
     ) {
         @Override
         public String displayName() {
-            ItemStack is = resolveItemStack();
-            if (!is.isEmpty()) {
-                try {
-                    String hoverName = is.getHoverName().getString();
-                    if (isValidDisplayName(hoverName)) {
-                        return hoverName;
-                    }
-                } catch (Throwable ignored) {}
-            }
-            if (itemId != null) {
-                try {
-                    var blk = ForgeRegistries.BLOCKS.getValue(itemId);
-                    if (blk != null && blk != net.minecraft.world.level.block.Blocks.AIR) {
-                        String bName = blk.getName().getString();
-                        if (isValidDisplayName(bName)) {
-                            return bName;
-                        }
-                    }
-                    String blockTrans = net.minecraft.network.chat.Component.translatable(itemId.toLanguageKey("block")).getString();
-                    if (isValidDisplayName(blockTrans)) {
-                        return blockTrans;
-                    }
-                    String itemTrans = net.minecraft.network.chat.Component.translatable(itemId.toLanguageKey("item")).getString();
-                    if (isValidDisplayName(itemTrans)) {
-                        return itemTrans;
-                    }
-                } catch (Throwable ignored) {}
-            }
-            if (isValidDisplayName(this.displayName)) {
-                return this.displayName;
-            }
-            if (itemId != null) {
-                return MultiblockStructureCatalog.formatMachineName(itemId.getPath());
-            }
-            return "Unknown";
+            return BOMDisplayNameResolver.resolve(itemId, this.displayName);
         }
 
         public static boolean isValidDisplayName(String name) {
-            if (name == null || name.isBlank()) return false;
-            return !name.startsWith("block.") && !name.startsWith("item.")
-                    && !name.startsWith("tagprefix.") && !name.startsWith("gtceu.")
-                    && !name.contains(".gtceu.") && !name.equals("tagprefix.frame");
+            return BOMDisplayNameResolver.isValidDisplayName(name);
         }
 
         public String formatStackCount() {
@@ -154,14 +116,7 @@ public record MultiblockBOMSummary(
         }
 
         public ItemStack resolveItemStack() {
-            if (itemId == null) return ItemStack.EMPTY;
-            try {
-                var item = ForgeRegistries.ITEMS.getValue(itemId);
-                if (item != null) {
-                    return new ItemStack(item);
-                }
-            } catch (Throwable ignored) {}
-            return ItemStack.EMPTY;
+            return BOMDisplayNameResolver.resolveItemStack(itemId);
         }
     }
 

@@ -238,13 +238,25 @@ $$\Delta_{\text{material}} = \sum \text{Output Rates} - \sum \text{Input Rates}$
 
 ---
 
-### [Algorithm 5] Target Batch ETA & Total Resource Calculator (`ProductionETACalculator`)
+### [Algorithm 5] Target Batch ETA & Stock Depletion Time (DT) (`ProductionETACalculator`)
 
-For a terminal/reroute node with target quota $A_{\text{target}}$ and incoming rate $\text{Rate}_{\text{in}}$:
+#### 1. Estimated Completion Time (ET)
+For a terminal or reroute node with target quota $A_{\text{target}}$, net inflow rate $\text{Rate}_{\text{in}}$, and maximum upstream cycle duration $T_{\text{cycle}}$:
 
-$$T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} \quad [\text{seconds}]$$
-$$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
-$$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
+1. **Continuous Flow Model** ($T_{\text{cycle}} \le 0$):
+   $$T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} \quad [\text{seconds}]$$
+2. **Discrete Machine Cycle Quantization Model** ($T_{\text{cycle}} > 0$):
+   For single-cycle production capacity $\text{Cap}_{\text{cycle}} = \text{Rate}_{\text{in}} \times T_{\text{cycle}}$, an epsilon guard ($\epsilon = 10^{-7}$) prevents false cycle increments caused by double-precision division rounding:
+   $$N_{\text{cycle}} = \left\lceil \frac{A_{\text{target}}}{\text{Cap}_{\text{cycle}}} - 10^{-7} \right\rceil, \quad T_{\text{ET}} = N_{\text{cycle}} \times T_{\text{cycle}} \quad [\text{seconds}]$$
+
+3. **Total Batch Energy & Feedstock Aggregation**:
+   $$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times n.\text{getEfficiency}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
+   $$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
+
+#### 2. Raw Material Stock Depletion Time (DT)
+For an unconnected raw feedstock junction buffer with stock amount $A_{\text{buffer}}$, total downstream outflow rate $\text{Rate}_{\text{out}}$, and downstream cycle duration $T_{\text{cycle, down}}$:
+
+$$N_{\text{drain}} = \left\lceil \frac{A_{\text{buffer}}}{\text{Rate}_{\text{out}} \times T_{\text{cycle, down}}} - 10^{-7} \right\rceil, \quad T_{\text{DT}} = N_{\text{drain}} \times T_{\text{cycle, down}} \quad [\text{seconds}]$$
 
 ---
 

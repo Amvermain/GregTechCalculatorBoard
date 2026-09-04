@@ -366,21 +366,26 @@ Guides newcomers through fundamental workflows (node creation, wiring, ratio bal
 * **`TutorialManager`**: Singleton tutorial state tracker detecting milestone completion.
 * **`TutorialOverlay`**: Renders pulse glow rings around target widgets/ports and instructions.
 
-### 6.1 Standard 11-Step Tutorial Progression Sequence
+### 6.1 14-Step Interactive Tutorial Progression Sequence
+ 
+ The onboarding tutorial is structured into a 14-step progression (`TutorialStep`), split into a Basic Tutorial (Steps 1–9) for beginners and an Advanced Tutorial (Steps 10–13) for power users:
 
-| Step | Identifier | Milestone Objective & Completion Trigger |
-| :---: | :--- | :--- |
-| **Step 1** | `STEP_1_OPEN_SEARCH` | Open recipe search dialog via toolbar button or `Space` key |
-| **Step 2** | `STEP_2_PLACE_RECIPE` | Select recipe from search results and place initial machine node on canvas |
-| **Step 3** | `STEP_3_CONNECT_WIRE` | Drag wire from output socket to connect to matching input socket |
-| **Step 4** | `STEP_4_AUTO_RATIO` | Perform 1:1 Auto-Ratio balancing via `Shift + Drag` or dialog button |
-| **Step 5** | `STEP_5_MACHINE_SELECTOR` | **[ADR-005]** Click machine card icon to switch between single/multiblock (e.g. EBF) machines via `MachineSelectorDialog` and inspect capability badges (`🏛 Multiblock`, `♨ Coil`, `⚡ Par Hatch`) |
-| **Step 6** | `STEP_6_CONFIG_ADDONS` | Open `MachineConfigDialog` (`C` key) to configure voltage tiers, heating coils, and energy hatches |
-| **Step 7** | `STEP_7_BOM_DASHBOARD` | Open Bill of Materials dashboard (`B` key or toolbar `[📦 BOM]`) to inspect multiblock parts requirements |
-| **Step 8** | `STEP_8_BATCH_TARGET` | Set batch target quantity (e.g. `1,000x`) on goal nodes and inspect estimated completion time (ETA) |
-| **Step 9** | `STEP_9_COMPOUND_MODULE`| Group multiple nodes into a modular Compound Node via `Ctrl + G` |
-| **Step 10** | `STEP_10_SHARED_POOL` | Group multiple recipes into a Shared Machine Pool frame to calculate time-sharing duty cycle (`Total Duty %`) |
-| **Step 11** | `STEP_11_BATCH_WIRING` | Perform marquee port multi-selection and bundle batch wiring (`Bundle Batch Wiring`) |
+| Step | Identifier | Track | Milestone Objective & Completion Trigger |
+| :---: | :--- | :---: | :--- |
+| **Step 1** | `STEP_1_ADD_RECIPE` | Basic | Click toolbar recipe search button and place a node on canvas |
+| **Step 2** | `STEP_2_DRAG_TO_SEARCH` | Basic | Drag wire from boiler output socket to connect to steam turbine input socket |
+| **Step 3** | `STEP_3_JUNCTION` | Basic | Click steam connection wire to automatically insert a reroute Junction node |
+| **Step 4** | `STEP_4_SHIFT_WIRING` | Basic | Connect with `Shift + Drag` to practice automatic 1:1 ratio matching (Auto-Ratio) |
+| **Step 5** | `STEP_5_JUNCTION_ETA` | Basic | Click junction bottom badge ➔ set target batch (1,000 mB) and inspect real-time Estimated Time (`ET: xx.xs`) |
+| **Step 6** | `STEP_6_MACHINE_SELECTOR` | Basic | Click machine card icon ➔ switch furnace to EBF via `MachineSelectorDialog` and verify capability badges |
+| **Step 7** | `STEP_7_MACHINE_CONFIG` | Basic | Open machine config modal (`C` key) to inspect voltage tiers, heating coils, and overclock stats |
+| **Step 8** | `STEP_8_GROUP_FRAME` | Basic | Drag-select nodes and create a Canvas Group Frame |
+| **Step 9** | `STEP_9_COMPOUND_MODULE`| Basic | Click frame collapse button to compact/expand a modular compound node (Basic tutorial completes) |
+| **Step 10** | `STEP_10_SHARED_MACHINE` | Advanced | Group 3 cutters into a Shared Machine Pool frame to verify quantized machine counts and time-sharing duty (`Total Duty %`) |
+| **Step 11** | `STEP_11_BOM_INSPECTION` | Advanced | Click toolbar `[📦 BOM]` button to inspect multiblock materials bill with quantized shared machine structures |
+| **Step 12** | `STEP_12_JUNCTION_SUPPLY` | Advanced | Right-click junction node ➔ set external supply mode (Infinite Supply $\infty$ / Flow Limit) and inspect feedstock Depletion Time (`DT: xx.xs`) |
+| **Step 13** | `STEP_13_FOLDER_BROWSER` | Advanced | Click toolbar `[📁]` button to open hierarchical page browser drawer and manage canvas pages (Advanced tutorial completes) |
+| **Step 14** | `COMPLETED` | Complete | Tutorial sequence completed and achievement badge awarded |
 
 ---
 

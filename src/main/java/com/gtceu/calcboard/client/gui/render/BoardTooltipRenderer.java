@@ -141,84 +141,7 @@ public final class BoardTooltipRenderer {
                     return;
                 }
 
-                if (widget.getNode().isReroute()) {
-                    List<Component> tooltipLines = new ArrayList<>();
-                    RecipeNode rNode = widget.getNode();
-                    IngredientStack rStack = !rNode.getInputs().isEmpty() ? rNode.getInputs().get(0) : null;
-
-                    if (rStack != null) {
-                        boolean hasIncoming = graph != null && graph.getConnections().stream().anyMatch(e -> e.toNodeId().equals(rNode.getId()) && e.inputIndex() == 0);
-                        double upstreamSupply = (graph != null && hasIncoming) ? com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetInflowRate(graph, rNode, 0) : 0.0;
-                        double downstreamDemand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, rNode, 0, null) : 0.0;
-
-                        boolean isInputSource = !hasIncoming && downstreamDemand > 0.0001;
-                        if (rNode.hasTargetBatch()) {
-                            String titleKey = isInputSource ? "gui.gtcalcboard.dt.tooltip.title" : "gui.gtcalcboard.eta.tooltip.title";
-                            String icon = isInputSource ? "§b📥" : "§6🎯";
-                            tooltipLines.add(Component.literal(icon + " §f" + Component.translatable(titleKey).getString() + " §7(" + rStack.getDisplayName() + "§7)"));
-                        } else {
-                            tooltipLines.add(Component.literal("§6🔀 §f" + rStack.getDisplayName() + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString() + ")"));
-                        }
-
-                        if (hasIncoming) {
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": §a+" + FormatUtil.formatRate(upstreamSupply, rStack)));
-                        }
-                        if (downstreamDemand > 0.0001) {
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §c-" + FormatUtil.formatRate(downstreamDemand, rStack)));
-                        }
-
-                        double netSurplus = upstreamSupply - downstreamDemand;
-                        if (hasIncoming && downstreamDemand > 0.0001) {
-                            if (Math.abs(netSurplus) < 0.0001) {
-                                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §a✔ " + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + " = " + Component.translatable("gui.gtcalcboard.tooltip.demand").getString()));
-                            } else if (netSurplus > 0) {
-                                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §b+" + FormatUtil.formatRate(netSurplus, rStack) + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + ")"));
-                            } else {
-                                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §c-" + FormatUtil.formatRate(-netSurplus, rStack) + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + ")"));
-                            }
-                        } else if (!hasIncoming && downstreamDemand > 0.0001) {
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.dt.tooltip.rate").getString() + ": §e-" + FormatUtil.formatRate(downstreamDemand, rStack) + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_raw").getString() + ")"));
-                        } else if (hasIncoming) {
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §a+" + FormatUtil.formatRate(upstreamSupply, rStack)));
-                        } else {
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §70/s"));
-                        }
-
-                        if (rNode.hasTargetBatch()) {
-                            double targetAmount = rNode.getTargetBatchAmount();
-                            String goalStr = FormatUtil.formatBatchAmount(targetAmount, rStack.isFluid());
-                            String targetKey = isInputSource ? "gui.gtcalcboard.dt.tooltip.target" : "gui.gtcalcboard.eta.tooltip.target";
-                            tooltipLines.add(Component.literal("§7" + Component.translatable(targetKey).getString() + ": §e" + goalStr));
-
-                            if (isInputSource) {
-                                double drainRate = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetOutflowRate(graph, rNode);
-                                double depletionSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateDepletionTime(graph, rNode, targetAmount, drainRate);
-                                String dtFormatted = FormatUtil.formatETA(depletionSec);
-                                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.dt.tooltip.duration").getString() + ": §b" + dtFormatted));
-                            } else {
-                                double effectiveRate = upstreamSupply > 0.0001 ? (netSurplus > 0.0001 ? netSurplus : upstreamSupply) : 0.0;
-                                double etaSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateETA(graph, rNode, targetAmount, effectiveRate);
-                                String etaFormatted = FormatUtil.formatETA(etaSec);
-                                tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.duration").getString() + ": §b" + etaFormatted));
-
-                                double totalEU = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateTotalEnergyForBatch(graph, rNode, targetAmount);
-                                if (totalEU > 0) {
-                                    tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.total_energy").getString() + ": §e" + FormatUtil.formatCompactNumber(totalEU) + " EU"));
-                                }
-                            }
-
-                            tooltipLines.add(Component.literal("§8§m------------------------"));
-                            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.eta.tooltip.click_edit").getString()));
-                            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.shift_reset").getString()));
-                        } else {
-                            tooltipLines.add(Component.literal("§8§m------------------------"));
-                            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.eta.tooltip.click_set").getString()));
-                        }
-                    } else {
-                        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString()));
-                    }
-
-                    renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
+                if (renderRerouteTooltip(graphics, font, screen, widget, graph, mouseX, mouseY)) {
                     return;
                 }
 
@@ -705,6 +628,143 @@ public final class BoardTooltipRenderer {
         }
 
         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.connected_consumers", String.valueOf(stats.connectionCount())).getString()));
+    }
+
+    private static boolean renderRerouteTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, FlowGraph graph, int mouseX, int mouseY) {
+        if (!widget.getNode().isReroute()) {
+            return false;
+        }
+
+        List<Component> tooltipLines = new ArrayList<>();
+        RecipeNode rNode = widget.getNode();
+        IngredientStack rStack = !rNode.getInputs().isEmpty() ? rNode.getInputs().get(0) : null;
+
+        if (rStack == null) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString()));
+            renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
+            return true;
+        }
+
+        boolean hasIncoming = graph != null && graph.getConnections().stream().anyMatch(e -> e.toNodeId().equals(rNode.getId()) && e.inputIndex() == 0);
+        double upstreamSupply = calculateRerouteSupply(rNode, graph, hasIncoming);
+        double downstreamDemand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, rNode, 0, null) : 0.0;
+        boolean hasSupply = hasIncoming || rNode.isExternalSupply() || rNode.isInfiniteSupply();
+        boolean isInputSource = !hasSupply && !rNode.isVoidSink() && downstreamDemand > 0.0001;
+
+        appendRerouteHeader(rNode, rStack, isInputSource, tooltipLines);
+        appendRerouteFlowRates(rNode, rStack, graph, upstreamSupply, downstreamDemand, hasSupply, isInputSource, tooltipLines);
+        appendRerouteTargetBatch(rNode, rStack, graph, upstreamSupply, downstreamDemand, isInputSource, tooltipLines);
+
+        renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
+        return true;
+    }
+
+    private static double calculateRerouteSupply(RecipeNode rNode, FlowGraph graph, boolean hasIncoming) {
+        if (rNode.isInfiniteSupply()) {
+            return Double.POSITIVE_INFINITY;
+        }
+        if (rNode.isExternalSupply()) {
+            return rNode.getExternalSupplyRate();
+        }
+        if (graph != null && hasIncoming) {
+            return com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetInflowRate(graph, rNode, 0);
+        }
+        return 0.0;
+    }
+
+    private static void appendRerouteHeader(RecipeNode rNode, IngredientStack rStack, boolean isInputSource, List<Component> tooltipLines) {
+        if (!rNode.hasTargetBatch()) {
+            tooltipLines.add(Component.literal("§6🔀 §f" + rStack.getDisplayName() + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.reroute_junction").getString() + ")"));
+            return;
+        }
+        String titleKey = isInputSource ? "gui.gtcalcboard.dt.tooltip.title" : "gui.gtcalcboard.eta.tooltip.title";
+        String icon = isInputSource ? "§b📥" : "§6🎯";
+        tooltipLines.add(Component.literal(icon + " §f" + Component.translatable(titleKey).getString() + " §7(" + rStack.getDisplayName() + "§7)"));
+    }
+
+    private static void appendRerouteFlowRates(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, double upstreamSupply, double downstreamDemand, boolean hasSupply, boolean isInputSource, List<Component> tooltipLines) {
+        if (hasSupply) {
+            String supStr = Double.isInfinite(upstreamSupply) ? "∞" : ("+" + FormatUtil.formatRate(upstreamSupply, rStack));
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": §a" + supStr));
+        }
+        if (downstreamDemand > 0.0001) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §c-" + FormatUtil.formatRate(downstreamDemand, rStack)));
+        }
+
+        double netSurplus = upstreamSupply - downstreamDemand;
+        if (hasSupply && downstreamDemand > 0.0001) {
+            appendBalancedRateLine(upstreamSupply, netSurplus, rStack, tooltipLines);
+            return;
+        }
+        if (isInputSource) {
+            double actualDrainRate = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetOutflowRate(graph, rNode);
+            double displayDrain = actualDrainRate > 0.0001 ? actualDrainRate : downstreamDemand;
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.dt.tooltip.rate").getString() + ": §e-" + FormatUtil.formatRate(displayDrain, rStack) + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.unconnected_raw").getString() + ")"));
+            return;
+        }
+        if (hasSupply) {
+            String supStr = Double.isInfinite(upstreamSupply) ? "∞" : ("+" + FormatUtil.formatRate(upstreamSupply, rStack));
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §a" + supStr));
+            return;
+        }
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §70/s"));
+    }
+
+    private static void appendBalancedRateLine(double upstreamSupply, double netSurplus, IngredientStack rStack, List<Component> tooltipLines) {
+        if (Double.isInfinite(upstreamSupply)) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §b+∞ §7(" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + ")"));
+            return;
+        }
+        if (Math.abs(netSurplus) < 0.0001) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §a✔ " + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + " = " + Component.translatable("gui.gtcalcboard.tooltip.demand").getString()));
+            return;
+        }
+        if (netSurplus > 0) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §b+" + FormatUtil.formatRate(netSurplus, rStack) + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + ")"));
+            return;
+        }
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.rate").getString() + ": §c-" + FormatUtil.formatRate(-netSurplus, rStack) + " §7(" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + ")"));
+    }
+
+    private static void appendRerouteTargetBatch(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, double upstreamSupply, double downstreamDemand, boolean isInputSource, List<Component> tooltipLines) {
+        if (!rNode.hasTargetBatch()) {
+            tooltipLines.add(Component.literal("§8§m------------------------"));
+            tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.eta.tooltip.click_set").getString()));
+            return;
+        }
+
+        double targetAmount = rNode.getTargetBatchAmount();
+        String goalStr = FormatUtil.formatBatchAmount(targetAmount, rStack.isFluid());
+        String targetKey = isInputSource ? "gui.gtcalcboard.dt.tooltip.target" : "gui.gtcalcboard.eta.tooltip.target";
+        tooltipLines.add(Component.literal("§7" + Component.translatable(targetKey).getString() + ": §e" + goalStr));
+
+        if (isInputSource) {
+            appendRerouteDepletionTime(graph, rNode, targetAmount, tooltipLines);
+        } else {
+            appendRerouteEstimatedTime(graph, rNode, targetAmount, upstreamSupply, downstreamDemand, tooltipLines);
+        }
+
+        tooltipLines.add(Component.literal("§8§m------------------------"));
+        tooltipLines.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.eta.tooltip.click_edit").getString()));
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.shift_reset").getString()));
+    }
+
+    private static void appendRerouteDepletionTime(FlowGraph graph, RecipeNode rNode, double targetAmount, List<Component> tooltipLines) {
+        double drainRate = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateNetOutflowRate(graph, rNode);
+        double depletionSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateDepletionTime(graph, rNode, targetAmount, drainRate);
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.dt.tooltip.duration").getString() + ": §b" + FormatUtil.formatETA(depletionSec)));
+    }
+
+    private static void appendRerouteEstimatedTime(FlowGraph graph, RecipeNode rNode, double targetAmount, double upstreamSupply, double downstreamDemand, List<Component> tooltipLines) {
+        double netSurplus = upstreamSupply - downstreamDemand;
+        double effectiveRate = upstreamSupply > 0.0001 ? (netSurplus > 0.0001 ? netSurplus : upstreamSupply) : 0.0;
+        double etaSec = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateETA(graph, rNode, targetAmount, effectiveRate);
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.duration").getString() + ": §b" + FormatUtil.formatETA(etaSec)));
+
+        double totalEU = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateTotalEnergyForBatch(graph, rNode, targetAmount);
+        if (totalEU > 0) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.total_energy").getString() + ": §e" + FormatUtil.formatCompactNumber(totalEU) + " EU"));
+        }
     }
 }
 

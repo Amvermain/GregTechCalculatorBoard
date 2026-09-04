@@ -690,36 +690,12 @@ public final class GTCEuBOMHelper {
 
     private static String resolveDisplayName(ResourceLocation id, String fallback) {
         if (id == null) return fallback;
-        try {
-            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                String hn = new net.minecraft.world.item.ItemStack(item).getHoverName().getString();
-                if (com.gtceu.calcboard.api.bom.MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(hn)) {
-                    return hn;
-                }
-            }
-            var blk = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(id);
-            if (blk != null && blk != net.minecraft.world.level.block.Blocks.AIR) {
-                String bn = blk.getName().getString();
-                if (com.gtceu.calcboard.api.bom.MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(bn)) {
-                    return bn;
-                }
-            }
-            String blockTrans = net.minecraft.network.chat.Component.translatable(id.toLanguageKey("block")).getString();
-            if (com.gtceu.calcboard.api.bom.MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(blockTrans)) {
-                return blockTrans;
-            }
-            String itemTrans = net.minecraft.network.chat.Component.translatable(id.toLanguageKey("item")).getString();
-            if (com.gtceu.calcboard.api.bom.MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(itemTrans)) {
-                return itemTrans;
-            }
-        } catch (Throwable ignored) {}
-        return fallback != null && !fallback.isBlank() ? fallback : formatDisplayName(id);
+        return com.gtceu.calcboard.api.bom.BOMDisplayNameResolver.resolve(id, fallback);
     }
 
     private static String formatDisplayName(ResourceLocation id) {
         if (id == null) return "";
-        return MultiblockStructureCatalog.formatMachineName(id.getPath());
+        return com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.formatMachineName(id.getPath());
     }
 }
 

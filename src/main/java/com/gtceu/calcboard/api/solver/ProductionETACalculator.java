@@ -17,53 +17,85 @@ public final class ProductionETACalculator {
     /**
      * Calculates the net inflow rate (units per second) into a specific input port of the target node.
      */
+    private record SupplyHop(String nodeId, int inIdx, double weight) {}
+
     public static double calculateNetInflowRate(FlowGraph graph, RecipeNode targetNode, int inputPortIndex) {
         if (graph == null || targetNode == null) return 0.0;
+        if (targetNode.isReroute() && targetNode.isInfiniteSupply()) {
+            return Double.POSITIVE_INFINITY;
+        }
 
-        record SupplyHop(String nodeId, int inIdx, double weight) {}
         Queue<SupplyHop> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
 
         queue.add(new SupplyHop(targetNode.getId(), inputPortIndex, 1.0));
         visited.add(targetNode.getId() + ":" + inputPortIndex);
 
-        double totalIncomingSupply = 0.0;
+        double totalIncomingSupply = targetNode.isReroute() && targetNode.isExternalSupply()
+                ? targetNode.getExternalSupplyRate()
+                : 0.0;
 
         while (!queue.isEmpty()) {
             SupplyHop hop = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(hop.nodeId) && edge.inputIndex() == hop.inIdx) {
-                    RecipeNode p = graph.findNodeById(edge.fromNodeId());
-                    if (p != null) {
-                        if (p.isReroute()) {
-                            int outDegree = 0;
-                            for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                                if (outEdge.fromNodeId().equals(p.getId())) {
-                                    outDegree++;
-                                }
-                            }
-                            double nextWeight = hop.weight / Math.max(1, outDegree);
-                            if (visited.add(p.getId() + ":0")) {
-                                queue.add(new SupplyHop(p.getId(), 0, nextWeight));
-                            }
-                        } else if (edge.outputIndex() < p.getOutputs().size()) {
-                            IngredientStack outStack = p.getOutputs().get(edge.outputIndex());
-                            double pRate = p.calculateSingleMachineOutputRate(outStack) * p.getMachineCount();
-
-                            int outDegree = 0;
-                            for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-                                if (outEdge.fromNodeId().equals(p.getId()) && outEdge.outputIndex() == edge.outputIndex()) {
-                                    outDegree++;
-                                }
-                            }
-                            totalIncomingSupply += (pRate * hop.weight) / Math.max(1, outDegree);
-                        }
-                    }
+                if (!edge.toNodeId().equals(hop.nodeId) || edge.inputIndex() != hop.inIdx) {
+                    continue;
                 }
+                totalIncomingSupply += processSupplyEdge(graph, edge, hop, queue, visited);
             }
         }
         return totalIncomingSupply;
     }
+
+    private static double processSupplyEdge(FlowGraph graph, FlowGraph.ConnectionEdge edge, SupplyHop hop, Queue<SupplyHop> queue, Set<String> visited) {
+        RecipeNode p = graph.findNodeById(edge.fromNodeId());
+        if (p == null) return 0.0;
+
+        if (p.isReroute()) {
+            if (p.isInfiniteSupply()) {
+                return Double.POSITIVE_INFINITY;
+            }
+            if (p.isExternalSupply()) {
+                int outDegree = countProducerPortOutDegree(graph, p.getId(), 0);
+                return (p.getExternalSupplyRate() * hop.weight) / Math.max(1, outDegree);
+            }
+            enqueueRerouteHop(graph, p, hop.weight, queue, visited);
+            return 0.0;
+        }
+        if (edge.outputIndex() >= p.getOutputs().size() || !p.isOperational(graph)) {
+            return 0.0;
+        }
+
+        IngredientStack outStack = p.getOutputs().get(edge.outputIndex());
+        double pRate = p.calculateSingleMachineOutputRate(outStack) * p.getMachineCount() * p.getEfficiency();
+        int outDegree = countProducerPortOutDegree(graph, p.getId(), edge.outputIndex());
+        return (pRate * hop.weight) / Math.max(1, outDegree);
+    }
+
+    private static void enqueueRerouteHop(FlowGraph graph, RecipeNode p, double currentWeight, Queue<SupplyHop> queue, Set<String> visited) {
+        int outDegree = 0;
+        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+            if (outEdge.fromNodeId().equals(p.getId())) {
+                outDegree++;
+            }
+        }
+        double nextWeight = currentWeight / Math.max(1, outDegree);
+        if (visited.add(p.getId() + ":0")) {
+            queue.add(new SupplyHop(p.getId(), 0, nextWeight));
+        }
+    }
+
+    private static int countProducerPortOutDegree(FlowGraph graph, String producerId, int outputIndex) {
+        int outDegree = 0;
+        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+            if (outEdge.fromNodeId().equals(producerId) && outEdge.outputIndex() == outputIndex) {
+                outDegree++;
+            }
+        }
+        return outDegree;
+    }
+
+    private static final double EPSILON = 1e-7;
 
     public static double calculateETA(double targetAmount, double netRatePerSec) {
         if (targetAmount <= 0.0) return 0.0;
@@ -79,7 +111,7 @@ public final class ProductionETACalculator {
         if (cycleDuration > 0.0001) {
             double cycleCapacity = netRatePerSec * cycleDuration;
             if (cycleCapacity > 1e-9) {
-                long cycles = (long) Math.ceil(targetAmount / cycleCapacity);
+                long cycles = (long) Math.ceil((targetAmount / cycleCapacity) - EPSILON);
                 return cycles * cycleDuration;
             }
         }
@@ -100,7 +132,7 @@ public final class ProductionETACalculator {
         if (cycleDuration > 0.0001) {
             double cycleCapacity = netOutflowRate * cycleDuration;
             if (cycleCapacity > 1e-9) {
-                long cycles = (long) Math.ceil(supplyAmount / cycleCapacity);
+                long cycles = (long) Math.ceil((supplyAmount / cycleCapacity) - EPSILON);
                 return cycles * cycleDuration;
             }
         }
@@ -163,10 +195,11 @@ public final class ProductionETACalculator {
         return maxDuration;
     }
 
+    private record ConsumerHop(String nodeId, double weight) {}
+
     public static double calculateNetOutflowRate(FlowGraph graph, RecipeNode sourceNode) {
         if (graph == null || sourceNode == null) return 0.0;
 
-        record ConsumerHop(String nodeId, double weight) {}
         Queue<ConsumerHop> queue = new ArrayDeque<>();
         Set<String> visited = new HashSet<>();
 
@@ -178,30 +211,43 @@ public final class ProductionETACalculator {
         while (!queue.isEmpty()) {
             ConsumerHop hop = queue.poll();
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.fromNodeId().equals(hop.nodeId)) {
-                    RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-                    if (consumer != null) {
-                        if (consumer.isReroute()) {
-                            if (visited.add(consumer.getId())) {
-                                queue.add(new ConsumerHop(consumer.getId(), hop.weight));
-                            }
-                        } else if (edge.inputIndex() < consumer.getInputs().size()) {
-                            IngredientStack inStack = consumer.getInputs().get(edge.inputIndex());
-                            double cRate = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount();
-
-                            int inDegree = 0;
-                            for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
-                                if (inEdge.toNodeId().equals(consumer.getId()) && inEdge.inputIndex() == edge.inputIndex()) {
-                                    inDegree++;
-                                }
-                            }
-                            totalOutflow += (cRate * hop.weight) / Math.max(1, inDegree);
-                        }
-                    }
+                if (!edge.fromNodeId().equals(hop.nodeId)) {
+                    continue;
                 }
+                totalOutflow += processConsumerEdge(graph, edge, hop, queue, visited);
             }
         }
         return totalOutflow;
+    }
+
+    private static double processConsumerEdge(FlowGraph graph, FlowGraph.ConnectionEdge edge, ConsumerHop hop, Queue<ConsumerHop> queue, Set<String> visited) {
+        RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+        if (consumer == null) return 0.0;
+
+        if (consumer.isReroute()) {
+            if (visited.add(consumer.getId())) {
+                queue.add(new ConsumerHop(consumer.getId(), hop.weight));
+            }
+            return 0.0;
+        }
+        if (edge.inputIndex() >= consumer.getInputs().size() || !consumer.isOperational(graph)) {
+            return 0.0;
+        }
+
+        IngredientStack inStack = consumer.getInputs().get(edge.inputIndex());
+        double cRate = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount() * consumer.getEfficiency();
+        int inDegree = countConsumerPortInDegree(graph, consumer.getId(), edge.inputIndex());
+        return (cRate * hop.weight) / Math.max(1, inDegree);
+    }
+
+    private static int countConsumerPortInDegree(FlowGraph graph, String consumerId, int inputIndex) {
+        int inDegree = 0;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (inEdge.toNodeId().equals(consumerId) && inEdge.inputIndex() == inputIndex) {
+                inDegree++;
+            }
+        }
+        return inDegree;
     }
 
     /**
@@ -244,14 +290,14 @@ public final class ProductionETACalculator {
     public static double calculateTotalEnergyForBatch(FlowGraph graph, RecipeNode targetNode, int targetPortIndex, double targetAmount) {
         if (graph == null || targetNode == null || targetAmount <= 0.0) return 0.0;
         double netRate = calculateNetInflowRate(graph, targetNode, targetPortIndex);
-        double etaSec = calculateETA(targetAmount, netRate);
+        double etaSec = calculateETA(graph, targetNode, targetAmount, netRate);
         if (Double.isInfinite(etaSec) || etaSec <= 0.0) return 0.0;
 
         Set<RecipeNode> upstreams = collectUpstreamNodes(graph, targetNode);
         double totalEUt = 0.0;
         for (RecipeNode n : upstreams) {
-            if (n.isReroute() || n.isGenerator()) continue;
-            totalEUt += n.getTotalEUt();
+            if (n.isReroute() || n.isGenerator() || !n.isOperational(graph)) continue;
+            totalEUt += n.getTotalEUt() * n.getEfficiency();
         }
 
         return totalEUt * 20.0 * etaSec;
@@ -271,7 +317,7 @@ public final class ProductionETACalculator {
         Map<IngredientStack, Double> result = new LinkedHashMap<>();
         if (graph == null || targetNode == null || targetAmount <= 0.0) return result;
         double netRate = calculateNetInflowRate(graph, targetNode, targetPortIndex);
-        double etaSec = calculateETA(targetAmount, netRate);
+        double etaSec = calculateETA(graph, targetNode, targetAmount, netRate);
         if (Double.isInfinite(etaSec) || etaSec <= 0.0) return result;
 
         Set<RecipeNode> upstreams = collectUpstreamNodes(graph, targetNode);

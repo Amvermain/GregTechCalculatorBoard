@@ -151,7 +151,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0-beta.2.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0.jar`.
 
 ---
 

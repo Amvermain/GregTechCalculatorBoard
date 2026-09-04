@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.event.CatalogLifecycleEvent;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
+import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -382,18 +383,35 @@ public class MultiblockStructureCatalog {
             ModAdapterRegistry.accumulateStructureSlots(itemId, category, amount, slots);
         }
 
+        private static boolean isSteamController(ResourceLocation controllerId) {
+            if (controllerId == null) return false;
+            return MultiblockDetector.isSteamMultiblock(controllerId)
+                    || controllerId.getPath().startsWith("steam_");
+        }
+
+        private static boolean isSteamStructurePart(ResourceLocation itemId) {
+            if (itemId == null) return false;
+            String path = itemId.getPath().toLowerCase(Locale.ROOT);
+            return path.startsWith("steam_import_")
+                    || path.startsWith("steam_export_")
+                    || path.startsWith("steam_input_")
+                    || path.startsWith("steam_output_")
+                    || path.equals("steam_bus")
+                    || path.equals("steam_hatch");
+        }
+
         private static MultiblockStructureDef createMultiblockDef(
                 ControllerInfo controllerInfo,
                 List<MultiblockStructurePart> parts,
                 StructureSlotCounts slots
         ) {
             Set<ResourceLocation> candidateBlocks = new HashSet<>();
-            boolean isSteam = controllerInfo.id.getPath().startsWith("steam_") || controllerInfo.id.getPath().contains("_steam_");
+            boolean isSteam = isSteamController(controllerInfo.id);
 
             for (MultiblockStructurePart p : parts) {
                 if (p == null || p.itemId() == null) continue;
                 candidateBlocks.add(p.itemId());
-                if (p.itemId().getPath().toLowerCase(Locale.ROOT).contains("steam")) {
+                if (isSteamStructurePart(p.itemId())) {
                     isSteam = true;
                 }
             }

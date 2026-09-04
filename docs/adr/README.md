@@ -56,6 +56,7 @@ stateDiagram-v2
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 | **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PROPOSED` | `v2.1.0` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
+| **[RFC-020](../RFC_020_HIGH_SPEED_FLOW_BATCHING_AND_EFFICIENCY_MODULATION.md)** | 고속 레시피 애니메이션 배치, 기계 효율 연동형 출력 와이어 흐름 및 분기 노드 우선 배분 명세<br/>*(High-Speed Recipe Animation Batching, Machine Efficiency Outgoing Wire Flow & Priority Split)* | 🟡 `PROPOSED` | `v2.2.0` | 2026-09-04 | 1초 미만 고속 레시피 $M$배수 파티클 묶음, 기계 가동률($\eta$) 비례 출력선 감속 듀티 사이클, 정션 노드 고정 유량 우선 배분 |
 
 
 

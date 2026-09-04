@@ -633,7 +633,9 @@ public class NodeCardRenderer {
             graphics.renderOutline(x + 13, y + 1, 18, 9, 0xFFA855F7);
             graphics.drawString(font, "VOID", x + 15, y + 1, 0xFFA855F7, false);
         } else if (node.isExternalSupply()) {
-            String rateStr = "+" + com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(node.getExternalSupplyRate(), false);
+            IngredientStack rStack = !node.getInputs().isEmpty() ? node.getInputs().get(0) : null;
+            boolean isFluid = rStack != null && rStack.isFluid();
+            String rateStr = "+" + com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(node.getExternalSupplyRate(), isFluid);
             int rw = font.width(rateStr);
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 200);
@@ -737,6 +739,7 @@ public class NodeCardRenderer {
 
     public static boolean isInputSourceJunction(FlowGraph graph, RecipeNode node) {
         if (graph == null || node == null || !node.isReroute()) return false;
+        if (node.isExternalSupply() || node.isInfiniteSupply() || node.isVoidSink()) return false;
         boolean hasIncoming = false;
         boolean hasOutgoing = false;
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {

@@ -35,7 +35,7 @@ public class CreateNewAgeRecipeHandler {
         if (catId != null && catId.getNamespace().equals(MOD_ID)) {
             String path = catId.getPath().toLowerCase(Locale.ROOT);
 
-            if (path.contains("energising") || path.contains("energizing")) {
+            if ("energising".equals(path) || "energizing".equals(path)) {
                 details.energyType = EnergyType.ELECTRIC_FE;
                 int duration = 100;
                 double energy = 5000.0;
@@ -104,7 +104,7 @@ public class CreateNewAgeRecipeHandler {
         String name = getItemDisplayName(itemId, displayName);
 
         if (namespace.equals(MOD_ID)) {
-            if (path.contains("generator_coil")) {
+            if ("generator_coil".equals(path)) {
                 RecipeNode node = RecipeNode.create(name != null ? name : "Generator Coil", 20.0, 512.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(true);
@@ -112,7 +112,7 @@ public class CreateNewAgeRecipeHandler {
                 node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:generator"));
                 node.addInput(IngredientStack.stressUnit(768.0)); // 24.0 base stress * 32 RPM
                 return node;
-            } else if (path.contains("carbon_brushes")) {
+            } else if ("carbon_brushes".equals(path)) {
                 RecipeNode node = RecipeNode.create(name != null ? name : "Carbon Brushes", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setGenerator(true);
@@ -152,7 +152,7 @@ public class CreateNewAgeRecipeHandler {
                 node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:stirling_engine"));
                 node.addOutput(IngredientStack.stressUnit(1024.0));
                 return node;
-            } else if (path.contains("solar_heating_plate")) {
+            } else if ("solar_heating_plate".equals(path)) {
                 RecipeNode node = RecipeNode.create(name != null ? name : "Solar Heating Plate", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.KINETIC_SU);
                 node.setGenerator(true);
@@ -160,7 +160,7 @@ public class CreateNewAgeRecipeHandler {
                 node.setRecipeCategoryId(ResourceLocation.tryParse("create_new_age:solar_heat"));
                 node.addOutput(IngredientStack.stressUnit(256.0));
                 return node;
-            } else if (path.contains("energiser")) {
+            } else if (path.startsWith("energiser") || path.startsWith("energizer")) {
                 RecipeNode node = RecipeNode.create(name != null ? name : "Energiser", 20.0, 256.0, GTVoltageTier.ULV);
                 node.setEnergyType(EnergyType.ELECTRIC_FE);
                 node.setMachineIcon(itemId);

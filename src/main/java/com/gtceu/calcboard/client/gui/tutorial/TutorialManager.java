@@ -14,7 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
 /**
- * Manages the state machine and progression of the 12-step interactive onboarding tutorial.
+ * Manages the state machine and progression of the 14-step interactive onboarding tutorial.
  */
 public class TutorialManager {
     private static final TutorialManager INSTANCE = new TutorialManager();

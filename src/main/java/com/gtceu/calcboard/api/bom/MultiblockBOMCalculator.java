@@ -154,31 +154,7 @@ public class MultiblockBOMCalculator {
 
     private static String resolveDisplayName(ResourceLocation id) {
         if (id == null) return "";
-        try {
-            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(id);
-            if (item != null && item != net.minecraft.world.item.Items.AIR) {
-                String hn = new net.minecraft.world.item.ItemStack(item).getHoverName().getString();
-                if (MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(hn)) {
-                    return hn;
-                }
-            }
-            var blk = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(id);
-            if (blk != null && blk != net.minecraft.world.level.block.Blocks.AIR) {
-                String bn = blk.getName().getString();
-                if (MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(bn)) {
-                    return bn;
-                }
-            }
-            String blockTrans = net.minecraft.network.chat.Component.translatable(id.toLanguageKey("block")).getString();
-            if (MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(blockTrans)) {
-                return blockTrans;
-            }
-            String itemTrans = net.minecraft.network.chat.Component.translatable(id.toLanguageKey("item")).getString();
-            if (MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(itemTrans)) {
-                return itemTrans;
-            }
-        } catch (Throwable ignored) {}
-        return MultiblockStructureCatalog.formatMachineName(id.getPath());
+        return BOMDisplayNameResolver.resolve(id, "");
     }
 
     private static class ItemAggregationBuilder {

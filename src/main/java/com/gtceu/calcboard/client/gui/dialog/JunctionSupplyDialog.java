@@ -27,7 +27,7 @@ public class JunctionSupplyDialog {
     private SupplyMode selectedMode = SupplyMode.NONE;
     private EditBox rateEditBox;
 
-    private static final int DIALOG_WIDTH = 260;
+    private static final int DIALOG_WIDTH = 300;
     private static final int DIALOG_HEIGHT = 185;
 
     public JunctionSupplyDialog(BoardScreen parent) {
@@ -41,9 +41,17 @@ public class JunctionSupplyDialog {
         this.visible = true;
 
         Font font = Minecraft.getInstance().font;
-        this.rateEditBox = new EditBox(font, 0, 0, 90, 16, Component.translatable("gui.gtcalcboard.junction.supply_rate"));
+        int screenWidth = getScreenWidth();
+        int screenHeight = getScreenHeight();
+        int x = (screenWidth - DIALOG_WIDTH) / 2;
+        int y = (screenHeight - DIALOG_HEIGHT) / 2;
+        int editBoxX = x + DIALOG_WIDTH - 85;
+        int editBoxY = y + 50 + SupplyMode.FIXED_RATE.ordinal() * 20;
+
+        this.rateEditBox = new EditBox(font, editBoxX, editBoxY, 75, 16, Component.translatable("gui.gtcalcboard.junction.supply_rate"));
         this.rateEditBox.setMaxLength(16);
         this.rateEditBox.setValue(node.getExternalSupplyRate() > 0 ? String.format("%.2f", node.getExternalSupplyRate()) : "100.0");
+        this.rateEditBox.setFocused(this.selectedMode == SupplyMode.FIXED_RATE);
     }
 
     public void close() {
@@ -110,7 +118,7 @@ public class JunctionSupplyDialog {
             graphics.drawString(font, modeLabel, x + 28, optY + 3, textColor, false);
 
             if (mode == SupplyMode.FIXED_RATE && isSelected) {
-                rateEditBox.setX(x + DIALOG_WIDTH - 100);
+                rateEditBox.setX(x + DIALOG_WIDTH - 85);
                 rateEditBox.setY(optY);
                 rateEditBox.render(graphics, mouseX, mouseY, 0);
             }
@@ -142,33 +150,74 @@ public class JunctionSupplyDialog {
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
 
-        // Close [X]
-        int closeX = x + DIALOG_WIDTH - 18;
-        int closeY = y + 4;
-        if (mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= closeY && mouseY <= closeY + 14) {
+        if (checkCloseClicked(x, y, mouseX, mouseY)) {
             close();
             return true;
         }
 
-        // Radio Selection
+        if (selectedMode == SupplyMode.FIXED_RATE && checkEditBoxClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+
+        if (checkRadioSelection(x, y, mouseX, mouseY)) {
+            return true;
+        }
+
+        if (checkFooterButtons(x, y, mouseX, mouseY)) {
+            return true;
+        }
+
+        return true;
+    }
+
+    private boolean checkCloseClicked(int x, int y, double mouseX, double mouseY) {
+        int closeX = x + DIALOG_WIDTH - 18;
+        int closeY = y + 4;
+        return mouseX >= closeX && mouseX <= closeX + 14 && mouseY >= closeY && mouseY <= closeY + 14;
+    }
+
+    private boolean checkEditBoxClicked(double mouseX, double mouseY, int button) {
+        if (rateEditBox == null) return false;
+        if (isMouseOverEditBox(mouseX, mouseY)) {
+            rateEditBox.setFocused(true);
+            rateEditBox.mouseClicked(mouseX, mouseY, button);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isMouseOverEditBox(double mouseX, double mouseY) {
+        if (rateEditBox == null) return false;
+        return mouseX >= rateEditBox.getX() && mouseX <= rateEditBox.getX() + rateEditBox.getWidth()
+                && mouseY >= rateEditBox.getY() && mouseY <= rateEditBox.getY() + rateEditBox.getHeight();
+    }
+
+    private boolean checkRadioSelection(int x, int y, double mouseX, double mouseY) {
         int optStartY = y + 50;
         int optH = 20;
         SupplyMode[] modes = SupplyMode.values();
         for (int i = 0; i < modes.length; i++) {
             SupplyMode mode = modes[i];
             int optY = optStartY + i * optH;
-            if (mouseX >= x + 10 && mouseX <= x + DIALOG_WIDTH - 10 && mouseY >= optY && mouseY <= optY + 16) {
+            int rightBound = (mode == SupplyMode.FIXED_RATE && selectedMode == mode && rateEditBox != null)
+                    ? rateEditBox.getX() - 4
+                    : x + DIALOG_WIDTH - 10;
+
+            if (mouseX >= x + 10 && mouseX <= rightBound && mouseY >= optY && mouseY <= optY + 16) {
                 this.selectedMode = mode;
+                if (mode == SupplyMode.FIXED_RATE && rateEditBox != null) {
+                    rateEditBox.setFocused(true);
+                } else if (rateEditBox != null) {
+                    rateEditBox.setFocused(false);
+                }
                 Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.2F));
                 return true;
             }
         }
+        return false;
+    }
 
-        if (selectedMode == SupplyMode.FIXED_RATE && rateEditBox != null) {
-            rateEditBox.mouseClicked(mouseX, mouseY, button);
-        }
-
-        // Footer Buttons
+    private boolean checkFooterButtons(int x, int y, double mouseX, double mouseY) {
         int btnW = 70;
         int btnH = 18;
         int btnY = y + DIALOG_HEIGHT - 24;
@@ -184,8 +233,7 @@ public class JunctionSupplyDialog {
             applyChanges();
             return true;
         }
-
-        return true; // Modal blocks canvas clicks
+        return false;
     }
 
     private void applyChanges() {

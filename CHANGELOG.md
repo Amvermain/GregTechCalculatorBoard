@@ -5,6 +5,48 @@
 </p>
 
 
+## [2.1.0] - 2026-09-04
+
+### Added
+- **EMI Hover Slot Synchronous Highlighting (`EmiPreviewWidgetHolder`)**:
+  - Implemented real-time synchronous hovering between EMI recipe viewer widgets and canvas node ports. Hovering any input/output slot in the EMI dialog instantly highlights corresponding item/fluid ports and connecting wires across the board canvas with luminous cyan outlines for instant visual flow tracing.
+- **Interactive Junction Node Estimated Completion Time (ET / DT) & 14-Step Tutorial Progression**:
+  - Completely overhauled the onboarding tutorial into a structured 14-step progressive curriculum (`TutorialStep`, Steps 1–14) with seamless mode separation:
+    - **Basic Tutorial (Steps 1–9)**: Added Step 5 (`STEP_5_JUNCTION_ETA`) directly into the beginner curriculum. Immediately following boiler-to-turbine wiring, users practice clicking the junction bottom badge, typing a target batch size (e.g., 1,000 mB), and observing the real-time Estimated Completion Time (`ET: 2.0s`) recalculation. Pressing Enter automatically commits and transitions to the Machine Selector step.
+    - **Advanced Tutorial (Steps 10–13)**: Enhanced Step 12 (`STEP_12_JUNCTION_SUPPLY`) for advanced junction mechanics, including right-click external supply configuration (Infinite Supply ∞ and Fixed Flow Limits to isolate upstream deficits) and live feedstock Depletion Time (`DT: xx.xs`).
+  - Added in-depth Junction Node ET/DT documentation to the in-game Guide Dialog (Chapter 3 Wiring and Chapter 8 Shortcuts), detailing left-click batch entry, right-click external supply config, and Shift+right-click reset operations.
+
+### Changed & Improved
+- **Virtual Viewport GUI Scale Decoupling & Coordinate Consistency**:
+  - Refined mouse hitbox translation, dialog dragging offsets, toolbar scissor clipping, and sticky note text rendering under custom board GUI scale settings (`boardGuiScale`), ensuring pixel-perfect alignment and zero coordinate drift regardless of custom UI scales.
+- **Four-Language Localization Parity (i18n)**:
+  - Synchronized all 974 localization keys with 100% parity across English (`en_us`), Korean (`ko_kr`), Simplified Chinese (`zh_cn`), and Russian (`ru_ru`), passing `tools/check_i18n.py` with zero missing keys or format token mismatches.
+
+### Fixed
+- **Shared Machine Multiblock BOM Duplication & Fractional Duty Counting**:
+  - Fixed a critical calculation defect in `MultiblockBOMCalculator` where multiblock machine structures within Shared Machine Pools (`CanvasGroupFrame`) were duplicated across multiple fractional-duty recipes. Instead of multiplying structure blocks by individual recipe lines, the system now computes the sum of duty cycles across shared recipes and quantizes them to physical machine counts using ceiling rounding. This prevents duplicate counting of machine casings, heating coils, buses, hatches, and controllers in the Bill of Materials.
+  - Introduced `MultiblockBOMSummary` and `MultiblockStructurePart` models to cleanly separate structure part requirements from raw recipe bills, properly formatting localized structure component names and required quantities.
+- **EMI Item Tooltip Depth Buffer (Z-Index) Clipping & Z-Fighting**:
+  - Resolved an issue in `BoardTooltipRenderer` where depth buffer values written during EMI 3D item model rendering caused subsequent tooltip backgrounds and text to be clipped or punched through by background item models. Added explicit draw call flushing (`graphics.flush()`), depth buffer clearing (`GL11.GL_DEPTH_BUFFER_BIT`), disabled depth testing, and applied Z-axis translation (`+1000.0f`) to guarantee pristine top-level tooltip rendering.
+- **Tutorial Step Machine Config Button Glowing & State Transition Stability**:
+  - Improved machine configuration button glowing indicators and step completion detection when entering the machine configuration stage in `TutorialManager`.
+- **Junction Node Estimated Completion Time (ET) & Batch Energy Distortion Under Supply Starvation (`ProductionETACalculator`)**:
+  - Fixed an issue where `calculateNetInflowRate`, `calculateNetOutflowRate`, and `calculateTotalEnergyForBatch` assumed theoretical 100% machine output regardless of upstream raw material deficits, calculating unrealistically optimistic completion times (ET) even when machines operated at reduced efficiency.
+  - Integrated real-time machine operating efficiency (`getEfficiency()`) and operational status (`isOperational()`) directly into the flow traversal solver. Under feedstock bottlenecks or partial starvation, the calculated inflow rate now accurately reflects derated throughput, ensuring real-time ET and total batch energy dynamically stretch in proportion to real factory constraints.
+- **Junction External Supply Config Dialog EditBox Hitbox & Label Overlap (`JunctionSupplyDialog`)**:
+  - Fixed an issue where the radio option row click-bounds intercepted clicks intended for the numeric `Fixed External Supply Rate` text box, preventing the input field from receiving focus or accepting keyboard input.
+  - Expanded dialog width from 260px to 300px to prevent the English/Russian supply rate label from overlapping the rate edit box (`...Supply Rat[ 100.00 ]`), and added auto-focusing on the text field when selecting the Fixed Rate radio option.
+- **Junction External Supply Misclassification as Depletion Buffer & Inflow Calculation Defect (`ProductionETACalculator`, `NodeCardRenderer`)**:
+  - Fixed an issue where a junction node with an external supply (fixed rate or infinite supply ∞) but without incoming upstream wires was erroneously classified as an unconnected feedstock buffer (`isInputSourceJunction`, Unconnected Raw Input), incorrectly computing and displaying Depletion Time (`DT`) instead of Estimated Completion Time (`ET`).
+  - Corrected `calculateNetInflowRate` to properly recognize a junction node's external supply rate, resolving an issue where external supply yielded 0.0 inflow, fixing both junction ETA calculations and flow propagation into downstream consumer machines.
+- **Junction Hover Tooltip Drain Rate and Depletion Time Numerical Discrepancy (`BoardTooltipRenderer`)**:
+  - Resolved a numerical contradiction in junction hover tooltips where the displayed `Drain Rate` showed theoretical unconstrained demand (e.g., -62 mB/s), while `Depletion Time` was divided by the derated machine throughput (30.86 mB/s) resulting in an inconsistent duration (32.4s instead of 1,000 / 62 = 16.1s). The tooltip now displays the actual operational drain rate (`calculateNetOutflowRate`) consistent with the depletion timer.
+- **Junction External Supply Badge Fluid Rate Formatting (`NodeCardRenderer`)**:
+  - Fixed an issue where external supply badges rendered on junction node cards omitted fluid type detection (`isFluid()`), incorrectly formatting fluid rates as item units (`+31 /s` instead of `+31 mB/s`).
+- **Discrete Machine Cycle Floating-Point Precision & Doubled Duration Defect (`ProductionETACalculator`)**:
+  - Fixed a critical numerical defect where target batch quantities matching an exact single machine cycle (e.g., 1,000 mB for a 16.20s LCR run) were computed as two cycles (16.2s * 2 = 32.4s, producing 62 mB/s * 32.4s = 2008 mB). Double-precision floating point rounding ((1000.0 / 16.2) * 16.2 = 999.9999999999999 mB) caused 1000.0 / 999.9999999999999 = 1.0000000000000002, which `Math.ceil` rounded up to 2 discrete cycles.
+  - Implemented an epsilon tolerance guard (1e-7) in `calculateETA` and `calculateDepletionTime` to eliminate false cycle increments, correctly computing 16.2s duration and consistent batch energy (311k EU).
+
 ## [2.1.0-beta.2] - 2026-09-04
 
 ### Added

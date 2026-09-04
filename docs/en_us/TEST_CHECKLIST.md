@@ -22,10 +22,12 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Basic Wiring**: Verify spline wire connects when clicking an output port (green) $\rightarrow$ input port (blue).
 - [ ] **✨ Shift + Connect (1:1 Auto-Ratio Matching)**:
   - [ ] Holding `Shift` while connecting analyzes source production vs target consumption, automatically scaling target machine count 1:1 (e.g., 500 mB/s source $\rightarrow$ 100 mB/s consumer scales machine count to **5.0**).
-- [ ] **Reroute Junctions**:
+- [ ] **Reroute Junctions & Target Batch ET/DT**:
   - [ ] **Double-clicking** an existing wire immediately inserts a zero-cost [🔀 Reroute Junction] node.
   - [ ] Flow and item distribution split correctly through junction nodes to multiple consumers.
   - [ ] `Shift + Connect` from junction nodes calculates ratios based on diverted flow.
+  - [ ] **Target Batch Quantity (ET / DT)**: Clicking the bottom badge on a junction opens the inline target batch editor. Setting a quantity displays real-time Estimated Completion Time (`ET: xx.xs`) or Depletion Time (`DT: xx.xs`).
+  - [ ] **Junction Supply & Reset**: Right-clicking opens supply mode dialog (Infinite/Fixed Rate); `Shift + Right-Click` resets target batch quantity to 0.
 - [ ] **Wire Cutting**: Right-clicking a wire or clicking a connected socket port severs the connection immediately.
 - [ ] **Drag-to-Search**:
   - [ ] Dragging from a port into empty canvas displays a 4-button quick action marker (🔍 Search, ➕ Junction, 📋 Copy, etc.).
@@ -53,8 +55,22 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `[Aa 1.0x]` button, wheel scroll, and `+`/`-` shortcuts adjust UI scaling from 0.75x to 1.30x.
   - [ ] Click hitboxes align accurately across all scales via Matrix Scaling & Virtual Mouse inversion.
 - [ ] **Global Fluid Unit Mode (FluidUnitMode)**:
-  - [ ] Toolbar button or `Shift+T` cycles between `Auto` ➔ `Always mB` ➔ `Always B`.
-  - [ ] Fluid numbers across all canvas nodes and tooltips unify immediately.
+### 1.5 I/O Port Hiding & Smart Inline Text Editing
+- [ ] **I/O Port Hiding & Selective Restore**:
+  - [ ] Right-clicking any socket port severs connected wires and hides that specific port.
+  - [ ] Cards with hidden ports display pill badges (`N Outputs hidden`, `N Inputs hidden`, `N Ports hidden`) at bottom right.
+  - [ ] Clicking the pill badge opens `HiddenPortsPopup` listing all hidden ports with `[IN]`/`[OUT]` tags and ingredient icons.
+  - [ ] Clicking an entry in the popup unhides that port and updates card height/ports immediately.
+  - [ ] Hidden port sets are persisted across save/load, multiplayer packets, and blueprint exports.
+- [ ] **Smart Inline Text Editing Engine (`InlineTextEditor`)**:
+  - [ ] Clicking text fields (name, machine count, parallel count, target batch) enters inline editing mode.
+  - [ ] Mouse dragging selects text ranges; double-clicking selects all.
+  - [ ] Arrow keys move cursor; `Shift + Arrow` creates selection range.
+  - [ ] `Ctrl + Left/Right` jumps across word boundaries; `Ctrl + Backspace/Delete` deletes words.
+  - [ ] `Ctrl + A` selects all text; `Ctrl + C / X / V` copies, cuts, and pastes clipboard text.
+  - [ ] Global hotkeys are not triggered while typing in inline text editors.
+- [ ] **ArchUnit Architectural Boundary Enforcement**:
+  - [ ] `ArchitectureTest` automated JUnit suite passes 100% without architectural violations.
 
 ---
 
@@ -239,9 +255,15 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 
 ## 7. UI/UX, Internationalization & Dialogs (i18n & Dialogs)
 
-- [ ] **Interactive 15s Tutorial**:
-  - [ ] 7-step guided highlight tour (Node placement $\rightarrow$ Module packaging) operates smoothly.
+- [ ] **Interactive Onboarding Tutorial & Advanced Tutorial (14 Steps)**:
+  - [ ] 9-step basic guided highlight tour (Node placement $\rightarrow$ Junction Target Batch & ET calculation $\rightarrow$ Machine Selector $\rightarrow$ Module packaging) operates smoothly.
+  - [ ] Advanced tutorial includes Step 10 (Shared Machine Pool), Step 11 (BOM Inspection), Step 12 (Junction Supply Mode $\infty$ / Flow Limit & Depletion Time DT), and Step 13 (Folder Browser & File Management).
   - [ ] Tutorial completion toast and badge award.
+- [ ] **Shared Machine Multiblock BOM Aggregation (`MultiblockBOMCalculator`)**:
+  - [ ] Shared Machine Pools (`CanvasGroupFrame`) group identical multiblocks and quantize to ceiling machine count, avoiding duplicated casing/coil/hatch BOM counts.
+- [ ] **EMI Slot Hover Highlighting & Tooltip Depth Buffer (Z-Index) Integrity**:
+  - [ ] Hovering slots inside EMI preview/recipe dialogs synchronously highlights corresponding input/output ports and wires on the board canvas.
+  - [ ] Tooltips rendered over EMI slots or board widgets render with cleared depth buffer and high Z-index translation, preventing 3D item models from clipping through tooltip backgrounds.
 - [ ] **Global Balance Dashboard (`B` Key)**:
   - [ ] Factory-wide raw input and net product balance sheets aggregate accurately.
 - [ ] **Board Settings Modal (`[⚙ Settings]`)**:
@@ -250,9 +272,9 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Checkbox selection for selective multi-port resource linking.
 - [ ] **Blueprint Metadata & Import Preview (`[📥] / [📤]`)**:
   - [ ] Title/description/tags metadata and pre-import node/material summaries.
-- [ ] **i18n Consistency**:
-  - [ ] `en_us.json` and `ko_kr.json` format tokens (`%s`, `%d`) match with zero missing translation keys.
-  - [ ] `testI18nCompletenessAndConsistency` unit test passes.
+- [ ] **i18n Consistency (4 Languages)**:
+  - [ ] `en_us.json`, `ko_kr.json`, `zh_cn.json`, and `ru_ru.json` format tokens (`%s`, `%d`) match with zero missing translation keys.
+  - [ ] `check_i18n.py` and `testI18nCompletenessAndConsistency` unit test pass 100%.
 
 ---
 

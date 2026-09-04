@@ -366,21 +366,26 @@
 * **`TutorialManager`**: 싱글톤 튜토리얼 상태 관리자. 단계별 목표 달성 감지(`TutorialStep`).
 * **`TutorialOverlay`**: 타겟 노드, 버튼, 포트 주변에 펄스 애니메이션 테두리와 안내 가이드 팝업 렌더링.
 
-### 6.1 표준 11단계 튜토리얼 시퀀스 (Tutorial Progression Sequence)
+### 6.1 14단계 대화형 튜토리얼 시퀀스 (14-Step Tutorial Progression Sequence)
 
-| 단계 (Step) | 식별자 | 학습 내용 및 완료 조건 |
-| :---: | :--- | :--- |
-| **Step 1** | `STEP_1_OPEN_SEARCH` | 레시피 검색창 열기 (상단 검색 버튼 또는 `Space` 단축키) |
-| **Step 2** | `STEP_2_PLACE_RECIPE` | 검색창에서 레시피 선택 후 캔버스에 첫 번째 기계 노드 배치 |
-| **Step 3** | `STEP_3_CONNECT_WIRE` | 출력 포트에서 드래그하여 다른 기계의 입력 포트로 와이어 배선 |
-| **Step 4** | `STEP_4_AUTO_RATIO` | `Shift + 드래그` 또는 `Auto-Ratio` 버튼으로 1:1 유량 비율 자동 정합 |
-| **Step 5** | `STEP_5_MACHINE_SELECTOR` | **[ADR-005]** 기계 카드 아이콘 클릭 ➔ `MachineSelectorDialog`에서 단일/멀티블록(EBF 등) 기계 전환 실습 및 능력 뱃지(`🏛 Multiblock`, `♨ Coil`, `⚡ Par Hatch`) 확인 |
-| **Step 6** | `STEP_6_CONFIG_ADDONS` | `MachineConfigDialog`(`C` 키) 열어 전압 티어, 가열 코일, 에너지 해치 등 하드웨어 설정 |
-| **Step 7** | `STEP_7_BOM_DASHBOARD` | `B` 키 또는 툴바 `[📦 BOM]` 버튼으로 전체 공정 멀티블록 자재 청구서 확인 |
-| **Step 8** | `STEP_8_BATCH_TARGET` | 목표 노드에 배치 생산량 설정(예: `1,000x`) 및 잔여 소요 시간(ETA) 확인 |
-| **Step 9** | `STEP_9_COMPOUND_MODULE`| `Ctrl + G`로 여러 노드를 하나의 복합 모듈(Compound Node)로 묶기 |
-| **Step 10** | `STEP_10_SHARED_POOL` | 여러 레시피를 단일 물리 기계 풀(Shared Machine Pool)로 묶어 시간 분할 점유율(`Total Duty %`) 계산 |
-| **Step 11** | `STEP_11_BATCH_WIRING` | 마키 포트 선택 및 번들 와이어 일괄 배선(`Bundle Batch Wiring`) 실습 |
+온보딩 튜토리얼은 신규 사용자를 위한 기본 튜토리얼(1~9단계)과 파워 유저를 위한 고급 튜토리얼(10~13단계)의 14단계 체계(`TutorialStep`)로 구성됩니다:
+
+| 단계 (Step) | 식별자 (Identifier) | 코스 구분 | 학습 내용 및 완료 조건 |
+| :---: | :--- | :---: | :--- |
+| **Step 1** | `STEP_1_ADD_RECIPE` | 기본 | 툴바 레시피 추가 버튼 클릭 및 캔버스에 노드 배치 |
+| **Step 2** | `STEP_2_DRAG_TO_SEARCH` | 기본 | 보일러 출력 포트에서 드래그하여 증기 터빈 입력 포트와 배선 연결 |
+| **Step 3** | `STEP_3_JUNCTION` | 기본 | 증기 배선 와이어를 클릭하여 분기점(Junction) 노드 자동 삽입 |
+| **Step 4** | `STEP_4_SHIFT_WIRING` | 기본 | `Shift + 드래그` 배선으로 1:1 유량 비율 자동 정합(Auto-Ratio) 실습 |
+| **Step 5** | `STEP_5_JUNCTION_ETA` | 기본 | 분기점 하단 뱃지 클릭 ➔ 목표 배치 수량(1,000 mB) 지정 및 실시간 예상 생산 완료 시간(`ET: xx.xs`) 확인 |
+| **Step 6** | `STEP_6_MACHINE_SELECTOR` | 기본 | 기계 카드 아이콘 클릭 ➔ `MachineSelectorDialog`에서 전기로 ➔ EBF 기계 전환 및 능력 뱃지 확인 |
+| **Step 7** | `STEP_7_MACHINE_CONFIG` | 기본 | 기계 설정 모달(`C` 키)을 열어 전압 티어, 가열 코일, 오버클럭 사양 확인 |
+| **Step 8** | `STEP_8_GROUP_FRAME` | 기본 | 마우스 드래그로 노드들을 다중 선택하고 프레임 그룹 생성 |
+| **Step 9** | `STEP_9_COMPOUND_MODULE`| 기본 | 프레임 접기 버튼 클릭으로 복합 모듈 축약 및 전개 실습 (기본 튜토리얼 완료) |
+| **Step 10** | `STEP_10_SHARED_MACHINE` | 고급 | 절단기 3대를 공유 머신 풀 프레임으로 묶어 통합 물리 기계 대수 및 가동률 점유율(`Total Duty %`) 확인 |
+| **Step 11** | `STEP_11_BOM_INSPECTION` | 고급 | 툴바 `[📦 BOM]` 버튼을 클릭하여 공유 기계 풀이 정수 올림 처리된 멀티블록 자재 청구서 확인 |
+| **Step 12** | `STEP_12_JUNCTION_SUPPLY` | 고급 | 분기점 노드 우클릭 ➔ 외부 공급 모드(무한 공급 $\infty$ / 고정 유량 한도) 지정 및 투입 원자재 고갈 시간(`DT: xx.xs`) 확인 |
+| **Step 13** | `STEP_13_FOLDER_BROWSER` | 고급 | 툴바 `[📁]` 버튼을 클릭하여 좌측 계층형 페이지 탐색기 드로어를 열고 페이지 구조 관리 실습 (고급 튜토리얼 완료) |
+| **Step 14** | `COMPLETED` | 완료 | 모든 실습 완료 및 튜토리얼 완주 배지 획득 |
 
 ---
 

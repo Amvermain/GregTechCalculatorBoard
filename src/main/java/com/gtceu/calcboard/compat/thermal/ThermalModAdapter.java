@@ -64,8 +64,10 @@ public class ThermalModAdapter implements IModAdapter {
     @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getMachineIcon() != null && node.getMachineIcon().getNamespace().equalsIgnoreCase("gtceu") && node.getMachineIcon().getPath().contains("boiler")) {
-            return false;
+        if (node.getMachineIcon() != null && "gtceu".equalsIgnoreCase(node.getMachineIcon().getNamespace())) {
+            if (com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isBoilerRecipe(node)) {
+                return false;
+            }
         }
         return ThermalAugmentHelper.isThermalMachine(node);
     }

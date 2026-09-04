@@ -285,26 +285,7 @@ public class ThermalAugmentHelper {
             return true;
         }
 
-        if (node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT || "thermal".equals(a.getModId()))) {
-            return true;
-        }
-
-        if (node.getName() != null) {
-            String nl = node.getName().toLowerCase(Locale.ROOT);
-            if (isThermalDynamoFallbackName(nl)) {
-                if (icon == null || !icon.getNamespace().equals("gtceu") || nl.contains("dynamo") || nl.contains("lapidary")) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static boolean isThermalDynamoFallbackName(String nl) {
-        return nl.contains("dynamo") || nl.contains("lapidary") || nl.contains("numismatic")
-                || nl.contains("magmatic") || nl.contains("gourmand") || nl.contains("disenchantment")
-                || nl.contains("stirling");
+        return node.getAddons().stream().anyMatch(a -> a instanceof ThermalAugmentAddon || a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT || "thermal".equals(a.getModId()));
     }
 
     private static boolean isThermalNamespace(String ns) {

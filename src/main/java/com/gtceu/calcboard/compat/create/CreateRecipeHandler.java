@@ -34,7 +34,7 @@ public class CreateRecipeHandler {
         }
         if (catId != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
             if ("create_new_age".equals(catId.getNamespace())) return false; // Handled by CreateNewAge
-            if (catId.getPath().contains("liquid_burning")) return false; // Liquid burner produces FE from fuel
+            if ("liquid_burning".equals(catId.getPath())) return false; // Liquid burner produces FE from fuel
             details.energyType = EnergyType.KINETIC_SU;
             details.tier = GTVoltageTier.ULV;
 

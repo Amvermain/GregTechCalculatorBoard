@@ -216,13 +216,25 @@ $$\Delta_{\text{material}} = \sum \text{Output Rates} - \sum \text{Input Rates}$
 
 ---
 
-### [알고리즘 5] 목표 배치 생산 소요 시간(ETA) 및 총 소요 자원 연산 (`ProductionETACalculator`)
+### [알고리즘 5] 목표 배치 생산 소요 시간(ETA) 및 원자재 고갈 시간(DT) 연산 (`ProductionETACalculator`)
 
-단말 노드의 목표 수량 $A_{\text{target}}$과 순 유입 속도 $\text{Rate}_{\text{in}}$ 기준:
+#### 1. 목표 생산 소요 시간 (Estimated Time / ET)
+단말 노드의 목표 수량 $A_{\text{target}}$과 순 유입 속도 $\text{Rate}_{\text{in}}$, 상류 기계의 최장 가동 주기 $T_{\text{cycle}}$ 기준:
 
-$$T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} \quad [\text{초}]$$
-$$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
-$$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
+1. **연속 유동(Continuous Flow) 모델** ($T_{\text{cycle}} \le 0$):
+   $$T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}} \quad [\text{초}]$$
+2. **이산 기계 사이클(Discrete Machine Cycle) 양자화 모델** ($T_{\text{cycle}} > 0$):
+   1회 가동 사이클당 생산량 $\text{Cap}_{\text{cycle}} = \text{Rate}_{\text{in}} \times T_{\text{cycle}}$에 대해, 부동소수점 배정밀도 나눗셈 오차로 인한 거짓 사이클 증가를 방지하기 위해 $\epsilon = 10^{-7}$ 입실론 가드를 적용하여 정수 올림 처리합니다:
+   $$N_{\text{cycle}} = \left\lceil \frac{A_{\text{target}}}{\text{Cap}_{\text{cycle}}} - 10^{-7} \right\rceil, \quad T_{\text{ET}} = N_{\text{cycle}} \times T_{\text{cycle}} \quad [\text{초}]$$
+
+3. **총 소요 전력 및 원자재 집계**:
+   $$E_{\text{total}} = \sum_{n \in \text{UpstreamNodes}} \left( n.\text{getTotalEUt}() \times n.\text{getEfficiency}() \times 20 \times T_{\text{ET}} \right) \quad [\text{EU}]$$
+   $$C_{\text{raw}}(M) = \text{UnconnectedInputRate}(M) \times T_{\text{ET}} \quad [\text{Items / mB}]$$
+
+#### 2. 원자재 재고 고갈 소요 시간 (Depletion Time / DT)
+상류 유입선이 연결되지 않은 원자재 투입 정션 노드에서 현재 보유 배치 수량 $A_{\text{buffer}}$과 하류 총 유출 속도 $\text{Rate}_{\text{out}}$, 하류 기계의 가동 주기 $T_{\text{cycle, down}}$ 기준:
+
+$$N_{\text{drain}} = \left\lceil \frac{A_{\text{buffer}}}{\text{Rate}_{\text{out}} \times T_{\text{cycle, down}}} - 10^{-7} \right\rceil, \quad T_{\text{DT}} = N_{\text{drain}} \times T_{\text{cycle, down}} \quad [\text{초}]$$
 
 ---
 

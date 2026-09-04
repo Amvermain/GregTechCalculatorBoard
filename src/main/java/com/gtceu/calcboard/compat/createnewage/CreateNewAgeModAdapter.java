@@ -38,6 +38,9 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     }
 
     public static final String MOD_ID = "create_new_age";
+    private static final ResourceLocation CAT_GENERATOR = ResourceLocation.tryParse("create_new_age:generator");
+    private static final ResourceLocation ITEM_CARBON_BRUSHES = ResourceLocation.tryParse("create_new_age:carbon_brushes");
+    private static final ResourceLocation ITEM_GENERATOR_COIL = ResourceLocation.tryParse("create_new_age:generator_coil");
 
     @Override
     public String getModId() {
@@ -77,10 +80,10 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     @Override
     public boolean supportsAddons(RecipeNode node) {
         if (node == null) return false;
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().toString().contains("create_new_age:generator")) return true;
-        if (node.getMachineIcon() != null) {
-            String path = node.getMachineIcon().getPath();
-            return path.contains("generator_coil") || path.contains("carbon_brushes");
+        if (CAT_GENERATOR.equals(node.getRecipeCategoryId())) return true;
+        ResourceLocation icon = node.getMachineIcon();
+        if (icon != null) {
+            return ITEM_GENERATOR_COIL.equals(icon) || ITEM_CARBON_BRUSHES.equals(icon);
         }
         return false;
     }
@@ -238,11 +241,8 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public void populateExtraBOMParts(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts) {
         if (node == null || parts == null) return;
         ResourceLocation icon = node.getMachineIcon();
-        if (icon != null && icon.getPath().contains("carbon_brushes")) {
-            ResourceLocation coilId = ResourceLocation.tryParse("create_new_age:generator_coil");
-            if (coilId != null) {
-                parts.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(coilId, "Generator Coil", 1, com.gtceu.calcboard.api.bom.PartCategory.COIL));
-            }
+        if (ITEM_CARBON_BRUSHES.equals(icon)) {
+            parts.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(ITEM_GENERATOR_COIL, "Generator Coil", 1, com.gtceu.calcboard.api.bom.PartCategory.COIL));
         }
     }
 

@@ -8,7 +8,7 @@ This document serves as the official Master Index for the **GregTech Calculator 
 
 | Item | Specification |
 | :--- | :--- |
-| **Document Version** | `v2.1.0-alpha.5` (Aligned with ADR-001 ~ ADR-012) |
+| **Document Version** | `v2.1.0` (Aligned with ADR-001 ~ ADR-019) |
 | **Target Platform** | Minecraft 1.20.1 (Minecraft Forge 47.2.0+) |
 | **Dependencies** | Java 17+, GregTech CEu Modern, EMI / JEI (Recipe Viewer) |
 | **Soft Dependencies** | FTB Teams, Phoenix Guilds (Multiplayer Team Integration) |
