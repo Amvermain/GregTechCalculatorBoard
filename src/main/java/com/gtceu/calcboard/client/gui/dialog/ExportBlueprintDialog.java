@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.storage.BlueprintFileManager;
 import com.gtceu.calcboard.api.storage.BlueprintMetadata;
 import com.gtceu.calcboard.api.storage.BlueprintPackage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 
@@ -214,7 +215,7 @@ public class ExportBlueprintDialog {
 
                     // Tooltip on hover
                     if (mouseX >= iconX && mouseX <= iconX + 16 && mouseY >= iconY && mouseY <= iconY + 16) {
-                        graphics.renderTooltip(font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY);
+                        BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY, screenWidth, screenHeight);
                     }
                     iconX += 20;
                 }

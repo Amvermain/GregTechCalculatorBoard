@@ -246,17 +246,13 @@ public class GTCEuMultiblockStructureScanner {
 
                             if (itemStack != null && !itemStack.isEmpty()) {
                                 itemId = ITEM_ID_CACHE.computeIfAbsent(itemStack.getItem(), ForgeRegistries.ITEMS::getKey);
-                                if (itemId != null) {
-                                    name = ITEM_NAME_CACHE.computeIfAbsent(itemStack.getItem(), itm -> itm.getDescription().getString());
-                                }
+                                name = resolveStackDisplayName(itemStack, itemId);
                             } else if (mGetBlockStateCached != null) {
                                 Object bState = mGetBlockStateCached.invoke(bInfo);
                                 if (bState instanceof BlockState bs) {
                                     Block blk = bs.getBlock();
                                     itemId = BLOCK_ID_CACHE.computeIfAbsent(blk, ForgeRegistries.BLOCKS::getKey);
-                                    if (itemId != null) {
-                                        name = BLOCK_NAME_CACHE.computeIfAbsent(blk, b -> b.getName().getString());
-                                    }
+                                    name = resolveBlockDisplayName(blk, itemId);
                                 }
                             }
 
@@ -286,6 +282,9 @@ public class GTCEuMultiblockStructureScanner {
                 ResourceLocation pId = entry.getKey();
                 int amount = entry.getValue();
                 String pName = partNames.getOrDefault(pId, MultiblockStructureCatalog.formatMachineName(pId.getPath()));
+                if (!isValidDisplayName(pName)) {
+                    pName = MultiblockStructureCatalog.formatMachineName(pId.getPath());
+                }
                 PartCategory category = MultiblockStructureCatalog.classifyPart(pId);
 
                 String path = pId.getPath().toLowerCase(Locale.ROOT);
@@ -333,6 +332,46 @@ public class GTCEuMultiblockStructureScanner {
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    private static String resolveStackDisplayName(ItemStack stack, ResourceLocation id) {
+        if (stack == null || stack.isEmpty()) {
+            return id != null ? MultiblockStructureCatalog.formatMachineName(id.getPath()) : "";
+        }
+        String cached = ITEM_NAME_CACHE.get(stack.getItem());
+        if (cached != null) return cached;
+        try {
+            String hn = stack.getHoverName().getString();
+            if (isValidDisplayName(hn)) {
+                ITEM_NAME_CACHE.put(stack.getItem(), hn);
+                return hn;
+            }
+        } catch (Throwable ignored) {}
+        return id != null ? MultiblockStructureCatalog.formatMachineName(id.getPath()) : "";
+    }
+
+    private static String resolveBlockDisplayName(Block block, ResourceLocation id) {
+        if (block == null) {
+            return id != null ? MultiblockStructureCatalog.formatMachineName(id.getPath()) : "";
+        }
+        String cached = BLOCK_NAME_CACHE.get(block);
+        if (cached != null) return cached;
+        try {
+            Item itm = block.asItem();
+            if (itm != null && itm != net.minecraft.world.item.Items.AIR) {
+                String hn = new ItemStack(itm).getHoverName().getString();
+                if (isValidDisplayName(hn)) {
+                    BLOCK_NAME_CACHE.put(block, hn);
+                    return hn;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return id != null ? MultiblockStructureCatalog.formatMachineName(id.getPath()) : "";
+    }
+
+    private static boolean isValidDisplayName(String name) {
+        if (name == null || name.isBlank()) return false;
+        return !name.startsWith("block.") && !name.startsWith("item.") && !name.startsWith("tagprefix.") && !name.equals("tagprefix.frame");
     }
 }
 

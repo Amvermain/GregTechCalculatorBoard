@@ -63,7 +63,7 @@ public class HotkeyHudWidget {
             graphics.drawString(font, icon, chipX + (COLLAPSED_WIDTH - iconW) / 2, chipY + 6, hovered ? 0xFFFFFFFF : 0xFF94A3B8, false);
 
             if (hovered) {
-                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.hotkey_hud.expand"), mouseX, mouseY);
+                com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.hotkey_hud.expand"), mouseX, mouseY, screenW, screenH);
             }
             return;
         }

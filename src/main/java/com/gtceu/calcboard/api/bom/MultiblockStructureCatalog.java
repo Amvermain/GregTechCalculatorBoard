@@ -34,6 +34,12 @@ public class MultiblockStructureCatalog {
         initializing = false;
     }
 
+    public static void clearStructure(ResourceLocation id) {
+        if (id == null) return;
+        STRUCTURES.remove(id);
+        STRUCTURE_VARIANTS.remove(id);
+    }
+
     public static boolean isInitialized() {
         return initialized;
     }

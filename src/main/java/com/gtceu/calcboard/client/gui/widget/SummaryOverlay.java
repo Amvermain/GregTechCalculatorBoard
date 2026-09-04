@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
@@ -317,7 +318,7 @@ public class SummaryOverlay {
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7EU/t: §f%,.2f EU/t", totEUt)));
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Current: §f%,.4fA %s", amps, tier.getName())));
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.power_mode_hint").getString()));
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
@@ -331,7 +332,7 @@ public class SummaryOverlay {
                 tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Stress Deficit: §c-%,.0f SU", -totSU)));
                 tooltip.add(Component.literal("§4⚠ " + Component.translatable("gui.gtcalcboard.tooltip.overstressed").getString()));
             }
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
@@ -351,7 +352,7 @@ public class SummaryOverlay {
             }
             tooltip.add(Component.literal("§8§m------------------------"));
             tooltip.add(Component.literal("§e" + Component.translatable("gui.gtcalcboard.fusion_start_buffer_desc").getString()));
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
@@ -361,13 +362,13 @@ public class SummaryOverlay {
             for (Map.Entry<String, Integer> entry : lastSummary.machineBreakdown().entrySet()) {
                 tooltip.add(Component.literal("§7• " + entry.getKey() + ": §f" + entry.getValue() + Component.translatable("gui.gtcalcboard.machine_unit").getString()));
             }
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
             return;
         }
 
         if (hoveredActionStack != null) {
             String actKey = hoveredActionIsRestore ? "gui.gtcalcboard.tooltip.unmark_void" : "gui.gtcalcboard.tooltip.mark_as_void";
-            graphics.renderTooltip(font, List.of(Component.translatable(actKey)), java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, List.of(Component.translatable(actKey)), mouseX, mouseY);
             return;
         }
 
@@ -378,7 +379,7 @@ public class SummaryOverlay {
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7Rate: §f" + ratePrefix + exactRateStr));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
         }
     }
 

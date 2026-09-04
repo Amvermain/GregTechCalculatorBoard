@@ -73,9 +73,7 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
         if (recipe == null) return;
 
         Minecraft mc = Minecraft.getInstance();
-        int screenW = mc.getWindow().getGuiScaledWidth();
-        int screenH = mc.getWindow().getGuiScaledHeight();
-        double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+        double[] pos = BoardScreen.getNextNodeCenterPosition();
 
         com.gtceu.calcboard.api.model.CompoundRecipeBuilder.CompoundCluster cluster =
                 EmiStepRecipeDetector.tryDetectAndBuild(recipe, null, pos[0], pos[1]);

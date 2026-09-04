@@ -244,28 +244,28 @@ public class CanvasGroupFrameRenderer {
 
                 // [✕ Delete]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [📦 Collapse]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§b📦 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b📦 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [⛶ Auto-Fit]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_autofit")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_autofit")), mouseX, mouseY);
                     return;
                 }
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
 
                 // [🎨 Color]
                 if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    graphics.renderTooltip(font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e🎨 ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
                     return;
                 }
 
@@ -273,7 +273,7 @@ public class CanvasGroupFrameRenderer {
                 if (frame.isSharedMachineFrame()) {
                     curBtnX -= (BTN_SIZE + BTN_SPACING);
                     if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                        graphics.renderTooltip(font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
+                        BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
                         return;
                     }
                 }
@@ -307,7 +307,7 @@ public class CanvasGroupFrameRenderer {
                         tooltipLines.add(Component.literal("§c\u26A0 ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
                     }
 
-                    graphics.renderComponentTooltip(font, tooltipLines, mouseX, mouseY);
+                    BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY);
                     return;
                 }
             }

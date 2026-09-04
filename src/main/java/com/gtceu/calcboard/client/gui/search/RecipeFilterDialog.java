@@ -215,7 +215,7 @@ public class RecipeFilterDialog {
 
         if (unsuppHover) {
             String desc = Component.translatable("gui.gtcalcboard.filter.include_unsupported.desc").getString();
-            graphics.renderTooltip(font, Component.literal(desc), mouseX, mouseY);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(desc), mouseX, mouseY, screenW, screenH);
         }
 
         // Done Footer Button

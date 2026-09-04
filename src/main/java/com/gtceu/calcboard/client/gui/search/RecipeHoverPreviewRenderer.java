@@ -12,12 +12,16 @@ import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -100,16 +104,88 @@ public class RecipeHoverPreviewRenderer {
             int screenW,
             int screenH
     ) {
-        if (!ModCompatHelper.isEmiLoaded()) return null;
-        if (sr == null || !EmiPreviewRendererImpl.isEmiRecipe(sr.recipe())) return null;
+        if (sr == null || sr.recipe() == null) return null;
+        if (ModCompatHelper.isEmiLoaded() && EmiPreviewRendererImpl.isEmiRecipe(sr.recipe())) {
+            int[] bounds = calculatePreviewBounds(sr, dialogX, dialogY, dialogW, dialogH, hoveredRowY, screenW, screenH);
+            if (bounds == null) return null;
+            int originX = bounds[0] + 8;
+            int originY = bounds[1] + 22;
+            return EmiPreviewRendererImpl.getHoveredIngredientFromCache(sr.recipe(), originX, originY, mouseX, mouseY);
+        }
+
+        RecipeNode rn = null;
+        if (sr.recipe() instanceof RecipeNode node) {
+            rn = node;
+        } else if (sr.recipe() instanceof com.gtceu.calcboard.integration.jei.JeiRecipeWrapper<?> wrapper) {
+            rn = com.gtceu.calcboard.integration.jei.JeiRecipeConverter.convert(wrapper);
+        }
+
+        if (rn != null) {
+            return findHoveredIngredientInNode(sr, rn, dialogX, dialogY, dialogW, dialogH, hoveredRowY, mouseX, mouseY, screenW, screenH);
+        }
+
+        return null;
+    }
+
+    private static IngredientStack findHoveredIngredientInNode(
+            SearchableRecipe sr,
+            RecipeNode rn,
+            int dialogX,
+            int dialogY,
+            int dialogW,
+            int dialogH,
+            int hoveredRowY,
+            int mouseX,
+            int mouseY,
+            int screenW,
+            int screenH
+    ) {
         int[] bounds = calculatePreviewBounds(sr, dialogX, dialogY, dialogW, dialogH, hoveredRowY, screenW, screenH);
         if (bounds == null) return null;
         int cardX = bounds[0];
         int cardY = bounds[1];
-        int originX = cardX + 8;
-        int originY = cardY + 22;
+        int cardW = bounds[2];
 
-        return EmiPreviewRendererImpl.getHoveredIngredientFromCache(sr.recipe(), originX, originY, mouseX, mouseY);
+        int inCount = rn.getInputs().size();
+        int outCount = rn.getOutputs().size();
+        int maxRows = Math.max(1, Math.max(inCount, outCount));
+        int contentY = cardY + 22;
+
+        if (inCount == 0 && outCount > 0) {
+            for (int i = 0; i < outCount; i++) {
+                int rowY = contentY + i * 18;
+                int slotX = cardX + 10;
+                if (mouseX >= slotX && mouseX <= slotX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                    return rn.getOutputs().get(i);
+                }
+            }
+        } else if (outCount == 0 && inCount > 0) {
+            for (int i = 0; i < inCount; i++) {
+                int rowY = contentY + i * 18;
+                int slotX = cardX + 10;
+                if (mouseX >= slotX && mouseX <= slotX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                    return rn.getInputs().get(i);
+                }
+            }
+        } else {
+            for (int i = 0; i < maxRows; i++) {
+                int rowY = contentY + i * 18;
+                if (i < inCount) {
+                    int inSlotX = cardX + 8;
+                    if (mouseX >= inSlotX && mouseX <= inSlotX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                        return rn.getInputs().get(i);
+                    }
+                }
+                int arrowX = cardX + (cardW / 2) - 4;
+                if (i < outCount) {
+                    int outStackX = arrowX + 12;
+                    if (mouseX >= outStackX && mouseX <= outStackX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                        return rn.getOutputs().get(i);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public static void renderPreview(
@@ -221,12 +297,18 @@ public class RecipeHoverPreviewRenderer {
         graphics.drawString(font, font.plainSubstrByWidth(title, cardW - 12), cardX + 6, cardY + 5, 0xFFFFFFFF, false);
 
         // Content
+        IngredientStack hoveredIngredient = null;
         int contentY = cardY + 22;
         if (inCount == 0 && outCount > 0) {
             for (int i = 0; i < outCount; i++) {
                 int rowY = contentY + i * 18;
                 IngredientStack out = rn.getOutputs().get(i);
-                IngredientRenderer.render(graphics, out, cardX + 10, rowY);
+                int slotX = cardX + 10;
+                IngredientRenderer.render(graphics, out, slotX, rowY);
+                if (mouseX >= slotX && mouseX <= slotX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                    graphics.fill(slotX, rowY, slotX + 16, rowY + 16, 0x55FFFFFF);
+                    hoveredIngredient = out;
+                }
                 String amtStr = out.isFluid() ? String.format("%.0f mB", out.getAmount()) : String.format("%.0f", out.getAmount());
                 if (out.getChance() < 0.999) {
                     amtStr += String.format(" §d(%.0f%%)", out.getChance() * 100.0);
@@ -238,7 +320,12 @@ public class RecipeHoverPreviewRenderer {
             for (int i = 0; i < inCount; i++) {
                 int rowY = contentY + i * 18;
                 IngredientStack in = rn.getInputs().get(i);
-                IngredientRenderer.render(graphics, in, cardX + 10, rowY);
+                int slotX = cardX + 10;
+                IngredientRenderer.render(graphics, in, slotX, rowY);
+                if (mouseX >= slotX && mouseX <= slotX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                    graphics.fill(slotX, rowY, slotX + 16, rowY + 16, 0x55FFFFFF);
+                    hoveredIngredient = in;
+                }
                 String amtStr = in.isFluid() ? String.format("%.0f mB", in.getAmount()) : String.format("%.0f", in.getAmount());
                 amtStr += "  §c(Input)";
                 graphics.drawString(font, font.plainSubstrByWidth(amtStr, cardW - 36), cardX + 30, rowY + 5, 0xFFE2E8F0, false);
@@ -249,7 +336,12 @@ public class RecipeHoverPreviewRenderer {
 
                 if (i < inCount) {
                     IngredientStack in = rn.getInputs().get(i);
-                    IngredientRenderer.render(graphics, in, cardX + 8, rowY);
+                    int inSlotX = cardX + 8;
+                    IngredientRenderer.render(graphics, in, inSlotX, rowY);
+                    if (mouseX >= inSlotX && mouseX <= inSlotX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                        graphics.fill(inSlotX, rowY, inSlotX + 16, rowY + 16, 0x55FFFFFF);
+                        hoveredIngredient = in;
+                    }
                     String amtStr = in.isFluid() ? String.format("%.0f mB", in.getAmount()) : String.format("%.0f", in.getAmount());
                     graphics.drawString(font, font.plainSubstrByWidth(amtStr, 60), cardX + 26, rowY + 5, 0xFFE2E8F0, false);
                 }
@@ -261,6 +353,10 @@ public class RecipeHoverPreviewRenderer {
                     IngredientStack out = rn.getOutputs().get(i);
                     int outStackX = arrowX + 12;
                     IngredientRenderer.render(graphics, out, outStackX, rowY);
+                    if (mouseX >= outStackX && mouseX <= outStackX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                        graphics.fill(outStackX, rowY, outStackX + 16, rowY + 16, 0x55FFFFFF);
+                        hoveredIngredient = out;
+                    }
                     String amtStr = out.isFluid() ? String.format("%.0f mB", out.getAmount()) : String.format("%.0f", out.getAmount());
                     if (out.getChance() < 0.999) {
                         amtStr += String.format(" §d(%.0f%%)", out.getChance() * 100.0);
@@ -288,6 +384,60 @@ public class RecipeHoverPreviewRenderer {
         }
 
         graphics.pose().popPose();
+
+        if (hoveredIngredient != null) {
+            renderIngredientTooltip(graphics, font, hoveredIngredient, mouseX, mouseY, screenW, screenH);
+        }
+    }
+
+    private static void renderIngredientTooltip(
+            GuiGraphics graphics,
+            Font font,
+            IngredientStack stack,
+            int mouseX,
+            int mouseY,
+            int screenW,
+            int screenH
+    ) {
+        if (stack == null || stack.getId() == null) return;
+        List<net.minecraft.network.chat.Component> lines = new ArrayList<>();
+
+        if (stack.isFluid()) {
+            var fluid = net.minecraftforge.registries.ForgeRegistries.FLUIDS.getValue(stack.getId());
+            if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
+                net.minecraftforge.fluids.FluidStack fs = new net.minecraftforge.fluids.FluidStack(fluid, 1000);
+                lines.add(fs.getDisplayName());
+            } else {
+                lines.add(net.minecraft.network.chat.Component.literal(stack.getDisplayName()));
+            }
+            lines.add(net.minecraft.network.chat.Component.literal(String.format(Locale.ROOT, "§7Amount: §f%.0f mB", stack.getAmount())));
+        } else {
+            var item = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(stack.getId());
+            if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                net.minecraft.world.item.ItemStack is = new net.minecraft.world.item.ItemStack(item);
+                var player = Minecraft.getInstance().player;
+                var flag = Minecraft.getInstance().options.advancedItemTooltips
+                        ? net.minecraft.world.item.TooltipFlag.Default.ADVANCED
+                        : net.minecraft.world.item.TooltipFlag.Default.NORMAL;
+                lines.addAll(is.getTooltipLines(player, flag));
+            } else {
+                lines.add(net.minecraft.network.chat.Component.literal(stack.getDisplayName()));
+            }
+            if (stack.getAmount() > 0) {
+                lines.add(net.minecraft.network.chat.Component.literal(String.format(Locale.ROOT, "§7Amount: §f%.0f", stack.getAmount())));
+            }
+        }
+
+        if (stack.getChance() < 0.999) {
+            lines.add(net.minecraft.network.chat.Component.literal(String.format(Locale.ROOT, "§eChance: §f%.1f%%", stack.getChance() * 100.0)));
+        }
+
+        if (Minecraft.getInstance().options.advancedItemTooltips && stack.isFluid()) {
+            lines.add(net.minecraft.network.chat.Component.literal("§8" + stack.getId()));
+        }
+
+        lines.add(net.minecraft.network.chat.Component.literal("§8").append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
+        BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screenW, screenH);
     }
 
     // =========================================================================
@@ -429,6 +579,7 @@ public class RecipeHoverPreviewRenderer {
             }
 
             graphics.pose().popPose();
+            holder.renderTooltips(graphics, font, originX, originY, mouseX, mouseY, screenW, screenH);
         }
 
         private static void renderEmiPreviewDirect(
@@ -473,6 +624,7 @@ public class RecipeHoverPreviewRenderer {
             holder.render(graphics, originX, originY, mouseX, mouseY, partialTick);
 
             graphics.pose().popPose();
+            holder.renderTooltips(graphics, font, originX, originY, mouseX, mouseY, screenW, screenH);
         }
 
         private static String getRecipeDisplayName(dev.emi.emi.api.recipe.EmiRecipe recipe) {

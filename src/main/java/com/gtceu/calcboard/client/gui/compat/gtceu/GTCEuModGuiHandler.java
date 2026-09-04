@@ -392,7 +392,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         if (dialog != null) {
             dialog.setDeferredTooltip(tooltip);
         } else {
-            graphics.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
         }
     }
 

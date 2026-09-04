@@ -7,6 +7,7 @@ import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.storage.BlueprintMetadata;
 import com.gtceu.calcboard.api.storage.BlueprintPackage;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 
@@ -180,7 +181,7 @@ public class ImportBlueprintDialog {
             graphics.renderOutline(iconInX - 1, inY - 1, 18, 18, 0xFF445566);
             IngredientRenderer.render(graphics, stack, iconInX, inY);
             if (mouseX >= iconInX && mouseX <= iconInX + 16 && mouseY >= inY && mouseY <= inY + 16) {
-                graphics.renderTooltip(font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY, screenWidth, screenHeight);
             }
             iconInX += 20;
         }
@@ -196,7 +197,7 @@ public class ImportBlueprintDialog {
             graphics.renderOutline(iconOutX - 1, outY - 1, 18, 18, 0xFF445566);
             IngredientRenderer.render(graphics, stack, iconOutX, outY);
             if (mouseX >= iconOutX && mouseX <= iconOutX + 16 && mouseY >= outY && mouseY <= outY + 16) {
-                graphics.renderTooltip(font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY);
+                BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal(stack.getDisplayName() + String.format(" (%,.2f/s)", stack.getAmount())), mouseX, mouseY, screenWidth, screenHeight);
             }
             iconOutX += 20;
         }

@@ -162,7 +162,7 @@ public class WorkspaceTabBarWidget {
                 tooltipLines.add(Component.literal("§7- §b" + member.getPlayerName() + " §8(§f" + pageDisplay + "§8)"));
             }
             // Pass mouseY + 24 to force the tooltip to render below the top bar and never clip at the top
-            graphics.renderTooltip(font, tooltipLines, java.util.Optional.empty(), mouseX, Math.max(30, mouseY + 24));
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, Math.max(30, mouseY + 24), screen.width, screen.height);
         }
     }
 
