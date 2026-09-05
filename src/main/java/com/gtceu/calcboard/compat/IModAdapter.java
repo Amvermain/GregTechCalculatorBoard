@@ -623,6 +623,13 @@ public interface IModAdapter {
     }
 
     /**
+     * Computes the effective probability/chance (0.0 ~ 1.0) of consuming an input slot.
+     */
+    default double computeEffectiveInputChance(RecipeNode node, int inputIndex, double defaultChance) {
+        return defaultChance;
+    }
+
+    /**
      * Checks if this recipe node represents a boiler recipe.
      */
     default boolean isBoilerRecipe(RecipeNode node) {

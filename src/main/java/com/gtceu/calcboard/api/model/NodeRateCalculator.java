@@ -19,12 +19,13 @@ public final class NodeRateCalculator {
         if (node == null) return rates;
 
         double cps = node.getCyclesPerSecond();
-        for (IngredientStack in : node.getInputs()) {
+        for (int i = 0; i < node.getInputs().size(); i++) {
+            IngredientStack in = node.getInputs().get(i);
             double r;
             if (in.isStressUnit()) {
                 r = node.isGenerator() ? (in.getAmount() * cps) : node.getTotalEUt();
             } else {
-                double amount = in.getAmount();
+                double amount = in.getAmount() * getEffectiveInputChance(node, i);
                 r = amount * cps;
                 r = ModAdapterRegistry.getAdapterForNode(node).computeEffectiveIngredientRate(node, in, true, r);
             }
@@ -54,10 +55,19 @@ public final class NodeRateCalculator {
                     ? (in.getAmount() * (effective ? node.getEffectiveCyclesPerSecond() : node.getNominalCyclesPerSecond())) 
                     : (node.getTotalEUt() * (effective ? node.getEfficiency() : 1.0));
         }
-        double amount = in.getAmount();
+        double amount = in.getAmount() * getEffectiveInputChance(node, index);
         double cps = effective ? node.getEffectiveCyclesPerSecond() : node.getNominalCyclesPerSecond();
         double r = amount * cps;
         return ModAdapterRegistry.getAdapterForNode(node).computeEffectiveIngredientRate(node, in, true, r);
+    }
+
+    public static double getEffectiveInputChance(RecipeNode node, int inputIndex) {
+        if (node == null || inputIndex < 0 || inputIndex >= node.getInputs().size()) return 0.0;
+        IngredientStack in = node.getInputs().get(inputIndex);
+        if (in.getChance() >= 1.0 && in.getTierChanceBoost() >= 0.0) return 1.0;
+
+        double baseChance = in.getEffectiveChance(node.getTierDelta());
+        return ModAdapterRegistry.getAdapterForNode(node).computeEffectiveInputChance(node, inputIndex, baseChance);
     }
 
     public static double getEffectiveOutputChance(RecipeNode node, int outputIndex) {
@@ -116,8 +126,9 @@ public final class NodeRateCalculator {
         if (node == null) return rates;
 
         double cps = node.getEffectiveCyclesPerSecond();
-        for (IngredientStack in : node.getInputs()) {
-            double amount = in.getAmount();
+        for (int i = 0; i < node.getInputs().size(); i++) {
+            IngredientStack in = node.getInputs().get(i);
+            double amount = in.getAmount() * getEffectiveInputChance(node, i);
             double r = amount * cps;
             r = ModAdapterRegistry.getAdapterForNode(node).computeEffectiveIngredientRate(node, in, true, r);
             boolean merged = false;
@@ -180,8 +191,10 @@ public final class NodeRateCalculator {
         if (in.isStressUnit()) {
             return node.isGenerator() ? in.getAmount() : node.getSingleMachineEUt();
         }
+        int idx = node.getInputs().indexOf(in);
+        double effChance = idx >= 0 ? getEffectiveInputChance(node, idx) : in.getEffectiveChance(node.getTierDelta());
         double singleCps = node.getOverclockResult().getCyclesPerSecond() * node.getTotalParallel();
-        double baseRate = in.getAmount() * singleCps;
+        double baseRate = in.getAmount() * effChance * singleCps;
         return ModAdapterRegistry.getAdapterForNode(node).computeSingleMachineIngredientRate(node, in, true, baseRate);
     }
 }

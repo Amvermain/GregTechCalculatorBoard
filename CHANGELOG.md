@@ -6,15 +6,42 @@
 
 ## [Unreleased]
 
+## [2.2.0-alpha.2] - 2026-09-06
+
 ### Added
+- **Tutorial Previous Step Navigation & UI Label Alignment**:
+  - Added a `[⮜ Prev]` navigation button to the tutorial overlay, allowing players to navigate back to previous steps and re-experience earlier tutorial exercises.
+  - Aligned tutorial instructions with the latest RFC-025 workspace UI labels across all 4 languages (referencing `[+ Add Recipe...]`, `[🔍 Search recipes...]`, `[▦ BOM]`, right Inspector `[⚙ Configure Junction]`, and `[📁]` activity dock button).
+- **Junction Node Fixed Continuous Drain Mode & Inspector Integration**:
+  - Added a dedicated "Fixed Continuous Drain Rate" mode (`SupplyMode.FIXED_DRAIN`) to Junction (Reroute) nodes, allowing players to specify persistent external consumption rates (e.g., `-65,536 mB/s` for passive rocket tank fueling or continuous steam turbine draw).
+  - Propagates persistent drain rates as active upstream port demand, enabling auto-ratio (`A` key / `FlowGraphSolver.autoRatioFromAnchor`) to automatically scale upstream producer machine counts to match the drain rate.
+  - Resolved output port flow rate checking (`getOutputPortStats`) and tooltip calculations to accurately recognize continuous drain rates as connected consumer demand, showing correct consumed flow, deficit warnings (⚠), and balanced supply metrics.
+  - Seamlessly integrated into the Flow Summary Aggregator (`FlowSummaryAggregator`) as baseline consumption, accurately offsetting upstream production for balanced net accounting.
+  - Enhanced Node Cards (`NodeCardRenderer`) and Inspector Side Panel (`NodeInspectorPanel`) with orange accent styling, badges (`-rate/s`), and interactive configuration dialog support (`JunctionSupplyDialog`).
 - **Target Output Rate Inverse Solver & Fractional Auto-Ratio**:
   - Added a Target Output Rate Dialog (`Ctrl + Left Click` on any output port) that automatically calculates the required machine count from a desired production rate.
   - Supports fractional expressions (e.g., `1/12s`, `1/60s`, `5/2min`) and diverse rate units (`/t`, `/s`, `/min`, `/h`, `/d`, `mB/s`, `B/min`) for instant entry without manual conversion.
   - [⚖ Auto Ratio] now supports high-precision fractional scaling up to 4 decimal places (`0.0001` precision) without forced integer ceiling rounding, accurately synchronizing slow or intermittent production lines.
+- **Unified Canvas Workspace & Context-Driven Controls (RFC-025)**:
+  - **Right-Click Context Menu**: Right-clicking empty canvas space opens a creation/action menu (Add Recipe, Junction, Paste, Fit View, Auto Connect, Auto Ratio). Right-clicking nodes, selections, or ports opens targeted action menus with hotkey indicators.
+  - **Unreal Blueprint Navigation & Smooth Diagonal Pan**: Right-click drag pans the canvas smoothly, while stationary right-click (<4.5px) opens the context menu. Added GLFW polling-based smooth WASD/arrow key panning with inertia and damping, fully supporting diagonal movement (WA, AS, SD, WD) and Shift acceleration.
+  - **Modern Compact Header Toolbar & Integrated Help Dropdown**: Redesigned the top toolbar to match modern IDE layouts: compact left controls (`[⚙ Settings]`, `[Page Name ▼]`, `[🔍 Recipe Space]`, dropdown groups for `[Optimize ▼]`, `[View ▼]`, `[I/O ▼]`, `[? Help ▼]`), and right quick actions (`[↶ Undo]`, `[↷ Redo]`, `[✕ Close]`). Dropdown menus dynamically resize to fit contents without text clipping, and toggleable view options (Rate Unit, Fluid Display, Grid Snap, Slim Card Mode) remain open on click for rapid successive adjustments. The new `[? Help ▼]` dropdown provides instant access to User Manual (📖), Basic Interactive Tutorial (▶), Advanced Tutorial (✦), and Hotkey Guide (⌨), with quick tutorial launch buttons also integrated into the Guidebook modal and Hotkey HUD header.
+  - **Left Activity Side Dock**: Added a slim vertical activity dock on the left edge with instant toggles for Page/Folder Explorer (`📁`), Favorite Recipes (`⭐`), Blueprints & Templates (`📋`), Team Workspaces (`👥`), Hotkey Guide (`?`), and Settings (`⚙`), fully integrating previously floating favorite and hotkey chips into a clean side dock layout matching the RFC-025 wireframe design.
+  - **Node Inspector Side Panel & Slim Card Mode**: Selecting a node opens a dedicated right-side Inspector panel for count adjustments, tier chips, overclock modes, and hardware configurations. Added a Slim Card Mode option in Settings to keep cards compact on canvas.
+  - **Adaptive Bottom Status Bar**: Added an adaptive bottom bar showing selection count or total node/wire stats with quick chips (`[∑ Balance]`, `[▦ BOM]`, `[⏸ Pause]`).
 - **Per-Craft Batch View Mode (`1x`)**:
   - Added a `1x` per-craft batch unit to the canvas toolbar and settings dialog unit cycling list (`/t` -> `/s` -> `/min` -> `/h` -> `/d` -> `1x`).
   - Displays raw recipe input/output amounts per single craft cycle independent of machine counts or overclocked cycles-per-second.
   - Ports with perfectly matching stoichiometric amounts display a green checkmark (`✔`), allowing instant visual verification of 1:1 chemical reaction ratios and closed recycling loops.
+
+- **Combustion Generator Family Tier Progression & Rated Output Capping**:
+  - Established seamless tier progression between singleblock combustion generators (LV, MV, HV) and multiblock combustion engines (EV LCE, IV ECE, LuV~UEV combustion modules).
+  - When changing the voltage tier via node cards or the inspector panel (e.g., HV -> EV, EV -> IV), nodes automatically transition to the matching machine hardware (`LV/MV/HV Combustion Generator` ➔ `EV Large Combustion Engine` ➔ `IV Extreme Combustion Engine` ➔ `LuV+ Combustion Module`), updating the machine icon, multiblock flag, and display name simultaneously.
+  - Resolved power distortion where singleblock generators produced abnormal amperage (e.g., `60A MV`) from high-energy fuels by deterministically capping output to the singleblock rated voltage (1A at that tier).
+- **Combustion Engine & Modular Combustion Boosting (GTCEu & Star Technology)**:
+  - Full support for GTCEu Large Combustion Engine (LCE, EV) with Oxygen boosting (1.5x power, 2x fuel parallel) and Extreme Combustion Engine (ECE, IV) with Liquid Oxygen boosting (2.0x power, 2x fuel parallel).
+  - Full support for Star Technology Modular Combustion Frame (MCF) coolant multipliers (Distilled Water +20%, Deionized Water +40%, unsupplied -10%) and T1~T4 Combustion Modules with oxidizer boosting (WFNA 5x, RFNA 6x, O2F2 8x, FCSO 12x power, 2x fuel parallel).
+  - Generator recipes scale power deterministically via voltage-proportional parallels without electric overclock duration reduction, preserving per-recipe batch duration (0.40s) and fuel energy density (EU/mB).
 
 ### Changed & Improved
 - **Closed-Loop Recirculation Protection & Greedy Supply-Filling Allocation**:
@@ -23,12 +50,37 @@
   - Clarified port status indicators: actual shortages relative to current machine speed are flagged with amber deficit warnings (⚠), while upstream-induced speed limits are indicated by a distinct blue throttled badge (↓).
 - **Pyrolyse Oven & Liquefaction Tower Coil Modifier Accuracy**:
   - Accurately computes coil temperature speed modifiers for Pyrolyse Ovens and Liquefaction Towers (+50% speed per tier above Kanthal 2700K, 0.75x speed penalty for Cupronickel).
+- **Onboarding Tutorial UX Improvements & Event-Driven Decoupling**:
+  - Clarified Step 1 instructions to guide players to right-click empty canvas space to open the context menu and select Recipe Search.
+  - Enhanced Step 4 to visually glow existing wires and instruct players to right-click to cut the connection wire first, then Shift-drag from the junction output to the turbine input for 1:1 auto-ratio scaling.
+  - Adjusted Advanced Tutorial Step 12 junction node coordinates to spawn cleanly below the Shared Machine Pool frame, preventing visual overlap with cutter machine card output slots.
+  - Completely decoupled canvas wire interaction handlers from `TutorialManager` by publishing Forge `FlowGraphEvent` (WireConnected, WireDisconnected, JunctionInserted), with `TutorialManager` subscribing and reacting exclusively to tutorial-scoped graph mutations.
 
 ### Fixed
+- **Electric Blast Furnace (EBF) Excess Temperature Perfect Overclock (POC)**:
+  - Fixed an issue where Electric Blast Furnace (EBF) and Alloy Blast Smelter (ABS) failed to apply 1 Perfect Overclock (POC, 4x speed, 0.25 duration) per 1800K excess temperature above recipe requirement (T_machine = T_coil + 100 * max(0, Tier - 2)) and 0.95x energy discount per 900K.
+- **Generator Mode Reset on Non-Turbine Power Generators**:
+  - Fixed an issue where `isGenerator` was incorrectly cleared for non-turbine power generators (Combustion Engines, Dynamos) during node validation.
 - **Per-Craft (`1x`) Tooltip Rate Distortion & Duplicate Suffix Bug**:
   - Fixed an issue where hovering over input/output ports in `1x` batch mode displayed distorted production rates (e.g., overclocked per-second throughput instead of per-craft batch amounts) and malformed duplicate suffixes (e.g., `(11.52 B1x)`) when holding `Shift`.
 - **Coil Addon Stat Invalidation on Card Controls & Header Quick Select**:
   - Fixed an issue where changing heating coils via node card badges (`♨ [Temp]K`) or the config dialog top quick-select header failed to update machine EU/t, duration, and cycle rates until manually manipulated through the lower catalog grid.
+- **Input Consumption Chance & Signed Tier Boost Calculation Bug**:
+  - Fixed an issue where input ingredients with probabilistic consumption chances (e.g., Star Technology Cyclonic Sifter Netherite Reinforced Mesh with 3% consumption chance) were calculated as 100% consumed, distorting factory demand rates by up to 33x.
+  - Added full support for negative tier chance boosts (e.g., -0.2%/tier reduction in mesh consumption on overclock) in domain rate solvers, recipe converters (EMI/JEI), NBT serialization, and port tooltips.
+- **Junction Node Inspector Panel Distortion & Missing Supply Dialog Access**:
+  - Fixed an issue where selecting a Junction/Reroute node improperly displayed machine-specific controls (machine count, voltage tier chips, overclock mode, hardware config, and power/duration stats) in the right-hand Inspector panel.
+  - Implemented a dedicated junction inspector layout featuring bound ingredient preview, supply/buffer mode badges, target batch amount with ETA/DT duration badge, and total inflow/outflow/net flow statistics.
+  - Added a direct `[⚙ Configure Junction]` shortcut button in the inspector panel and integrated junction configuration into the node right-click context menu to grant immediate access to external supply modes, buffer size, and port allocation limits.
+- **Wire Severing Blocked by Context Menu Regression**:
+  - Fixed a regression where right-clicking connection wires on the canvas opened the canvas context menu instead of cutting the wire.
+  - Reordered canvas mouse event priorities so right-clicking wires severs them immediately with sound effects and undo support, while preserving canvas and node context menus for stationary right-clicks on empty canvas and node cards.
+- **Group Frame & Sticky Note History (Undo / Redo) Support**:
+  - Fixed an issue where creating group frames (`Ctrl+G`), shared machine frames (`Ctrl+Shift+S`), and sticky notes failed to record undo/redo history commands, preventing players from reverting newly created frames.
+  - Fixed a critical loss of group frames and sticky notes when collapsing them into a compound module or grouping nodes, ensuring `GroupModuleCommand` and `ExpandModuleCommand` fully capture and restore enclosed frames and notes upon undo and redo.
+  - Added undo/redo history tracking for frame and sticky note property edits (dialog saves, color cycling, sticky note deletions, and resizing).
+- **Tutorial Step 12 Infinite Supply Event Detection**:
+  - Resolved an issue where configuring a Junction node to Infinite Supply did not advance the tutorial step by dispatching `FlowGraphEvent.JunctionConfigured` and adding fallback detection in `FlowGraphEvent.PostSolve`.
 
 ## [2.2.0-alpha.1] - 2026-09-05
 

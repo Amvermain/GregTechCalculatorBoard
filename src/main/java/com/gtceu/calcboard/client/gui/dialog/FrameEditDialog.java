@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.client.gui.dialog;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-
+import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -10,6 +10,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
+
+import java.util.Objects;
 
 /**
  * Modal dialog for editing Frame Title and Theme Color.
@@ -22,6 +24,9 @@ public class FrameEditDialog {
     private EditBox titleInput;
     private int selectedColor;
     private boolean sharedMachineMode;
+    private String initialTitle;
+    private int initialColor;
+    private boolean initialSharedMode;
 
     public FrameEditDialog(BoardScreen parent) {
         this.parent = parent;
@@ -32,6 +37,9 @@ public class FrameEditDialog {
         this.targetFrame = frame;
         this.selectedColor = frame.getColor();
         this.sharedMachineMode = frame.isSharedMachineFrame();
+        this.initialTitle = frame.getTitle() != null ? frame.getTitle() : "";
+        this.initialColor = frame.getColor();
+        this.initialSharedMode = frame.isSharedMachineFrame();
         this.visible = true;
 
         Font font = Minecraft.getInstance().font;
@@ -240,12 +248,28 @@ public class FrameEditDialog {
     private void commitSave() {
         if (targetFrame != null) {
             String newTitle = titleInput != null ? titleInput.getValue().trim() : "";
-            if (!newTitle.isEmpty()) {
-                targetFrame.setTitle(newTitle);
+            if (newTitle.isEmpty() && initialTitle != null) {
+                newTitle = initialTitle;
             }
-            targetFrame.setColor(selectedColor);
-            targetFrame.setSharedMachineFrame(sharedMachineMode);
-            parent.markSummaryDirty();
+            int newColor = selectedColor;
+            boolean newShared = sharedMachineMode;
+
+            boolean changed = !Objects.equals(initialTitle, newTitle)
+                    || initialColor != newColor
+                    || initialSharedMode != newShared;
+
+            if (changed) {
+                targetFrame.setTitle(newTitle);
+                targetFrame.setColor(newColor);
+                targetFrame.setSharedMachineFrame(newShared);
+                parent.recordCommand(new BoardCommand.ModifyFramePropertiesCommand(
+                        targetFrame.getId(),
+                        initialTitle, newTitle,
+                        initialColor, newColor,
+                        initialSharedMode, newShared
+                ));
+                parent.markSummaryDirty();
+            }
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
         }
         close();

@@ -204,6 +204,7 @@ public final class FlowBalanceMatrixSolver {
                 if (cNode == null) continue;
 
                 if (cNode.isReroute()) {
+                    totalPortDemand += computeRerouteDrainDemand(cNode, hop);
                     processRerouteDemandHop(graph, cNode, hop, countsMap, queue, visited);
                 } else if (outEdge.inputIndex() < cNode.getInputs().size()) {
                     totalPortDemand += computeDirectPortDemand(graph, cNode, outEdge, hop, countsMap);
@@ -211,6 +212,13 @@ public final class FlowBalanceMatrixSolver {
             }
         }
         return totalPortDemand;
+    }
+
+    private static double computeRerouteDrainDemand(RecipeNode node, DemandHop hop) {
+        if (node.isFixedDrain() && node.getExternalDrainRate() > 0.0) {
+            return node.getExternalDrainRate() * hop.weight;
+        }
+        return 0.0;
     }
 
     private static void processRerouteDemandHop(
@@ -661,7 +669,8 @@ public final class FlowBalanceMatrixSolver {
     public static double getConnectedConsumerDemand(FlowGraph graph, RecipeNode consumer, int inputIndex, Map<String, Double> effMap) {
         if (consumer == null || consumer.isVoidSink()) return 0.0;
         if (consumer.isReroute()) {
-            return calculateTotalConnectedPortDemand(graph, consumer, 0, null);
+            double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0;
+            return drain + calculateTotalConnectedPortDemand(graph, consumer, 0, null);
         }
         if (inputIndex < consumer.getInputs().size()) {
             if (effMap != null && effMap.containsKey(consumer.getId())) {
@@ -1107,7 +1116,7 @@ public final class FlowBalanceMatrixSolver {
 
         double totalDemand;
         if (consumer.isReroute()) {
-            totalDemand = calculateTotalConnectedPortDemand(graph, consumer, 0, null);
+            totalDemand = getConnectedConsumerDemand(graph, consumer, inPortIdx);
         } else {
             IngredientStack inStack = consumer.getInputs().get(inPortIdx);
             totalDemand = consumer.calculateSingleMachineInputRate(inStack) * consumer.getMachineCount();

@@ -1,8 +1,8 @@
 package com.gtceu.calcboard.client.gui.dialog;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-
+import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
+import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,6 +11,8 @@ import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
+
+import java.util.Objects;
 
 /**
  * Modal dialog for editing Sticky Note Title, Multi-line Content, and Theme Color.
@@ -23,6 +25,9 @@ public class NoteEditDialog {
     private EditBox titleInput;
     private MultiLineEditBox contentInput;
     private int selectedColor;
+    private String initialTitle;
+    private String initialContent;
+    private int initialColor;
 
     public NoteEditDialog(BoardScreen parent) {
         this.parent = parent;
@@ -32,6 +37,9 @@ public class NoteEditDialog {
         if (note == null) return;
         this.targetNote = note;
         this.selectedColor = note.getColor();
+        this.initialTitle = note.getTitle() != null ? note.getTitle() : "";
+        this.initialContent = note.getContent() != null ? note.getContent() : "";
+        this.initialColor = note.getColor();
         this.visible = true;
 
         Font font = Minecraft.getInstance().font;
@@ -251,12 +259,28 @@ public class NoteEditDialog {
     private void commitSave() {
         if (targetNote != null) {
             String newTitle = titleInput != null ? titleInput.getValue().trim() : "";
-            if (!newTitle.isEmpty()) {
-                targetNote.setTitle(newTitle);
+            if (newTitle.isEmpty() && initialTitle != null) {
+                newTitle = initialTitle;
             }
-            targetNote.setContent(contentInput != null ? contentInput.getValue() : "");
-            targetNote.setColor(selectedColor);
-            parent.markSummaryDirty();
+            String newContent = contentInput != null ? contentInput.getValue() : "";
+            int newColor = selectedColor;
+
+            boolean changed = !Objects.equals(initialTitle, newTitle)
+                    || !Objects.equals(initialContent, newContent)
+                    || initialColor != newColor;
+
+            if (changed) {
+                targetNote.setTitle(newTitle);
+                targetNote.setContent(newContent);
+                targetNote.setColor(newColor);
+                parent.recordCommand(new BoardCommand.ModifyNotePropertiesCommand(
+                        targetNote.getId(),
+                        initialTitle, newTitle,
+                        initialContent, newContent,
+                        initialColor, newColor
+                ));
+                parent.markSummaryDirty();
+            }
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
         }
         close();

@@ -662,6 +662,7 @@ public class MultiblockDetector {
         if (STEAM_MULTIBLOCKS.contains(workstationId)) return true;
         if (THREADING_MAX_HELIX_CAPACITY.containsKey(workstationId)) return true;
         if (MultiblockStructureCatalog.getStructure(workstationId) != null) return true;
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(workstationId)) return true;
         Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
         if (def != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isMultiblockDefinition(def)) {
             return true;

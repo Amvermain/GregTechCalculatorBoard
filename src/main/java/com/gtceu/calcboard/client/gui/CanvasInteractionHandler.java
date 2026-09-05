@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.client.gui.interaction.CanvasContextMenuManager;
 import com.gtceu.calcboard.client.gui.interaction.CanvasFrameInteractionHandler;
 import com.gtceu.calcboard.client.gui.interaction.CanvasNoteInteractionHandler;
 import com.gtceu.calcboard.client.gui.interaction.CanvasPanZoomHandler;
@@ -31,6 +32,7 @@ public class CanvasInteractionHandler {
     private final CanvasFrameInteractionHandler frameHandler = new CanvasFrameInteractionHandler();
     private final CanvasNoteInteractionHandler noteHandler = new CanvasNoteInteractionHandler();
     private final CanvasWireInteractionHandler wireHandler = new CanvasWireInteractionHandler();
+    private final CanvasContextMenuManager contextMenuManager;
 
     private NodeWidget draggingNode = null;
     private double lastDragCanvasX, lastDragCanvasY;
@@ -40,10 +42,17 @@ public class CanvasInteractionHandler {
     private double resizeStartCanvasX, resizeStartCanvasY;
     private int origNodeWidth, origNodeHeight;
 
+    private double rightClickStartMouseX = 0;
+    private double rightClickStartMouseY = 0;
+    private double rightClickStartCanvasX = 0;
+    private double rightClickStartCanvasY = 0;
+    private boolean isPotentialRightClick = false;
+
     private final Map<String, double[]> dragStartPositions = new HashMap<>();
 
     public CanvasInteractionHandler(BoardScreen screen) {
         this.screen = screen;
+        this.contextMenuManager = new CanvasContextMenuManager(screen);
     }
 
     public boolean hasQuickAddMarker() {
@@ -114,11 +123,22 @@ public class CanvasInteractionHandler {
         return panZoomHandler.isPanning();
     }
 
+    public CanvasContextMenuManager getContextMenuManager() {
+        return contextMenuManager;
+    }
+
     public void cancelWireDrag() {
         wireHandler.cancelWireDrag();
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (contextMenuManager.isOpen()) {
+            if (contextMenuManager.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+            contextMenuManager.close();
+        }
+
         if (wireHandler.isDraggingWire() && button == 1) {
             wireHandler.cancelWireDrag();
             return true;
@@ -135,7 +155,8 @@ public class CanvasInteractionHandler {
             return true;
         }
 
-        if (wireHandler.handleWireClick(canvasMouseX, canvasMouseY, button, screen)) {
+        if (!isPointInsideAnyNode(canvasMouseX, canvasMouseY)
+                && wireHandler.handleWireClick(canvasMouseX, canvasMouseY, button, screen)) {
             return true;
         }
 
@@ -162,10 +183,46 @@ public class CanvasInteractionHandler {
         }
 
         if (button == 1 || button == 2) {
+            rightClickStartMouseX = mouseX;
+            rightClickStartMouseY = mouseY;
+            rightClickStartCanvasX = canvasMouseX;
+            rightClickStartCanvasY = canvasMouseY;
+            isPotentialRightClick = (button == 1);
             panZoomHandler.startPan(mouseX, mouseY);
             return true;
         }
 
+        return false;
+    }
+
+    private void openAppropriateContextMenu(double mouseX, double mouseY, double canvasX, double canvasY) {
+        if (screen.findHoveredWire(canvasX, canvasY, 8.0) != null) {
+            return;
+        }
+
+        List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
+        for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
+            NodeWidget nw = nodeWidgets.get(i);
+            if (!nw.isPointInside(canvasX, canvasY)) continue;
+
+            if (screen.getSelectedNodeIds().size() > 1 && screen.isNodeSelected(nw.getNode().getId())) {
+                contextMenuManager.openForSelection(mouseX, mouseY);
+                return;
+            }
+
+            contextMenuManager.openForNode(mouseX, mouseY, nw);
+            return;
+        }
+
+        contextMenuManager.openForCanvas(mouseX, mouseY, canvasX, canvasY);
+    }
+
+    private boolean isPointInsideAnyNode(double canvasX, double canvasY) {
+        for (NodeWidget nw : screen.getNodeWidgets()) {
+            if (nw.isPointInside(canvasX, canvasY)) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -360,21 +417,16 @@ public class CanvasInteractionHandler {
                 screen.recordCommand(new BoardCommand.AddNodesCommand(List.of(reroute), List.of(), "Add Junction Node"));
                 screen.rebuildWidgets();
                 screen.markSummaryDirty();
-                TutorialManager.getInstance().onJunctionInserted();
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionInserted(screen.getGraph(), null, reroute));
             } else {
                 screen.addRerouteNodeAt(markerX, markerY);
-                TutorialManager.getInstance().onJunctionInserted();
             }
         }
         clearQuickAddMarker();
     }
 
     private boolean handleEmptySpaceClick(double canvasMouseX, double canvasMouseY) {
-        if (quickAddMarkerHandler.handleEmptyCanvasClick(canvasMouseX, canvasMouseY, screen)) {
-            selectionHandler.stopBoxSelection();
-            return true;
-        }
-
+        clearQuickAddMarker();
         selectionHandler.startBoxSelection(canvasMouseX, canvasMouseY);
         if (!Screen.hasShiftDown()) {
             screen.clearSelection();
@@ -553,6 +605,18 @@ public class CanvasInteractionHandler {
             }
         }
 
+        if (button == 1 && isPotentialRightClick) {
+            isPotentialRightClick = false;
+            double dist = Math.hypot(mouseX - rightClickStartMouseX, mouseY - rightClickStartMouseY);
+            if (dist < 4.5) {
+                openAppropriateContextMenu(mouseX, mouseY, rightClickStartCanvasX, rightClickStartCanvasY);
+                if (panZoomHandler.isPanning()) {
+                    panZoomHandler.stopPan();
+                }
+                return true;
+            }
+        }
+
         if (panZoomHandler.isPanning() && (button == 1 || button == 2)) {
             panZoomHandler.stopPan();
             return true;
@@ -567,12 +631,11 @@ public class CanvasInteractionHandler {
         double minY = Math.min(selectionHandler.getBoxSelectStartY(), selectionHandler.getBoxSelectCurY());
         double maxY = Math.max(selectionHandler.getBoxSelectStartY(), selectionHandler.getBoxSelectCurY());
 
+        clearQuickAddMarker();
         if (Math.abs(maxX - minX) > 6 || Math.abs(maxY - minY) > 6) {
-            clearQuickAddMarker();
             selectionHandler.finishBoxSelection(screen, Screen.hasShiftDown());
         } else {
             selectionHandler.stopBoxSelection();
-            quickAddMarkerHandler.triggerContextualMarker(selectionHandler.getBoxSelectStartX(), selectionHandler.getBoxSelectStartY(), null, -1, false, null, false);
         }
     }
 

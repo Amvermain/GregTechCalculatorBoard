@@ -133,7 +133,6 @@ public class FavoritesDockWidget {
         private dev.emi.emi.api.recipe.EmiRecipe hoveredFlyoutRecipe = null;
 
         private static final int EXPANDED_WIDTH = 145;
-        private static final int COLLAPSED_WIDTH = 95;
         private static final int HEADER_HEIGHT = 18;
         private static final int ROW_HEIGHT = 22;
         private static final int SUB_WIDTH = 185;
@@ -160,7 +159,7 @@ public class FavoritesDockWidget {
         }
 
         private int getDockX() {
-            return 8;
+            return LeftActivityBarWidget.BAR_WIDTH;
         }
 
         private int getDockY() {
@@ -304,25 +303,18 @@ public class FavoritesDockWidget {
                 closeFlyout();
             }
 
+            if (!parent.isExpanded()) {
+                return;
+            }
+
             graphics.pose().pushPose();
             graphics.pose().translate(0, 0, 10);
 
             int dockY = getDockY();
             String countDisplay = loading ? Component.translatable("gui.gtcalcboard.favorites_dock.loading").getString() : String.valueOf(count);
 
-            if (!parent.isExpanded()) {
-                boolean hovered = mouseX >= getDockX() && mouseX <= getDockX() + COLLAPSED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT;
-                int bg = hovered ? 0xEE1E293B : 0xAA0F172A;
-                int border = hovered ? 0xFFFFD700 : (loading ? 0xFFF59E0B : 0xFF475569);
-
-                graphics.fill(getDockX(), dockY, getDockX() + COLLAPSED_WIDTH, dockY + HEADER_HEIGHT, bg);
-                graphics.renderOutline(getDockX(), dockY, COLLAPSED_WIDTH, HEADER_HEIGHT, border);
-
-                String title = "⭐ " + Component.translatable("gui.gtcalcboard.favorites").getString() + " (" + countDisplay + ") ▶";
-                graphics.drawString(font, font.plainSubstrByWidth(title, COLLAPSED_WIDTH - 6), getDockX() + 6, dockY + 5, hovered ? 0xFFFFD700 : (loading ? 0xFFFDE047 : 0xFFE2E8F0), false);
-            } else {
-                int maxH = Math.min(240, screen.height - dockY - 60);
-                int contentH = maxH - HEADER_HEIGHT;
+            int maxH = Math.min(240, screen.height - dockY - 60);
+            int contentH = maxH - HEADER_HEIGHT;
 
                 int bg = 0xF00F172A;
                 int border = loading ? 0xFFF59E0B : 0xFF38BDF8;
@@ -451,7 +443,6 @@ public class FavoritesDockWidget {
                 if (activeFlyoutFavorite != null && !activeFlyoutRecipes.isEmpty()) {
                     renderSubFlyoutPanel(graphics, font, subX, dockY, SUB_WIDTH, maxH, mouseX, mouseY);
                 }
-            }
 
             if (isDragging && (draggingFavorite != null || draggingFlyoutRecipe != null)) {
                 graphics.pose().pushPose();
@@ -555,7 +546,7 @@ public class FavoritesDockWidget {
         }
 
         private void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
-            if (isDragging) return;
+            if (!parent.isExpanded() || isDragging) return;
 
             int screenW = screen.width;
             int screenH = screen.height;
@@ -721,18 +712,11 @@ public class FavoritesDockWidget {
         }
 
         private boolean mouseClicked(double mouseX, double mouseY, int button) {
-            int dockY = getDockY();
             if (!parent.isExpanded()) {
-                if (button == 0 && mouseX >= getDockX() && mouseX <= getDockX() + COLLAPSED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {
-                    parent.toggle();
-                    Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
-                    );
-                    return true;
-                }
                 return false;
             }
 
+            int dockY = getDockY();
             int maxH = Math.min(240, screen.height - dockY - 60);
 
             if (button == 0 && mouseX >= getDockX() && mouseX <= getDockX() + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {

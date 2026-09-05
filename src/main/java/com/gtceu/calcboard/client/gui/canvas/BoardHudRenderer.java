@@ -82,6 +82,21 @@ public class BoardHudRenderer {
         RenderSystem.disableBlend();
     }
 
+    public static void renderEmptyCanvasWatermark(GuiGraphics graphics, Font font, int width, int height, int nodeCount) {
+        if (nodeCount > 0) return;
+        String title = "GREGTECH CALCULATOR BOARD";
+        String hint = Component.translatable("gui.gtcalcboard.canvas.empty_watermark_hint").getString();
+
+        int cx = width / 2;
+        int cy = height / 2 - 10;
+
+        int titleW = font.width(title);
+        int hintW = font.width(hint);
+
+        graphics.drawString(font, title, cx - titleW / 2, cy - 8, 0x4494A3B8, false);
+        graphics.drawString(font, hint, cx - hintW / 2, cy + 6, 0x4464748B, false);
+    }
+
     public static void renderQuickAddMarker(GuiGraphics graphics, Font font, double qx, double qy, double canvasMouseX, double canvasMouseY) {
         boolean searchHovered = canvasMouseX >= qx - 44 && canvasMouseX <= qx - 24 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
         boolean junctionHovered = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;

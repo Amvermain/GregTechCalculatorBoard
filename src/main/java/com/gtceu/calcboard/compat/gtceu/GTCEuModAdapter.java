@@ -28,6 +28,7 @@ import com.gtceu.calcboard.compat.gtceu.badge.GTBadgeProvider;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import com.gtceu.calcboard.compat.gtceu.handler.GTNodeValidator;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCapabilityScanner;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuMultiblockScanner;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuMultiblockStructureScanner;
@@ -48,6 +49,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -615,6 +617,13 @@ public class GTCEuModAdapter implements IModAdapter {
             return null;
         }
 
+        if (GTCombustionHelper.isCombustionFamily(node)) {
+            ResourceLocation combustionWs = GTCombustionHelper.getCombustionMachineForTier(tier);
+            if (combustionWs != null) {
+                return combustionWs;
+            }
+        }
+
         ResourceLocation fromList = node.getWorkstationForTierFromList(tier);
         if (fromList != null) {
             return fromList;
@@ -707,7 +716,7 @@ public class GTCEuModAdapter implements IModAdapter {
             int defPar = MultiblockDetector.getDefaultParallel(newIcon);
             node.setParallel(Math.max(1, defPar));
             node.setSteamMode(SteamMode.HIGH_PRESSURE);
-        } else if (MultiblockDetector.isMultiblock(newIcon) || node.isFusion()) {
+        } else if (MultiblockDetector.isMultiblock(newIcon) || node.isFusion() || GTCombustionHelper.isCombustionEngine(newIcon)) {
             node.setMultiblock(true);
             if (node.getSteamMode().isSteam()) {
                 node.setSteamMode(SteamMode.NONE);
@@ -780,22 +789,28 @@ public class GTCEuModAdapter implements IModAdapter {
         if (!MultiblockDetector.supportsOverpressure(newIcon)) {
             node.getAddons().removeIf(a -> a.getId() != null && a.getId().equals("gtceu:overpressure_autoclave"));
         }
+        if (!GTCombustionHelper.isCombustionEngine(node)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isCombustionBoostAddon);
+        }
     }
 
     private void applyMachinePresets(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
-        if (oldIcon != null && !oldIcon.equals(newIcon)) {
-            if (MultiblockDetector.isTurbineMachine(newIcon)) {
-                node.setGenerator(true);
-                int defPar = MultiblockDetector.getDefaultParallel(newIcon);
-                if (defPar > 1) {
-                    node.setParallel(defPar);
-                }
-                GTVoltageTier baseTier = MultiblockDetector.getTurbineBaseTier(newIcon);
-                if (baseTier != null && (node.getTargetTier() == null || (MultiblockDetector.requiresMinimumBaseTier(newIcon) && node.getTargetTier().ordinal() < baseTier.ordinal()))) {
-                    node.setTargetTier(baseTier);
-                }
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            node.setGenerator(true);
+        }
+        if (MultiblockDetector.isTurbineMachine(newIcon)) {
+            node.setGenerator(true);
+            GTVoltageTier baseTier = MultiblockDetector.getTurbineBaseTier(newIcon);
+            if (baseTier != null && (node.getTargetTier() == null || (MultiblockDetector.requiresMinimumBaseTier(newIcon) && node.getTargetTier().ordinal() < baseTier.ordinal()))) {
+                node.setTargetTier(baseTier);
             }
+            int defPar = MultiblockDetector.getDefaultParallel(newIcon);
+            if (defPar > 1) {
+                node.setParallel(defPar);
+            }
+        }
 
+        if (oldIcon != null && !oldIcon.equals(newIcon)) {
             if (MultiblockDetector.supportsThroughputBoosting(newIcon)) {
                 boolean hasBoost = node.getAddons().stream().anyMatch(a -> a.getId() != null && a.getId().equals("gtceu:throughput_boosting"));
                 if (!hasBoost) {

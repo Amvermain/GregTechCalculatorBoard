@@ -57,6 +57,7 @@ public class BoardManager {
     private boolean showDebugInfo = false;
     private boolean autoRatioFractionalDefault = false;
     private boolean preserveFractionalAnchor = true;
+    private boolean slimCardMode = true;
 
     private final Map<String, IBoardStorageExtension> storageExtensions = new ConcurrentHashMap<>();
     private final Map<String, CompoundTag> pendingExtensionTags = new ConcurrentHashMap<>();
@@ -119,6 +120,7 @@ public class BoardManager {
         this.gridSnapEnabled = false;
         this.gridSnapSize = 16;
         this.showDebugInfo = false;
+        this.slimCardMode = true;
         com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().clearAll();
         for (IBoardStorageExtension ext : this.storageExtensions.values()) {
             ext.onReset();
@@ -800,6 +802,7 @@ public class BoardManager {
             rootTag.putBoolean("showDebugInfo", isShowDebugInfo());
             rootTag.putBoolean("autoRatioFractionalDefault", isAutoRatioFractionalDefault());
             rootTag.putBoolean("preserveFractionalAnchor", isPreserveFractionalAnchor());
+            rootTag.putBoolean("slimCardMode", isSlimCardMode());
             rootTag.put("categoryPresets", com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().serializeNBT());
             for (Map.Entry<String, IBoardStorageExtension> entry : this.storageExtensions.entrySet()) {
                 CompoundTag extTag = entry.getValue().serialize();
@@ -937,6 +940,9 @@ public class BoardManager {
                 }
                 if (rootTag.contains("preserveFractionalAnchor")) {
                     this.preserveFractionalAnchor = rootTag.getBoolean("preserveFractionalAnchor");
+                }
+                if (rootTag.contains("slimCardMode")) {
+                    this.slimCardMode = rootTag.getBoolean("slimCardMode");
                 }
                 if (rootTag.contains("categoryPresets", Tag.TAG_COMPOUND)) {
                     com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().deserializeNBT(rootTag.getCompound("categoryPresets"));
@@ -1133,6 +1139,14 @@ public class BoardManager {
         if (rootTag.contains("addonCatalogListView")) {
             this.addonCatalogListView = rootTag.getBoolean("addonCatalogListView");
         }
+    }
+
+    public boolean isSlimCardMode() {
+        return slimCardMode;
+    }
+
+    public void setSlimCardMode(boolean slimCardMode) {
+        this.slimCardMode = slimCardMode;
     }
 }
 

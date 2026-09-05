@@ -60,8 +60,8 @@ stateDiagram-v2
 
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :---: | :---: | :---: | :--- |
-| **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PROPOSED` | `v2.1.0` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
-| **[RFC-025](../RFC_025_UNIFIED_CANVAS_WORKSPACE_AND_CONTEXT_DRIVEN_UI.md)** | 3-패널 통합 워크스페이스 및 컨텍스트 중심 UI/UX 현대화 명세<br/>*(Unified Canvas Workspace & Context-Driven UI/UX Modernization Specification)* | 🟡 `PROPOSED` | `v2.3.0` | 2026-09-05 | 캔버스/노드 우클릭 컨텍스트 메뉴, 스마트 커넥트 추천, 노드 카드 슬림화 및 비모달 우측 인스펙터, 3-패널 통합 워크스페이스 구축 |
+| **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
+| **[RFC-025](../RFC_025_UNIFIED_CANVAS_WORKSPACE_AND_CONTEXT_DRIVEN_UI.md)** | 3-패널 통합 워크스페이스 및 컨텍스트 중심 UI/UX 현대화 명세<br/>*(Unified Canvas Workspace & Context-Driven UI/UX Modernization Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 캔버스/노드 우클릭 컨텍스트 메뉴, 스마트 커넥트 추천, 노드 카드 슬림화 및 비모달 우측 인스펙터, 3-패널 통합 워크스페이스 구축 |
 
 
 

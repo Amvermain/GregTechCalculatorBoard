@@ -19,6 +19,18 @@ import net.minecraft.sounds.SoundEvents;
 public class TutorialManager {
     private static final TutorialManager INSTANCE = new TutorialManager();
 
+    static {
+        registerEventListeners();
+    }
+
+    public static void registerEventListeners() {
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener((com.gtceu.calcboard.api.event.FlowGraphEvent.WireConnected event) -> INSTANCE.onWireConnectedEvent(event));
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener((com.gtceu.calcboard.api.event.FlowGraphEvent.WireDisconnected event) -> INSTANCE.onWireDisconnectedEvent(event));
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener((com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionInserted event) -> INSTANCE.onJunctionInsertedEvent(event));
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener((com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionConfigured event) -> INSTANCE.onJunctionConfiguredEvent(event));
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener((com.gtceu.calcboard.api.event.FlowGraphEvent.PostSolve event) -> INSTANCE.onPostSolveEvent(event));
+    }
+
     private boolean active = false;
     private TutorialStep currentStep = TutorialStep.STEP_1_ADD_RECIPE;
     private BoardScreen currentScreen = null;
@@ -141,6 +153,24 @@ public class TutorialManager {
         }
     }
 
+    public boolean hasPreviousStep() {
+        if (!active || currentStep == TutorialStep.COMPLETED) return false;
+        if (mode == TutorialMode.ADVANCED) {
+            return currentStep.ordinal() > TutorialStep.STEP_10_SHARED_MACHINE.ordinal();
+        }
+        return currentStep.ordinal() > TutorialStep.STEP_1_ADD_RECIPE.ordinal();
+    }
+
+    public void previousStep() {
+        if (!hasPreviousStep()) return;
+        int prevOrdinal = currentStep.ordinal() - 1;
+        if (prevOrdinal >= 0) {
+            currentStep = TutorialStep.values()[prevOrdinal];
+            playUiSound(1, 0.9f);
+            onStepEnter(currentStep);
+        }
+    }
+
     public void completeTutorial() {
         currentStep = TutorialStep.COMPLETED;
         playUiSound(2, 1.0f);
@@ -225,10 +255,26 @@ public class TutorialManager {
 
         ensureBoilerAndTurbineExist(tutPage);
 
-        // Reset turbine machine count to 1.0 so user can experience Shift auto-calculation to 5.0
+        RecipeNode boiler = tutPage.getGraph().findNodeById(boilerNodeId);
         RecipeNode turbine = tutPage.getGraph().findNodeById(turbineNodeId);
         if (turbine != null) {
             turbine.setMachineCount(1.0);
+        }
+
+        RecipeNode junction = tutPage.getGraph().getNodes().stream()
+                .filter(RecipeNode::isReroute)
+                .findFirst()
+                .orElse(null);
+
+        if (junction == null && boiler != null && turbine != null) {
+            IngredientStack outStack = !boiler.getOutputs().isEmpty() ? boiler.getOutputs().get(0) : null;
+            junction = RecipeNode.createReroute(boiler.getPosX() + 180, boiler.getPosY() + 20);
+            if (outStack != null) {
+                junction.bindRerouteIngredient(outStack.copy());
+            }
+            tutPage.getGraph().addNode(junction);
+            tutPage.getGraph().addConnection(boiler.getId(), 0, junction.getId(), 0);
+            tutPage.getGraph().addConnection(junction.getId(), 0, turbine.getId(), 0);
         }
         if (currentScreen != null) currentScreen.rebuildWidgets();
     }
@@ -353,19 +399,19 @@ public class TutorialManager {
         ResourceLocation cutterIcon = ResourceLocation.tryParse("gtceu:lv_cutter");
         RecipeNode cutter1 = RecipeNode.create(cutterIcon, "Quartz Slicing (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
         cutter1.setMachineCount(0.15);
-        cutter1.setPos(-200, -40);
+        cutter1.setPos(-280, -50);
         cutter1.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:quartz_block"), "Quartz Block", 1.0));
         cutter1.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:quartz"), "Quartz", 4.0));
 
         RecipeNode cutter2 = RecipeNode.create(cutterIcon, "Amethyst Slicing (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
         cutter2.setMachineCount(0.20);
-        cutter2.setPos(60, -40);
+        cutter2.setPos(0, -50);
         cutter2.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:amethyst_block"), "Amethyst Block", 1.0));
         cutter2.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:amethyst_shard"), "Amethyst Shard", 4.0));
 
         RecipeNode cutter3 = RecipeNode.create(cutterIcon, "Echo Slicing (Tutorial)", 20.0, 30.0, GTVoltageTier.LV);
         cutter3.setMachineCount(0.10);
-        cutter3.setPos(320, -40);
+        cutter3.setPos(280, -50);
         cutter3.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:echo_shard"), "Echo Shard", 1.0));
         cutter3.addOutput(IngredientStack.item(ResourceLocation.tryParse("minecraft:sculk"), "Sculk", 2.0));
 
@@ -393,12 +439,24 @@ public class TutorialManager {
 
     private void setupStep12SupplyExercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
         if (tutPage == null) return;
-        boolean hasJunction = tutPage.getGraph().getNodes().stream().anyMatch(RecipeNode::isReroute);
-        if (!hasJunction && !tutPage.getGraph().getNodes().isEmpty()) {
-            RecipeNode sourceNode = tutPage.getGraph().getNodes().get(0);
+        RecipeNode sourceNode = tutPage.getGraph().getNodes().stream()
+                .filter(n -> !n.isReroute())
+                .findFirst()
+                .orElse(null);
+        if (sourceNode == null) return;
+
+        RecipeNode junction = tutPage.getGraph().getNodes().stream()
+                .filter(RecipeNode::isReroute)
+                .findFirst()
+                .orElse(null);
+
+        double targetX = sourceNode.getPosX() + 105;
+        double targetY = sourceNode.getPosY() + 160;
+
+        if (junction == null) {
             IngredientStack outStack = !sourceNode.getOutputs().isEmpty() ? sourceNode.getOutputs().get(0) : null;
             if (outStack != null) {
-                RecipeNode junction = RecipeNode.createReroute(sourceNode.getPosX() + 180, sourceNode.getPosY() + 20);
+                junction = RecipeNode.createReroute(targetX, targetY);
                 junction.bindRerouteIngredient(outStack.copy());
                 junction.setTargetBatchAmount(100.0);
                 tutPage.getGraph().addNode(junction);
@@ -406,7 +464,11 @@ public class TutorialManager {
                         sourceNode.getId(), 0, junction.getId(), 0
                 ));
             }
+        } else if (junction.getPosY() < sourceNode.getPosY() + 100) {
+            junction.setPosX(targetX);
+            junction.setPosY(targetY);
         }
+
         if (currentScreen != null) {
             currentScreen.rebuildWidgets();
         }
@@ -486,12 +548,61 @@ public class TutorialManager {
     }
 
     public void onWireDisconnected() {
+        if (!active) return;
+        if (currentScreen != null) {
+            currentScreen.rebuildWidgets();
+        }
     }
 
     public void onJunctionInserted() {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_3_JUNCTION) {
             nextStep(); // Advance to Step 4 (Shift Wiring)
+        }
+    }
+
+    public void onWireConnectedEvent(com.gtceu.calcboard.api.event.FlowGraphEvent.WireConnected event) {
+        if (!active || event.getGraph() == null) return;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null || tutPage.getGraph() != event.getGraph()) return;
+        onWireConnected(event.isShiftDown());
+    }
+
+    public void onWireDisconnectedEvent(com.gtceu.calcboard.api.event.FlowGraphEvent.WireDisconnected event) {
+        if (!active || event.getGraph() == null) return;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null || tutPage.getGraph() != event.getGraph()) return;
+        onWireDisconnected();
+    }
+
+    public void onJunctionInsertedEvent(com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionInserted event) {
+        if (!active || event.getGraph() == null) return;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null || tutPage.getGraph() != event.getGraph()) return;
+        onJunctionInserted();
+    }
+
+    public void onJunctionConfiguredEvent(com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionConfigured event) {
+        if (!active || event.getGraph() == null) return;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null || tutPage.getGraph() != event.getGraph()) return;
+        if (currentStep == TutorialStep.STEP_12_JUNCTION_SUPPLY) {
+            if (event.getMode() != null && event.getMode() != com.gtceu.calcboard.api.type.SupplyMode.NONE) {
+                onJunctionSupplyConfigured();
+            }
+        }
+    }
+
+    public void onPostSolveEvent(com.gtceu.calcboard.api.event.FlowGraphEvent.PostSolve event) {
+        if (!active || event.getGraph() == null) return;
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+        if (tutPage == null || tutPage.getGraph() != event.getGraph()) return;
+        if (currentStep == TutorialStep.STEP_12_JUNCTION_SUPPLY) {
+            boolean hasConfiguredSupply = tutPage.getGraph().getNodes().stream()
+                    .anyMatch(n -> n.isReroute() && n.getSupplyMode() != com.gtceu.calcboard.api.type.SupplyMode.NONE);
+            if (hasConfiguredSupply) {
+                onJunctionSupplyConfigured();
+            }
         }
     }
 
@@ -654,6 +765,18 @@ public class TutorialManager {
         return isNodeConfigButtonGlowing(nodeId);
     }
 
+    public boolean isJunctionGlowing(String nodeId) {
+        if (!active || nodeId == null) return false;
+        if (currentStep == TutorialStep.STEP_12_JUNCTION_SUPPLY) {
+            com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+            if (tutPage != null) {
+                RecipeNode junc = tutPage.getGraph().getNodes().stream().filter(RecipeNode::isReroute).findFirst().orElse(null);
+                return junc != null && junc.getId().equals(nodeId);
+            }
+        }
+        return false;
+    }
+
     public boolean isFrameCollapseButtonGlowing(String frameId) {
         if (!active) return false;
         return currentStep == TutorialStep.STEP_9_COMPOUND_MODULE;
@@ -665,6 +788,9 @@ public class TutorialManager {
             return (boilerNodeId != null && boilerNodeId.equals(fromNodeId))
                     || (turbineNodeId != null && turbineNodeId.equals(toNodeId));
         }
+        if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
+            return turbineNodeId != null && turbineNodeId.equals(toNodeId);
+        }
         return false;
     }
 
@@ -675,7 +801,10 @@ public class TutorialManager {
                 return true;
             }
         } else if (currentStep == TutorialStep.STEP_4_SHIFT_WIRING) {
-            if (!isInput && portIdx == 0 && boilerNodeId != null && boilerNodeId.equals(nodeId)) {
+            com.gtceu.calcboard.api.storage.BoardPage tutPage = getTutorialPage();
+            RecipeNode junction = tutPage != null ? tutPage.getGraph().getNodes().stream().filter(RecipeNode::isReroute).findFirst().orElse(null) : null;
+            String sourceId = junction != null ? junction.getId() : boilerNodeId;
+            if (!isInput && portIdx == 0 && sourceId != null && sourceId.equals(nodeId)) {
                 return true;
             }
             if (isInput && portIdx == 0 && turbineNodeId != null && turbineNodeId.equals(nodeId)) {

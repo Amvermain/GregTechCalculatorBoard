@@ -19,8 +19,6 @@ public class HotkeyHudWidget {
 
     private static final int EXPANDED_WIDTH = 195;
     private static final int EXPANDED_HEIGHT = 244;
-    private static final int COLLAPSED_WIDTH = 22;
-    private static final int COLLAPSED_HEIGHT = 20;
 
     private double scrollY = 0;
 
@@ -42,35 +40,23 @@ public class HotkeyHudWidget {
         setExpanded(!this.expanded);
     }
 
+    private int getPanelX() {
+        return LeftActivityBarWidget.BAR_WIDTH + 4;
+    }
+
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (!expanded) {
+            return;
+        }
+
         Font font = Minecraft.getInstance().font;
         int screenW = screen.width;
         int screenH = screen.height;
 
-        if (!expanded) {
-            int chipX = 8;
-            int chipY = screenH - COLLAPSED_HEIGHT - 8;
-
-            boolean hovered = mouseX >= chipX && mouseX <= chipX + COLLAPSED_WIDTH && mouseY >= chipY && mouseY <= chipY + COLLAPSED_HEIGHT;
-            int bgColor = hovered ? 0xEE1E293B : 0xAA0F172A;
-            int borderColor = hovered ? 0xFF38BDF8 : 0xFF475569;
-
-            graphics.fill(chipX, chipY, chipX + COLLAPSED_WIDTH, chipY + COLLAPSED_HEIGHT, bgColor);
-            graphics.renderOutline(chipX, chipY, COLLAPSED_WIDTH, COLLAPSED_HEIGHT, borderColor);
-
-            String icon = "?";
-            int iconW = font.width(icon);
-            graphics.drawString(font, icon, chipX + (COLLAPSED_WIDTH - iconW) / 2, chipY + 6, hovered ? 0xFFFFFFFF : 0xFF94A3B8, false);
-
-            if (hovered) {
-                com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.hotkey_hud.expand"), mouseX, mouseY, screenW, screenH);
-            }
-            return;
-        }
-
-        int panelX = 8;
-        int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
-        int panelY = screenH - panelH - 8;
+        int bottomOffset = getBottomOffset();
+        int panelX = getPanelX();
+        int panelH = Math.min(EXPANDED_HEIGHT, screenH - bottomOffset - 16);
+        int panelY = screenH - panelH - bottomOffset;
 
         graphics.fill(panelX, panelY, panelX + EXPANDED_WIDTH, panelY + panelH, 0xEE0B1120);
         graphics.renderOutline(panelX, panelY, EXPANDED_WIDTH, panelH, 0xFF1E293B);
@@ -83,6 +69,11 @@ public class HotkeyHudWidget {
         int minBtnY = panelY + 2;
         boolean minHovered = mouseX >= minBtnX && mouseX <= minBtnX + 12 && mouseY >= minBtnY && mouseY <= minBtnY + 12;
         graphics.drawString(font, "x", minBtnX + 2, minBtnY + 2, minHovered ? 0xFFFF5555 : 0xFF64748B, false);
+
+        int tutBtnX = minBtnX - 14;
+        int tutBtnY = panelY + 2;
+        boolean tutHovered = mouseX >= tutBtnX && mouseX <= tutBtnX + 12 && mouseY >= tutBtnY && mouseY <= tutBtnY + 12;
+        graphics.drawString(font, "▶", tutBtnX + 2, tutBtnY + 2, tutHovered ? 0xFF00FF88 : 0xFF10B981, false);
 
         int contentH = panelH - 20;
         int totalContentH = 18 * 12 + 4;
@@ -129,6 +120,12 @@ public class HotkeyHudWidget {
         renderKeyLine(graphics, font, panelX + 6, curY, "Delete", "gui.gtcalcboard.hotkey_hud.delete");
 
         BoardScissorHelper.disableScissor(graphics);
+
+        if (tutHovered) {
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderTooltip(
+                graphics, font, Component.translatable("gui.gtcalcboard.tutorial_btn"), mouseX, mouseY, screenW, screenH
+            );
+        }
     }
 
     private void renderKeyLine(GuiGraphics graphics, Font font, int x, int y, String key, String langKey) {
@@ -142,7 +139,7 @@ public class HotkeyHudWidget {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!expanded) return false;
         int screenH = screen.height;
-        int panelX = 8;
+        int panelX = getPanelX();
         int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
         int panelY = screenH - panelH - 8;
         int contentH = panelH - 20;
@@ -156,22 +153,16 @@ public class HotkeyHudWidget {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int screenW = screen.width;
-        int screenH = screen.height;
-
         if (!expanded) {
-            int chipX = 8;
-            int chipY = screenH - COLLAPSED_HEIGHT - 8;
-            if (mouseX >= chipX && mouseX <= chipX + COLLAPSED_WIDTH && mouseY >= chipY && mouseY <= chipY + COLLAPSED_HEIGHT) {
-                setExpanded(true);
-                return true;
-            }
             return false;
         }
 
-        int panelX = 8;
-        int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
-        int panelY = screenH - panelH - 8;
+        int screenW = screen.width;
+        int screenH = screen.height;
+        int bottomOffset = getBottomOffset();
+        int panelX = getPanelX();
+        int panelH = Math.min(EXPANDED_HEIGHT, screenH - bottomOffset - 16);
+        int panelY = screenH - panelH - bottomOffset;
 
         if (mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + panelH) {
             int minBtnX = panelX + EXPANDED_WIDTH - 14;
@@ -180,10 +171,22 @@ public class HotkeyHudWidget {
                 setExpanded(false);
                 return true;
             }
-            return true; // Consume clicks inside panel
+
+            int tutBtnX = minBtnX - 14;
+            int tutBtnY = panelY + 2;
+            if (mouseX >= tutBtnX && mouseX <= tutBtnX + 12 && mouseY >= tutBtnY && mouseY <= tutBtnY + 12) {
+                setExpanded(false);
+                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
+                return true;
+            }
+            return true;
         }
 
         return false;
+    }
+
+    private int getBottomOffset() {
+        return AdaptiveStatusBar.BAR_HEIGHT + 6;
     }
 }
 

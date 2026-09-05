@@ -1,7 +1,14 @@
 package com.gtceu.calcboard.client.tutorial;
 
+import com.gtceu.calcboard.api.event.FlowGraphEvent;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.type.SupplyMode;
+import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialStep;
 import com.gtceu.calcboard.testutil.MinecraftBootstrapExtension;
+import net.minecraftforge.common.MinecraftForge;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +22,12 @@ import com.google.gson.reflect.TypeToken;
 
 @ExtendWith(MinecraftBootstrapExtension.class)
 public class TutorialStepTest {
+
+    @org.junit.jupiter.api.BeforeEach
+    public void setUp() {
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.start();
+        TutorialManager.registerEventListeners();
+    }
 
     @Test
     public void testTutorialStepSequence() {
@@ -222,6 +235,194 @@ public class TutorialStepTest {
         // Simulate machine switch to EBF
         mgr.onMachineSwitched(furnace, ebfId);
         Assertions.assertEquals(TutorialStep.STEP_7_MACHINE_CONFIG, mgr.getCurrentStep());
+
+        mgr.stopTutorial();
+    }
+
+    @Test
+    public void testStep12JunctionLayoutNoOverlap() {
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager mgr = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance();
+        com.gtceu.calcboard.api.storage.BoardManager bm = com.gtceu.calcboard.api.storage.BoardManager.getInstance();
+        bm.resetToDefault();
+
+        mgr.startAdvancedTutorial(null);
+        mgr.nextStep(); // Step 11
+        mgr.nextStep(); // Step 12
+        Assertions.assertEquals(TutorialStep.STEP_12_JUNCTION_SUPPLY, mgr.getCurrentStep());
+
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(tutPage);
+
+        com.gtceu.calcboard.api.model.RecipeNode junction = tutPage.getGraph().getNodes().stream()
+                .filter(com.gtceu.calcboard.api.model.RecipeNode::isReroute)
+                .findFirst()
+                .orElse(null);
+        Assertions.assertNotNull(junction);
+
+        double juncX = junction.getPosX();
+        double juncY = junction.getPosY();
+        double juncW = 32.0;
+        double juncH = 32.0;
+
+        for (com.gtceu.calcboard.api.model.RecipeNode node : tutPage.getGraph().getNodes()) {
+            if (node.isReroute()) continue;
+            double nodeX = node.getPosX();
+            double nodeY = node.getPosY();
+            double nodeW = node.getCardWidth();
+            double nodeH = 70.0;
+
+            boolean overlapX = juncX < nodeX + nodeW && juncX + juncW > nodeX;
+            boolean overlapY = juncY < nodeY + nodeH && juncY + juncH > nodeY;
+            Assertions.assertFalse(overlapX && overlapY,
+                    "Junction at (" + juncX + ", " + juncY + ") must not overlap cutter node " + node.getName() + " at (" + nodeX + ", " + nodeY + ")");
+        }
+
+        mgr.stopTutorial();
+    }
+
+    @Test
+    public void testStep4WireEventBusAndGlowFlow() {
+        com.gtceu.calcboard.client.gui.tutorial.TutorialManager mgr = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance();
+        com.gtceu.calcboard.api.storage.BoardManager bm = com.gtceu.calcboard.api.storage.BoardManager.getInstance();
+        bm.resetToDefault();
+
+        mgr.startTutorial(null);
+        mgr.nextStep(); // Step 2
+        mgr.nextStep(); // Step 3
+        mgr.nextStep(); // Step 4
+        Assertions.assertEquals(TutorialStep.STEP_4_SHIFT_WIRING, mgr.getCurrentStep());
+
+        com.gtceu.calcboard.api.storage.BoardPage tutPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(tutPage);
+
+        String turbineId = mgr.getTurbineNodeId();
+        Assertions.assertNotNull(turbineId);
+
+        // While junction-to-turbine wire exists, it should glow
+        Assertions.assertTrue(mgr.isWireGlowing("any_from", turbineId));
+
+        // Cut wire via EventBus
+        com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge wireEdge = tutPage.getGraph().getConnections().stream()
+                .filter(c -> turbineId.equals(c.toNodeId()))
+                .findFirst()
+                .orElse(null);
+        Assertions.assertNotNull(wireEdge);
+
+        tutPage.getGraph().getConnections().remove(wireEdge);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.WireDisconnected(tutPage.getGraph(), wireEdge));
+
+        // Verify wire is now cut and ports glow
+        com.gtceu.calcboard.api.model.RecipeNode junction = tutPage.getGraph().getNodes().stream()
+                .filter(com.gtceu.calcboard.api.model.RecipeNode::isReroute)
+                .findFirst()
+                .orElse(null);
+        Assertions.assertNotNull(junction);
+
+        Assertions.assertTrue(mgr.isPortGlowing(junction.getId(), false, 0), "Junction output port must glow in Step 4");
+        Assertions.assertTrue(mgr.isPortGlowing(turbineId, true, 0), "Turbine input port must glow in Step 4");
+
+        // Reconnect via Shift-drag via EventBus
+        com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge newEdge = new com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge(junction.getId(), 0, turbineId, 0);
+        tutPage.getGraph().addConnection(newEdge);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.WireConnected(tutPage.getGraph(), newEdge, true));
+
+        // Should advance to Step 5 (Junction ETA)
+        Assertions.assertEquals(TutorialStep.STEP_5_JUNCTION_ETA, mgr.getCurrentStep());
+
+        mgr.stopTutorial();
+    }
+
+    @Test
+    public void testTutorialPreviousStepNavigation() {
+        TutorialManager mgr = TutorialManager.getInstance();
+        BoardManager bm = BoardManager.getInstance();
+        bm.resetToDefault();
+
+        mgr.startTutorial(null);
+        Assertions.assertFalse(mgr.hasPreviousStep(), "Step 1 in basic mode cannot go back");
+
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.STEP_2_DRAG_TO_SEARCH, mgr.getCurrentStep());
+        Assertions.assertTrue(mgr.hasPreviousStep());
+
+        mgr.previousStep();
+        Assertions.assertEquals(TutorialStep.STEP_1_ADD_RECIPE, mgr.getCurrentStep());
+        Assertions.assertFalse(mgr.hasPreviousStep());
+
+        mgr.nextStep();
+        mgr.nextStep();
+        mgr.previousStep();
+        Assertions.assertEquals(TutorialStep.STEP_2_DRAG_TO_SEARCH, mgr.getCurrentStep());
+
+        mgr.stopTutorial();
+
+        mgr.startAdvancedTutorial(null);
+        Assertions.assertEquals(TutorialStep.STEP_10_SHARED_MACHINE, mgr.getCurrentStep());
+        Assertions.assertFalse(mgr.hasPreviousStep(), "First step of advanced mode cannot go back to basic tutorial");
+
+        mgr.nextStep();
+        Assertions.assertTrue(mgr.hasPreviousStep());
+        mgr.previousStep();
+        Assertions.assertEquals(TutorialStep.STEP_10_SHARED_MACHINE, mgr.getCurrentStep());
+
+        mgr.stopTutorial();
+    }
+
+    @Test
+    public void testStep12JunctionConfiguredAutoAdvance() {
+        TutorialManager mgr = TutorialManager.getInstance();
+        BoardManager bm = BoardManager.getInstance();
+        bm.resetToDefault();
+
+        mgr.startAdvancedTutorial(null);
+        mgr.nextStep();
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.STEP_12_JUNCTION_SUPPLY, mgr.getCurrentStep());
+
+        BoardPage tutPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(tutPage);
+
+        RecipeNode junction = tutPage.getGraph().getNodes().stream()
+                .filter(RecipeNode::isReroute)
+                .findFirst()
+                .orElse(null);
+        Assertions.assertNotNull(junction);
+        Assertions.assertTrue(mgr.isJunctionGlowing(junction.getId()), "Step 12 junction node should glow");
+
+        junction.setSupplyMode(SupplyMode.INFINITE);
+        MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.JunctionConfigured(tutPage.getGraph(), junction, SupplyMode.INFINITE));
+
+        Assertions.assertEquals(TutorialStep.STEP_13_FOLDER_BROWSER, mgr.getCurrentStep(),
+                "Configuring junction to INFINITE must advance to Step 13");
+
+        mgr.stopTutorial();
+    }
+
+    @Test
+    public void testStep12PostSolveSupplyDetection() {
+        TutorialManager mgr = TutorialManager.getInstance();
+        BoardManager bm = BoardManager.getInstance();
+        bm.resetToDefault();
+
+        mgr.startAdvancedTutorial(null);
+        mgr.nextStep();
+        mgr.nextStep();
+        Assertions.assertEquals(TutorialStep.STEP_12_JUNCTION_SUPPLY, mgr.getCurrentStep());
+
+        BoardPage tutPage = mgr.getTutorialPage();
+        Assertions.assertNotNull(tutPage);
+
+        RecipeNode junction = tutPage.getGraph().getNodes().stream()
+                .filter(RecipeNode::isReroute)
+                .findFirst()
+                .orElse(null);
+        Assertions.assertNotNull(junction);
+
+        junction.setSupplyMode(SupplyMode.FIXED_RATE);
+        MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.PostSolve(tutPage.getGraph()));
+
+        Assertions.assertEquals(TutorialStep.STEP_13_FOLDER_BROWSER, mgr.getCurrentStep(),
+                "PostSolve detecting non-NORMAL junction must advance Step 12 to Step 13");
 
         mgr.stopTutorial();
     }

@@ -92,10 +92,13 @@
 | 파이프라인 연결 | 포트 클릭 드래그 -> 대상 포트에 드롭 |
 | 드래그 앤 검색 & 자동 연결 | 포트에서 빈 캔버스로 드래그 -> 레시피 선택 |
 | 스마트 자동 맞춤 연결 | Shift + 드래그 연결 (정수 올림 1:1 맞춤) |
+| 목표 생산량 역산 대화창 | 출력 포트 Ctrl + 좌클릭 |
+| 맥락형 컨텍스트 메뉴 | 빈 캔버스, 노드, 포트, 선택 영역 우클릭 |
+| 언리얼 패닝 및 대각선 이동 | 우클릭 드래그 또는 WASD / 방향키 (Shift 가속) |
 | 와이어 / 포트 연결 해제 | 연결선 또는 포트 소켓 우클릭 |
 | 보이드 처리 토글 | 출력 포트 Alt + 우클릭 |
 | 인플레이스 레시피 전환 | 기계 설정창의 [🔄 Switch Recipe] 또는 노드 우클릭 메뉴 |
-| 시간 단위계 순환 | T (/s -> /min -> /h -> /d -> /t) |
+| 시간 단위계 순환 | T (/s -> /min -> /h -> /d -> /t -> 1x 1회 배치) |
 | 전역 유체 단위계 순환 | Shift + T (Auto -> Always mB -> Always B) |
 | 기계 설정창 UI 배율 조절 | [Aa 1.0x] 버튼 클릭(좌/우), 휠 스크롤, 또는 [+] / [-] 키 |
 | 기준 기계(Anchor) 지정 | 기계 카드 헤더의 닻(Anchor) 아이콘 클릭 |
@@ -152,7 +155,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.1.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.2.jar` 경로에 생성됩니다.
 
 ---
 

@@ -89,6 +89,12 @@
   - [ ] 초당 사이클 수 $\text{CPS} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$ 정밀 연산 검증
 - [ ] **확률 부산물 전압 티어 부스트 (Tier Chance Boost)**:
   - [ ] 분쇄기/원심분리기 등에서 전압 티어 상승 시 $\text{Effective Chance} = \min(1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$ 적용 검증
+- [ ] **투입물 소모 확률 및 음수 티어 부스트 (Input Consumption Chance & Reduction Boost)**:
+  - [ ] 확률적 투입물 유량 정밀 연산 검증: $\text{Rate} = \text{Amount} \times \text{EffectiveChance} \times \text{CPS}$
+  - [ ] 부호 지원 티어 부스트 연산: $\text{Effective Chance} = \text{clamp}(0.0, 1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$
+  - [ ] Star Technology Cyclonic Sifter Netherite Mesh 소모율 검증 (ZPM 기본 $3\% \rightarrow 0.0025\text{/s}$, UV 오버클럭 $2.8\% \rightarrow 0.00467\text{/s}$)
+  - [ ] 투입 포트 툴팁의 동적 소모 확률 및 부호 반영 티어 변동치($\%+.1f\%/\text{Tier}$) 표시 확인
+  - [ ] `InputConsumptionChanceTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
 
 ### 2.2 가우스-요르단 폐루프 질량 보존 솔버 (`MassBalanceSolver`)
 - [ ] **폐루프 선형 연립방정식 정식화 ($A\mathbf{x} = \mathbf{b}$)**:

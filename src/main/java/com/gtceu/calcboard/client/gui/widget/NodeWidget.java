@@ -124,6 +124,9 @@ public class NodeWidget {
     public int getContentStartY() {
         int y = (int) node.getPosY();
         int ctrlY = y + HEADER_HEIGHT + 6;
+        if (com.gtceu.calcboard.api.storage.BoardManager.getInstance().isSlimCardMode()) {
+            return ctrlY + 18 + 2;
+        }
         int row2H = node.isModule() ? 0 : 18;
         int infoY = ctrlY + row2H + 18;
         int sepY = infoY + 14;
@@ -543,6 +546,34 @@ public class NodeWidget {
             return true;
         }
 
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionFamily(node)) {
+            GTVoltageTier curTier = node.getTargetTier();
+            if (curTier == null) {
+                curTier = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getCombustionTierForMachine(node.getMachineIcon());
+                if (curTier == null) curTier = GTVoltageTier.LV;
+            }
+            int curOrdinal = curTier.ordinal();
+            int minOrdinal = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getMinCombustionTier().ordinal();
+            int maxOrdinal = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getMaxCombustionTier().ordinal();
+            int nextOrdinal = curOrdinal + direction;
+            if (nextOrdinal < minOrdinal || nextOrdinal > maxOrdinal || nextOrdinal == curOrdinal) {
+                return false;
+            }
+            GTVoltageTier nextTier = GTVoltageTier.getByIndex(nextOrdinal);
+            GTVoltageTier oldTier = node.getTargetTier();
+            boolean ok = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.syncCombustionMachine(node, nextTier);
+            if (ok) {
+                syncSharedFrameHardware(node);
+                if (parent != null) {
+                    parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, nextTier));
+                    parent.markSummaryDirty();
+                }
+                invalidateCache();
+                return true;
+            }
+            return false;
+        }
+
         int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
         int maxIdx = GTVoltageTier.values().length - 1;
         if (node.isTurbine()) {
@@ -869,10 +900,12 @@ public class NodeWidget {
             }
             List<RecipeNode> subNodes = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getNodes()) : Collections.emptyList();
             List<FlowGraph.ConnectionEdge> subEdges = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getConnections()) : Collections.emptyList();
+            List<com.gtceu.calcboard.api.model.CanvasGroupFrame> subFrames = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getFrames()) : Collections.emptyList();
+            List<com.gtceu.calcboard.api.model.CanvasStickyNote> subNotes = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getStickyNotes()) : Collections.emptyList();
 
             boolean expanded = parent.getGraph().expandModule(node);
             if (expanded) {
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ExpandModuleCommand(node, subNodes, subEdges, moduleEdges));
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ExpandModuleCommand(node, subNodes, subEdges, moduleEdges, subFrames, subNotes));
                 parent.rebuildWidgets();
                 parent.markSummaryDirty();
                 com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onModuleExpanded();

@@ -90,7 +90,14 @@ public class CanvasFrameInteractionHandler {
             return deleteFrame(frame, screen);
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.COLOR && button == 0) {
+            int oldColor = frame.getColor();
             frame.cycleColor();
+            screen.recordCommand(new BoardCommand.ModifyFramePropertiesCommand(
+                    frame.getId(),
+                    frame.getTitle(), frame.getTitle(),
+                    oldColor, frame.getColor(),
+                    frame.isSharedMachineFrame(), frame.isSharedMachineFrame()
+            ));
             screen.markSummaryDirty();
             return true;
         }

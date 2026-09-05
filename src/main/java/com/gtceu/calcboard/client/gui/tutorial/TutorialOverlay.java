@@ -32,6 +32,9 @@ public class TutorialOverlay {
         }
 
         if (step != TutorialStep.COMPLETED) {
+            if (layout.hasPrev) {
+                drawTutorialBtn(graphics, font, layout.prevText, layout.prevBtnX, layout.prevBtnY, layout.prevBtnW, layout.prevBtnH, mouseX, mouseY, 0xFF94A3B8);
+            }
             drawTutorialBtn(graphics, font, layout.skipText, layout.skipBtnX, layout.skipBtnY, layout.skipBtnW, layout.skipBtnH, mouseX, mouseY, 0xFF888888);
             drawTutorialBtn(graphics, font, layout.nextText, layout.nextBtnX, layout.nextBtnY, layout.nextBtnW, layout.nextBtnH, mouseX, mouseY, 0xFF00E676);
         } else {
@@ -46,6 +49,11 @@ public class TutorialOverlay {
         TutorialStep step = mgr.getCurrentStep();
         Font font = Minecraft.getInstance().font;
         CardLayout layout = computeLayout(font, step, screenW, screenH);
+
+        if (step != TutorialStep.COMPLETED && layout.hasPrev && isInside(mouseX, mouseY, layout.prevBtnX, layout.prevBtnY, layout.prevBtnW, layout.prevBtnH)) {
+            mgr.previousStep();
+            return true;
+        }
 
         if (isInside(mouseX, mouseY, layout.nextBtnX, layout.nextBtnY, layout.nextBtnW, layout.nextBtnH)) {
             if (step == TutorialStep.COMPLETED) {
@@ -65,7 +73,8 @@ public class TutorialOverlay {
     }
 
     private static CardLayout computeLayout(Font font, TutorialStep step, int screenW, int screenH) {
-        int bannerW = Math.min(580, screenW - 32);
+        TutorialManager mgr = TutorialManager.getInstance();
+        int bannerW = Math.min(620, screenW - 32);
         int totalSteps = TutorialStep.values().length - 1;
         String stepTag = step != TutorialStep.COMPLETED 
             ? String.format("§a▶ [Step %d/%d] ", step.getStepNumber(), totalSteps) 
@@ -76,12 +85,15 @@ public class TutorialOverlay {
             ? Component.translatable("gui.gtcalcboard.tutorial.next").getString()
             : Component.translatable("gui.gtcalcboard.tutorial.finish").getString();
         String skipText = Component.translatable("gui.gtcalcboard.tutorial.skip").getString();
+        String prevText = Component.translatable("gui.gtcalcboard.tutorial.prev").getString();
+        boolean hasPrev = mgr.hasPreviousStep();
 
         int btnH = 18;
         int nextBtnW = Math.max(64, font.width(nextText) + 16);
         int skipBtnW = Math.max(54, font.width(skipText) + 16);
+        int prevBtnW = hasPrev ? Math.max(54, font.width(prevText) + 16) : 0;
 
-        int buttonsTotalW = (step != TutorialStep.COMPLETED ? skipBtnW + 6 : 0) + nextBtnW;
+        int buttonsTotalW = (step != TutorialStep.COMPLETED ? skipBtnW + 6 : 0) + (hasPrev ? prevBtnW + 6 : 0) + nextBtnW;
         int textW = Math.max(160, bannerW - buttonsTotalW - 24);
 
         String descStr = Component.translatable(step.getDescKey()).getString();
@@ -96,12 +108,15 @@ public class TutorialOverlay {
         int nextBtnY = bannerY + bannerH - btnH - 8;
         int skipBtnX = nextBtnX - skipBtnW - 6;
         int skipBtnY = nextBtnY;
+        int prevBtnX = skipBtnX - prevBtnW - 6;
+        int prevBtnY = nextBtnY;
 
         return new CardLayout(
             bannerX, bannerY, bannerW, bannerH,
             title, lines,
             nextText, nextBtnX, nextBtnY, nextBtnW, btnH,
-            skipText, skipBtnX, skipBtnY, skipBtnW, btnH
+            skipText, skipBtnX, skipBtnY, skipBtnW, btnH,
+            hasPrev, prevText, prevBtnX, prevBtnY, prevBtnW, btnH
         );
     }
 
@@ -125,7 +140,13 @@ public class TutorialOverlay {
         int skipBtnX,
         int skipBtnY,
         int skipBtnW,
-        int skipBtnH
+        int skipBtnH,
+        boolean hasPrev,
+        String prevText,
+        int prevBtnX,
+        int prevBtnY,
+        int prevBtnW,
+        int prevBtnH
     ) {}
 
     private static NodeWidget findWidget(BoardScreen screen, String nodeId) {

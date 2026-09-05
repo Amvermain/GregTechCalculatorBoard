@@ -105,30 +105,12 @@ public class JeiRecipeConverter {
             outputs.addAll(collector.extractOutputs());
         }
 
-        // Synchronize chance and tierChanceBoost for outputs if extracted via layout collector
+        if (isGT && !inputs.isEmpty()) {
+            syncSlotChances(inputs, GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs"));
+        }
+
         if (isGT && !outputs.isEmpty()) {
-            List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
-            if (gtOuts != null && !gtOuts.isEmpty()) {
-                boolean[] used = new boolean[gtOuts.size()];
-                for (int i = 0; i < outputs.size(); i++) {
-                    IngredientStack out = outputs.get(i);
-                    if (out == null || out.getId() == null) continue;
-                    if (i < gtOuts.size() && !used[i] && gtOuts.get(i) != null && out.getId().equals(gtOuts.get(i).getId())) {
-                        out.setChance(gtOuts.get(i).getChance());
-                        out.setTierChanceBoost(gtOuts.get(i).getTierChanceBoost());
-                        used[i] = true;
-                    } else {
-                        for (int j = 0; j < gtOuts.size(); j++) {
-                            if (!used[j] && gtOuts.get(j) != null && out.getId().equals(gtOuts.get(j).getId())) {
-                                out.setChance(gtOuts.get(j).getChance());
-                                out.setTierChanceBoost(gtOuts.get(j).getTierChanceBoost());
-                                used[j] = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            syncSlotChances(outputs, GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs"));
         }
 
         // Vanilla Recipe Fallback extraction (Smelting, Crafting, Blasting, Stonecutting, etc.)
@@ -399,5 +381,31 @@ public class JeiRecipeConverter {
             sb.append(" ");
         }
         return sb.toString().trim();
+    }
+
+    private static void syncSlotChances(List<IngredientStack> targetList, List<IngredientStack> gtList) {
+        if (targetList == null || gtList == null || gtList.isEmpty()) return;
+        boolean[] used = new boolean[gtList.size()];
+        for (int i = 0; i < targetList.size(); i++) {
+            matchAndApplyChance(targetList.get(i), i, gtList, used);
+        }
+    }
+
+    private static void matchAndApplyChance(IngredientStack stack, int index, List<IngredientStack> gtList, boolean[] used) {
+        if (stack == null || stack.getId() == null) return;
+        ResourceLocation id = stack.getId();
+        if (index < gtList.size() && !used[index] && gtList.get(index) != null && id.equals(gtList.get(index).getId())) {
+            stack.setChance(gtList.get(index).getChance());
+            stack.setTierChanceBoost(gtList.get(index).getTierChanceBoost());
+            used[index] = true;
+            return;
+        }
+        for (int j = 0; j < gtList.size(); j++) {
+            if (used[j] || gtList.get(j) == null || !id.equals(gtList.get(j).getId())) continue;
+            stack.setChance(gtList.get(j).getChance());
+            stack.setTierChanceBoost(gtList.get(j).getTierChanceBoost());
+            used[j] = true;
+            return;
+        }
     }
 }

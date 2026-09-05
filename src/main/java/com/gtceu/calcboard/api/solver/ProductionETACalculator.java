@@ -206,7 +206,7 @@ public final class ProductionETACalculator {
         queue.add(new ConsumerHop(sourceNode.getId(), 1.0));
         visited.add(sourceNode.getId());
 
-        double totalOutflow = 0.0;
+        double totalOutflow = (sourceNode.isFixedDrain() ? sourceNode.getExternalDrainRate() : 0.0);
 
         while (!queue.isEmpty()) {
             ConsumerHop hop = queue.poll();
@@ -225,10 +225,11 @@ public final class ProductionETACalculator {
         if (consumer == null) return 0.0;
 
         if (consumer.isReroute()) {
+            double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() * hop.weight : 0.0;
             if (visited.add(consumer.getId())) {
                 queue.add(new ConsumerHop(consumer.getId(), hop.weight));
             }
-            return 0.0;
+            return drain;
         }
         if (edge.inputIndex() >= consumer.getInputs().size() || !consumer.isOperational(graph)) {
             return 0.0;

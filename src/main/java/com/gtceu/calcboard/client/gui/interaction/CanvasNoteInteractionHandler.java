@@ -89,6 +89,7 @@ public class CanvasNoteInteractionHandler {
         }
         if (action == CanvasStickyNoteRenderer.NoteAction.DELETE && button == 0) {
             screen.getGraph().removeStickyNote(note);
+            screen.recordCommand(new BoardCommand.RemoveStickyNotesCommand(List.of(note), "Delete sticky note"));
             screen.markSummaryDirty();
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
@@ -96,7 +97,14 @@ public class CanvasNoteInteractionHandler {
             return true;
         }
         if (action == CanvasStickyNoteRenderer.NoteAction.COLOR && button == 0) {
+            int oldColor = note.getColor();
             note.cycleColor();
+            screen.recordCommand(new BoardCommand.ModifyNotePropertiesCommand(
+                    note.getId(),
+                    note.getTitle(), note.getTitle(),
+                    note.getContent(), note.getContent(),
+                    oldColor, note.getColor()
+            ));
             screen.markSummaryDirty();
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
@@ -287,6 +295,13 @@ public class CanvasNoteInteractionHandler {
             Map<String, double[]> dragStartPositions
     ) {
         if (resizingNote != null && button == 0) {
+            double newW = resizingNote.getWidth();
+            double newH = resizingNote.getHeight();
+            if (Math.abs(origNoteWidth - newW) > 0.1 || Math.abs(origNoteHeight - newH) > 0.1) {
+                screen.recordCommand(new BoardCommand.ResizeStickyNoteCommand(
+                        resizingNote.getId(), origNoteWidth, origNoteHeight, newW, newH, "Resize sticky note"
+                ));
+            }
             resizingNote = null;
             screen.markSummaryDirty();
             return true;

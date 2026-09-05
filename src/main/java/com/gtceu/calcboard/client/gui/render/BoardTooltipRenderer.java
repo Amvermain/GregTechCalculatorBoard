@@ -494,9 +494,7 @@ public final class BoardTooltipRenderer {
 
         appendInputPortStats(tooltipLines, stats, in, showExact, hiddenRef, graph, widget.getNode(), inIdx);
 
-        if (in.getChance() < 1.0) {
-            tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", in.getChance() * 100.0))));
-        }
+        appendInputChanceInfo(tooltipLines, widget.getNode(), in, inIdx);
         if (in.hasAlternatives()) {
             int curIdx = in.getAlternatives().indexOf(in.getId()) + 1;
             tooltipLines.add(Component.literal("§6[⟲ " + Component.translatable("gui.gtcalcboard.tooltip.scroll_cycle").getString() + "]: §e" + Component.translatable("gui.gtcalcboard.tooltip.tag_alts", String.valueOf(curIdx), String.valueOf(in.getAlternatives().size())).getString()));
@@ -570,9 +568,41 @@ public final class BoardTooltipRenderer {
         return true;
     }
 
+    private static void appendInputChanceInfo(List<Component> tooltipLines, RecipeNode node, IngredientStack in, int inIdx) {
+        double effChance = node != null ? node.getEffectiveInputChance(inIdx) : in.getChance();
+        if (effChance >= 1.0 && in.getChance() >= 1.0 && Math.abs(in.getTierChanceBoost()) <= 0.00001) {
+            return;
+        }
+
+        String chanceLabel = Component.translatable("gui.gtcalcboard.chance").getString().replace("%s%%", "").replace(":", "").trim();
+        if (effChance <= 0.0) {
+            tooltipLines.add(Component.literal("§c⚠ " + chanceLabel + ": 0%"));
+            return;
+        }
+
+        if (Math.abs(in.getTierChanceBoost()) > 0.00001) {
+            int tierDelta = node != null ? node.getTierDelta() : 0;
+            if (tierDelta > 0 && Math.abs(effChance - in.getChance()) > 0.0001) {
+                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(%+.1f%%/Tier §a→ %.1f%%§7)",
+                        chanceLabel,
+                        in.getChance() * 100.0,
+                        in.getTierChanceBoost() * 100.0,
+                        effChance * 100.0)));
+            } else {
+                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(%+.1f%%/Tier)",
+                        chanceLabel,
+                        in.getChance() * 100.0,
+                        in.getTierChanceBoost() * 100.0)));
+            }
+            return;
+        }
+
+        tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", effChance * 100.0))));
+    }
+
     private static void appendOutputChanceInfo(List<Component> tooltipLines, RecipeNode node, IngredientStack out, int outIdx) {
         double effChance = node != null ? node.getEffectiveOutputChance(outIdx) : out.getChance();
-        if (effChance >= 1.0 && out.getChance() >= 1.0) {
+        if (effChance >= 1.0 && out.getChance() >= 1.0 && Math.abs(out.getTierChanceBoost()) <= 0.00001) {
             return;
         }
 
@@ -591,16 +621,16 @@ public final class BoardTooltipRenderer {
             return;
         }
 
-        if (out.getTierChanceBoost() > 0.0) {
+        if (Math.abs(out.getTierChanceBoost()) > 0.00001) {
             int tierDelta = node != null ? node.getTierDelta() : 0;
-            if (tierDelta > 0 && effChance > out.getChance()) {
-                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(+%.1f%%/Tier §a→ %.1f%%§7)",
+            if (tierDelta > 0 && Math.abs(effChance - out.getChance()) > 0.0001) {
+                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(%+.1f%%/Tier §a→ %.1f%%§7)",
                         chanceLabel,
                         out.getChance() * 100.0,
                         out.getTierChanceBoost() * 100.0,
                         effChance * 100.0)));
             } else {
-                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(+%.1f%%/Tier)",
+                tooltipLines.add(Component.literal(String.format(java.util.Locale.ROOT, "§e%s: %.1f%% §7(%+.1f%%/Tier)",
                         chanceLabel,
                         out.getChance() * 100.0,
                         out.getTierChanceBoost() * 100.0)));
@@ -762,8 +792,11 @@ public final class BoardTooltipRenderer {
         boolean hasIncoming = graph != null && graph.getConnections().stream().anyMatch(e -> e.toNodeId().equals(rNode.getId()) && e.inputIndex() == 0);
         double upstreamSupply = calculateRerouteSupply(rNode, graph, hasIncoming);
         double downstreamDemand = graph != null ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, rNode, 0, null) : 0.0;
+        if (rNode.isFixedDrain()) {
+            downstreamDemand += rNode.getExternalDrainRate();
+        }
         boolean hasSupply = hasIncoming || rNode.isExternalSupply() || rNode.isInfiniteSupply();
-        boolean isInputSource = !hasSupply && !rNode.isVoidSink() && downstreamDemand > 0.0001;
+        boolean isInputSource = !hasSupply && !rNode.isVoidSink() && !rNode.isFixedDrain() && downstreamDemand > 0.0001;
 
         appendRerouteHeader(rNode, rStack, isInputSource, tooltipLines);
         appendRerouteBatchBuffer(rNode, rStack, graph, tooltipLines);
@@ -810,11 +843,14 @@ public final class BoardTooltipRenderer {
     }
 
     private static void appendRerouteFlowRates(RecipeNode rNode, IngredientStack rStack, FlowGraph graph, double upstreamSupply, double downstreamDemand, boolean hasSupply, boolean isInputSource, List<Component> tooltipLines) {
+        if (rNode.isFixedDrain()) {
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.junction.supply_mode.fixed_drain").getString() + ": §c-" + FormatUtil.formatRate(rNode.getExternalDrainRate(), rStack)));
+        }
         if (hasSupply) {
             String supStr = Double.isInfinite(upstreamSupply) ? "∞" : ("+" + FormatUtil.formatRate(upstreamSupply, rStack));
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": §a" + supStr));
         }
-        if (downstreamDemand > 0.0001) {
+        if (downstreamDemand > 0.0001 && !rNode.isFixedDrain()) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §c-" + FormatUtil.formatRate(downstreamDemand, rStack)));
         }
 

@@ -72,6 +72,7 @@ public class RecipeNode {
     private boolean isReroute = false;
     private SupplyMode supplyMode = SupplyMode.NONE;
     private double externalSupplyRate = 0.0;
+    private double externalDrainRate = 0.0;
 
     // Horizontal Flip / Directionality (Left-to-Right vs Right-to-Left)
     private boolean isFlipped = false;
@@ -105,7 +106,7 @@ public class RecipeNode {
         this.id = id != null ? id : UUID.randomUUID().toString();
         this.name = name;
         this.baseDurationTicks = Math.max(0.0, baseDurationTicks);
-        this.baseEUt = Math.max(0.0, baseEUt);
+        this.baseEUt = Math.abs(baseEUt);
         this.recipeTier = recipeTier != null ? recipeTier : GTVoltageTier.getTierForVoltage((long) baseEUt);
         this.targetTier = this.recipeTier;
         this.machineCount = 1.0;
@@ -219,7 +220,7 @@ public class RecipeNode {
     }
 
     public void setBaseEUt(double baseEUt) {
-        this.baseEUt = Math.max(0.0, baseEUt);
+        this.baseEUt = Math.abs(baseEUt);
         markOverclockDirty();
     }
 
@@ -399,7 +400,11 @@ public class RecipeNode {
     }
 
     public boolean isVoidSink() {
-        return isReroute && getSupplyMode().isSink();
+        return isReroute && getSupplyMode() == SupplyMode.VOID_SINK;
+    }
+
+    public boolean isFixedDrain() {
+        return isReroute && getSupplyMode() == SupplyMode.FIXED_DRAIN;
     }
 
     public double getExternalSupplyRate() {
@@ -408,6 +413,14 @@ public class RecipeNode {
 
     public void setExternalSupplyRate(double externalSupplyRate) {
         this.externalSupplyRate = Math.max(0.0, externalSupplyRate);
+    }
+
+    public double getExternalDrainRate() {
+        return externalDrainRate;
+    }
+
+    public void setExternalDrainRate(double externalDrainRate) {
+        this.externalDrainRate = Math.max(0.0, externalDrainRate);
     }
 
     public int getCustomParallel() {
@@ -1121,6 +1134,10 @@ public class RecipeNode {
 
     public double getInputSlotRate(int index, boolean effective) {
         return NodeRateCalculator.getInputSlotRate(this, index, effective);
+    }
+
+    public double getEffectiveInputChance(int inputIndex) {
+        return NodeRateCalculator.getEffectiveInputChance(this, inputIndex);
     }
 
     public double getEffectiveOutputChance(int outputIndex) {

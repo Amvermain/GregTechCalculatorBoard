@@ -70,7 +70,8 @@ public class JunctionSupplyDialog {
             int editBoxY = y + 74 + SupplyMode.FIXED_RATE.ordinal() * 18;
             this.rateEditBox = new EditBox(font, editBoxX, editBoxY, 75, 14, Component.translatable("gui.gtcalcboard.junction.supply_rate"));
             this.rateEditBox.setMaxLength(16);
-            this.rateEditBox.setValue(node.getExternalSupplyRate() > 0 ? String.format("%.2f", node.getExternalSupplyRate()) : "100.0");
+            double curRate = (selectedMode == SupplyMode.FIXED_DRAIN) ? node.getExternalDrainRate() : node.getExternalSupplyRate();
+            this.rateEditBox.setValue(curRate > 0 ? String.format("%.2f", curRate) : "100.0");
 
             this.bufferSizeEditBox = new EditBox(font, x + DIALOG_WIDTH - 90, y + 84, 75, 14, Component.translatable("gui.gtcalcboard.junction.buffer_size"));
             this.bufferSizeEditBox.setMaxLength(16);
@@ -203,7 +204,7 @@ public class JunctionSupplyDialog {
             int textColor = isSelected ? 0xFFFFFFFF : (isHover ? 0xFFCBD5E1 : 0xFF94A3B8);
             graphics.drawString(font, modeLabel, x + 30, optY + 3, textColor, false);
 
-            if (mode == SupplyMode.FIXED_RATE && isSelected) {
+            if ((mode == SupplyMode.FIXED_RATE || mode == SupplyMode.FIXED_DRAIN) && isSelected) {
                 rateEditBox.setX(x + DIALOG_WIDTH - 85);
                 rateEditBox.setY(optY);
                 rateEditBox.render(graphics, mouseX, mouseY, 0);
@@ -338,7 +339,8 @@ public class JunctionSupplyDialog {
         }
 
         if (activeTab == 0) {
-            if (selectedMode == SupplyMode.FIXED_RATE && checkEditBoxClicked(rateEditBox, mouseX, mouseY, button)) return true;
+            boolean isRateMode = (selectedMode == SupplyMode.FIXED_RATE || selectedMode == SupplyMode.FIXED_DRAIN);
+            if (isRateMode && checkEditBoxClicked(rateEditBox, mouseX, mouseY, button)) return true;
             if (checkRadioSelection(x, y, mouseX, mouseY)) return true;
         } else {
             if (isBuffer && checkEditBoxClicked(bufferSizeEditBox, mouseX, mouseY, button)) return true;
@@ -363,7 +365,7 @@ public class JunctionSupplyDialog {
                 playClickSound();
                 return true;
             }
-            if (mouseX >= x + 14 + tabW && mouseX <= x + 14 + (tabW * 2)) {
+            if (mouseX >= x + 14 + tabW && mouseX <= x + 14 + tabW * 2) {
                 activeTab = 1;
                 playClickSound();
                 return true;
@@ -449,6 +451,8 @@ public class JunctionSupplyDialog {
         targetNode.setSupplyMode(selectedMode);
         if (selectedMode == SupplyMode.FIXED_RATE && rateEditBox != null) {
             targetNode.setExternalSupplyRate(Math.max(0.0, parseDoubleSafe(rateEditBox.getValue())));
+        } else if (selectedMode == SupplyMode.FIXED_DRAIN && rateEditBox != null) {
+            targetNode.setExternalDrainRate(Math.max(0.0, parseDoubleSafe(rateEditBox.getValue())));
         }
 
         targetNode.setJunctionBuffer(isBuffer);
@@ -462,6 +466,9 @@ public class JunctionSupplyDialog {
                 double limit = Math.max(0.0, parseDoubleSafe(entry.getValue().getValue()));
                 graph.setConnectionFixedLimit(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), limit);
             }
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                new com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionConfigured(graph, targetNode, selectedMode)
+            );
         }
 
         if (parent != null) {

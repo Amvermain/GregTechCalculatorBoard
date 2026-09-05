@@ -192,6 +192,9 @@ public final class RecipeNodeSerializer {
         if (node.getExternalSupplyRate() > 0.0) {
             tag.putDouble("externalSupplyRate", node.getExternalSupplyRate());
         }
+        if (node.getExternalDrainRate() > 0.0) {
+            tag.putDouble("externalDrainRate", node.getExternalDrainRate());
+        }
         if (node.getCustomParallel() > 0) {
             tag.putInt("customParallel", node.getCustomParallel());
         }
@@ -401,6 +404,9 @@ public final class RecipeNodeSerializer {
         }
         if (tag.contains("externalSupplyRate")) {
             node.setExternalSupplyRate(tag.getDouble("externalSupplyRate"));
+        }
+        if (tag.contains("externalDrainRate")) {
+            node.setExternalDrainRate(tag.getDouble("externalDrainRate"));
         }
         if (tag.contains("customParallel")) {
             node.setCustomParallel(tag.getInt("customParallel"));

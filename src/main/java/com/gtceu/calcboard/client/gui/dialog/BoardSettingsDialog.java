@@ -270,6 +270,11 @@ public class BoardSettingsDialog {
         drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
                 Component.translatable("gui.gtcalcboard.settings.show_debug_info").getString(),
                 bm.isShowDebugInfo());
+        rowY += rowH + 2;
+
+        drawCheckbox(graphics, font, x, rowY, w, rowH, mouseX, mouseY,
+                Component.translatable("gui.gtcalcboard.settings.slim_card_mode").getString(),
+                bm.isSlimCardMode());
     }
 
     private void renderUnitsTab(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, BoardManager bm) {
@@ -667,6 +672,16 @@ public class BoardSettingsDialog {
         if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
             bm.setShowDebugInfo(!bm.isShowDebugInfo());
             onSettingsChanged();
+            return;
+        }
+        rowY += rowH + 2;
+
+        if (isInsideRow(mouseX, mouseY, x, rowY, w, rowH)) {
+            bm.setSlimCardMode(!bm.isSlimCardMode());
+            onSettingsChanged();
+            if (parent != null) {
+                parent.rebuildWidgets();
+            }
         }
     }
 

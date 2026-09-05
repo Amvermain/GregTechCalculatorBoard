@@ -35,12 +35,14 @@ import com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
 import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -90,6 +92,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private final PageBrowserDrawer pageBrowserDrawer = new PageBrowserDrawer(this);
     private final CanvasInteractionHandler canvasHandler = new CanvasInteractionHandler(this);
     private final CanvasWireRenderer wireRenderer = new CanvasWireRenderer();
+    private final NodeInspectorPanel nodeInspectorPanel = new NodeInspectorPanel(this);
+    private final AdaptiveStatusBar statusBar = new AdaptiveStatusBar(this);
+    private final LeftActivityBarWidget leftActivityBar = new LeftActivityBarWidget(this);
 
     private final BoardDialogManager dialogManager = new BoardDialogManager(this);
     private final BoardCanvasRenderer canvasRenderer = new BoardCanvasRenderer();
@@ -100,6 +105,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private double lastMouseX, lastMouseY;
     private long lastEditTimestamp = 0;
     private int presencePingTicks = 0;
+    private double wasdVelX = 0.0;
+    private double wasdVelY = 0.0;
+    private long lastFrameTimeNano = 0;
 
     public BoardScreen() {
         this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
@@ -290,6 +298,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        updateSmoothPan();
         if (this.minecraft != null) {
             viewportTransform.update(this.minecraft);
             if (viewportTransform.isScaled()) {
@@ -312,6 +321,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
 
         renderBackground(graphics);
         BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
+        BoardHudRenderer.renderEmptyCanvasWatermark(graphics, font, width, height, getGraph().getNodes().size());
 
         canvasRenderer.renderCanvasScene(graphics, this, getGraph(), nodeWidgets, wireRenderer, canvasHandler, panX, panY, zoom, width, height, localMouseX, localMouseY, partialTicks);
 
@@ -320,6 +330,78 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         renderTopOverlays(graphics, localMouseX, localMouseY, partialTicks);
 
         graphics.pose().popPose();
+    }
+
+    private void updateSmoothPan() {
+        long now = System.nanoTime();
+        if (lastFrameTimeNano == 0) {
+            lastFrameTimeNano = now;
+            return;
+        }
+        double dt = (now - lastFrameTimeNano) / 1_000_000_000.0;
+        lastFrameTimeNano = now;
+        if (dt <= 0.0 || dt > 0.1) {
+            dt = 0.016;
+        }
+
+        if (isSmoothPanBlocked()) {
+            wasdVelX = 0.0;
+            wasdVelY = 0.0;
+            return;
+        }
+
+        long window = Minecraft.getInstance().getWindow().getWindow();
+        boolean isW = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_W) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_UP);
+        boolean isS = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_S) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_DOWN);
+        boolean isA = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_A) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT);
+        boolean isD = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_D) || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT);
+
+        double dirX = 0.0;
+        double dirY = 0.0;
+        if (isA) dirX += 1.0;
+        if (isD) dirX -= 1.0;
+        if (isW) dirY += 1.0;
+        if (isS) dirY -= 1.0;
+
+        if (dirX != 0.0 && dirY != 0.0) {
+            double norm = 1.0 / Math.sqrt(2.0);
+            dirX *= norm;
+            dirY *= norm;
+        }
+
+        double speed = (net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 850.0 : 420.0) / Math.max(0.2, zoom);
+        applyVelocityDamping(dirX, dirY, speed, dt);
+    }
+
+    private boolean isSmoothPanBlocked() {
+        if (net.minecraft.client.gui.screens.Screen.hasControlDown() || net.minecraft.client.gui.screens.Screen.hasAltDown()) return true;
+        if (isAnyModalOpen()) return true;
+        if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) return true;
+        if (dialogManager.getSearchDialog() != null && dialogManager.getSearchDialog().isVisible()) return true;
+        for (NodeWidget nw : nodeWidgets) {
+            if (nw.isAnyEditorActive()) return true;
+        }
+        return false;
+    }
+
+    private void applyVelocityDamping(double dirX, double dirY, double speed, double dt) {
+        if (dirX != 0.0 || dirY != 0.0) {
+            double targetVelX = dirX * speed;
+            double targetVelY = dirY * speed;
+            double blend = Math.min(1.0, dt * 22.0);
+            wasdVelX += (targetVelX - wasdVelX) * blend;
+            wasdVelY += (targetVelY - wasdVelY) * blend;
+        } else {
+            wasdVelX *= Math.max(0.0, 1.0 - dt * 20.0);
+            wasdVelY *= Math.max(0.0, 1.0 - dt * 20.0);
+            if (Math.abs(wasdVelX) < 0.2) wasdVelX = 0.0;
+            if (Math.abs(wasdVelY) < 0.2) wasdVelY = 0.0;
+        }
+
+        if (wasdVelX != 0.0 || wasdVelY != 0.0) {
+            setPanX(panX + wasdVelX * dt);
+            setPanY(panY + wasdVelY * dt);
+        }
     }
 
     private void updateGraphSummaryIfDirty() {
@@ -334,11 +416,14 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         workspaceTabBar.render(graphics, mouseX, mouseY, partialTicks);
         pageTabBar.render(graphics, mouseX, mouseY, partialTicks);
         toolbarWidget.render(graphics, mouseX, mouseY);
+        leftActivityBar.render(graphics, mouseX, mouseY, partialTicks);
         if (BoardManager.getInstance().isShowHotkeyHud()) {
             hotkeyHudWidget.render(graphics, mouseX, mouseY, partialTicks);
         }
         favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
         pageBrowserDrawer.render(graphics, mouseX, mouseY, partialTicks);
+        nodeInspectorPanel.render(graphics, mouseX, mouseY, partialTicks);
+        statusBar.render(graphics, mouseX, mouseY, partialTicks);
 
         if (summaryDirty || cachedSummary == null) {
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
@@ -354,6 +439,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
             BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
             favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
             workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
+            leftActivityBar.renderTooltips(graphics, font, mouseX, mouseY);
         }
     }
 
@@ -363,6 +449,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
             RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
             RenderSystem.disableDepthTest();
             dialogManager.renderModals(graphics, width, height, mouseX, mouseY, partialTicks);
+        }
+        if (canvasHandler != null && canvasHandler.getContextMenuManager() != null) {
+            canvasHandler.getContextMenuManager().render(graphics, font, mouseX, mouseY);
         }
         TutorialOverlay.render(graphics, font, this, width, height, mouseX, mouseY);
         BoardToast.render(graphics, font, width, height);
@@ -401,11 +490,14 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         if (dialogManager.handleMouseClicked(vx, vy, button, width, height)) return true;
         if (TutorialOverlay.mouseClicked(this, width, height, vx, vy, button)) return true;
         if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseClicked(vx, vy, button)) return true;
+        if (leftActivityBar.mouseClicked(vx, vy, button)) return true;
         if (workspaceTabBar.mouseClicked(vx, vy, button)) return true;
         if (pageTabBar.mouseClicked(vx, vy, button)) return true;
         if (favoritesDockWidget.mouseClicked(vx, vy, button)) return true;
         if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseClicked(vx, vy, button)) return true;
         if (summaryOverlay.mouseClicked(vx, vy, button, width, height)) return true;
+        if (nodeInspectorPanel.mouseClicked(vx, vy, button)) return true;
+        if (statusBar.mouseClicked(vx, vy, button)) return true;
         if (toolbarWidget.mouseClicked(vx, vy, button)) return true;
         if (canvasHandler.mouseClicked(vx, vy, button)) return true;
         return super.mouseClicked(mouseX, mouseY, button);
@@ -530,15 +622,15 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     }
 
     public int getDynamicLeftMargin() {
-        int maxRight = 8;
+        int maxRight = LeftActivityBarWidget.BAR_WIDTH + 6;
         for (var child : this.children()) {
             if (child instanceof AbstractWidget widget && !(widget instanceof EditBox)) {
                 if (widget.visible && widget.getY() < 60 && widget.getX() >= 0 && widget.getX() < this.width / 3) {
-                    maxRight = Math.max(maxRight, widget.getX() + widget.getWidth());
+                    maxRight = Math.max(maxRight, widget.getX() + widget.getWidth() + 6);
                 }
             }
         }
-        return maxRight > 8 ? (maxRight + 6) : 8;
+        return maxRight;
     }
 
     public int getPageTabY() { return ClientWorkspaceState.getInstance().isCollaborationEnabled() ? 22 : 2; }
@@ -583,7 +675,15 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public boolean isNodeSelected(String id) { return selectionModel.isSelected(id); }
     public boolean isNoteSelected(String id) { return selectionModel.isNoteSelected(id); }
     public boolean isFrameSelected(String id) { return selectionModel.isFrameSelected(id); }
-    public void selectNode(String id, boolean multi) { selectionModel.select(id, multi); }
+    public void selectNode(String id, boolean multi) {
+        selectionModel.select(id, multi);
+        if (!multi && id != null) {
+            nodeInspectorPanel.setTargetWidget(widgetByNodeId.get(id));
+        }
+    }
+    public void openNodeInspector(NodeWidget widget) { nodeInspectorPanel.setTargetWidget(widget); }
+    public NodeInspectorPanel getNodeInspectorPanel() { return nodeInspectorPanel; }
+    public AdaptiveStatusBar getStatusBar() { return statusBar; }
     public void selectNote(String id, boolean multi) { selectionModel.selectNote(id, multi); }
     public void selectFrame(String id, boolean multi) { selectionModel.selectFrame(id, multi); }
     public void toggleSelectNode(String id) { selectionModel.toggle(id); }
@@ -598,7 +698,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public void toggleSelectPort(String nodeId, boolean isInput, int portIndex) { selectionModel.togglePort(nodeId, isInput, portIndex); }
     public void selectPortRange(String nodeId, boolean isInput, int targetPortIndex) { selectionModel.selectPortRange(nodeId, isInput, targetPortIndex); }
     public void clearPortSelection() { selectionModel.clearPorts(); }
-    public void clearSelection() { selectionModel.clear(); }
+    public void clearSelection() {
+        selectionModel.clear();
+        nodeInspectorPanel.close();
+    }
     public void selectAll() { selectionModel.selectAll(this); }
     public void deleteSelection() { selectionModel.deleteSelection(this); }
     public void copySelection() { selectionModel.copySelection(this); }

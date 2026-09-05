@@ -7,6 +7,7 @@ import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
@@ -204,6 +205,18 @@ public class GTCEuAddonCrawler {
         overpressure.setEutMultiplier(1.25);
         overpressure.setDiscoverySource("GTCEu Multiblock Trait Specification [gtceu:autoclave]");
         tryAddTrait(list, seenIds, overpressure);
+
+        MachineAddon oxygenBoost = new MachineAddon("gtceu:oxygen_boost", "gui.gtcalcboard.addon.oxygen_boost", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.oxygen_boost.desc", GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        oxygenBoost.setParallelMultiplier(2);
+        oxygenBoost.setEutMultiplier(1.5);
+        oxygenBoost.setDiscoverySource("GTCEu Large Combustion Engine Oxygen Boost Specification");
+        tryAddTrait(list, seenIds, oxygenBoost);
+
+        MachineAddon liquidOxygenBoost = new MachineAddon("gtceu:liquid_oxygen_boost", "gui.gtcalcboard.addon.liquid_oxygen_boost", MachineAddon.Category.MULTIBLOCK_TRAIT, "gui.gtcalcboard.addon.liquid_oxygen_boost.desc", GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
+        liquidOxygenBoost.setParallelMultiplier(2);
+        liquidOxygenBoost.setEutMultiplier(2.0);
+        liquidOxygenBoost.setDiscoverySource("GTCEu Extreme Combustion Engine Liquid Oxygen Boost Specification");
+        tryAddTrait(list, seenIds, liquidOxygenBoost);
 
         MachineAddon maint = new MachineAddon("gtceu:maintenance_hatch", "gui.gtcalcboard.addon.maintenance_hatch", MachineAddon.Category.MAINTENANCE, "gui.gtcalcboard.addon.maintenance_hatch.desc", ResourceLocation.tryParse("gtceu:maintenance_hatch"));
         maint.setDurationMultiplier(1.0);

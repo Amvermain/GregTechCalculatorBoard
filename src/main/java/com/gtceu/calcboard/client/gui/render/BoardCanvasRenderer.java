@@ -126,6 +126,9 @@ public class BoardCanvasRenderer {
             Font font = Minecraft.getInstance().font;
             BoardHudRenderer.renderQuickAddMarker(graphics, font, canvasHandler.getQuickAddMarkerCanvasX(), canvasHandler.getQuickAddMarkerCanvasY(), mouseX, mouseY);
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0f, 0.0f, 5000.0f);
         canvasHandler.renderMarquee(graphics);
+        graphics.pose().popPose();
     }
 }

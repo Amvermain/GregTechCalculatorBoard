@@ -519,26 +519,9 @@ public final class GTTurbineHelper {
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0) return;
 
-        String rName = node.getRotorName();
-        int rEff = node.getRotorEfficiency();
-        int rPow = node.getRotorPower();
-        boolean hasRotor = node.getAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR)
-                || (rName != null && !rName.isEmpty() && !rName.startsWith("Standard"));
-        if (!hasRotor && rEff <= 100 && (rPow <= 100 || rPow == 0)) {
-            return;
-        }
-
-        int activePower = rPow > 0 && rPow != 100 ? rPow : TurbineRotorHelper.getRotorStats(rName).power();
-        for (MachineAddon addon : node.getAddons()) {
-            if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-                if (addon.getRotorPower() > 0) {
-                    activePower = addon.getRotorPower();
-                }
-                break;
-            }
-        }
-
         double capFinal = getGeneratorMaxEUt(node);
+        if (capFinal <= 0.0 || capFinal >= Double.MAX_VALUE) return;
+
         int multiplier = GTPlasmaTurbineModel.isPlasmaTurbine(node) ? GTPlasmaTurbineModel.getModel(node).getParallelMultiplier() : 1;
         node.setParallel((int) Math.max(1, Math.ceil(capFinal / recipeEUt)) * multiplier);
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);

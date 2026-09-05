@@ -56,6 +56,21 @@ public final class GTCEuProperties {
     public static final NodePropertyKey<Double> ROTOR_WEAR_PER_SEC = NodeProperties.register(
             NodePropertyKey.ofDouble("rotor_wear_per_sec", 0.0)
     );
+    public static final NodePropertyKey<Integer> EBF_PERFECT_OC_COUNT = NodeProperties.register(
+            NodePropertyKey.ofInt("ebf_perfect_oc_count", 0)
+    );
+    public static final NodePropertyKey<Boolean> OXYGEN_BOOST = NodeProperties.register(
+            NodePropertyKey.ofBoolean("oxygen_boost", false)
+    );
+    public static final NodePropertyKey<Boolean> LIQUID_OXYGEN_BOOST = NodeProperties.register(
+            NodePropertyKey.ofBoolean("liquid_oxygen_boost", false)
+    );
+    public static final NodePropertyKey<String> COMBUSTION_COOLANT_TYPE = NodeProperties.register(
+            NodePropertyKey.ofString("combustion_coolant_type", "none")
+    );
+    public static final NodePropertyKey<String> COMBUSTION_OXIDIZER_TYPE = NodeProperties.register(
+            NodePropertyKey.ofString("combustion_oxidizer_type", "none")
+    );
 
     private GTCEuProperties() {}
 

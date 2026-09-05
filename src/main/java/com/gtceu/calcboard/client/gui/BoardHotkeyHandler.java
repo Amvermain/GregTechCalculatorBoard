@@ -28,6 +28,10 @@ public final class BoardHotkeyHandler {
 
         // Priority ESC handlers (Active wire drag, QuickPageSwitcher, TemplateClone, Drawer, Welcome dialog, active tutorial, modals)
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (screen.getCanvasHandler() != null && screen.getCanvasHandler().getContextMenuManager().isOpen()) {
+                screen.getCanvasHandler().getContextMenuManager().close();
+                return true;
+            }
             if (screen.getCanvasHandler() != null && screen.getCanvasHandler().isDraggingWire()) {
                 screen.getCanvasHandler().cancelWireDrag();
                 return true;
@@ -258,7 +262,34 @@ public final class BoardHotkeyHandler {
             return true;
         }
 
+        // 13. Keyboard WASD / Arrow Key Canvas Pan Navigation
+        if (handleWasdPan(screen, keyCode, modifiers)) {
+            return true;
+        }
+
         return false;
+    }
+
+    private static boolean handleWasdPan(BoardScreen screen, int keyCode, int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 || (modifiers & GLFW.GLFW_MOD_ALT) != 0) {
+            return false;
+        }
+        if (screen.isAnyModalOpen() || (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen())) {
+            return false;
+        }
+        if (screen.getSearchDialog() != null && screen.getSearchDialog().isVisible()) {
+            return false;
+        }
+        for (NodeWidget w : screen.getNodeWidgets()) {
+            if (w.isAnyEditorActive()) return false;
+        }
+
+        boolean isW = (keyCode == GLFW.GLFW_KEY_W || keyCode == GLFW.GLFW_KEY_UP);
+        boolean isS = (keyCode == GLFW.GLFW_KEY_S || keyCode == GLFW.GLFW_KEY_DOWN);
+        boolean isA = (keyCode == GLFW.GLFW_KEY_A || keyCode == GLFW.GLFW_KEY_LEFT);
+        boolean isD = (keyCode == GLFW.GLFW_KEY_D || keyCode == GLFW.GLFW_KEY_RIGHT);
+
+        return isW || isS || isA || isD;
     }
 
     private static boolean handleControlHotkeys(BoardScreen screen, int keyCode, int modifiers, double lastMouseX, double lastMouseY) {

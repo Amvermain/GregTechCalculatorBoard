@@ -293,18 +293,10 @@ public final class GTCEuCoilModifierHelper {
         int smelterPar = coilAddon.getSmelterParallel();
 
         switch (spec.kind()) {
-            case BLAST_FURNACE -> {
-                if (reqTemp > 0 && coilTemp > reqTemp) {
-                    int excessTemp = coilTemp - reqTemp;
-                    int tiersAbove = excessTemp / 900;
-                    coilAddon.setEutMultiplier(Math.pow(0.95, tiersAbove));
-                } else {
-                    coilAddon.setEutMultiplier(1.0);
-                }
-                coilAddon.setDurationMultiplier(1.0);
-                coilAddon.setParallelMultiplier(1);
-            }
+            case BLAST_FURNACE -> applyBlastFurnaceModifier(node, coilAddon, reqTemp, coilTemp, true);
+            case GENERIC -> applyBlastFurnaceModifier(node, coilAddon, reqTemp, coilTemp, false);
             case PYROLYSE_OVEN, LIQUEFACTION_TOWER -> {
+                node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
                 double speedMult;
                 if (pyroSpeed > 0 && (pyroSpeed != 100 || coilTemp >= 2700)) {
                     speedMult = pyroSpeed / 100.0;
@@ -319,21 +311,25 @@ public final class GTCEuCoilModifierHelper {
                 coilAddon.setParallelMultiplier(1);
             }
             case CRACKING_UNIT -> {
+                node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
                 coilAddon.setDurationMultiplier(1.0);
                 coilAddon.setEutMultiplier(crackEnergy / 100.0);
                 coilAddon.setParallelMultiplier(1);
             }
             case CHEMICAL_REACTOR -> {
+                node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
                 coilAddon.setDurationMultiplier(100.0 / Math.max(1, chemSpeed));
                 coilAddon.setEutMultiplier(chemEnergy / 100.0);
                 coilAddon.setParallelMultiplier(1);
             }
             case MULTI_SMELTER -> {
+                node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
                 coilAddon.setParallelMultiplier(Math.max(1, smelterPar));
                 coilAddon.setDurationMultiplier(1.0);
                 coilAddon.setEutMultiplier(1.0);
             }
             case CUSTOM_COIL_MULTIBLOCK -> {
+                node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
                 CustomCoilMultiplier cm = spec.customMultiplier();
                 int coilLevel = Math.max(1, (coilTemp - 1800) / 900);
                 double durMult = (cm.durationMultiplier() > 0) ? Math.max(0.01, 1.0 - (coilLevel * cm.durationMultiplier())) : 1.0;
@@ -344,18 +340,30 @@ public final class GTCEuCoilModifierHelper {
                 coilAddon.setEutMultiplier(eutMult);
                 coilAddon.setParallelMultiplier(par);
             }
-            case GENERIC -> {
-                if (reqTemp > 0 && coilTemp > reqTemp) {
-                    int excessTemp = coilTemp - reqTemp;
-                    int tiersAbove = excessTemp / 900;
-                    coilAddon.setEutMultiplier(Math.pow(0.95, tiersAbove));
-                } else {
-                    coilAddon.setEutMultiplier(1.0);
-                }
-                coilAddon.setDurationMultiplier(1.0);
-                coilAddon.setParallelMultiplier(1);
-            }
         }
+    }
+
+    private static void applyBlastFurnaceModifier(RecipeNode node, MachineAddon coilAddon, int reqTemp, int coilTemp, boolean isBlastFurnace) {
+        int targetTierOrdinal = (node.getTargetTier() != null) ? node.getTargetTier().ordinal() : (node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : 0);
+        int tierBonus = 100 * Math.max(0, targetTierOrdinal - 2);
+        int totalMachineTemp = coilTemp + tierBonus;
+
+        if (reqTemp <= 0 || totalMachineTemp <= reqTemp) {
+            coilAddon.setEutMultiplier(1.0);
+            coilAddon.setDurationMultiplier(1.0);
+            coilAddon.setParallelMultiplier(1);
+            node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
+            return;
+        }
+
+        int excessTemp = totalMachineTemp - reqTemp;
+        int discountAmount = excessTemp / 900;
+        int perfectOCs = isBlastFurnace ? (discountAmount / 2) : 0;
+
+        coilAddon.setEutMultiplier(Math.pow(0.95, discountAmount));
+        coilAddon.setDurationMultiplier(1.0);
+        coilAddon.setParallelMultiplier(1);
+        node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, perfectOCs);
     }
 }
 

@@ -867,10 +867,9 @@ public class GTCEuRecipeHandler {
                     } catch (Throwable ignored2) {}
                 }
             }
-            if (tierChanceBoost > 1.0) {
+            if (Math.abs(tierChanceBoost) > 1.0) {
                 tierChanceBoost = tierChanceBoost / 10000.0;
             }
-            tierChanceBoost = Math.max(0.0, tierChanceBoost);
 
             IngredientStack is = null;
             if (inner instanceof ItemStack stack) {
@@ -967,7 +966,7 @@ public class GTCEuRecipeHandler {
                 is.setChance((float) chance);
             }
 
-            if (is != null && tierChanceBoost > 0.0) {
+            if (is != null && Math.abs(tierChanceBoost) > 0.00001) {
                 is.setTierChanceBoost(tierChanceBoost);
             }
             return is;

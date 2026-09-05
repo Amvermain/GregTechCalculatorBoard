@@ -1,14 +1,15 @@
 package com.gtceu.calcboard.client.history;
 
+import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.history.HistoryManager;
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
-
-import com.gtceu.calcboard.api.history.BoardCommand;
-import com.gtceu.calcboard.api.history.HistoryManager;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -329,6 +330,240 @@ public class HistoryTest {
         assertEquals(multiWs, node.getMachineIcon());
         assertTrue(node.isMultiblock());
         assertEquals(8, node.getParallel());
+    }
+
+    @Test
+    public void testDisconnectWireUndoRedo() {
+        RecipeNode node1 = RecipeNode.create("Node 1", 100.0, 30.0, GTVoltageTier.LV);
+        RecipeNode node2 = RecipeNode.create("Node 2", 200.0, 30.0, GTVoltageTier.LV);
+        node1.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 100.0, 1.0));
+        node2.addInput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 100.0, 1.0));
+
+        graph.addNode(node1);
+        graph.addNode(node2);
+        graph.addConnection(node1.getId(), 0, node2.getId(), 0);
+        assertEquals(1, graph.getConnections().size());
+
+        FlowGraph.ConnectionEdge edge = graph.getConnections().get(0);
+        graph.getConnections().remove(edge);
+        historyManager.record(new BoardCommand.DisconnectWireCommand(edge));
+        assertEquals(0, graph.getConnections().size());
+
+        historyManager.undo(graph);
+        assertEquals(1, graph.getConnections().size());
+        assertEquals(edge, graph.getConnections().get(0));
+
+        historyManager.redo(graph);
+        assertEquals(0, graph.getConnections().size());
+    }
+
+    @Test
+    public void testGroupFrameCreationUndoRedo() {
+        CanvasGroupFrame frame = new CanvasGroupFrame("frame1", "Group A", CanvasGroupFrame.COLOR_BLUE, 100, 100, 300, 200);
+        graph.addFrame(frame);
+        historyManager.record(new BoardCommand.AddFramesCommand(frame, "Create Group Frame"));
+        assertEquals(1, graph.getFrames().size());
+
+        historyManager.undo(graph);
+        assertEquals(0, graph.getFrames().size());
+
+        historyManager.redo(graph);
+        assertEquals(1, graph.getFrames().size());
+        assertEquals("frame1", graph.getFrames().get(0).getId());
+    }
+
+    @Test
+    public void testStickyNoteCreationUndoRedo() {
+        CanvasStickyNote note = CanvasStickyNote.create("Note 1", "Content", CanvasStickyNote.COLOR_AMBER, 50, 50);
+        graph.addStickyNote(note);
+        historyManager.record(new BoardCommand.AddStickyNotesCommand(note, "Create Sticky Note"));
+        assertEquals(1, graph.getStickyNotes().size());
+
+        historyManager.undo(graph);
+        assertEquals(0, graph.getStickyNotes().size());
+
+        historyManager.redo(graph);
+        assertEquals(1, graph.getStickyNotes().size());
+        assertEquals(note.getId(), graph.getStickyNotes().get(0).getId());
+    }
+
+    @Test
+    public void testModifyFramePropertiesUndoRedo() {
+        CanvasGroupFrame frame = new CanvasGroupFrame("f1", "Initial Title", CanvasGroupFrame.COLOR_BLUE, 0, 0, 200, 150);
+        frame.setSharedMachineFrame(false);
+        graph.addFrame(frame);
+
+        frame.setTitle("Updated Title");
+        frame.setColor(CanvasGroupFrame.COLOR_EMERALD);
+        frame.setSharedMachineFrame(true);
+
+        historyManager.record(new BoardCommand.ModifyFramePropertiesCommand(
+                "f1",
+                "Initial Title", "Updated Title",
+                CanvasGroupFrame.COLOR_BLUE, CanvasGroupFrame.COLOR_EMERALD,
+                false, true
+        ));
+
+        assertEquals("Updated Title", frame.getTitle());
+        assertEquals(CanvasGroupFrame.COLOR_EMERALD, frame.getColor());
+        assertTrue(frame.isSharedMachineFrame());
+
+        historyManager.undo(graph);
+        assertEquals("Initial Title", frame.getTitle());
+        assertEquals(CanvasGroupFrame.COLOR_BLUE, frame.getColor());
+        assertFalse(frame.isSharedMachineFrame());
+
+        historyManager.redo(graph);
+        assertEquals("Updated Title", frame.getTitle());
+        assertEquals(CanvasGroupFrame.COLOR_EMERALD, frame.getColor());
+        assertTrue(frame.isSharedMachineFrame());
+    }
+
+    @Test
+    public void testModifyNotePropertiesUndoRedo() {
+        CanvasStickyNote note = CanvasStickyNote.create("Old Title", "Old Text", CanvasStickyNote.COLOR_AMBER, 10, 10);
+        graph.addStickyNote(note);
+
+        note.setTitle("New Title");
+        note.setContent("New Text");
+        note.setColor(CanvasStickyNote.COLOR_ROSE);
+
+        historyManager.record(new BoardCommand.ModifyNotePropertiesCommand(
+                note.getId(),
+                "Old Title", "New Title",
+                "Old Text", "New Text",
+                CanvasStickyNote.COLOR_AMBER, CanvasStickyNote.COLOR_ROSE
+        ));
+
+        assertEquals("New Title", note.getTitle());
+        assertEquals("New Text", note.getContent());
+        assertEquals(CanvasStickyNote.COLOR_ROSE, note.getColor());
+
+        historyManager.undo(graph);
+        assertEquals("Old Title", note.getTitle());
+        assertEquals("Old Text", note.getContent());
+        assertEquals(CanvasStickyNote.COLOR_AMBER, note.getColor());
+
+        historyManager.redo(graph);
+        assertEquals("New Title", note.getTitle());
+        assertEquals("New Text", note.getContent());
+        assertEquals(CanvasStickyNote.COLOR_ROSE, note.getColor());
+    }
+
+    @Test
+    public void testGroupModulePreservesEnclosedFramesAndNotesOnUndoRedo() {
+        RecipeNode node1 = RecipeNode.create("Machine 1", 20.0, 30.0, GTVoltageTier.LV);
+        node1.setPos(100, 100);
+        node1.setCardWidth(180);
+        node1.setCardHeight(100);
+        RecipeNode node2 = RecipeNode.create("Machine 2", 20.0, 30.0, GTVoltageTier.LV);
+        node2.setPos(300, 100);
+        node2.setCardWidth(180);
+        node2.setCardHeight(100);
+
+        graph.addNode(node1);
+        graph.addNode(node2);
+
+        CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes("Group Frame", List.of(node1, node2), CanvasGroupFrame.COLOR_BLUE);
+        graph.addFrame(frame);
+
+        CanvasStickyNote note = CanvasStickyNote.create("Note", "Info", CanvasStickyNote.COLOR_CYAN, 120, 120);
+        graph.addStickyNote(note);
+
+        List<RecipeNode> origNodes = new ArrayList<>(graph.getNodes());
+        List<FlowGraph.ConnectionEdge> origEdges = new ArrayList<>(graph.getConnections());
+
+        RecipeNode moduleNode = graph.groupIntoModule(Set.of(node1.getId(), node2.getId()), "Test Module", frame);
+        assertNotNull(moduleNode);
+        assertTrue(moduleNode.isModule());
+
+        List<RecipeNode> groupedNodes = new ArrayList<>();
+        for (RecipeNode n : origNodes) {
+            if (!graph.getNodes().contains(n)) groupedNodes.add(n);
+        }
+        List<FlowGraph.ConnectionEdge> rewires = new ArrayList<>(graph.getConnections());
+
+        historyManager.record(new BoardCommand.GroupModuleCommand(groupedNodes, moduleNode, origEdges, rewires));
+
+        assertEquals(0, graph.getFrames().size());
+        assertEquals(0, graph.getStickyNotes().size());
+        assertEquals(1, graph.getNodes().size());
+        assertEquals(moduleNode.getId(), graph.getNodes().get(0).getId());
+
+        historyManager.undo(graph);
+
+        assertEquals(1, graph.getFrames().size());
+        assertEquals(frame.getId(), graph.getFrames().get(0).getId());
+        assertEquals(1, graph.getStickyNotes().size());
+        assertEquals(note.getId(), graph.getStickyNotes().get(0).getId());
+        assertEquals(2, graph.getNodes().size());
+        assertFalse(graph.getNodes().contains(moduleNode));
+
+        historyManager.redo(graph);
+
+        assertEquals(0, graph.getFrames().size());
+        assertEquals(0, graph.getStickyNotes().size());
+        assertEquals(1, graph.getNodes().size());
+        assertEquals(moduleNode.getId(), graph.getNodes().get(0).getId());
+    }
+
+    @Test
+    public void testExpandModulePreservesEnclosedFramesAndNotesOnUndoRedo() {
+        RecipeNode node1 = RecipeNode.create("Machine 1", 20.0, 30.0, GTVoltageTier.LV);
+        node1.setPos(100, 100);
+        node1.setCardWidth(180);
+        node1.setCardHeight(100);
+        RecipeNode node2 = RecipeNode.create("Machine 2", 20.0, 30.0, GTVoltageTier.LV);
+        node2.setPos(300, 100);
+        node2.setCardWidth(180);
+        node2.setCardHeight(100);
+
+        graph.addNode(node1);
+        graph.addNode(node2);
+
+        CanvasGroupFrame frame = CanvasGroupFrame.createFromNodes("Group Frame", List.of(node1, node2), CanvasGroupFrame.COLOR_BLUE);
+        graph.addFrame(frame);
+
+        CanvasStickyNote note = CanvasStickyNote.create("Note", "Info", CanvasStickyNote.COLOR_CYAN, 120, 120);
+        graph.addStickyNote(note);
+
+        RecipeNode moduleNode = graph.groupIntoModule(Set.of(node1.getId(), node2.getId()), "Test Module", frame);
+        assertNotNull(moduleNode);
+
+        List<FlowGraph.ConnectionEdge> moduleEdges = new ArrayList<>();
+        for (FlowGraph.ConnectionEdge e : graph.getConnections()) {
+            if (e.fromNodeId().equals(moduleNode.getId()) || e.toNodeId().equals(moduleNode.getId())) {
+                moduleEdges.add(e);
+            }
+        }
+        List<RecipeNode> subNodes = new ArrayList<>(moduleNode.getSubGraph().getNodes());
+        List<FlowGraph.ConnectionEdge> subEdges = new ArrayList<>(moduleNode.getSubGraph().getConnections());
+        List<CanvasGroupFrame> subFrames = new ArrayList<>(moduleNode.getSubGraph().getFrames());
+        List<CanvasStickyNote> subNotes = new ArrayList<>(moduleNode.getSubGraph().getStickyNotes());
+
+        boolean expanded = graph.expandModule(moduleNode);
+        assertTrue(expanded);
+
+        historyManager.record(new BoardCommand.ExpandModuleCommand(moduleNode, subNodes, subEdges, moduleEdges, subFrames, subNotes));
+
+        assertEquals(1, graph.getFrames().size());
+        assertEquals(1, graph.getStickyNotes().size());
+        assertEquals(2, graph.getNodes().size());
+        assertFalse(graph.getNodes().contains(moduleNode));
+
+        historyManager.undo(graph);
+
+        assertEquals(0, graph.getFrames().size());
+        assertEquals(0, graph.getStickyNotes().size());
+        assertEquals(1, graph.getNodes().size());
+        assertEquals(moduleNode.getId(), graph.getNodes().get(0).getId());
+
+        historyManager.redo(graph);
+
+        assertEquals(1, graph.getFrames().size());
+        assertEquals(1, graph.getStickyNotes().size());
+        assertEquals(2, graph.getNodes().size());
+        assertFalse(graph.getNodes().contains(moduleNode));
     }
 }
 

@@ -433,12 +433,29 @@ public interface BoardCommand {
         private final RecipeNode moduleNode;
         private final List<FlowGraph.ConnectionEdge> originalEdges;
         private final List<FlowGraph.ConnectionEdge> rewires;
+        private final List<CanvasGroupFrame> capturedFrames;
+        private final List<CanvasStickyNote> capturedNotes;
 
-        public GroupModuleCommand(List<RecipeNode> groupedNodes, RecipeNode moduleNode, List<FlowGraph.ConnectionEdge> originalEdges, List<FlowGraph.ConnectionEdge> rewires) {
+        public GroupModuleCommand(
+                List<RecipeNode> groupedNodes,
+                RecipeNode moduleNode,
+                List<FlowGraph.ConnectionEdge> originalEdges,
+                List<FlowGraph.ConnectionEdge> rewires,
+                List<CanvasGroupFrame> capturedFrames,
+                List<CanvasStickyNote> capturedNotes
+        ) {
             this.groupedNodes = new ArrayList<>(groupedNodes);
             this.moduleNode = moduleNode;
             this.originalEdges = new ArrayList<>(originalEdges);
             this.rewires = new ArrayList<>(rewires);
+            this.capturedFrames = capturedFrames != null ? new ArrayList<>(capturedFrames) : Collections.emptyList();
+            this.capturedNotes = capturedNotes != null ? new ArrayList<>(capturedNotes) : Collections.emptyList();
+        }
+
+        public GroupModuleCommand(List<RecipeNode> groupedNodes, RecipeNode moduleNode, List<FlowGraph.ConnectionEdge> originalEdges, List<FlowGraph.ConnectionEdge> rewires) {
+            this(groupedNodes, moduleNode, originalEdges, rewires,
+                    moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getFrames() : Collections.emptyList(),
+                    moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getStickyNotes() : Collections.emptyList());
         }
 
         @Override
@@ -457,6 +474,16 @@ public interface BoardCommand {
                     graph.getConnections().add(e);
                 }
             }
+            for (CanvasGroupFrame f : capturedFrames) {
+                if (!graph.getFrames().contains(f)) {
+                    graph.addFrame(f);
+                }
+            }
+            for (CanvasStickyNote note : capturedNotes) {
+                if (!graph.getStickyNotes().contains(note)) {
+                    graph.addStickyNote(note);
+                }
+            }
         }
 
         @Override
@@ -471,6 +498,12 @@ public interface BoardCommand {
                 if (!graph.getConnections().contains(r)) {
                     graph.getConnections().add(r);
                 }
+            }
+            for (CanvasGroupFrame f : capturedFrames) {
+                graph.removeFrame(f);
+            }
+            for (CanvasStickyNote note : capturedNotes) {
+                graph.removeStickyNote(note);
             }
         }
 
@@ -488,12 +521,29 @@ public interface BoardCommand {
         private final List<RecipeNode> expandedNodes;
         private final List<FlowGraph.ConnectionEdge> restoredEdges;
         private final List<FlowGraph.ConnectionEdge> moduleEdges;
+        private final List<CanvasGroupFrame> expandedFrames;
+        private final List<CanvasStickyNote> expandedNotes;
 
-        public ExpandModuleCommand(RecipeNode moduleNode, List<RecipeNode> expandedNodes, List<FlowGraph.ConnectionEdge> restoredEdges, List<FlowGraph.ConnectionEdge> moduleEdges) {
+        public ExpandModuleCommand(
+                RecipeNode moduleNode,
+                List<RecipeNode> expandedNodes,
+                List<FlowGraph.ConnectionEdge> restoredEdges,
+                List<FlowGraph.ConnectionEdge> moduleEdges,
+                List<CanvasGroupFrame> expandedFrames,
+                List<CanvasStickyNote> expandedNotes
+        ) {
             this.moduleNode = moduleNode;
             this.expandedNodes = new ArrayList<>(expandedNodes);
             this.restoredEdges = new ArrayList<>(restoredEdges);
             this.moduleEdges = new ArrayList<>(moduleEdges);
+            this.expandedFrames = expandedFrames != null ? new ArrayList<>(expandedFrames) : Collections.emptyList();
+            this.expandedNotes = expandedNotes != null ? new ArrayList<>(expandedNotes) : Collections.emptyList();
+        }
+
+        public ExpandModuleCommand(RecipeNode moduleNode, List<RecipeNode> expandedNodes, List<FlowGraph.ConnectionEdge> restoredEdges, List<FlowGraph.ConnectionEdge> moduleEdges) {
+            this(moduleNode, expandedNodes, restoredEdges, moduleEdges,
+                    moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getFrames() : Collections.emptyList(),
+                    moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getStickyNotes() : Collections.emptyList());
         }
 
         @Override
@@ -503,6 +553,12 @@ public interface BoardCommand {
             }
             for (FlowGraph.ConnectionEdge e : restoredEdges) {
                 graph.getConnections().remove(e);
+            }
+            for (CanvasGroupFrame f : expandedFrames) {
+                graph.removeFrame(f);
+            }
+            for (CanvasStickyNote note : expandedNotes) {
+                graph.removeStickyNote(note);
             }
             if (!graph.getNodes().contains(moduleNode)) {
                 graph.addNode(moduleNode);
@@ -517,6 +573,9 @@ public interface BoardCommand {
         @Override
         public void redo(FlowGraph graph) {
             graph.removeNode(moduleNode);
+            for (FlowGraph.ConnectionEdge e : moduleEdges) {
+                graph.getConnections().remove(e);
+            }
             for (RecipeNode n : expandedNodes) {
                 if (!graph.getNodes().contains(n)) {
                     graph.addNode(n);
@@ -525,6 +584,16 @@ public interface BoardCommand {
             for (FlowGraph.ConnectionEdge e : restoredEdges) {
                 if (!graph.getConnections().contains(e)) {
                     graph.getConnections().add(e);
+                }
+            }
+            for (CanvasGroupFrame f : expandedFrames) {
+                if (!graph.getFrames().contains(f)) {
+                    graph.addFrame(f);
+                }
+            }
+            for (CanvasStickyNote note : expandedNotes) {
+                if (!graph.getStickyNotes().contains(note)) {
+                    graph.addStickyNote(note);
                 }
             }
         }
@@ -1019,6 +1088,156 @@ public interface BoardCommand {
         @Override
         public String getDescription() {
             return "Switch machine icon to " + (newIcon != null ? newIcon.getPath() : "none");
+        }
+    }
+
+    /**
+     * Modification of frame properties (title, color, shared machine mode).
+     */
+    class ModifyFramePropertiesCommand implements BoardCommand {
+        private final String frameId;
+        private final String oldTitle;
+        private final String newTitle;
+        private final int oldColor;
+        private final int newColor;
+        private final boolean oldShared;
+        private final boolean newShared;
+
+        public ModifyFramePropertiesCommand(
+                String frameId,
+                String oldTitle, String newTitle,
+                int oldColor, int newColor,
+                boolean oldShared, boolean newShared
+        ) {
+            this.frameId = frameId;
+            this.oldTitle = oldTitle;
+            this.newTitle = newTitle;
+            this.oldColor = oldColor;
+            this.newColor = newColor;
+            this.oldShared = oldShared;
+            this.newShared = newShared;
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            CanvasGroupFrame frame = graph.findFrameById(frameId);
+            if (frame != null) {
+                frame.setTitle(oldTitle);
+                frame.setColor(oldColor);
+                frame.setSharedMachineFrame(oldShared);
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            CanvasGroupFrame frame = graph.findFrameById(frameId);
+            if (frame != null) {
+                frame.setTitle(newTitle);
+                frame.setColor(newColor);
+                frame.setSharedMachineFrame(newShared);
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return "Modify Frame Properties";
+        }
+    }
+
+    /**
+     * Modification of sticky note properties (title, content, color).
+     */
+    class ModifyNotePropertiesCommand implements BoardCommand {
+        private final String noteId;
+        private final String oldTitle;
+        private final String newTitle;
+        private final String oldContent;
+        private final String newContent;
+        private final int oldColor;
+        private final int newColor;
+
+        public ModifyNotePropertiesCommand(
+                String noteId,
+                String oldTitle, String newTitle,
+                String oldContent, String newContent,
+                int oldColor, int newColor
+        ) {
+            this.noteId = noteId;
+            this.oldTitle = oldTitle;
+            this.newTitle = newTitle;
+            this.oldContent = oldContent;
+            this.newContent = newContent;
+            this.oldColor = oldColor;
+            this.newColor = newColor;
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            CanvasStickyNote note = graph.findStickyNoteById(noteId);
+            if (note != null) {
+                note.setTitle(oldTitle);
+                note.setContent(oldContent);
+                note.setColor(oldColor);
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            CanvasStickyNote note = graph.findStickyNoteById(noteId);
+            if (note != null) {
+                note.setTitle(newTitle);
+                note.setContent(newContent);
+                note.setColor(newColor);
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return "Modify Note Properties";
+        }
+    }
+
+    /**
+     * Resizing of a sticky note.
+     */
+    class ResizeStickyNoteCommand implements BoardCommand {
+        private final String noteId;
+        private final double oldW;
+        private final double oldH;
+        private final double newW;
+        private final double newH;
+        private final String description;
+
+        public ResizeStickyNoteCommand(String noteId, double oldW, double oldH, double newW, double newH, String description) {
+            this.noteId = noteId;
+            this.oldW = oldW;
+            this.oldH = oldH;
+            this.newW = newW;
+            this.newH = newH;
+            this.description = description;
+        }
+
+        @Override
+        public void undo(FlowGraph graph) {
+            CanvasStickyNote note = graph.findStickyNoteById(noteId);
+            if (note != null) {
+                note.setWidth(oldW);
+                note.setHeight(oldH);
+            }
+        }
+
+        @Override
+        public void redo(FlowGraph graph) {
+            CanvasStickyNote note = graph.findStickyNoteById(noteId);
+            if (note != null) {
+                note.setWidth(newW);
+                note.setHeight(newH);
+            }
+        }
+
+        @Override
+        public String getDescription() {
+            return description != null ? description : "Resize Sticky Note";
         }
     }
 }

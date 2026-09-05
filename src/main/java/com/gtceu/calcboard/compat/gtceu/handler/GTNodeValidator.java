@@ -24,9 +24,6 @@ public final class GTNodeValidator {
         if (node == null) return true;
         boolean valid = true;
 
-        if (node.getBaseEUt() > 0 && !GTTurbineHelper.isTurbine(node) && node.isGenerator()) {
-            node.setGenerator(false);
-        }
 
         // 1. Reflector requirement check (RFC-001 & RFC-002)
         int req = node.getProperties().get(GTCEuProperties.REQUIRED_REFLECTOR_TIER);

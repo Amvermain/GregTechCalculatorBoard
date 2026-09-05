@@ -92,10 +92,13 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 | Connect Wire | Left Click & Drag between ports |
 | Drag to Search & Auto-Wire | Drag from port onto empty canvas -> Select recipe |
 | Smart Match Connect (Bidirectional) | Shift + Drag between ports (Integer Ceiling matching) |
+| Target Output Rate Inverse Solver | Ctrl + Left Click on output port |
+| Context Menu | Right Click on empty canvas, node, port, or selection |
+| Unreal Pan & Diagonal Movement | Right-Click Drag or WASD / Arrow Keys (Shift to accelerate) |
 | Disconnect Wire / Port | Right Click on wire or port socket |
 | Toggle Void Marking | Alt + Right Click on output port |
 | Switch Recipe (In-Place) | Click [🔄 Switch Recipe] in Machine Config or Node Context Menu |
-| Cycle Rate Time Unit | T (/s -> /min -> /h -> /d -> /t) |
+| Cycle Rate Time Unit | T (/s -> /min -> /h -> /d -> /t -> 1x per-craft batch) |
 | Cycle Global Fluid Unit | Shift + T (Auto -> Always mB -> Always B) |
 | Adjust UI Font Scale | Click [Aa 1.0x] (Left/Right), Mouse Wheel, or [+] / [-] |
 | Set Master Anchor | Click Anchor icon on recipe card header |
@@ -152,7 +155,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.1.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.2.jar`.
 
 ---
 

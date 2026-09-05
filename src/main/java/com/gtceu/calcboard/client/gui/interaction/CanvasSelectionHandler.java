@@ -159,7 +159,31 @@ public class CanvasSelectionHandler {
         int minY = (int) Math.floor(Math.min(boxSelectStartY, boxSelectCurY));
         int maxY = (int) Math.ceil(Math.max(boxSelectStartY, boxSelectCurY));
 
+        renderIntersectedEntitiesHighlight(graphics, screen, minX, minY, maxX, maxY);
+        renderMarqueeBox(graphics, minX, minY, maxX, maxY);
+    }
+
+    private void renderMarqueeBox(GuiGraphics graphics, int minX, int minY, int maxX, int maxY) {
         graphics.fill(minX, minY, maxX, maxY, 0x3338BDF8);
         graphics.renderOutline(minX, minY, maxX - minX, maxY - minY, 0xFF38BDF8);
+    }
+
+    private void renderIntersectedEntitiesHighlight(GuiGraphics graphics, BoardScreen screen, int minX, int minY, int maxX, int maxY) {
+        if (screen == null) return;
+        for (NodeWidget w : screen.getNodeWidgets()) {
+            RecipeNode n = w.getNode();
+            double nx = n.getPosX();
+            double ny = n.getPosY();
+            int nw = w.getWidth();
+            int nh = w.getHeight();
+            if (nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY) {
+                renderNodeHighlight(graphics, (int) nx, (int) ny, nw, nh);
+            }
+        }
+    }
+
+    private void renderNodeHighlight(GuiGraphics graphics, int x, int y, int w, int h) {
+        graphics.fill(x - 2, y - 2, x + w + 2, y + h + 2, 0x2E38BDF8);
+        graphics.renderOutline(x - 2, y - 2, w + 4, h + 4, 0xFF38BDF8);
     }
 }

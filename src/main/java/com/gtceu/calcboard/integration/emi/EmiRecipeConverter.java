@@ -170,7 +170,11 @@ public class EmiRecipeConverter {
             com.gtceu.calcboard.compat.greate.GreateMachineHelper.syncMachineIconToTier(node, initTier);
         }
 
-        for (EmiIngredient input : recipe.getInputs()) {
+        List<SlotChance> extractedInputChances = extractSlotChances(recipe, true);
+        boolean[] usedInputChances = new boolean[extractedInputChances.size()];
+
+        for (int inIdx = 0; inIdx < recipe.getInputs().size(); inIdx++) {
+            EmiIngredient input = recipe.getInputs().get(inIdx);
             long reqAmount = input.getAmount();
             float reqChance = input.getChance();
             IngredientStack primaryStack = null;
@@ -209,46 +213,23 @@ public class EmiRecipeConverter {
                     }
                 } catch (Throwable ignored) {}
 
+                applySlotChance(primaryStack, inIdx, extractedInputChances, usedInputChances);
                 primaryStack.setAlternatives(altIds);
                 node.addInput(primaryStack);
             }
         }
 
-        List<OutputSlotChance> extractedChances = extractOutputSlotChances(recipe);
+        List<SlotChance> extractedChances = extractSlotChances(recipe, false);
         boolean[] usedChances = new boolean[extractedChances.size()];
 
-        // Convert Outputs
         for (int i = 0; i < recipe.getOutputs().size(); i++) {
             EmiStack outStack = recipe.getOutputs().get(i);
             if (outStack == null || outStack.isEmpty()) continue;
             if (isDummyConditionMarker(outStack.getId())) continue;
 
-            float chance = outStack.getChance();
-            double tierBoost = 0.0;
-            ResourceLocation outId = outStack.getId();
-
-            // 1. Try exact index matching first
-            if (i < extractedChances.size() && !usedChances[i] && outId != null && outId.equals(extractedChances.get(i).id())) {
-                chance = (float) extractedChances.get(i).chance();
-                tierBoost = extractedChances.get(i).tierChanceBoost();
-                usedChances[i] = true;
-            } else if (outId != null) {
-                // 2. Consume first unused matching ID in order
-                for (int j = 0; j < extractedChances.size(); j++) {
-                    if (!usedChances[j] && outId.equals(extractedChances.get(j).id())) {
-                        chance = (float) extractedChances.get(j).chance();
-                        tierBoost = extractedChances.get(j).tierChanceBoost();
-                        usedChances[j] = true;
-                        break;
-                    }
-                }
-            }
-
-            IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), chance);
+            IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), outStack.getChance());
             if (os != null && !isDummyConditionMarker(os.getId())) {
-                if (os.getChance() < 1.0) {
-                    os.setTierChanceBoost(tierBoost);
-                }
+                applySlotChance(os, i, extractedChances, usedChances);
                 node.addOutput(os);
             }
         }
@@ -532,130 +513,187 @@ public class EmiRecipeConverter {
         }
     }
 
-    public record OutputSlotChance(ResourceLocation id, double chance, double tierChanceBoost) {}
- 
-    private static List<OutputSlotChance> extractOutputSlotChances(EmiRecipe recipe) {
-        List<OutputSlotChance> list = new ArrayList<>();
-        if (recipe == null) return list;
-        try {
-            Object backing = unwrapBackingRecipe(recipe);
-            if (backing == null) backing = recipe.getBackingRecipe();
-            if (backing == null) return list;
+    public record SlotChance(ResourceLocation id, double chance, double tierChanceBoost) {}
 
-            // 1. GTCEu GTRecipe
-            if (ModCompatHelper.isGTLoaded() && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
-                List<IngredientStack> gtOuts = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeContents(backing, "outputs");
-                if (gtOuts != null && !gtOuts.isEmpty()) {
-                    for (IngredientStack is : gtOuts) {
-                        if (is != null && is.getId() != null) {
-                            list.add(new OutputSlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
-                        }
-                    }
-                    return list;
+    public record OutputSlotChance(ResourceLocation id, double chance, double tierChanceBoost) {}
+
+    private static void applySlotChance(IngredientStack stack, int index, List<SlotChance> chances, boolean[] used) {
+        if (stack == null || stack.getId() == null) return;
+        ResourceLocation id = stack.getId();
+        if (index < chances.size() && !used[index] && id.equals(chances.get(index).id())) {
+            stack.setChance(chances.get(index).chance());
+            stack.setTierChanceBoost(chances.get(index).tierChanceBoost());
+            used[index] = true;
+            return;
+        }
+        for (int j = 0; j < chances.size(); j++) {
+            if (used[j] || !id.equals(chances.get(j).id())) continue;
+            stack.setChance(chances.get(j).chance());
+            stack.setTierChanceBoost(chances.get(j).tierChanceBoost());
+            used[j] = true;
+            return;
+        }
+    }
+
+    private static List<SlotChance> extractSlotChances(EmiRecipe recipe, boolean isInput) {
+        List<SlotChance> list = new ArrayList<>();
+        if (recipe == null) return list;
+        Object backing = unwrapBackingRecipe(recipe);
+        if (backing == null) backing = recipe.getBackingRecipe();
+        if (backing == null) return list;
+
+        String key = isInput ? "inputs" : "outputs";
+
+        if (ModCompatHelper.isGTLoaded() && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
+            List<SlotChance> gtChances = extractGTRecipeSlotChances(backing, key);
+            if (!gtChances.isEmpty()) return gtChances;
+        }
+
+        if (!isInput) {
+            List<SlotChance> createChances = extractCreateRollableChances(backing);
+            if (!createChances.isEmpty()) return createChances;
+        }
+
+        if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
+            list.addAll(extractGTFallbackSlotChances(backing, key));
+        }
+        return list;
+    }
+
+    private static List<SlotChance> extractGTRecipeSlotChances(Object backing, String key) {
+        List<SlotChance> list = new ArrayList<>();
+        List<IngredientStack> gtStacks = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeContents(backing, key);
+        if (gtStacks == null || gtStacks.isEmpty()) return list;
+        for (IngredientStack is : gtStacks) {
+            if (is == null || is.getId() == null) continue;
+            list.add(new SlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
+        }
+        return list;
+    }
+
+    private static List<SlotChance> extractCreateRollableChances(Object backing) {
+        List<SlotChance> list = new ArrayList<>();
+        try {
+            Method m = backing.getClass().getMethod("getRollableResults");
+            Object res = m.invoke(backing);
+            if (!(res instanceof List<?> rollableList)) return list;
+            for (Object po : rollableList) {
+                SlotChance sc = parseCreateRollableSlot(po);
+                if (sc != null) list.add(sc);
+            }
+        } catch (Throwable ignored) {}
+        return list;
+    }
+
+    private static SlotChance parseCreateRollableSlot(Object po) {
+        if (po == null) return null;
+        try {
+            Method getStackM = po.getClass().getMethod("getStack");
+            Method getChanceM = po.getClass().getMethod("getChance");
+            Object stackObj = getStackM.invoke(po);
+            Object chanceObj = getChanceM.invoke(po);
+            if (stackObj instanceof net.minecraft.world.item.ItemStack is && chanceObj instanceof Number n) {
+                ResourceLocation id = ForgeRegistries.ITEMS.getKey(is.getItem());
+                if (id != null) {
+                    double ch = Math.max(0.0, Math.min(1.0, n.doubleValue()));
+                    return new SlotChance(id, ch, 0.0);
                 }
             }
+        } catch (Throwable ignored) {}
+        return null;
+    }
 
-            // 2. Create ProcessingRecipe (e.g. Fan Washing, Crushing, Milling, Cutting, etc.)
-            try {
-                Method m = backing.getClass().getMethod("getRollableResults");
-                Object res = m.invoke(backing);
-                if (res instanceof List<?> rollableList) {
-                    for (Object po : rollableList) {
-                        if (po == null) continue;
-                        Method getStackM = po.getClass().getMethod("getStack");
-                        Method getChanceM = po.getClass().getMethod("getChance");
-                        Object stackObj = getStackM.invoke(po);
-                        Object chanceObj = getChanceM.invoke(po);
-                        if (stackObj instanceof net.minecraft.world.item.ItemStack is && chanceObj instanceof Number n) {
-                            ResourceLocation id = ForgeRegistries.ITEMS.getKey(is.getItem());
-                            if (id != null) {
-                                double ch = Math.max(0.0, Math.min(1.0, n.doubleValue()));
-                                list.add(new OutputSlotChance(id, ch, 0.0));
-                            }
-                        }
-                    }
-                    if (!list.isEmpty()) {
-                        return list;
-                    }
-                }
-            } catch (Throwable ignored) {}
-
-            // 3. GTCEu GTRecipe reflection fallback
-            if (ModCompatHelper.isGTLoaded() && backing.getClass().getName().contains("GTRecipe")) {
-                Field outputsField = null;
-                try {
-                    outputsField = backing.getClass().getField("outputs");
-                } catch (Throwable ignored) {
-                    try {
-                        outputsField = backing.getClass().getDeclaredField("outputs");
-                        outputsField.setAccessible(true);
-                    } catch (Throwable ignored2) {}
-                }
-                if (outputsField != null) {
-                    Object outputsObj = outputsField.get(backing);
-                    if (outputsObj instanceof Map<?, ?> outMap) {
-                        for (Object listObj : outMap.values()) {
-                            if (listObj instanceof List<?> contentList) {
-                                for (Object contentObj : contentList) {
-                                    if (contentObj == null) continue;
-                                    double chance = 1.0;
-                                    try {
-                                        Field f = contentObj.getClass().getField("chance");
-                                        Object v = f.get(contentObj);
-                                        if (v instanceof Number n) chance = n.doubleValue();
-                                    } catch (Throwable ignored) {
-                                        try {
-                                            Method m = contentObj.getClass().getMethod("chance");
-                                            Object v = m.invoke(contentObj);
-                                            if (v instanceof Number n) chance = n.doubleValue();
-                                        } catch (Throwable ignored2) {
-                                            try {
-                                                Method m = contentObj.getClass().getMethod("getChance");
-                                                Object v = m.invoke(contentObj);
-                                                if (v instanceof Number n) chance = n.doubleValue();
-                                            } catch (Throwable ignored3) {}
-                                        }
-                                    }
-                                    if (chance > 1.0) {
-                                        chance = chance / 10000.0; // GTCEu uses 10000 = 100%
-                                    }
-                                    chance = Math.max(0.0, Math.min(1.0, chance));
-
-                                    double boost = 0.0;
-                                    try {
-                                        Field f = contentObj.getClass().getField("tierChanceBoost");
-                                        Object v = f.get(contentObj);
-                                        if (v instanceof Number n) boost = n.doubleValue();
-                                    } catch (Throwable ignored) {
-                                        try {
-                                            Method m = contentObj.getClass().getMethod("tierChanceBoost");
-                                            Object v = m.invoke(contentObj);
-                                            if (v instanceof Number n) boost = n.doubleValue();
-                                        } catch (Throwable ignored2) {
-                                            try {
-                                                Method m = contentObj.getClass().getMethod("getTierChanceBoost");
-                                                Object v = m.invoke(contentObj);
-                                                if (v instanceof Number n) boost = n.doubleValue();
-                                            } catch (Throwable ignored3) {}
-                                        }
-                                    }
-                                    if (boost > 1.0) {
-                                        boost = boost / 10000.0; // e.g. 500 = 5% = 0.05
-                                    }
-                                    boost = Math.max(0.0, boost);
-
-                                    ResourceLocation resId = extractContentResourceId(contentObj);
-                                    if (resId != null) {
-                                        list.add(new OutputSlotChance(resId, chance, boost));
-                                    }
-                                }
-                            }
-                        }
-                    }
+    private static List<SlotChance> extractGTFallbackSlotChances(Object backing, String key) {
+        List<SlotChance> list = new ArrayList<>();
+        try {
+            Field slotsField = getGTField(backing, key);
+            if (slotsField == null) return list;
+            Object slotsObj = slotsField.get(backing);
+            if (!(slotsObj instanceof Map<?, ?> slotMap)) return list;
+            for (Object listObj : slotMap.values()) {
+                if (listObj instanceof List<?> contentList) {
+                    parseGTContentList(contentList, list);
                 }
             }
         } catch (Throwable ignored) {}
         return list;
+    }
+
+    private static Field getGTField(Object backing, String name) {
+        try {
+            return backing.getClass().getField(name);
+        } catch (Throwable ignored) {
+            try {
+                Field f = backing.getClass().getDeclaredField(name);
+                f.setAccessible(true);
+                return f;
+            } catch (Throwable ignored2) {
+                return null;
+            }
+        }
+    }
+
+    private static void parseGTContentList(List<?> contentList, List<SlotChance> target) {
+        for (Object contentObj : contentList) {
+            SlotChance sc = parseGTContentSlot(contentObj);
+            if (sc != null) target.add(sc);
+        }
+    }
+
+    private static SlotChance parseGTContentSlot(Object contentObj) {
+        if (contentObj == null) return null;
+        double chance = extractGTContentChance(contentObj);
+        double boost = extractGTContentBoost(contentObj);
+        ResourceLocation resId = extractContentResourceId(contentObj);
+        return resId != null ? new SlotChance(resId, chance, boost) : null;
+    }
+
+    private static double extractGTContentChance(Object contentObj) {
+        double chance = 1.0;
+        try {
+            Field f = contentObj.getClass().getField("chance");
+            Object v = f.get(contentObj);
+            if (v instanceof Number n) chance = n.doubleValue();
+        } catch (Throwable ignored) {
+            chance = invokeChanceMethod(contentObj);
+        }
+        if (chance > 1.0) chance = chance / 10000.0;
+        return Math.max(0.0, Math.min(1.0, chance));
+    }
+
+    private static double invokeChanceMethod(Object contentObj) {
+        for (String mName : new String[]{"chance", "getChance"}) {
+            try {
+                Method m = contentObj.getClass().getMethod(mName);
+                Object v = m.invoke(contentObj);
+                if (v instanceof Number n) return n.doubleValue();
+            } catch (Throwable ignored) {}
+        }
+        return 1.0;
+    }
+
+    private static double extractGTContentBoost(Object contentObj) {
+        double boost = 0.0;
+        try {
+            Field f = contentObj.getClass().getField("tierChanceBoost");
+            Object v = f.get(contentObj);
+            if (v instanceof Number n) boost = n.doubleValue();
+        } catch (Throwable ignored) {
+            boost = invokeBoostMethod(contentObj);
+        }
+        if (Math.abs(boost) > 1.0) boost = boost / 10000.0;
+        return boost;
+    }
+
+    private static double invokeBoostMethod(Object contentObj) {
+        for (String mName : new String[]{"tierChanceBoost", "getTierChanceBoost"}) {
+            try {
+                Method m = contentObj.getClass().getMethod(mName);
+                Object v = m.invoke(contentObj);
+                if (v instanceof Number n) return n.doubleValue();
+            } catch (Throwable ignored) {}
+        }
+        return 0.0;
     }
 
     private static ResourceLocation extractContentResourceId(Object contentObj) {

@@ -166,7 +166,7 @@ public class IngredientStack {
     }
 
     public void setTierChanceBoost(double tierChanceBoost) {
-        this.tierChanceBoost = Math.max(0.0, tierChanceBoost);
+        this.tierChanceBoost = tierChanceBoost;
     }
 
     public void setChance(double chance) {
@@ -174,8 +174,8 @@ public class IngredientStack {
     }
 
     public double getEffectiveChance(int tierDelta) {
-        if (chance >= 1.0) return 1.0;
-        if (tierChanceBoost <= 0.0 || tierDelta <= 0) return chance;
+        if (chance >= 1.0 && tierChanceBoost >= 0.0) return 1.0;
+        if (tierChanceBoost == 0.0 || tierDelta <= 0) return chance;
         return Math.min(1.0, Math.max(0.0, chance + tierDelta * tierChanceBoost));
     }
 
@@ -208,7 +208,7 @@ public class IngredientStack {
         if (Math.abs(chance - 1.0) > 0.0001) {
             tag.putDouble("chance", chance);
         }
-        if (tierChanceBoost > 0.0) {
+        if (Math.abs(tierChanceBoost) > 0.00001) {
             tag.putDouble("tierChanceBoost", tierChanceBoost);
         }
         if (!alternatives.isEmpty()) {

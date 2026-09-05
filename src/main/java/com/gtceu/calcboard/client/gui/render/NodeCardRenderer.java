@@ -305,19 +305,21 @@ public class NodeCardRenderer {
             }
         }
 
-        if (!node.isModule()) {
-            var guiHandler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-            boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
-            guiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
+        boolean slim = BoardManager.getInstance().isSlimCardMode();
+        if (!slim) {
+            if (!node.isModule()) {
+                var guiHandler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+                boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
+                guiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
+            }
+
+            int infoY = node.isModule() ? (ctrlY + 18) : (row2Y + 18);
+            graphics.drawString(font, textCache.getRightInfoStr(), x + cardW - 6 - textCache.getRightInfoW(), infoY, 0xFFFFFFFF, false);
+            graphics.drawString(font, textCache.getFittedPowerStr(), x + 6, infoY, 0xFFFFFFFF, false);
         }
 
-        // 8. Recipe Energy & Duration Info
-        int infoY = node.isModule() ? (ctrlY + 18) : (row2Y + 18);
-        graphics.drawString(font, textCache.getRightInfoStr(), x + cardW - 6 - textCache.getRightInfoW(), infoY, 0xFFFFFFFF, false);
-        graphics.drawString(font, textCache.getFittedPowerStr(), x + 6, infoY, 0xFFFFFFFF, false);
-
         // Separator Line
-        int sepY = infoY + 14;
+        int sepY = slim ? (ctrlY + 16) : ((node.isModule() ? (ctrlY + 18) : (row2Y + 18)) + 14);
         graphics.fill(x + 4, sepY, x + cardW - 4, sepY + 1, !isOperational ? 0xFF5A2228 : 0xFF353C4D);
 
         // 9. Input & Output Ports Listing
@@ -601,10 +603,15 @@ public class NodeCardRenderer {
         graphics.fill(x + 2, y + 2, x + 30, y + 30, bg);
 
         int border;
-        if (isSelected) {
+        boolean isGlow = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isJunctionGlowing(node.getId());
+        if (isGlow) {
+            border = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF00FF88);
+        } else if (isSelected) {
             border = 0xFF00FFFF;
         } else if (node.isVoidSink()) {
             border = 0xFFA855F7;
+        } else if (node.isFixedDrain()) {
+            border = 0xFFF97316;
         } else if (node.isInfiniteSupply()) {
             border = 0xFF38BDF8;
         } else if (node.isExternalSupply()) {
@@ -613,17 +620,21 @@ public class NodeCardRenderer {
             border = isHovered ? 0xFF94A3B8 : 0xFF64748B;
         }
         graphics.renderOutline(x + 2, y + 2, 28, 28, border);
-        if (isSelected) {
+        if (isGlow) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, border);
+        } else if (isSelected) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x8800FFFF);
         } else if (node.isVoidSink()) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x44A855F7);
+        } else if (node.isFixedDrain()) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x44F97316);
         } else if (node.isInfiniteSupply()) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x4438BDF8);
         } else if (node.isExternalSupply()) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x4434D399);
         }
 
-        // External Supply Badge (Top: ∞, VOID, or +rate)
+        // External Supply Badge (Top: ∞, VOID, -rate, or +rate)
         if (node.isInfiniteSupply()) {
             graphics.fill(x + 19, y + 1, x + 31, y + 10, 0xEE0B132B);
             graphics.renderOutline(x + 19, y + 1, 12, 9, 0xFF38BDF8);
@@ -632,6 +643,18 @@ public class NodeCardRenderer {
             graphics.fill(x + 13, y + 1, x + 31, y + 10, 0xEE1E1035);
             graphics.renderOutline(x + 13, y + 1, 18, 9, 0xFFA855F7);
             graphics.drawString(font, "VOID", x + 15, y + 1, 0xFFA855F7, false);
+        } else if (node.isFixedDrain()) {
+            IngredientStack rStack = !node.getInputs().isEmpty() ? node.getInputs().get(0) : null;
+            boolean isFluid = rStack != null && rStack.isFluid();
+            String rateStr = "-" + com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(node.getExternalDrainRate(), isFluid);
+            int rw = font.width(rateStr);
+            graphics.pose().pushPose();
+            graphics.pose().translate(0, 0, 200);
+            graphics.pose().scale(0.7f, 0.7f, 1.0f);
+            int rx = (int) ((x + 16) / 0.7f - rw / 2);
+            int ry = (int) ((y + 1) / 0.7f);
+            graphics.drawString(font, rateStr, rx, ry, 0xFFF87171, true);
+            graphics.pose().popPose();
         } else if (node.isExternalSupply()) {
             IngredientStack rStack = !node.getInputs().isEmpty() ? node.getInputs().get(0) : null;
             boolean isFluid = rStack != null && rStack.isFluid();
@@ -739,7 +762,7 @@ public class NodeCardRenderer {
 
     public static boolean isInputSourceJunction(FlowGraph graph, RecipeNode node) {
         if (graph == null || node == null || !node.isReroute()) return false;
-        if (node.isExternalSupply() || node.isInfiniteSupply() || node.isVoidSink()) return false;
+        if (node.isExternalSupply() || node.isInfiniteSupply() || node.isVoidSink() || node.isFixedDrain()) return false;
         boolean hasIncoming = false;
         boolean hasOutgoing = false;
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {

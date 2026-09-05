@@ -20,6 +20,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -27,298 +28,46 @@ import net.minecraft.sounds.SoundEvents;
 import java.util.*;
 
 /**
- * Top horizontal toolbar widget managing quick access buttons, layout modes, tools, and scrollable action bars.
+ * Top horizontal toolbar widget managing quick access buttons, layout modes, tools, and dropdown menus.
  */
 public class ToolbarWidget {
-    private static final int MINIMAP_PADDING = 16;
     private final BoardScreen screen;
 
-    private boolean overflowMenuOpen = false;
-    private final List<ToolbarButtonDef> visibleButtons = new ArrayList<>();
-    private final List<ToolbarButtonDef> overflowButtons = new ArrayList<>();
-    private int overflowBtnX = 0;
-    private int overflowBtnY = 0;
-    private int overflowBtnW = 20;
-    private boolean isCompactMode = false;
-    private int lastMenuX = 0;
-    private int lastMenuY = 0;
-    private int lastMenuW = 160;
-    private int lastMenuH = 0;
-    private ToolbarButtonDef hoveredBtn = null;
-    private boolean isTitleHovered = false;
-    private int cachedTbX = 0;
-    private int cachedTbY = 0;
-    private int cachedTitleRight = 0;
-    private int cachedActualW = 0;
+    public enum DropdownMenu {
+        NONE, OPTIMIZE, VIEW, IO, HELP
+    }
+
+    public record DropdownItem(String label, String shortcut, Runnable action, boolean keepOpen) {
+        public DropdownItem(String label, String shortcut, Runnable action) {
+            this(label, shortcut, action, false);
+        }
+    }
+
+    private DropdownMenu activeDropdown = DropdownMenu.NONE;
+    private int dropdownX = 0;
+    private int dropdownY = 0;
+    private int dropdownW = 160;
+    private final List<DropdownItem> currentDropdownItems = new ArrayList<>();
+
+    private int settingsBtnX, settingsBtnW = 18;
+    private int pageBtnX, pageBtnW;
+    private int searchBtnX, searchBtnW;
+    private int optimizeBtnX, optimizeBtnW;
+    private int viewBtnX, viewBtnW;
+    private int ioBtnX, ioBtnW;
+    private int guideBtnX, guideBtnW;
+
+    private int undoBtnX, undoBtnW = 18;
+    private int redoBtnX, redoBtnW = 18;
+    private int closeBtnX, closeBtnW = 18;
+    private int tbX, tbY, tbW, tbH = 18;
 
     public ToolbarWidget(BoardScreen screen) {
         this.screen = screen;
     }
 
     public boolean isOverflowMenuOpen() {
-        return overflowMenuOpen;
-    }
-
-    private static class ToolbarButtonDef {
-        final String id;
-        final String text;
-        final String icon;
-        final int color;
-        final int bg;
-        final int hoverBg;
-        final int border;
-        final int width;
-        final int compactWidth;
-        final java.util.function.Consumer<Integer> onClick;
-
-        ToolbarButtonDef(String id, String text, String icon, int color, int bg, int hoverBg, int border, int width, int compactWidth, java.util.function.Consumer<Integer> onClick) {
-            this.id = id;
-            this.text = text;
-            this.icon = icon;
-            this.color = color;
-            this.bg = bg;
-            this.hoverBg = hoverBg;
-            this.border = border;
-            this.width = width;
-            this.compactWidth = compactWidth;
-            this.onClick = onClick;
-        }
-    }
-
-    private List<ToolbarButtonDef> buildButtons(Font font) {
-        List<ToolbarButtonDef> list = new ArrayList<>();
-        boolean isShift = Screen.hasShiftDown();
-        boolean isAlt = Screen.hasAltDown();
-
-        addGuideAndTutorialButtons(list, font, isShift);
-        addOptimizationButtons(list, font, isShift, isAlt);
-        addUtilityAndToggleButtons(list, font);
-        addIoButtons(list, font);
-        addTeamCollaborationButtons(list, font);
-        addSystemButtons(list, font);
-
-        return list;
-    }
-
-    private void addGuideAndTutorialButtons(List<ToolbarButtonDef> list, Font font, boolean isShift) {
-        BoardManager bm = BoardManager.getInstance();
-        if (bm.isShowGuideButton()) {
-            String guideTxt = "§e? " + Component.translatable("gui.gtcalcboard.guide_btn").getString();
-            list.add(new ToolbarButtonDef("guide", guideTxt, "?", 0xFFFFEE55, 0xFF352E1B, 0xFF5A4A28, 0xFF776433, font.width(guideTxt) + 12, 22, btn -> {
-                if (screen.getGuideDialog() != null) {
-                    screen.getGuideDialog().open();
-                }
-            }));
-        }
-
-        if (bm.isShowTutorialButton()) {
-            if (isShift) {
-                String advTutTxt = "§b✦ " + Component.translatable("gui.gtcalcboard.advanced_tutorial_btn").getString();
-                list.add(new ToolbarButtonDef("tutorial", advTutTxt, "✦", 0xFF38BDF8, 0xFF0C4A6E, 0xFF075985, 0xFF0284C7, font.width(advTutTxt) + 12, 22, btn -> {
-                    com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startAdvancedTutorial(screen);
-                }));
-            } else {
-                String tutTxt = "§a▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
-                list.add(new ToolbarButtonDef("tutorial", tutTxt, "▶", 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38, 0xFF3B774E, font.width(tutTxt) + 12, 22, btn -> {
-                    com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
-                }));
-            }
-        }
-    }
-
-    private void addOptimizationButtons(List<ToolbarButtonDef> list, Font font, boolean isShift, boolean isAlt) {
-        if (isShift) {
-            String quickConnTxt = "§e⚡ " + Component.translatable("gui.gtcalcboard.quick_connect").getString();
-            list.add(new ToolbarButtonDef("auto_connect", quickConnTxt, "⚡", 0xFFFFF176, 0xFF3A351C, 0xFF5C5228, 0xFF887733, font.width(quickConnTxt) + 12, 22, btn -> performAutoConnect()));
-        } else {
-            String connTxt = "↔ " + Component.translatable("gui.gtcalcboard.auto_connect").getString();
-            list.add(new ToolbarButtonDef("auto_connect", connTxt, "↔", 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(connTxt) + 12, 22, btn -> performAutoConnect()));
-        }
-
-        addAutoRatioButton(list, font, isShift, isAlt);
-
-        String flowTxt = "▲ " + Component.translatable("gui.gtcalcboard.max_flow").getString();
-        list.add(new ToolbarButtonDef("max_flow", flowTxt, "▲", 0xFFFFAA00, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(flowTxt) + 12, 22, btn -> performMaxThroughputOptimization()));
-
-        String fitTxt = "⌖ " + Component.translatable("gui.gtcalcboard.fit_view").getString();
-        list.add(new ToolbarButtonDef("fit_view", fitTxt, "⌖", 0xFF38BDF8, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(fitTxt) + 12, 22, btn -> screen.fitToView()));
-    }
-
-    private void addAutoRatioButton(List<ToolbarButtonDef> list, Font font, boolean isShift, boolean isAlt) {
-        boolean isFractionalDefault = BoardManager.getInstance().isAutoRatioFractionalDefault();
-        if (isAlt) {
-            String fracTxt = "§b⚡ " + Component.translatable("gui.gtcalcboard.auto_ratio_fractional").getString();
-            list.add(new ToolbarButtonDef("auto_ratio", fracTxt, "⚡", 0xFF38BDF8, 0xFF0C4A6E, 0xFF075985, 0xFF0284C7, font.width(fracTxt) + 12, 22, btn -> performAutoRatio(false, true)));
-            return;
-        }
-        if (isShift) {
-            String harmonizeTxt = "§6✧ " + Component.translatable("gui.gtcalcboard.harmonize_ratio").getString();
-            list.add(new ToolbarButtonDef("auto_ratio", harmonizeTxt, "✧", 0xFFFFD700, 0xFF3D2A1C, 0xFF634226, 0xFFA66D38, font.width(harmonizeTxt) + 12, 22, btn -> performAutoRatio(true, false)));
-            return;
-        }
-        String ratioTxt = isFractionalDefault
-                ? "§b⚡ " + Component.translatable("gui.gtcalcboard.auto_ratio_fractional").getString()
-                : "⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString();
-        int color = isFractionalDefault ? 0xFF38BDF8 : 0xFFCCCCCC;
-        int bg = isFractionalDefault ? 0xFF0C4A6E : 0xFF282E3B;
-        int hbg = isFractionalDefault ? 0xFF075985 : 0xFF3E475A;
-        int border = isFractionalDefault ? 0xFF0284C7 : 0xFF3D4455;
-        list.add(new ToolbarButtonDef("auto_ratio", ratioTxt, isFractionalDefault ? "⚡" : "⚖", color, bg, hbg, border, font.width(ratioTxt) + 12, 22, btn -> performAutoRatio(false, isFractionalDefault)));
-    }
-
-    private void addUtilityAndToggleButtons(List<ToolbarButtonDef> list, Font font) {
-        BoardManager bm = BoardManager.getInstance();
-        String balanceTxt = "§b§l∑ " + Component.translatable("gui.gtcalcboard.global_balance").getString();
-        list.add(new ToolbarButtonDef("global_balance", balanceTxt, "∑", 0xFF66E5FF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(balanceTxt) + 12, 22, btn -> {
-            if (screen.getGlobalBalanceDialog() != null) {
-                screen.getGlobalBalanceDialog().open();
-            }
-        }));
-
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported() && bm.isShowMultiblockBomButton()) {
-            String bomTxt = "§6▦ " + Component.translatable("gui.gtcalcboard.bom").getString();
-            list.add(new ToolbarButtonDef("multiblock_bom", bomTxt, "▦", 0xFFFFCC66, 0xFF352B1C, 0xFF4D3D28, 0xFF665035, font.width(bomTxt) + 12, 22, btn -> {
-                if (screen.getMultiblockBOMDialog() != null) {
-                    screen.getMultiblockBOMDialog().open();
-                }
-            }));
-        }
-
-        if (bm.isShowTimeUnitButton()) {
-            com.gtceu.calcboard.api.type.RateTimeUnit curUnit = FormatUtil.getActiveTimeUnit();
-            String unitTxt = "§e⏱ " + curUnit.getSuffix() + " ▼";
-            String compactUnit = "⏱" + curUnit.getSuffix();
-            int compactW = font.width(compactUnit) + 8;
-            list.add(new ToolbarButtonDef("time_unit", unitTxt, compactUnit, 0xFFFFF176, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(unitTxt) + 12, compactW, btn -> {
-                com.gtceu.calcboard.api.type.RateTimeUnit next = curUnit.next();
-                FormatUtil.setActiveTimeUnit(next);
-                BoardManager.getInstance().setTimeUnit(next);
-                BoardManager.getInstance().saveForCurrentContext();
-                BoardToast.show(Component.literal("§e⏱ ").append(
-                    Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), Component.translatable(next.getTranslationKey()).getString())
-                ));
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-                );
-                screen.markSummaryDirty();
-            }));
-        }
-
-        if (bm.isShowFluidUnitButton()) {
-            com.gtceu.calcboard.api.type.FluidUnitMode curFluidMode = FormatUtil.getActiveFluidUnitMode();
-            String fluidTxt = "§b~ " + curFluidMode.getLabel() + " ▼";
-            String compactFluid = "~" + curFluidMode.getLabel();
-            int compactW = font.width(compactFluid) + 8;
-            list.add(new ToolbarButtonDef("fluid_unit", fluidTxt, compactFluid, 0xFF66E5FF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(fluidTxt) + 12, compactW, btn -> {
-                com.gtceu.calcboard.api.type.FluidUnitMode next = curFluidMode.next();
-                FormatUtil.setActiveFluidUnitMode(next);
-                BoardManager.getInstance().setFluidUnitMode(next);
-                BoardManager.getInstance().saveForCurrentContext();
-                BoardToast.show(Component.literal("§b~ ").append(
-                    Component.translatable("gui.gtcalcboard.toast.fluid_unit_changed", Component.translatable(next.getTranslationKey()).getString())
-                ));
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-                );
-                screen.markSummaryDirty();
-            }));
-        }
-
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isAe2Loaded()) {
-            BoardPage activePage = bm.getActivePage();
-            boolean isBound = activePage != null && com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance().isPageBound(activePage.getId());
-            String ae2Txt = isBound ? "§b⚡ " + Component.translatable("gui.gtcalcboard.ae2.btn_bound").getString()
-                                    : "§7⚡ " + Component.translatable("gui.gtcalcboard.ae2.btn_bind").getString();
-            int ae2Bg = isBound ? 0xFF0C4A6E : 0xFF282E3B;
-            int ae2Hover = isBound ? 0xFF075985 : 0xFF3E475A;
-            int ae2Border = isBound ? 0xFF0284C7 : 0xFF3D4455;
-            list.add(new ToolbarButtonDef("ae2_bind", ae2Txt, "⚡", isBound ? 0xFF38BDF8 : 0xFFCCCCCC, ae2Bg, ae2Hover, ae2Border, font.width(ae2Txt) + 12, 22, btn -> {
-                if (screen.getPatternBindingDialog() != null) {
-                    screen.getPatternBindingDialog().open(activePage);
-                }
-            }));
-        }
-    }
-
-    private void addIoButtons(List<ToolbarButtonDef> list, Font font) {
-        String shareTxt = "» " + Component.translatable("gui.gtcalcboard.export").getString();
-        list.add(new ToolbarButtonDef("export", shareTxt, "»", 0xFF66DDFF, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(shareTxt) + 12, 22, btn -> copyBlueprintToClipboard()));
-
-        String importTxt = "« " + Component.translatable("gui.gtcalcboard.import").getString();
-        list.add(new ToolbarButtonDef("import", importTxt, "«", 0xFF66FF88, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(importTxt) + 12, 22, btn -> importBlueprintFromClipboard()));
-    }
-
-    private void addTeamCollaborationButtons(List<ToolbarButtonDef> list, Font font) {
-        com.gtceu.calcboard.client.team.ClientWorkspaceState state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
-        if (state.isTeamMode()) {
-            String activePageId = state.getActiveTeamPageId();
-            boolean hasLock = state.doesHoldLock(activePageId);
-
-            if (hasLock) {
-                String cancelTxt = "§c✕ " + Component.translatable("gui.gtcalcboard.btn_cancel_edit").getString();
-                list.add(new ToolbarButtonDef("cancel_edit", cancelTxt, "✕", 0xFFFF6B6B, 0xFF3D1C1C, 0xFF5A2A2A, 0xFF773B3B, font.width(cancelTxt) + 12, 22, btn -> {
-                    state.autoCommitAndRelease(screen, activePageId);
-                    screen.rebuildWidgets();
-                    screen.markSummaryDirty();
-                }));
-            }
-
-            String copyTxt = "§b» " + Component.translatable("gui.gtcalcboard.btn_copy_to_personal").getString();
-            list.add(new ToolbarButtonDef("copy_to_personal", copyTxt, "»", 0xFF66DDFF, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(copyTxt) + 12, 22, btn -> {
-                BoardManager bmInstance = BoardManager.getInstance();
-                com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage(activePageId);
-                String pageTitle = (remotePage != null && remotePage.getTitle() != null && !remotePage.getTitle().trim().isEmpty())
-                    ? remotePage.getTitle() : "Team Page";
-                com.gtceu.calcboard.api.storage.BoardPage newPage = new com.gtceu.calcboard.api.storage.BoardPage(pageTitle);
-                FlowGraph copiedGraph = screen.getGraph().copy();
-                for (RecipeNode n : copiedGraph.getNodes()) {
-                    newPage.getGraph().addNode(n);
-                }
-                for (FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
-                    newPage.getGraph().getConnections().add(e);
-                }
-                bmInstance.addPage(newPage);
-                bmInstance.setActivePageIndex(bmInstance.getPages().size() - 1);
-                state.setCurrentMode(com.gtceu.calcboard.client.team.ClientWorkspaceState.WorkspaceMode.LOCAL);
-                screen.rebuildWidgets();
-                screen.markSummaryDirty();
-                BoardToast.show("gui.gtcalcboard.toast.copied_to_personal", pageTitle);
-            }));
-
-            String historyTxt = "§f⟲ " + Component.translatable("gui.gtcalcboard.btn_recent_saves").getString();
-            list.add(new ToolbarButtonDef("recent_saves", historyTxt, "⟲", 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(historyTxt) + 12, 22, btn -> {
-                if (screen.getRecentSavesDialog() != null) {
-                    screen.getRecentSavesDialog().open();
-                }
-            }));
-        } else if (state.isCollaborationEnabled()) {
-            String exportTeamTxt = "§a» " + Component.translatable("gui.gtcalcboard.btn_export_to_team").getString();
-            list.add(new ToolbarButtonDef("export_to_team", exportTeamTxt, "»", 0xFF55FF88, 0xFF1C3D26, 0xFF2A5A38, 0xFF3B774E, font.width(exportTeamTxt) + 12, 22, btn -> {
-                if (screen.getExportToTeamDialog() != null) {
-                    screen.getExportToTeamDialog().open();
-                }
-            }));
-        }
-    }
-
-    private void addSystemButtons(List<ToolbarButtonDef> list, Font font) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.hasSingleplayerServer()) {
-            boolean isPaused = BoardManager.getInstance().isPauseGameInSingleplayer();
-            String pauseTxt = isPaused
-                    ? "§b⏸ " + Component.translatable("gui.gtcalcboard.btn_pause_on").getString()
-                    : "§7▶ " + Component.translatable("gui.gtcalcboard.btn_pause_off").getString();
-            int pauseBg = isPaused ? 0xFF1C2C44 : 0xFF222630;
-            int pauseBorder = isPaused ? 0xFF355580 : 0xFF3D4455;
-            list.add(new ToolbarButtonDef("pause_toggle", pauseTxt, isPaused ? "⏸" : "▶", isPaused ? 0xFF66DDFF : 0xFFAAAAAA, pauseBg, pauseBg + 0x00151515, pauseBorder, font.width(pauseTxt) + 12, 22, btn -> {
-                boolean nextVal = !BoardManager.getInstance().isPauseGameInSingleplayer();
-                BoardManager.getInstance().setPauseGameInSingleplayer(nextVal);
-                screen.rebuildWidgets();
-                screen.markSummaryDirty();
-                String statusStr = nextVal ? "ON" : "OFF";
-                BoardToast.show(Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.toast.pause_toggle_hint", statusStr)));
-            }));
-        }
+        return activeDropdown != DropdownMenu.NONE;
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -329,242 +78,496 @@ public class ToolbarWidget {
         Font font = Minecraft.getInstance().font;
         int width = screen.width;
 
-        int tbX = screen.getDynamicLeftMargin();
-        int tbY = screen.getToolbarY();
-        int tbH = 18;
-        int tbW = Math.max(120, width - tbX - 8 - MINIMAP_PADDING);
+        this.tbX = screen.getDynamicLeftMargin();
+        this.tbY = screen.getToolbarY();
+        this.tbW = Math.max(200, width - tbX - 8);
 
-        // Adaptive Title Text
-        String titleStr;
-        if (width >= 560) {
-            titleStr = "§6" + Component.translatable("gui.gtcalcboard.title").getString() + " §7⚙";
-        } else if (width >= 420) {
-            titleStr = "§6" + Component.translatable("gui.gtcalcboard.title_short").getString() + " §7⚙";
-        } else {
-            titleStr = "§6⚙ §7⚙";
+        renderBarBackground(graphics, tbX, tbY, tbW, tbH);
+        renderLeftHeaderGroup(graphics, font, mouseX, mouseY);
+        renderRightHeaderGroup(graphics, font, mouseX, mouseY);
+        updateHoverDropdown(mouseX, mouseY);
+        renderActiveDropdownPopup(graphics, font, mouseX, mouseY);
+
+        graphics.pose().popPose();
+    }
+
+    private void renderBarBackground(GuiGraphics graphics, int x, int y, int w, int h) {
+        graphics.fill(x, y, x + w, y + h, 0xF50F172A);
+        graphics.renderOutline(x, y, w, h, 0xFF1E293B);
+    }
+
+    private void renderLeftHeaderGroup(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        int curX = tbX + 2;
+
+        curX = renderSettingsButton(graphics, font, curX, mouseX, mouseY);
+        curX = renderPageTitleButton(graphics, font, curX, mouseX, mouseY);
+        curX = renderSeparator(graphics, curX);
+        curX = renderSearchButton(graphics, font, curX, mouseX, mouseY);
+        curX = renderOptimizeButton(graphics, font, curX, mouseX, mouseY);
+        curX = renderViewButton(graphics, font, curX, mouseX, mouseY);
+        curX = renderIoButton(graphics, font, curX, mouseX, mouseY);
+        renderGuideButton(graphics, font, curX, mouseX, mouseY);
+    }
+
+    private int renderSettingsButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        this.settingsBtnX = x;
+        this.settingsBtnW = 18;
+        boolean hovered = isHovered(mouseX, mouseY, settingsBtnX, settingsBtnW);
+
+        graphics.fill(settingsBtnX, tbY + 1, settingsBtnX + settingsBtnW, tbY + tbH - 1, hovered ? 0xFF334155 : 0xFF1E293B);
+        graphics.renderOutline(settingsBtnX, tbY + 1, settingsBtnW, tbH - 2, hovered ? 0xFFF59E0B : 0xFF334155);
+        graphics.drawCenteredString(font, "⚙", settingsBtnX + settingsBtnW / 2, tbY + 5, 0xFFF59E0B);
+
+        return settingsBtnX + settingsBtnW + 4;
+    }
+
+    private int renderPageTitleButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        BoardPage activePage = BoardManager.getInstance().getActivePage();
+        String title = (activePage != null && activePage.getName() != null && !activePage.getName().isEmpty())
+                ? activePage.getName() : "Untitled Page";
+        String pageTxt = font.plainSubstrByWidth(title, 120) + " ▼";
+
+        this.pageBtnX = x;
+        this.pageBtnW = font.width(pageTxt) + 10;
+        boolean hovered = isHovered(mouseX, mouseY, pageBtnX, pageBtnW);
+
+        if (hovered) {
+            graphics.fill(pageBtnX, tbY + 1, pageBtnX + pageBtnW, tbY + tbH - 1, 0xFF1E293B);
+            graphics.renderOutline(pageBtnX, tbY + 1, pageBtnW, tbH - 2, 0xFF38BDF8);
         }
-        int titleRight = tbX + 6 + font.width(titleStr) + 8;
+        graphics.drawString(font, pageTxt, pageBtnX + 5, tbY + 5, hovered ? 0xFFFFFFFF : 0xFFE2E8F0, false);
 
-        this.cachedTbX = tbX;
-        this.cachedTbY = tbY;
-        this.cachedTitleRight = titleRight;
+        return pageBtnX + pageBtnW + 4;
+    }
 
-        // Layout mode determination
-        ToolbarDisplayMode prefMode = BoardManager.getInstance().getToolbarDisplayMode();
-        List<ToolbarButtonDef> allButtons = buildButtons(font);
-        int totalFullW = 0;
-        for (ToolbarButtonDef btn : allButtons) {
-            totalFullW += btn.width + 3;
-        }
-        int availBtnAreaW = Math.max(0, (tbX + tbW) - titleRight - 4);
+    private int renderSeparator(GuiGraphics graphics, int x) {
+        graphics.fill(x, tbY + 3, x + 1, tbY + tbH - 3, 0xFF334155);
+        return x + 5;
+    }
 
-        if (prefMode == ToolbarDisplayMode.FULL) {
-            this.isCompactMode = false;
-        } else if (prefMode == ToolbarDisplayMode.COMPACT) {
-            this.isCompactMode = true;
-        } else {
-            this.isCompactMode = (totalFullW > availBtnAreaW);
-        }
+    private int renderSearchButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        String label = "🔍 " + Component.translatable("gui.gtcalcboard.search").getString();
+        this.searchBtnX = x;
+        this.searchBtnW = font.width(label) + 10;
+        boolean hovered = isHovered(mouseX, mouseY, searchBtnX, searchBtnW);
 
-        visibleButtons.clear();
-        overflowButtons.clear();
+        graphics.fill(searchBtnX, tbY + 1, searchBtnX + searchBtnW, tbY + tbH - 1, hovered ? 0xFF0C4A6E : 0xFF0F172A);
+        graphics.renderOutline(searchBtnX, tbY + 1, searchBtnW, tbH - 2, hovered ? 0xFF38BDF8 : 0xFF1E293B);
+        graphics.drawString(font, label, searchBtnX + 5, tbY + 5, hovered ? 0xFFFFFFFF : 0xFF38BDF8, false);
 
-        int totalRequiredW = 0;
-        for (ToolbarButtonDef btn : allButtons) {
-            totalRequiredW += (isCompactMode ? btn.compactWidth : btn.width) + 3;
-        }
+        return searchBtnX + searchBtnW + 3;
+    }
 
-        if (totalRequiredW <= availBtnAreaW) {
-            visibleButtons.addAll(allButtons);
-        } else {
-            int budget = availBtnAreaW - overflowBtnW - 4;
-            int currentUsed = 0;
-            for (ToolbarButtonDef btn : allButtons) {
-                int w = (isCompactMode ? btn.compactWidth : btn.width) + 3;
-                if (currentUsed + w <= budget) {
-                    visibleButtons.add(btn);
-                    currentUsed += w;
-                } else {
-                    overflowButtons.add(btn);
-                }
+    private int renderOptimizeButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        String label = Component.translatable("gui.gtcalcboard.toolbar.group_optimize").getString() + " ▼";
+        this.optimizeBtnX = x;
+        this.optimizeBtnW = font.width(label) + 10;
+        boolean hovered = isHovered(mouseX, mouseY, optimizeBtnX, optimizeBtnW) || activeDropdown == DropdownMenu.OPTIMIZE;
+
+        graphics.fill(optimizeBtnX, tbY + 1, optimizeBtnX + optimizeBtnW, tbY + tbH - 1, hovered ? 0xFF1E293B : 0xFF0F172A);
+        graphics.renderOutline(optimizeBtnX, tbY + 1, optimizeBtnW, tbH - 2, hovered ? 0xFF38BDF8 : 0xFF1E293B);
+        graphics.drawString(font, label, optimizeBtnX + 5, tbY + 5, hovered ? 0xFFFFFFFF : 0xFFCBD5E1, false);
+
+        return optimizeBtnX + optimizeBtnW + 3;
+    }
+
+    private int renderViewButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        String label = Component.translatable("gui.gtcalcboard.toolbar.group_view").getString() + " ▼";
+        this.viewBtnX = x;
+        this.viewBtnW = font.width(label) + 10;
+        boolean hovered = isHovered(mouseX, mouseY, viewBtnX, viewBtnW) || activeDropdown == DropdownMenu.VIEW;
+
+        graphics.fill(viewBtnX, tbY + 1, viewBtnX + viewBtnW, tbY + tbH - 1, hovered ? 0xFF1E293B : 0xFF0F172A);
+        graphics.renderOutline(viewBtnX, tbY + 1, viewBtnW, tbH - 2, hovered ? 0xFF38BDF8 : 0xFF1E293B);
+        graphics.drawString(font, label, viewBtnX + 5, tbY + 5, hovered ? 0xFFFFFFFF : 0xFFCBD5E1, false);
+
+        return viewBtnX + viewBtnW + 3;
+    }
+
+    private int renderIoButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        String label = Component.translatable("gui.gtcalcboard.toolbar.group_share").getString() + " ▼";
+        this.ioBtnX = x;
+        this.ioBtnW = font.width(label) + 10;
+        boolean hovered = isHovered(mouseX, mouseY, ioBtnX, ioBtnW) || activeDropdown == DropdownMenu.IO;
+
+        graphics.fill(ioBtnX, tbY + 1, ioBtnX + ioBtnW, tbY + tbH - 1, hovered ? 0xFF1E293B : 0xFF0F172A);
+        graphics.renderOutline(ioBtnX, tbY + 1, ioBtnW, tbH - 2, hovered ? 0xFF38BDF8 : 0xFF1E293B);
+        graphics.drawString(font, label, ioBtnX + 5, tbY + 5, hovered ? 0xFFFFFFFF : 0xFFCBD5E1, false);
+
+        return ioBtnX + ioBtnW + 3;
+    }
+
+    private void renderGuideButton(GuiGraphics graphics, Font font, int x, int mouseX, int mouseY) {
+        String label = "? " + Component.translatable("gui.gtcalcboard.guide_btn").getString() + " ▼";
+        this.guideBtnX = x;
+        this.guideBtnW = font.width(label) + 10;
+        boolean hovered = isHovered(mouseX, mouseY, guideBtnX, guideBtnW) || activeDropdown == DropdownMenu.HELP;
+
+        graphics.fill(guideBtnX, tbY + 1, guideBtnX + guideBtnW, tbY + tbH - 1, hovered ? 0xFF1E293B : 0xFF0F172A);
+        graphics.renderOutline(guideBtnX, tbY + 1, guideBtnW, tbH - 2, hovered ? 0xFF38BDF8 : 0xFF1E293B);
+        graphics.drawString(font, label, guideBtnX + 5, tbY + 5, hovered ? 0xFFFFFFFF : 0xFFCBD5E1, false);
+    }
+
+    private void renderRightHeaderGroup(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        int rightEdge = tbX + tbW - 2;
+
+        this.closeBtnX = rightEdge - 18;
+        this.closeBtnW = 18;
+        boolean closeHover = isHovered(mouseX, mouseY, closeBtnX, closeBtnW);
+        graphics.fill(closeBtnX, tbY + 1, closeBtnX + closeBtnW, tbY + tbH - 1, closeHover ? 0xFF7F1D1D : 0xFF1E293B);
+        graphics.renderOutline(closeBtnX, tbY + 1, closeBtnW, tbH - 2, closeHover ? 0xFFEF4444 : 0xFF334155);
+        graphics.drawCenteredString(font, "✕", closeBtnX + closeBtnW / 2, tbY + 5, closeHover ? 0xFFFFFFFF : 0xFF94A3B8);
+
+        int sepX = closeBtnX - 5;
+        graphics.fill(sepX, tbY + 3, sepX + 1, tbY + tbH - 3, 0xFF334155);
+
+        this.redoBtnX = sepX - 20;
+        this.redoBtnW = 18;
+        boolean redoHover = isHovered(mouseX, mouseY, redoBtnX, redoBtnW);
+        graphics.fill(redoBtnX, tbY + 1, redoBtnX + redoBtnW, tbY + tbH - 1, redoHover ? 0xFF334155 : 0xFF1E293B);
+        graphics.renderOutline(redoBtnX, tbY + 1, redoBtnW, tbH - 2, redoHover ? 0xFF38BDF8 : 0xFF334155);
+        graphics.drawCenteredString(font, "↷", redoBtnX + redoBtnW / 2, tbY + 5, redoHover ? 0xFFFFFFFF : 0xFF94A3B8);
+
+        this.undoBtnX = redoBtnX - 20;
+        this.undoBtnW = 18;
+        boolean undoHover = isHovered(mouseX, mouseY, undoBtnX, undoBtnW);
+        graphics.fill(undoBtnX, tbY + 1, undoBtnX + undoBtnW, tbY + tbH - 1, undoHover ? 0xFF334155 : 0xFF1E293B);
+        graphics.renderOutline(undoBtnX, tbY + 1, undoBtnW, tbH - 2, undoHover ? 0xFF38BDF8 : 0xFF334155);
+        graphics.drawCenteredString(font, "↶", undoBtnX + undoBtnW / 2, tbY + 5, undoHover ? 0xFFFFFFFF : 0xFF94A3B8);
+    }
+
+    private void renderActiveDropdownPopup(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        if (activeDropdown == DropdownMenu.NONE || currentDropdownItems.isEmpty()) return;
+
+        buildCurrentDropdownItems();
+        int popupH = currentDropdownItems.size() * 18 + 4;
+        int px = Math.min(dropdownX, screen.width - dropdownW - 8);
+        int py = tbY + tbH + 2;
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 420.0f);
+
+        graphics.fill(px, py, px + dropdownW, py + popupH, 0xF80F172A);
+        graphics.renderOutline(px, py, dropdownW, popupH, 0xFF334155);
+
+        for (int i = 0; i < currentDropdownItems.size(); i++) {
+            DropdownItem it = currentDropdownItems.get(i);
+            int rowY = py + 2 + i * 18;
+            boolean hovered = mouseX >= px + 2 && mouseX <= px + dropdownW - 2 && mouseY >= rowY && mouseY <= rowY + 18;
+
+            if (hovered) {
+                graphics.fill(px + 2, rowY, px + dropdownW - 2, rowY + 18, 0xFF1E293B);
             }
-        }
+            graphics.drawString(font, it.label(), px + 6, rowY + 5, hovered ? 0xFFFFFFFF : 0xFFCBD5E1, false);
 
-        int visibleButtonsW = 0;
-        for (ToolbarButtonDef btn : visibleButtons) {
-            visibleButtonsW += (isCompactMode ? btn.compactWidth : btn.width) + 3;
-        }
-        if (!overflowButtons.isEmpty()) {
-            visibleButtonsW += overflowBtnW + 3;
-        }
-        int actualToolbarW = Math.min(tbW, (titleRight - tbX) + visibleButtonsW + 4);
-        this.cachedActualW = actualToolbarW;
-
-        // Toolbar background
-        graphics.fill(tbX, tbY, tbX + actualToolbarW, tbY + tbH, 0xEE1E222B);
-        graphics.renderOutline(tbX, tbY, actualToolbarW, tbH, 0xFF3D4455);
-
-        // Fixed clickable title & settings gear on the left
-        isTitleHovered = mouseX >= tbX + 2 && mouseX <= titleRight - 2 && mouseY >= tbY && mouseY <= tbY + tbH;
-        if (isTitleHovered) {
-            graphics.fill(tbX + 2, tbY + 1, titleRight - 2, tbY + tbH - 1, 0xFF2A364D);
-            graphics.renderOutline(tbX + 2, tbY + 1, (titleRight - 4) - tbX, tbH - 2, 0xFF5B9BD5);
-            graphics.drawString(font, titleStr.replace("§7", "§b"), tbX + 6, tbY + 5, 0xFFFFFFFF, false);
-        } else {
-            graphics.drawString(font, titleStr, tbX + 6, tbY + 5, 0xFFFFFFFF, false);
-        }
-
-        // Render visible buttons
-        hoveredBtn = null;
-        int curX = titleRight;
-        for (ToolbarButtonDef btn : visibleButtons) {
-            int bw = isCompactMode ? btn.compactWidth : btn.width;
-            String label = isCompactMode ? btn.icon : btn.text;
-            boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isToolbarButtonGlowing(btn.id);
-            drawBtn(graphics, font, label, curX, tbY + 1, bw, 16, mouseX, mouseY, btn.color, btn.bg, btn.hoverBg, btn.border, isGlowing);
-            if (mouseX >= curX && mouseX <= curX + bw && mouseY >= tbY + 1 && mouseY <= tbY + 17) {
-                hoveredBtn = btn;
-            }
-            curX += bw + 3;
-        }
-
-        // Render overflow button [···] if some buttons didn't fit
-        boolean overflowHover = false;
-        if (!overflowButtons.isEmpty()) {
-            overflowBtnX = curX;
-            overflowBtnY = tbY + 1;
-            overflowHover = mouseX >= overflowBtnX && mouseX <= overflowBtnX + overflowBtnW && mouseY >= overflowBtnY && mouseY <= overflowBtnY + 16;
-            int ofBg = overflowMenuOpen ? 0xFF3D4A66 : (overflowHover ? 0xFF353D4E : 0xFF282E3B);
-            int ofBorder = overflowMenuOpen ? 0xFF5B9BD5 : (overflowHover ? 0xFF4F5B73 : 0xFF3D4455);
-            drawBtn(graphics, font, "···", overflowBtnX, overflowBtnY, overflowBtnW, 16, mouseX, mouseY, 0xFFE0E0E0, ofBg, ofBg, ofBorder, false);
-        }
-
-        // Render floating dropdown popup menu if open
-        if (overflowMenuOpen && !overflowButtons.isEmpty()) {
-            lastMenuW = 160;
-            int rowH = 18;
-            lastMenuH = overflowButtons.size() * rowH + 4;
-            lastMenuX = Math.max(8, Math.min(overflowBtnX, width - lastMenuW - 8));
-            lastMenuY = tbY + tbH + 2;
-
-            graphics.fill(lastMenuX, lastMenuY, lastMenuX + lastMenuW, lastMenuY + lastMenuH, 0xF5141720);
-            graphics.renderOutline(lastMenuX, lastMenuY, lastMenuW, lastMenuH, 0xFF4A556B);
-
-            for (int i = 0; i < overflowButtons.size(); i++) {
-                ToolbarButtonDef btn = overflowButtons.get(i);
-                int rowY = lastMenuY + 2 + i * rowH;
-                boolean rowHover = mouseX >= lastMenuX + 2 && mouseX <= lastMenuX + lastMenuW - 2 && mouseY >= rowY && mouseY <= rowY + rowH;
-                if (rowHover) {
-                    graphics.fill(lastMenuX + 2, rowY, lastMenuX + lastMenuW - 2, rowY + rowH, 0xFF2A364D);
-                }
-                graphics.drawString(font, btn.text, lastMenuX + 6, rowY + 5, rowHover ? 0xFFFFFFFF : btn.color, false);
+            if (it.shortcut() != null) {
+                int scW = font.width(it.shortcut());
+                graphics.drawString(font, it.shortcut(), px + dropdownW - scW - 6, rowY + 5, 0xFF64748B, false);
             }
         }
 
         graphics.pose().popPose();
+    }
 
-        // Tooltips
-        if (hoveredBtn != null) {
-            String tooltipKey = "gui.gtcalcboard.tooltip.btn_" + hoveredBtn.id;
-            String raw = Component.translatable(tooltipKey).getString();
-            if (raw.contains("\n")) {
-                List<Component> lines = Arrays.stream(raw.split("\n"))
-                        .<Component>map(Component::literal)
-                        .toList();
-                BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
-            } else {
-                BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable(tooltipKey), mouseX, mouseY, screen.width, screen.height);
-            }
-        } else if (isTitleHovered) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.tooltip.open_settings"), mouseX, mouseY, screen.width, screen.height);
-        } else if (overflowHover && !overflowMenuOpen) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.toolbar.more"), mouseX, mouseY, screen.width, screen.height);
+    private void buildCurrentDropdownItems() {
+        currentDropdownItems.clear();
+        if (activeDropdown == DropdownMenu.OPTIMIZE) {
+            populateOptimizeDropdown();
+        } else if (activeDropdown == DropdownMenu.VIEW) {
+            populateViewDropdown();
+        } else if (activeDropdown == DropdownMenu.IO) {
+            populateIoDropdown();
+        } else if (activeDropdown == DropdownMenu.HELP) {
+            populateHelpDropdown();
+        }
+        adjustDropdownWidth();
+    }
+
+    private void adjustDropdownWidth() {
+        Font font = Minecraft.getInstance().font;
+        int maxW = 160;
+        for (DropdownItem it : currentDropdownItems) {
+            int labelW = font.width(it.label());
+            int scW = (it.shortcut() != null) ? font.width(it.shortcut()) + 16 : 0;
+            maxW = Math.max(maxW, labelW + scW + 20);
+        }
+        this.dropdownW = maxW;
+    }
+
+    private void populateOptimizeDropdown() {
+        currentDropdownItems.add(new DropdownItem("↔ " + Component.translatable("gui.gtcalcboard.auto_connect").getString(), "Shift+C", this::performAutoConnect));
+        currentDropdownItems.add(new DropdownItem("⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString(), "Alt+R", () -> performAutoRatio(false, false)));
+        currentDropdownItems.add(new DropdownItem("⚡ " + Component.translatable("gui.gtcalcboard.auto_ratio_fractional").getString(), "Shift+Alt+R", () -> performAutoRatio(false, true)));
+        currentDropdownItems.add(new DropdownItem("▲ " + Component.translatable("gui.gtcalcboard.max_flow").getString(), null, this::performMaxThroughputOptimization));
+    }
+
+    private void populateViewDropdown() {
+        currentDropdownItems.add(new DropdownItem("⌖ " + Component.translatable("gui.gtcalcboard.fit_view").getString(), "Home", screen::fitToView));
+
+        var timeUnit = FormatUtil.getActiveTimeUnit();
+        String timeLabel = "⏱ " + Component.translatable("gui.gtcalcboard.toolbar.time_unit").getString() + ": " + timeUnit.getSuffix();
+        currentDropdownItems.add(new DropdownItem(timeLabel, null, () -> {
+            var next = timeUnit.next();
+            FormatUtil.setActiveTimeUnit(next);
+            BoardManager.getInstance().setTimeUnit(next);
+            BoardManager.getInstance().saveForCurrentContext();
+            screen.markSummaryDirty();
+        }, true));
+
+        var fluidMode = FormatUtil.getActiveFluidUnitMode();
+        String fluidLabel = "~ " + Component.translatable("gui.gtcalcboard.toolbar.fluid_unit").getString() + ": " + fluidMode.getLabel();
+        currentDropdownItems.add(new DropdownItem(fluidLabel, null, () -> {
+            var next = fluidMode.next();
+            FormatUtil.setActiveFluidUnitMode(next);
+            BoardManager.getInstance().setFluidUnitMode(next);
+            BoardManager.getInstance().saveForCurrentContext();
+            screen.markSummaryDirty();
+        }, true));
+
+        String snapStatus = BoardManager.getInstance().isGridSnapEnabled() ? "ON" : "OFF";
+        String snapLabel = "▦ " + Component.translatable("gui.gtcalcboard.toolbar.grid_snap").getString() + ": " + snapStatus;
+        currentDropdownItems.add(new DropdownItem(snapLabel, null, () -> {
+            BoardManager.getInstance().setGridSnapEnabled(!BoardManager.getInstance().isGridSnapEnabled());
+            BoardManager.getInstance().saveForCurrentContext();
+        }, true));
+
+        String slimStatus = BoardManager.getInstance().isSlimCardMode() ? "ON" : "OFF";
+        String slimLabel = "□ " + Component.translatable("gui.gtcalcboard.toolbar.slim_card_mode").getString() + ": " + slimStatus;
+        currentDropdownItems.add(new DropdownItem(slimLabel, null, () -> {
+            BoardManager.getInstance().setSlimCardMode(!BoardManager.getInstance().isSlimCardMode());
+            BoardManager.getInstance().saveForCurrentContext();
+            screen.rebuildWidgets();
+            screen.markSummaryDirty();
+        }, true));
+    }
+
+    private void populateIoDropdown() {
+        currentDropdownItems.add(new DropdownItem("» " + Component.translatable("gui.gtcalcboard.export").getString(), "Ctrl+C", this::copyBlueprintToClipboard));
+        currentDropdownItems.add(new DropdownItem("« " + Component.translatable("gui.gtcalcboard.import").getString(), "Ctrl+V", this::importBlueprintFromClipboard));
+
+        if (ModCompatHelper.isAe2Loaded()) {
+            BoardPage activePage = BoardManager.getInstance().getActivePage();
+            String ae2Label = "⚡ " + Component.translatable("gui.gtcalcboard.ae2.btn_bind").getString();
+            currentDropdownItems.add(new DropdownItem(ae2Label, null, () -> {
+                if (screen.getPatternBindingDialog() != null) {
+                    screen.getPatternBindingDialog().open(activePage);
+                }
+            }));
+        }
+
+        var state = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        if (state.isCollaborationEnabled()) {
+            String teamLabel = "👥 " + Component.translatable("gui.gtcalcboard.btn_export_to_team").getString();
+            currentDropdownItems.add(new DropdownItem(teamLabel, null, () -> {
+                if (screen.getExportToTeamDialog() != null) {
+                    screen.getExportToTeamDialog().open();
+                }
+            }));
         }
     }
 
-    private void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int defaultTextColor, int bg, int hoverBg, int border, boolean isGlowing) {
-        boolean hover = mx >= bx && mx <= bx + bw && my >= by && my <= by + bh;
+    private void populateHelpDropdown() {
+        currentDropdownItems.add(new DropdownItem("📖 " + Component.translatable("gui.gtcalcboard.guide.modal_title").getString(), null, () -> {
+            if (screen.getGuideDialog() != null) {
+                screen.getGuideDialog().open();
+            }
+        }));
+        currentDropdownItems.add(new DropdownItem("▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString(), null, () -> {
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(screen);
+        }));
+        currentDropdownItems.add(new DropdownItem("✦ " + Component.translatable("gui.gtcalcboard.advanced_tutorial_btn").getString(), null, () -> {
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startAdvancedTutorial(screen);
+        }));
+        currentDropdownItems.add(new DropdownItem("⌨ " + Component.translatable("gui.gtcalcboard.activity_bar.help").getString(), "H", () -> {
+            if (screen.getHotkeyHudWidget() != null) {
+                screen.getHotkeyHudWidget().toggle();
+            }
+        }));
+    }
 
-        if (isGlowing) {
-            float glowTime = (System.currentTimeMillis() % 1500) / 1500.0f;
-            float glowAlpha = 0.5f + 0.5f * (float) Math.sin(glowTime * Math.PI * 2);
-            int glowColor = (int) (glowAlpha * 255) << 24 | 0x00FF88;
-            graphics.fill(bx - 2, by - 2, bx + bw + 2, by + bh + 2, glowColor & 0x4400FF88);
-            graphics.renderOutline(bx - 1, by - 1, bw + 2, bh + 2, glowColor);
-        }
-
-        graphics.fill(bx, by, bx + bw, by + bh, hover ? hoverBg : bg);
-        graphics.renderOutline(bx, by, bw, bh, hover ? 0xFF5B9BD5 : border);
-
-        int strW = font.width(text);
-        int tx = bx + (bw - strW) / 2;
-        int ty = by + (bh - 8) / 2;
-        graphics.drawString(font, text, tx, ty, (hover || isGlowing) ? 0xFFFFFFFF : defaultTextColor, false);
+    private boolean isHovered(double mouseX, double mouseY, int x, int width) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= tbY + 1 && mouseY <= tbY + tbH - 1;
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // 1. If overflow menu is open, handle clicks inside the popup
-        if (overflowMenuOpen && !overflowButtons.isEmpty()) {
-            if (mouseX >= lastMenuX && mouseX <= lastMenuX + lastMenuW && mouseY >= lastMenuY && mouseY <= lastMenuY + lastMenuH) {
-                int idx = (int) ((mouseY - lastMenuY - 2) / 18);
-                if (idx >= 0 && idx < overflowButtons.size()) {
-                    ToolbarButtonDef clicked = overflowButtons.get(idx);
-                    overflowMenuOpen = false;
-                    Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-                    );
-                    clicked.onClick.accept(button);
-                    return true;
-                }
-            } else if (mouseX >= overflowBtnX && mouseX <= overflowBtnX + overflowBtnW && mouseY >= overflowBtnY && mouseY <= overflowBtnY + 16) {
-                overflowMenuOpen = false;
-                Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-                );
-                return true;
-            } else {
-                overflowMenuOpen = false;
-            }
-        }
+        if (button != 0) return false;
 
-        // 2. Check overflow button click
-        if (!overflowButtons.isEmpty() && mouseX >= overflowBtnX && mouseX <= overflowBtnX + overflowBtnW && mouseY >= overflowBtnY && mouseY <= overflowBtnY + 16) {
-            overflowMenuOpen = !overflowMenuOpen;
-            Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-            );
+        if (handleDropdownPopupClick(mouseX, mouseY)) {
             return true;
         }
 
-        // 3. Check title / settings click
-        if (mouseX >= cachedTbX + 2 && mouseX <= cachedTitleRight - 2 && mouseY >= cachedTbY && mouseY <= cachedTbY + 18) {
+        if (handleLeftGroupClick(mouseX, mouseY)) {
+            return true;
+        }
+
+        if (handleRightGroupClick(mouseX, mouseY)) {
+            return true;
+        }
+
+        return isClickInsideBar(mouseX, mouseY);
+    }
+
+    private boolean handleDropdownPopupClick(double mouseX, double mouseY) {
+        if (activeDropdown == DropdownMenu.NONE || currentDropdownItems.isEmpty()) {
+            return false;
+        }
+
+        int popupH = currentDropdownItems.size() * 18 + 4;
+        int px = Math.min(dropdownX, screen.width - dropdownW - 8);
+        int py = tbY + tbH + 2;
+
+        if (mouseX < px || mouseX > px + dropdownW || mouseY < py || mouseY > py + popupH) {
+            activeDropdown = DropdownMenu.NONE;
+            return false;
+        }
+
+        int idx = (int) ((mouseY - py - 2) / 18);
+        if (idx < 0 || idx >= currentDropdownItems.size()) {
+            return true;
+        }
+
+        DropdownItem it = currentDropdownItems.get(idx);
+        if (!it.keepOpen()) {
+            activeDropdown = DropdownMenu.NONE;
+        }
+        playClickSound();
+        if (it.action() != null) {
+            it.action().run();
+        }
+        if (it.keepOpen()) {
+            buildCurrentDropdownItems();
+        }
+        return true;
+    }
+
+    private boolean handleLeftGroupClick(double mouseX, double mouseY) {
+        if (isHovered(mouseX, mouseY, settingsBtnX, settingsBtnW)) {
+            playClickSound();
             screen.openSettingsDialog();
-            Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-            );
             return true;
         }
-
-        // 4. Check visible buttons click
-        int curX = cachedTitleRight;
-        for (ToolbarButtonDef btn : visibleButtons) {
-            int bw = isCompactMode ? btn.compactWidth : btn.width;
-            if (mouseX >= curX && mouseX <= curX + bw && mouseY >= cachedTbY + 1 && mouseY <= cachedTbY + 17) {
-                Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
-                );
-                btn.onClick.accept(button);
-                return true;
+        if (isHovered(mouseX, mouseY, pageBtnX, pageBtnW)) {
+            playClickSound();
+            screen.openQuickPageSwitcher();
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, searchBtnX, searchBtnW)) {
+            playClickSound();
+            if (screen.getSearchDialog() != null) {
+                double[] center = screen.getScreenCenterCanvasPosition();
+                screen.getSearchDialog().openAt(center[0], center[1]);
             }
-            curX += bw + 3;
-        }
-
-        // 5. Absorb click within toolbar bounds
-        if (mouseX >= cachedTbX && mouseX <= cachedTbX + cachedActualW && mouseY >= cachedTbY && mouseY <= cachedTbY + 18) {
             return true;
         }
-
+        if (isHovered(mouseX, mouseY, optimizeBtnX, optimizeBtnW)) {
+            openDropdown(DropdownMenu.OPTIMIZE, optimizeBtnX, 170);
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, viewBtnX, viewBtnW)) {
+            openDropdown(DropdownMenu.VIEW, viewBtnX, 185);
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, ioBtnX, ioBtnW)) {
+            openDropdown(DropdownMenu.IO, ioBtnX, 175);
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, guideBtnX, guideBtnW)) {
+            openDropdown(DropdownMenu.HELP, guideBtnX, 195);
+            return true;
+        }
         return false;
+    }
+
+    private boolean handleRightGroupClick(double mouseX, double mouseY) {
+        if (isHovered(mouseX, mouseY, closeBtnX, closeBtnW)) {
+            playClickSound();
+            screen.onClose();
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, redoBtnX, redoBtnW)) {
+            playClickSound();
+            screen.redo();
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, undoBtnX, undoBtnW)) {
+            playClickSound();
+            screen.undo();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isClickInsideBar(double mouseX, double mouseY) {
+        return mouseX >= tbX && mouseX <= tbX + tbW && mouseY >= tbY && mouseY <= tbY + tbH;
+    }
+
+    private void updateHoverDropdown(int mouseX, int mouseY) {
+        if (isHovered(mouseX, mouseY, optimizeBtnX, optimizeBtnW)) {
+            openDropdown(DropdownMenu.OPTIMIZE, optimizeBtnX, 170);
+            return;
+        }
+        if (isHovered(mouseX, mouseY, viewBtnX, viewBtnW)) {
+            openDropdown(DropdownMenu.VIEW, viewBtnX, 185);
+            return;
+        }
+        if (isHovered(mouseX, mouseY, ioBtnX, ioBtnW)) {
+            openDropdown(DropdownMenu.IO, ioBtnX, 175);
+            return;
+        }
+        if (isHovered(mouseX, mouseY, guideBtnX, guideBtnW)) {
+            openDropdown(DropdownMenu.HELP, guideBtnX, 195);
+            return;
+        }
+
+        if (activeDropdown != DropdownMenu.NONE) {
+            int curBtnX = getActiveDropdownButtonX();
+            int curBtnW = getActiveDropdownButtonW();
+            boolean overBtn = mouseX >= curBtnX - 2 && mouseX <= curBtnX + curBtnW + 2 && mouseY >= tbY - 2 && mouseY <= tbY + tbH + 3;
+
+            int px = Math.min(dropdownX, screen.width - dropdownW - 8);
+            int py = tbY + tbH + 2;
+            int popupH = currentDropdownItems.size() * 18 + 4;
+            boolean overPopup = mouseX >= px - 4 && mouseX <= px + dropdownW + 4 && mouseY >= py - 4 && mouseY <= py + popupH + 4;
+
+            if (!overBtn && !overPopup) {
+                activeDropdown = DropdownMenu.NONE;
+            }
+        }
+    }
+
+    private void openDropdown(DropdownMenu menu, int btnX, int popupW) {
+        if (activeDropdown != menu) {
+            activeDropdown = menu;
+            dropdownX = btnX;
+            dropdownW = popupW;
+            buildCurrentDropdownItems();
+        }
+    }
+
+    private int getActiveDropdownButtonX() {
+        return switch (activeDropdown) {
+            case OPTIMIZE -> optimizeBtnX;
+            case VIEW -> viewBtnX;
+            case IO -> ioBtnX;
+            case HELP -> guideBtnX;
+            default -> 0;
+        };
+    }
+
+    private int getActiveDropdownButtonW() {
+        return switch (activeDropdown) {
+            case OPTIMIZE -> optimizeBtnW;
+            case VIEW -> viewBtnW;
+            case IO -> ioBtnW;
+            case HELP -> guideBtnW;
+            default -> 0;
+        };
+    }
+
+    private void playClickSound() {
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
+        );
     }
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {

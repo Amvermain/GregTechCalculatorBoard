@@ -92,6 +92,12 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Verify exact cycles per second: $\text{CPS} = 20.0 \times \text{BatchesPerTick} \times \text{Parallel} \times \text{MachineCount}$.
 - [ ] **Tier Chance Boost for Probabilistic Outputs**:
   - [ ] Verify boosted output chance on tier increase: $\text{Effective Chance} = \min(1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$.
+- [ ] **Input Consumption Chance & Tier Chance Boost (Including Reductions)**:
+  - [ ] Verify probabilistic input flow calculation: $\text{Rate} = \text{Amount} \times \text{EffectiveChance} \times \text{CPS}$.
+  - [ ] Verify signed tier chance boost: $\text{Effective Chance} = \text{clamp}(0.0, 1.0, \text{BaseChance} + (\Delta\text{Tier} \times \text{TierChanceBoost}))$.
+  - [ ] Verify Star Technology Cyclonic Sifter Netherite Mesh consumption rate at base ZPM ($3\% \rightarrow 0.0025\text{/s}$) and UV overclock ($2.8\% \rightarrow 0.00467\text{/s}$).
+  - [ ] Verify input port tooltip rendering of dynamic consumption chance and signed boost ($\%+.1f\%/\text{Tier}$).
+  - [ ] `InputConsumptionChanceTest` automated JUnit regression suite passes 100%.
 
 ### 2.2 Gauss-Jordan Mass Conservation Solver (`MassBalanceSolver`)
 - [ ] **Closed-Loop Linear Formulation ($A\mathbf{x} = \mathbf{b}$)**:

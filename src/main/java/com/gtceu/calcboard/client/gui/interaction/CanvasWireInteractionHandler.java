@@ -12,7 +12,7 @@ import com.gtceu.calcboard.client.gui.editor.NodeCountEditor;
 import com.gtceu.calcboard.client.gui.model.PortRef;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
-import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.api.event.FlowGraphEvent;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
@@ -217,7 +217,7 @@ public class CanvasWireInteractionHandler {
 
         screen.rebuildWidgets();
         screen.markSummaryDirty();
-        TutorialManager.getInstance().onJunctionInserted();
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.JunctionInserted(graph, clickedEdge, reroute));
         Minecraft.getInstance().getSoundManager().play(
                 SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
@@ -232,6 +232,7 @@ public class CanvasWireInteractionHandler {
         graph.getConnections().remove(cutEdge);
         screen.recordCommand(new BoardCommand.DisconnectWireCommand(cutEdge));
         notifyDisconnect("message.gtcalcboard.disconnect_wire", screen);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.WireDisconnected(graph, cutEdge));
         return true;
     }
 
@@ -383,7 +384,7 @@ public class CanvasWireInteractionHandler {
 
         screen.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, shiftDown ? toNode.getId() : null, oldMachineCount, newMachineCount));
         screen.markSummaryDirty();
-        TutorialManager.getInstance().onWireConnected(shiftDown);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.WireConnected(graph, newEdge, shiftDown));
     }
 
     private void handleReverseWireConnect(NodeWidget targetWidget, FlowGraph graph, int outPortIdx, BoardScreen screen) {
@@ -421,7 +422,7 @@ public class CanvasWireInteractionHandler {
 
         screen.recordCommand(new BoardCommand.ConnectWireCommand(newEdge, shiftDown ? fromNode.getId() : null, oldMachineCount, newMachineCount));
         screen.markSummaryDirty();
-        TutorialManager.getInstance().onWireConnected(shiftDown);
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new FlowGraphEvent.WireConnected(graph, newEdge, shiftDown));
     }
 
     private void bindRerouteStacks(RecipeNode fromNode, RecipeNode toNode, int outIdx, int inIdx) {
@@ -524,7 +525,6 @@ public class CanvasWireInteractionHandler {
 
     private void notifyDisconnect(String translatableKey, BoardScreen screen) {
         screen.markSummaryDirty();
-        TutorialManager.getInstance().onWireDisconnected();
         BoardToast.show(Component.literal("§c✕ ").append(Component.translatable(translatableKey)));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
     }

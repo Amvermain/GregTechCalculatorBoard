@@ -280,7 +280,8 @@ public class GraphSerializationTest {
         page2.getGraph().addNode(poly);
 
         BoardPage page3 = BoardPage.createDefault("Turbine Power Station");
-        RecipeNode turbine = RecipeNode.create("Gas Turbine", 20.0, 30000.0, GTVoltageTier.EV);
+        RecipeNode turbine = RecipeNode.create("Large Gas Turbine", 20.0, 30000.0, GTVoltageTier.EV);
+        turbine.setMultiblock(true);
         turbine.setGenerator(true);
         turbine.setMachineCount(1.0);
         page3.getGraph().addNode(turbine);

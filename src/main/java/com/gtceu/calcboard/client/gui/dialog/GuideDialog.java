@@ -119,6 +119,15 @@ public class GuideDialog {
         graphics.renderOutline(closeX, closeY, 16, 16, closeHover ? 0xFFFF4444 : 0xFF4A5A78);
         graphics.drawCenteredString(font, "✕", closeX + 8, closeY + 4, closeHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
+        String tutText = "▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
+        int tutBtnW = font.width(tutText) + 10;
+        int tutBtnX = closeX - tutBtnW - 6;
+        int tutBtnY = dialogY + 4;
+        boolean tutHover = mouseX >= tutBtnX && mouseX <= tutBtnX + tutBtnW && mouseY >= tutBtnY && mouseY <= tutBtnY + 16;
+        graphics.fill(tutBtnX, tutBtnY, tutBtnX + tutBtnW, tutBtnY + 16, tutHover ? 0xFF15803D : 0xFF14532D);
+        graphics.renderOutline(tutBtnX, tutBtnY, tutBtnW, 16, tutHover ? 0xFF22C55E : 0xFF166534);
+        graphics.drawString(font, tutText, tutBtnX + 5, tutBtnY + 4, tutHover ? 0xFFFFFFFF : 0xFF86EFAC, false);
+
         // 3. Left Sidebar Tabs
         int sidebarX = dialogX + 6;
         int sidebarY = dialogY + 28;
@@ -247,6 +256,16 @@ public class GuideDialog {
         int closeY = dialogY + 4;
         if (mouseX >= closeX && mouseX <= closeX + 16 && mouseY >= closeY && mouseY <= closeY + 16) {
             close();
+            return true;
+        }
+
+        String tutText = "▶ " + Component.translatable("gui.gtcalcboard.tutorial_btn").getString();
+        int tutBtnW = Minecraft.getInstance().font.width(tutText) + 10;
+        int tutBtnX = closeX - tutBtnW - 6;
+        int tutBtnY = dialogY + 4;
+        if (mouseX >= tutBtnX && mouseX <= tutBtnX + tutBtnW && mouseY >= tutBtnY && mouseY <= tutBtnY + 16) {
+            close();
+            com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().startTutorial(parent);
             return true;
         }
 

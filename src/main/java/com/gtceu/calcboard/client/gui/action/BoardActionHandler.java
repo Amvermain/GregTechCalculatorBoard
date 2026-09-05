@@ -216,6 +216,7 @@ public class BoardActionHandler {
         }
 
         graph.addFrame(frame);
+        screen.recordCommand(new BoardCommand.AddFramesCommand(frame, "Create Group Frame"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -241,6 +242,7 @@ public class BoardActionHandler {
         }
         frame.setSharedMachineFrame(true);
         graph.addFrame(frame);
+        screen.recordCommand(new BoardCommand.AddFramesCommand(frame, "Create Shared Machine Frame"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -259,6 +261,7 @@ public class BoardActionHandler {
         String defaultTitle = Component.translatable("gui.gtcalcboard.default_frame_name").getString();
         CanvasGroupFrame frame = new CanvasGroupFrame(UUID.randomUUID().toString(), defaultTitle, CanvasGroupFrame.COLOR_BLUE, canvasX - 100, canvasY - 60, 200, 120);
         screen.getGraph().addFrame(frame);
+        screen.recordCommand(new BoardCommand.AddFramesCommand(frame, "Create Group Frame"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -277,6 +280,7 @@ public class BoardActionHandler {
                 canvasX - 80, canvasY - 50
         );
         screen.getGraph().addStickyNote(note);
+        screen.recordCommand(new BoardCommand.AddStickyNotesCommand(note, "Create Sticky Note"));
         screen.clearSelection();
         screen.rebuildWidgets();
         screen.markSummaryDirty();

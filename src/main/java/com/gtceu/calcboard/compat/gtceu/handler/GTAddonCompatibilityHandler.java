@@ -16,6 +16,8 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import com.gtceu.calcboard.compat.gtceu.physics.GTTurbinePhysics;
+import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
 import com.gtceu.calcboard.compat.start.StarTTurbineHelper;
 import net.minecraft.network.chat.Component;
@@ -47,6 +49,9 @@ public final class GTAddonCompatibilityHandler {
 
     public static boolean supportsAddons(RecipeNode node) {
         if (node == null || node.getEnergyType() == EnergyType.NONE) return false;
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            return true;
+        }
         if (GTPowerCalculator.isBoilerRecipe(node)) {
             return node.isMultiblock();
         }
@@ -58,6 +63,15 @@ public final class GTAddonCompatibilityHandler {
 
     public static List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
         if (node == null) return List.of();
+
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            List<AddonCategory> cats = new ArrayList<>();
+            cats.add(AddonCategory.MULTIBLOCK_TRAIT);
+            cats.add(AddonCategory.MAINTENANCE);
+            cats.add(AddonCategory.HATCH_BUS);
+            cats.add(AddonCategory.CUSTOM);
+            return cats;
+        }
 
         if (GTPowerCalculator.isBoilerRecipe(node)) {
             if (node.isMultiblock()) {
@@ -169,6 +183,16 @@ public final class GTAddonCompatibilityHandler {
             }
             if (addon.getCategory() == AddonCategory.MULTIBLOCK_TRAIT && StarTTurbineHelper.isStarTTrait(addon)) {
                 return StarTTurbineHelper.isCompatibleStarTTrait(node, addon);
+            }
+            return false;
+        }
+
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            if (addon.getCategory() == AddonCategory.MAINTENANCE || addon.getCategory() == AddonCategory.HATCH_BUS) {
+                return true;
+            }
+            if (addon.getCategory() == AddonCategory.MULTIBLOCK_TRAIT) {
+                return isCombustionBoostCompatible(node, addon);
             }
             return false;
         }
@@ -570,6 +594,11 @@ public final class GTAddonCompatibilityHandler {
             updateNodeTierFromEnergyHatches(node);
             return;
         }
+        if (isCombustionBoostAddon(addon)) {
+            applyCombustionBoostInstallation(node, addon);
+            node.getAddons().add(addon);
+            return;
+        }
         if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
             node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
             node.getAddons().add(addon);
@@ -608,8 +637,106 @@ public final class GTAddonCompatibilityHandler {
             GTTurbinePhysics.autoCalculateTurbineParallel(node);
         } else if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
             node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
+            if (isCombustionBoostAddon(addon)) {
+                applyCombustionBoostRemoval(node, addon);
+            }
         }
         node.markOverclockDirty();
+    }
+
+    public static boolean isCombustionBoostAddon(MachineAddon addon) {
+        if (addon == null || addon.getId() == null) return false;
+        String id = addon.getId();
+        return "gtceu:oxygen_boost".equals(id)
+                || "gtceu:liquid_oxygen_boost".equals(id)
+                || isCoolantAddon(addon)
+                || isOxidizerAddon(addon);
+    }
+
+    private static boolean isCoolantAddon(MachineAddon addon) {
+        if (addon == null || addon.getId() == null) return false;
+        String id = addon.getId();
+        return "start_core:distilled_water_coolant".equals(id) || "start_core:deionized_water_coolant".equals(id);
+    }
+
+    private static boolean isOxidizerAddon(MachineAddon addon) {
+        if (addon == null || addon.getId() == null) return false;
+        String id = addon.getId();
+        return "start_core:t1_oxidizer_boost".equals(id)
+                || "start_core:t2_oxidizer_boost".equals(id)
+                || "start_core:t3_oxidizer_boost".equals(id)
+                || "start_core:t4_oxidizer_boost".equals(id);
+    }
+
+    private static boolean isCombustionBoostCompatible(RecipeNode node, MachineAddon addon) {
+        String id = addon.getId();
+        if (GTCombustionHelper.isLargeCombustionEngine(node)) {
+            return "gtceu:oxygen_boost".equals(id);
+        }
+        if (GTCombustionHelper.isExtremeCombustionEngine(node)) {
+            return "gtceu:liquid_oxygen_boost".equals(id);
+        }
+        if (GTCombustionHelper.isModularCombustionFrame(node)) {
+            return isCoolantAddon(addon);
+        }
+        if (GTCombustionHelper.START_T1_COMBUSTION.equals(node.getMachineIcon())) {
+            return "start_core:t1_oxidizer_boost".equals(id);
+        }
+        if (GTCombustionHelper.START_T2_COMBUSTION.equals(node.getMachineIcon())) {
+            return "start_core:t2_oxidizer_boost".equals(id);
+        }
+        if (GTCombustionHelper.START_T3_COMBUSTION.equals(node.getMachineIcon())) {
+            return "start_core:t3_oxidizer_boost".equals(id);
+        }
+        if (GTCombustionHelper.START_T4_COMBUSTION.equals(node.getMachineIcon())) {
+            return "start_core:t4_oxidizer_boost".equals(id);
+        }
+        return false;
+    }
+
+    private static void applyCombustionBoostInstallation(RecipeNode node, MachineAddon addon) {
+        String id = addon.getId();
+        if ("gtceu:oxygen_boost".equals(id)) {
+            node.getAddons().removeIf(a -> "gtceu:oxygen_boost".equals(a.getId()));
+            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, true);
+        } else if ("gtceu:liquid_oxygen_boost".equals(id)) {
+            node.getAddons().removeIf(a -> "gtceu:liquid_oxygen_boost".equals(a.getId()));
+            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, true);
+        } else if ("start_core:distilled_water_coolant".equals(id)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "distilled_water");
+        } else if ("start_core:deionized_water_coolant".equals(id)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "deionized_water");
+        } else if ("start_core:t1_oxidizer_boost".equals(id)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "white_fuming_nitric_acid");
+        } else if ("start_core:t2_oxidizer_boost".equals(id)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "red_fuming_nitric_acid");
+        } else if ("start_core:t3_oxidizer_boost".equals(id)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "dioxygen_difluoride");
+        } else if ("start_core:t4_oxidizer_boost".equals(id)) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "ferrocenium_superoxide");
+        }
+    }
+
+    private static void applyCombustionBoostRemoval(RecipeNode node, MachineAddon addon) {
+        String id = addon.getId();
+        if ("gtceu:oxygen_boost".equals(id)) {
+            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, false);
+        } else if ("gtceu:liquid_oxygen_boost".equals(id)) {
+            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, false);
+        } else if ("start_core:distilled_water_coolant".equals(id) || "start_core:deionized_water_coolant".equals(id)) {
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
+        } else if ("start_core:t1_oxidizer_boost".equals(id)
+                || "start_core:t2_oxidizer_boost".equals(id)
+                || "start_core:t3_oxidizer_boost".equals(id)
+                || "start_core:t4_oxidizer_boost".equals(id)) {
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "none");
+        }
     }
 
     public static void updateNodeTierFromEnergyHatches(RecipeNode node) {
