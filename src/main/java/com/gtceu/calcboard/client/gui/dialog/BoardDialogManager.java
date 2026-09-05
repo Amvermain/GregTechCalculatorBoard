@@ -45,6 +45,7 @@ public class BoardDialogManager {
     private AutoConnectFilterDialog autoConnectDialog;
     private PatternBindingDialog patternBindingDialog;
     private JunctionSupplyDialog junctionSupplyDialog;
+    private TargetOutputRateDialog targetOutputRateDialog;
 
     public BoardDialogManager(BoardScreen screen) {
         this.screen = screen;
@@ -74,6 +75,7 @@ public class BoardDialogManager {
         if (this.autoConnectDialog == null) this.autoConnectDialog = new AutoConnectFilterDialog(screen);
         if (this.patternBindingDialog == null) this.patternBindingDialog = new PatternBindingDialog(screen);
         if (this.junctionSupplyDialog == null) this.junctionSupplyDialog = new JunctionSupplyDialog(screen);
+        if (this.targetOutputRateDialog == null) this.targetOutputRateDialog = new TargetOutputRateDialog(screen);
     }
 
     public void markDirty() {
@@ -110,7 +112,8 @@ public class BoardDialogManager {
             || (noteEditDialog != null && noteEditDialog.isVisible())
             || (autoConnectDialog != null && autoConnectDialog.isVisible())
             || (patternBindingDialog != null && patternBindingDialog.isVisible())
-            || (junctionSupplyDialog != null && junctionSupplyDialog.isVisible());
+            || (junctionSupplyDialog != null && junctionSupplyDialog.isVisible())
+            || (targetOutputRateDialog != null && targetOutputRateDialog.isVisible());
     }
 
     public void renderModals(GuiGraphics graphics, int width, int height, int mouseX, int mouseY, float partialTicks) {
@@ -212,6 +215,10 @@ public class BoardDialogManager {
         }
         if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
             junctionSupplyDialog.render(graphics, width, height, mouseX, mouseY);
+            return;
+        }
+        if (targetOutputRateDialog != null && targetOutputRateDialog.isVisible()) {
+            targetOutputRateDialog.render(graphics, mouseX, mouseY);
         }
     }
 
@@ -290,6 +297,9 @@ public class BoardDialogManager {
         }
         if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
             return junctionSupplyDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (targetOutputRateDialog != null && targetOutputRateDialog.isVisible()) {
+            return targetOutputRateDialog.mouseClicked(mouseX, mouseY, button);
         }
         return false;
     }
@@ -436,6 +446,9 @@ public class BoardDialogManager {
         if (guideDialog != null && guideDialog.isVisible()) {
             return guideDialog.keyPressed(keyCode, scanCode, modifiers);
         }
+        if (targetOutputRateDialog != null && targetOutputRateDialog.isVisible()) {
+            return targetOutputRateDialog.keyPressed(keyCode, scanCode, modifiers);
+        }
         return false;
     }
 
@@ -484,6 +497,9 @@ public class BoardDialogManager {
         }
         if (junctionSupplyDialog != null && junctionSupplyDialog.isVisible()) {
             return junctionSupplyDialog.charTyped(codePoint, modifiers);
+        }
+        if (targetOutputRateDialog != null && targetOutputRateDialog.isVisible()) {
+            return targetOutputRateDialog.charTyped(codePoint, modifiers);
         }
         return false;
     }
@@ -669,7 +685,16 @@ public class BoardDialogManager {
     public FrameEditDialog getFrameEditDialog() { return frameEditDialog; }
     public NoteEditDialog getNoteEditDialog() { return noteEditDialog; }
     public BoardSettingsDialog getSettingsDialog() { return settingsDialog; }
+    public void openTargetOutputRateDialog(RecipeNode node, int outputIndex) {
+        if (!screen.ensureEditPermission() || node == null) return;
+        if (targetOutputRateDialog == null) {
+            targetOutputRateDialog = new TargetOutputRateDialog(screen);
+        }
+        targetOutputRateDialog.open(node, outputIndex);
+    }
+
     public AutoConnectFilterDialog getAutoConnectDialog() { return autoConnectDialog; }
     public PatternBindingDialog getPatternBindingDialog() { return patternBindingDialog; }
     public JunctionSupplyDialog getJunctionSupplyDialog() { return junctionSupplyDialog; }
+    public TargetOutputRateDialog getTargetOutputRateDialog() { return targetOutputRateDialog; }
 }

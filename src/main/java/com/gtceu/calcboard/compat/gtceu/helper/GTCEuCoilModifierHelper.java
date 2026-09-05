@@ -30,6 +30,7 @@ public final class GTCEuCoilModifierHelper {
         CRACKING_UNIT,
         CHEMICAL_REACTOR,
         MULTI_SMELTER,
+        LIQUEFACTION_TOWER,
         CUSTOM_COIL_MULTIBLOCK,
         GENERIC
     }
@@ -79,19 +80,34 @@ public final class GTCEuCoilModifierHelper {
             Object def = GTCEuReflectionBridge.getMachineDefinition(machineId);
             if (def == null) return inspectFallback(machineId);
 
+            Class<?> machineClass = extractMachineClass(def);
+            boolean isCoilCandidate = (machineClass != null && GTCEuReflectionBridge.isCoilWorkableClass(machineClass))
+                    || GTCEuReflectionBridge.isMultiblockDefinition(def);
+            if (!isCoilCandidate) {
+                return CoilMachineSpec.GENERIC;
+            }
+
             // 1. Inspect registered recipeModifiers function objects
             CoilMachineKind kindFromModifiers = inspectRecipeModifiers(def);
             if (kindFromModifiers != null && kindFromModifiers != CoilMachineKind.GENERIC) {
                 return new CoilMachineSpec(kindFromModifiers, CustomCoilMultiplier.DEFAULT);
             }
 
+            // 1.5. Inspect machine's registered RecipeTypes
+            CoilMachineKind kindFromRecipeTypes = inspectRecipeTypes(def);
+            if (kindFromRecipeTypes != null && kindFromRecipeTypes != CoilMachineKind.GENERIC) {
+                return new CoilMachineSpec(kindFromRecipeTypes, CustomCoilMultiplier.DEFAULT);
+            }
+
             // 2. Inspect MetaMachine class hierarchy
-            Class<?> machineClass = extractMachineClass(def);
             if (machineClass != null) {
                 CoilMachineKind kindFromClass = classifyByMachineClass(machineClass);
                 if (kindFromClass == CoilMachineKind.CUSTOM_COIL_MULTIBLOCK) {
                     CustomCoilMultiplier multiplier = extractCustomMultiplier(def, machineClass);
-                    return new CoilMachineSpec(CoilMachineKind.CUSTOM_COIL_MULTIBLOCK, multiplier);
+                    if (multiplier.durationMultiplier() > 0 || multiplier.energyMultiplier() > 0 || multiplier.parallelMultiplier() > 0) {
+                        return new CoilMachineSpec(CoilMachineKind.CUSTOM_COIL_MULTIBLOCK, multiplier);
+                    }
+                    return new CoilMachineSpec(CoilMachineKind.GENERIC, CustomCoilMultiplier.DEFAULT);
                 } else if (kindFromClass != CoilMachineKind.GENERIC) {
                     return new CoilMachineSpec(kindFromClass, CustomCoilMultiplier.DEFAULT);
                 }
@@ -114,18 +130,68 @@ public final class GTCEuCoilModifierHelper {
         return null;
     }
 
-    private static CoilMachineKind classifyModifierObject(Object modifier) {
+    public static CoilMachineKind classifyModifierObject(Object modifier) {
         if (modifier == null) return null;
         String modId = GTCEuReflectionBridge.getRecipeModifierName(modifier);
-        if (modId != null) {
-            if ("EBF_OC".equals(modId) || "ELECTRIC_BLAST_FURNACE".equals(modId)) return CoilMachineKind.BLAST_FURNACE;
-            if ("PYROLYSE_OVEN_OC".equals(modId) || "PYROLYSE_OVEN".equals(modId)) return CoilMachineKind.PYROLYSE_OVEN;
-            if ("CRACKER_OC".equals(modId) || "CRACKING_UNIT".equals(modId)) return CoilMachineKind.CRACKING_UNIT;
-            if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_PLANT".equals(modId)) {
-                return isStarTCoilReactor() ? CoilMachineKind.CHEMICAL_REACTOR : CoilMachineKind.GENERIC;
-            }
-            if ("MULTI_SMELLTER_PARALLEL".equals(modId) || "MULTI_SMELTER_PARALLEL".equals(modId) || "MULTI_SMELTER".equals(modId)) return CoilMachineKind.MULTI_SMELTER;
+        if (modId != null && !modId.isBlank()) {
+            CoilMachineKind directKind = matchModifierDescriptor(modId.toLowerCase(Locale.ROOT));
+            if (directKind != null) return directKind;
         }
+
+        String desc = extractModifierDescriptor(modifier);
+        return matchModifierDescriptor(desc);
+    }
+
+    private static String extractModifierDescriptor(Object modifier) {
+        StringBuilder sb = new StringBuilder();
+        collectDescriptor(modifier, sb, 0);
+        return sb.toString().toLowerCase(Locale.ROOT);
+    }
+
+    private static void collectDescriptor(Object obj, StringBuilder sb, int depth) {
+        if (obj == null || depth > 2) return;
+        sb.append(obj.getClass().getName()).append(' ').append(obj).append(' ');
+        for (Field f : obj.getClass().getDeclaredFields()) {
+            try {
+                f.setAccessible(true);
+                Object val = f.get(obj);
+                if (val != null && val != obj) {
+                    sb.append(val.getClass().getName()).append(' ').append(val).append(' ');
+                    if (depth < 1 && (val.getClass().getName().contains("rhino") || val.getClass().getName().contains("kubejs"))) {
+                        collectDescriptor(val, sb, depth + 1);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private static CoilMachineKind matchModifierDescriptor(String desc) {
+        if (desc.contains("pyrolyse") || desc.contains("liquefaction")) return CoilMachineKind.PYROLYSE_OVEN;
+        if (desc.contains("ebf") || desc.contains("blastfurnace") || desc.contains("blast_furnace")) return CoilMachineKind.BLAST_FURNACE;
+        if (desc.contains("cracker") || desc.contains("cracking")) return CoilMachineKind.CRACKING_UNIT;
+        if (desc.contains("smelter") || desc.contains("multismelter")) return CoilMachineKind.MULTI_SMELTER;
+        if (desc.contains("chemical") || desc.contains("chemicalreactor")) {
+            return isStarTCoilReactor() ? CoilMachineKind.CHEMICAL_REACTOR : CoilMachineKind.GENERIC;
+        }
+        return null;
+    }
+
+    private static CoilMachineKind inspectRecipeTypes(Object def) {
+        try {
+            List<Object> recipeTypes = GTCEuReflectionBridge.getRecipeTypes(def);
+            if (recipeTypes != null) {
+                for (Object rt : recipeTypes) {
+                    ResourceLocation rtId = com.gtceu.calcboard.api.catalog.MultiblockDetector.extractRecipeTypeId(rt);
+                    if (rtId == null) continue;
+                    String path = rtId.getPath().toLowerCase(Locale.ROOT);
+                    if (path.contains("pyrolyse") || path.contains("liquefaction")) return CoilMachineKind.PYROLYSE_OVEN;
+                    if (path.contains("blast") || path.contains("ebf")) return CoilMachineKind.BLAST_FURNACE;
+                    if (path.contains("cracker") || path.contains("cracking")) return CoilMachineKind.CRACKING_UNIT;
+                    if (path.contains("smelter")) return CoilMachineKind.MULTI_SMELTER;
+                    if (path.contains("chemical") && isStarTCoilReactor()) return CoilMachineKind.CHEMICAL_REACTOR;
+                }
+            }
+        } catch (Throwable ignored) {}
         return null;
     }
 
@@ -179,21 +245,21 @@ public final class GTCEuCoilModifierHelper {
         if (id == null) return CoilMachineSpec.GENERIC;
         String path = id.getPath().toLowerCase(Locale.ROOT);
 
-        if (path.contains("blast") || path.contains("ebf") || path.contains("abs") || path.contains("alloy_blast")) {
-            return new CoilMachineSpec(CoilMachineKind.BLAST_FURNACE, CustomCoilMultiplier.DEFAULT);
-        }
-        if (path.contains("pyrolyse")) {
+        if (path.contains("pyrolyse") || path.contains("liquefaction") || path.contains("nuclear") || path.contains("fuel_factory")) {
             return new CoilMachineSpec(CoilMachineKind.PYROLYSE_OVEN, CustomCoilMultiplier.DEFAULT);
+        }
+        if (path.contains("electric_blast_furnace") || path.contains("blast_furnace") || path.contains("ebf") || path.contains("abs") || path.contains("alloy_blast")) {
+            return new CoilMachineSpec(CoilMachineKind.BLAST_FURNACE, CustomCoilMultiplier.DEFAULT);
         }
         if (path.contains("cracker") || path.contains("cracking") || path.contains("super_cracker")) {
             return new CoilMachineSpec(CoilMachineKind.CRACKING_UNIT, CustomCoilMultiplier.DEFAULT);
         }
-        if (path.contains("chemical") || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {
+        if (path.contains("large_chemical") || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {
             return isStarTCoilReactor()
                     ? new CoilMachineSpec(CoilMachineKind.CHEMICAL_REACTOR, CustomCoilMultiplier.DEFAULT)
                     : CoilMachineSpec.GENERIC;
         }
-        if (path.contains("smelter")) {
+        if (path.contains("multi_smelter") || path.contains("multismelter")) {
             return new CoilMachineSpec(CoilMachineKind.MULTI_SMELTER, CustomCoilMultiplier.DEFAULT);
         }
 
@@ -238,8 +304,17 @@ public final class GTCEuCoilModifierHelper {
                 coilAddon.setDurationMultiplier(1.0);
                 coilAddon.setParallelMultiplier(1);
             }
-            case PYROLYSE_OVEN -> {
-                coilAddon.setDurationMultiplier(100.0 / Math.max(1, pyroSpeed));
+            case PYROLYSE_OVEN, LIQUEFACTION_TOWER -> {
+                double speedMult;
+                if (pyroSpeed > 0 && (pyroSpeed != 100 || coilTemp >= 2700)) {
+                    speedMult = pyroSpeed / 100.0;
+                } else if (coilTemp < 2700) {
+                    speedMult = 0.75;
+                } else {
+                    int tiersAboveKanthal = Math.max(0, (coilTemp - 2700) / 900);
+                    speedMult = 1.0 + (0.50 * tiersAboveKanthal);
+                }
+                coilAddon.setDurationMultiplier(1.0 / Math.max(0.01, speedMult));
                 coilAddon.setEutMultiplier(1.0);
                 coilAddon.setParallelMultiplier(1);
             }

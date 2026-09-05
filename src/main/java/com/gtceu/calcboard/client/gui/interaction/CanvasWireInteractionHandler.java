@@ -99,7 +99,7 @@ public class CanvasWireInteractionHandler {
         String nodeId = widget.getNode().getId();
 
         if (ctrl) {
-            screen.toggleSelectPort(nodeId, false, outPortIdx);
+            screen.openTargetOutputRateDialog(widget.getNode(), outPortIdx);
             return true;
         }
         if (shift) {

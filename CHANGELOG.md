@@ -4,6 +4,31 @@
   <b>English</b> | <a href="CHANGELOG_KR.md">한국어</a>
 </p>
 
+## [Unreleased]
+
+### Added
+- **Target Output Rate Inverse Solver & Fractional Auto-Ratio**:
+  - Added a Target Output Rate Dialog (`Ctrl + Left Click` on any output port) that automatically calculates the required machine count from a desired production rate.
+  - Supports fractional expressions (e.g., `1/12s`, `1/60s`, `5/2min`) and diverse rate units (`/t`, `/s`, `/min`, `/h`, `/d`, `mB/s`, `B/min`) for instant entry without manual conversion.
+  - [⚖ Auto Ratio] now supports high-precision fractional scaling up to 4 decimal places (`0.0001` precision) without forced integer ceiling rounding, accurately synchronizing slow or intermittent production lines.
+- **Per-Craft Batch View Mode (`1x`)**:
+  - Added a `1x` per-craft batch unit to the canvas toolbar and settings dialog unit cycling list (`/t` -> `/s` -> `/min` -> `/h` -> `/d` -> `1x`).
+  - Displays raw recipe input/output amounts per single craft cycle independent of machine counts or overclocked cycles-per-second.
+  - Ports with perfectly matching stoichiometric amounts display a green checkmark (`✔`), allowing instant visual verification of 1:1 chemical reaction ratios and closed recycling loops.
+
+### Changed & Improved
+- **Closed-Loop Recirculation Protection & Greedy Supply-Filling Allocation**:
+  - Enhanced the flow balance solver to protect closed recirculation loops (e.g., chemical byproduct recycling) against feedback attenuation and rate collapse.
+  - Implemented greedy demand-filling allocation to fulfill 100% of consumer requirements before distributing surplus flows.
+  - Clarified port status indicators: actual shortages relative to current machine speed are flagged with amber deficit warnings (⚠), while upstream-induced speed limits are indicated by a distinct blue throttled badge (↓).
+- **Pyrolyse Oven & Liquefaction Tower Coil Modifier Accuracy**:
+  - Accurately computes coil temperature speed modifiers for Pyrolyse Ovens and Liquefaction Towers (+50% speed per tier above Kanthal 2700K, 0.75x speed penalty for Cupronickel).
+
+### Fixed
+- **Per-Craft (`1x`) Tooltip Rate Distortion & Duplicate Suffix Bug**:
+  - Fixed an issue where hovering over input/output ports in `1x` batch mode displayed distorted production rates (e.g., overclocked per-second throughput instead of per-craft batch amounts) and malformed duplicate suffixes (e.g., `(11.52 B1x)`) when holding `Shift`.
+- **Coil Addon Stat Invalidation on Card Controls & Header Quick Select**:
+  - Fixed an issue where changing heating coils via node card badges (`♨ [Temp]K`) or the config dialog top quick-select header failed to update machine EU/t, duration, and cycle rates until manually manipulated through the lower catalog grid.
 
 ## [2.2.0-alpha.1] - 2026-09-05
 

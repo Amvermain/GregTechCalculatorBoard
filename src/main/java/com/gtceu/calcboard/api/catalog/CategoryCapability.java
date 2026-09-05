@@ -109,7 +109,8 @@ public record CategoryCapability(
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
+                supportsCoil = def.supportsAbility("HEATING_COILS")
+                        || def.coilSlotCount() > 0
                         || MultiblockDetector.isCoilMultiblock(mbId)
                         || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             } else {

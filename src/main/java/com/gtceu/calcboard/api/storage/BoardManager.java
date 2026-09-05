@@ -55,6 +55,8 @@ public class BoardManager {
     private boolean gridSnapEnabled = false;
     private int gridSnapSize = 16;
     private boolean showDebugInfo = false;
+    private boolean autoRatioFractionalDefault = false;
+    private boolean preserveFractionalAnchor = true;
 
     private final Map<String, IBoardStorageExtension> storageExtensions = new ConcurrentHashMap<>();
     private final Map<String, CompoundTag> pendingExtensionTags = new ConcurrentHashMap<>();
@@ -346,6 +348,22 @@ public class BoardManager {
 
     public void toggleDebugInfo() {
         this.showDebugInfo = !this.showDebugInfo;
+    }
+
+    public boolean isAutoRatioFractionalDefault() {
+        return autoRatioFractionalDefault;
+    }
+
+    public void setAutoRatioFractionalDefault(boolean autoRatioFractionalDefault) {
+        this.autoRatioFractionalDefault = autoRatioFractionalDefault;
+    }
+
+    public boolean isPreserveFractionalAnchor() {
+        return preserveFractionalAnchor;
+    }
+
+    public void setPreserveFractionalAnchor(boolean preserveFractionalAnchor) {
+        this.preserveFractionalAnchor = preserveFractionalAnchor;
     }
 
     public static BoardManager getInstance() {
@@ -780,6 +798,8 @@ public class BoardManager {
             rootTag.putBoolean("gridSnapEnabled", isGridSnapEnabled());
             rootTag.putInt("gridSnapSize", getGridSnapSize());
             rootTag.putBoolean("showDebugInfo", isShowDebugInfo());
+            rootTag.putBoolean("autoRatioFractionalDefault", isAutoRatioFractionalDefault());
+            rootTag.putBoolean("preserveFractionalAnchor", isPreserveFractionalAnchor());
             rootTag.put("categoryPresets", com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().serializeNBT());
             for (Map.Entry<String, IBoardStorageExtension> entry : this.storageExtensions.entrySet()) {
                 CompoundTag extTag = entry.getValue().serialize();
@@ -911,6 +931,12 @@ public class BoardManager {
                 }
                 if (rootTag.contains("showDebugInfo")) {
                     this.showDebugInfo = rootTag.getBoolean("showDebugInfo");
+                }
+                if (rootTag.contains("autoRatioFractionalDefault")) {
+                    this.autoRatioFractionalDefault = rootTag.getBoolean("autoRatioFractionalDefault");
+                }
+                if (rootTag.contains("preserveFractionalAnchor")) {
+                    this.preserveFractionalAnchor = rootTag.getBoolean("preserveFractionalAnchor");
                 }
                 if (rootTag.contains("categoryPresets", Tag.TAG_COMPOUND)) {
                     com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().deserializeNBT(rootTag.getCompound("categoryPresets"));

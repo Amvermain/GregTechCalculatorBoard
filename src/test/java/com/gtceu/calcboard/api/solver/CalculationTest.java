@@ -518,6 +518,8 @@ public class CalculationTest {
         Assertions.assertEquals(500.0, inStats.requiredOrProducedRate(), 0.001);
         Assertions.assertEquals(438.0, inStats.connectedRate(), 0.001);
         Assertions.assertEquals(2, inStats.connectionCount());
+        Assertions.assertTrue(inStats.isNominalDeficit());
+        Assertions.assertFalse(inStats.isUpstreamThrottled());
         Assertions.assertTrue(inStats.isInputDeficit());
         Assertions.assertFalse(inStats.isBalanced());
         Assertions.assertEquals(87.6, inStats.getPercent(), 0.01);
@@ -752,7 +754,7 @@ public class CalculationTest {
 
         FlowGraphSolver.PortFlowStats inStats = graph.getInputPortStats(turbine, 0);
         Assertions.assertTrue(inStats.isConnected());
-        Assertions.assertTrue(inStats.isInputDeficit());
+        Assertions.assertTrue(inStats.isNominalDeficit());
         Assertions.assertTrue(inStats.getPercent() < 100.0);
 
         // Flow deficit active -> validation fails & inoperational

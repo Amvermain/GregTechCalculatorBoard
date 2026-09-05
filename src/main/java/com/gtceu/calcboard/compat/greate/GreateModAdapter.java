@@ -181,13 +181,13 @@ public class GreateModAdapter extends AbstractKineticModAdapter {
         }
 
         double shaftCapacity = GreateProperties.getShaftCapacityForTier(machineTier);
-        double currentStress = computeOverclock(node, node.getTargetTier(), false).eut() * node.getMachineCount() * node.getCombinedEutMultiplier();
-        if (currentStress > shaftCapacity) {
+        double singleMachineStress = computeOverclock(node, node.getTargetTier(), false).eut() * node.getCombinedEutMultiplier();
+        if (singleMachineStress > shaftCapacity) {
             valid = false;
             if (warnings != null) {
                 warnings.add(Component.translatable(
                         "gui.gtcalcboard.greate.shaft_capacity_warning",
-                        String.format(Locale.ROOT, "%,.0f", currentStress),
+                        String.format(Locale.ROOT, "%,.0f", singleMachineStress),
                         String.format(Locale.ROOT, "%,.0f", shaftCapacity)
                 ));
             }
@@ -201,7 +201,7 @@ public class GreateModAdapter extends AbstractKineticModAdapter {
         if (node == null) return "";
         double suRate = node.getEffectiveTotalEUt();
         int tier = Math.max(0, node.getProperties().get(GreateProperties.MACHINE_TIER));
-        double capacity = GreateProperties.getShaftCapacityForTier(tier);
+        double capacity = GreateProperties.getShaftCapacityForTier(tier) * Math.max(1.0, node.getMachineCount());
 
         if (node.isGenerator()) {
             return String.format(Locale.ROOT, "§6+%,.0f / %,.0f SU", suRate, capacity);
@@ -216,7 +216,7 @@ public class GreateModAdapter extends AbstractKineticModAdapter {
         double totSU = node.getEffectiveTotalEUt();
         int tier = Math.max(0, node.getProperties().get(GreateProperties.MACHINE_TIER));
         String tierName = GreateProperties.getTierName(tier);
-        double cap = GreateProperties.getShaftCapacityForTier(tier);
+        double cap = GreateProperties.getShaftCapacityForTier(tier) * Math.max(1.0, node.getMachineCount());
 
         if (node.isGenerator()) {
             tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));

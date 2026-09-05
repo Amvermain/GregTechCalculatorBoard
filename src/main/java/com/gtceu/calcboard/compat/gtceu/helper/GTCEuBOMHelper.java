@@ -298,7 +298,7 @@ public final class GTCEuBOMHelper {
                     list.add(part);
                 }
             } else if (part.category() == PartCategory.COIL || CoilHelper.isHeatingCoil(part.itemId())) {
-                if (equippedCoil != null && equippedCoil.getItemIcon() != null) {
+                if (equippedCoil != null && equippedCoil.getItemIcon() != null && def.coilSlotCount() > 0) {
                     list.add(new MultiblockStructurePart(
                         equippedCoil.getItemIcon(),
                         equippedCoil.getName(),

@@ -88,9 +88,10 @@ public class ToolbarWidget {
     private List<ToolbarButtonDef> buildButtons(Font font) {
         List<ToolbarButtonDef> list = new ArrayList<>();
         boolean isShift = Screen.hasShiftDown();
+        boolean isAlt = Screen.hasAltDown();
 
         addGuideAndTutorialButtons(list, font, isShift);
-        addOptimizationButtons(list, font, isShift);
+        addOptimizationButtons(list, font, isShift, isAlt);
         addUtilityAndToggleButtons(list, font);
         addIoButtons(list, font);
         addTeamCollaborationButtons(list, font);
@@ -125,7 +126,7 @@ public class ToolbarWidget {
         }
     }
 
-    private void addOptimizationButtons(List<ToolbarButtonDef> list, Font font, boolean isShift) {
+    private void addOptimizationButtons(List<ToolbarButtonDef> list, Font font, boolean isShift, boolean isAlt) {
         if (isShift) {
             String quickConnTxt = "§e⚡ " + Component.translatable("gui.gtcalcboard.quick_connect").getString();
             list.add(new ToolbarButtonDef("auto_connect", quickConnTxt, "⚡", 0xFFFFF176, 0xFF3A351C, 0xFF5C5228, 0xFF887733, font.width(quickConnTxt) + 12, 22, btn -> performAutoConnect()));
@@ -134,19 +135,35 @@ public class ToolbarWidget {
             list.add(new ToolbarButtonDef("auto_connect", connTxt, "↔", 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(connTxt) + 12, 22, btn -> performAutoConnect()));
         }
 
-        if (isShift) {
-            String harmonizeTxt = "§6✧ " + Component.translatable("gui.gtcalcboard.harmonize_ratio").getString();
-            list.add(new ToolbarButtonDef("auto_ratio", harmonizeTxt, "✧", 0xFFFFD700, 0xFF3D2A1C, 0xFF634226, 0xFFA66D38, font.width(harmonizeTxt) + 12, 22, btn -> performAutoRatio(true)));
-        } else {
-            String ratioTxt = "⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString();
-            list.add(new ToolbarButtonDef("auto_ratio", ratioTxt, "⚖", 0xFFCCCCCC, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(ratioTxt) + 12, 22, btn -> performAutoRatio(false)));
-        }
+        addAutoRatioButton(list, font, isShift, isAlt);
 
         String flowTxt = "▲ " + Component.translatable("gui.gtcalcboard.max_flow").getString();
         list.add(new ToolbarButtonDef("max_flow", flowTxt, "▲", 0xFFFFAA00, 0xFF282E3B, 0xFF3E475A, 0xFF3D4455, font.width(flowTxt) + 12, 22, btn -> performMaxThroughputOptimization()));
 
         String fitTxt = "⌖ " + Component.translatable("gui.gtcalcboard.fit_view").getString();
         list.add(new ToolbarButtonDef("fit_view", fitTxt, "⌖", 0xFF38BDF8, 0xFF1C2C44, 0xFF2B4466, 0xFF355580, font.width(fitTxt) + 12, 22, btn -> screen.fitToView()));
+    }
+
+    private void addAutoRatioButton(List<ToolbarButtonDef> list, Font font, boolean isShift, boolean isAlt) {
+        boolean isFractionalDefault = BoardManager.getInstance().isAutoRatioFractionalDefault();
+        if (isAlt) {
+            String fracTxt = "§b⚡ " + Component.translatable("gui.gtcalcboard.auto_ratio_fractional").getString();
+            list.add(new ToolbarButtonDef("auto_ratio", fracTxt, "⚡", 0xFF38BDF8, 0xFF0C4A6E, 0xFF075985, 0xFF0284C7, font.width(fracTxt) + 12, 22, btn -> performAutoRatio(false, true)));
+            return;
+        }
+        if (isShift) {
+            String harmonizeTxt = "§6✧ " + Component.translatable("gui.gtcalcboard.harmonize_ratio").getString();
+            list.add(new ToolbarButtonDef("auto_ratio", harmonizeTxt, "✧", 0xFFFFD700, 0xFF3D2A1C, 0xFF634226, 0xFFA66D38, font.width(harmonizeTxt) + 12, 22, btn -> performAutoRatio(true, false)));
+            return;
+        }
+        String ratioTxt = isFractionalDefault
+                ? "§b⚡ " + Component.translatable("gui.gtcalcboard.auto_ratio_fractional").getString()
+                : "⚖ " + Component.translatable("gui.gtcalcboard.auto_ratio").getString();
+        int color = isFractionalDefault ? 0xFF38BDF8 : 0xFFCCCCCC;
+        int bg = isFractionalDefault ? 0xFF0C4A6E : 0xFF282E3B;
+        int hbg = isFractionalDefault ? 0xFF075985 : 0xFF3E475A;
+        int border = isFractionalDefault ? 0xFF0284C7 : 0xFF3D4455;
+        list.add(new ToolbarButtonDef("auto_ratio", ratioTxt, isFractionalDefault ? "⚡" : "⚖", color, bg, hbg, border, font.width(ratioTxt) + 12, 22, btn -> performAutoRatio(false, isFractionalDefault)));
     }
 
     private void addUtilityAndToggleButtons(List<ToolbarButtonDef> list, Font font) {
@@ -781,63 +798,105 @@ public class ToolbarWidget {
     }
 
     public void performAutoRatio() {
-        performAutoRatio(Screen.hasShiftDown());
+        boolean isShift = Screen.hasShiftDown();
+        boolean isAlt = Screen.hasAltDown();
+        boolean isFractionalDefault = BoardManager.getInstance().isAutoRatioFractionalDefault();
+        if (isAlt) {
+            performAutoRatio(false, true);
+        } else if (isShift) {
+            performAutoRatio(true, false);
+        } else {
+            performAutoRatio(false, isFractionalDefault);
+        }
     }
 
     public void performAutoRatio(boolean harmonized) {
+        performAutoRatio(harmonized, false);
+    }
+
+    public void performAutoRatio(boolean harmonized, boolean fractional) {
         if (!screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
-        RecipeNode baseNode = graph.findBaseNode();
-        if (baseNode == null && !graph.getNodes().isEmpty()) {
-            baseNode = graph.getNodes().get(0);
-        }
+        RecipeNode baseNode = findAnchorNode(graph);
 
-        Map<String, Double> oldCounts = new HashMap<>();
+        Map<String, Double> oldCounts = captureMachineCounts(graph);
+        executeAutoRatioAlgorithm(graph, baseNode, harmonized, fractional);
+        recordAutoRatioHistory(graph, baseNode, oldCounts, harmonized, fractional);
+
+        refreshWidgetsAfterAutoRatio();
+        notifyAutoRatioResult(baseNode, harmonized, fractional);
+    }
+
+    private RecipeNode findAnchorNode(FlowGraph graph) {
+        if (graph == null) return null;
+        RecipeNode base = graph.findBaseNode();
+        if (base == null && !graph.getNodes().isEmpty()) {
+            return graph.getNodes().get(0);
+        }
+        return base;
+    }
+
+    private Map<String, Double> captureMachineCounts(FlowGraph graph) {
+        Map<String, Double> counts = new HashMap<>();
+        if (graph == null) return counts;
         for (RecipeNode n : graph.getNodes()) {
-            oldCounts.put(n.getId(), n.getMachineCount());
+            counts.put(n.getId(), n.getMachineCount());
         }
+        return counts;
+    }
 
-        if (baseNode != null) {
-            if (harmonized) {
-                graph.autoRatioHarmonized(baseNode);
-            } else {
-                graph.autoRatioFromAnchor(baseNode);
-            }
+    private void executeAutoRatioAlgorithm(FlowGraph graph, RecipeNode baseNode, boolean harmonized, boolean fractional) {
+        if (graph == null || baseNode == null) return;
+        if (harmonized) {
+            graph.autoRatioHarmonized(baseNode);
+        } else if (fractional) {
+            graph.autoRatioFractional(baseNode);
+        } else {
+            graph.autoRatioFromAnchor(baseNode);
         }
+    }
 
+    private void recordAutoRatioHistory(FlowGraph graph, RecipeNode baseNode, Map<String, Double> oldCounts, boolean harmonized, boolean fractional) {
+        if (graph == null) return;
         List<com.gtceu.calcboard.api.history.BoardCommand> subCmds = new ArrayList<>();
         for (RecipeNode n : graph.getNodes()) {
             double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
             double newC = n.getMachineCount();
             if (Math.abs(oldC - newC) > 0.0001) {
-                subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(
-                    n.getId(),
-                    oldC,
-                    newC
-                ));
+                subCmds.add(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
             }
         }
-        if (!subCmds.isEmpty()) {
-            String baseName = baseNode != null ? baseNode.getName() : "Graph";
-            String actionName = harmonized ? "Harmonized Auto Ratio (" + baseName + ")" : "Auto Ratio (" + baseName + ")";
-            screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(subCmds, actionName));
-        }
+        if (subCmds.isEmpty()) return;
 
+        String baseName = baseNode != null ? baseNode.getName() : "Graph";
+        String actionName = harmonized ? "Harmonized Auto Ratio (" + baseName + ")"
+                : (fractional ? "Fractional Auto Ratio (" + baseName + ")" : "Auto Ratio (" + baseName + ")");
+        screen.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.CompoundCommand(subCmds, actionName));
+    }
+
+    private void refreshWidgetsAfterAutoRatio() {
         for (NodeWidget w : screen.getNodeWidgets()) {
             w.updateCountBuffer();
             w.invalidateCache();
         }
         screen.markSummaryDirty();
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onAutoRatioTriggered();
+    }
 
+    private void notifyAutoRatioResult(RecipeNode baseNode, boolean harmonized, boolean fractional) {
         String baseName = baseNode != null ? baseNode.getName() : "Graph";
         if (harmonized && baseNode != null) {
             BoardToast.show(Component.literal("§6✨ ").append(Component.translatable("message.gtcalcboard.auto_ratio_harmonized", baseName, (int) baseNode.getMachineCount())));
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
-        } else {
-            BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)));
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            return;
         }
+        if (fractional && baseNode != null) {
+            BoardToast.show(Component.literal("§b⚡ ").append(Component.translatable("message.gtcalcboard.auto_ratio_fractional", baseName)));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            return;
+        }
+        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)));
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
     }
 
     public void performMaxThroughputOptimization() {

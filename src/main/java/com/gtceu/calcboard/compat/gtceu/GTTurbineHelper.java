@@ -207,6 +207,7 @@ public final class GTTurbineHelper {
     public static void setDynamoTier(RecipeNode node, GTVoltageTier tier) {
         if (node == null || tier == null) return;
         node.getProperties().set(GTCEuProperties.DYNAMO_HATCH_TIER, clampToMinimumDynamoTier(tier));
+        node.markOverclockDirty();
     }
 
     public static int getDynamoAmperage(RecipeNode node) {
@@ -225,6 +226,7 @@ public final class GTTurbineHelper {
     public static void setDynamoAmperage(RecipeNode node, int amperage) {
         if (node == null) return;
         node.getProperties().set(GTCEuProperties.DYNAMO_AMPERAGE, Math.max(1, amperage));
+        node.markOverclockDirty();
     }
 
     public static boolean supportsTurbineBoost(RecipeNode node) {
@@ -242,6 +244,7 @@ public final class GTTurbineHelper {
         node.getProperties().set(GTCEuProperties.LUBRICANT_BOOST, boost);
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.syncBoosterInputs(node);
+        node.markOverclockDirty();
     }
 
     public static boolean isCoolantBoost(RecipeNode node) {
@@ -253,6 +256,7 @@ public final class GTTurbineHelper {
         node.getProperties().set(GTCEuProperties.COOLANT_BOOST, boost);
         com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.syncBoosterInputs(node);
+        node.markOverclockDirty();
     }
 
     public static void cycleTurbineBoost(RecipeNode node, int direction) {
@@ -590,7 +594,7 @@ public final class GTTurbineHelper {
         if (node == null || graph == null || !isTurbine(node)) return false;
         for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
             FlowGraphSolver.PortFlowStats stats = graph.getInputPortStats(node, inIdx);
-            if (stats != null && stats.isConnected() && stats.isInputDeficit()) {
+            if (stats != null && stats.isConnected() && stats.isNominalDeficit()) {
                 return true;
             }
         }

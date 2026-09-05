@@ -662,6 +662,10 @@ public class MultiblockDetector {
         if (STEAM_MULTIBLOCKS.contains(workstationId)) return true;
         if (THREADING_MAX_HELIX_CAPACITY.containsKey(workstationId)) return true;
         if (MultiblockStructureCatalog.getStructure(workstationId) != null) return true;
+        Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
+        if (def != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isMultiblockDefinition(def)) {
+            return true;
+        }
         String path = workstationId.getPath().toLowerCase(Locale.ROOT);
         return path.endsWith("fusion_reactor") || path.contains("auxiliary_fusion") || path.contains("auxiliary_booster");
     }
@@ -672,7 +676,28 @@ public class MultiblockDetector {
             initialize();
         }
         if (COIL_MULTIBLOCK_CONTROLLERS.contains(workstationId)) return true;
-        return isMultiblock(workstationId) && com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(workstationId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
+
+        var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(workstationId);
+        if (defStruct != null && (defStruct.supportsAbility("HEATING_COILS") || defStruct.coilSlotCount() > 0)) {
+            COIL_MULTIBLOCK_CONTROLLERS.add(workstationId);
+            return true;
+        }
+
+        Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
+        if (def != null) {
+            Class<?> mCls = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineClass(def);
+            if (mCls != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isCoilWorkableClass(mCls)) {
+                COIL_MULTIBLOCK_CONTROLLERS.add(workstationId);
+                return true;
+            }
+        }
+
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(workstationId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
+            COIL_MULTIBLOCK_CONTROLLERS.add(workstationId);
+            return true;
+        }
+
+        return false;
     }
 
     public static void registerCoilCategory(ResourceLocation categoryId) {

@@ -50,6 +50,9 @@ stateDiagram-v2
 | **[ADR-019](ADR_019_BYPRODUCT_VOID_MANAGEMENT_AND_SINK_SYSTEM.md)** | 잉여 부산물 폐기 처리 및 보이드 싱크 시스템 명세<br/>*(Byproduct Void Management & Sink System Specification)* | 🟢 `IMPLEMENTED` | `v2.1.0-beta.2` | 2026-09-04 | 캔버스 정션 보이드 싱크(SupplyMode.VOID_SINK), 노드 포트/SummaryOverlay 단위 직접 보이드 마킹(Mark as Void), 유량 수지 차감 엔진 연동 |
 | **[ADR-020](ADR_020_HIGH_SPEED_FLOW_BATCHING_AND_EFFICIENCY_MODULATION.md)** | 고속 레시피 애니메이션 배치, 기계 효율 연동형 출력 와이어 흐름 및 분기 노드 우선 배분/배치 버퍼 명세<br/>*(High-Speed Recipe Animation Batching, Machine Efficiency Outgoing Wire Flow, Priority Split & Junction Batch Buffer Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0` | 2026-09-05 | 1초 미만 고속 레시피 $M$배수 파티클 묶음, 결핍 입력선 경고 펄스 vs 기계 가동률($\eta$) 비례 출력선 감속 직교 분리, 정션 고정 유량 우선 배분 및 배치 누적 버퍼 |
 | **[ADR-021](ADR_021_GREATE_KINETIC_TIER_ADAPTER_INTEGRATION.md)** | Greate 모드 연동을 위한 AbstractKineticModAdapter 계층 분리 및 티어드 회전 운동 기계 어댑터 명세<br/>*(AbstractKineticModAdapter Class Hierarchy Extraction & Greate Tiered Kinetic Machine Adapter Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0` | 2026-09-04 | AbstractKineticModAdapter 추상 클래스 추출, CreateModAdapter 상속 리팩토링, GreateModAdapter(Priority 95) 10단계 티어 매핑, 회로 번호, 샤프트 허용 용량 검증 |
+| **[ADR-022](ADR_022_CLOSED_LOOP_RECIRCULATION_AND_SUPPLY_ALLOCATION.md)** | 폐쇄 순환 공정 자급 자원 보호 및 공급 우선 할당 알고리즘 명세<br/>*(Closed-Loop Recirculation Self-Sustaining Protection & Supply-Filling Allocation Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | Tarjan SCC 기반 자급 순환 자원 불변식 감쇠 나선 차단, Greedy Demand-Filling 엣지 할당, 실효 소비량 결손 판정 및 상류 감속(↓) 인디케이터 |
+| **[ADR-023](ADR_023_PER_CRAFT_BATCH_VIEW_AND_STOICHIOMETRIC_LOOP_VERIFICATION.md)** | 레시피 1회(배치) 기준 뷰 모드 및 화학양론적 순환 루프 검증 명세<br/>*(Per-Craft Batch View & Stoichiometric Recirculation Loop Verification Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 시간 단위 소거형 1회(1x) 뷰 모드(RateTimeUnit.PER_RECIPE), 모델 B 독립 1회 레시피 뷰, 화학양론적 포트 보존 및 밸런스(✔) 인디케이터 |
+| **[ADR-024](ADR_024_TARGET_OUTPUT_RATE_AND_FRACTIONAL_AUTO_RATIO.md)** | 목표 생산량 기반 기계 대수 자동 역산 및 정밀 소수점 Auto-Ratio 명세<br/>*(Target Output Rate Inverse Solver & Fractional Auto-Ratio Precision Scaling Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 출력 포트 Ctrl+클릭 목표치(예: 1/12s, 5/min) 기계 대수 O(1) 역산, 정밀 소수점 Auto-Ratio(Alt+클릭), 앵커 소수점 보존 모드 |
 
 ---
 
@@ -58,6 +61,9 @@ stateDiagram-v2
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 | **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PROPOSED` | `v2.1.0` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
+| **[RFC-025](../RFC_025_UNIFIED_CANVAS_WORKSPACE_AND_CONTEXT_DRIVEN_UI.md)** | 3-패널 통합 워크스페이스 및 컨텍스트 중심 UI/UX 현대화 명세<br/>*(Unified Canvas Workspace & Context-Driven UI/UX Modernization Specification)* | 🟡 `PROPOSED` | `v2.3.0` | 2026-09-05 | 캔버스/노드 우클릭 컨텍스트 메뉴, 스마트 커넥트 추천, 노드 카드 슬림화 및 비모달 우측 인스펙터, 3-패널 통합 워크스페이스 구축 |
+
+
 
 
 

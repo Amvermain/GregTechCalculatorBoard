@@ -137,5 +137,105 @@ public class CoilModifierDeductionTest {
         Assertions.assertEquals(4, spec.customMultiplier().parallelMultiplier());
         Assertions.assertEquals(2, spec.customMultiplier().baseParallel());
     }
+
+    @Test
+    @DisplayName("Test Liquefaction Tower Coil Speed Bonus (Cupro 25% slower, Kanthal base, +50% speed per tier above Kanthal)")
+    public void testLiquefactionTowerCoilModifiers() {
+        ResourceLocation ltId = ResourceLocation.tryParse("gtceu:liquefaction_tower");
+        RecipeNode node = new RecipeNode("node-lt", "Liquefaction Tower", 10.0, 120.0, GTVoltageTier.MV);
+        node.setMachineIcon(ltId);
+        node.setMultiblock(true);
+
+        // 1. Detection check
+        Assertions.assertTrue(com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(ltId),
+                "Liquefaction Tower must be detected as a coil multiblock");
+
+        // 2. Cupronickel (1800K) -> 25% slower (speed = 0.75, duration = 1.0 / 0.75 = 1.333...)
+        CoilHelper.CoilStats cuproStats = new CoilHelper.CoilStats(1800, 100, 100, 100, 100, 16);
+        GTCoilAddon cupro = new GTCoilAddon("gtceu:cupronickel_coil", "Cupronickel Coil", "1800K", null, cuproStats);
+        MachineAddon tailoredCupro = CoilHelper.tailorCoilAddon(cupro, node);
+        Assertions.assertEquals(1.0 / 0.75, tailoredCupro.getDurationMultiplier(), 0.001);
+        Assertions.assertEquals(1.0, tailoredCupro.getEutMultiplier(), 0.001);
+
+        // 3. Kanthal (2700K) -> Base speed (1.0x)
+        CoilHelper.CoilStats kanthalStats = new CoilHelper.CoilStats(2700, 100, 90, 125, 95, 32);
+        GTCoilAddon kanthal = new GTCoilAddon("gtceu:kanthal_coil", "Kanthal Coil", "2700K", null, kanthalStats);
+        MachineAddon tailoredKanthal = CoilHelper.tailorCoilAddon(kanthal, node);
+        Assertions.assertEquals(1.0, tailoredKanthal.getDurationMultiplier(), 0.001);
+
+        // 4. Nichrome (3600K) -> +50% speed (1.5x speed -> duration = 1.0 / 1.5 = 0.666...)
+        CoilHelper.CoilStats nichromeStats = new CoilHelper.CoilStats(3600, 150, 80, 150, 90, 64);
+        GTCoilAddon nichrome = new GTCoilAddon("gtceu:nichrome_coil", "Nichrome Coil", "3600K", null, nichromeStats);
+        MachineAddon tailoredNichrome = CoilHelper.tailorCoilAddon(nichrome, node);
+        Assertions.assertEquals(1.0 / 1.5, tailoredNichrome.getDurationMultiplier(), 0.001);
+
+        // 5. RTM Alloy (4500K) -> +100% speed (2.0x speed -> duration = 1.0 / 2.0 = 0.5)
+        CoilHelper.CoilStats rtmStats = new CoilHelper.CoilStats(4500, 200, 70, 175, 85, 128);
+        GTCoilAddon rtm = new GTCoilAddon("gtceu:rtm_alloy_coil", "RTM Alloy Coil", "4500K", null, rtmStats);
+        MachineAddon tailoredRtm = CoilHelper.tailorCoilAddon(rtm, node);
+        Assertions.assertEquals(0.5, tailoredRtm.getDurationMultiplier(), 0.001);
+
+        // 6. HSS-G (5400K) -> +150% speed (2.5x speed -> duration = 1.0 / 2.5 = 0.4)
+        CoilHelper.CoilStats hssgStats = new CoilHelper.CoilStats(5400, 250, 60, 200, 80, 256);
+        GTCoilAddon hssg = new GTCoilAddon("gtceu:hssg_coil", "HSS-G Coil", "5400K", null, hssgStats);
+        MachineAddon tailoredHssg = CoilHelper.tailorCoilAddon(hssg, node);
+        Assertions.assertEquals(0.4, tailoredHssg.getDurationMultiplier(), 0.001);
+
+        // 7. Category capability check: AddonCategory.COIL must be present
+        var cats = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.getApplicableAddonCategories(node);
+        Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.COIL),
+                "Liquefaction Tower applicable addon categories must contain COIL");
+    }
+
+    @Test
+    @DisplayName("Test Nuclear Fuel Factory Coil Speed Bonus (shares Pyrolyse Oven overclock speed formula)")
+    public void testNuclearFuelFactoryCoilSpeedModifiers() {
+        ResourceLocation nffId = ResourceLocation.tryParse("gtceu:nuclear_fuel_factory");
+        RecipeNode node = new RecipeNode("node-nff", "Nuclear Fuel Factory", 10.0, 1920.0, GTVoltageTier.EV);
+        node.setMachineIcon(nffId);
+        node.setMultiblock(true);
+
+        // Cupronickel (1800K) -> 75% speed -> duration = 1.0 / 0.75 = 1.333x
+        CoilHelper.CoilStats cuproStats = new CoilHelper.CoilStats(1800, 75, 100, 100, 100, 16);
+        GTCoilAddon cupro = new GTCoilAddon("gtceu:cupronickel_coil", "Cupronickel Coil", "1800K", null, cuproStats);
+        MachineAddon tailoredCupro = CoilHelper.tailorCoilAddon(cupro, node);
+        Assertions.assertEquals(1.0 / 0.75, tailoredCupro.getDurationMultiplier(), 0.001);
+
+        // RTM Alloy (4500K) -> 200% speed -> duration = 1.0 / 2.0 = 0.5x
+        CoilHelper.CoilStats rtmStats = new CoilHelper.CoilStats(4500, 200, 70, 175, 85, 128);
+        GTCoilAddon rtm = new GTCoilAddon("gtceu:rtm_alloy_coil", "RTM Alloy Coil", "4500K", null, rtmStats);
+        MachineAddon tailoredRtm = CoilHelper.tailorCoilAddon(rtm, node);
+        Assertions.assertEquals(0.5, tailoredRtm.getDurationMultiplier(), 0.001);
+
+        // Tritanium (10800K) -> 550% speed -> duration = 1.0 / 5.5 = 0.1818x
+        CoilHelper.CoilStats tritaniumStats = new CoilHelper.CoilStats(10800, 550, 40, 300, 60, 512);
+        GTCoilAddon tritanium = new GTCoilAddon("gtceu:tritanium_coil", "Tritanium Coil", "10800K", null, tritaniumStats);
+        MachineAddon tailoredTritanium = CoilHelper.tailorCoilAddon(tritanium, node);
+        Assertions.assertEquals(1.0 / 5.5, tailoredTritanium.getDurationMultiplier(), 0.001);
+    }
+
+    @Test
+    @DisplayName("Simulated KubeJS proxy modifier with pyrolyseOvenOverclock is properly classified")
+    public void testKubeJsProxyModifierClassification() {
+        // Simulates a Rhino/KubeJS JavaInterfaceProxy holding an anonymous function
+        Object dummyJsFunction = new Object() {
+            @Override
+            public String toString() {
+                return "(machine, recipe) => GTRecipeModifiers.pyrolyseOvenOverclock(machine, recipe)";
+            }
+        };
+
+        Object simulatedKubeJsProxy = new Object() {
+            public final Object function = dummyJsFunction;
+
+            @Override
+            public String toString() {
+                return "JavaInterfaceProxy[" + function + "]";
+            }
+        };
+
+        GTCEuCoilModifierHelper.CoilMachineKind kind = GTCEuCoilModifierHelper.classifyModifierObject(simulatedKubeJsProxy);
+        Assertions.assertEquals(GTCEuCoilModifierHelper.CoilMachineKind.PYROLYSE_OVEN, kind);
+    }
 }
 

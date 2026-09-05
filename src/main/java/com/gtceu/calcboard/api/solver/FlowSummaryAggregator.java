@@ -27,9 +27,12 @@ public final class FlowSummaryAggregator {
         if (node.isReroute() && inputIndex != 0) {
             return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
         }
-        double req = node.isReroute()
+        double nominalReq = node.isReroute()
                 ? FlowBalanceMatrixSolver.calculateTotalConnectedPortDemand(graph, node, 0, null)
                 : node.getInputSlotRate(inputIndex, false);
+        double effectiveReq = node.isReroute()
+                ? nominalReq
+                : node.getInputSlotRate(inputIndex, true);
 
         double totalSupplied = 0.0;
         int count = 0;
@@ -42,7 +45,13 @@ public final class FlowSummaryAggregator {
                 }
             }
         }
-        return new FlowGraphSolver.PortFlowStats(req, totalSupplied, count, count > 0);
+
+        boolean isConnected = count > 0;
+        boolean isUpstreamThrottled = isConnected
+                && (effectiveReq < nominalReq - 0.001)
+                && (totalSupplied > effectiveReq + 0.001);
+
+        return new FlowGraphSolver.PortFlowStats(nominalReq, totalSupplied, count, isConnected, effectiveReq, isUpstreamThrottled);
     }
 
     public static FlowGraphSolver.PortFlowStats getOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
@@ -402,5 +411,164 @@ public final class FlowSummaryAggregator {
             }
         }
         return 0.0;
+    }
+
+    public static FlowGraphSolver.PortFlowStats getBatchInputPortStats(FlowGraph graph, RecipeNode node, int inputIndex) {
+        if (graph == null || node == null || inputIndex < 0) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (!node.isReroute() && inputIndex >= node.getInputs().size()) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (node.isReroute() && inputIndex != 0) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        double reqBatch = node.isOperational() ? getEffectiveConsumerBatchAmount(graph, node, inputIndex, new HashSet<>()) : 0.0;
+        double totalSupplied = 0.0;
+        int count = 0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(node.getId()) && edge.inputIndex() == inputIndex) {
+                RecipeNode p = graph.findNodeById(edge.fromNodeId());
+                if (p != null) {
+                    totalSupplied += resolveAllocatedBatchSupply(graph, edge, p, reqBatch);
+                    count++;
+                }
+            }
+        }
+        return new FlowGraphSolver.PortFlowStats(reqBatch, totalSupplied, count, count > 0, reqBatch, false);
+    }
+
+    public static FlowGraphSolver.PortFlowStats getBatchOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
+        if (graph == null || node == null || outputIndex < 0) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (!node.isReroute() && outputIndex >= node.getOutputs().size()) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        if (node.isReroute() && outputIndex != 0) {
+            return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        }
+        double prodBatch = node.isOperational() ? getEffectiveProducerBatchAmount(graph, node, outputIndex, new HashSet<>()) : 0.0;
+        double totalDemanded = 0.0;
+        int count = 0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(node.getId()) && edge.outputIndex() == outputIndex) {
+                RecipeNode c = graph.findNodeById(edge.toNodeId());
+                if (c != null && !c.isVoidSink()) {
+                    totalDemanded += resolveAllocatedBatchDemand(graph, edge, c, prodBatch);
+                    count++;
+                }
+            }
+        }
+        return new FlowGraphSolver.PortFlowStats(prodBatch, totalDemanded, count, count > 0, prodBatch, false);
+    }
+
+    private static double resolveAllocatedBatchSupply(FlowGraph graph, FlowGraph.ConnectionEdge edge, RecipeNode producer, double consumerReqBatch) {
+        if (producer == null || !producer.isOperational()) return 0.0;
+        double prodBatch = getEffectiveProducerBatchAmount(graph, producer, edge.outputIndex(), new HashSet<>());
+        if (prodBatch <= 0.00001) return 0.0;
+
+        double totalPortDemanded = calculateTotalBatchPortDemand(graph, producer, edge.outputIndex());
+        if (totalPortDemanded > 0.0001) {
+            return prodBatch * (consumerReqBatch / totalPortDemanded);
+        }
+        int edgeCount = countOutgoingEdges(graph, producer.getId(), edge.outputIndex());
+        return edgeCount > 0 ? prodBatch / edgeCount : prodBatch;
+    }
+
+    private static double resolveAllocatedBatchDemand(FlowGraph graph, FlowGraph.ConnectionEdge edge, RecipeNode consumer, double producerProdBatch) {
+        if (consumer == null || !consumer.isOperational()) return 0.0;
+        double reqBatch = getEffectiveConsumerBatchAmount(graph, consumer, edge.inputIndex(), new HashSet<>());
+        if (reqBatch <= 0.00001) return 0.0;
+
+        double totalPortSupplied = calculateTotalBatchPortSupply(graph, consumer, edge.inputIndex());
+        if (totalPortSupplied > 0.0001) {
+            return reqBatch * (producerProdBatch / totalPortSupplied);
+        }
+        int edgeCount = countIncomingEdges(graph, consumer.getId(), edge.inputIndex());
+        return edgeCount > 0 ? reqBatch / edgeCount : reqBatch;
+    }
+
+    private static double getEffectiveProducerBatchAmount(FlowGraph graph, RecipeNode producer, int outputIndex, Set<String> visited) {
+        if (producer == null || outputIndex < 0 || !visited.add(producer.getId())) {
+            return 0.0;
+        }
+        if (!producer.isReroute()) {
+            if (outputIndex >= producer.getOutputs().size()) return 0.0;
+            IngredientStack s = producer.getOutputs().get(outputIndex);
+            return s.getAmount() * s.getChance();
+        }
+        double totalIncoming = 0.0;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (inEdge.toNodeId().equals(producer.getId()) && inEdge.inputIndex() == 0) {
+                RecipeNode p = graph.findNodeById(inEdge.fromNodeId());
+                totalIncoming += getEffectiveProducerBatchAmount(graph, p, inEdge.outputIndex(), visited);
+            }
+        }
+        return totalIncoming;
+    }
+
+    private static double getEffectiveConsumerBatchAmount(FlowGraph graph, RecipeNode consumer, int inputIndex, Set<String> visited) {
+        if (consumer == null || inputIndex < 0 || !visited.add(consumer.getId())) {
+            return 0.0;
+        }
+        if (!consumer.isReroute()) {
+            if (inputIndex >= consumer.getInputs().size()) return 0.0;
+            return consumer.getInputs().get(inputIndex).getAmount();
+        }
+        double totalOutgoing = 0.0;
+        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
+            if (outEdge.fromNodeId().equals(consumer.getId()) && outEdge.outputIndex() == 0) {
+                RecipeNode c = graph.findNodeById(outEdge.toNodeId());
+                totalOutgoing += getEffectiveConsumerBatchAmount(graph, c, outEdge.inputIndex(), visited);
+            }
+        }
+        return totalOutgoing;
+    }
+
+    private static double calculateTotalBatchPortDemand(FlowGraph graph, RecipeNode producer, int outputIndex) {
+        double demand = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(producer.getId()) && edge.outputIndex() == outputIndex) {
+                RecipeNode c = graph.findNodeById(edge.toNodeId());
+                if (c != null && !c.isVoidSink()) {
+                    demand += getEffectiveConsumerBatchAmount(graph, c, edge.inputIndex(), new HashSet<>());
+                }
+            }
+        }
+        return demand;
+    }
+
+    private static double calculateTotalBatchPortSupply(FlowGraph graph, RecipeNode consumer, int inputIndex) {
+        double supply = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(consumer.getId()) && edge.inputIndex() == inputIndex) {
+                RecipeNode p = graph.findNodeById(edge.fromNodeId());
+                if (p != null) {
+                    supply += getEffectiveProducerBatchAmount(graph, p, edge.outputIndex(), new HashSet<>());
+                }
+            }
+        }
+        return supply;
+    }
+
+    private static int countOutgoingEdges(FlowGraph graph, String producerId, int outputIndex) {
+        int count = 0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(producerId) && edge.outputIndex() == outputIndex) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int countIncomingEdges(FlowGraph graph, String consumerId, int inputIndex) {
+        int count = 0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(consumerId) && edge.inputIndex() == inputIndex) {
+                count++;
+            }
+        }
+        return count;
     }
 }

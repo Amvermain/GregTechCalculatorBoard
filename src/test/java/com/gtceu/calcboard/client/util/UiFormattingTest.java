@@ -323,10 +323,48 @@ public class UiFormattingTest {
             String exactPerMin = com.gtceu.calcboard.client.gui.util.FormatUtil.formatExactRate(50.0, true);
             Assertions.assertTrue(exactPerMin.contains("4,320.00 B/d"));
 
-            Assertions.assertEquals(RateTimeUnit.PER_TICK, RateTimeUnit.PER_DAY.next());
+            Assertions.assertEquals(RateTimeUnit.PER_RECIPE, RateTimeUnit.PER_DAY.next());
+            Assertions.assertEquals(RateTimeUnit.PER_TICK, RateTimeUnit.PER_RECIPE.next());
             Assertions.assertEquals(RateTimeUnit.PER_SECOND, RateTimeUnit.PER_TICK.next());
         } finally {
             com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testRecipeBatchModeFormatting() {
+        try {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_RECIPE);
+
+            // 1. Exact amount matching for integer mB (e.g. 288 mB)
+            Assertions.assertEquals("288 mB", FormatUtil.formatRate(288.0, true));
+            Assertions.assertEquals("288 mB", FormatUtil.formatExactRate(288.0, true));
+
+            boolean[] hiddenRef = new boolean[]{false};
+            String normalTooltip = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(288.0, true, false, hiddenRef);
+            Assertions.assertEquals("288 mB", normalTooltip);
+            Assertions.assertFalse(hiddenRef[0], "Identical compact and exact rates must not trigger shift-exact hint");
+
+            String shiftTooltip = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(288.0, true, true, hiddenRef);
+            Assertions.assertEquals("288 mB", shiftTooltip, "Shift tooltip must remain clean without duplicate parenthesis or 1x suffix");
+
+            // 2. Exact item amounts
+            Assertions.assertEquals("4", FormatUtil.formatRate(4.0, false));
+            Assertions.assertEquals("4", FormatUtil.formatExactRate(4.0, false));
+
+            // 3. Large amounts where compact differs from exact (e.g. thousand separator)
+            Assertions.assertEquals("10000 B", FormatUtil.formatRate(10_000_000.0, true));
+            Assertions.assertEquals("10,000 B", FormatUtil.formatExactRate(10_000_000.0, true));
+
+            boolean[] largeHiddenRef = new boolean[]{false};
+            String largeNormal = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(10_000_000.0, true, false, largeHiddenRef);
+            Assertions.assertEquals("10000 B", largeNormal);
+            Assertions.assertTrue(largeHiddenRef[0], "Differing compact rate must trigger shift hint");
+
+            String largeShift = com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.formatPortRate(10_000_000.0, true, true, largeHiddenRef);
+            Assertions.assertEquals("10000 B §8(10,000 B)", largeShift);
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }
     }
 
@@ -724,6 +762,41 @@ public class UiFormattingTest {
         Assertions.assertTrue(violations.isEmpty(),
                 "Hardcoded Korean strings found in Java source code. All UI texts must use Component.translatable(...) with keys in assets/gtcalcboard/lang/*.json:\n"
                         + String.join("\n", violations));
+    }
+
+    @Test
+    public void testRateTimeUnitPerRecipeCycleAndFormatting() {
+        RateTimeUnit unit = RateTimeUnit.PER_SECOND;
+        unit = unit.next();
+        unit = unit.next();
+        unit = unit.next();
+        unit = unit.next();
+        Assertions.assertEquals(RateTimeUnit.PER_RECIPE, unit);
+        Assertions.assertTrue(unit.isRecipeBatchMode());
+        Assertions.assertEquals("1x", unit.getSuffix());
+        Assertions.assertEquals("gui.gtcalcboard.unit.per_recipe", unit.getTranslationKey());
+        Assertions.assertEquals(RateTimeUnit.PER_TICK, unit.next());
+
+        FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_RECIPE);
+        try {
+            IngredientStack item = IngredientStack.item(ResourceLocation.tryParse("minecraft:iron_ingot"), "Iron Ingot", 4.0, 1.0);
+            IngredientStack fluid = IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 2000.0, 1.0);
+            IngredientStack su = IngredientStack.stressUnit(512);
+
+            Assertions.assertEquals("4", FormatUtil.formatRate(4.0, item));
+            Assertions.assertEquals("2 B", FormatUtil.formatRate(2000.0, fluid));
+            Assertions.assertEquals("512 SU", FormatUtil.formatRate(512.0, su));
+
+            String connectedIn = FormatUtil.formatBatchConnectedInput(2000.0, 2000.0, fluid, false);
+            Assertions.assertTrue(connectedIn.contains("2 B"));
+            Assertions.assertFalse(connectedIn.contains("/s"));
+
+            String connectedOut = FormatUtil.formatBatchConnectedOutput(4.0, 4.0, item, false);
+            Assertions.assertTrue(connectedOut.contains("4"));
+            Assertions.assertFalse(connectedOut.contains("/s"));
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
     }
 }
 

@@ -120,7 +120,8 @@ public final class GTAddonCompatibilityHandler {
             }
             boolean supportsCoil = false;
             if (def != null) {
-                supportsCoil = (def.supportsAbility("HEATING_COILS") && def.coilSlotCount() > 0)
+                supportsCoil = def.supportsAbility("HEATING_COILS")
+                        || def.coilSlotCount() > 0
                         || MultiblockDetector.isCoilMultiblock(mbId)
                         || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             } else {

@@ -406,6 +406,10 @@ public class FlowGraph {
         FlowGraphSolver.autoRatioHarmonized(this, anchor);
     }
 
+    public void autoRatioFractional(RecipeNode anchor) {
+        FlowGraphSolver.autoRatioFractional(this, anchor);
+    }
+
     public Map<String, Double> computeNodeEfficiencies() {
         return FlowGraphSolver.computeNodeEfficiencies(this);
     }
@@ -428,6 +432,16 @@ public class FlowGraph {
         stats = FlowGraphSolver.getOutputPortStats(this, node, outputIndex);
         portStatsCache.put(key, stats);
         return stats;
+    }
+
+    public FlowGraphSolver.PortFlowStats getBatchInputPortStats(RecipeNode node, int inputIndex) {
+        if (node == null) return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        return FlowGraphSolver.getBatchInputPortStats(this, node, inputIndex);
+    }
+
+    public FlowGraphSolver.PortFlowStats getBatchOutputPortStats(RecipeNode node, int outputIndex) {
+        if (node == null) return new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        return FlowGraphSolver.getBatchOutputPortStats(this, node, outputIndex);
     }
 
     public BalanceSummary computeSummary() {

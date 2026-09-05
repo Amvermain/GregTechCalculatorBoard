@@ -59,7 +59,16 @@ public final class FlowBalanceMatrixSolver {
         } catch (Throwable ignored) {}
         graph.cleanupInvalidConnections();
 
-        double targetAnchorCount = quantizeMachineCount(graph, anchor, anchor.getMachineCount(), CountRoundingMode.CEIL, integerCounts);
+        double currentAnchorCount = anchor.getMachineCount();
+        boolean isAnchorAlreadyFractional = Math.abs(currentAnchorCount - Math.round(currentAnchorCount)) > 1e-4;
+        boolean preserveFractional = isAnchorAlreadyFractional && com.gtceu.calcboard.api.storage.BoardManager.getInstance().isPreserveFractionalAnchor();
+
+        double targetAnchorCount;
+        if (!integerCounts || preserveFractional) {
+            targetAnchorCount = Math.max(0.0001, Math.round(currentAnchorCount * 10000.0) / 10000.0);
+        } else {
+            targetAnchorCount = quantizeMachineCount(graph, anchor, currentAnchorCount, CountRoundingMode.CEIL, true);
+        }
         anchor.setMachineCount(targetAnchorCount);
 
         // 1. Identify direct anchor suppliers (upstream boundary) and downstream chain from anchor
@@ -497,6 +506,11 @@ public final class FlowBalanceMatrixSolver {
 
     public static Map<FlowGraph.ConnectionEdge, Double> calculateOutgoingEdgeAllocations(
             FlowGraph graph, RecipeNode producer, int outputIndex, double totalProducerRate) {
+        return calculateOutgoingEdgeAllocations(graph, producer, outputIndex, totalProducerRate, null);
+    }
+
+    public static Map<FlowGraph.ConnectionEdge, Double> calculateOutgoingEdgeAllocations(
+            FlowGraph graph, RecipeNode producer, int outputIndex, double totalProducerRate, Map<String, Double> effMap) {
         Map<FlowGraph.ConnectionEdge, Double> allocations = new LinkedHashMap<>();
         if (graph == null || producer == null || totalProducerRate <= 0.00001) {
             return allocations;
@@ -522,28 +536,51 @@ public final class FlowBalanceMatrixSolver {
             }
         }
 
-        if (!variableEdges.isEmpty()) {
-            double totalDemand = 0.0;
-            Map<FlowGraph.ConnectionEdge, Double> demandMap = new LinkedHashMap<>();
-            for (FlowGraph.ConnectionEdge edge : variableEdges) {
-                RecipeNode consumer = graph.findNodeById(edge.toNodeId());
-                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex());
-                demandMap.put(edge, demand);
-                totalDemand += demand;
-            }
-
-            for (FlowGraph.ConnectionEdge edge : variableEdges) {
-                double alloc;
-                if (totalDemand > 0.0001) {
-                    alloc = remainingFlow * (demandMap.get(edge) / totalDemand);
-                } else {
-                    alloc = remainingFlow / variableEdges.size();
-                }
-                allocations.put(edge, alloc);
-            }
+        if (variableEdges.isEmpty()) {
+            return allocations;
         }
 
+        allocateVariableEdges(graph, variableEdges, remainingFlow, effMap, allocations);
         return allocations;
+    }
+
+    private static void allocateVariableEdges(
+            FlowGraph graph,
+            List<FlowGraph.ConnectionEdge> variableEdges,
+            double remainingFlow,
+            Map<String, Double> effMap,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        double totalDemand = 0.0;
+        Map<FlowGraph.ConnectionEdge, Double> demandMap = new LinkedHashMap<>();
+        for (FlowGraph.ConnectionEdge edge : variableEdges) {
+            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+            double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap);
+            demandMap.put(edge, demand);
+            totalDemand += demand;
+        }
+
+        if (totalDemand <= 0.0001) {
+            double split = remainingFlow / variableEdges.size();
+            for (FlowGraph.ConnectionEdge edge : variableEdges) {
+                allocations.put(edge, split);
+            }
+            return;
+        }
+
+        if (remainingFlow >= totalDemand - 0.0001) {
+            double surplus = remainingFlow - totalDemand;
+            for (FlowGraph.ConnectionEdge edge : variableEdges) {
+                double demand = demandMap.get(edge);
+                double surplusShare = surplus * (demand / totalDemand);
+                allocations.put(edge, demand + surplusShare);
+            }
+            return;
+        }
+
+        for (FlowGraph.ConnectionEdge edge : variableEdges) {
+            allocations.put(edge, remainingFlow * (demandMap.get(edge) / totalDemand));
+        }
     }
 
     public static double getEdgeAllocatedFlow(FlowGraph graph, FlowGraph.ConnectionEdge targetEdge, Map<String, Double> effMap) {
@@ -557,7 +594,7 @@ public final class FlowBalanceMatrixSolver {
             return 0.0;
         }
         double prodActualRate = getEffectiveProducerOutputRate(graph, producer, targetEdge.outputIndex(), effMap, visited);
-        Map<FlowGraph.ConnectionEdge, Double> allocations = calculateOutgoingEdgeAllocations(graph, producer, targetEdge.outputIndex(), prodActualRate);
+        Map<FlowGraph.ConnectionEdge, Double> allocations = calculateOutgoingEdgeAllocations(graph, producer, targetEdge.outputIndex(), prodActualRate, effMap);
         return allocations.getOrDefault(targetEdge, 0.0);
     }
 
@@ -590,7 +627,7 @@ public final class FlowBalanceMatrixSolver {
                 for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
                     if (outEdge.fromNodeId().equals(producer.getId()) && outEdge.outputIndex() == outputIndex) {
                         RecipeNode c = graph.findNodeById(outEdge.toNodeId());
-                        totalPortDemand += getConnectedConsumerDemand(graph, c, outEdge.inputIndex());
+                        totalPortDemand += getConnectedConsumerDemand(graph, c, outEdge.inputIndex(), effMap);
                     }
                 }
                 return totalPortDemand;
@@ -605,7 +642,7 @@ public final class FlowBalanceMatrixSolver {
                 for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
                     if (outEdge.fromNodeId().equals(producer.getId()) && outEdge.outputIndex() == outputIndex) {
                         RecipeNode c = graph.findNodeById(outEdge.toNodeId());
-                        totalPortDemand += getConnectedConsumerDemand(graph, c, outEdge.inputIndex());
+                        totalPortDemand += getConnectedConsumerDemand(graph, c, outEdge.inputIndex(), effMap);
                     }
                 }
                 return totalPortDemand;
@@ -618,11 +655,18 @@ public final class FlowBalanceMatrixSolver {
     }
 
     public static double getConnectedConsumerDemand(FlowGraph graph, RecipeNode consumer, int inputIndex) {
+        return getConnectedConsumerDemand(graph, consumer, inputIndex, null);
+    }
+
+    public static double getConnectedConsumerDemand(FlowGraph graph, RecipeNode consumer, int inputIndex, Map<String, Double> effMap) {
         if (consumer == null || consumer.isVoidSink()) return 0.0;
         if (consumer.isReroute()) {
             return calculateTotalConnectedPortDemand(graph, consumer, 0, null);
         }
         if (inputIndex < consumer.getInputs().size()) {
+            if (effMap != null && effMap.containsKey(consumer.getId())) {
+                return consumer.getInputSlotRate(inputIndex, false) * effMap.get(consumer.getId());
+            }
             return consumer.getInputSlotRate(inputIndex, false);
         }
         return 0.0;
@@ -642,38 +686,15 @@ public final class FlowBalanceMatrixSolver {
 
         for (int iter = 0; iter < 10; iter++) {
             boolean changed = false;
+            List<SelfSustainingLoop> loops = detectSelfSustainingLoops(graph, effMap);
+
             for (RecipeNode consumer : graph.getNodes()) {
-                double minRatio = 1.0;
-                boolean hasConnectedInput = false;
-
-                for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
-                    List<FlowGraph.ConnectionEdge> inEdges = findIncomingEdges(graph, consumer.getId(), inIdx);
-                    if (inEdges.isEmpty()) {
-                        continue;
-                    }
-                    hasConnectedInput = true;
-
-                    IngredientStack inStack = consumer.getInputs().get(inIdx);
-                    double nominalInRate = consumer.getInputSlotRate(inIdx, false);
-                    if (nominalInRate <= 0.00001) continue;
-
-                    double totalIncomingSupply = computeIncomingSupply(graph, inEdges, effMap);
-
-                    double portRatio = totalIncomingSupply / nominalInRate;
-                    if (inStack.isStressUnit() && portRatio < 0.9999) {
-                        portRatio = 0.0;
-                    }
-                    minRatio = Math.min(minRatio, portRatio);
-                }
-
-                double calculatedEff = hasConnectedInput ? Math.max(0.0, Math.min(1.0, minRatio)) : 1.0;
+                double calculatedEff = computeConsumerEfficiency(graph, consumer, loops, effMap);
                 double oldEff = effMap.get(consumer.getId());
+                consumer.setEfficiency(calculatedEff);
                 if (Math.abs(oldEff - calculatedEff) > 0.0001) {
                     effMap.put(consumer.getId(), calculatedEff);
-                    consumer.setEfficiency(calculatedEff);
                     changed = true;
-                } else {
-                    consumer.setEfficiency(calculatedEff);
                 }
             }
 
@@ -707,6 +728,70 @@ public final class FlowBalanceMatrixSolver {
         return effMap;
     }
 
+    private static double computeConsumerEfficiency(
+            FlowGraph graph,
+            RecipeNode consumer,
+            List<SelfSustainingLoop> loops,
+            Map<String, Double> effMap
+    ) {
+        double minRatio = 1.0;
+        boolean hasConnectedInput = false;
+
+        for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
+            double portRatio = computePortRatio(graph, consumer, inIdx, loops, effMap);
+            if (portRatio < 0.0) {
+                continue;
+            }
+            hasConnectedInput = true;
+            minRatio = Math.min(minRatio, portRatio);
+        }
+
+        return hasConnectedInput ? Math.max(0.0, Math.min(1.0, minRatio)) : 1.0;
+    }
+
+    private static double computePortRatio(
+            FlowGraph graph,
+            RecipeNode consumer,
+            int inIdx,
+            List<SelfSustainingLoop> loops,
+            Map<String, Double> effMap
+    ) {
+        List<FlowGraph.ConnectionEdge> inEdges = findIncomingEdges(graph, consumer.getId(), inIdx);
+        if (inEdges.isEmpty()) {
+            return -1.0;
+        }
+        IngredientStack inStack = consumer.getInputs().get(inIdx);
+        double nominalInRate = consumer.getInputSlotRate(inIdx, false);
+        if (nominalInRate <= 0.00001) {
+            return -1.0;
+        }
+
+        double totalIncomingSupply = computeIncomingSupply(graph, inEdges, effMap);
+        double portRatio = totalIncomingSupply / nominalInRate;
+        portRatio = applyLoopRelaxation(consumer, inStack, portRatio, loops);
+
+        if (inStack.isStressUnit() && portRatio < 0.9999) {
+            return 0.0;
+        }
+        return portRatio;
+    }
+
+    private static double applyLoopRelaxation(
+            RecipeNode consumer,
+            IngredientStack inStack,
+            double baseRatio,
+            List<SelfSustainingLoop> loops
+    ) {
+        double ratio = baseRatio;
+        for (SelfSustainingLoop loop : loops) {
+            if (loop.matches(consumer, inStack)) {
+                double loopBound = Math.min(1.0, loop.selfSufficiencyRatio()) * loop.externalFeedEfficiency();
+                ratio = Math.max(ratio, loopBound);
+            }
+        }
+        return ratio;
+    }
+
     private static List<FlowGraph.ConnectionEdge> findIncomingEdges(FlowGraph graph, String nodeId, int inputIndex) {
         List<FlowGraph.ConnectionEdge> inEdges = new ArrayList<>();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
@@ -726,6 +811,205 @@ public final class FlowBalanceMatrixSolver {
             totalIncomingSupply += getEdgeAllocatedFlow(graph, edge, effMap);
         }
         return totalIncomingSupply;
+    }
+
+    private record SelfSustainingResource(
+            IngredientStack.Type type,
+            net.minecraft.resources.ResourceLocation id
+    ) {
+        public boolean matches(IngredientStack stack) {
+            if (stack == null) return false;
+            return stack.getType() == type && Objects.equals(stack.getId(), id);
+        }
+    }
+
+    private record SelfSustainingLoop(
+            Set<String> nodeIds,
+            SelfSustainingResource resource,
+            double selfSufficiencyRatio,
+            double externalFeedEfficiency
+    ) {
+        public boolean matches(RecipeNode node, IngredientStack stack) {
+            return node != null && nodeIds.contains(node.getId()) && resource.matches(stack);
+        }
+    }
+
+    private static List<SelfSustainingLoop> detectSelfSustainingLoops(FlowGraph graph, Map<String, Double> effMap) {
+        List<SelfSustainingLoop> result = new ArrayList<>();
+        if (graph == null || graph.getNodes().isEmpty() || graph.getConnections().isEmpty()) {
+            return result;
+        }
+
+        List<Set<String>> sccs = findStronglyConnectedComponents(graph);
+        for (Set<String> scc : sccs) {
+            if (scc.size() < 2 && !hasSelfLoop(graph, scc)) {
+                continue;
+            }
+            Map<SelfSustainingResource, Double> prodTotals = new HashMap<>();
+            Map<SelfSustainingResource, Double> demTotals = new HashMap<>();
+
+            accumulateLoopResourceTotals(graph, scc, prodTotals, demTotals);
+
+            for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
+                SelfSustainingResource res = entry.getKey();
+                double dem = entry.getValue();
+                double prod = prodTotals.getOrDefault(res, 0.0);
+                if (dem > 0.0001 && prod >= dem - 0.001) {
+                    double ratio = prod / dem;
+                    double extFeedEff = calculateExternalFeedEfficiency(graph, scc, res, effMap);
+                    result.add(new SelfSustainingLoop(scc, res, ratio, extFeedEff));
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean hasSelfLoop(FlowGraph graph, Set<String> singleNodeScc) {
+        if (singleNodeScc.size() != 1) return false;
+        String nodeId = singleNodeScc.iterator().next();
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(nodeId) && edge.toNodeId().equals(nodeId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void accumulateLoopResourceTotals(
+            FlowGraph graph,
+            Set<String> scc,
+            Map<SelfSustainingResource, Double> prodTotals,
+            Map<SelfSustainingResource, Double> demTotals
+    ) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!scc.contains(edge.fromNodeId()) || !scc.contains(edge.toNodeId())) {
+                continue;
+            }
+            RecipeNode producer = graph.findNodeById(edge.fromNodeId());
+            if (producer != null && !producer.isReroute() && edge.outputIndex() < producer.getOutputs().size()) {
+                IngredientStack outStack = producer.getOutputs().get(edge.outputIndex());
+                SelfSustainingResource res = new SelfSustainingResource(outStack.getType(), outStack.getId());
+                prodTotals.putIfAbsent(res, 0.0);
+                demTotals.putIfAbsent(res, 0.0);
+            }
+        }
+
+        for (String nodeId : scc) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node == null || node.isReroute()) continue;
+
+            for (int outIdx = 0; outIdx < node.getOutputs().size(); outIdx++) {
+                IngredientStack out = node.getOutputs().get(outIdx);
+                SelfSustainingResource res = new SelfSustainingResource(out.getType(), out.getId());
+                if (prodTotals.containsKey(res)) {
+                    double rate = node.getOutputSlotRate(outIdx, false);
+                    prodTotals.put(res, prodTotals.get(res) + rate);
+                }
+            }
+            for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
+                IngredientStack in = node.getInputs().get(inIdx);
+                SelfSustainingResource res = new SelfSustainingResource(in.getType(), in.getId());
+                if (demTotals.containsKey(res)) {
+                    double rate = node.getInputSlotRate(inIdx, false);
+                    demTotals.put(res, demTotals.get(res) + rate);
+                }
+            }
+        }
+    }
+
+    private static double calculateExternalFeedEfficiency(
+            FlowGraph graph,
+            Set<String> scc,
+            SelfSustainingResource recirculatedRes,
+            Map<String, Double> effMap
+    ) {
+        double minFeedEff = 1.0;
+        for (String nodeId : scc) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node == null || node.isReroute()) continue;
+
+            for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
+                IngredientStack inStack = node.getInputs().get(inIdx);
+                if (recirculatedRes.matches(inStack)) {
+                    continue;
+                }
+                double nomRate = node.getInputSlotRate(inIdx, false);
+                if (nomRate <= 0.0001) continue;
+
+                List<FlowGraph.ConnectionEdge> inEdges = findIncomingEdges(graph, nodeId, inIdx);
+                if (inEdges.isEmpty()) {
+                    continue;
+                }
+                double supply = computeIncomingSupply(graph, inEdges, effMap);
+                double feedRatio = Math.max(0.0, Math.min(1.0, supply / nomRate));
+                minFeedEff = Math.min(minFeedEff, feedRatio);
+            }
+        }
+        return minFeedEff;
+    }
+
+    private static List<Set<String>> findStronglyConnectedComponents(FlowGraph graph) {
+        List<Set<String>> sccs = new ArrayList<>();
+        Map<String, List<String>> adj = new HashMap<>();
+        for (RecipeNode node : graph.getNodes()) {
+            adj.put(node.getId(), new ArrayList<>());
+        }
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            List<String> neighbors = adj.get(edge.fromNodeId());
+            if (neighbors != null && adj.containsKey(edge.toNodeId())) {
+                neighbors.add(edge.toNodeId());
+            }
+        }
+
+        Map<String, Integer> indices = new HashMap<>();
+        Map<String, Integer> lowlinks = new HashMap<>();
+        Deque<String> stack = new ArrayDeque<>();
+        Set<String> onStack = new HashSet<>();
+        int[] index = {0};
+
+        for (RecipeNode node : graph.getNodes()) {
+            if (!indices.containsKey(node.getId())) {
+                strongConnect(node.getId(), adj, indices, lowlinks, stack, onStack, index, sccs);
+            }
+        }
+        return sccs;
+    }
+
+    private static void strongConnect(
+            String u,
+            Map<String, List<String>> adj,
+            Map<String, Integer> indices,
+            Map<String, Integer> lowlinks,
+            Deque<String> stack,
+            Set<String> onStack,
+            int[] index,
+            List<Set<String>> sccs
+    ) {
+        indices.put(u, index[0]);
+        lowlinks.put(u, index[0]);
+        index[0]++;
+        stack.push(u);
+        onStack.add(u);
+
+        for (String v : adj.getOrDefault(u, Collections.emptyList())) {
+            if (!indices.containsKey(v)) {
+                strongConnect(v, adj, indices, lowlinks, stack, onStack, index, sccs);
+                lowlinks.put(u, Math.min(lowlinks.get(u), lowlinks.get(v)));
+            } else if (onStack.contains(v)) {
+                lowlinks.put(u, Math.min(lowlinks.get(u), indices.get(v)));
+            }
+        }
+
+        if (lowlinks.get(u).equals(indices.get(u))) {
+            Set<String> scc = new HashSet<>();
+            String w;
+            do {
+                w = stack.pop();
+                onStack.remove(w);
+                scc.add(w);
+            } while (!u.equals(w));
+            sccs.add(scc);
+        }
     }
 
     public static void optimizeMaxThroughput(FlowGraph graph, boolean preferParallels, boolean integerCounts) {

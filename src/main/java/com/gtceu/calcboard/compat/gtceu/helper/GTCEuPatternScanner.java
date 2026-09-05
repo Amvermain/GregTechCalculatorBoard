@@ -82,9 +82,14 @@ public final class GTCEuPatternScanner {
 
         Set<String> abilities = new HashSet<>();
         Set<ResourceLocation> candidateBlocks = new HashSet<>();
+        Set<Block> coilBlocks = new HashSet<>();
 
-        scanPatternFactory(multiDef, abilities, candidateBlocks);
+        scanPatternFactory(multiDef, abilities, candidateBlocks, coilBlocks);
         enrichFromMachineDefinition(multiDef, abilities);
+
+        if (!coilBlocks.isEmpty()) {
+            abilities.add("HEATING_COILS");
+        }
 
         return new PatternScanResult(
                 Collections.unmodifiableSet(abilities),
@@ -93,14 +98,14 @@ public final class GTCEuPatternScanner {
         );
     }
 
-    private static void scanPatternFactory(MultiblockMachineDefinition multiDef, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanPatternFactory(MultiblockMachineDefinition multiDef, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (multiDef.getPatternFactory() == null) return;
         BlockPattern pattern = multiDef.getPatternFactory().get();
         if (pattern == null) return;
 
         TraceabilityPredicate[][][] matches = extractBlockMatches(pattern);
         if (matches != null) {
-            scanGrid(matches, abilities, candidateBlocks);
+            scanGrid(matches, abilities, candidateBlocks, coilBlocks);
         }
     }
 
@@ -113,69 +118,69 @@ public final class GTCEuPatternScanner {
         }
     }
 
-    private static void scanGrid(TraceabilityPredicate[][][] grid, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanGrid(TraceabilityPredicate[][][] grid, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         for (TraceabilityPredicate[][] plane : grid) {
-            if (plane != null) scanPlane(plane, abilities, candidateBlocks);
+            if (plane != null) scanPlane(plane, abilities, candidateBlocks, coilBlocks);
         }
     }
 
-    private static void scanPlane(TraceabilityPredicate[][] plane, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanPlane(TraceabilityPredicate[][] plane, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         for (TraceabilityPredicate[] row : plane) {
-            if (row != null) scanRow(row, abilities, candidateBlocks);
+            if (row != null) scanRow(row, abilities, candidateBlocks, coilBlocks);
         }
     }
 
-    private static void scanRow(TraceabilityPredicate[] row, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanRow(TraceabilityPredicate[] row, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         for (TraceabilityPredicate pred : row) {
-            if (pred != null) scanTraceabilityPredicate(pred, abilities, candidateBlocks);
+            if (pred != null) scanTraceabilityPredicate(pred, abilities, candidateBlocks, coilBlocks);
         }
     }
 
-    private static void scanTraceabilityPredicate(TraceabilityPredicate pred, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
-        scanSimpleList(pred.common, abilities, candidateBlocks);
-        scanSimpleList(pred.limited, abilities, candidateBlocks);
+    private static void scanTraceabilityPredicate(TraceabilityPredicate pred, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
+        scanSimpleList(pred.common, abilities, candidateBlocks, coilBlocks);
+        scanSimpleList(pred.limited, abilities, candidateBlocks, coilBlocks);
     }
 
-    private static void scanSimpleList(List<SimplePredicate> list, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanSimpleList(List<SimplePredicate> list, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (list == null) return;
         for (SimplePredicate sp : list) {
-            if (sp != null) scanSimplePredicate(sp, abilities, candidateBlocks);
+            if (sp != null) scanSimplePredicate(sp, abilities, candidateBlocks, coilBlocks);
         }
     }
 
-    private static void scanSimplePredicate(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanSimplePredicate(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (sp.type != null && !sp.type.isBlank()) {
             abilities.add(sp.type.toUpperCase(Locale.ROOT));
         }
 
         if (sp instanceof PredicateBlocks pb) {
-            scanBlocksArray(pb.blocks, abilities, candidateBlocks);
+            scanBlocksArray(pb.blocks, abilities, candidateBlocks, coilBlocks);
             return;
         }
 
         if (sp instanceof PredicateStates ps) {
-            scanStatesArray(ps.states, abilities, candidateBlocks);
+            scanStatesArray(ps.states, abilities, candidateBlocks, coilBlocks);
             return;
         }
 
-        scanCandidatesSupplier(sp, abilities, candidateBlocks);
+        scanCandidatesSupplier(sp, abilities, candidateBlocks, coilBlocks);
     }
 
-    private static void scanBlocksArray(Block[] blocks, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanBlocksArray(Block[] blocks, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (blocks == null) return;
         for (Block b : blocks) {
-            scanBlock(b, abilities, candidateBlocks);
+            scanBlock(b, abilities, candidateBlocks, coilBlocks);
         }
     }
 
-    private static void scanStatesArray(BlockState[] states, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanStatesArray(BlockState[] states, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (states == null) return;
         for (BlockState bs : states) {
-            if (bs != null) scanBlock(bs.getBlock(), abilities, candidateBlocks);
+            if (bs != null) scanBlock(bs.getBlock(), abilities, candidateBlocks, coilBlocks);
         }
     }
 
-    private static void scanCandidatesSupplier(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanCandidatesSupplier(SimplePredicate sp, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (CANDIDATES_FIELD == null) return;
         try {
             Object rawSupplier = CANDIDATES_FIELD.get(sp);
@@ -184,30 +189,49 @@ public final class GTCEuPatternScanner {
             if (!(rawInfos instanceof Object[] arr)) return;
 
             for (Object item : arr) {
-                if (item != null) scanCandidateItem(item, abilities, candidateBlocks);
+                if (item != null) scanCandidateItem(item, abilities, candidateBlocks, coilBlocks);
             }
         } catch (Throwable ignored) {}
     }
 
-    private static void scanCandidateItem(Object item, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanCandidateItem(Object item, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (item instanceof Block b) {
-            scanBlock(b, abilities, candidateBlocks);
+            scanBlock(b, abilities, candidateBlocks, coilBlocks);
             return;
         }
         if (item instanceof BlockState bs) {
-            scanBlock(bs.getBlock(), abilities, candidateBlocks);
+            scanBlock(bs.getBlock(), abilities, candidateBlocks, coilBlocks);
             return;
         }
+        Block block = extractBlockFromCandidate(item);
+        if (block != null) {
+            scanBlock(block, abilities, candidateBlocks, coilBlocks);
+        }
+    }
+
+    private static Block extractBlockFromCandidate(Object item) {
+        if (item == null) return null;
         try {
             Method mGetBlockState = item.getClass().getMethod("getBlockState");
             Object bState = mGetBlockState.invoke(item);
-            if (bState instanceof BlockState bs) {
-                scanBlock(bs.getBlock(), abilities, candidateBlocks);
+            if (bState instanceof BlockState bs) return bs.getBlock();
+        } catch (Throwable ignored) {}
+        try {
+            Field fState = item.getClass().getField("blockState");
+            Object bState = fState.get(item);
+            if (bState instanceof BlockState bs) return bs.getBlock();
+        } catch (Throwable ignored) {}
+        try {
+            Method mStack = item.getClass().getMethod("getItemStackForm");
+            Object stackObj = mStack.invoke(item);
+            if (stackObj instanceof net.minecraft.world.item.ItemStack stack && !stack.isEmpty()) {
+                return Block.byItem(stack.getItem());
             }
         } catch (Throwable ignored) {}
+        return null;
     }
 
-    private static void scanBlock(Block b, Set<String> abilities, Set<ResourceLocation> candidateBlocks) {
+    private static void scanBlock(Block b, Set<String> abilities, Set<ResourceLocation> candidateBlocks, Set<Block> coilBlocks) {
         if (b == null) return;
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(b);
         if (id != null && !id.getPath().equals("air")) {
@@ -215,7 +239,7 @@ public final class GTCEuPatternScanner {
         }
 
         if (GTCEuAPI.HEATING_COILS.containsKey(b)) {
-            abilities.add("HEATING_COILS");
+            coilBlocks.add(b);
         }
 
         matchPartAbilities(b, abilities);
@@ -265,6 +289,9 @@ public final class GTCEuPatternScanner {
             }
             if ("CHEMICAL_REACTOR_OC".equals(modId) || "CHEMICAL_REACTOR_OVERCLOCK".equals(modId) || "CHEMICAL_PLANT".equals(modId)
                     || "VACUUM_CHEMICAL_REACTION_CHAMBER".equals(modId)) {
+                abilities.add("HEATING_COILS");
+            }
+            if ("LIQUEFACTION".equals(modId) || "LIQUEFACTION_TOWER".equals(modId)) {
                 abilities.add("HEATING_COILS");
             }
             if ("THROUGHPUT_BOOSTING".equals(modId)) abilities.add("THROUGHPUT_BOOSTING");

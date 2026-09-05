@@ -23,8 +23,14 @@ public final class FlowGraphSolver {
         double requiredOrProducedRate,
         double connectedRate,
         int connectionCount,
-        boolean isConnected
+        boolean isConnected,
+        double effectiveRate,
+        boolean isUpstreamThrottled
     ) {
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, requiredOrProducedRate, false);
+        }
+
         public double getRatio() {
             if (requiredOrProducedRate <= 0.0001) return 1.0;
             return connectedRate / requiredOrProducedRate;
@@ -39,11 +45,25 @@ public final class FlowGraphSolver {
         }
 
         public boolean isInputDeficit() {
+            if (!isConnected) return false;
+            double effectiveReq = effectiveRate > 0.0001 ? effectiveRate : requiredOrProducedRate;
+            return connectedRate < requiredOrProducedRate - 0.001 && connectedRate <= effectiveReq + 0.001;
+        }
+
+        public boolean isNominalDeficit() {
             return isConnected && connectedRate < requiredOrProducedRate - 0.001;
         }
 
+        public boolean isUpstreamThrottled() {
+            return isConnected
+                    && (effectiveRate < requiredOrProducedRate - 0.001)
+                    && (connectedRate > effectiveRate + 0.001);
+        }
+
         public boolean isInputSurplus() {
-            return isConnected && connectedRate > requiredOrProducedRate + 0.001;
+            if (!isConnected) return false;
+            double effectiveReq = effectiveRate > 0.0001 ? effectiveRate : requiredOrProducedRate;
+            return connectedRate > effectiveReq + 0.001;
         }
 
         public boolean isOutputSurplus() {
@@ -70,6 +90,10 @@ public final class FlowGraphSolver {
         FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, integerCounts);
     }
 
+    public static void autoRatioFractional(FlowGraph graph, RecipeNode anchor) {
+        FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, false);
+    }
+
     /**
      * Computes the bottleneck-constrained operating efficiency for every node in the graph.
      */
@@ -84,11 +108,16 @@ public final class FlowGraphSolver {
         return FlowSummaryAggregator.getInputPortStats(graph, node, inputIndex);
     }
 
-    /**
-     * Obtains output port flow statistics.
-     */
     public static PortFlowStats getOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
         return FlowSummaryAggregator.getOutputPortStats(graph, node, outputIndex);
+    }
+
+    public static PortFlowStats getBatchInputPortStats(FlowGraph graph, RecipeNode node, int inputIndex) {
+        return FlowSummaryAggregator.getBatchInputPortStats(graph, node, inputIndex);
+    }
+
+    public static PortFlowStats getBatchOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
+        return FlowSummaryAggregator.getBatchOutputPortStats(graph, node, outputIndex);
     }
 
     /**

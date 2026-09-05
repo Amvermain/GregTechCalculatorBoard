@@ -117,6 +117,46 @@ public class CoilAndReflectorHardwareGatingTest {
     }
 
     @Test
+    @DisplayName("Verify coil installation and cycling invalidates cached overclock calculations")
+    void testCoilInstallationInvalidatesOverclockCache() {
+        RecipeNode ebf = RecipeNode.create("Electric Blast Furnace", 20, 120, GTVoltageTier.HV);
+        ebf.setMultiblock(true);
+        ebf.setMachineIcon(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
+        ebf.setRecipeTemperature(1800);
+
+        CoilHelper.installCoil(ebf, CoilHelper.getCoilForTemperature(1800));
+        double initialEUt = ebf.getSingleMachineEUt();
+        assertEquals(initialEUt, ebf.getOverclockResult().eut(), 0.001);
+
+        MachineAddon nichrome = CoilHelper.getCoilForTemperature(3600);
+        CoilHelper.installCoil(ebf, nichrome);
+
+        double updatedEUt = ebf.getSingleMachineEUt();
+        assertTrue(updatedEUt < initialEUt, "EU/t must decrease with higher coil temperature");
+        assertEquals(updatedEUt, ebf.getOverclockResult().eut(), 0.001);
+    }
+
+    @Test
+    @DisplayName("Verify Nuclear Fuel Factory speed modifier updates on coil cycling")
+    void testNuclearFuelFactoryCoilCyclingUpdatesDuration() {
+        RecipeNode nff = RecipeNode.create("Nuclear Fuel Factory", 20, 1920, GTVoltageTier.EV);
+        nff.setMultiblock(true);
+        nff.setMachineIcon(ResourceLocation.tryParse("gtceu:nuclear_fuel_factory"));
+
+        CoilHelper.installCoil(nff, CoilHelper.getCoilForTemperature(1800));
+        double initialDuration = nff.getEffectiveDurationSeconds();
+        assertEquals(initialDuration, nff.getOverclockResult().durationTicks() / 20.0, 0.001);
+
+        CoilHelper.installCoil(nff, CoilHelper.getCoilForTemperature(2700));
+        double kanthalDuration = nff.getEffectiveDurationSeconds();
+        assertTrue(kanthalDuration < initialDuration, "Duration must decrease with Kanthal coil");
+
+        CoilHelper.cycleCoil(nff);
+        double nichromeDuration = nff.getEffectiveDurationSeconds();
+        assertTrue(nichromeDuration < kanthalDuration, "Duration must decrease with Nichrome coil");
+    }
+
+    @Test
     @DisplayName("Verify reflector installation and cycling on fusion reactor nodes")
     void testReflectorCatalogAndCycling() {
         RecipeNode fusion = RecipeNode.create("Fusion Mk2", 30, 32768, GTVoltageTier.ZPM);

@@ -59,7 +59,7 @@ public final class GTNodeValidator {
         if (graph != null && GTTurbineHelper.isTurbine(node)) {
             for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
                 FlowGraphSolver.PortFlowStats stats = graph.getInputPortStats(node, inIdx);
-                if (stats != null && stats.isConnected() && stats.isInputDeficit()) {
+                if (stats != null && stats.isConnected() && stats.isNominalDeficit()) {
                     if (warnings != null) {
                         IngredientStack inStack = node.getInputs().get(inIdx);
                         String matName = inStack != null ? inStack.getDisplayName() : "Fluid";

@@ -458,6 +458,7 @@ public class CoilHelper {
             MachineAddon tailored = tailorCoilAddon(coilAddon, node);
             node.getAddons().add(tailored != null ? tailored : coilAddon.copy());
         }
+        node.markOverclockDirty();
     }
 
     public static void cycleCoil(RecipeNode node) {

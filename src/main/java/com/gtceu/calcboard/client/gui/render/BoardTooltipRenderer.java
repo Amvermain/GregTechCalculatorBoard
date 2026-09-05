@@ -479,14 +479,17 @@ public final class BoardTooltipRenderer {
 
         IngredientStack in = widget.getNode().getInputs().get(inIdx);
         FlowGraph graph = screen.getGraph();
-        FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getInputPortStats(widget.getNode(), inIdx) : new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        boolean isBatch = FormatUtil.getActiveTimeUnit().isRecipeBatchMode();
+        FlowGraphSolver.PortFlowStats stats = graph != null
+                ? (isBatch ? graph.getBatchInputPortStats(widget.getNode(), inIdx) : graph.getInputPortStats(widget.getNode(), inIdx))
+                : new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
         boolean showExact = Screen.hasShiftDown();
         boolean[] hiddenRef = new boolean[]{false};
 
         List<Component> tooltipLines = new ArrayList<>();
         tooltipLines.add(Component.literal("§b[« " + Component.translatable("gui.gtcalcboard.input").getString() + "] §f" + in.getDisplayName()));
 
-        String reqDisplay = formatPortRate(stats.requiredOrProducedRate(), in.isFluid(), showExact, hiddenRef);
+        String reqDisplay = formatPortRate(stats.requiredOrProducedRate(), in, showExact, hiddenRef);
         tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.demand").getString() + ": §f" + reqDisplay));
 
         appendInputPortStats(tooltipLines, stats, in, showExact, hiddenRef, graph, widget.getNode(), inIdx);
@@ -525,7 +528,10 @@ public final class BoardTooltipRenderer {
 
         IngredientStack out = widget.getNode().getOutputs().get(outIdx);
         FlowGraph graph = screen.getGraph();
-        FlowGraphSolver.PortFlowStats stats = graph != null ? graph.getOutputPortStats(widget.getNode(), outIdx) : new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
+        boolean isBatch = FormatUtil.getActiveTimeUnit().isRecipeBatchMode();
+        FlowGraphSolver.PortFlowStats stats = graph != null
+                ? (isBatch ? graph.getBatchOutputPortStats(widget.getNode(), outIdx) : graph.getOutputPortStats(widget.getNode(), outIdx))
+                : new FlowGraphSolver.PortFlowStats(0, 0, 0, false);
         boolean showExact = Screen.hasShiftDown();
         boolean[] hiddenRef = new boolean[]{false};
 
@@ -535,7 +541,7 @@ public final class BoardTooltipRenderer {
             tooltipLines.add(Component.literal("§d[∅] §d" + Component.translatable("gui.gtcalcboard.tooltip.voided_port").getString()));
         }
 
-        String prodDisplay = formatPortRate(stats.requiredOrProducedRate(), out.isFluid(), showExact, hiddenRef);
+        String prodDisplay = formatPortRate(stats.requiredOrProducedRate(), out, showExact, hiddenRef);
         tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.production").getString() + ": §f" + prodDisplay));
 
         appendOutputPortStats(tooltipLines, stats, out, showExact, hiddenRef);
@@ -556,6 +562,7 @@ public final class BoardTooltipRenderer {
         }
         tooltipLines.add(Component.literal("§7[Drag]: §f" + Component.translatable("gui.gtcalcboard.tooltip.drag_connect").getString()));
         tooltipLines.add(Component.literal("§e[Shift+Drag]: §a⚡ " + Component.translatable("gui.gtcalcboard.tooltip.shift_auto_ratio").getString()));
+        tooltipLines.add(Component.literal("§e[Ctrl+Click]: §b🎯 " + Component.translatable("gui.gtcalcboard.tooltip.port_target_rate").getString()));
         tooltipLines.add(Component.literal("§c[Right-Click]: §7" + Component.translatable("gui.gtcalcboard.tooltip.right_click_hide").getString()));
         tooltipLines.add(Component.literal("§d[Ctrl/Alt+Right-Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.alt_right_click_void").getString()));
         tooltipLines.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
@@ -604,6 +611,23 @@ public final class BoardTooltipRenderer {
         tooltipLines.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.chance", String.format(java.util.Locale.ROOT, "%.1f", effChance * 100.0))));
     }
 
+    public static String formatPortRate(double rate, IngredientStack stack, boolean showExact, boolean[] hiddenExactRef) {
+        if (stack != null && stack.isStressUnit()) {
+            String compact = FormatUtil.formatRate(rate, stack);
+            String exact = FormatUtil.formatExactRate(rate, false);
+            if (!compact.equals(exact)) {
+                if (hiddenExactRef != null && !showExact) {
+                    hiddenExactRef[0] = true;
+                }
+                if (showExact) {
+                    return compact + " §8(" + exact + ")";
+                }
+            }
+            return compact;
+        }
+        return formatPortRate(rate, stack != null && stack.isFluid(), showExact, hiddenExactRef);
+    }
+
     public static String formatPortRate(double rate, boolean isFluid, boolean showExact, boolean[] hiddenExactRef) {
         String compact = NodeCardRenderer.formatRate(rate, isFluid);
         String exact = FormatUtil.formatExactRate(rate, isFluid);
@@ -627,8 +651,8 @@ public final class BoardTooltipRenderer {
         RecipeNode bufferNode = graph != null ? graph.findConnectedBufferNode(node, inIdx) : null;
         boolean isBuffered = bufferNode != null;
 
-        String supDisplay = formatPortRate(stats.connectedRate(), in.isFluid(), showExact, hiddenRef);
-        String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? (isBuffered ? "§e" : "§c") : "§b");
+        String supDisplay = formatPortRate(stats.connectedRate(), in, showExact, hiddenRef);
+        String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? (isBuffered ? "§e" : "§c") : (stats.isUpstreamThrottled() ? "§3" : "§b"));
 
         if (stats.isBalanced()) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay + " §7(§a✔ 100%§7)"));
@@ -639,7 +663,7 @@ public final class BoardTooltipRenderer {
         if (stats.isInputDeficit()) {
             double deficit = stats.requiredOrProducedRate() - stats.connectedRate();
             double defPercent = (1.0 - stats.getRatio()) * 100.0;
-            String defDisplay = formatPortRate(deficit, in.isFluid(), showExact, hiddenRef);
+            String defDisplay = formatPortRate(deficit, in, showExact, hiddenRef);
 
             if (isBuffered) {
                 tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay
@@ -656,10 +680,22 @@ public final class BoardTooltipRenderer {
                 tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + ": §c-" + defDisplay
                         + String.format(java.util.Locale.ROOT, " §7(-%.1f%%)", defPercent)));
             }
+        } else if (stats.isUpstreamThrottled()) {
+            double effRate = stats.effectiveRate();
+            String effDisplay = formatPortRate(effRate, in, showExact, hiddenRef);
+            double surplus = Math.max(0.0, stats.connectedRate() - effRate);
+            String surDisplay = formatPortRate(surplus, in, showExact, hiddenRef);
+
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay
+                    + String.format(java.util.Locale.ROOT, " §7(§b%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.fulfilled").getString())));
+            tooltipLines.add(Component.literal("§3↓ " + Component.translatable("gui.gtcalcboard.tooltip.upstream_throttled", effDisplay).getString()));
+            if (surplus > 0.0001) {
+                tooltipLines.add(Component.literal("§b+ " + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + ": §b+" + surDisplay));
+            }
         } else {
-            double surplus = stats.connectedRate() - stats.requiredOrProducedRate();
-            double surPercent = (stats.getRatio() - 1.0) * 100.0;
-            String surDisplay = formatPortRate(surplus, in.isFluid(), showExact, hiddenRef);
+            double surplus = Math.max(0.0, stats.connectedRate() - stats.requiredOrProducedRate());
+            double surPercent = Math.max(0.0, (stats.getRatio() - 1.0) * 100.0);
+            String surDisplay = formatPortRate(surplus, in, showExact, hiddenRef);
 
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay
                     + String.format(java.util.Locale.ROOT, " §7(§b+%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.fulfilled").getString())));
@@ -676,7 +712,7 @@ public final class BoardTooltipRenderer {
             return;
         }
 
-        String demDisplay = formatPortRate(stats.connectedRate(), out.isFluid(), showExact, hiddenRef);
+        String demDisplay = formatPortRate(stats.connectedRate(), out, showExact, hiddenRef);
         String percentCol = stats.isBalanced() ? "§a" : (stats.isOutputSurplus() ? "§b" : "§c");
 
         if (stats.isBalanced()) {
@@ -688,7 +724,7 @@ public final class BoardTooltipRenderer {
         if (stats.isOutputSurplus()) {
             double surplus = stats.requiredOrProducedRate() - stats.connectedRate();
             double surPercent = (1.0 - stats.getRatio()) * 100.0;
-            String surDisplay = formatPortRate(surplus, out.isFluid(), showExact, hiddenRef);
+            String surDisplay = formatPortRate(surplus, out, showExact, hiddenRef);
 
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.consumed").getString() + ": " + percentCol + demDisplay
                     + String.format(java.util.Locale.ROOT, " §7(§b%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.consumed_stat").getString())));
@@ -697,7 +733,7 @@ public final class BoardTooltipRenderer {
         } else {
             double deficit = stats.connectedRate() - stats.requiredOrProducedRate();
             double defPercent = (stats.getRatio() - 1.0) * 100.0;
-            String defDisplay = formatPortRate(deficit, out.isFluid(), showExact, hiddenRef);
+            String defDisplay = formatPortRate(deficit, out, showExact, hiddenRef);
 
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.consumed").getString() + ": " + percentCol + demDisplay
                     + String.format(java.util.Locale.ROOT, " §7(§c%.1f%% %s§7)", stats.getPercent(), Component.translatable("gui.gtcalcboard.tooltip.demanded_stat").getString())));

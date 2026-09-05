@@ -80,11 +80,19 @@ public class GTCEuMultiblockStructureScanner {
 
             GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
             Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
-            boolean supportsCoilAbility = (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
+            boolean supportsCoilAbility = maxCoil > 0
+                    || patternRes.allowedAbilities().contains("HEATING_COILS")
+                    || (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
                     || MultiblockDetector.isCoilMultiblock(controllerId)
                     || (GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
             if (!supportsCoilAbility) {
                 maxCoil = 0;
+            }
+
+            Set<String> finalAbilities = new HashSet<>(patternRes.allowedAbilities());
+            if (maxCoil > 0) {
+                finalAbilities.add("HEATING_COILS");
+                MultiblockDetector.registerCoilMultiblock(controllerId, null);
             }
 
             Set<ResourceLocation> allCandidates = new HashSet<>(patternRes.candidateBlocks());
@@ -105,7 +113,7 @@ public class GTCEuMultiblockStructureScanner {
                     maxInHatch,
                     maxOutHatch,
                     maxMaint,
-                    patternRes.allowedAbilities(),
+                    Collections.unmodifiableSet(finalAbilities),
                     Collections.unmodifiableSet(allCandidates)
             );
 
@@ -174,9 +182,19 @@ public class GTCEuMultiblockStructureScanner {
 
                     GTCEuPatternScanner.PatternScanResult patternRes = GTCEuPatternScanner.scanPattern(def);
                     Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
-                    boolean supportsCoilAbility = mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls);
+                    boolean supportsCoilAbility = maxCoil > 0
+                            || patternRes.allowedAbilities().contains("HEATING_COILS")
+                            || (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls))
+                            || MultiblockDetector.isCoilMultiblock(controllerId)
+                            || (GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
                     if (!supportsCoilAbility) {
                         maxCoil = 0;
+                    }
+
+                    Set<String> scanAbilities = new HashSet<>(patternRes.allowedAbilities());
+                    if (maxCoil > 0) {
+                        scanAbilities.add("HEATING_COILS");
+                        MultiblockDetector.registerCoilMultiblock(controllerId, null);
                     }
 
                     Set<ResourceLocation> scanCandidates = new HashSet<>(patternRes.candidateBlocks());
@@ -197,7 +215,7 @@ public class GTCEuMultiblockStructureScanner {
                             maxInHatch,
                             maxOutHatch,
                             maxMaint,
-                            patternRes.allowedAbilities(),
+                            Collections.unmodifiableSet(scanAbilities),
                             Collections.unmodifiableSet(scanCandidates)
                     );
 
@@ -311,11 +329,6 @@ public class GTCEuMultiblockStructureScanner {
 
             String controllerName = MultiblockStructureCatalog.formatMachineName(controllerId.getPath());
             parts.add(0, new MultiblockStructurePart(controllerId, controllerName, 1, PartCategory.CONTROLLER));
-
-            if (!MultiblockDetector.isCoilMultiblock(controllerId)
-                    && GTCEuCoilModifierHelper.getCoilMachineSpec(controllerId).kind() == GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
-                coilSlots = 0;
-            }
 
             return new MultiblockStructureDef(
                     controllerId,

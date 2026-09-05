@@ -156,4 +156,34 @@ public class GreateModAdapterTest {
         Assertions.assertTrue(tooltip.stream().anyMatch(c -> c.getString().contains("128 SU")));
         Assertions.assertTrue(tooltip.stream().anyMatch(c -> c.getString().contains("stress_headroom") || c.getString().contains("Headroom")));
     }
+
+    @Test
+    public void testMachineCountScalingDoesNotCauseShaftOverstress() {
+        RecipeNode node = RecipeNode.create("Aluminium Press (Multiple)", 100.0, 48.0, GTVoltageTier.MV);
+        node.setEnergyType(EnergyType.KINETIC_SU);
+        node.getProperties().set(GreateProperties.IS_GREATE, true);
+        node.getProperties().set(GreateProperties.MACHINE_TIER, 2); // MS (128 SU capacity)
+        node.getProperties().set(GreateProperties.REQUIRED_RECIPE_TIER, 2);
+        node.setRpm(64); // single machine stress = 96 SU (<= 128 SU)
+        node.setMachineCount(2.0); // total stress = 192 SU (> 128 SU, but <= 256 SU total capacity)
+
+        List<Component> warnings = new java.util.ArrayList<>();
+        boolean valid = adapter.validateNode(node, warnings);
+        Assertions.assertTrue(valid);
+        Assertions.assertTrue(warnings.isEmpty());
+
+        String stats = adapter.formatEnergyStats(node, PowerDisplayMode.EUT);
+        Assertions.assertTrue(stats.contains("192"));
+        Assertions.assertTrue(stats.contains("256 SU"));
+
+        List<Component> tooltip = adapter.buildEnergyTooltip(node);
+        Assertions.assertTrue(tooltip.stream().anyMatch(c -> {
+            String text = c.getString();
+            return text.contains("256 SU");
+        }));
+        Assertions.assertTrue(tooltip.stream().anyMatch(c -> {
+            String text = c.getString();
+            return text.contains("stress_headroom") || text.contains("Headroom");
+        }));
+    }
 }
