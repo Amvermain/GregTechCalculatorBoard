@@ -122,6 +122,10 @@ public final class NodeRateCalculator {
     }
 
     public static Map<IngredientStack, Double> calculateEffectiveInputRates(RecipeNode node) {
+        return calculateEffectiveInputRates(node, true);
+    }
+
+    public static Map<IngredientStack, Double> calculateEffectiveInputRates(RecipeNode node, boolean postEvent) {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         if (node == null) return rates;
 
@@ -131,25 +135,21 @@ public final class NodeRateCalculator {
             double amount = in.getAmount() * getEffectiveInputChance(node, i);
             double r = amount * cps;
             r = ModAdapterRegistry.getAdapterForNode(node).computeEffectiveIngredientRate(node, in, true, r);
-            boolean merged = false;
-            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
-                if (entry.getKey().equals(in)) {
-                    entry.setValue(entry.getValue() + r);
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                rates.put(in, r);
-            }
+            rates.merge(in, r, Double::sum);
         }
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, rates, Collections.emptyMap()));
-        } catch (Throwable ignored) {}
+        if (postEvent) {
+            try {
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, rates, Collections.emptyMap()));
+            } catch (Throwable ignored) {}
+        }
         return rates;
     }
 
     public static Map<IngredientStack, Double> calculateEffectiveOutputRates(RecipeNode node) {
+        return calculateEffectiveOutputRates(node, true);
+    }
+
+    public static Map<IngredientStack, Double> calculateEffectiveOutputRates(RecipeNode node, boolean postEvent) {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         if (node == null) return rates;
 
@@ -159,21 +159,13 @@ public final class NodeRateCalculator {
             double amount = out.getAmount() * getEffectiveOutputChance(node, i);
             double r = amount * cps;
             r = ModAdapterRegistry.getAdapterForNode(node).computeEffectiveIngredientRate(node, out, false, r);
-            boolean merged = false;
-            for (Map.Entry<IngredientStack, Double> entry : rates.entrySet()) {
-                if (entry.getKey().equals(out)) {
-                    entry.setValue(entry.getValue() + r);
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                rates.put(out, r);
-            }
+            rates.merge(out, r, Double::sum);
         }
-        try {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, Collections.emptyMap(), rates));
-        } catch (Throwable ignored) {}
+        if (postEvent) {
+            try {
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.RecipeNodeEvent.PostCalculation(node, Collections.emptyMap(), rates));
+            } catch (Throwable ignored) {}
+        }
         return rates;
     }
 

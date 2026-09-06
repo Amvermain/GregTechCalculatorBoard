@@ -156,6 +156,8 @@ public class CanvasContextMenuManager {
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.group_module", "📦", "Ctrl+Shift+G", screen::performGroupIntoModule));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.shared_frame", "⧉", "Ctrl+Shift+S", screen::createSharedMachineFrameFromSelection));
         this.items.add(ContextMenuItem.separator());
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.auto_ratio", "⚖", "Alt+R", screen::performAutoRatio));
+        this.items.add(ContextMenuItem.separator());
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.copy_selection", "📋", "Ctrl+C", screen::copySelection));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.duplicate_selection", "⎘", "Ctrl+D", screen::duplicateSelection));
         this.items.add(ContextMenuItem.danger("gui.gtcalcboard.menu.delete_selection", "✕", "Del", screen::deleteSelection));

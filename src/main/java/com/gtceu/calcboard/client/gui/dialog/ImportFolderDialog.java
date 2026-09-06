@@ -14,9 +14,12 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.List;
 
-public class ImportFolderDialog {
+public class ImportFolderDialog implements IBoardModal {
     private final BoardScreen screen;
     private boolean visible = false;
     private FolderBlueprintPackage currentPackage;
@@ -51,6 +54,11 @@ public class ImportFolderDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

@@ -11,12 +11,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.Objects;
 
 /**
  * Modal dialog for editing Frame Title and Theme Color.
  */
-public class FrameEditDialog {
+public class FrameEditDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private CanvasGroupFrame targetFrame = null;
@@ -63,6 +66,11 @@ public class FrameEditDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {

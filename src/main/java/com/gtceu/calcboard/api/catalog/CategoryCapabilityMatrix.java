@@ -296,6 +296,30 @@ public class CategoryCapabilityMatrix {
                 true, true, false, true, false, false, false, null, null, GTVoltageTier.EV, 4096.0
         );
         registerMockCategory(
+                ResourceLocation.tryParse("gtceu:combustion_generator"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_combustion"),
+                        ResourceLocation.tryParse("gtceu:mv_combustion"),
+                        ResourceLocation.tryParse("gtceu:hv_combustion"),
+                        ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                        ResourceLocation.tryParse("gtceu:extreme_combustion_engine")
+                ),
+                ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                true, true, false, false, false, false, false, null, null, GTVoltageTier.EV, 4096.0
+        );
+        registerMockCategory(
+                ResourceLocation.tryParse("gtceu:combustion_generator_fuels"),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_combustion"),
+                        ResourceLocation.tryParse("gtceu:mv_combustion"),
+                        ResourceLocation.tryParse("gtceu:hv_combustion"),
+                        ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                        ResourceLocation.tryParse("gtceu:extreme_combustion_engine")
+                ),
+                ResourceLocation.tryParse("gtceu:large_combustion_engine"),
+                true, true, false, false, false, false, false, null, null, GTVoltageTier.EV, 4096.0
+        );
+        registerMockCategory(
                 ResourceLocation.tryParse("gtceu:plasma_turbine"),
                 List.of(
                         ResourceLocation.tryParse("gtceu:plasma_large_turbine"),

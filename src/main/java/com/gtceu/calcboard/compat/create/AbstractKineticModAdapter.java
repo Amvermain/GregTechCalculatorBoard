@@ -6,6 +6,7 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -19,6 +20,15 @@ import java.util.Set;
  * Encapsulates RPM-based overclock calculations, stress unit formatting, and tooltip generation.
  */
 public abstract class AbstractKineticModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IEnergySimulationProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     private static final Set<String> FAN_PROCESSING_PATHS = Set.of(
             "splashing", "washing", "haunting", "smoking", "blasting"
@@ -58,6 +68,17 @@ public abstract class AbstractKineticModAdapter implements IModAdapter {
     @Override
     public EnergyType getEnergyType(RecipeNode node) {
         return EnergyType.KINETIC_SU;
+    }
+
+    @Override
+    public double computeSingleMachinePower(RecipeNode node) {
+        if (node == null) return 0.0;
+        return node.getOverclockResult().eut();
+    }
+
+    @Override
+    public int computeEffectiveParallel(RecipeNode node) {
+        return node != null ? Math.max(1, node.getParallel()) : 1;
     }
 
     @Override

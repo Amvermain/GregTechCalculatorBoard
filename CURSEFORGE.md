@@ -37,7 +37,7 @@ The mod is completely standalone and fully optional on both client and server:
 #### 2. Deep GregTech & Multi-Mod Calculation Engine
 * **GregTech CEu Modern**: Full ULV~MAX voltage tiers, Standard/Perfect/Lossless overclocking, subtick CPS batching, and dual energy hatch support.
 * **Hardware Addons & Multiblocks**: Deductive calculation for heating coils (temperature & speed bonuses), parallel hatches, configurable maintenance hatches, and turbine rotors.
-* **Multi-Mod Energy Systems**: Kinetic calculations for **Create** & **Create: New Age** (SU, RPM, generator coils), RF/t dynamos & tier kits for **Thermal Series**, and steam consumption modeling for **Systeams** / Boilers.
+* **Multi-Mod Energy Systems**: Kinetic calculations for **Create**, **Create: New Age**, & **Create: Diesel Generators** (SU, RPM, diesel combustion engines, generator coils), RF/t dynamos & tier kits for **Thermal Series**, and steam consumption modeling for **Systeams** / Boilers.
 
 #### 3. Factory Multiblock BOM & Shared Machine Pools
 * **Multiblock Bill of Materials (BOM)**: Automatically aggregates all required casings, coils, hatches, and controllers across the factory (`B` hotkey). Export shopping lists directly to EMI Recipe Tree, JEI++, or clipboard.

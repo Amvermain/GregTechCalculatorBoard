@@ -21,17 +21,17 @@
 graph TD
     subgraph UI["1. 프레젠테이션 & UI 계층 (com.gtceu.calcboard.client.gui)"]
         BS["BoardScreen (화면 오케스트레이터, 최상위 이벤트 라우터)"]
-        BDM["BoardDialogManager (20여종 모달 다이얼로그 생명주기 및 우선순위 디스패치)"]
+        BDM["BoardDialogManager & ModalStack (LIFO 모달 생명주기 및 ESC 순차 닫힘)"]
         BCR["BoardCanvasRenderer (뷰포트 컬링 및 노드/와이어 렌더링 파이프라인 조율)"]
         BAH["BoardActionHandler (Undo/Redo 액션 기록 및 노드/와이어 삭제 수집)"]
         BVT["BoardViewportTransform (가상 GUI 배율 독립 좌표 변환 엔진)"]
-        CIH["CanvasInteractionHandler (Pan, Zoom, 드래그 다중 선택, 퀵애드 인터랙션)"]
+        CIH["CanvasInteractionHandler & CanvasStateMachine (유한 상태 머신 기반 상호 배타성 보장)"]
         RENDER["Two-Pass Z-Order 렌더링 & 포화도 기반 와이어 펄스 셰이더"]
         WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E) 공간 분할)"]
         NCTC["NodeCardTextCache (dirty 기반 텍스트 절삭 및 단위 포맷팅 캐시)"]
         Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay)"]
         Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog)"]
-        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
+        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & 합성 가능 명세 패턴)"]
     end
 
     subgraph Core["2. 코어 수학 & 도메인 엔진 (com.gtceu.calcboard.api)"]
@@ -46,11 +46,13 @@ graph TD
 
     subgraph Compat["3. 모드 호환성 공용 SPI 계층 (com.gtceu.calcboard.compat)"]
         MAR["ModAdapterRegistry (우선순위 기반 동적 라우팅 SPI)"]
-        IMA["IModAdapter (생명주기, 오버클럭, 에너지, BOM 기여 & 유효성 검증)"]
+        IMA["IModAdapter & 6대 Extension Provider (에너지, 레시피, 애드온, BOM, 부스터, 기능)"]
         subgraph Adapters["도메인 모드 어댑터 (100% 헤드리스 안전)"]
             GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
             CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, 스트레스 용량, 키네틱 기계)"]
+            CDG["createdieselgenerators (디젤 엔진 3종, SU 발전/연료 소모, 분별 증류)"]
             CNA["createnewage (모터, 발전기 코일, 자석 링, FE/SU 변환)"]
+            GR["greate (티어형 키네틱 기계)"]
             TH["thermal (AugmentData, 티어 키트, 다이나모, RF/t)"]
             SY["systeams (보일러, 증기 다이나모, 증기 mB/s)"]
             ST["start (StarTReflectionBridge, 플라즈마 터빈, 스레딩 헬릭스 구조체, SPT/NPT 특성)"]
@@ -124,6 +126,14 @@ graph TD
   1. 공식 API 및 런타임 Java 리플렉션을 통한 기능적 연역.
   2. 모드 내부 객체/물리 시뮬레이션 직접 실행.
   3. 결정론적 NBT 수치 데이터 구조(`AugmentData` Float/Int 태그) 및 공식 `TagKey` 직접 검사.
+
+### 2.6 계층형 모달 다이얼로그 스택 및 캔버스 인터랙션 유한 상태 머신 (ADR-026 & ADR-027)
+* **LIFO 모달 스택 (`ModalStack` 및 `IBoardModal`)**: 캔버스 내 26개 모달 다이얼로그를 LIFO 역순으로 관리하여, `ESC` 키 또는 외부 클릭 시 최상위 모달부터 순차적으로 닫히도록 제어하고 하위 캔버스로의 고스트 클릭 및 입력 누수를 원천 차단합니다.
+* **유한 상태 머신 (`CanvasStateMachine`)**: 상호작용 상태(IDLE, DRAGGING_NODES, WIRING, BOX_SELECTING, RESIZING, PANNING) 간의 상호 배타성을 보장하며, 조작 중 `ESC`나 우클릭 시 임시 버퍼를 정리하고 안전하게 이전 상태로 롤백합니다.
+
+### 2.7 합성 가능 레시피 검색 명세 패턴 및 Extension Object SPI (ADR-028 & ADR-029)
+* **명세 패턴 쿼리 엔진 (`RecipeSearchQueryEngine`)**: 다중 필터 조건(`@mod`, `#tag`, `tier:`, `eut:`)을 선언적 Predicate로 합성하고 토큰 인덱스를 메모이제이션하여 대규모 레시피 검색 성능을 극대화합니다.
+* **인터페이스 분리 및 Extension Object 패턴 (`IModAdapter`)**: 코어 생명주기 인터페이스를 86줄로 슬림화하고, 6대 도메인 Provider(`IEnergySimulationProvider`, `ICompoundRecipeProvider`, `IHardwareAddonProvider`, `IMultiblockBOMProvider`, `IBoosterProvider`, `ICapabilityMatrixProvider`)로 역할을 분리하여 100% 하위 호환성을 유지하면서 높은 확장성을 확보했습니다.
 
 ---
 

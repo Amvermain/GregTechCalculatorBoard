@@ -35,10 +35,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class RecipeSearchDialog {
+public class RecipeSearchDialog implements IBoardModal {
     private final BoardScreen parent;
     private final EditBox searchBox;
 
@@ -126,16 +129,25 @@ public class RecipeSearchDialog {
 
     public RecipeSearchDialog(BoardScreen parent) {
         this.parent = parent;
-        Font font = Minecraft.getInstance().font;
-        this.searchBox = new EditBox(font, 0, 0, BASE_DIALOG_WIDTH - 48, 16, Component.translatable("gui.gtcalcboard.search"));
-        this.searchBox.setMaxLength(256);
-        this.searchBox.setResponder(this::onSearchQueryChanged);
-        this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc != null ? mc.font : null;
+        if (font != null) {
+            this.searchBox = new EditBox(font, 0, 0, BASE_DIALOG_WIDTH - 48, 16, Component.translatable("gui.gtcalcboard.search"));
+            this.searchBox.setMaxLength(256);
+            this.searchBox.setResponder(this::onSearchQueryChanged);
+            this.searchBox.setHint(Component.translatable("gui.gtcalcboard.search.search_help"));
+        } else {
+            this.searchBox = null;
+        }
 
-        this.filterDialog.setOnFilterChanged(() -> updateSearchResults(searchBox.getValue()));
+        this.filterDialog.setOnFilterChanged(() -> {
+            String query = searchBox != null ? searchBox.getValue() : "";
+            updateSearchResults(query);
+        });
         registerFavoritesListener(() -> {
             if (this.visible) {
-                updateSearchResults(searchBox.getValue());
+                String query = searchBox != null ? searchBox.getValue() : "";
+                updateSearchResults(query);
             }
         });
     }
@@ -273,6 +285,16 @@ public class RecipeSearchDialog {
 
     public void setVisible(boolean visible) {
         setVisible(visible, false, 0, 0);
+    }
+
+    @Override
+    public void close() {
+        setVisible(false);
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     private void onSearchQueryChanged(String query) {
@@ -678,6 +700,11 @@ public class RecipeSearchDialog {
             tooltipLines.add(Component.literal("§e★ " + Component.translatable("gui.gtcalcboard.search.prefix.click_hint").getString()));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, parent.width, parent.height);
         }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        return mouseClicked(mouseX, mouseY, button, parent.width, parent.height);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {

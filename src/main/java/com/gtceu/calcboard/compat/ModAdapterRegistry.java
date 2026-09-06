@@ -2,7 +2,9 @@ package com.gtceu.calcboard.compat;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
+import com.gtceu.calcboard.compat.createdieselgenerators.CreateDieselGeneratorsModAdapter;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeModAdapter;
+import com.gtceu.calcboard.compat.extension.IModExtension;
 import com.gtceu.calcboard.compat.greate.GreateModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.start.StarTModAdapter;
@@ -40,6 +42,7 @@ public class ModAdapterRegistry {
         register(new ThermalModAdapter());       // Priority 100
         register(new GTCEuModAdapter());         // Priority 100
         register(new GreateModAdapter());        // Priority 95 (intercepts Greate tiered kinetic machinery)
+        register(new CreateDieselGeneratorsModAdapter()); // Priority 95 (intercepts CDG engines, distillation, fermenting)
         register(new CreateModAdapter());        // Priority 90
         register(FALLBACK_ADAPTER);               // Priority 0
 
@@ -100,14 +103,18 @@ public class ModAdapterRegistry {
     }
 
     public static IModAdapter getAdapterForNode(RecipeNode node) {
-        init();
         if (node == null) return FALLBACK_ADAPTER;
+        IModAdapter cached = node.getCachedModAdapter();
+        if (cached != null) return cached;
+        init();
 
         for (IModAdapter a : ADAPTERS) {
             if (a.isLoaded() && a.handlesNode(node)) {
+                node.setCachedModAdapter(a);
                 return a;
             }
         }
+        node.setCachedModAdapter(FALLBACK_ADAPTER);
         return FALLBACK_ADAPTER;
     }
 
@@ -167,6 +174,21 @@ public class ModAdapterRegistry {
                 a.accumulateStructureSlots(itemId, category, amount, slots);
             }
         }
+    }
+
+    public static <T extends IModExtension> Optional<T> getExtension(RecipeNode node, Class<T> extensionClass) {
+        IModAdapter adapter = getAdapterForNode(node);
+        return adapter != null ? adapter.getExtension(extensionClass) : Optional.empty();
+    }
+
+    public static <T extends IModExtension> Optional<T> getExtensionForMod(String modId, Class<T> extensionClass) {
+        IModAdapter adapter = getAdapterForModId(modId);
+        return adapter != null ? adapter.getExtension(extensionClass) : Optional.empty();
+    }
+
+    public static <T extends IModExtension> Optional<T> getExtensionForCategory(ResourceLocation categoryId, Class<T> extensionClass) {
+        IModAdapter adapter = getAdapterForCategory(categoryId);
+        return adapter != null ? adapter.getExtension(extensionClass) : Optional.empty();
     }
 }
 

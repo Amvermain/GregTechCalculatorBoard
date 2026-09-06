@@ -95,6 +95,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private final NodeInspectorPanel nodeInspectorPanel = new NodeInspectorPanel(this);
     private final AdaptiveStatusBar statusBar = new AdaptiveStatusBar(this);
     private final LeftActivityBarWidget leftActivityBar = new LeftActivityBarWidget(this);
+    private final SelectionFloatingToolbarWidget selectionToolbarWidget = new SelectionFloatingToolbarWidget(this);
 
     private final BoardDialogManager dialogManager = new BoardDialogManager(this);
     private final BoardCanvasRenderer canvasRenderer = new BoardCanvasRenderer();
@@ -108,6 +109,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private double wasdVelX = 0.0;
     private double wasdVelY = 0.0;
     private long lastFrameTimeNano = 0;
+    private boolean summaryAutoCollapsedForInspector = false;
 
     public BoardScreen() {
         this(new BoardMenu(0, Minecraft.getInstance() != null && Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getInventory() : null));
@@ -183,6 +185,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private void initNetworkPresence() {
         if (minecraft == null || minecraft.getConnection() == null) return;
         ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (!state.isCollaborationEnabled()) return;
         UUID teamId = state.getCurrentTeamId();
         String pageId = state.getActiveTeamPageId();
         boolean isTeamMode = state.isTeamMode();
@@ -422,24 +425,35 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         }
         favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
         pageBrowserDrawer.render(graphics, mouseX, mouseY, partialTicks);
-        nodeInspectorPanel.render(graphics, mouseX, mouseY, partialTicks);
-        statusBar.render(graphics, mouseX, mouseY, partialTicks);
 
         if (summaryDirty || cachedSummary == null) {
             cachedSummary = FlowGraphSolver.computeSummary(getGraph());
             summaryDirty = false;
         }
+        summaryOverlay.setRightOffset(getSummaryRightOffset());
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
+
+        nodeInspectorPanel.render(graphics, mouseX, mouseY, partialTicks);
+        statusBar.render(graphics, mouseX, mouseY, partialTicks);
+        selectionToolbarWidget.render(graphics, font, mouseX, mouseY);
         BoardHudRenderer.renderCentralLoadingCard(graphics, font, width, height, isAnyModalOpen(), favoritesDockWidget);
 
-        if (!isAnyModalOpen() && !pageBrowserDrawer.isOpen()) {
-            graphics.flush();
-            com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
-            com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
-            BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
-            favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
-            workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
-            leftActivityBar.renderTooltips(graphics, font, mouseX, mouseY);
+        if (!isAnyModalOpen()) {
+            if (!pageBrowserDrawer.isOpen()) {
+                graphics.flush();
+                com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+                com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+                BoardTooltipRenderer.renderTooltips(this, graphics, font, mouseX, mouseY);
+                favoritesDockWidget.renderTooltips(graphics, font, mouseX, mouseY);
+                workspaceTabBar.renderTooltips(graphics, font, mouseX, mouseY);
+                leftActivityBar.renderTooltips(graphics, font, mouseX, mouseY);
+                selectionToolbarWidget.renderTooltips(graphics, font, mouseX, mouseY);
+            } else if (mouseX >= 0 && mouseX <= LeftActivityBarWidget.BAR_WIDTH) {
+                graphics.flush();
+                com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+                com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+                leftActivityBar.renderTooltips(graphics, font, mouseX, mouseY);
+            }
         }
     }
 
@@ -495,10 +509,12 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         if (pageTabBar.mouseClicked(vx, vy, button)) return true;
         if (favoritesDockWidget.mouseClicked(vx, vy, button)) return true;
         if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseClicked(vx, vy, button)) return true;
-        if (summaryOverlay.mouseClicked(vx, vy, button, width, height)) return true;
+        summaryOverlay.setRightOffset(getSummaryRightOffset());
         if (nodeInspectorPanel.mouseClicked(vx, vy, button)) return true;
+        if (summaryOverlay.mouseClicked(vx, vy, button, width, height)) return true;
         if (statusBar.mouseClicked(vx, vy, button)) return true;
         if (toolbarWidget.mouseClicked(vx, vy, button)) return true;
+        if (selectionToolbarWidget.mouseClicked(vx, vy, button)) return true;
         if (canvasHandler.mouseClicked(vx, vy, button)) return true;
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -542,6 +558,8 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen() && pageBrowserDrawer.mouseScrolled(vx, vy, delta)) return true;
         if (favoritesDockWidget.mouseScrolled(vx, vy, delta)) return true;
         if (pageTabBar.mouseScrolled(vx, vy, delta)) return true;
+        summaryOverlay.setRightOffset(getSummaryRightOffset());
+        if (nodeInspectorPanel.mouseScrolled(vx, vy, delta)) return true;
         if (summaryOverlay.mouseScrolled(vx, vy, delta, width, height)) return true;
         if (toolbarWidget.mouseScrolled(vx, vy, delta)) return true;
         if (BoardManager.getInstance().isShowHotkeyHud() && hotkeyHudWidget.mouseScrolled(vx, vy, delta)) return true;
@@ -683,7 +701,32 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     }
     public void openNodeInspector(NodeWidget widget) { nodeInspectorPanel.setTargetWidget(widget); }
     public NodeInspectorPanel getNodeInspectorPanel() { return nodeInspectorPanel; }
+
+    public int getSummaryRightOffset() {
+        return (nodeInspectorPanel != null && nodeInspectorPanel.isVisible())
+                ? (nodeInspectorPanel.getPanelWidth() + 6)
+                : 0;
+    }
+
+    public void onNodeInspectorOpened() {
+        if (this.width < 760 && !summaryOverlay.isCollapsed()) {
+            summaryOverlay.setCollapsed(true);
+            summaryAutoCollapsedForInspector = true;
+        }
+    }
+
+    public void onNodeInspectorClosed() {
+        if (summaryAutoCollapsedForInspector) {
+            summaryOverlay.setCollapsed(false);
+            summaryAutoCollapsedForInspector = false;
+        }
+    }
+
+    public void onSummaryOverlayToggled() {
+        summaryAutoCollapsedForInspector = false;
+    }
     public AdaptiveStatusBar getStatusBar() { return statusBar; }
+    public SelectionFloatingToolbarWidget getSelectionToolbarWidget() { return selectionToolbarWidget; }
     public void selectNote(String id, boolean multi) { selectionModel.selectNote(id, multi); }
     public void selectFrame(String id, boolean multi) { selectionModel.selectFrame(id, multi); }
     public void toggleSelectNode(String id) { selectionModel.toggle(id); }

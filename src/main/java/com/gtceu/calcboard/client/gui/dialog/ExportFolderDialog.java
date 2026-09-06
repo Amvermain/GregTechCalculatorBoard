@@ -15,10 +15,13 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.io.File;
 import java.util.List;
 
-public class ExportFolderDialog {
+public class ExportFolderDialog implements IBoardModal {
     private final BoardScreen screen;
     private boolean visible = false;
     private String folderPath = "";
@@ -69,6 +72,11 @@ public class ExportFolderDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

@@ -18,6 +18,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.*;
 
@@ -25,7 +27,7 @@ import java.util.*;
  * Modal dialog for inspecting and switching available machine workstations / multiblock controllers
  * for a RecipeNode. Automatically applies machine presets upon selection.
  */
-public class MachineSelectorDialog {
+public class MachineSelectorDialog implements IBoardModal {
 
     public record MachineEntry(
             ResourceLocation id,
@@ -258,6 +260,11 @@ public class MachineSelectorDialog {
             }
         }
         return null;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {

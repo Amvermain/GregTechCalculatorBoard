@@ -416,11 +416,20 @@ public class MultiblockStructureCatalog {
                 }
             }
 
-            Set<String> allowedAbilities = determineAllowedAbilities(slots, isSteam);
+            boolean isCoilCapable = MultiblockDetector.isCoilMultiblock(controllerInfo.id)
+                    || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(controllerInfo.id).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+
+            if (!isCoilCapable) {
+                slots.coilSlots = 0;
+            }
+
+            List<MultiblockStructurePart> resolvedParts = sanitizeEmiParts(parts, isCoilCapable);
+            Set<String> allowedAbilities = determineAllowedAbilities(slots, isSteam, isCoilCapable);
+
             return new MultiblockStructureDef(
                     controllerInfo.id,
                     controllerInfo.name,
-                    parts,
+                    resolvedParts,
                     slots.coilSlots,
                     slots.energyHatchSlots,
                     slots.inputBusSlots,
@@ -433,7 +442,20 @@ public class MultiblockStructureCatalog {
             );
         }
 
-        private static Set<String> determineAllowedAbilities(StructureSlotCounts slots, boolean isSteam) {
+        private static List<MultiblockStructurePart> sanitizeEmiParts(List<MultiblockStructurePart> parts, boolean isCoilCapable) {
+            if (isCoilCapable || parts == null) return parts;
+            List<MultiblockStructurePart> sanitized = new ArrayList<>(parts.size());
+            for (MultiblockStructurePart part : parts) {
+                if (part != null && part.category() == PartCategory.COIL) {
+                    sanitized.add(new MultiblockStructurePart(part.itemId(), part.displayName(), part.amount(), PartCategory.CASING));
+                } else {
+                    sanitized.add(part);
+                }
+            }
+            return sanitized;
+        }
+
+        private static Set<String> determineAllowedAbilities(StructureSlotCounts slots, boolean isSteam, boolean isCoilCapable) {
             Set<String> abilities = new HashSet<>();
             if (slots.inputBusSlots > 0) abilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
             if (slots.outputBusSlots > 0) abilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
@@ -441,6 +463,7 @@ public class MultiblockStructureCatalog {
             if (slots.outputHatchSlots > 0) abilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
             if (slots.energyHatchSlots > 0 && !isSteam) abilities.add("INPUT_ENERGY");
             if (slots.maintenanceSlots > 0 && !isSteam) abilities.add("MAINTENANCE");
+            if (slots.coilSlots > 0 && isCoilCapable) abilities.add("HEATING_COILS");
             return abilities;
         }
     }

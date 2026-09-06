@@ -1,6 +1,8 @@
 package com.gtceu.calcboard.client.gui.tutorial;
 
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,8 +13,19 @@ import java.util.List;
 /**
  * Onboarding welcome modal shown when a user opens the calculator board for the first time.
  */
-public class WelcomeTutorialDialog {
+public class WelcomeTutorialDialog implements IBoardModal {
+    private BoardScreen screen;
     private boolean visible = false;
+
+    public WelcomeTutorialDialog() {}
+
+    public WelcomeTutorialDialog(BoardScreen screen) {
+        this.screen = screen;
+    }
+
+    public void setScreen(BoardScreen screen) {
+        this.screen = screen;
+    }
 
     public void show() {
         this.visible = true;
@@ -22,8 +35,19 @@ public class WelcomeTutorialDialog {
         this.visible = false;
     }
 
+    @Override
+    public void close() {
+        hide();
+    }
+
+    @Override
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {
@@ -75,6 +99,18 @@ public class WelcomeTutorialDialog {
         drawBtn(graphics, font, Component.translatable("gui.gtcalcboard.welcome.start").getString(), startBtnX, startBtnY, btnW, btnH, mouseX, mouseY, 0xFF00FF88, 0xFF1D5A3A);
 
         graphics.pose().popPose();
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int w = screen != null ? screen.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int h = screen != null ? screen.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        return mouseClicked(mouseX, mouseY, button, w, h);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+        return mouseClicked(screen, screenWidth, screenHeight, mouseX, mouseY, button);
     }
 
     public boolean mouseClicked(BoardScreen screen, int screenW, int screenH, double mouseX, double mouseY, int button) {

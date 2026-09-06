@@ -60,6 +60,9 @@ public class ClientWorkspaceState {
         if (mc == null || mc.player == null) {
             return false;
         }
+        if (mc.hasSingleplayerServer()) {
+            return false;
+        }
         return currentTeamId != null;
     }
 

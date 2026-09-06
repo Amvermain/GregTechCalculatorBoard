@@ -127,6 +127,12 @@ public class NodeCardRenderer {
         ResourceLocation iconId = node.getMachineIcon();
         if (iconId != null) {
             var item = ForgeRegistries.ITEMS.getValue(iconId);
+            if ((item == null || item == Items.AIR) && ForgeRegistries.BLOCKS != null) {
+                var block = ForgeRegistries.BLOCKS.getValue(iconId);
+                if (block != null && block.asItem() != Items.AIR) {
+                    item = block.asItem();
+                }
+            }
             if (item != null && item != Items.AIR) {
                 if (com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineIconGlowing(node.getId())) {
                     int glowBorder = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFFFFD700);

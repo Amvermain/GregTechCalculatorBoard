@@ -10,6 +10,7 @@ import com.gtceu.calcboard.api.type.NodeThreadingConfig;
 
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
+import com.gtceu.calcboard.compat.extension.IBoosterProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
@@ -17,8 +18,17 @@ import net.minecraftforge.fml.ModList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 public class StarTModAdapter extends GTCEuModAdapter {
+
+    @Override
+    public <T> Optional<T> getExtension(Class<T> extensionClass) {
+        if (IBoosterProvider.class.equals(extensionClass)) {
+            return Optional.empty();
+        }
+        return super.getExtension(extensionClass);
+    }
 
     @Override
     public String getModId() {
@@ -45,6 +55,10 @@ public class StarTModAdapter extends GTCEuModAdapter {
     public boolean handlesCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
         String ns = categoryId.getNamespace().toLowerCase(Locale.ROOT);
+        String path = categoryId.getPath().toLowerCase(Locale.ROOT);
+        if (path.equals("large_rotor_machine") || path.equals("gate_construction") || path.equals("stargate_component_assembly")) {
+            return true;
+        }
         return ns.equals("start_core") || ns.equals("gtceu_start") || ns.equals("start") || ns.equals("star_technology");
     }
 

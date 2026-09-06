@@ -45,6 +45,16 @@ public class SummaryOverlay {
     private boolean hoveredVoidHeader = false;
     private BalanceSummary lastSummary = null;
 
+    private int rightOffset = 0;
+
+    public int getRightOffset() {
+        return rightOffset;
+    }
+
+    public void setRightOffset(int rightOffset) {
+        this.rightOffset = Math.max(0, rightOffset);
+    }
+
     public boolean isCollapsed() {
         return collapsed;
     }
@@ -60,13 +70,32 @@ public class SummaryOverlay {
             scrollY = 0;
         }
         BoardManager.getInstance().setSummaryOverlayCollapsed(this.collapsed);
+        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
+            bs.onSummaryOverlayToggled();
+        }
     }
 
     public static int getEffectiveWidth(int screenWidth) {
-        if (screenWidth < 520) {
-            return Math.min(WIDTH, Math.max(160, screenWidth - 160));
+        return getEffectiveWidth(screenWidth, 0);
+    }
+
+    public static int getEffectiveWidth(int screenWidth, int rightOffset) {
+        int avail = screenWidth - rightOffset - 40;
+        if (avail < WIDTH) {
+            return Math.max(160, avail);
         }
         return WIDTH;
+    }
+
+    public int getPanelX(int screenWidth) {
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int right = (rightOffset > 0) ? (screenWidth - rightOffset - 4) : (screenWidth - 10);
+        return Math.max(36, right - effectiveW);
+    }
+
+    public int getTabX(int screenWidth) {
+        int tabW = 24;
+        return (rightOffset > 0) ? (screenWidth - rightOffset - tabW - 4) : (screenWidth - tabW - 4);
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, BalanceSummary summary, int mouseX, int mouseY) {
@@ -76,18 +105,17 @@ public class SummaryOverlay {
         graphics.pose().pushPose();
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        int effectiveW = getEffectiveWidth(screenWidth);
-        int x = screenWidth - effectiveW - 10;
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int x = getPanelX(screenWidth);
         int y = 66;
         int height = screenHeight - 74;
         hoveredStack = null;
         hoveredMachines = false;
 
         if (collapsed) {
-            // Mini collapsed tab
             int tabW = 24;
             int tabH = 50;
-            int tabX = screenWidth - tabW - 4;
+            int tabX = getTabX(screenWidth);
             graphics.fill(tabX, y, tabX + tabW, y + tabH, 0xEE1E2430);
             graphics.renderOutline(tabX, y, tabW, tabH, 0xFF3D4B66);
             graphics.drawCenteredString(font, "⚡", tabX + tabW / 2, y + 8, 0xFFFFAA00);
@@ -390,8 +418,8 @@ public class SummaryOverlay {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {
         if (collapsed) return false;
 
-        int effectiveW = getEffectiveWidth(screenWidth);
-        int x = screenWidth - effectiveW - 10;
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int x = getPanelX(screenWidth);
         int y = 66;
         int height = screenHeight - 74;
 
@@ -408,7 +436,7 @@ public class SummaryOverlay {
         if (collapsed) {
             int tabW = 24;
             int tabH = 50;
-            int tabX = screenWidth - tabW - 4;
+            int tabX = getTabX(screenWidth);
             int y = 66;
             if (mouseX >= tabX && mouseX <= tabX + tabW && mouseY >= y && mouseY <= y + tabH) {
                 toggle();
@@ -417,8 +445,8 @@ public class SummaryOverlay {
             return false;
         }
 
-        int effectiveW = getEffectiveWidth(screenWidth);
-        int x = screenWidth - effectiveW - 10;
+        int effectiveW = getEffectiveWidth(screenWidth, rightOffset);
+        int x = getPanelX(screenWidth);
         int y = 66;
 
         // Void Section Header Click -> collapse/expand void section

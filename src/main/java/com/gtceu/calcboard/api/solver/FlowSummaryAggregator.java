@@ -231,7 +231,7 @@ public final class FlowSummaryAggregator {
                     }
                 }
 
-                if (node.isFusion() && node.getEuToStart() > 0) {
+                if (node.getEuToStart() > 0 && node.isFusion()) {
                     int fTier = node.getFusionTier();
                     long startEU = node.getEuToStart();
                     int nodeMachines = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
@@ -242,13 +242,14 @@ public final class FlowSummaryAggregator {
                 }
 
                 double rawPower = node.getEffectiveTotalEUt();
-                if (node.getEnergyType() == EnergyType.KINETIC_SU) {
+                EnergyType eType = node.getEnergyType();
+                if (eType == EnergyType.KINETIC_SU) {
                     if (node.isGenerator()) {
                         totalGeneratedSU += rawPower;
                     } else {
                         totalConsumedSU += rawPower;
                     }
-                } else if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+                } else if (eType == EnergyType.ELECTRIC_FE) {
                     if (node.isGenerator()) {
                         totalGeneratedFE += rawPower;
                         totalGeneratedEUt += rawPower / 4.0;
@@ -256,7 +257,7 @@ public final class FlowSummaryAggregator {
                         totalConsumedFE += rawPower;
                         totalConsumedEUt += rawPower / 4.0;
                     }
-                } else if (node.getEnergyType() == EnergyType.ELECTRIC_EU) {
+                } else if (eType == EnergyType.ELECTRIC_EU) {
                     if (node.isGenerator()) {
                         totalGeneratedEUt += rawPower;
                     } else {
@@ -264,12 +265,12 @@ public final class FlowSummaryAggregator {
                     }
                 }
 
-                if (node.getEnergyType() == EnergyType.ELECTRIC_EU && node.getTargetTier().ordinal() > highestTier.ordinal()) {
+                if (eType == EnergyType.ELECTRIC_EU && node.getTargetTier().ordinal() > highestTier.ordinal()) {
                     highestTier = node.getTargetTier();
                 }
             }
 
-            Map<IngredientStack, Double> outRates = node.calculateEffectiveOutputRates();
+            Map<IngredientStack, Double> outRates = node.calculateEffectiveOutputRates(false);
             for (Map.Entry<IngredientStack, Double> entry : outRates.entrySet()) {
                 mergeRate(totalProduction, entry.getKey(), entry.getValue());
             }
@@ -295,7 +296,7 @@ public final class FlowSummaryAggregator {
                 }
             }
 
-            Map<IngredientStack, Double> inRates = node.calculateEffectiveInputRates();
+            Map<IngredientStack, Double> inRates = node.calculateEffectiveInputRates(false);
             for (Map.Entry<IngredientStack, Double> entry : inRates.entrySet()) {
                 mergeRate(totalConsumption, entry.getKey(), entry.getValue());
             }
@@ -306,10 +307,10 @@ public final class FlowSummaryAggregator {
         Map<IngredientStack, Double> balanced = new LinkedHashMap<>();
         Map<IngredientStack, Double> voidedOutputs = new LinkedHashMap<>();
 
-        List<IngredientStack> uniqueStacks = new ArrayList<>();
-        collectUniqueStacks(totalProduction.keySet(), uniqueStacks);
-        collectUniqueStacks(totalConsumption.keySet(), uniqueStacks);
-        collectUniqueStacks(totalVoided.keySet(), uniqueStacks);
+        Set<IngredientStack> uniqueStacks = new LinkedHashSet<>();
+        uniqueStacks.addAll(totalProduction.keySet());
+        uniqueStacks.addAll(totalConsumption.keySet());
+        uniqueStacks.addAll(totalVoided.keySet());
 
         for (IngredientStack stack : uniqueStacks) {
             double produced = findRate(totalProduction, stack);
@@ -339,38 +340,13 @@ public final class FlowSummaryAggregator {
         return new BalanceSummary(netEUt, netSU, netFE, highestTier, totalMachineCount, machineBreakdown, rawInputs, netOutputs, balanced, totalProduction, totalConsumption, voidedOutputs, totalFusionStartupEU, fusionTierCounts, fusionTierStartupEU);
     }
 
-    private static void collectUniqueStacks(Set<IngredientStack> source, List<IngredientStack> destination) {
-        for (IngredientStack s : source) {
-            boolean exists = false;
-            for (IngredientStack u : destination) {
-                if (u.equals(s)) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists) destination.add(s);
-        }
-    }
-
     private static void mergeRate(Map<IngredientStack, Double> map, IngredientStack stack, double rate) {
         if (stack == null) return;
-        for (Map.Entry<IngredientStack, Double> entry : map.entrySet()) {
-            if (entry.getKey().equals(stack)) {
-                entry.setValue(entry.getValue() + rate);
-                return;
-            }
-        }
-        map.put(stack, rate);
+        map.merge(stack, rate, Double::sum);
     }
 
     private static double findRate(Map<IngredientStack, Double> map, IngredientStack stack) {
-        if (stack == null) return 0.0;
-        for (Map.Entry<IngredientStack, Double> entry : map.entrySet()) {
-            if (entry.getKey().equals(stack)) {
-                return entry.getValue();
-            }
-        }
-        return 0.0;
+        return stack != null ? map.getOrDefault(stack, 0.0) : 0.0;
     }
 
     public static FlowGraphSolver.PortFlowStats getBatchInputPortStats(FlowGraph graph, RecipeNode node, int inputIndex) {

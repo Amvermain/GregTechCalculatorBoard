@@ -18,6 +18,12 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.extension.IBoosterProvider;
+import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.compat.extension.IMultiblockBOMProvider;
 import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
@@ -418,19 +424,34 @@ public class GTCEuModAdapter implements IModAdapter {
             double startX,
             double startY
     ) {
-        if (backingRecipe == null) return null;
+        if (backingRecipe == null && recipeObj == null) return null;
 
-        String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Machine";
-        ResourceLocation icon = preferredWorkstation;
+        String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : resolveMachineName(recipeObj);
+        ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : resolveMachineIcon(recipeObj);
 
-        if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backingRecipe)) {
+        if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backingRecipe, recipeObj)) {
             EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
-            GTCEuRecipeHandler.extractGTRecipeDetails(backingRecipe, details);
+            Object detailSource = backingRecipe != null ? backingRecipe : recipeObj;
+            GTCEuRecipeHandler.extractGTRecipeDetails(detailSource, details);
             return GTCEuLayeredRecipeExtractor.buildCompoundCluster(
-                    backingRecipe, machineName, icon, details.tier, startX, startY
+                    backingRecipe, recipeObj, machineName, icon, details.tier, startX, startY
             );
         }
 
+        return null;
+    }
+
+    private static String resolveMachineName(Object recipeObj) {
+        if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emi && emi.getCategory() != null && emi.getCategory().getId() != null) {
+            return EmiRecipeConverter.formatName(emi.getCategory().getId().getPath());
+        }
+        return "Machine";
+    }
+
+    private static ResourceLocation resolveMachineIcon(Object recipeObj) {
+        if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emi) {
+            return EmiRecipeConverter.findMachineIcon(emi);
+        }
         return null;
     }
 
@@ -711,6 +732,12 @@ public class GTCEuModAdapter implements IModAdapter {
     public void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
         if (node == null || newIcon == null) return;
 
+        ResourceLocation normalized = GTCombustionHelper.normalizeMachineIcon(newIcon);
+        if (!normalized.equals(newIcon)) {
+            node.setMachineIcon(normalized);
+            return;
+        }
+
         if (MultiblockDetector.isSteamMultiblock(newIcon)) {
             node.setMultiblock(true);
             int defPar = MultiblockDetector.getDefaultParallel(newIcon);
@@ -789,7 +816,7 @@ public class GTCEuModAdapter implements IModAdapter {
         if (!MultiblockDetector.supportsOverpressure(newIcon)) {
             node.getAddons().removeIf(a -> a.getId() != null && a.getId().equals("gtceu:overpressure_autoclave"));
         }
-        if (!GTCombustionHelper.isCombustionEngine(node)) {
+        if (!GTCombustionHelper.isCombustionEngine(node) || !node.isMultiblock()) {
             node.getAddons().removeIf(GTAddonCompatibilityHandler::isCombustionBoostAddon);
         }
     }
@@ -833,11 +860,12 @@ public class GTCEuModAdapter implements IModAdapter {
 
         GTVoltageTier iconTier = extractVoltageTierFromIcon(newIcon);
         if (iconTier != null && !node.isTurbine()) {
-            node.setTargetTier(iconTier);
+            GTVoltageTier effectiveTier = sanitizeTargetTier(node, iconTier);
+            node.setTargetTier(effectiveTier);
             if (node.isFusion()) {
                 node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ENERGY_HATCH
                         && a instanceof GTEnergyHatchAddon eh
-                        && eh.getTier() != iconTier);
+                        && eh.getTier() != effectiveTier);
             }
         }
 
@@ -984,14 +1012,106 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
+    public GTVoltageTier getMinimumWorkstationTier(RecipeNode node) {
+        if (node == null) return null;
+        List<ResourceLocation> workstations = node.getAvailableWorkstations();
+        if (workstations == null || workstations.isEmpty()) return null;
+
+        GTVoltageTier minTier = null;
+        for (ResourceLocation ws : workstations) {
+            if (ws == null || EmiRecipeConverter.isDummyConditionMarker(ws) || EmiRecipeConverter.isIgnoredWorkstation(ws)) {
+                continue;
+            }
+            GTVoltageTier tier = extractVoltageTierFromIcon(ws);
+            if (tier != null && (minTier == null || tier.ordinal() < minTier.ordinal())) {
+                minTier = tier;
+            }
+        }
+        return minTier;
+    }
+
+    @Override
     public GTVoltageTier sanitizeTargetTier(RecipeNode node, GTVoltageTier requestedTier) {
         GTVoltageTier tier = requestedTier != null ? requestedTier : (node != null ? node.getRecipeTier() : GTVoltageTier.ULV);
-        if (node != null && isFusion(node)) {
-            GTVoltageTier minTier = getMinFusionVoltageTier(node);
-            if (tier.ordinal() < minTier.ordinal()) {
-                tier = minTier;
+        if (node == null) return tier;
+
+        tier = clampToRecipeMinimumTier(node, tier);
+        tier = clampToFusionMinimumTier(node, tier);
+        tier = clampToTurbineMinimumTier(node, tier);
+        tier = clampToWorkstationMinimumTier(node, tier);
+        return tier;
+    }
+
+    private GTVoltageTier clampToRecipeMinimumTier(RecipeNode node, GTVoltageTier tier) {
+        if (node.isTurbine()) {
+            return tier;
+        }
+        boolean isVanillaCooking = node.getRecipeCategoryId() != null && VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
+        boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == EnergyType.NONE;
+        if (!isVanillaCooking && !isPassiveOrSteam && node.getRecipeTier() != null) {
+            if (tier.ordinal() < node.getRecipeTier().ordinal()) {
+                return node.getRecipeTier();
             }
         }
         return tier;
+    }
+
+    private GTVoltageTier clampToFusionMinimumTier(RecipeNode node, GTVoltageTier tier) {
+        if (isFusion(node)) {
+            GTVoltageTier minTier = getMinFusionVoltageTier(node);
+            if (minTier != null && tier.ordinal() < minTier.ordinal()) {
+                return minTier;
+            }
+        }
+        return tier;
+    }
+
+    private GTVoltageTier clampToTurbineMinimumTier(RecipeNode node, GTVoltageTier tier) {
+        if (node.isTurbine() && node.isMultiblock()) {
+            GTVoltageTier baseTier = GTTurbineHelper.getTurbineBaseTier(node);
+            if (baseTier != null && tier.ordinal() < baseTier.ordinal()) {
+                return baseTier;
+            }
+        }
+        return tier;
+    }
+
+    private GTVoltageTier clampToWorkstationMinimumTier(RecipeNode node, GTVoltageTier tier) {
+        boolean isVanillaCooking = node.getRecipeCategoryId() != null && VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
+        boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == EnergyType.NONE;
+        if (isVanillaCooking || isPassiveOrSteam) {
+            return tier;
+        }
+        GTVoltageTier minWsTier = getMinimumWorkstationTier(node);
+        if (minWsTier != null && tier.ordinal() < minWsTier.ordinal()) {
+            return minWsTier;
+        }
+        return tier;
+    }
+
+    @Override
+    public String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        if (addon.getCategory().equals(AddonCategory.ENERGY_HATCH) && addon instanceof GTEnergyHatchAddon eh) {
+            return String.format("Tier: %s (%,dA)", eh.getTier().getName(), eh.getAmperage());
+        }
+        if (addon.getCategory().equals(AddonCategory.HATCH_BUS) && addon instanceof GTHatchAddon h) {
+            return String.format("Tier: %s", h.getTier().getName());
+        }
+        return IModAdapter.super.formatAddonSubtitle(node, addon);
+    }
+
+    @Override
+    public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && addon instanceof GTEnergyHatchAddon eh) {
+            return eh.getAmperage() > 2
+                    ? String.format("§e⚡%s (%,dA)", eh.getTier().getName(), eh.getAmperage())
+                    : String.format("§e⚡%s", eh.getTier().getName());
+        }
+        if (addon.getCategory() == MachineAddon.Category.HATCH_BUS && addon instanceof GTHatchAddon h) {
+            return String.format("§d⚡%s", h.getTier().getName());
+        }
+        return IModAdapter.super.formatAddonBadge(node, addon);
     }
 }

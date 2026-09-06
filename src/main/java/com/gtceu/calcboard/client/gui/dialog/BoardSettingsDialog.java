@@ -12,6 +12,7 @@ import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.client.gui.util.OklabColorUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -19,6 +20,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +30,7 @@ import java.util.List;
  * Central Preferences & Customization Modal Dialog for GregTech Calculator Board.
  * Provides granular toggles for toolbar buttons, HUDs, simulation defaults, and wire theme palettes.
  */
-public class BoardSettingsDialog {
+public class BoardSettingsDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private int activeTab = 0;
@@ -98,6 +101,11 @@ public class BoardSettingsDialog {
         if (maxScaleInput != null) {
             maxScaleInput.setFocused(false);
         }
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -453,7 +461,7 @@ public class BoardSettingsDialog {
         rowY += palSize + 16;
 
         // 3. Live Wire Preview Box
-        int previewH = 50;
+        int previewH = 54;
         int previewW = w - 4;
         graphics.fill(x, rowY, x + previewW, rowY + previewH, 0xEE10131A);
         graphics.renderOutline(x, rowY, previewW, previewH, 0xFF2C394F);
@@ -461,20 +469,38 @@ public class BoardSettingsDialog {
         // Preview Label
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.settings.preview_label").getString(), x + 6, rowY + 4, 0xFF8899AA, false);
 
-        // Render Bezier curves for Default and Matched wire preview
-        float wx1 = x + 25;
-        float wy1 = rowY + 34;
-        float wx2 = x + previewW / 2 - 20;
-        float wy2 = rowY + 22;
-        ConnectionRenderer.renderBezier(graphics, wx1, wy1, wx2, wy2, curDef.getArgb(), 2.5f);
-        graphics.drawCenteredString(font, "Default", (int) (wx1 + wx2) / 2, (int) Math.min(wy1, wy2) - 9, curDef.getArgb());
+        int midColor = OklabColorUtil.interpolateOklab(curDef.getArgb(), curMatched.getArgb(), 0.5f);
+        float sectionW = (previewW - 20) / 3.0f;
 
-        float mx1 = x + previewW / 2 + 20;
+        float wx1 = x + 10;
+        float wy1 = rowY + 34;
+        float wx2 = x + 10 + sectionW - 8;
+        float wy2 = rowY + 20;
+        ConnectionRenderer.renderBezier(graphics, wx1, wy1, wx2, wy2, curDef.getArgb(), 2.0f);
+        graphics.drawCenteredString(font, "0%", (int) (wx1 + wx2) / 2, (int) Math.min(wy1, wy2) - 8, curDef.getArgb());
+
+        float bx1 = x + 10 + sectionW + 4;
+        float by1 = rowY + 34;
+        float bx2 = x + 10 + 2 * sectionW - 4;
+        float by2 = rowY + 20;
+        ConnectionRenderer.renderBezier(graphics, bx1, by1, bx2, by2, midColor, 2.5f);
+        graphics.drawCenteredString(font, "50%", (int) (bx1 + bx2) / 2, (int) Math.min(by1, by2) - 8, midColor);
+
+        float mx1 = x + 10 + 2 * sectionW + 8;
         float my1 = rowY + 34;
-        float mx2 = x + previewW - 25;
-        float my2 = rowY + 22;
-        ConnectionRenderer.renderBezier(graphics, mx1, my1, mx2, my2, curMatched.getArgb(), 3.0f);
-        graphics.drawCenteredString(font, "Matched", (int) (mx1 + mx2) / 2, (int) Math.min(my1, my2) - 9, curMatched.getArgb());
+        float mx2 = x + previewW - 10;
+        float my2 = rowY + 20;
+        ConnectionRenderer.renderBezier(graphics, mx1, my1, mx2, my2, curMatched.getArgb(), 2.5f);
+        graphics.drawCenteredString(font, "100%", (int) (mx1 + mx2) / 2, (int) Math.min(my1, my2) - 8, curMatched.getArgb());
+
+        int barX = x + 10;
+        int barW = previewW - 20;
+        int barY = rowY + previewH - 6;
+        int[] lut = OklabColorUtil.getWireColorLut(curDef.getArgb(), curMatched.getArgb());
+        for (int i = 0; i < barW; i++) {
+            int lutIdx = (i * (lut.length - 1)) / (barW - 1);
+            graphics.fill(barX + i, barY, barX + i + 1, barY + 2, lut[lutIdx]);
+        }
     }
 
     private void drawCheckbox(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY, String label, boolean checked) {

@@ -422,7 +422,17 @@ public class CoilHelper {
             CoilStats stats = getCoilStats(installed.getId());
             if (stats != null && stats.temperature() > 0) return stats.temperature();
         }
-        if (node.isMultiblock() && (MultiblockDetector.isCoilMultiblock(node.getMachineIcon()) || MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId()))) {
+        boolean isCoilMb = false;
+        if (node.isMultiblock()) {
+            if (node.getMachineIcon() != null) {
+                isCoilMb = MultiblockDetector.isCoilMultiblock(node.getMachineIcon());
+            } else if (node.getMultiblockWorkstation() != null) {
+                isCoilMb = MultiblockDetector.isCoilMultiblock(node.getMultiblockWorkstation());
+            } else {
+                isCoilMb = MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId());
+            }
+        }
+        if (isCoilMb) {
             return 1800;
         }
         return 0;

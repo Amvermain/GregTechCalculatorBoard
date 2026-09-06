@@ -51,6 +51,7 @@ public class PageBrowserDrawer {
     private double dragStartY = 0;
     private boolean isDragging = false;
 
+    public static final int DRAWER_X = LeftActivityBarWidget.BAR_WIDTH;
     public static final int DRAWER_WIDTH = 230;
     private static final int ITEM_HEIGHT = 20;
 
@@ -62,12 +63,23 @@ public class PageBrowserDrawer {
         return open;
     }
 
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        if (!open) return false;
+        int topY = screen.getHeaderBottomY();
+        int drawerH = screen.height - topY - 4;
+        return mouseX >= DRAWER_X && mouseX <= DRAWER_X + DRAWER_WIDTH && mouseY >= topY && mouseY <= topY + drawerH;
+    }
+
     public void setOpen(boolean open) {
         this.open = open;
         if (open) {
             initSearchBox();
             this.contextMenuOpen = false;
             this.promptMode = PromptMode.NONE;
+            if (screen.getFavoritesDockWidget() != null) {
+                screen.getFavoritesDockWidget().setExpanded(false);
+                screen.getFavoritesDockWidget().closeFlyout();
+            }
             com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onFolderBrowserOpened();
         } else {
             this.searchBox = null;
@@ -90,7 +102,7 @@ public class PageBrowserDrawer {
     private void initSearchBox() {
         Font font = Minecraft.getInstance().font;
         int topY = screen.getHeaderBottomY() + 4;
-        this.searchBox = new EditBox(font, 12, topY + 22, DRAWER_WIDTH - 24, 16, Component.translatable("gui.gtcalcboard.browser.search_hint"));
+        this.searchBox = new EditBox(font, DRAWER_X + 8, topY + 22, DRAWER_WIDTH - 16, 16, Component.translatable("gui.gtcalcboard.browser.search_hint"));
         this.searchBox.setMaxLength(64);
         this.searchBox.setValue("");
     }
@@ -119,16 +131,16 @@ public class PageBrowserDrawer {
     }
 
     private void renderBackground(GuiGraphics graphics, int topY, int drawerH) {
-        graphics.fill(4, topY, DRAWER_WIDTH, topY + drawerH, 0xF5141822);
-        graphics.renderOutline(4, topY, DRAWER_WIDTH - 4, drawerH, 0xFF353C4D);
-        graphics.renderOutline(5, topY + 1, DRAWER_WIDTH - 6, drawerH - 2, 0xFF0D1117);
+        graphics.fill(DRAWER_X, topY, DRAWER_X + DRAWER_WIDTH, topY + drawerH, 0xF5141822);
+        graphics.renderOutline(DRAWER_X, topY, DRAWER_WIDTH, drawerH, 0xFF353C4D);
+        graphics.renderOutline(DRAWER_X + 1, topY + 1, DRAWER_WIDTH - 2, drawerH - 2, 0xFF0D1117);
     }
 
     private void renderHeader(GuiGraphics graphics, Font font, int topY, int mouseX, int mouseY) {
-        graphics.drawString(font, "§6≡ " + Component.translatable("gui.gtcalcboard.browser.title").getString(), 12, topY + 8, 0xFFFFFFFF, false);
+        graphics.drawString(font, "§6≡ " + Component.translatable("gui.gtcalcboard.browser.title").getString(), DRAWER_X + 8, topY + 8, 0xFFFFFFFF, false);
 
         int btnY = topY + 6;
-        int closeX = DRAWER_WIDTH - 20;
+        int closeX = DRAWER_X + DRAWER_WIDTH - 20;
         int importX = closeX - 22;
         int addPageX = importX - 22;
         int addFolderX = addPageX - 24;
@@ -154,15 +166,16 @@ public class PageBrowserDrawer {
 
     private void renderSearchBox(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks, int topY) {
         if (searchBox == null) return;
-        searchBox.setX(12);
+        searchBox.setX(DRAWER_X + 8);
         searchBox.setY(topY + 24);
+        searchBox.setWidth(DRAWER_WIDTH - 16);
         searchBox.render(graphics, mouseX, mouseY, partialTicks);
     }
 
     private void renderTreeView(GuiGraphics graphics, Font font, int topY, int drawerH, int mouseX, int mouseY) {
-        int listX = 8;
+        int listX = DRAWER_X + 6;
         int listY = topY + 44;
-        int listW = DRAWER_WIDTH - 14;
+        int listW = DRAWER_WIDTH - 12;
         int listH = drawerH - 50;
 
         graphics.fill(listX, listY, listX + listW, listY + listH, 0xFF0D1017);
@@ -295,7 +308,7 @@ public class PageBrowserDrawer {
         int menuW = 140;
         int menuH = items.size() * 18 + 6;
 
-        int mx = Math.min(contextMenuX, DRAWER_WIDTH - menuW);
+        int mx = Math.max(DRAWER_X + 4, Math.min(contextMenuX, DRAWER_X + DRAWER_WIDTH - menuW - 4));
         int my = Math.min(contextMenuY, screen.height - menuH - 10);
 
         graphics.fill(mx, my, mx + menuW, my + menuH, 0xF5181C26);
@@ -317,11 +330,11 @@ public class PageBrowserDrawer {
 
         int topY = screen.getHeaderBottomY() + 2;
         int drawerH = screen.height - topY - 4;
-        graphics.fill(4, topY, DRAWER_WIDTH, topY + drawerH, 0xAA000000);
+        graphics.fill(DRAWER_X, topY, DRAWER_X + DRAWER_WIDTH, topY + drawerH, 0xAA000000);
 
         int pw = 180;
         int ph = 70;
-        int px = (DRAWER_WIDTH - pw) / 2;
+        int px = DRAWER_X + (DRAWER_WIDTH - pw) / 2;
         int py = (screen.height - ph) / 2;
 
         graphics.fill(px, py, px + pw, py + ph, 0xF5161A24);
@@ -462,11 +475,17 @@ public class PageBrowserDrawer {
         if (mouseY < screen.getHeaderBottomY()) {
             return false;
         }
-        if (mouseX > DRAWER_WIDTH) {
+        if (mouseX < DRAWER_X) {
+            return false;
+        }
+        if (mouseX > DRAWER_X + DRAWER_WIDTH) {
             setOpen(false);
             return true;
         }
         if (handlePromptClicks(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (promptMode != PromptMode.NONE) {
             return true;
         }
         if (handleContextMenuClicks(mouseX, mouseY, button)) {
@@ -479,7 +498,8 @@ public class PageBrowserDrawer {
             return true;
         }
 
-        return handleTreeClicks(mouseX, mouseY, button);
+        handleTreeClicks(mouseX, mouseY, button);
+        return true;
     }
 
     private boolean handlePromptClicks(double mouseX, double mouseY, int button) {
@@ -487,7 +507,7 @@ public class PageBrowserDrawer {
 
         int pw = 180;
         int ph = 70;
-        int px = (DRAWER_WIDTH - pw) / 2;
+        int px = DRAWER_X + (DRAWER_WIDTH - pw) / 2;
         int py = (screen.height - ph) / 2;
         int btnY = py + 46;
 
@@ -512,7 +532,7 @@ public class PageBrowserDrawer {
         List<ContextMenuItem> items = buildContextMenuItems();
         int menuW = 140;
         int menuH = items.size() * 18 + 6;
-        int mx = Math.min(contextMenuX, DRAWER_WIDTH - menuW);
+        int mx = Math.max(DRAWER_X + 4, Math.min(contextMenuX, DRAWER_X + DRAWER_WIDTH - menuW - 4));
         int my = Math.min(contextMenuY, screen.height - menuH - 10);
 
         if (mouseX >= mx && mouseX <= mx + menuW && mouseY >= my && mouseY <= my + menuH) {
@@ -531,7 +551,7 @@ public class PageBrowserDrawer {
         if (button != 0) return false;
         int topY = screen.getHeaderBottomY() + 2;
         int btnY = topY + 6;
-        int closeX = DRAWER_WIDTH - 20;
+        int closeX = DRAWER_X + DRAWER_WIDTH - 20;
         int importX = closeX - 22;
         int addPageX = importX - 22;
         int addFolderX = addPageX - 24;
@@ -565,9 +585,9 @@ public class PageBrowserDrawer {
 
     private boolean handleTreeClicks(double mouseX, double mouseY, int button) {
         int topY = screen.getHeaderBottomY() + 2;
-        int listX = 8;
+        int listX = DRAWER_X + 6;
         int listY = topY + 44;
-        int listW = DRAWER_WIDTH - 14;
+        int listW = DRAWER_WIDTH - 12;
         int listH = screen.height - topY - 54;
 
         if (mouseX < listX || mouseX > listX + listW || mouseY < listY || mouseY > listY + listH) {
@@ -905,11 +925,12 @@ public class PageBrowserDrawer {
                 }
             }
         }
+        boolean wasInteracting = (draggingPage != null || draggingFolder != null);
         draggingFolder = null;
         draggingPage = null;
         draggingPageIndex = -1;
         isDragging = false;
-        return true;
+        return wasInteracting || isMouseOver(mouseX, mouseY);
     }
 
     private String resolveFolderUnderMouse(double mouseY) {
@@ -947,7 +968,9 @@ public class PageBrowserDrawer {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (!open || mouseX > DRAWER_WIDTH) return false;
+        if (!open || mouseX < DRAWER_X || mouseX > DRAWER_X + DRAWER_WIDTH) return false;
+        int topY = screen.getHeaderBottomY();
+        if (mouseY < topY || mouseY > screen.height - 4) return false;
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * 20.0));
         return true;
     }

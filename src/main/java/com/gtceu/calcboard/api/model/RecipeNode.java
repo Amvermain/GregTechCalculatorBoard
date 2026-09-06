@@ -54,6 +54,10 @@ public class RecipeNode {
     private final NodePropertyStore properties = new NodePropertyStore();
     private transient OverclockMode.OverclockResult cachedOverclockResult = null;
     private transient boolean overclockDirty = true;
+    private transient IModAdapter cachedModAdapter = null;
+    private transient int cachedTotalParallel = -1;
+    private transient double cachedNominalCps = -1.0;
+    private transient double cachedSingleMachinePower = -1.0;
 
     // Canvas position & Dimensions
     private double posX;
@@ -197,6 +201,7 @@ public class RecipeNode {
 
     public void setMachineIcon(ResourceLocation machineIcon) {
         if (Objects.equals(this.machineIcon, machineIcon)) return;
+        invalidateModAdapterCache();
         ResourceLocation oldIcon = this.machineIcon;
         this.machineIcon = machineIcon;
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
@@ -684,7 +689,10 @@ public class RecipeNode {
     }
 
     public void setRecipeCategoryId(ResourceLocation recipeCategoryId) {
-        this.recipeCategoryId = recipeCategoryId;
+        if (!Objects.equals(this.recipeCategoryId, recipeCategoryId)) {
+            invalidateModAdapterCache();
+            this.recipeCategoryId = recipeCategoryId;
+        }
     }
 
     public static boolean isMultiblockWorkstation(ResourceLocation ws) {
@@ -1078,6 +1086,22 @@ public class RecipeNode {
     public void markOverclockDirty() {
         this.overclockDirty = true;
         this.cachedOverclockResult = null;
+        this.cachedTotalParallel = -1;
+        this.cachedNominalCps = -1.0;
+        this.cachedSingleMachinePower = -1.0;
+        this.cachedModAdapter = null;
+    }
+
+    public IModAdapter getCachedModAdapter() {
+        return cachedModAdapter;
+    }
+
+    public void setCachedModAdapter(IModAdapter adapter) {
+        this.cachedModAdapter = adapter;
+    }
+
+    public void invalidateModAdapterCache() {
+        this.cachedModAdapter = null;
     }
 
     public OverclockMode.OverclockResult getOverclockResult() {
@@ -1099,11 +1123,17 @@ public class RecipeNode {
         if (customParallel > 0) {
             return customParallel;
         }
-        return ModAdapterRegistry.getAdapterForNode(this).computeEffectiveParallel(this);
+        if (cachedTotalParallel < 1) {
+            cachedTotalParallel = ModAdapterRegistry.getAdapterForNode(this).computeEffectiveParallel(this);
+        }
+        return cachedTotalParallel;
     }
 
     public double getSingleMachineEUt() {
-        return ModAdapterRegistry.getAdapterForNode(this).computeSingleMachinePower(this);
+        if (cachedSingleMachinePower < 0.0) {
+            cachedSingleMachinePower = ModAdapterRegistry.getAdapterForNode(this).computeSingleMachinePower(this);
+        }
+        return cachedSingleMachinePower;
     }
 
     public double getTotalEUt() {
@@ -1117,7 +1147,10 @@ public class RecipeNode {
     }
 
     public double getNominalCyclesPerSecond() {
-        return getOverclockResult().getCyclesPerSecond() * machineCount * getTotalParallel();
+        if (cachedNominalCps < 0.0) {
+            cachedNominalCps = getOverclockResult().getCyclesPerSecond() * machineCount * getTotalParallel();
+        }
+        return cachedNominalCps;
     }
 
     public double getCyclesPerSecond() {
@@ -1157,11 +1190,19 @@ public class RecipeNode {
     }
 
     public Map<IngredientStack, Double> calculateEffectiveInputRates() {
-        return NodeRateCalculator.calculateEffectiveInputRates(this);
+        return calculateEffectiveInputRates(true);
+    }
+
+    public Map<IngredientStack, Double> calculateEffectiveInputRates(boolean postEvent) {
+        return NodeRateCalculator.calculateEffectiveInputRates(this, postEvent);
     }
 
     public Map<IngredientStack, Double> calculateEffectiveOutputRates() {
-        return NodeRateCalculator.calculateEffectiveOutputRates(this);
+        return calculateEffectiveOutputRates(true);
+    }
+
+    public Map<IngredientStack, Double> calculateEffectiveOutputRates(boolean postEvent) {
+        return NodeRateCalculator.calculateEffectiveOutputRates(this, postEvent);
     }
 
     public double calculateSingleMachineOutputRate(IngredientStack out) {

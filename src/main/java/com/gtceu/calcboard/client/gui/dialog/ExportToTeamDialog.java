@@ -15,12 +15,15 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.UUID;
 
 /**
  * Modal dialog for exporting a personal board page directly to the team shared workspace.
  */
-public class ExportToTeamDialog {
+public class ExportToTeamDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -39,6 +42,11 @@ public class ExportToTeamDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

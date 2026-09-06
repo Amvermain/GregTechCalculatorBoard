@@ -22,10 +22,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.*;
 
-public class MultiblockBOMDialog {
+public class MultiblockBOMDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
 
@@ -125,6 +127,11 @@ public class MultiblockBOMDialog {
             cachedSummary = MultiblockBOMSummary.merge(pageSummaries);
             dirty = false;
         }
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {

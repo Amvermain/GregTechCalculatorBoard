@@ -11,6 +11,7 @@ import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import com.gtceu.calcboard.client.gui.util.OklabColorUtil;
 
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 
@@ -107,7 +108,8 @@ public class CanvasWireRenderer {
                     boolean isHovered = edge.equals(hoveredEdge);
                     boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
                     int defWireColor = BoardManager.getInstance().getWireColor();
-                    WireStyle wireStyle = resolveWireStyle(isHovered, isWireGlowing, satRatio, defWireColor);
+                    int matchedWireColor = BoardManager.getInstance().getMatchedWireColor();
+                    WireStyle wireStyle = resolveWireStyle(isHovered, isWireGlowing, satRatio, defWireColor, matchedWireColor);
                     ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, wireStyle.color(), wireStyle.thickness());
 
                     float fromEff = resolveFromEfficiency(graph, fromNode);
@@ -193,7 +195,8 @@ public class CanvasWireRenderer {
             boolean isHovered,
             boolean isWireGlowing,
             float satRatio,
-            int defWireColor
+            int defWireColor,
+            int matchedWireColor
     ) {
         if (isHovered) {
             return new WireStyle(0xFFFF3366, 2.0f);
@@ -201,14 +204,8 @@ public class CanvasWireRenderer {
         if (isWireGlowing) {
             return new WireStyle(TutorialManager.getGlowBorderColor(0xFF55FF88), 3.5f);
         }
-        if (satRatio < 0.9999f && BoardManager.getInstance().getWireAnimationMode() == com.gtceu.calcboard.api.type.WireAnimationMode.RATE_MODULATED) {
-            float timeSec = (System.currentTimeMillis() % 60000L) / 1000.0f;
-            float alpha = ParticleBatchingEngine.computePulseAlpha(satRatio, timeSec);
-            int alphaInt = Math.max(30, Math.min(255, (int) (alpha * 255.0f)));
-            int rgb = (satRatio < 0.5f) ? 0xEF4444 : 0xF59E0B;
-            return new WireStyle((alphaInt << 24) | rgb, 2.5f);
-        }
-        return new WireStyle(defWireColor, 2.0f);
+        int color = OklabColorUtil.getInterpolatedWireColor(defWireColor, matchedWireColor, satRatio);
+        return new WireStyle(color, 2.0f);
     }
 
     private static float resolveFromEfficiency(FlowGraph graph, RecipeNode fromNode) {

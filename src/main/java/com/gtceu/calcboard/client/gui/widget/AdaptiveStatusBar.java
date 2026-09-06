@@ -1,7 +1,6 @@
 package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -13,10 +12,6 @@ public class AdaptiveStatusBar {
     public static final int BAR_HEIGHT = 20;
     private final BoardScreen screen;
 
-    private int balanceChipX = 0;
-    private int balanceChipW = 0;
-    private int bomChipX = 0;
-    private int bomChipW = 0;
     private int pauseChipX = 0;
     private int pauseChipW = 0;
 
@@ -71,11 +66,7 @@ public class AdaptiveStatusBar {
     }
 
     private void renderRightChips(GuiGraphics graphics, Font font, int width, int y, int mouseX, int mouseY) {
-        int curX = width - 8;
-
-        curX = renderPauseChip(graphics, font, y, curX, mouseX, mouseY);
-        curX = renderBomChip(graphics, font, y, curX, mouseX, mouseY);
-        renderBalanceChip(graphics, font, y, curX, mouseX, mouseY);
+        renderPauseChip(graphics, font, y, width - 8, mouseX, mouseY);
     }
 
     private int renderPauseChip(GuiGraphics graphics, Font font, int y, int rightEdge, int mouseX, int mouseY) {
@@ -104,65 +95,10 @@ public class AdaptiveStatusBar {
         return chipX - 6;
     }
 
-    private int renderBomChip(GuiGraphics graphics, Font font, int y, int rightEdge, int mouseX, int mouseY) {
-        if (!ModCompatHelper.isBoMSupported()) {
-            this.bomChipW = 0;
-            return rightEdge;
-        }
-
-        String bomLabel = "▦ BOM";
-        int chipW = font.width(bomLabel) + 12;
-        int chipX = rightEdge - chipW;
-
-        this.bomChipX = chipX;
-        this.bomChipW = chipW;
-
-        boolean hovered = mouseX >= chipX && mouseX <= chipX + chipW && mouseY >= y + 2 && mouseY <= y + BAR_HEIGHT - 2;
-        int bg = hovered ? 0xFF422006 : 0xFF1C1917;
-        int border = hovered ? 0xFFF59E0B : 0xFF78350F;
-
-        graphics.fill(chipX, y + 2, chipX + chipW, y + BAR_HEIGHT - 2, bg);
-        graphics.renderOutline(chipX, y + 2, chipW, BAR_HEIGHT - 4, border);
-        graphics.drawCenteredString(font, bomLabel, chipX + chipW / 2, y + 6, 0xFFFBBF24);
-
-        return chipX - 6;
-    }
-
-    private void renderBalanceChip(GuiGraphics graphics, Font font, int y, int rightEdge, int mouseX, int mouseY) {
-        String balLabel = "∑ Balance";
-        int chipW = font.width(balLabel) + 12;
-        int chipX = rightEdge - chipW;
-
-        this.balanceChipX = chipX;
-        this.balanceChipW = chipW;
-
-        boolean hovered = mouseX >= chipX && mouseX <= chipX + chipW && mouseY >= y + 2 && mouseY <= y + BAR_HEIGHT - 2;
-        int bg = hovered ? 0xFF0C4A6E : 0xFF0B192C;
-        int border = hovered ? 0xFF38BDF8 : 0xFF0284C7;
-
-        graphics.fill(chipX, y + 2, chipX + chipW, y + BAR_HEIGHT - 2, bg);
-        graphics.renderOutline(chipX, y + 2, chipW, BAR_HEIGHT - 4, border);
-        graphics.drawCenteredString(font, balLabel, chipX + chipW / 2, y + 6, 0xFF38BDF8);
-    }
-
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int y = screen.height - BAR_HEIGHT;
         if (mouseY < y || mouseY > screen.height || button != 0) {
             return false;
-        }
-
-        if (isInside(mouseX, balanceChipX, balanceChipW)) {
-            if (screen.getGlobalBalanceDialog() != null) {
-                screen.getGlobalBalanceDialog().open();
-            }
-            return true;
-        }
-
-        if (isInside(mouseX, bomChipX, bomChipW)) {
-            if (screen.getMultiblockBOMDialog() != null) {
-                screen.getMultiblockBOMDialog().open();
-            }
-            return true;
         }
 
         if (isInside(mouseX, pauseChipX, pauseChipW)) {

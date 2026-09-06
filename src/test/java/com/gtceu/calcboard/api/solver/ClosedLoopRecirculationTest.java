@@ -229,4 +229,81 @@ public class ClosedLoopRecirculationTest {
         Assertions.assertTrue(stats.isInputDeficit());
         Assertions.assertFalse(stats.isInputSurplus());
     }
+
+    @Test
+    @DisplayName("Performance: Complex multi-node closed loop evaluation executes under 2ms per cycle")
+    public void testComplexMultiNodeLoopPerformance() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode ext1 = RecipeNode.create("Extractor 1", 20.0, 30.0, GTVoltageTier.HV);
+        ext1.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 100.0, 1.0));
+        ext1.setMachineCount(1.0);
+        graph.addNode(ext1);
+
+        RecipeNode ext2 = RecipeNode.create("Extractor 2", 20.0, 30.0, GTVoltageTier.HV);
+        ext2.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 50.0, 1.0));
+        ext2.setMachineCount(1.0);
+        graph.addNode(ext2);
+
+        RecipeNode auto1 = RecipeNode.create("Autoclave 1", 20.0, 30.0, GTVoltageTier.HV);
+        auto1.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 50.0, 1.0));
+        auto1.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:dust_c"), "Dust C", 1.0, 1.0));
+        auto1.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:gem_d"), "Gem D", 1.0, 1.0));
+        auto1.setMachineCount(2.0);
+        graph.addNode(auto1);
+
+        RecipeNode auto2 = RecipeNode.create("Autoclave 2", 20.0, 30.0, GTVoltageTier.HV);
+        auto2.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 50.0, 1.0));
+        auto2.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:gem_d"), "Gem D", 1.0, 1.0));
+        auto2.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:plate_e"), "Plate E", 1.0, 1.0));
+        auto2.setMachineCount(1.0);
+        graph.addNode(auto2);
+
+        RecipeNode press = RecipeNode.create("Forming Press", 20.0, 30.0, GTVoltageTier.HV);
+        press.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:plate_e"), "Plate E", 1.0, 1.0));
+        press.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:shaped_f"), "Shaped F", 1.0, 1.0));
+        press.setMachineCount(1.0);
+        graph.addNode(press);
+
+        RecipeNode comp = RecipeNode.create("Implosion Compressor", 20.0, 30.0, GTVoltageTier.HV);
+        comp.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:shaped_f"), "Shaped F", 1.0, 1.0));
+        comp.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:compressed_g"), "Compressed G", 1.0, 1.0));
+        comp.setMachineCount(1.0);
+        graph.addNode(comp);
+
+        RecipeNode hammer = RecipeNode.create("Forge Hammer", 20.0, 30.0, GTVoltageTier.HV);
+        hammer.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:compressed_g"), "Compressed G", 1.0, 1.0));
+        hammer.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:hammered_h"), "Hammered H", 1.0, 1.0));
+        hammer.setMachineCount(1.0);
+        graph.addNode(hammer);
+
+        RecipeNode polarizer = RecipeNode.create("Polarizer", 20.0, 30.0, GTVoltageTier.HV);
+        polarizer.addInput(IngredientStack.item(ResourceLocation.tryParse("gtceu:hammered_h"), "Hammered H", 1.0, 1.0));
+        polarizer.addOutput(IngredientStack.item(ResourceLocation.tryParse("gtceu:dust_c"), "Dust C", 1.0, 1.0));
+        polarizer.setMachineCount(1.0);
+        graph.addNode(polarizer);
+
+        graph.addConnection(ext1.getId(), 0, auto1.getId(), 0);
+        graph.addConnection(ext2.getId(), 0, auto2.getId(), 0);
+        graph.addConnection(auto1.getId(), 0, auto2.getId(), 1);
+        graph.addConnection(auto2.getId(), 0, press.getId(), 0);
+        graph.addConnection(press.getId(), 0, comp.getId(), 0);
+        graph.addConnection(comp.getId(), 0, hammer.getId(), 0);
+        graph.addConnection(hammer.getId(), 0, polarizer.getId(), 0);
+        graph.addConnection(polarizer.getId(), 0, auto1.getId(), 1);
+
+        // Warm-up JIT
+        for (int i = 0; i < 30; i++) {
+            graph.computeSummary();
+        }
+
+        int iterations = 100;
+        long startTimeSum = System.nanoTime();
+        for (int i = 0; i < iterations; i++) {
+            graph.computeSummary();
+        }
+        double avgSumMs = ((System.nanoTime() - startTimeSum) / 1_000_000.0) / iterations;
+
+        Assertions.assertTrue(avgSumMs < 2.0, "Average summary compute time in closed loop must be < 2ms, but was: " + avgSumMs + "ms");
+    }
 }

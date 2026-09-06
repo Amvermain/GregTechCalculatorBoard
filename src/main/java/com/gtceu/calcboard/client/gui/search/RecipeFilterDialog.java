@@ -23,11 +23,16 @@ public class RecipeFilterDialog {
     private Runnable onFilterChanged;
 
     public RecipeFilterDialog() {
-        Font font = Minecraft.getInstance().font;
-        this.searchBox = new EditBox(font, 0, 0, 100, 14, Component.translatable("gui.gtcalcboard.search"));
-        this.searchBox.setMaxLength(256);
-        this.searchBox.setResponder(this::onSearchQueryChanged);
-        this.searchBox.setHint(Component.translatable("gui.gtcalcboard.filter.search_hint"));
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc != null ? mc.font : null;
+        if (font != null) {
+            this.searchBox = new EditBox(font, 0, 0, 100, 14, Component.translatable("gui.gtcalcboard.search"));
+            this.searchBox.setMaxLength(256);
+            this.searchBox.setResponder(this::onSearchQueryChanged);
+            this.searchBox.setHint(Component.translatable("gui.gtcalcboard.filter.search_hint"));
+        } else {
+            this.searchBox = null;
+        }
     }
 
     public boolean isVisible() {

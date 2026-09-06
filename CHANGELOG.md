@@ -6,6 +6,75 @@
 
 ## [Unreleased]
 
+### Added
+
+### Changed & Improved
+
+### Fixed
+
+## [2.2.0-alpha.3] - 2026-09-07
+
+### Added
+- **Improved Wire Color Interpolation & Settings Preview**:
+  - Improved wire color interpolation based on supply/demand saturation ratio, ensuring smooth and natural color transitions without muddy mid-tones.
+  - Added a real-time preview curve and gradient bar to the Wire tab in the Board Settings Dialog to preview saturation colors.
+- **Create: Diesel Generators Mod Support**:
+  - Added support for Create: Diesel Generators, calculating kinetic stress capacity (SU) and fluid fuel consumption rates for all 3 diesel engines (Default, Modular, Huge).
+  - Added recipe support for basin fermenting (`basin_fermenting`), crude oil distillation (`distillation`), and compression molding (`compression_molding`).
+- **Multi-Filter Recipe Search Query Support**:
+  - Added multi-filter recipe search query support, allowing combined filters such as mod namespace (`@mod`), item tag (`#tag`), voltage tier (`tier:`), and power range (`eut:`).
+  - Optimized search query evaluation and indexing for responsive search performance across large recipe catalogs.
+- **Sequential ESC Dismissal & Modal Dialog Input Isolation**:
+  - Improved dialog navigation so pressing `ESC` or clicking outside dismisses only the topmost active dialog in reverse order, preventing accidental workspace exits.
+  - Enhanced modal input routing to prevent mouse clicks and keyboard shortcuts from leaking into background canvas elements while dialogs are open.
+- **Canvas Interaction Cancellation via ESC / Right-Click**:
+  - Added interaction cancellation: pressing `ESC` or right-clicking while dragging nodes or connecting wires immediately cancels the operation and reverts components to their previous positions.
+  - Prevented gesture overlap across node dragging, box selection, wire drawing, and viewport panning for smoother canvas manipulation.
+- **Multi-Selection Floating Action Bar**:
+  - Added a floating action bar above selected nodes whenever 2 or more nodes are selected.
+  - Provides one-click access to Group into Frame (`▤`), Group into Module (`📦`), Shared Machine Frame (`⧉`), Auto Ratio (`⚖`), Copy (`📋`), and Delete (`✕`).
+- **Multiblock BOM & Global Balance in Left Activity Bar**:
+  - Moved the Multiblock BOM (`▦`, Shift+B/M) and Global Balance Dashboard (`📊`, B) buttons to the Left Activity Bar for easier access.
+  - Cleaned up redundant chip buttons from the bottom status bar for a cleaner layout.
+
+### Fixed
+- **Accurate Rates for Continuous Per-Tick Fluid & Item Recipes**:
+  - Fixed an issue where GregTech machines with continuous per-tick fluid or item consumption/production (such as Greenhouses or Pisciculture Fisheries) had their throughput rates drastically underestimated on the board.
+- **Fixed Inappropriate Coil Option Display on Non-Coil Machines**:
+  - Fixed an issue where multiblock machines with fixed structural coil blocks (such as Heat Chamber, Draco Infusion, or Titan Forge) inappropriately exposed coil tier options in their GUI and BOM.
+  - Fixed an issue where non-coil machines (such as Void Extractor) displayed coil tier options on their cards when sharing a recipe category with higher-tier coil machines.
+- **Stutter-Free Closed Loop Recirculation Recalculation**:
+  - Resolved UI frame drops and micro-stuttering when adjusting machine counts or tiers in complex closed-loop recirculation setups, ensuring smooth real-time responsiveness.
+- **Kinetic Machine & Diesel Engine Inspector Display Improvements**:
+  - Fixed an issue where GT voltage tiers (`LV`) and overclock buttons inappropriately appeared on Create kinetic machines and diesel engines in the inspector panel; power metrics now display with appropriate units (`SU`, `FE/t`, `EU/t`).
+  - Fixed an issue in the Favorites Dock where clicking a diesel engine displayed unrelated kinetic recipes instead of filtering specifically to its combustion power recipes.
+- **Page Browser & Favorites Dock Usability Improvements**:
+  - Fixed a layout issue where opening the Page Browser drawer covered the left activity bar buttons.
+  - Applied mutually exclusive toggling between the Page Browser drawer and Favorites Dock, and prevented mouse hover and click events from leaking into background panels.
+- **Hide Multiplayer Options in Singleplayer Worlds**:
+  - Hidden the Team Collaboration button (`👥`) and workspace export options from the left activity bar and toolbar when running in singleplayer worlds.
+- **Singleblock Combustion Generator Addon Filter Fix**:
+  - Fixed an issue where multiblock boost traits (Oxygen / Liquid Oxygen Boost) and maintenance hatches inappropriately appeared in the machine config dialog for singleblock combustion generators (LV~HV).
+- **Recipe Initial Voltage Tier & Workstation Clamping**:
+  - Fixed an issue where recipes imported from EMI/JEI were incorrectly initialized to low voltage tiers below the recipe requirement or the machine's minimum tier.
+  - Improved tier resolution to automatically select matching tiered workstation icons based on recipe requirements and machine specifications.
+- **GTCEu & Star Technology Layered Recipe Cluster Extraction**:
+  - Fixed an issue where multi-step progressive recipes (such as Large Rotor Machine recipes in Star Technology) imported from EMI/JEI collapsed into a single node with merged inputs.
+  - Accurately decomposes layered recipes into sequential nodes (`Layer I`, `Layer II`, etc.) inside a compound group frame with properly apportioned durations and voltage tiers.
+- **Node Inspector & Process Summary Panel Alignment**:
+  - Fixed an issue where the right-side Node Inspector panel and Process Summary overlay overlapped at identical screen positions.
+  - The Process Summary panel now dynamically shifts to the left of the active inspector, keeping real-time flow and power balances visible during machine configuration.
+- **Combustion Generator Fuel Rate Accuracy & ZPM Tier Cap**:
+  - Corrected combustion generator base voltages for EV+ tiers so fluid fuel consumption rates (such as HOG) match in-game mechanics.
+  - Capped combustion generator tier progression at ZPM, preventing Supreme Combustion Module from rolling over into rocket-fuel-only modules (UV) when scrolling.
+  - Enabled Modular Combustion Frame (MCF) coolant boost addons on Star Technology combustion and rocket modules with appropriate power multipliers.
+- **Node Inspector High Voltage Tier Selection & Responsive Grid**:
+  - Expanded available voltage tiers in the Node Inspector panel beyond EV up to MAX for multiblock and singleblock electric machines.
+  - Reorganized voltage tier chips into an adaptive multi-row grid, preventing chips from overflowing outside the panel boundary on machines with numerous tiers.
+- **Singleblock Combustion Generator Icon Rendering Fix**:
+  - Fixed an issue where the machine item icon failed to render on node cards and the inspector panel for singleblock combustion generators (LV~HV).
+  - Added compatibility resolution so previously saved board files seamlessly migrate to modern machine identifiers.
+
 ## [2.2.0-alpha.2] - 2026-09-06
 
 ### Added

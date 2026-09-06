@@ -148,7 +148,16 @@ public final class GTBadgeProvider {
             int reqTemp = store.get(GTCEuProperties.EBF_TEMPERATURE);
             if (reqTemp <= 0) reqTemp = node.getRecipeTemperature();
 
-            boolean isCoilMb = node.isMultiblock() && (com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(node.getMachineIcon()) || com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId()));
+            boolean isCoilMb = false;
+            if (node.isMultiblock()) {
+                if (node.getMachineIcon() != null) {
+                    isCoilMb = com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(node.getMachineIcon());
+                } else if (node.getMultiblockWorkstation() != null) {
+                    isCoilMb = com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilMultiblock(node.getMultiblockWorkstation());
+                } else {
+                    isCoilMb = com.gtceu.calcboard.api.catalog.MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId());
+                }
+            }
             int instTemp = com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.getInstalledCoilTemperature(node);
 
             if (reqTemp <= 0 && instTemp <= 0 && !isCoilMb) return List.of();

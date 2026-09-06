@@ -17,10 +17,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.Locale;
 import java.util.OptionalDouble;
 
-public class TargetOutputRateDialog {
+public class TargetOutputRateDialog implements IBoardModal {
 
     private static final int DIALOG_WIDTH = 280;
     private static final int DIALOG_HEIGHT = 155;
@@ -81,6 +84,11 @@ public class TargetOutputRateDialog {
         double count = Math.max(0.0001, node.getMachineCount());
         double singleCps = effCps / count;
         return stack.getAmount() * stack.getChance() * singleCps;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY) {

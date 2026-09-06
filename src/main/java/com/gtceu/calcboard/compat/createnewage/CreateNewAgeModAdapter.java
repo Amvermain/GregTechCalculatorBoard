@@ -15,6 +15,10 @@ import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.compat.extension.IMultiblockBOMProvider;
 import com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.network.chat.Component;
@@ -26,12 +30,25 @@ import net.minecraftforge.fml.loading.FMLLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Dedicated Mod Adapter for Create: New Age (create_new_age).
  * Encapsulates Electricity Generation, Motors, Energising processing, and Magnet addons.
  */
 public class CreateNewAgeModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IHardwareAddonProvider.class,
+            IMultiblockBOMProvider.class,
+            IEnergySimulationProvider.class,
+            ICapabilityMatrixProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     static {
         com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(com.gtceu.calcboard.api.catalog.AddonCategory.MAGNET, (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon(id, name, desc, icon, 0));

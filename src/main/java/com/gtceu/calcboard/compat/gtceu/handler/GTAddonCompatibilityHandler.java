@@ -34,23 +34,25 @@ public final class GTAddonCompatibilityHandler {
 
     private GTAddonCompatibilityHandler() {}
 
+    private static final ResourceLocation DISTILLATION_TOWER_ID = ResourceLocation.tryParse("gtceu:distillation_tower");
+
     public static boolean isMufflerAddon(MachineAddon addon) {
-        if (addon == null) return false;
-        String id = addon.getId().toLowerCase(Locale.ROOT);
-        return id.contains("muffler") || id.contains("muffler_hatch");
+        if (addon == null || addon.getId() == null) return false;
+        String id = addon.getId();
+        return id.startsWith("gtceu:") && (id.contains("muffler_hatch") || id.contains("muffler"));
     }
 
     public static boolean isDistillationTower(RecipeNode node) {
         if (node == null) return false;
-        if (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("distillation_tower")) return true;
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("distillation_tower")) return true;
+        if (DISTILLATION_TOWER_ID.equals(node.getMachineIcon())) return true;
+        if (DISTILLATION_TOWER_ID.equals(node.getRecipeCategoryId())) return true;
         return false;
     }
 
     public static boolean supportsAddons(RecipeNode node) {
         if (node == null || node.getEnergyType() == EnergyType.NONE) return false;
-        if (GTCombustionHelper.isCombustionEngine(node)) {
-            return true;
+        if (GTCombustionHelper.isCombustionFamily(node)) {
+            return node.isMultiblock();
         }
         if (GTPowerCalculator.isBoilerRecipe(node)) {
             return node.isMultiblock();
@@ -64,13 +66,16 @@ public final class GTAddonCompatibilityHandler {
     public static List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
         if (node == null) return List.of();
 
-        if (GTCombustionHelper.isCombustionEngine(node)) {
-            List<AddonCategory> cats = new ArrayList<>();
-            cats.add(AddonCategory.MULTIBLOCK_TRAIT);
-            cats.add(AddonCategory.MAINTENANCE);
-            cats.add(AddonCategory.HATCH_BUS);
-            cats.add(AddonCategory.CUSTOM);
-            return cats;
+        if (GTCombustionHelper.isCombustionFamily(node)) {
+            if (node.isMultiblock()) {
+                List<AddonCategory> cats = new ArrayList<>();
+                cats.add(AddonCategory.MULTIBLOCK_TRAIT);
+                cats.add(AddonCategory.MAINTENANCE);
+                cats.add(AddonCategory.HATCH_BUS);
+                cats.add(AddonCategory.CUSTOM);
+                return cats;
+            }
+            return List.of(AddonCategory.CUSTOM);
         }
 
         if (GTPowerCalculator.isBoilerRecipe(node)) {
@@ -187,7 +192,10 @@ public final class GTAddonCompatibilityHandler {
             return false;
         }
 
-        if (GTCombustionHelper.isCombustionEngine(node)) {
+        if (GTCombustionHelper.isCombustionFamily(node)) {
+            if (!node.isMultiblock()) {
+                return false;
+            }
             if (addon.getCategory() == AddonCategory.MAINTENANCE || addon.getCategory() == AddonCategory.HATCH_BUS) {
                 return true;
             }
@@ -236,7 +244,7 @@ public final class GTAddonCompatibilityHandler {
                 var def = MultiblockStructureCatalog.getStructure(mbId);
                 if (def != null) {
                     if (isMufflerAddon(addon)) {
-                        boolean hasMuffler = def.parts().stream().anyMatch(p -> p != null && p.itemId() != null && p.itemId().getPath().contains("muffler"));
+                        boolean hasMuffler = def.supportsAbility("MUFFLER") || def.parts().stream().anyMatch(p -> p != null && p.itemId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuAddonCrawler.isMufflerHatchItem(null, p.itemId()));
                         if (!hasMuffler) return false;
                     } else {
                         if (def.maintenanceSlotCount() == 0 && !def.supportsAbility("MAINTENANCE")) return false;
@@ -342,6 +350,7 @@ public final class GTAddonCompatibilityHandler {
             return node.hasThreading();
         }
         if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
+            if (!node.isMultiblock()) return false;
             if (StarTTurbineHelper.isStarTTrait(addon)) {
                 return node.isTurbine() && StarTTurbineHelper.isCompatibleStarTTrait(node, addon);
             }
@@ -361,7 +370,6 @@ public final class GTAddonCompatibilityHandler {
             if (addon.getItemIcon() != null) {
                 ResourceLocation target = addon.getItemIcon();
                 if (node.getMachineIcon() != null && node.getMachineIcon().equals(target)) return true;
-                if (node.getAvailableWorkstations().contains(target)) return true;
                 if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().equals(target)) return true;
                 return false;
             }
@@ -676,8 +684,12 @@ public final class GTAddonCompatibilityHandler {
         if (GTCombustionHelper.isExtremeCombustionEngine(node)) {
             return "gtceu:liquid_oxygen_boost".equals(id);
         }
-        if (GTCombustionHelper.isModularCombustionFrame(node)) {
-            return isCoolantAddon(addon);
+        if (GTCombustionHelper.isModularCombustionFrame(node)
+                || GTCombustionHelper.isStarTCombustionModule(node)
+                || GTCombustionHelper.isStarTRocketModule(node)) {
+            if (isCoolantAddon(addon)) {
+                return true;
+            }
         }
         if (GTCombustionHelper.START_T1_COMBUSTION.equals(node.getMachineIcon())) {
             return "start_core:t1_oxidizer_boost".equals(id);

@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.ProductionETACalculator;
+import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
@@ -9,6 +10,10 @@ import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.api.type.SteamMode;
+import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -16,14 +21,20 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 
 public class NodeInspectorPanel {
 
     private final BoardScreen screen;
     private NodeWidget targetWidget = null;
     private boolean visible = false;
-    private static final int PANEL_WIDTH = 195;
+    public static final int PANEL_WIDTH = 195;
 
     public NodeInspectorPanel(BoardScreen screen) {
         this.screen = screen;
@@ -34,17 +45,38 @@ public class NodeInspectorPanel {
     }
 
     public void setTargetWidget(NodeWidget widget) {
+        boolean wasVisible = this.visible;
         this.targetWidget = widget;
         this.visible = (widget != null);
+        if (this.visible && !wasVisible) {
+            screen.onNodeInspectorOpened();
+        } else if (!this.visible && wasVisible) {
+            screen.onNodeInspectorClosed();
+        }
     }
 
     public void close() {
-        this.visible = false;
-        this.targetWidget = null;
+        if (this.visible) {
+            this.visible = false;
+            this.targetWidget = null;
+            screen.onNodeInspectorClosed();
+        }
     }
 
     public int getPanelWidth() {
         return isVisible() ? PANEL_WIDTH : 0;
+    }
+
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        if (!isVisible()) return false;
+        int px = screen.width - PANEL_WIDTH - 6;
+        int py = screen.getToolbarY() + 22;
+        int ph = getPanelHeight();
+        return mouseX >= px && mouseX <= px + PANEL_WIDTH && mouseY >= py && mouseY <= py + ph;
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        return isMouseOver(mouseX, mouseY);
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
@@ -52,11 +84,10 @@ public class NodeInspectorPanel {
 
         Font font = Minecraft.getInstance().font;
         int screenW = screen.width;
-        int screenH = screen.height;
 
         int px = screenW - PANEL_WIDTH - 6;
         int py = screen.getToolbarY() + 22;
-        int ph = Math.max(160, screenH - py - 32);
+        int ph = getPanelHeight();
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 350.0f);
@@ -80,7 +111,13 @@ public class NodeInspectorPanel {
 
         if (node.getMachineIcon() != null) {
             var item = ForgeRegistries.ITEMS.getValue(node.getMachineIcon());
-            if (item != null) {
+            if ((item == null || item == Items.AIR) && ForgeRegistries.BLOCKS != null) {
+                var block = ForgeRegistries.BLOCKS.getValue(node.getMachineIcon());
+                if (block != null && block.asItem() != Items.AIR) {
+                    item = block.asItem();
+                }
+            }
+            if (item != null && item != Items.AIR) {
                 graphics.renderItem(new ItemStack(item), px + 4, py + 3);
                 titleX = px + 24;
             }
@@ -104,15 +141,15 @@ public class NodeInspectorPanel {
         renderCountControls(graphics, font, px + 8, curY, mouseX, mouseY);
         curY += 22;
 
-        if (node.getTargetTier() != null) {
+        if (supportsVoltageTier(node)) {
             String tierLabel = Component.translatable("gui.gtcalcboard.inspector.tier").getString();
             graphics.drawString(font, tierLabel, px + 8, curY, 0xFF94A3B8, false);
             curY += 12;
             renderTierControls(graphics, font, px + 8, curY, mouseX, mouseY);
-            curY += 20;
+            curY += getTierControlsHeight(node) + 6;
         }
 
-        if (node.getOverclockMode() != null) {
+        if (supportsOverclockMode(node)) {
             String ocLabel = Component.translatable("gui.gtcalcboard.inspector.overclock").getString();
             graphics.drawString(font, ocLabel, px + 8, curY, 0xFF94A3B8, false);
             curY += 12;
@@ -172,49 +209,162 @@ public class NodeInspectorPanel {
         graphics.drawCenteredString(font, "⌖", anchorX + 9, y + 4, isBase ? 0xFFFDE68A : 0xFF94A3B8);
     }
 
-    private java.util.List<GTVoltageTier> getInspectorTiers(com.gtceu.calcboard.api.model.RecipeNode node) {
-        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionFamily(node)) {
-            return com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getAvailableCombustionTiers();
+    public int getPanelHeight() {
+        int screenH = screen.height;
+        int py = screen.getToolbarY() + 22;
+        int minH = Math.max(160, screenH - py - 32);
+        if (targetWidget == null || targetWidget.getNode() == null) {
+            return minH;
         }
-        return java.util.List.of(GTVoltageTier.LV, GTVoltageTier.MV, GTVoltageTier.HV, GTVoltageTier.EV);
+        RecipeNode node = targetWidget.getNode();
+        if (node.isReroute()) {
+            return minH;
+        }
+        int contentH = calculateContentHeight(node);
+        return Math.max(minH, contentH);
+    }
+
+    private int calculateContentHeight(RecipeNode node) {
+        int h = 28;
+        h += 12 + 22;
+        if (supportsVoltageTier(node)) {
+            h += 12 + getTierControlsHeight(node) + 6;
+        }
+        if (supportsOverclockMode(node)) {
+            h += 12 + 20;
+        }
+        h += 44;
+        h += 48 + 8;
+        return h;
+    }
+
+    public int getTierControlsHeight(RecipeNode node) {
+        if (node == null || node.getTargetTier() == null) {
+            return 0;
+        }
+        List<GTVoltageTier> tiers = getInspectorTiers(node);
+        if (tiers.isEmpty()) {
+            return 0;
+        }
+        int cols = 4;
+        int numRows = (tiers.size() + cols - 1) / cols;
+        int chipH = 16;
+        int rowGap = 4;
+        return numRows * chipH + (numRows - 1) * rowGap;
+    }
+
+    public List<GTVoltageTier> getInspectorTiers(RecipeNode node) {
+        if (node == null) {
+            return Collections.emptyList();
+        }
+        if (GTCombustionHelper.isCombustionFamily(node)) {
+            return GTCombustionHelper.getAvailableCombustionTiers();
+        }
+        if (node.isTurbine()) {
+            return getTurbineInspectorTiers(node);
+        }
+        return getStandardInspectorTiers(node);
+    }
+
+    private List<GTVoltageTier> getTurbineInspectorTiers(RecipeNode node) {
+        if (!node.isMultiblock()) {
+            return List.of(GTVoltageTier.LV, GTVoltageTier.MV, GTVoltageTier.HV);
+        }
+        GTVoltageTier baseTier = GTTurbineHelper.getTurbineBaseTier(node);
+        int minIdx = baseTier != null ? baseTier.ordinal() : GTVoltageTier.EV.ordinal();
+        int maxIdx = GTVoltageTier.MAX.ordinal();
+        if (node.getTargetTier() != null) {
+            minIdx = Math.min(minIdx, node.getTargetTier().ordinal());
+            maxIdx = Math.max(maxIdx, node.getTargetTier().ordinal());
+        }
+        List<GTVoltageTier> list = new ArrayList<>();
+        for (int i = minIdx; i <= maxIdx; i++) {
+            list.add(GTVoltageTier.getByIndex(i));
+        }
+        return list;
+    }
+
+    private List<GTVoltageTier> getStandardInspectorTiers(RecipeNode node) {
+        int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.LV.ordinal();
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
+        if (node.isMultiblock()) {
+            minIdx = Math.max(minIdx, GTVoltageTier.LV.ordinal());
+            if (adapter != null && adapter.isFusion(node)) {
+                var minFusion = adapter.getMinFusionVoltageTier(node);
+                if (minFusion != null) {
+                    minIdx = Math.max(minIdx, minFusion.ordinal());
+                }
+            }
+        }
+        boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
+        boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE;
+        if (adapter != null && !isVanillaCooking && !isPassiveOrSteam) {
+            GTVoltageTier minWsTier = adapter.getMinimumWorkstationTier(node);
+            if (minWsTier != null) {
+                minIdx = Math.max(minIdx, minWsTier.ordinal());
+            }
+        }
+        int maxIdx = GTVoltageTier.MAX.ordinal();
+        if (node.getTargetTier() != null) {
+            minIdx = Math.min(minIdx, node.getTargetTier().ordinal());
+            maxIdx = Math.max(maxIdx, node.getTargetTier().ordinal());
+        }
+        List<GTVoltageTier> list = new ArrayList<>();
+        for (int i = minIdx; i <= maxIdx; i++) {
+            list.add(GTVoltageTier.getByIndex(i));
+        }
+        return list;
     }
 
     private void renderTierControls(GuiGraphics graphics, Font font, int x, int y, int mouseX, int mouseY) {
         var node = targetWidget.getNode();
         GTVoltageTier currentTier = node.getTargetTier();
-        java.util.List<GTVoltageTier> tiers = getInspectorTiers(node);
+        List<GTVoltageTier> tiers = getInspectorTiers(node);
         int totalW = PANEL_WIDTH - 16;
-        int count = tiers.size();
+        int cols = 4;
         int gap = 4;
-        int chipW = Math.max(26, (totalW - gap * (count - 1)) / count);
+        int rowGap = 4;
+        int chipW = (totalW - gap * (cols - 1)) / cols;
+        int chipH = 16;
+        int count = tiers.size();
 
         for (int i = 0; i < count; i++) {
             GTVoltageTier t = tiers.get(i);
-            int cx = x + i * (chipW + gap);
+            int col = i % cols;
+            int row = i / cols;
+            int cx = x + col * (chipW + gap);
+            int cy = y + row * (chipH + rowGap);
             boolean isCur = (t == currentTier);
-            boolean hov = mouseX >= cx && mouseX <= cx + chipW && mouseY >= y && mouseY <= y + 16;
+            boolean hov = mouseX >= cx && mouseX <= cx + chipW && mouseY >= cy && mouseY <= cy + chipH;
 
             int bg = isCur ? 0xFF0284C7 : (hov ? 0xFF334155 : 0xFF1E293B);
             int border = isCur ? 0xFF38BDF8 : (hov ? 0xFF64748B : 0xFF334155);
-            graphics.fill(cx, y, cx + chipW, y + 16, bg);
-            graphics.renderOutline(cx, y, chipW, 16, border);
-            graphics.drawCenteredString(font, t.name(), cx + chipW / 2, y + 4, isCur ? 0xFFFFFFFF : 0xFF94A3B8);
+            graphics.fill(cx, cy, cx + chipW, cy + chipH, bg);
+            graphics.renderOutline(cx, cy, chipW, chipH, border);
+            graphics.drawCenteredString(font, t.name(), cx + chipW / 2, cy + 4, isCur ? 0xFFFFFFFF : 0xFF94A3B8);
         }
     }
 
     private boolean handleTierControlsClick(double mouseX, double mouseY, int x, int curY) {
         var node = targetWidget.getNode();
-        java.util.List<GTVoltageTier> tiers = getInspectorTiers(node);
+        List<GTVoltageTier> tiers = getInspectorTiers(node);
         int totalW = PANEL_WIDTH - 16;
-        int count = tiers.size();
+        int cols = 4;
         int gap = 4;
-        int chipW = Math.max(26, (totalW - gap * (count - 1)) / count);
+        int rowGap = 4;
+        int chipW = (totalW - gap * (cols - 1)) / cols;
+        int chipH = 16;
+        int count = tiers.size();
 
         for (int i = 0; i < count; i++) {
             GTVoltageTier t = tiers.get(i);
-            int cx = x + i * (chipW + gap);
-            if (mouseX >= cx && mouseX <= cx + chipW && mouseY >= curY && mouseY <= curY + 16) {
+            int col = i % cols;
+            int row = i / cols;
+            int cx = x + col * (chipW + gap);
+            int cy = curY + row * (chipH + rowGap);
+            if (mouseX >= cx && mouseX <= cx + chipW && mouseY >= cy && mouseY <= cy + chipH) {
                 applyTierSelection(node, t);
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
                 targetWidget.invalidateCache();
                 screen.markSummaryDirty();
                 return true;
@@ -223,18 +373,44 @@ public class NodeInspectorPanel {
         return false;
     }
 
-    private void applyTierSelection(com.gtceu.calcboard.api.model.RecipeNode node, GTVoltageTier tier) {
-        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionFamily(node)) {
-            com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.syncCombustionMachine(node, tier);
+    private void applyTierSelection(RecipeNode node, GTVoltageTier tier) {
+        if (GTCombustionHelper.isCombustionFamily(node)) {
+            GTVoltageTier oldTier = node.getTargetTier();
+            boolean ok = GTCombustionHelper.syncCombustionMachine(node, tier);
+            if (ok && screen != null) {
+                screen.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, tier));
+                syncSharedFrame(node);
+            }
             return;
         }
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            node.setSteamMode(SteamMode.NONE);
+        }
+        GTVoltageTier oldTier = node.getTargetTier();
         node.setTargetTier(tier);
-        if (node.isMultiblock()) {
-            return;
+        if (node.isLargeTurbine()) {
+            GTTurbineHelper.setRotorHolderTier(node, tier);
         }
-        var ws = com.gtceu.calcboard.api.model.NodeWorkstationResolver.getWorkstationForTier(node, tier);
-        if (ws != null) {
-            node.setMachineIcon(ws);
+        if (!node.isMultiblock()) {
+            var ws = com.gtceu.calcboard.api.model.NodeWorkstationResolver.getWorkstationForTier(node, tier);
+            if (ws != null) {
+                node.setMachineIcon(ws);
+            }
+        }
+        com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
+        if (screen != null) {
+            screen.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, tier));
+            syncSharedFrame(node);
+        }
+    }
+
+    private void syncSharedFrame(RecipeNode node) {
+        if (screen != null && screen.getGraph() != null) {
+            var frame = screen.getGraph().findFrameEnclosingNode(node);
+            if (frame != null && frame.isSharedMachineFrame()) {
+                frame.syncHardwareConfig(node, screen.getGraph());
+                screen.rebuildWidgets();
+            }
         }
     }
 
@@ -276,34 +452,59 @@ public class NodeInspectorPanel {
 
         var node = targetWidget.getNode();
         double power = node.getSingleMachineEUt();
-        String powerStr = String.format("%,.0f EU/t", power);
+        String powerStr = formatPowerValue(node, power);
         int powerCol = power > 0 ? 0xFF10B981 : (power < 0 ? 0xFFF59E0B : 0xFF94A3B8);
 
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.inspector.single_power").getString(), x + 6, y + 6, 0xFF64748B, false);
         graphics.drawString(font, powerStr, x + boxW - font.width(powerStr) - 6, y + 6, powerCol, false);
 
         double totalPower = node.getTotalEUt();
-        String totalStr = String.format("%,.0f EU/t", totalPower);
+        String totalStr = formatPowerValue(node, totalPower);
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.inspector.total_power").getString(), x + 6, y + 20, 0xFF64748B, false);
         graphics.drawString(font, totalStr, x + boxW - font.width(totalStr) - 6, y + 20, powerCol, false);
 
         double duration = node.getEffectiveDurationSeconds();
-        String durStr = String.format("%.2f s", duration);
+        String durStr = String.format(Locale.ROOT, "%.2f s", duration);
         graphics.drawString(font, Component.translatable("gui.gtcalcboard.inspector.duration").getString(), x + 6, y + 34, 0xFF64748B, false);
         graphics.drawString(font, durStr, x + boxW - font.width(durStr) - 6, y + 34, 0xFFCBD5E1, false);
     }
 
+    private String formatPowerValue(RecipeNode node, double power) {
+        EnergyType type = node.getEnergyType();
+        if (type == EnergyType.NONE) {
+            return Component.translatable("gui.gtcalcboard.energy_passive_stat").getString();
+        }
+        String unit = switch (type) {
+            case KINETIC_SU -> "SU";
+            case ELECTRIC_FE -> "FE/t";
+            default -> "EU/t";
+        };
+        if (power > 0 || node.isGenerator()) {
+            return String.format(Locale.ROOT, "+%,.0f %s", Math.abs(power), unit);
+        }
+        return String.format(Locale.ROOT, "%,.0f %s", power, unit);
+    }
+
+    private boolean supportsVoltageTier(RecipeNode node) {
+        if (node == null || node.getTargetTier() == null) return false;
+        if (Boolean.TRUE.equals(node.getProperties().get(com.gtceu.calcboard.compat.greate.GreateProperties.IS_GREATE))) return true;
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return false;
+        return node.getEnergyType() == EnergyType.ELECTRIC_EU;
+    }
+
+    private boolean supportsOverclockMode(RecipeNode node) {
+        if (node == null || node.getOverclockMode() == null) return false;
+        if (node.isGenerator() || node.getEnergyType() == EnergyType.NONE) return false;
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return false;
+        return node.getEnergyType() == EnergyType.ELECTRIC_EU;
+    }
+
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!isVisible()) return false;
+        if (!isMouseOver(mouseX, mouseY)) return false;
 
         int screenW = screen.width;
         int px = screenW - PANEL_WIDTH - 6;
         int py = screen.getToolbarY() + 22;
-        int ph = Math.max(160, screen.height - py - 32);
-
-        if (mouseX < px || mouseX > px + PANEL_WIDTH || mouseY < py || mouseY > py + ph) {
-            return false;
-        }
 
         if (button == 0) {
             int closeX = px + PANEL_WIDTH - 16;
@@ -318,7 +519,8 @@ public class NodeInspectorPanel {
                 return handleJunctionInspectorClick(px, py, mouseX, mouseY, node);
             }
 
-            int curY = py + 40;
+            int curY = py + 28;
+            curY += 12;
             int x = px + 8;
 
             if (mouseX >= x && mouseX <= x + 16 && mouseY >= curY && mouseY <= curY + 16) {
@@ -353,24 +555,32 @@ public class NodeInspectorPanel {
                 return true;
             }
 
-            curY += 34;
-            if (handleTierControlsClick(mouseX, mouseY, x, curY)) {
-                return true;
+            curY += 22;
+
+            if (supportsVoltageTier(node)) {
+                curY += 12;
+                if (handleTierControlsClick(mouseX, mouseY, x, curY)) {
+                    return true;
+                }
+                curY += getTierControlsHeight(node) + 6;
             }
 
-            curY += 32;
             int btnW = PANEL_WIDTH - 16;
-            if (mouseX >= x && mouseX <= x + btnW && mouseY >= curY && mouseY <= curY + 16) {
-                var curMode = targetWidget.getNode().getOverclockMode();
-                var vals = OverclockMode.values();
-                var nextMode = vals[(curMode.ordinal() + 1) % vals.length];
-                targetWidget.getNode().setOverclockMode(nextMode);
-                targetWidget.invalidateCache();
-                screen.markSummaryDirty();
-                return true;
+            if (supportsOverclockMode(node)) {
+                curY += 12;
+                if (mouseX >= x && mouseX <= x + btnW && mouseY >= curY && mouseY <= curY + 16) {
+                    var curMode = targetWidget.getNode().getOverclockMode();
+                    var vals = OverclockMode.values();
+                    var nextMode = vals[(curMode.ordinal() + 1) % vals.length];
+                    targetWidget.getNode().setOverclockMode(nextMode);
+                    Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                    targetWidget.invalidateCache();
+                    screen.markSummaryDirty();
+                    return true;
+                }
+                curY += 20;
             }
 
-            curY += 20;
             if (mouseX >= x && mouseX <= x + btnW && mouseY >= curY && mouseY <= curY + 36) {
                 if (screen.getMachineConfigDialog() != null) {
                     screen.getMachineConfigDialog().open(targetWidget.getNode());

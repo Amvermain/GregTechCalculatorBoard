@@ -17,6 +17,8 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Ctrl + A` select-all functionality.
   - [ ] `Delete` / `Backspace` keys batch delete selected nodes/frames.
   - [ ] `Ctrl + Z` (Undo) and `Ctrl + Y` (Redo) history stack execution.
+  - [ ] **Canvas Interaction Cancellation**: Pressing `ESC` or right-clicking during node dragging or wire drawing immediately cancels operation and restores positions.
+  - [ ] **Multi-Selection Floating Action Bar**: Selecting 2+ nodes renders floating toolbar (`SelectionFloatingToolbarWidget`) with Frame (`▤`), Module (`📦`), Shared Machine Frame (`⧉`), Auto Ratio (`⚖`), Copy (`📋`), and Delete (`✕`).
 
 ### 1.2 Wire Connections & Ratio Scaling
 - [ ] **Basic Wiring**: Verify spline wire connects when clicking an output port (green) $\rightarrow$ input port (blue).
@@ -76,6 +78,16 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **ArchUnit Architectural Boundary Enforcement**:
   - [ ] `ArchitectureTest` automated JUnit suite passes 100% without architectural violations.
 
+### 1.6 Modal Dialog Stack & Activity Bar Navigation
+- [ ] **Sequential ESC Dismissal (LIFO Modal Stack)**:
+  - [ ] When multiple dialogs are open, pressing `ESC` or clicking outside dismisses only the topmost dialog in reverse order.
+  - [ ] Mouse and keyboard input does not leak through to background canvas or underlying dialogs.
+- [ ] **Left Activity Bar Integration**:
+  - [ ] Multiblock BOM (`▦`) and Global Balance Dashboard (`📊`) open directly from the Left Activity Bar.
+  - [ ] Redundant chip buttons removed from bottom status bar.
+- [ ] **Wire Tab Saturation Preview**:
+  - [ ] Board Settings Dialog Wire tab displays real-time preview curve and gradient bar for saturation colors.
+
 ---
 
 ## 2. Calculation Solver & Overclocking & Math Engine (Solver & Math Engine)
@@ -133,6 +145,15 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] **Pyrolyse Oven**: Verify duration multiplier $\text{DurationMult} = \frac{100.0}{\text{PyrolyseSpeed}\%}$.
   - [ ] **Cracking Unit**: Verify power multiplier $\text{EUtMult} = \frac{\text{CrackingEnergy}\%}{100.0}$.
   - [ ] **Multi Smelter**: Verify coil tier dedicated parallel scaling ($32\text{x}, 64\text{x}, 128\text{x}\dots$).
+  - [ ] **Structural Fixed Coil Protection & Machine-Specific Coil Gating**:
+    - [ ] Multiblock machines containing fixed structural coil blocks (e.g. Heat Chamber, Draco Infusion, Titan Forge, etc.) are protected from being detected as functional coil multiblocks (`isCoilMultiblock == false`, `coilSlotCount == 0`, parts classified as `PartCategory.CASING` in BOM).
+    - [ ] Non-coil machines (e.g. Void Extractor) in recipe categories that contain higher-tier coil multiblocks (e.g. Void Excavator) do not display the `♨` coil badge on cards or expose coil options in the parts dialog.
+    - [ ] `StructuralCoilProtectionTest` and `CoilGatingRegressionTest` automated JUnit suites pass 100%.
+- [ ] **Continuous Tick I/O Scaling & Extraction (`GTRecipeTickFluidExtractionTest`)**:
+  - [ ] Extract continuous per-tick fluid and item ingredients defined in `GTRecipe.tickInputs` and `GTRecipe.tickOutputs`.
+  - [ ] Normalize per-tick amounts to recipe batch totals ($\text{Amount}_{\text{batch}} = \text{Amount}_{\text{perTick}} \times \text{DurationTicks}$), ensuring rate calculations in mB/t and mB/s match in-game physics and recipe viewer displays.
+  - [ ] Preserve consumption/production chance and tier chance boosts for continuous tick ingredients.
+  - [ ] `GTRecipeTickFluidExtractionTest` automated JUnit regression suite passes 100%.
 - [ ] **Large Turbines & Rotor Holder Physics (`GTTurbinePhysics`)**:
   - [ ] **Rotor Holder Throughput Cap**: Verify tier base capacity (EV 4,096 EU/t base, doubling per tier) and rotor power scaling $\lfloor \text{BaseCap} \times \frac{\text{RotorPower}}{100} \rfloor$.
   - [ ] **Rotor Efficiency & Holder Bonus**: Combine rotor base efficiency + holder tier bonus ($\Delta\text{Tier} \times 10\%$) to scale fuel cycle duration.
@@ -195,6 +216,18 @@ This document is the official QA verification checklist for `GregTechCalculatorB
 - [ ] **Ultra-High-Voltage Plasma Turbine Models**:
   - [ ] Supreme Plasma Turbine (SPT, 6x parallel, $98,304\text{ EU/t}$ base).
   - [ ] Nyinsane Plasma Turbine (NPT, 12x parallel, $196,608\text{ EU/t}$ base).
+
+### 3.7 Create: Diesel Generators
+- [ ] **Diesel Engine Kinetic Generation & Fuel Metrics**:
+  - [ ] **Default Diesel Engine**: 96 RPM base, 6,144 SU stress capacity, 1.0 mB/s diesel consumption.
+  - [ ] **Modular Diesel Engine (`large_diesel_engine`)**: 96 RPM base, 16,384 SU stress capacity, 2.0 mB/s diesel consumption per modular unit.
+  - [ ] **Huge Diesel Engine**: 48 RPM base, 65,536 SU stress capacity, 8.0 mB/s diesel consumption.
+  - [ ] Dynamic extraction from `createdieselgenerators:fuel_type` registry using cached reflection with graceful fallback to default specs.
+- [ ] **Non-Kinetic Recipe Categories**:
+  - [ ] Basin Fermenting (`basin_fermenting`): Processing duration, fluid/item inputs, and fermented outputs.
+  - [ ] Distillation (`distillation`): Multi-fluid distillation outputs from crude oil with temperature/duration modeling.
+  - [ ] Compression Molding (`compression_molding`): Mold ingredients, plastic consumption, and shaped outputs.
+- [ ] `CreateDieselGeneratorsTest` automated JUnit regression suite passes 100%.
 
 ---
 

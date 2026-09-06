@@ -155,9 +155,11 @@ public class CreateNewAgeTest {
 
         // Test custom modpack suToEnergy config (e.g. Star Technology: 0.05 -> 3686.4 FE/t = 3.7K ⚡/t)
         CreateNewAgeModAdapter.testSuToEnergyOverride = 0.05;
+        coilNode.markOverclockDirty();
         double customFE = coilNode.getSingleMachineEUt();
         Assertions.assertEquals(3686.4, customFE, 0.001);
         CreateNewAgeModAdapter.testSuToEnergyOverride = null;
+        coilNode.markOverclockDirty();
     }
 
     @Test

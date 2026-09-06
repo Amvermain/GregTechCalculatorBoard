@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public class EmiRecipeConverter {
 
@@ -116,7 +117,16 @@ public class EmiRecipeConverter {
                 node.getAvailableWorkstations().add(ws);
             }
         }
-        ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : findMachineIcon(recipe);
+        ResourceLocation icon = preferredWorkstation;
+        if (icon == null) {
+            GTVoltageTier initialTier = details.tier != null ? details.tier : GTVoltageTier.LV;
+            ResourceLocation tieredWs = node.getWorkstationForTier(initialTier);
+            if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
+                icon = tieredWs;
+            } else {
+                icon = findMachineIcon(recipe);
+            }
+        }
         if (icon != null && !isIgnoredWorkstation(icon)) {
             node.setMachineIcon(icon);
             if (!node.getAvailableWorkstations().contains(icon)) {
@@ -170,6 +180,13 @@ public class EmiRecipeConverter {
             com.gtceu.calcboard.compat.greate.GreateMachineHelper.syncMachineIconToTier(node, initTier);
         }
 
+        List<IngredientStack> gtTickInputs = null;
+        List<IngredientStack> gtTickOutputs = null;
+        if (backing != null && com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.isGTRecipe(backing)) {
+            gtTickInputs = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractTickIngredients(backing, "tickInputs", details.durationTicks);
+            gtTickOutputs = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractTickIngredients(backing, "tickOutputs", details.durationTicks);
+        }
+
         List<SlotChance> extractedInputChances = extractSlotChances(recipe, true);
         boolean[] usedInputChances = new boolean[extractedInputChances.size()];
 
@@ -213,9 +230,18 @@ public class EmiRecipeConverter {
                     }
                 } catch (Throwable ignored) {}
 
+                primaryStack = applyTickIngredientScaling(primaryStack, gtTickInputs);
                 applySlotChance(primaryStack, inIdx, extractedInputChances, usedInputChances);
                 primaryStack.setAlternatives(altIds);
                 node.addInput(primaryStack);
+            }
+        }
+
+        if (gtTickInputs != null) {
+            for (IngredientStack tickIn : gtTickInputs) {
+                if (tickIn != null && tickIn.getId() != null && !containsIngredient(node.getInputs(), tickIn)) {
+                    node.addInput(tickIn.copy());
+                }
             }
         }
 
@@ -229,8 +255,17 @@ public class EmiRecipeConverter {
 
             IngredientStack os = convertEmiStack(outStack, outStack.getAmount(), outStack.getChance());
             if (os != null && !isDummyConditionMarker(os.getId())) {
+                os = applyTickIngredientScaling(os, gtTickOutputs);
                 applySlotChance(os, i, extractedChances, usedChances);
                 node.addOutput(os);
+            }
+        }
+
+        if (gtTickOutputs != null) {
+            for (IngredientStack tickOut : gtTickOutputs) {
+                if (tickOut != null && tickOut.getId() != null && !containsIngredient(node.getOutputs(), tickOut)) {
+                    node.addOutput(tickOut.copy());
+                }
             }
         }
 
@@ -316,6 +351,12 @@ public class EmiRecipeConverter {
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        GTVoltageTier effectiveTier = node.getTargetTier() != null ? node.getTargetTier() : (node.getRecipeTier() != null ? node.getRecipeTier() : GTVoltageTier.LV);
+        if (adapter != null) {
+            effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
+        }
+        node.setTargetTier(effectiveTier);
         return node;
     }
 
@@ -563,10 +604,19 @@ public class EmiRecipeConverter {
     private static List<SlotChance> extractGTRecipeSlotChances(Object backing, String key) {
         List<SlotChance> list = new ArrayList<>();
         List<IngredientStack> gtStacks = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeContents(backing, key);
-        if (gtStacks == null || gtStacks.isEmpty()) return list;
-        for (IngredientStack is : gtStacks) {
-            if (is == null || is.getId() == null) continue;
-            list.add(new SlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
+        if (gtStacks != null && !gtStacks.isEmpty()) {
+            for (IngredientStack is : gtStacks) {
+                if (is == null || is.getId() == null) continue;
+                list.add(new SlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
+            }
+        }
+        String tickKey = "inputs".equalsIgnoreCase(key) ? "tickInputs" : "tickOutputs";
+        List<IngredientStack> gtTickStacks = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractGTRecipeContents(backing, tickKey);
+        if (gtTickStacks != null && !gtTickStacks.isEmpty()) {
+            for (IngredientStack is : gtTickStacks) {
+                if (is == null || is.getId() == null) continue;
+                list.add(new SlotChance(is.getId(), is.getChance(), is.getTierChanceBoost()));
+            }
         }
         return list;
     }
@@ -949,6 +999,34 @@ public class EmiRecipeConverter {
                 || catPath.equals("combustion_generator") || catPath.equals("semi_fluid_generator")
                 || catPath.equals("gas_turbine") || catPath.equals("steam_turbine") || catPath.equals("plasma_generator")
                 || ((catNs.equals("thermal") || catNs.equals("thermal_expansion") || catNs.equals("systeams")) && catPath.contains("fuel"));
+    }
+
+    private static IngredientStack applyTickIngredientScaling(IngredientStack stack, List<IngredientStack> tickList) {
+        if (stack == null || tickList == null || tickList.isEmpty()) {
+            return stack;
+        }
+        IngredientStack matchingTick = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.findMatchingTickIngredient(tickList, stack);
+        if (matchingTick == null) {
+            return stack;
+        }
+        IngredientStack scaled = stack.withAmount(matchingTick.getAmount());
+        if (matchingTick.getChance() > 0) {
+            scaled.setChance(matchingTick.getChance());
+            scaled.setTierChanceBoost(matchingTick.getTierChanceBoost());
+        }
+        return scaled;
+    }
+
+    private static boolean containsIngredient(List<IngredientStack> list, IngredientStack target) {
+        if (list == null || target == null || target.getId() == null) {
+            return false;
+        }
+        for (IngredientStack s : list) {
+            if (s != null && Objects.equals(s.getId(), target.getId()) && s.isFluid() == target.isFluid()) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

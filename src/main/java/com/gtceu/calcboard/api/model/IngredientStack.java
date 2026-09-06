@@ -86,6 +86,15 @@ public class IngredientStack {
         IngredientStack c = new IngredientStack(this.type, this.id, this.displayName, this.amount, this.chance);
         c.setAlternatives(new java.util.ArrayList<>(this.alternatives));
         c.selectedAltIndex = this.selectedAltIndex;
+        c.tierChanceBoost = this.tierChanceBoost;
+        return c;
+    }
+
+    public IngredientStack withAmount(double newAmount) {
+        IngredientStack c = new IngredientStack(this.type, this.id, this.displayName, Math.max(0.0, newAmount), this.chance);
+        c.setAlternatives(new java.util.ArrayList<>(this.alternatives));
+        c.selectedAltIndex = this.selectedAltIndex;
+        c.tierChanceBoost = this.tierChanceBoost;
         return c;
     }
 

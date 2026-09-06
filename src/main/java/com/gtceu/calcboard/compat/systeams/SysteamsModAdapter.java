@@ -11,6 +11,9 @@ import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.network.chat.Component;
@@ -19,12 +22,23 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Mod Adapter facade for Thermal Systeams (boilers, steam generation, steam dynamos).
  * Manages boiler recipe parsing, water-to-steam scaling, and steam dynamo conversions.
  */
 public class SysteamsModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IEnergySimulationProvider.class,
+            ICompoundRecipeProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     @Override
     public String getModId() {
@@ -184,8 +198,31 @@ public class SysteamsModAdapter implements IModAdapter {
     }
 
     @Override
+    public String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
+        return "";
+    }
+
+    @Override
+    public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
+        if (addon == null) return "";
+        if (addon.getEutMultiplier() != 1.0) {
+            return String.format("§e⚡%.1fx", addon.getEutMultiplier());
+        }
+        if (addon.getDurationMultiplier() != 1.0) {
+            return String.format("§a⏱%.1fx", addon.getDurationMultiplier());
+        }
+        return "";
+    }
+
+    @Override
     public int computeEffectiveParallel(RecipeNode node) {
         return Math.max(1, node.getParallel());
+    }
+
+    @Override
+    public double computeSingleMachinePower(RecipeNode node) {
+        if (node == null) return 0.0;
+        return node.getOverclockResult().eut();
     }
 
     @Override

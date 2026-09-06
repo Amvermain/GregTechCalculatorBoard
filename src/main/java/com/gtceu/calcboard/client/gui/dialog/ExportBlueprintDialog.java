@@ -21,13 +21,16 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.io.File;
 import java.util.List;
 
 /**
  * Modal dialog for packaging and exporting flow blueprints with customizable title and metadata.
  */
-public class ExportBlueprintDialog {
+public class ExportBlueprintDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -78,6 +81,11 @@ public class ExportBlueprintDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

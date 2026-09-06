@@ -748,13 +748,11 @@ public class GTCEuRecipeHandler {
 
             if (mapObj instanceof Map<?, ?> map) {
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    Object cap = entry.getKey();
                     Object contentList = entry.getValue();
                     if (contentList instanceof List<?> list) {
-                        boolean isFluid = cap != null && cap.toString().toLowerCase(Locale.ROOT).contains("fluid");
-                        boolean isInput = "inputs".equalsIgnoreCase(fieldName);
+                        boolean isInput = fieldName != null && fieldName.toLowerCase(Locale.ROOT).contains("input");
                         for (Object contentObj : list) {
-                            IngredientStack is = parseGTContent(contentObj, isFluid);
+                            IngredientStack is = parseGTContent(contentObj);
                             if (is != null && is.getId() != null) {
                                 if (isInput && com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isIgnoredInput(is.getId(), is.getChance())) {
                                     continue;
@@ -772,6 +770,31 @@ public class GTCEuRecipeHandler {
         return result;
     }
 
+    public static List<IngredientStack> extractTickIngredients(Object backing, String fieldName, double durationTicks) {
+        List<IngredientStack> result = new ArrayList<>();
+        if (backing == null) return result;
+        Object unwrapped = unwrapRecipe(backing);
+        List<IngredientStack> raw = extractGTRecipeContents(unwrapped, fieldName);
+        if (raw == null || raw.isEmpty()) return result;
+        double multiplier = Math.max(1.0, durationTicks);
+        for (IngredientStack stack : raw) {
+            if (stack == null) continue;
+            IngredientStack scaled = stack.withAmount(stack.getAmount() * multiplier);
+            result.add(scaled);
+        }
+        return result;
+    }
+
+    public static IngredientStack findMatchingTickIngredient(List<IngredientStack> tickIngredients, IngredientStack target) {
+        if (tickIngredients == null || target == null || target.getId() == null) return null;
+        for (IngredientStack tick : tickIngredients) {
+            if (tick != null && target.getId().equals(tick.getId()) && target.isFluid() == tick.isFluid()) {
+                return tick;
+            }
+        }
+        return null;
+    }
+
     private static String formatFallbackName(ResourceLocation id) {
         String path = id.getPath();
         StringBuilder sb = new StringBuilder();
@@ -783,7 +806,7 @@ public class GTCEuRecipeHandler {
         return sb.length() > 0 ? sb.toString() : path;
     }
 
-    private static IngredientStack parseGTContent(Object contentObj, boolean isFluid) {
+    private static IngredientStack parseGTContent(Object contentObj) {
         if (contentObj == null) return null;
         try {
             Object inner = contentObj;

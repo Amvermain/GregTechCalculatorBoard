@@ -14,12 +14,15 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.UUID;
 
 /**
  * Modal dialog for confirming and writing a short note when saving a page to the shared team workspace.
  */
-public class SaveToTeamDialog {
+public class SaveToTeamDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -52,6 +55,11 @@ public class SaveToTeamDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

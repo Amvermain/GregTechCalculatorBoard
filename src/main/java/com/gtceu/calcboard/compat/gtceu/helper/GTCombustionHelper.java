@@ -6,26 +6,44 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.Set;
 
+/**
+ * Helper utility for combustion generator machines across singleblock and multiblock tiers.
+ * Manages GTCEu Modern registered machine identifiers, legacy saved board migration,
+ * multiblock oxidizer boost compatibility, and singleblock hardware addon isolation.
+ */
 public final class GTCombustionHelper {
 
-    public static final ResourceLocation LV_COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:lv_combustion_generator");
-    public static final ResourceLocation MV_COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:mv_combustion_generator");
-    public static final ResourceLocation HV_COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:hv_combustion_generator");
+    public static final ResourceLocation LV_COMBUSTION = ResourceLocation.tryParse("gtceu:lv_combustion");
+    public static final ResourceLocation MV_COMBUSTION = ResourceLocation.tryParse("gtceu:mv_combustion");
+    public static final ResourceLocation HV_COMBUSTION = ResourceLocation.tryParse("gtceu:hv_combustion");
+
+    public static final ResourceLocation LV_COMBUSTION_GENERATOR = LV_COMBUSTION;
+    public static final ResourceLocation MV_COMBUSTION_GENERATOR = MV_COMBUSTION;
+    public static final ResourceLocation HV_COMBUSTION_GENERATOR = HV_COMBUSTION;
     public static final ResourceLocation COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:combustion_generator");
+
+    public static final ResourceLocation LEGACY_LV_COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:lv_combustion_generator");
+    public static final ResourceLocation LEGACY_MV_COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:mv_combustion_generator");
+    public static final ResourceLocation LEGACY_HV_COMBUSTION_GENERATOR = ResourceLocation.tryParse("gtceu:hv_combustion_generator");
 
     public static final ResourceLocation LARGE_COMBUSTION_ENGINE = ResourceLocation.tryParse("gtceu:large_combustion_engine");
     public static final ResourceLocation EXTREME_COMBUSTION_ENGINE = ResourceLocation.tryParse("gtceu:extreme_combustion_engine");
 
     public static final ResourceLocation START_T1_COMBUSTION = ResourceLocation.tryParse("start_core:luv_combustion_module");
     public static final ResourceLocation START_T2_COMBUSTION = ResourceLocation.tryParse("start_core:zpm_combustion_module");
-    public static final ResourceLocation START_T3_COMBUSTION = ResourceLocation.tryParse("start_core:uv_combustion_module");
-    public static final ResourceLocation START_T4_COMBUSTION = ResourceLocation.tryParse("start_core:uev_combustion_module");
+    public static final ResourceLocation START_T3_ROCKET = ResourceLocation.tryParse("start_core:uv_combustion_module");
+    public static final ResourceLocation START_T4_ROCKET = ResourceLocation.tryParse("start_core:uev_combustion_module");
+    public static final ResourceLocation START_T3_COMBUSTION = START_T3_ROCKET;
+    public static final ResourceLocation START_T4_COMBUSTION = START_T4_ROCKET;
     public static final ResourceLocation START_MCF = ResourceLocation.tryParse("start_core:modular_combustion_frame");
 
     private static final Set<ResourceLocation> SINGLEBLOCK_COMBUSTION_GENERATORS = Set.of(
-            LV_COMBUSTION_GENERATOR,
-            MV_COMBUSTION_GENERATOR,
-            HV_COMBUSTION_GENERATOR,
+            LV_COMBUSTION,
+            MV_COMBUSTION,
+            HV_COMBUSTION,
+            LEGACY_LV_COMBUSTION_GENERATOR,
+            LEGACY_MV_COMBUSTION_GENERATOR,
+            LEGACY_HV_COMBUSTION_GENERATOR,
             COMBUSTION_GENERATOR
     );
 
@@ -34,16 +52,26 @@ public final class GTCombustionHelper {
             EXTREME_COMBUSTION_ENGINE,
             START_T1_COMBUSTION,
             START_T2_COMBUSTION,
-            START_T3_COMBUSTION,
-            START_T4_COMBUSTION,
+            START_T3_ROCKET,
+            START_T4_ROCKET,
             START_MCF
+    );
+
+    private static final Set<ResourceLocation> START_COMBUSTION_MODULES = Set.of(
+            START_T1_COMBUSTION,
+            START_T2_COMBUSTION
+    );
+
+    private static final Set<ResourceLocation> START_ROCKET_MODULES = Set.of(
+            START_T3_ROCKET,
+            START_T4_ROCKET
     );
 
     private static final Set<ResourceLocation> START_MODULES = Set.of(
             START_T1_COMBUSTION,
             START_T2_COMBUSTION,
-            START_T3_COMBUSTION,
-            START_T4_COMBUSTION
+            START_T3_ROCKET,
+            START_T4_ROCKET
     );
 
     private static final ResourceLocation COMBUSTION_CATEGORY_ID = ResourceLocation.tryParse("gtceu:combustion_generator");
@@ -87,6 +115,14 @@ public final class GTCombustionHelper {
     }
 
     public static boolean isStarTCombustionModule(RecipeNode node) {
+        return node != null && START_COMBUSTION_MODULES.contains(node.getMachineIcon());
+    }
+
+    public static boolean isStarTRocketModule(RecipeNode node) {
+        return node != null && START_ROCKET_MODULES.contains(node.getMachineIcon());
+    }
+
+    public static boolean isStarTModule(RecipeNode node) {
         return node != null && START_MODULES.contains(node.getMachineIcon());
     }
 
@@ -104,7 +140,7 @@ public final class GTCombustionHelper {
 
     public static com.gtceu.calcboard.api.type.GTVoltageTier getMaxCombustionTier() {
         if (hasStarTCombustionModules()) {
-            return com.gtceu.calcboard.api.type.GTVoltageTier.UEV;
+            return com.gtceu.calcboard.api.type.GTVoltageTier.ZPM;
         }
         return com.gtceu.calcboard.api.type.GTVoltageTier.IV;
     }
@@ -124,8 +160,6 @@ public final class GTCombustionHelper {
         if (hasStarTCombustionModules()) {
             list.add(com.gtceu.calcboard.api.type.GTVoltageTier.LuV);
             list.add(com.gtceu.calcboard.api.type.GTVoltageTier.ZPM);
-            list.add(com.gtceu.calcboard.api.type.GTVoltageTier.UV);
-            list.add(com.gtceu.calcboard.api.type.GTVoltageTier.UEV);
         }
         return list;
     }
@@ -140,17 +174,15 @@ public final class GTCombustionHelper {
             case IV -> EXTREME_COMBUSTION_ENGINE;
             case LuV -> hasStarTCombustionModules() ? START_T1_COMBUSTION : null;
             case ZPM -> hasStarTCombustionModules() ? START_T2_COMBUSTION : null;
-            case UV -> hasStarTCombustionModules() ? START_T3_COMBUSTION : null;
-            case UEV -> hasStarTCombustionModules() ? START_T4_COMBUSTION : null;
             default -> null;
         };
     }
 
     public static com.gtceu.calcboard.api.type.GTVoltageTier getCombustionTierForMachine(ResourceLocation icon) {
         if (icon == null) return null;
-        if (LV_COMBUSTION_GENERATOR.equals(icon) || COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.LV;
-        if (MV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.MV;
-        if (HV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.HV;
+        if (LV_COMBUSTION.equals(icon) || LEGACY_LV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.LV;
+        if (MV_COMBUSTION.equals(icon) || LEGACY_MV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.MV;
+        if (HV_COMBUSTION.equals(icon) || LEGACY_HV_COMBUSTION_GENERATOR.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.HV;
         if (LARGE_COMBUSTION_ENGINE.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.EV;
         if (EXTREME_COMBUSTION_ENGINE.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.IV;
         if (START_T1_COMBUSTION.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.LuV;
@@ -158,6 +190,14 @@ public final class GTCombustionHelper {
         if (START_T3_COMBUSTION.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.UV;
         if (START_T4_COMBUSTION.equals(icon)) return com.gtceu.calcboard.api.type.GTVoltageTier.UEV;
         return null;
+    }
+
+    public static ResourceLocation normalizeMachineIcon(ResourceLocation icon) {
+        if (icon == null) return null;
+        if (LEGACY_LV_COMBUSTION_GENERATOR.equals(icon)) return LV_COMBUSTION;
+        if (LEGACY_MV_COMBUSTION_GENERATOR.equals(icon)) return MV_COMBUSTION;
+        if (LEGACY_HV_COMBUSTION_GENERATOR.equals(icon)) return HV_COMBUSTION;
+        return icon;
     }
 
     public static boolean syncCombustionMachine(RecipeNode node, com.gtceu.calcboard.api.type.GTVoltageTier targetTier) {
@@ -193,8 +233,8 @@ public final class GTCombustionHelper {
         if (isExtremeCombustionEngine(node)) {
             return Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LIQUID_OXYGEN_BOOST)) ? 2.0 : 1.0;
         }
-        if (isStarTCombustionModule(node)) {
-            return getStarTModulePowerMultiplier(node);
+        if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
+            return getStarTModulePowerMultiplier(node) * getFrameCoolantMultiplier(node);
         }
         if (isModularCombustionFrame(node)) {
             return getFrameCoolantMultiplier(node);
@@ -212,7 +252,7 @@ public final class GTCombustionHelper {
         if (isExtremeCombustionEngine(node) && Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LIQUID_OXYGEN_BOOST))) {
             return 2;
         }
-        if (isStarTCombustionModule(node) && isStarTModuleBoosted(node)) {
+        if ((isStarTCombustionModule(node) || isStarTRocketModule(node)) && isStarTModuleBoosted(node)) {
             return 2;
         }
         return 1;
@@ -224,22 +264,22 @@ public final class GTCombustionHelper {
         }
         ResourceLocation id = node.getMachineIcon();
         if (LARGE_COMBUSTION_ENGINE.equals(id)) {
-            return 1920L;
+            return com.gtceu.calcboard.api.type.GTVoltageTier.EV.getVoltage();
         }
         if (EXTREME_COMBUSTION_ENGINE.equals(id)) {
-            return 7680L;
+            return com.gtceu.calcboard.api.type.GTVoltageTier.IV.getVoltage();
         }
         if (START_T1_COMBUSTION.equals(id)) {
-            return 30720L;
+            return com.gtceu.calcboard.api.type.GTVoltageTier.LuV.getVoltage();
         }
         if (START_T2_COMBUSTION.equals(id)) {
-            return 122880L;
+            return com.gtceu.calcboard.api.type.GTVoltageTier.ZPM.getVoltage();
         }
-        if (START_T3_COMBUSTION.equals(id)) {
-            return 491520L;
+        if (START_T3_ROCKET.equals(id)) {
+            return com.gtceu.calcboard.api.type.GTVoltageTier.UV.getVoltage();
         }
-        if (START_T4_COMBUSTION.equals(id)) {
-            return 1966080L;
+        if (START_T4_ROCKET.equals(id)) {
+            return com.gtceu.calcboard.api.type.GTVoltageTier.UEV.getVoltage();
         }
         return 0L;
     }
@@ -253,10 +293,10 @@ public final class GTCombustionHelper {
         if (START_T2_COMBUSTION.equals(id)) {
             return boosted ? 6.0 : 1.0;
         }
-        if (START_T3_COMBUSTION.equals(id)) {
+        if (START_T3_ROCKET.equals(id)) {
             return boosted ? 8.0 : 2.0;
         }
-        if (START_T4_COMBUSTION.equals(id)) {
+        if (START_T4_ROCKET.equals(id)) {
             return boosted ? 12.0 : 2.0;
         }
         return 1.0;
@@ -275,6 +315,9 @@ public final class GTCombustionHelper {
         if ("distilled_water".equalsIgnoreCase(coolant)) {
             return 1.2;
         }
-        return 0.9;
+        if (isModularCombustionFrame(node)) {
+            return 0.9;
+        }
+        return 1.0;
     }
 }

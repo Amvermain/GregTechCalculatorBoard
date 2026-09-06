@@ -16,6 +16,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -26,7 +29,7 @@ import java.util.Locale;
 /**
  * Modal dialog for browsing, loading, copying, and managing saved blueprint files (*.gtcb) from disk.
  */
-public class DiskBlueprintsDialog {
+public class DiskBlueprintsDialog implements IBoardModal {
 
     private final BoardScreen screen;
     private boolean visible = false;
@@ -95,6 +98,11 @@ public class DiskBlueprintsDialog {
         if (scrollOffset > maxScroll) {
             scrollOffset = maxScroll;
         }
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {

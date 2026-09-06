@@ -9,6 +9,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +19,7 @@ import java.util.List;
  * Interactive In-Game Manual & Tutorial Guidebook Modal Dialog.
  * Provides clear, categorized visual instructions with keycap highlights.
  */
-public class GuideDialog {
+public class GuideDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private int activeCategoryIndex = 0;
@@ -88,6 +91,11 @@ public class GuideDialog {
 
     public void close() {
         setVisible(false);
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {

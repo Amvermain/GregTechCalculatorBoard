@@ -29,6 +29,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.List;
 
@@ -41,7 +43,7 @@ import java.util.List;
  * 4. Custom Addon multiplier tuner (CustomAddonBuilderView)
  * 5. Star Technology Helix/Threading configurator (ThreadingHelixView)
  */
-public class MachineConfigDialog {
+public class MachineConfigDialog implements IBoardModal {
 
     private final BoardScreen parent;
     private RecipeNode node;
@@ -254,6 +256,11 @@ public class MachineConfigDialog {
 
     public static void cycleFontScalePrevious() {
         currentFontScale = currentFontScale.previous();
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.mouseX(), context.mouseY(), context.partialTicks(), context.screenWidth(), context.screenHeight());
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks, int screenWidth, int screenHeight) {

@@ -4,6 +4,8 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.type.BoardGuiScale;
 import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
 import com.gtceu.calcboard.client.gui.util.BoardViewportTransform;
+import com.gtceu.calcboard.client.gui.widget.NodeInspectorPanel;
+import com.gtceu.calcboard.client.gui.widget.SummaryOverlay;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -120,5 +122,35 @@ public class ResponsiveGuiScaleTest {
         bm.setBoardGuiScale(BoardGuiScale.AUTO);
         bm.setToolbarDisplayMode(ToolbarDisplayMode.AUTO);
         bm.setAddonCatalogListView(false);
+    }
+
+    @Test
+    public void testSummaryOverlayRightOffsetAndInspectorLayout() {
+        SummaryOverlay overlay = new SummaryOverlay();
+        int screenWidth = 800;
+
+        Assertions.assertEquals(0, overlay.getRightOffset());
+        Assertions.assertEquals(550, overlay.getPanelX(screenWidth));
+        Assertions.assertEquals(772, overlay.getTabX(screenWidth));
+
+        int inspectorOffset = NodeInspectorPanel.PANEL_WIDTH + 6;
+        overlay.setRightOffset(inspectorOffset);
+
+        Assertions.assertEquals(201, overlay.getRightOffset());
+        int expectedOverlayX = (screenWidth - 201 - 4) - SummaryOverlay.WIDTH;
+        Assertions.assertEquals(expectedOverlayX, overlay.getPanelX(screenWidth));
+
+        int inspectorLeftX = screenWidth - NodeInspectorPanel.PANEL_WIDTH - 6;
+        int overlayRightEdge = overlay.getPanelX(screenWidth) + SummaryOverlay.getEffectiveWidth(screenWidth, inspectorOffset);
+        Assertions.assertTrue(overlayRightEdge <= inspectorLeftX);
+
+        int tabX = overlay.getTabX(screenWidth);
+        int tabRightEdge = tabX + 24;
+        Assertions.assertTrue(tabRightEdge <= inspectorLeftX);
+
+        int narrowScreenWidth = 400;
+        int effectiveWidthNarrow = SummaryOverlay.getEffectiveWidth(narrowScreenWidth, inspectorOffset);
+        Assertions.assertTrue(effectiveWidthNarrow >= 160);
+        Assertions.assertTrue(overlay.getPanelX(narrowScreenWidth) >= 36);
     }
 }

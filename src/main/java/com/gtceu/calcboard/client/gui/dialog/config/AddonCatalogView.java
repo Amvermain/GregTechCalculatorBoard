@@ -377,7 +377,11 @@ public class AddonCatalogView {
                 graphics.fill(barX + 1, barY + 1, barX + fillW - 1, barY + barH - 1, 0xFF4A90E2);
                 return;
             } else {
-                String msg = "§8" + Component.translatable("gui.gtcalcboard.search.no_results").getString();
+                String msg = (searchBox != null && !searchBox.getValue().isEmpty())
+                        ? "§8" + Component.translatable("gui.gtcalcboard.search.no_results").getString()
+                        : (!node.isMultiblock()
+                                ? Component.translatable("gui.gtcalcboard.config.singleblock_no_addons").getString()
+                                : "§8" + Component.translatable("gui.gtcalcboard.search.no_results").getString());
                 graphics.drawCenteredString(font, msg, startX + width / 2, gridStartY + 24, 0xFF888888);
                 return;
             }

@@ -26,6 +26,8 @@ public class LeftActivityBarWidget {
     private int pagesBtnY;
     private int favoritesBtnY;
     private int blueprintsBtnY;
+    private int bomBtnY;
+    private int balanceBtnY;
     private int teamBtnY;
     private int helpBtnY;
     private int settingsBtnY;
@@ -73,9 +75,29 @@ public class LeftActivityBarWidget {
         renderButton(graphics, font, 2, blueprintsBtnY, "📋", false, mouseX, mouseY, 0xFFF97316);
         curY += BTN_SIZE + BTN_SPACING;
 
-        this.teamBtnY = curY;
-        boolean teamActive = ClientWorkspaceState.getInstance().isTeamMode();
-        renderButton(graphics, font, 2, teamBtnY, "👥", teamActive, mouseX, mouseY, 0xFFA855F7);
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported()) {
+            this.bomBtnY = curY;
+            boolean bomActive = screen.getMultiblockBOMDialog() != null && screen.getMultiblockBOMDialog().isVisible();
+            renderButton(graphics, font, 2, bomBtnY, "▦", bomActive, mouseX, mouseY, 0xFFFBBF24);
+            curY += BTN_SIZE + BTN_SPACING;
+        } else {
+            this.bomBtnY = -100;
+        }
+
+        this.balanceBtnY = curY;
+        boolean balanceActive = screen.getGlobalBalanceDialog() != null && screen.getGlobalBalanceDialog().isVisible();
+        renderButton(graphics, font, 2, balanceBtnY, "📊", balanceActive, mouseX, mouseY, 0xFF38BDF8);
+        curY += BTN_SIZE + BTN_SPACING;
+
+        boolean showTeam = ClientWorkspaceState.getInstance().isCollaborationEnabled();
+        if (showTeam) {
+            this.teamBtnY = curY;
+            boolean teamActive = ClientWorkspaceState.getInstance().isTeamMode();
+            renderButton(graphics, font, 2, teamBtnY, "👥", teamActive, mouseX, mouseY, 0xFFA855F7);
+            curY += BTN_SIZE + BTN_SPACING;
+        } else {
+            this.teamBtnY = -100;
+        }
 
         this.settingsBtnY = bottomY - BTN_SIZE - 4;
         renderButton(graphics, font, 2, settingsBtnY, "⚙", false, mouseX, mouseY, 0xFFF59E0B);
@@ -109,6 +131,9 @@ public class LeftActivityBarWidget {
             togglePageBrowser();
             return true;
         }
+
+        closePageBrowserIfOpen();
+
         if (isHovered(mouseX, mouseY, 2, favoritesBtnY)) {
             playClickSound();
             toggleFavoritesDock();
@@ -119,7 +144,17 @@ public class LeftActivityBarWidget {
             openBlueprintsDialog();
             return true;
         }
-        if (isHovered(mouseX, mouseY, 2, teamBtnY)) {
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported() && isHovered(mouseX, mouseY, 2, bomBtnY)) {
+            playClickSound();
+            toggleMultiblockBOM();
+            return true;
+        }
+        if (isHovered(mouseX, mouseY, 2, balanceBtnY)) {
+            playClickSound();
+            toggleGlobalBalance();
+            return true;
+        }
+        if (ClientWorkspaceState.getInstance().isCollaborationEnabled() && isHovered(mouseX, mouseY, 2, teamBtnY)) {
             playClickSound();
             toggleTeamMode();
             return true;
@@ -138,6 +173,12 @@ public class LeftActivityBarWidget {
         return isInsideBar(mouseY);
     }
 
+    private void closePageBrowserIfOpen() {
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            screen.getPageBrowserDrawer().setOpen(false);
+        }
+    }
+
     private void toggleHotkeyHud() {
         if (screen.getHotkeyHudWidget() != null) {
             screen.getHotkeyHudWidget().toggle();
@@ -146,6 +187,10 @@ public class LeftActivityBarWidget {
 
     private void togglePageBrowser() {
         if (screen.getPageBrowserDrawer() != null) {
+            boolean willOpen = !screen.getPageBrowserDrawer().isOpen();
+            if (willOpen && screen.getFavoritesDockWidget() != null) {
+                screen.getFavoritesDockWidget().setExpanded(false);
+            }
             screen.getPageBrowserDrawer().toggle();
         }
     }
@@ -159,6 +204,26 @@ public class LeftActivityBarWidget {
     private void openBlueprintsDialog() {
         if (screen.getDiskBlueprintsDialog() != null) {
             screen.getDiskBlueprintsDialog().open();
+        }
+    }
+
+    private void toggleMultiblockBOM() {
+        if (screen.getMultiblockBOMDialog() != null) {
+            if (screen.getMultiblockBOMDialog().isVisible()) {
+                screen.getMultiblockBOMDialog().close();
+            } else {
+                screen.getMultiblockBOMDialog().open();
+            }
+        }
+    }
+
+    private void toggleGlobalBalance() {
+        if (screen.getGlobalBalanceDialog() != null) {
+            if (screen.getGlobalBalanceDialog().isVisible()) {
+                screen.getGlobalBalanceDialog().close();
+            } else {
+                screen.getGlobalBalanceDialog().open();
+            }
         }
     }
 
@@ -197,7 +262,15 @@ public class LeftActivityBarWidget {
             BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.blueprints"), mouseX, mouseY, screen.width, screen.height);
             return;
         }
-        if (isHovered(mouseX, mouseY, 2, teamBtnY)) {
+        if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported() && isHovered(mouseX, mouseY, 2, bomBtnY)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.bom"), mouseX, mouseY, screen.width, screen.height);
+            return;
+        }
+        if (isHovered(mouseX, mouseY, 2, balanceBtnY)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.balance"), mouseX, mouseY, screen.width, screen.height);
+            return;
+        }
+        if (ClientWorkspaceState.getInstance().isCollaborationEnabled() && isHovered(mouseX, mouseY, 2, teamBtnY)) {
             BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.team"), mouseX, mouseY, screen.width, screen.height);
             return;
         }

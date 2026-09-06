@@ -57,6 +57,10 @@ public class ModCompatHelper {
         return isModLoaded("vintageimprovements") || isModLoaded("vintage_improvements") || isModLoaded("create_vintage_improvements") || isModLoaded("vintage");
     }
 
+    public static boolean isCreateDieselGeneratorsLoaded() {
+        return isModLoaded("createdieselgenerators");
+    }
+
     public static boolean isGreateLoaded() {
         return isModLoaded("greate");
     }
@@ -68,6 +72,7 @@ public class ModCompatHelper {
                 || lower.equals("greate")
                 || lower.equals("createaddition")
                 || lower.equals("create_new_age")
+                || lower.equals("createdieselgenerators")
                 || lower.equals("vintageimprovements")
                 || lower.equals("vintage_improvements")
                 || lower.equals("create_vintage_improvements")

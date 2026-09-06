@@ -12,12 +12,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.Objects;
 
 /**
  * Modal dialog for editing Sticky Note Title, Multi-line Content, and Theme Color.
  */
-public class NoteEditDialog {
+public class NoteEditDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private CanvasStickyNote targetNote = null;
@@ -69,6 +72,11 @@ public class NoteEditDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {

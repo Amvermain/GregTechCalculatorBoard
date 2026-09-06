@@ -43,7 +43,16 @@ public class FavoritesDockWidget {
     public void setExpanded(boolean expanded) {
         this.expanded = expanded;
         BoardManager.getInstance().setFavoritesDockExpanded(expanded);
+        if (expanded && screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            screen.getPageBrowserDrawer().setOpen(false);
+        }
         if (!expanded && emiImpl instanceof EmiFavoritesDockImpl impl) {
+            impl.closeFlyout();
+        }
+    }
+
+    public void closeFlyout() {
+        if (emiImpl instanceof EmiFavoritesDockImpl impl) {
             impl.closeFlyout();
         }
     }
@@ -76,11 +85,17 @@ public class FavoritesDockWidget {
         if (!ModCompatHelper.isEmiLoaded() || !(emiImpl instanceof EmiFavoritesDockImpl impl)) {
             return;
         }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            return;
+        }
         impl.renderTooltips(graphics, font, mouseX, mouseY);
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (!ModCompatHelper.isEmiLoaded() || !(emiImpl instanceof EmiFavoritesDockImpl impl)) {
+            return false;
+        }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
             return false;
         }
         return impl.keyPressed(keyCode, scanCode, modifiers);
@@ -90,11 +105,17 @@ public class FavoritesDockWidget {
         if (!ModCompatHelper.isEmiLoaded() || !(emiImpl instanceof EmiFavoritesDockImpl impl)) {
             return false;
         }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            return false;
+        }
         return impl.mouseClicked(mouseX, mouseY, button);
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (!ModCompatHelper.isEmiLoaded() || !(emiImpl instanceof EmiFavoritesDockImpl impl)) {
+            return false;
+        }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
             return false;
         }
         return impl.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -104,11 +125,17 @@ public class FavoritesDockWidget {
         if (!ModCompatHelper.isEmiLoaded() || !(emiImpl instanceof EmiFavoritesDockImpl impl)) {
             return false;
         }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+            return false;
+        }
         return impl.mouseReleased(mouseX, mouseY, button);
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!ModCompatHelper.isEmiLoaded() || !(emiImpl instanceof EmiFavoritesDockImpl impl)) {
+            return false;
+        }
+        if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
             return false;
         }
         return impl.mouseScrolled(mouseX, mouseY, delta);
@@ -267,14 +294,7 @@ public class FavoritesDockWidget {
                                         if (isWs) break;
                                     }
                                     if (isWs) {
-                                        List<dev.emi.emi.api.recipe.EmiRecipe> catRecipes = rm.getRecipes(cat);
-                                        if (catRecipes != null) {
-                                            for (dev.emi.emi.api.recipe.EmiRecipe cr : catRecipes) {
-                                                if (cr != null && !list.contains(cr)) {
-                                                    list.add(cr);
-                                                }
-                                            }
-                                        }
+                                        collectMatchingCategoryRecipes(rm, cat, stack, list);
                                     }
                                 }
                             }
@@ -292,6 +312,41 @@ public class FavoritesDockWidget {
             return unmodifiable;
         }
 
+        private void collectMatchingCategoryRecipes(dev.emi.emi.api.recipe.EmiRecipeManager rm, dev.emi.emi.api.recipe.EmiRecipeCategory cat,
+                                                     dev.emi.emi.api.stack.EmiStack stack, List<dev.emi.emi.api.recipe.EmiRecipe> list) {
+            List<dev.emi.emi.api.recipe.EmiRecipe> catRecipes = rm.getRecipes(cat);
+            if (catRecipes == null) return;
+            for (dev.emi.emi.api.recipe.EmiRecipe cr : catRecipes) {
+                if (cr != null && !list.contains(cr) && matchesRecipeWorkstation(cr, stack)) {
+                    list.add(cr);
+                }
+            }
+        }
+
+        private boolean matchesRecipeWorkstation(dev.emi.emi.api.recipe.EmiRecipe recipe, dev.emi.emi.api.stack.EmiStack stack) {
+            if (recipe instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg) {
+                List<dev.emi.emi.api.stack.EmiIngredient> workstations = kg.getWorkstations();
+                if (workstations == null || workstations.isEmpty()) {
+                    return true;
+                }
+                for (dev.emi.emi.api.stack.EmiIngredient ws : workstations) {
+                    if (containsMatchingStack(ws, stack)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return true;
+        }
+
+        private boolean containsMatchingStack(dev.emi.emi.api.stack.EmiIngredient ingredient, dev.emi.emi.api.stack.EmiStack target) {
+            if (ingredient == null || ingredient.getEmiStacks() == null) return false;
+            for (dev.emi.emi.api.stack.EmiStack s : ingredient.getEmiStacks()) {
+                if (s != null && s.isEqual(target)) return true;
+            }
+            return false;
+        }
+
         private void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             Font font = Minecraft.getInstance().font;
             boolean loading = isEmiLoading();
@@ -299,7 +354,8 @@ public class FavoritesDockWidget {
             int count = favorites.size();
             hoveredFavorite = null;
 
-            if (screen.isAnyModalOpen() || (activeFlyoutFavorite != null && !favorites.contains(activeFlyoutFavorite))) {
+            boolean drawerBlocking = (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen());
+            if (screen.isAnyModalOpen() || drawerBlocking || (activeFlyoutFavorite != null && !favorites.contains(activeFlyoutFavorite))) {
                 closeFlyout();
             }
 
@@ -322,7 +378,7 @@ public class FavoritesDockWidget {
                 graphics.fill(getDockX(), dockY, getDockX() + EXPANDED_WIDTH, dockY + maxH, bg);
                 graphics.renderOutline(getDockX(), dockY, EXPANDED_WIDTH, maxH, border);
 
-                boolean headerHover = mouseX >= getDockX() && mouseX <= getDockX() + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT;
+                boolean headerHover = !drawerBlocking && mouseX >= getDockX() && mouseX <= getDockX() + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT;
                 graphics.fill(getDockX() + 1, dockY + 1, getDockX() + EXPANDED_WIDTH - 1, dockY + HEADER_HEIGHT, headerHover ? 0xFF1E293B : 0xFF172033);
                 graphics.fill(getDockX() + 1, dockY + HEADER_HEIGHT, getDockX() + EXPANDED_WIDTH - 1, dockY + HEADER_HEIGHT + 1, 0xFF334155);
 
@@ -343,9 +399,9 @@ public class FavoritesDockWidget {
 
                 int[] previewBounds = (activeEmiRecipe != null) ? com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer.calculateEmiPreviewBounds(activeEmiRecipe, previewAnchorX, activeEmiRowY, screenW, screenH) : null;
 
-                boolean mouseInPreview = previewBounds != null && mouseX >= previewBounds[0] && mouseX <= previewBounds[0] + previewBounds[2] && mouseY >= previewBounds[1] && mouseY <= previewBounds[1] + previewBounds[3];
+                boolean mouseInPreview = !drawerBlocking && previewBounds != null && mouseX >= previewBounds[0] && mouseX <= previewBounds[0] + previewBounds[2] && mouseY >= previewBounds[1] && mouseY <= previewBounds[1] + previewBounds[3];
                 int totalDockRight = (activeFlyoutFavorite != null) ? (subX + SUB_WIDTH) : (getDockX() + EXPANDED_WIDTH);
-                boolean mouseInDockArea = mouseX >= getDockX() && mouseX <= totalDockRight && mouseY >= dockY && mouseY <= dockY + maxH;
+                boolean mouseInDockArea = !drawerBlocking && mouseX >= getDockX() && mouseX <= totalDockRight && mouseY >= dockY && mouseY <= dockY + maxH;
 
                 boolean mouseInBridge = false;
                 if (activeFlyoutFavorite != null && previewBounds != null) {
@@ -396,7 +452,7 @@ public class FavoritesDockWidget {
                         if (rowY + ROW_HEIGHT < listY || rowY > listY + listH) continue;
 
                         boolean isFlyoutActive = (activeFlyoutFavorite == fav);
-                        boolean rowHover = mouseX >= getDockX() + 2 && mouseX <= getDockX() + EXPANDED_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
+                        boolean rowHover = !drawerBlocking && mouseX >= getDockX() + 2 && mouseX <= getDockX() + EXPANDED_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
 
                         if (rowHover) {
                             hoveredFavorite = fav;
@@ -424,7 +480,7 @@ public class FavoritesDockWidget {
                         graphics.drawString(font, font.plainSubstrByWidth(name, EXPANDED_WIDTH - 42), getDockX() + 24, rowY + 7, textColor, false);
 
                         int removeBtnX = getDockX() + EXPANDED_WIDTH - 16;
-                        boolean removeHover = mouseX >= removeBtnX && mouseX <= removeBtnX + 12 && mouseY >= rowY + 5 && mouseY <= rowY + 17;
+                        boolean removeHover = !drawerBlocking && mouseX >= removeBtnX && mouseX <= removeBtnX + 12 && mouseY >= rowY + 5 && mouseY <= rowY + 17;
                         if (rowHover || isFlyoutActive) {
                             graphics.drawString(font, "✕", removeBtnX, rowY + 6, removeHover ? 0xFFFF5555 : 0xFF64748B, false);
                         }

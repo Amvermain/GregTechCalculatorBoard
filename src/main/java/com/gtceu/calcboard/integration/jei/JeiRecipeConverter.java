@@ -90,12 +90,23 @@ public class JeiRecipeConverter {
         List<IngredientStack> inputs = new ArrayList<>();
         List<IngredientStack> outputs = new ArrayList<>();
 
+        // Details extraction
         boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catId.getNamespace()));
+        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        if (isGT) {
+            GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
+            GTCEuRecipeHandler.adaptRecipeDetails(null, recipe, details);
+        }
+
         if (isGT) {
             List<IngredientStack> gtIns = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "inputs");
             List<IngredientStack> gtOuts = GTCEuRecipeHandler.extractGTRecipeContents(recipe, "outputs");
+            List<IngredientStack> gtTickIns = GTCEuRecipeHandler.extractTickIngredients(recipe, "tickInputs", details.durationTicks);
+            List<IngredientStack> gtTickOuts = GTCEuRecipeHandler.extractTickIngredients(recipe, "tickOutputs", details.durationTicks);
             if (gtIns != null && !gtIns.isEmpty()) inputs.addAll(gtIns);
+            if (gtTickIns != null && !gtTickIns.isEmpty()) inputs.addAll(gtTickIns);
             if (gtOuts != null && !gtOuts.isEmpty()) outputs.addAll(gtOuts);
+            if (gtTickOuts != null && !gtTickOuts.isEmpty()) outputs.addAll(gtTickOuts);
         }
 
         if (inputs.isEmpty()) {
@@ -118,16 +129,11 @@ public class JeiRecipeConverter {
             extractVanillaRecipeContents(recipe, inputs, outputs);
         }
 
-        // Details extraction
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
-        if (isGT) {
-            GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
-            GTCEuRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isThermalLoaded() && catId != null && "thermal".equals(catId.getNamespace())) {
+        if (!isGT && ModCompatHelper.isThermalLoaded() && catId != null && "thermal".equals(catId.getNamespace())) {
             ThermalRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isCreateLoaded() && catId != null && !"create_new_age".equals(catId.getNamespace()) && ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
+        } else if (!isGT && ModCompatHelper.isCreateLoaded() && catId != null && !"create_new_age".equals(catId.getNamespace()) && ModCompatHelper.isCreateFamilyNamespace(catId.getNamespace())) {
             CreateRecipeHandler.adaptRecipeDetails(null, recipe, details);
-        } else if (ModCompatHelper.isCreateNewAgeLoaded() && catId != null && CreateNewAgeRecipeHandler.MOD_ID.equals(catId.getNamespace())) {
+        } else if (!isGT && ModCompatHelper.isCreateNewAgeLoaded() && catId != null && CreateNewAgeRecipeHandler.MOD_ID.equals(catId.getNamespace())) {
             CreateNewAgeRecipeHandler.adaptRecipeDetails(null, recipe, details);
         }
 
@@ -231,7 +237,13 @@ public class JeiRecipeConverter {
 
         ResourceLocation icon = preferredWorkstation;
         if (icon == null && !node.getAvailableWorkstations().isEmpty()) {
-            icon = node.getAvailableWorkstations().get(0);
+            GTVoltageTier initialTier = details.tier != null ? details.tier : GTVoltageTier.LV;
+            ResourceLocation tieredWs = node.getWorkstationForTier(initialTier);
+            if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
+                icon = tieredWs;
+            } else {
+                icon = node.getAvailableWorkstations().get(0);
+            }
         }
         if (icon == null && catId != null) {
             if (ForgeRegistries.ITEMS.containsKey(catId)) {
@@ -307,6 +319,13 @@ public class JeiRecipeConverter {
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }
+
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
+        GTVoltageTier effectiveTier = node.getTargetTier() != null ? node.getTargetTier() : (node.getRecipeTier() != null ? node.getRecipeTier() : GTVoltageTier.LV);
+        if (adapter != null) {
+            effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
+        }
+        node.setTargetTier(effectiveTier);
 
         return node;
     }

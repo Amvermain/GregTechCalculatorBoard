@@ -1,18 +1,14 @@
 package com.gtceu.calcboard.compat.vanilla;
 
-import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-
 import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +20,15 @@ import java.util.Set;
  */
 public class VanillaModAdapter implements IModAdapter {
 
+    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IEnergySimulationProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
+
     @Override
     public String getModId() {
         return "minecraft";
@@ -31,7 +36,7 @@ public class VanillaModAdapter implements IModAdapter {
 
     @Override
     public int getPriority() {
-        return 0; // Lowest priority, acts as universal fallback
+        return 0;
     }
 
     @Override
@@ -68,28 +73,13 @@ public class VanillaModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean supportsAddons(RecipeNode node) {
-        return false;
+    public double computeSingleMachinePower(RecipeNode node) {
+        return 0.0;
     }
 
     @Override
-    public void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
-        // Vanilla has no hardware addons
-    }
-
-    @Override
-    public void enrichCapabilities(CategoryCapabilityMatrix matrix, Object emiRecipeManager) {
-        // Standard singleblock capability
-    }
-
-    @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
-        return false;
-    }
-
-    @Override
-    public MachineAddon tailorAddon(MachineAddon addon, RecipeNode targetNode) {
-        return addon;
+    public int computeEffectiveParallel(RecipeNode node) {
+        return node != null ? Math.max(1, node.getParallel()) : 1;
     }
 
     @Override
@@ -113,6 +103,3 @@ public class VanillaModAdapter implements IModAdapter {
         return tooltipLines;
     }
 }
-
-
-

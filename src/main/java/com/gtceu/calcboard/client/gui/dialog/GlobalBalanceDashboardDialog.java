@@ -20,6 +20,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.*;
 
@@ -28,7 +30,7 @@ import java.util.*;
  * Provides multi-page process net balance aggregation, total generation vs consumption power balance,
  * and per-item drill-down source/sink contribution analysis.
  */
-public class GlobalBalanceDashboardDialog {
+public class GlobalBalanceDashboardDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
 
@@ -120,6 +122,11 @@ public class GlobalBalanceDashboardDialog {
             this.cachedSummary = GlobalBalanceAggregator.compute(selectedPages);
             this.dirty = false;
         }
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
@@ -523,6 +530,13 @@ public class GlobalBalanceDashboardDialog {
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.global_balance.click_drilldown_hint").getString()));
             com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
         }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int screenH = parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        return mouseClicked(mouseX, mouseY, button, screenW, screenH);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {

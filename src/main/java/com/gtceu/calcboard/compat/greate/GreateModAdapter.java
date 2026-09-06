@@ -1,8 +1,6 @@
 package com.gtceu.calcboard.compat.greate;
 
-import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.CompoundRecipeBuilder;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -21,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+
+import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
 
 /**
  * Dedicated Mod Adapter for Greate (Create + GTCEu Modern tiered kinetic machinery).
@@ -108,25 +108,6 @@ public class GreateModAdapter extends AbstractKineticModAdapter {
             return true;
         }
         return node.getProperties().has(GreateProperties.REQUIRED_RECIPE_TIER);
-    }
-
-    @Override
-    public boolean supportsAddons(RecipeNode node) {
-        return false;
-    }
-
-    @Override
-    public List<AddonCategory> getApplicableAddonCategories(RecipeNode node) {
-        return List.of();
-    }
-
-    @Override
-    public boolean isAddonCompatible(RecipeNode node, MachineAddon addon) {
-        return false;
-    }
-
-    @Override
-    public void discoverAddons(List<MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
     }
 
     @Override

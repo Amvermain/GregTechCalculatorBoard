@@ -87,7 +87,7 @@ public final class GTCEuPatternScanner {
         scanPatternFactory(multiDef, abilities, candidateBlocks, coilBlocks);
         enrichFromMachineDefinition(multiDef, abilities);
 
-        if (!coilBlocks.isEmpty()) {
+        if (coilBlocks.size() > 1) {
             abilities.add("HEATING_COILS");
         }
 

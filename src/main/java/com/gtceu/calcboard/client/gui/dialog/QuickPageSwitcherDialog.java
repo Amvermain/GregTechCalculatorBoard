@@ -14,10 +14,13 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.ArrayList;
 import java.util.List;
 
-public class QuickPageSwitcherDialog {
+public class QuickPageSwitcherDialog implements IBoardModal {
     private final BoardScreen screen;
     private boolean visible = false;
 
@@ -45,14 +48,19 @@ public class QuickPageSwitcherDialog {
         this.scrollY = 0;
         this.selectedIndex = 0;
 
-        Font font = Minecraft.getInstance().font;
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc != null ? mc.font : null;
         int cx = (screen.width - DIALOG_WIDTH) / 2;
         int cy = (screen.height - DIALOG_HEIGHT) / 2;
 
-        this.searchBox = new EditBox(font, cx + 12, cy + 28, DIALOG_WIDTH - 24, 16, Component.translatable("gui.gtcalcboard.quick_switcher.hint"));
-        this.searchBox.setMaxLength(64);
-        this.searchBox.setFocused(true);
-        this.searchBox.setValue("");
+        if (font != null) {
+            this.searchBox = new EditBox(font, cx + 12, cy + 28, DIALOG_WIDTH - 24, 16, Component.translatable("gui.gtcalcboard.quick_switcher.hint"));
+            this.searchBox.setMaxLength(64);
+            this.searchBox.setFocused(true);
+            this.searchBox.setValue("");
+        } else {
+            this.searchBox = null;
+        }
 
         updateSearchResults();
     }
@@ -81,6 +89,11 @@ public class QuickPageSwitcherDialog {
         if (selectedIndex >= results.size()) {
             selectedIndex = Math.max(0, results.size() - 1);
         }
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {

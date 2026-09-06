@@ -39,6 +39,7 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
     private final List<EmiIngredient> emiInputs;
     private final List<EmiStack> emiOutputs;
     private final List<EmiIngredient> workstations;
+    private final java.util.function.Supplier<RecipeNode> nodeSupplier;
 
     public KineticGenerationEmiRecipe(
             ResourceLocation id,
@@ -54,6 +55,24 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
             List<IngredientStack> outputStacks,
             ItemStack machineItem
     ) {
+        this(id, category, machineIconId, displayName, durationTicks, eut, tier, energyType, isGenerator, inputStacks, outputStacks, machineItem, null);
+    }
+
+    public KineticGenerationEmiRecipe(
+            ResourceLocation id,
+            EmiRecipeCategory category,
+            ResourceLocation machineIconId,
+            String displayName,
+            double durationTicks,
+            double eut,
+            GTVoltageTier tier,
+            EnergyType energyType,
+            boolean isGenerator,
+            List<IngredientStack> inputStacks,
+            List<IngredientStack> outputStacks,
+            ItemStack machineItem,
+            java.util.function.Supplier<RecipeNode> nodeSupplier
+    ) {
         this.id = id;
         this.category = category;
         this.machineIconId = machineIconId;
@@ -65,6 +84,7 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
         this.isGenerator = isGenerator;
         this.inputStacks = inputStacks != null ? inputStacks : List.of();
         this.outputStacks = outputStacks != null ? outputStacks : List.of();
+        this.nodeSupplier = nodeSupplier;
 
         List<EmiIngredient> inList = new ArrayList<>();
         if (inputStacks != null) {
@@ -95,6 +115,12 @@ public class KineticGenerationEmiRecipe implements EmiRecipe {
     }
 
     public RecipeNode toRecipeNode() {
+        if (nodeSupplier != null) {
+            RecipeNode supplied = nodeSupplier.get();
+            if (supplied != null) {
+                return supplied;
+            }
+        }
         RecipeNode node = RecipeNode.create(displayName, durationTicks, eut, tier);
         node.setGenerator(isGenerator);
         node.setEnergyType(energyType);

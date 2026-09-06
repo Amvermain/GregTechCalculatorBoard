@@ -16,13 +16,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.*;
 
 /**
  * Interactive modal dialog that previews and filters auto-connect candidates by resource type (item/fluid).
  * Allows users to selectively exclude universal materials (e.g. water, oxygen, steam) before wiring.
  */
-public class AutoConnectFilterDialog {
+public class AutoConnectFilterDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private final List<ResourceEntry> entries = new ArrayList<>();
@@ -267,6 +270,11 @@ public class AutoConnectFilterDialog {
             }
         }
         return false;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {

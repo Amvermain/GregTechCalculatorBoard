@@ -29,6 +29,7 @@ public class CreateKineticModCheckTest {
         ModCompatHelper.setTestOverride("create", false);
         ModCompatHelper.setTestOverride("createaddition", false);
         ModCompatHelper.setTestOverride("create_new_age", false);
+        ModCompatHelper.setTestOverride("createdieselgenerators", false);
 
         List<SearchableRecipe> createRecipes = CreateRecipeHandler.getVirtualKineticSearchRecipes();
         Assertions.assertTrue(createRecipes.isEmpty(), "Virtual Create recipes should be empty when Create is not loaded");
@@ -45,6 +46,7 @@ public class CreateKineticModCheckTest {
         ModCompatHelper.setTestOverride("create", true);
         ModCompatHelper.setTestOverride("createaddition", true);
         ModCompatHelper.setTestOverride("create_new_age", true);
+        ModCompatHelper.setTestOverride("createdieselgenerators", true);
 
         List<SearchableRecipe> combined = CreateModAdapter.getVirtualKineticSearchRecipes();
         Assertions.assertFalse(combined.isEmpty(), "Virtual recipes should be present when Create mods are loaded");

@@ -574,7 +574,16 @@ public class NodeWidget {
             return false;
         }
 
+        boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
+        boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE;
+
         int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
+        if (adapter != null && !isVanillaCooking && !isPassiveOrSteam) {
+            GTVoltageTier minWsTier = adapter.getMinimumWorkstationTier(node);
+            if (minWsTier != null) {
+                minIdx = Math.max(minIdx, minWsTier.ordinal());
+            }
+        }
         int maxIdx = GTVoltageTier.values().length - 1;
         if (node.isTurbine()) {
             if (node.isMultiblock()) {
@@ -586,8 +595,6 @@ public class NodeWidget {
                 maxIdx = GTVoltageTier.HV.ordinal();
             }
         }
-
-        boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
 
         if (!node.isMultiblock() && node.supportsSteamMode()) {
             SteamMode curSteam = node.getSteamMode();

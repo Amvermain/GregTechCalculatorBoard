@@ -11,10 +11,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
+import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
+import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
+
 import java.util.ArrayList;
 import java.util.List;
 
-public class TutorialExitConfirmDialog {
+public class TutorialExitConfirmDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
     private int targetPageIndex = -1;
@@ -55,6 +58,11 @@ public class TutorialExitConfirmDialog {
 
     public boolean isVisible() {
         return visible;
+    }
+
+    @Override
+    public void renderModal(ModalRenderContext context) {
+        render(context.graphics(), context.screenWidth(), context.screenHeight(), context.mouseX(), context.mouseY());
     }
 
     public void render(GuiGraphics graphics, int screenW, int screenH, int mouseX, int mouseY) {

@@ -53,14 +53,18 @@ stateDiagram-v2
 | **[ADR-022](ADR_022_CLOSED_LOOP_RECIRCULATION_AND_SUPPLY_ALLOCATION.md)** | 폐쇄 순환 공정 자급 자원 보호 및 공급 우선 할당 알고리즘 명세<br/>*(Closed-Loop Recirculation Self-Sustaining Protection & Supply-Filling Allocation Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | Tarjan SCC 기반 자급 순환 자원 불변식 감쇠 나선 차단, Greedy Demand-Filling 엣지 할당, 실효 소비량 결손 판정 및 상류 감속(↓) 인디케이터 |
 | **[ADR-023](ADR_023_PER_CRAFT_BATCH_VIEW_AND_STOICHIOMETRIC_LOOP_VERIFICATION.md)** | 레시피 1회(배치) 기준 뷰 모드 및 화학양론적 순환 루프 검증 명세<br/>*(Per-Craft Batch View & Stoichiometric Recirculation Loop Verification Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 시간 단위 소거형 1회(1x) 뷰 모드(RateTimeUnit.PER_RECIPE), 모델 B 독립 1회 레시피 뷰, 화학양론적 포트 보존 및 밸런스(✔) 인디케이터 |
 | **[ADR-024](ADR_024_TARGET_OUTPUT_RATE_AND_FRACTIONAL_AUTO_RATIO.md)** | 목표 생산량 기반 기계 대수 자동 역산 및 정밀 소수점 Auto-Ratio 명세<br/>*(Target Output Rate Inverse Solver & Fractional Auto-Ratio Precision Scaling Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 출력 포트 Ctrl+클릭 목표치(예: 1/12s, 5/min) 기계 대수 O(1) 역산, 정밀 소수점 Auto-Ratio(Alt+클릭), 앵커 소수점 보존 모드 |
+| **[ADR-026](ADR_026_MODAL_DIALOG_STACK_AND_REGISTRY.md)** | 모달 다이얼로그 스택 및 레지스트리 아키텍처<br/>*(Modal Dialog Stack & Registry Architecture)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | IBoardModal 공통 인터페이스, LIFO 기반 ModalStack 및 BoardDialogManager 26개 if-else 분기 평탄화 O(1) 디스패치 |
+| **[ADR-027](ADR_027_CANVAS_INTERACTION_FINITE_STATE_MACHINE.md)** | 캔버스 인터랙션 유한 상태 머신 명세<br/>*(Canvas Interaction Finite State Machine Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | CanvasInteractionState FSM 전면 도입, 10여 개 불리언 플래그 제거, 결정론적 상태 전이 및 $O(1)$ 단일 활성 상태 보장 |
+| **[ADR-028](ADR_028_COMPOSABLE_RECIPE_SEARCH_SPECIFICATION.md)** | 합성 가능한 레시피 검색 쿼리 명세 패턴<br/>*(Composable Recipe Search Specification Pattern)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | 검색 필터 로직의 Specification Pattern 모듈화, And/Or/Not 선언적 합성 및 비용 기반 단락 평가(Short-Circuit) 최적화 |
+| **[ADR-029](ADR_029_MOD_ADAPTER_INTERFACE_SEGREGATION_AND_EXTENSIONS.md)** | IModAdapter 인터페이스 분리(ISP) 및 Extension Object 패턴 명세<br/>*(IModAdapter Interface Segregation & Extension Object Pattern Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | IModAdapter 824줄에서 86줄 슬림화, 6대 도메인 Provider 분리 및 Extension Object 패턴 확립, 100% 하위 호환성 유지 |
 
 ---
 
 ## 💡 활성 RFC 제안 목록 (Active RFC Proposals)
 
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-02 | MCF 허브-노드 결합형 모듈러 발전, 윤활유/산화제 2단계 부스팅, 시간당 500B 냉각수 소모 및 다중 유체 시뮬레이션 |
+| :---: | :--- | :--- :---: | :---: | :---: | :--- |
+| **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PARTIALLY_IMPLEMENTED` | `v2.2.0` | 2026-09-02 | Trait 기반 물리/승수(5A~12A, 냉각 1.2x/1.4x) 및 머신 설정 UI 통합 완료(Phase 1), 부수 유체 입력 주입 대기(Phase 2) |
 | **[RFC-025](../RFC_025_UNIFIED_CANVAS_WORKSPACE_AND_CONTEXT_DRIVEN_UI.md)** | 3-패널 통합 워크스페이스 및 컨텍스트 중심 UI/UX 현대화 명세<br/>*(Unified Canvas Workspace & Context-Driven UI/UX Modernization Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 캔버스/노드 우클릭 컨텍스트 메뉴, 스마트 커넥트 추천, 노드 카드 슬림화 및 비모달 우측 인스펙터, 3-패널 통합 워크스페이스 구축 |
 
 

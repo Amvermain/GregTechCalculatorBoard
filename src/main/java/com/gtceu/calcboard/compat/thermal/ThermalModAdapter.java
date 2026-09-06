@@ -13,6 +13,10 @@ import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 
 import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
@@ -22,12 +26,25 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Mod Adapter facade for Thermal Series (Thermal Expansion, Foundation, Innovation).
  * Manages Thermal augments, upgrade kit discovery, slot validation, and recipe scaling.
  */
 public class ThermalModAdapter implements IModAdapter {
+
+    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+            IHardwareAddonProvider.class,
+            IEnergySimulationProvider.class,
+            ICompoundRecipeProvider.class,
+            ICapabilityMatrixProvider.class
+    );
+
+    @Override
+    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+        return SUPPORTED_EXTENSIONS;
+    }
 
     static {
         ThermalProperties.init();
@@ -191,8 +208,19 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
+    public String formatAddonSubtitle(RecipeNode node, MachineAddon addon) {
+        return "";
+    }
+
+    @Override
     public int computeEffectiveParallel(RecipeNode node) {
         return Math.max(1, node.getParallel());
+    }
+
+    @Override
+    public double computeSingleMachinePower(RecipeNode node) {
+        if (node == null) return 0.0;
+        return node.getOverclockResult().eut();
     }
 
     @Override

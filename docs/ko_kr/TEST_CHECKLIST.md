@@ -130,6 +130,10 @@
   - [ ] **열분해로 (Pyrolyse Oven)**: 코일 속도 보너스 기반 소요 시간 단축 ($\text{DurationMult} = \frac{100.0}{\text{PyrolyseSpeed}\%}$) 검증
   - [ ] **크래킹 유닛 (Cracking Unit)**: 코일 에너지 보너스 기반 전력 할인 ($\text{EUtMult} = \frac{\text{CrackingEnergy}\%}{100.0}$) 검증
   - [ ] **대형 제련로 (Multi Smelter)**: 코일 티어에 따른 고유 병렬 수($32\text{x}, 64\text{x}, 128\text{x}\dots$) 자동 연동 검증
+  - [ ] **구조적 고정 코일 보호 및 기계별 코일 게이팅**:
+    - [ ] 구조에 고정 코일 블록이 포함된 멀티블록 기계(예: Heat Chamber, Draco Infusion, Titan Forge 등)가 기능적 코일 멀티블록으로 오인되지 않도록 보호 (`isCoilMultiblock == false`, `coilSlotCount == 0`, BOM 부품 카테고리가 `PartCategory.CASING`으로 유지)
+    - [ ] 동일 레시피 카테고리에 고티어 코일 기계(예: Void Excavator)가 존재하더라도, 현재 노드의 기계 아이콘이 비-코일 기계(예: Void Extractor)인 경우 카드에 `♨` 코일 뱃지가 뜨지 않고 부품 설정창에도 코일 탭이 비활성화됨을 확인
+    - [ ] `StructuralCoilProtectionTest` 및 `CoilGatingRegressionTest` 자동 회귀 테스트 100% 통과 확인
 - [ ] **대형 증기/가스/플라즈마 터빈 & 로터 홀더 물리 (`GTTurbinePhysics`)**:
   - [ ] **로터 홀더 스루풋 캡**: 전압 티어(EV 4,096 EU/t base, 티어별 2배) 및 장착된 로터 파워($\text{RotorPower}\%$)에 따른 최대 발전 용량 $\lfloor \text{BaseCap} \times \frac{\text{RotorPower}}{100} \rfloor$ 연산 검증
   - [ ] **로터 효율 및 홀더 보너스**: 로터 재질 고유 효율($\text{Efficiency}\%$) + 대형 터빈 홀더 티어차 보너스($\Delta\text{Tier} \times 10\%$)를 통한 연료 소비 지속시간 스케일링 검증

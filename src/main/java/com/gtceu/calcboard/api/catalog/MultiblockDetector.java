@@ -679,7 +679,7 @@ public class MultiblockDetector {
         if (COIL_MULTIBLOCK_CONTROLLERS.contains(workstationId)) return true;
 
         var defStruct = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(workstationId);
-        if (defStruct != null && (defStruct.supportsAbility("HEATING_COILS") || defStruct.coilSlotCount() > 0)) {
+        if (defStruct != null && defStruct.supportsAbility("HEATING_COILS") && defStruct.coilSlotCount() > 0) {
             COIL_MULTIBLOCK_CONTROLLERS.add(workstationId);
             return true;
         }

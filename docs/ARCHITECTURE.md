@@ -21,17 +21,17 @@ GTCalcBoard is architected into 5 strictly isolated layers following **Clean Arc
 graph TD
     subgraph UI["1. Presentation & UI Layer (com.gtceu.calcboard.client.gui)"]
         BS["BoardScreen (Main Screen Orchestrator & Input Router)"]
-        BDM["BoardDialogManager (Modal Dialog Lifecycle & Priority Dispatch)"]
+        BDM["BoardDialogManager & ModalStack (LIFO Modal Lifecycle & ESC Dismissal)"]
         BCR["BoardCanvasRenderer (Viewport Culling & Canvas Rendering Coordinator)"]
         BAH["BoardActionHandler (Undo/Redo Actions & Node/Wire Removal Collector)"]
         BVT["BoardViewportTransform (Virtual GUI Scale Coordinate Transform Engine)"]
-        CIH["CanvasInteractionHandler (Pan, Zoom, Drag Multi-Selection, QuickAdd)"]
+        CIH["CanvasInteractionHandler & CanvasStateMachine (FSM-Driven Mutual Exclusion)"]
         RENDER["Two-Pass Z-Order Rendering & Rate-Based Flow Wire Animation Shader"]
         WSI["WireSpatialIndex (128x128 AABB Uniform Grid O(log E) Spatial Indexing)"]
         NCTC["NodeCardTextCache (Dirty-Flag Based Text Truncation & Formatting Cache)"]
         Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay)"]
         Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog)"]
-        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine)"]
+        Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & Composable Specification)"]
     end
 
     subgraph Core["2. Core Domain & Math Engine (com.gtceu.calcboard.api)"]
@@ -46,11 +46,13 @@ graph TD
 
     subgraph Compat["3. Mod Compatibility Common SPI (com.gtceu.calcboard.compat)"]
         MAR["ModAdapterRegistry (Priority Dynamic Routing SPI)"]
-        IMA["IModAdapter (Lifecycle, Overclock, Energy, BOM Contribution & Validation)"]
+        IMA["IModAdapter & Extension Object Providers (Energy, Recipe, Addon, BOM, Booster, Capability)"]
         subgraph Adapters["Domain Mod Adapters (100% Headless Safe)"]
             GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
             CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, Kinetic Machines)"]
+            CDG["createdieselgenerators (Diesel Engines, SU/Fuel, Distillation)"]
             CNA["createnewage (Motors, Generator Coils, Magnet Rings, FE/SU Conversion)"]
+            GR["greate (Tiered Kinetic Machines)"]
             TH["thermal (AugmentData, Tier Kits, Dynamos, RF/t)"]
             SY["systeams (Boilers, Steam Dynamos, Steam mB/s)"]
             ST["start (StarTReflectionBridge, Plasma Turbines, Threading Helix Structures, SPT/NPT Traits)"]
@@ -124,6 +126,14 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
   1. Official APIs & Java Reflection.
   2. Physics Simulations & Internal Objects.
   3. Deterministic NBT numerical data structures & official `TagKey` lookups.
+
+### 2.6 Hierarchical Modal Dialog Stack & Canvas Interaction FSM (ADR-026 & ADR-027)
+* **LIFO Modal Stack (`ModalStack` & `IBoardModal`)**: Manages 26 workspace overlay dialogs with strict LIFO ordering, sequential ESC dismissal, and input isolation against ghost clicks.
+* **Finite State Machine (`CanvasStateMachine`)**: Enforces mutually exclusive interaction states (IDLE, DRAGGING_NODES, WIRING, BOX_SELECTING, RESIZING, PANNING) with clean rollback on abort.
+
+### 2.7 Composable Recipe Search & Extension Object SPI (ADR-028 & ADR-029)
+* **Specification Pattern Query Engine (`RecipeSearchQueryEngine`)**: Decomposes recipe search into composable predicates (`@mod`, `#tag`, `tier:`, `eut:`) with memoized token indexing.
+* **Interface Segregation & Extension Object Pattern (`IModAdapter`)**: Core lifecycle reduced to 86 lines; domain capabilities partitioned into 6 modular SPI providers (`IEnergySimulationProvider`, `ICompoundRecipeProvider`, `IHardwareAddonProvider`, `IMultiblockBOMProvider`, `IBoosterProvider`, `ICapabilityMatrixProvider`) with 100% backward compatibility.
 
 ---
 

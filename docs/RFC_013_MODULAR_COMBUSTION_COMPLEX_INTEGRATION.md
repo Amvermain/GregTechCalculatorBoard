@@ -2,10 +2,11 @@
 # (Star Technology Modular Combustion Complex & Frame Boosting Integration Specification)
 
 - **문서 번호**: RFC-013
-- **대상 버전**: `v2.1.0`
-- **상태**: `PROPOSED`
+- **대상 버전**: `v2.2.0`
+- **상태**: `PARTIALLY_IMPLEMENTED` (Phase 1 물리/UI 통합 완료, Phase 2 부수 유체 연동 대기)
 - **작성일**: 2026-09-02
-- **주관 계층**: Pure Domain Layer (`api.model`, `api.property`), Mod Adapter SPI Layer (`compat.start`, `compat.gtceu`), Client GUI Layer (`client.gui.compat.start`, `client.gui.editor`)
+- **최종 갱신일**: 2026-09-06
+- **주관 계층**: Pure Domain Layer (`api.model`, `api.catalog`), Mod Adapter SPI Layer (`compat.gtceu.helper`, `compat.gtceu.handler`), Client GUI Layer (`client.gui.dialog.MachineConfigModal`)
 
 ---
 
@@ -15,28 +16,30 @@
 Star Technology 모드팩 환경에서 대규모 전력 생산의 핵심 인프라인 **모듈러 연소 프레임 (Modular Combustion Frame [MCF], `start_core:modular_combustion_frame`)** 및 4종의 **모듈러 연소/로켓 모듈 (Modular Combustion/Rocket Modules)** 멀티블록 발전 시스템은 다음과 같은 복합 메커니즘을 가집니다:
 
 1. **허브-노드 결합형 모듈러 아키텍처**:
-   - MCF 프레임 본체는 자체 발전 레시피를 구동하지 않고, 최대 8개의 하위 모듈 멀티블록(UCM, SCM, SRM, NRM)과 도킹 해치(`MODULAR_NODE` $\leftrightarrow$ `MODULAR_TERMINAL`)로 결합하여 각 모듈에서 생산된 에너지를 수집·출력합니다.
+   - MCF 프레임 본체는 자체 발전 레시피를 구동하지 않고, 하위 모듈 멀티블록(UCM, SCM, SRM, NRM)과 도킹 해치(`MODULAR_NODE` $\leftrightarrow$ `MODULAR_TERMINAL`)로 결합하여 각 모듈에서 생산된 에너지를 수집·출력합니다.
+   - GTCEu 순정 멀티블록인 LCE(EV) 및 ECE(IV)는 `MODULAR_TERMINAL` 해치가 없어 MCF에 연결되지 않으며, 오직 Star Technology 모듈 4종만 연결 가능합니다.
 2. **2단계 중첩 부스팅(Dual-Tier Boosting) 물리 메커니즘**:
    - **1단계 (모듈 산화제 부스팅)**: 각 모듈은 고유 윤활유와 발연질산/초산화물 계열 산화제를 $3.6\text{초}(72\text{틱})$ 주기로 소모하여 출력 Amps를 기본 $1\text{A}\sim 2\text{A}$에서 $5\text{A}\sim 12\text{A}$로 증폭하고 병렬 수를 $2\times$ 확장합니다.
-   - **2단계 (MCF 프레임 냉각 부스팅)**: MCF 프레임은 연결된 모듈 1개당 시간당 $500\text{ B}$ ($500,000\text{ mB/hr}$)의 냉각수를 소모하며, 탈이온수 공급 시 $+40\%$ ($1.4\times$), 증류수 공급 시 $+20\%$ ($1.2\times$), 미공급 시 $-10\%$ ($0.9\times$)의 출력 승수를 전체 전력에 적용합니다.
-3. **기존 계산기 모델링의 한계**:
-   - 기존 시스템은 단일 기계 기반의 발전량만을 계산하며, 이러한 복합 도킹 발전 프레임워크와 다중 유체 소모(연료 + 윤활유 + 산화제 + 냉각수) 연계 수치를 정확히 시뮬레이션하지 못했습니다.
+   - **2단계 (MCF 프레임 냉각 부스팅)**: MCF 프레임은 연결된 모듈 1개당 시간당 $500\text{ B}$ ($500,000\text{ mB/hr}$)의 냉각수를 소모하며, 탈염수 공급 시 $+40\%$ ($1.4\times$), 증류수 공급 시 $+20\%$ ($1.2\times$), 미공급 시 $-10\%$ ($0.9\times$)의 출력 승수를 전체 전력에 적용합니다.
 
-### 1.2 목표
-- Pure Domain의 불변성을 유지하면서 `NodePropertyStore` 및 SPI 확장을 통해 4종 모듈과 MCF 프레임의 2단계 부스팅을 정밀 모델링합니다.
-- 노드 카드 UI 및 머신 설정 모달에서 산화제 부스팅 토글과 MCF 냉각수 등급을 직관적으로 제어할 수 있도록 지원합니다.
-- 연료뿐만 아니라 윤활유, 산화제, 냉각수 소모량을 레시피 계산 그래프와 BOM(자재 명세서)에 결정론적(Deterministic)으로 자동 동기화합니다.
+### 1.2 구현 방향 진화 및 통합 (Trait-based Architecture Evolution)
+- **초기 기획**: Star Technology 전용 어댑터(`StarTModAdapter`), 독점 속성 키(`StarTProperties`), 노드 카드 상단 전용 토글 배지 버튼(`[OX]`, `[MCF]`) 신설을 구상하였습니다.
+- **실제 채택된 아키텍처**:
+  - 도메인 순수성 유지 및 UI 일관성을 위해 범용 멀티블록 트레이트 시스템인 **`MachineAddon` (`Category.MULTIBLOCK_TRAIT`)** 및 `GTCombustionHelper`로 통합 구현되었습니다.
+  - 전용 배지로 노드 카드를 복잡하게 만드는 대신, 다른 부품(코일, 로터, 해치)들과 동일하게 **머신 설정 다이얼로그 (Machine Config Dialog / Addon Tab)**에서 통일된 인터랙션으로 부스팅을 구성합니다.
+  - **Phase 1 (완료)**: 발전 출력 승수($5\text{A}\sim 12\text{A}$), 병렬 2배 확장, 냉각 부스팅($0.9\times, 1.2\times, 1.4\times$) 계산 엔진 및 머신 설정 UI 통합 완료.
+  - **Phase 2 (예정)**: 부수 유체(산화제, 윤활유, 냉각수)의 소모 유량 산출 및 `node.getInputs()` 자동 주입을 통한 계산 그래프/BOM 연동.
 
 ---
 
-## 2. 핵심 유저 스토리 (User Stories)
+## 2. 핵심 유저 스토리 및 구현 상태 (User Stories & Implementation Status)
 
-| 구분 | 유저 스토리 (User Story) | 수용 기준 (Acceptance Criteria) |
-|---|---|---|
-| **US-01** | 플레이어는 LuV~UEV 티어 모듈러 연소/로켓 모듈 노드를 배치하고 연료 투입에 따른 발전량을 계산할 수 있다. | UCM(LuV), SCM(ZPM), SRM(UV), NRM(UEV)의 기본 전압 및 $V[\text{Tier}] / \text{recipeEUt}$ 병렬 계산이 정확히 수행된다. |
-| **US-02** | 플레이어는 노드 카드에서 클릭 한 번으로 [산화제 부스팅]을 활성화하여 전력 증폭 및 산화제/윤활유 소모량을 확인할 수 있다. | 부스팅 활성화 시 출력 Amps가 $5\text{A}\sim 12\text{A}$로 증가하고, $3.6\text{초}$ 주기 소모 유체가 `node.getInputs()`에 자동 등록된다. |
-| **US-03** | 플레이어는 모듈이 MCF 프레임에 도킹된 상태를 선택하고 냉각수 등급(None / Distilled / Deionized)을 지정할 수 있다. | 냉각수 등급에 따라 $0.9\times, 1.2\times, 1.4\times$ 승수가 전력에 적용되며, $500\text{ B/hr}$의 냉각수 소비량이 그래프에 반영된다. |
-| **US-04** | 플레이어는 MCF 프레임 단독 노드를 배치하여 연결할 모듈 수(1~8대)를 설정하고 통합 발전량과 냉각수 총량을 일괄 산출할 수 있다. | 모듈 수 $N$에 따른 냉각수 소모량($N \times 500\text{ B/hr}$)과 레이저 해치 출력 한도가 계산된다. |
+| 구분 | 유저 스토리 (User Story) | 수용 기준 (Acceptance Criteria) | 상태 (Status) |
+|---|---|---|:---:|
+| **US-01** | 플레이어는 LuV~UEV 티어 모듈러 연소/로켓 모듈 노드를 배치하고 연료 투입에 따른 발전량을 계산할 수 있다. | UCM(LuV), SCM(ZPM), SRM(UV), NRM(UEV)의 기본 전압 및 $V[\text{Tier}] / \text{recipeEUt}$ 병렬 계산이 정확히 수행된다. | 🟢 **완료 (Phase 1)** |
+| **US-02** | 플레이어는 머신 설정 창에서 산화제 부스팅을 활성화하여 전력 증폭 및 산화제/윤활유 소모량을 확인할 수 있다. | 부스팅 활성화 시 출력 Amps가 $5\text{A}\sim 12\text{A}$로 증가하고 병렬 수가 $2\times$ 확장된다. $3.6\text{초}$ 주기 소모 유체가 `node.getInputs()`에 자동 등록된다. | 🟡 **부분 완료**<br/>(전력/병렬 완료, 유체 입력 Phase 2) |
+| **US-03** | 플레이어는 모듈에 MCF 냉각수 등급(Distilled / Deionized) 애드온을 장착하고 출력 승수를 적용할 수 있다. | 냉각수 등급에 따라 $1.2\times, 1.4\times$ 승수가 전력에 적용된다. $500\text{ B/hr}$의 냉각수 소비량이 그래프에 반영된다. | 🟡 **부분 완료**<br/>(승수 완료, 유체 입력 Phase 2) |
+| **US-04** | 플레이어는 MCF 프레임 단독 노드를 배치하여 연결할 모듈 수(1~8대)를 설정하고 통합 발전량과 냉각수 총량을 일괄 산출할 수 있다. | 모듈 수 $N$에 따른 냉각수 소모량($N \times 500\text{ B/hr}$)과 레이저 해치 출력 한도가 계산된다. | ⚪ **백로그 (Phase 2)** |
 
 ---
 
@@ -47,29 +50,31 @@ Star Technology 모드팩 환경에서 대규모 전력 생산의 핵심 인프�
 ```mermaid
 flowchart TD
     subgraph Client_GUI_Layer ["Client GUI Layer"]
-        StarTModGuiHandler["StarTModGuiHandler (Card Badge & Click Handler)"]
-        MachineConfigModal["MachineConfigModal (MCF & Booster Control)"]
+        MachineConfigModal["MachineConfigModal (Addon Tab Trait Selector)"]
+        NodeWidget["NodeWidget (Displays Multipliers & Net Power)"]
     end
 
     subgraph Pure_Domain_Layer ["Pure Domain Layer (Clean Engine)"]
         RecipeNode["RecipeNode (Pure Domain Entity)"]
         NodePropertyStore["NodePropertyStore (Type-Safe Keys)"]
-        FlowGraphSolver["FlowGraphSolver (Graph Mass-Balance)"]
+        MachineAddon["MachineAddon (Category.MULTIBLOCK_TRAIT)"]
+        MachineAddonCatalog["MachineAddonCatalog (Registry)"]
     end
 
-    subgraph Mod_Adapter_SPI_Layer ["Mod Adapter SPI Layer (StarT Compat)"]
-        StarTModAdapter["StarTModAdapter (IModAdapter Impl)"]
-        StarTCombustionHelper["StarTCombustionHelper (Physics & Inputs Sync)"]
-        StarTProperties["StarTProperties (NodePropertyKey Definitions)"]
-        GTPowerCalculator["GTPowerCalculator (Power & Parallel Capacity)"]
+    subgraph Mod_Adapter_SPI_Layer ["Mod Adapter SPI Layer (GTCEu Compat)"]
+        GTAddonCompatibilityHandler["GTAddonCompatibilityHandler (Trait Filtering & Install)"]
+        GTCombustionHelper["GTCombustionHelper (Power & Parallel Physics)"]
+        GTPowerCalculator["GTPowerCalculator (Single Machine Power Engine)"]
+        GTCEuProperties["GTCEuProperties (COMBUSTION_OXIDIZER_TYPE, COMBUSTION_COOLANT_TYPE)"]
     end
 
-    Client_GUI_Layer -->|Render & Event| StarTModAdapter
-    StarTModAdapter -->|Delegate Physics| StarTCombustionHelper
-    StarTCombustionHelper -->|Read/Write Properties| NodePropertyStore
+    Client_GUI_Layer -->|Open Modal & Install Trait| GTAddonCompatibilityHandler
+    GTAddonCompatibilityHandler -->|Query Traits| MachineAddonCatalog
+    GTAddonCompatibilityHandler -->|Set State| NodePropertyStore
     RecipeNode --> NodePropertyStore
-    GTPowerCalculator --> StarTCombustionHelper
-    FlowGraphSolver --> RecipeNode
+    GTPowerCalculator --> GTCombustionHelper
+    GTCombustionHelper --> NodePropertyStore
+    NodeWidget -->|Render Stats| RecipeNode
 ```
 
 ---
@@ -97,17 +102,17 @@ flowchart TD
 
 $$M_{\text{frame}} = \begin{cases} 
 1.0 & \text{단독 운전 (Standalone, No Frame)} \\
-0.9 & \text{MCF 장착 / 냉각수 미공급 (No Coolant Penalty)} \\
-1.2 & \text{MCF 장착 / 증류수 공급 (Distilled Water, +20\%)} \\
-1.4 & \text{MCF 장착 / 탈이온수 공급 (De-Ionized Water, +40\%)}
+0.9 & \text{MCF 단독 노드 / 냉각수 미공급 (No Coolant Penalty)} \\
+1.2 & \text{MCF 결합 / 증류수 공급 (Distilled Water, +20\%)} \\
+1.4 & \text{MCF 결합 / 탈염수 공급 (De-Ionized Water, +40\%)}
 \end{cases}$$
 
 #### 4) 최종 발전 출력 ($P_{\text{total}}$)
 
 $$P_{\text{total}} = \text{RecipeEU/t} \times P_{\text{base}} \times M_{\text{amp}} \times M_{\text{frame}}$$
 
-#### 5) 부수 유체 시간당 투입량 공식 ($\text{Fluid Consumption Rate}$)
-레시피 1회당 투입량($Q_{\text{recipe}}$, 단위: $\text{mB}$)은 가동 주기 $T_{\text{op}} = 3.6\text{초}(72\text{틱})$와 레시피 지속 시간 $D_{\text{sec}}$에 따라 다음과 같이 계산됩니다:
+#### 5) 부수 유체 시간당 투입량 공식 (Phase 2 연동 예정)
+레시피 1회당 투입량($Q_{\text{recipe}}$, 단위: $\text{mB}$)은 가동 주기 $T_{\text{op}} = 3.6\text{초}(72\text{틱})$와 레시피 지속 시간 $D_{\text{sec}}$에 따라 다음과 같이 산출됩니다:
 
 $$Q_{\text{lube}} = \frac{R_{\text{lube}}}{3.6} \times \frac{D_{\text{sec}}}{P_{\text{eff}}}, \quad Q_{\text{ox}} = \frac{R_{\text{ox}}}{3.6} \times \frac{D_{\text{sec}}}{P_{\text{eff}}}$$
 
@@ -115,23 +120,19 @@ $$Q_{\text{coolant}} = \frac{500,000\text{ mB}}{3600\text{ 초}} \times \frac{D_
 
 ---
 
-### 3.3 타입 세이프 속성 키 정의 (`StarTProperties.java`)
+### 3.3 타입 세이프 속성 키 정의 (`GTCEuProperties.java`)
 
-Rule 6에 따라 `RecipeNode`에 전용 필드를 추가하지 않고 `NodePropertyStore`에 다음 키를 신규 등록합니다:
+`NodePropertyStore`에 등록되어 운영 중인 결정론적 키는 다음과 같습니다:
 
 ```java
-public final class StarTProperties {
-    /** 모듈 자체 산화제 부스팅 활성화 여부 (true: 5A~12A, false: 1A~2A) */
-    public static final NodePropertyKey<Boolean> OXIDIZER_BOOST =
-            NodePropertyKey.of("start_core:oxidizer_boost", Boolean.class, false);
+public final class GTCEuProperties {
+    /** 모듈 산화제 부스트 유체 종류 ("none", "white_fuming_nitric_acid", "red_fuming_nitric_acid", "dioxygen_difluoride", "ferrocenium_superoxide") */
+    public static final NodePropertyKey<String> COMBUSTION_OXIDIZER_TYPE =
+            NodeProperties.register("gtceu:combustion_oxidizer_type", String.class, "none");
 
-    /** MCF 프레임 냉각수 부스팅 등급 (0: STANDALONE, 1: UNCOOLED_0_9X, 2: DISTILLED_1_2X, 3: DEIONIZED_1_4X) */
-    public static final NodePropertyKey<Integer> MCF_COOLANT_MODE =
-            NodePropertyKey.of("start_core:mcf_coolant_mode", Integer.class, 0);
-
-    /** MCF 프레임에 도킹된 모듈 수 (MCF 컨트롤러 전용, 1~8) */
-    public static final NodePropertyKey<Integer> MCF_LINKED_MODULES =
-            NodePropertyKey.of("start_core:mcf_linked_modules", Integer.class, 1);
+    /** MCF 냉각 부스트 유체 종류 ("none", "distilled_water", "deionized_water") */
+    public static final NodePropertyKey<String> COMBUSTION_COOLANT_TYPE =
+            NodeProperties.register("gtceu:combustion_coolant_type", String.class, "none");
 }
 ```
 
@@ -139,82 +140,67 @@ public final class StarTProperties {
 
 ## 4. UI / UX 디자인 상세
 
-### 4.1 노드 카드 인라인 부스터 배지 (Node Card Booster Badge)
-
-노드 카드 상단 액션 바 영역에 모듈 상태를 한눈에 확인하고 즉시 순환(Cycle)할 수 있는 2개의 배지를 렌더링합니다:
-
-1. **산화제 부스트 배지 ([OX])**:
-   - `[OX: OFF (1A)]`: 비활성 (회색 테두리 `0xFF666666`, 배경 `0xFF222222`)
-   - `[OX: BOOST (6A)]`: 활성 (황금색 테두리 `0xFFFFD700`, 배경 `0xFF4A3E16`)
-2. **MCF 냉각 배지 ([MCF])**:
-   - `[MCF: NONE]`: 단독 가동 ($1.0\times$)
-   - `[MCF: 0.9x]`: 노쿨링 페널티 (적색 `0xFFFF7777`, 배경 `0xFF3D2424`)
-   - `[MCF: 1.2x]`: 증류수 ($+20\%$, 청록색 `0xFF38BDF8`, 배경 `0xFF1C3240`)
-   - `[MCF: 1.4x]`: 탈이온수 ($+40\%$, 네온 시안 `0xFF00FFFF`, 배경 `0xFF0E3A4A`)
-
-```
-+-----------------------------------------------------------------------+
-| [⚡] Supreme Combustion Module [SCM]                       (Tier: ZPM) |
-| Mode: 6A Boost (786,432 EU/t)  |  MCF Boost: 1.4x (De-Ionized Water)    |
-| [OX: BOOST (6A)] [MCF: 1.4x (De-Ionized)]                             |
-+-----------------------------------------------------------------------+
-| Inputs:                                                               |
-| • High Octane Gasoline: 120.0 mB/t                                    |
-| • Lubricant: 55.56 mB/s (200 mB / 3.6s)                               |
-| • Red Fuming Nitric Acid: 120.0 mB/s (432 mB / 3.6s)                  |
-| • De-Ionized Water: 138.89 B/s (500 B/hr)                             |
-| Outputs:                                                              |
-| • Power: 1,101,004.8 EU/t (Net: +1,101,004.8 EU/t)                   |
-+-----------------------------------------------------------------------+
-```
+### 4.1 머신 설정 모달 애드온 탭 연동
+- 노드 카드의 복잡도를 줄이기 위해 노드 우클릭 또는 톱니바퀴 아이콘으로 호출되는 **머신 설정 다이얼로그(Machine Config Modal)**의 **Addon 탭**에 멀티블록 트레이트로 배치됩니다.
+- 노드의 기계 종류에 따라 호환 가능한 트레이트만 필터링되어 노출됩니다:
+  - **LCE (EV)**: `gtceu:oxygen_boost` (산소 부스트)만 노출.
+  - **ECE (IV)**: `gtceu:liquid_oxygen_boost` (액체 산소 부스트)만 노출.
+  - **UCM (LuV)**: `start_core:t1_oxidizer_boost`, `start_core:distilled_water_coolant`, `start_core:deionized_water_coolant` 노출.
+  - **SCM (ZPM)**: `start_core:t2_oxidizer_boost`, `start_core:distilled_water_coolant`, `start_core:deionized_water_coolant` 노출.
+  - **SRM (UV)**: `start_core:t3_oxidizer_boost`, `start_core:distilled_water_coolant`, `start_core:deionized_water_coolant` 노출.
+  - **NRM (UEV)**: `start_core:t4_oxidizer_boost`, `start_core:distilled_water_coolant`, `start_core:deionized_water_coolant` 노출.
+  - **MCF (Frame)**: `start_core:distilled_water_coolant`, `start_core:deionized_water_coolant` 노출.
+- 상호 배타적 선택: 증류수와 탈염수 냉각 트레이트는 동시에 2개를 장착할 수 없으며, 새 냉각 트레이트 선택 시 기존 냉각 트레이트가 자동 대체됩니다.
 
 ---
 
 ## 5. 다국어 리소스 (i18n) 명세
 
-`en_us.json` 및 `ko_kr.json`에 동등하게 다음 키를 동기화합니다:
+`en_us.json`, `ko_kr.json`, `zh_cn.json`, `ru_ru.json` 4개 언어에 100% 동기화된 트레이트 키:
 
 ```json
 {
-  "gui.gtcalcboard.config.start.ox_boost_off": "Oxidizer: OFF (%dA)",
-  "gui.gtcalcboard.config.start.ox_boost_on": "Oxidizer: ACTIVE (%dA)",
-  "gui.gtcalcboard.config.start.mcf_mode_standalone": "MCF: Standalone (1.0x)",
-  "gui.gtcalcboard.config.start.mcf_mode_uncooled": "MCF: Uncooled (0.9x)",
-  "gui.gtcalcboard.config.start.mcf_mode_distilled": "MCF: Distilled Water (+20%)",
-  "gui.gtcalcboard.config.start.mcf_mode_deionized": "MCF: De-Ionized Water (+40%)",
-  "gui.gtcalcboard.tooltip.start.ox_boost_desc": "Consumes %s every 3.6s to boost output amps to %dA and doubles fuel parallel.",
-  "gui.gtcalcboard.tooltip.start.mcf_coolant_desc": "Consumes %s (500 B/hr per module) for a %s EU/t output modifier."
+  "trait.gtceu.oxygen_boost": "Oxygen Boost",
+  "trait.gtceu.oxygen_boost.desc": "Boosts Large Combustion Engine output to 3x EU/t and doubles fuel consumption.",
+  "trait.gtceu.liquid_oxygen_boost": "Liquid Oxygen Boost",
+  "trait.gtceu.liquid_oxygen_boost.desc": "Boosts Extreme Combustion Engine output to 4x EU/t and doubles fuel consumption.",
+  "trait.start_core.t1_oxidizer_boost": "UCM Oxidizer Boost (5A)",
+  "trait.start_core.t1_oxidizer_boost.desc": "Consumes White Fuming Nitric Acid and Lubricant to boost output to 5A and double fuel parallel.",
+  "trait.start_core.t2_oxidizer_boost": "SCM Oxidizer Boost (6A)",
+  "trait.start_core.t2_oxidizer_boost.desc": "Consumes Red Fuming Nitric Acid and Lubricant to boost output to 6A and double fuel parallel.",
+  "trait.start_core.t3_oxidizer_boost": "SRM Oxidizer Boost (8A)",
+  "trait.start_core.t3_oxidizer_boost.desc": "Consumes Dioxygen Difluoride and WS2 to boost output to 8A and double fuel parallel.",
+  "trait.start_core.t4_oxidizer_boost": "NRM Oxidizer Boost (12A)",
+  "trait.start_core.t4_oxidizer_boost.desc": "Consumes Ferrocenium Superoxide and WS2 to boost output to 12A and double fuel parallel.",
+  "trait.start_core.distilled_water_coolant": "MCF Coolant: Distilled Water (+20%)",
+  "trait.start_core.distilled_water_coolant.desc": "Supplies distilled water via Modular Combustion Frame for a +20% (1.2x) EU/t multiplier.",
+  "trait.start_core.deionized_water_coolant": "MCF Coolant: Deionized Water (+40%)",
+  "trait.start_core.deionized_water_coolant.desc": "Supplies deionized water via Modular Combustion Frame for a +40% (1.4x) EU/t multiplier."
 }
 ```
 
 ---
 
-## 6. 개발 로드맵 및 검증 계획 (Phased Roadmap & Verification)
-
-### 6.1 개발 단계 (Milestones)
+## 6. 개발 단계 및 검증 상태 (Phased Milestones & Verification)
 
 ```mermaid
 gantt
-    title RFC-013 구현 로드맵
+    title RFC-013 구현 및 로드맵 현황
     dateFormat  YYYY-MM-DD
-    section 도메인 & SPI
-    StarTProperties & NodePropertyStore 키 등록     :done, a1, 2026-09-02, 1d
-    StarTCombustionHelper 물리/수식 및 입력 동기화   :active, a2, 2026-09-02, 1d
-    GTPowerCalculator 및 ModAdapter 연계           :a3, 2026-09-02, 1d
-    section UI 및 i18n
-    노드 카드 배지 & 머신 설정 모달 UI 통합        :b1, 2026-09-02, 1d
-    en_us / ko_kr 다국어 리소스 동기화             :b2, 2026-09-02, 1d
-    section 검증
-    StarTCombustionEnhancementTest 단위 테스트 작성 :c1, 2026-09-02, 1d
-    Clean Build & testI18nCompleteness 검증       :c2, 2026-09-02, 1d
+    section Phase 1 (완료)
+    MachineAddon MULTIBLOCK_TRAIT 카탈로그 구축       :done, p1_1, 2026-09-02, 1d
+    GTCombustionHelper 물리/승수 및 GTPowerCalculator 연동 :done, p1_2, 2026-09-02, 1d
+    머신 설정 모달 UI 호환성 필터링 및 장착 로직      :done, p1_3, 2026-09-03, 1d
+    CombustionAndGeneratorOverclockTest 단위 테스트 검증 :done, p1_4, 2026-09-06, 1d
+    section Phase 2 (예정)
+    산화제/윤활유 소모량 산출 및 node.getInputs() 주입 :active, p2_1, 2026-09-07, 2d
+    MCF 냉각수(500B/hr) 소모량 계산 및 입력 주입       :p2_2, after p2_1, 1d
+    계산 그래프 FlowGraphSolver 및 BOM 연동 검증        :p2_3, after p2_2, 1d
+    최종 ADR-013 승격 및 활성 RFC 종료                :p2_4, after p2_3, 1d
 ```
 
-### 6.2 단위 테스트 검증 시나리오 (`StarTCombustionEnhancementTest.java`)
-1. **단독 기본 발전 검증**:
-   - SCM 노드에 ZPM 연료 투입 시 기본 1A ($131,072\text{ EU/t}$) 및 $1\times$ 병렬이 정확히 도출되는지 검증.
-2. **산화제 부스팅 활성화 검증**:
-   - `OXIDIZER_BOOST = true` 설정 시 6A ($786,432\text{ EU/t}$) 및 $2\times$ 병렬로 승격되고, RFNA 및 Lubricant 입력 유체가 자동 등록되는지 검증.
-3. **MCF 프레임 탈이온수 부스팅 복합 검증**:
-   - `MCF_COOLANT_MODE = DEIONIZED_1_4X` 적용 시 $786,432 \times 1.4 = 1,101,004.8\text{ EU/t}$가 출력되고, 탈이온수 $500\text{ B/hr}$ 유체 입력이 동기화되는지 검증.
-4. **다국어 무결성 검증**:
-   - `testI18nCompletenessAndConsistency`를 통해 한/영 번역 누락 및 포맷팅 토큰 일치 여부 100% 통과 검증.
+### 6.1 Phase 1 단위 테스트 검증 결과 (`CombustionAndGeneratorOverclockTest.java`)
+- `testStarTCombustionModuleCoolantAddonCompatibility`: UCM 노드에 탈염수 장착 시 $1.4\times$ ($32,768 \times 1.4\text{ EU/t}$) 승수 적용 및 해제 시 $1.0\times$ 원복 검증 통과.
+- `testStarTModularCombustionFrameCoolant`: MCF 프레임 노드에 미냉각($0.9\times$), 증류수($1.2\times$), 탈염수($1.4\times$) 승수 적용 및 해제 검증 통과.
+- `testStarTCombustionModuleOxidizerBoost`: UCM 5A ($163,200\text{ EU/t}$, 병렬 408), SCM 6A ($786,240\text{ EU/t}$, 병렬 1638) 승격 검증 통과.
+- `testSingleblockCombustionGeneratorRejectsBoostAndTraits`: LV/MV/HV 싱글블록 연소 발전기에서 부스트 트레이트 및 유지보수 해치 원천 차단 검증 통과.
