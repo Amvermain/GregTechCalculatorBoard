@@ -357,6 +357,7 @@ public class EmiRecipeConverter {
             effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
         }
         node.setTargetTier(effectiveTier);
+        com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.ensureCombustionInputs(node);
         return node;
     }
 

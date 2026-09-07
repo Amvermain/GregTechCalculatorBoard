@@ -17,6 +17,7 @@ import net.minecraft.sounds.SoundEvents;
  * Manages the state machine and progression of the 14-step interactive onboarding tutorial.
  */
 public class TutorialManager {
+    private static final ResourceLocation ELECTRIC_BLAST_FURNACE_ID = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
     private static final TutorialManager INSTANCE = new TutorialManager();
 
     static {
@@ -623,7 +624,7 @@ public class TutorialManager {
     public void onMachineSwitched(RecipeNode node, ResourceLocation newWs) {
         if (!active) return;
         if (currentStep == TutorialStep.STEP_6_MACHINE_SELECTOR) {
-            if (node != null && (node.isMultiblock() || (newWs != null && newWs.getPath().contains("electric_blast_furnace")))) {
+            if (node != null && (node.isMultiblock() || ELECTRIC_BLAST_FURNACE_ID.equals(newWs))) {
                 nextStep(); // Advance to Step 7 (Machine Config)
             }
         }
@@ -748,7 +749,7 @@ public class TutorialManager {
     public boolean isMachineSelectorRowGlowing(ResourceLocation machineId) {
         if (!active || machineId == null) return false;
         if (currentStep == TutorialStep.STEP_6_MACHINE_SELECTOR) {
-            return machineId.getPath().contains("electric_blast_furnace");
+            return ELECTRIC_BLAST_FURNACE_ID.equals(machineId);
         }
         return false;
     }

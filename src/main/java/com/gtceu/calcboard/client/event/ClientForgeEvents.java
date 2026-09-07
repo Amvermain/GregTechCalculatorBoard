@@ -28,6 +28,7 @@ import net.minecraftforge.fml.common.Mod;
 import com.gtceu.calcboard.client.command.CalcBoardClientCommands;
 import com.gtceu.calcboard.client.gui.compat.InventoryProfilesNextCompat;
 import com.gtceu.calcboard.client.storage.ClientPreferenceManager;
+import com.gtceu.calcboard.client.update.ClientUpdateNotifier;
 import com.gtceu.calcboard.config.CalcBoardClientConfig;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 
@@ -35,6 +36,7 @@ import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 public class ClientForgeEvents {
 
     private static int welcomeMessageDelayTicks = -1;
+    private static int updateMessageDelayTicks = -1;
 
     @SubscribeEvent
     public static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
@@ -88,6 +90,13 @@ public class ClientForgeEvents {
             welcomeMessageDelayTicks = -1;
         }
 
+        ClientUpdateNotifier.getInstance().refresh();
+        if (ClientUpdateNotifier.getInstance().shouldShowChatNotification()) {
+            updateMessageDelayTicks = 70; // ~3.5 seconds delay (after welcome message if any)
+        } else {
+            updateMessageDelayTicks = -1;
+        }
+
         // Fast load registry-backed addons immediately (<5ms, zero memory overhead)
         MachineAddonCatalog.getInstance().ensureFastLoaded();
 
@@ -108,6 +117,7 @@ public class ClientForgeEvents {
     @SubscribeEvent
     public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
         welcomeMessageDelayTicks = -1;
+        updateMessageDelayTicks = -1;
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.screen instanceof BoardScreen) {
             mc.setScreen(null);
@@ -273,6 +283,13 @@ public class ClientForgeEvents {
                 }
             }
 
+            if (updateMessageDelayTicks > 0) {
+                updateMessageDelayTicks--;
+                if (updateMessageDelayTicks == 0) {
+                    sendUpdateChatMessage(mc);
+                }
+            }
+
             while (KeyBindings.OPEN_BOARD.consumeClick()) {
                 if (mc.screen == null) {
                     welcomeMessageDelayTicks = -1;
@@ -319,6 +336,43 @@ public class ClientForgeEvents {
                 .append(text)
                 .append(net.minecraft.network.chat.Component.literal(" "))
                 .append(openBtn);
+
+        mc.player.sendSystemMessage(fullMessage);
+    }
+
+    private static void sendUpdateChatMessage(Minecraft mc) {
+        if (mc.player == null) return;
+        ClientUpdateNotifier notifier = ClientUpdateNotifier.getInstance();
+        if (!notifier.shouldShowChatNotification()) return;
+
+        notifier.markChatNotificationSeen();
+
+        var prefix = net.minecraft.network.chat.Component.literal("[GTCalcBoard]")
+                .withStyle(net.minecraft.ChatFormatting.AQUA, net.minecraft.ChatFormatting.BOLD);
+
+        var text = net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.update.available", notifier.getLatestVersion())
+                .withStyle(net.minecraft.ChatFormatting.GRAY);
+
+        var linkBtn = net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.update.download_button")
+                .withStyle(style -> style
+                        .withColor(net.minecraft.ChatFormatting.GREEN)
+                        .withUnderlined(true)
+                        .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                                net.minecraft.network.chat.ClickEvent.Action.OPEN_URL,
+                                notifier.getUpdateUrl()
+                        ))
+                        .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                                net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
+                                net.minecraft.network.chat.Component.translatable("gtcalcboard.chat.update.download_tooltip")
+                        ))
+                );
+
+        var fullMessage = net.minecraft.network.chat.Component.empty()
+                .append(prefix)
+                .append(net.minecraft.network.chat.Component.literal(" "))
+                .append(text)
+                .append(net.minecraft.network.chat.Component.literal(" "))
+                .append(linkBtn);
 
         mc.player.sendSystemMessage(fullMessage);
     }

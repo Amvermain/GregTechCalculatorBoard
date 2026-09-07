@@ -15,20 +15,65 @@ public final class GTFusionHelper {
 
     private GTFusionHelper() {}
 
+    public static final ResourceLocation FUSION_REACTOR_CATEGORY = ResourceLocation.tryParse("gtceu:fusion_reactor");
+
+    public static final ResourceLocation FUSION_MK1 = ResourceLocation.tryParse("gtceu:luv_fusion_reactor");
+    public static final ResourceLocation FUSION_MK2 = ResourceLocation.tryParse("gtceu:zpm_fusion_reactor");
+    public static final ResourceLocation FUSION_MK3 = ResourceLocation.tryParse("gtceu:uv_fusion_reactor");
+    public static final ResourceLocation FUSION_MK4 = ResourceLocation.tryParse("gtceu:uev_fusion_reactor");
+    public static final ResourceLocation FUSION_MK5 = ResourceLocation.tryParse("gtceu:uxv_fusion_reactor");
+
+    public static final ResourceLocation START_REFLECTOR_FUSION_I = ResourceLocation.tryParse("start_core:reflector_fusion_reactor_i");
+    public static final ResourceLocation START_REFLECTOR_FUSION_II = ResourceLocation.tryParse("start_core:reflector_fusion_reactor_ii");
+    public static final ResourceLocation START_REFLECTOR_FUSION_III = ResourceLocation.tryParse("start_core:reflector_fusion_reactor_iii");
+    public static final ResourceLocation START_REFLECTOR_FUSION = ResourceLocation.tryParse("start_core:reflector_fusion_reactor");
+
+    public static final ResourceLocation GT_REFLECTOR_FUSION_I = ResourceLocation.tryParse("gtceu:reflector_fusion_reactor_i");
+    public static final ResourceLocation GT_REFLECTOR_FUSION_II = ResourceLocation.tryParse("gtceu:reflector_fusion_reactor_ii");
+    public static final ResourceLocation GT_REFLECTOR_FUSION_III = ResourceLocation.tryParse("gtceu:reflector_fusion_reactor_iii");
+    public static final ResourceLocation GT_REFLECTOR_FUSION = ResourceLocation.tryParse("gtceu:reflector_fusion_reactor");
+
+    private static final java.util.Set<ResourceLocation> FUSION_CATEGORIES = java.util.Set.of(
+            FUSION_REACTOR_CATEGORY,
+            START_REFLECTOR_FUSION_I,
+            START_REFLECTOR_FUSION_II,
+            START_REFLECTOR_FUSION_III,
+            START_REFLECTOR_FUSION,
+            GT_REFLECTOR_FUSION_I,
+            GT_REFLECTOR_FUSION_II,
+            GT_REFLECTOR_FUSION_III,
+            GT_REFLECTOR_FUSION
+    );
+
+    private static final java.util.Set<ResourceLocation> FUSION_MACHINES = java.util.Set.of(
+            FUSION_MK1,
+            FUSION_MK2,
+            FUSION_MK3,
+            FUSION_MK4,
+            FUSION_MK5,
+            START_REFLECTOR_FUSION_I,
+            START_REFLECTOR_FUSION_II,
+            START_REFLECTOR_FUSION_III,
+            START_REFLECTOR_FUSION,
+            GT_REFLECTOR_FUSION_I,
+            GT_REFLECTOR_FUSION_II,
+            GT_REFLECTOR_FUSION_III,
+            GT_REFLECTOR_FUSION
+    );
+
+    public static boolean isFusionCategory(ResourceLocation catId) {
+        return catId != null && FUSION_CATEGORIES.contains(catId);
+    }
+
+    public static boolean isFusionMachine(ResourceLocation icon) {
+        return icon != null && FUSION_MACHINES.contains(icon);
+    }
+
     public static boolean isFusion(RecipeNode node) {
         if (node == null) return false;
         if (node.getEuToStart() > 0 || node.getRequiredReflectorTier() > 0) return true;
-        ResourceLocation catId = node.getRecipeCategoryId();
-        if (catId != null) {
-            String path = catId.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("fusion")) return true;
-        }
-        ResourceLocation icon = node.getMachineIcon();
-        if (icon != null) {
-            String path = icon.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("fusion")) return true;
-        }
-        return false;
+        if (isFusionCategory(node.getRecipeCategoryId())) return true;
+        return isFusionMachine(node.getMachineIcon());
     }
 
     public static int getFusionTier(RecipeNode node) {
@@ -42,11 +87,10 @@ public final class GTFusionHelper {
         }
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
-            String path = icon.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("mk2") || path.contains("zpm") || path.contains("_ii") || path.endsWith("_2")) return 2;
-            if (path.contains("mk3") || path.contains("uv") || path.contains("_iii") || path.endsWith("_3")) return 3;
-            if (path.contains("mk4") || path.contains("uev") || path.contains("_iv") || path.endsWith("_4")) return 4;
-            if (path.contains("mk5") || path.contains("uxv") || path.contains("_v") || path.endsWith("_5")) return 5;
+            if (FUSION_MK2.equals(icon) || START_REFLECTOR_FUSION_II.equals(icon) || GT_REFLECTOR_FUSION_II.equals(icon)) return 2;
+            if (FUSION_MK3.equals(icon) || START_REFLECTOR_FUSION_III.equals(icon) || GT_REFLECTOR_FUSION_III.equals(icon)) return 3;
+            if (FUSION_MK4.equals(icon)) return 4;
+            if (FUSION_MK5.equals(icon)) return 5;
         }
         return 1;
     }

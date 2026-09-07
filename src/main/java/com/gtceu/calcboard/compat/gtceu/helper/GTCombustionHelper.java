@@ -1,7 +1,9 @@
 package com.gtceu.calcboard.compat.gtceu.helper;
 
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
+import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Set;
@@ -36,6 +38,30 @@ public final class GTCombustionHelper {
     public static final ResourceLocation START_T3_COMBUSTION = START_T3_ROCKET;
     public static final ResourceLocation START_T4_COMBUSTION = START_T4_ROCKET;
     public static final ResourceLocation START_MCF = ResourceLocation.tryParse("start_core:modular_combustion_frame");
+
+    public static final ResourceLocation OXYGEN = ResourceLocation.tryParse("gtceu:oxygen");
+    public static final ResourceLocation LIQUID_OXYGEN = ResourceLocation.tryParse("gtceu:liquid_oxygen");
+    public static final ResourceLocation LUBRICANT = ResourceLocation.tryParse("gtceu:lubricant");
+    public static final ResourceLocation TUNGSTEN_DISULFIDE = ResourceLocation.tryParse("gtceu:tungsten_disulfide");
+    public static final ResourceLocation WHITE_FUMING_NITRIC_ACID = ResourceLocation.tryParse("gtceu:white_fuming_nitric_acid");
+    public static final ResourceLocation RED_FUMING_NITRIC_ACID = ResourceLocation.tryParse("gtceu:red_fuming_nitric_acid");
+    public static final ResourceLocation DIOXYGEN_DIFLUORIDE = ResourceLocation.tryParse("gtceu:dioxygen_difluoride");
+    public static final ResourceLocation FERROCENIUM_SUPEROXIDE = ResourceLocation.tryParse("gtceu:ferrocenium_superoxide");
+    public static final ResourceLocation DISTILLED_WATER = ResourceLocation.tryParse("gtceu:distilled_water");
+    public static final ResourceLocation DEIONIZED_WATER = ResourceLocation.tryParse("gtceu:deionized_water");
+
+    public static final Set<ResourceLocation> COMBUSTION_AUXILIARY_FLUIDS = Set.of(
+            OXYGEN,
+            LIQUID_OXYGEN,
+            LUBRICANT,
+            TUNGSTEN_DISULFIDE,
+            WHITE_FUMING_NITRIC_ACID,
+            RED_FUMING_NITRIC_ACID,
+            DIOXYGEN_DIFLUORIDE,
+            FERROCENIUM_SUPEROXIDE,
+            DISTILLED_WATER,
+            DEIONIZED_WATER
+    );
 
     private static final Set<ResourceLocation> SINGLEBLOCK_COMBUSTION_GENERATORS = Set.of(
             LV_COMBUSTION,
@@ -103,31 +129,60 @@ public final class GTCombustionHelper {
         if (node == null) {
             return false;
         }
-        return isCombustionEngine(node.getMachineIcon());
+        if (node.getMachineIcon() != null && isCombustionEngine(node.getMachineIcon())) return true;
+        if (node.getMultiblockWorkstation() != null && isCombustionEngine(node.getMultiblockWorkstation())) return true;
+        return isLargeCombustionEngine(node) || isExtremeCombustionEngine(node) || isStarTModule(node);
     }
 
     public static boolean isLargeCombustionEngine(RecipeNode node) {
-        return node != null && LARGE_COMBUSTION_ENGINE.equals(node.getMachineIcon());
+        if (node == null) return false;
+        if (LARGE_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
+            return true;
+        }
+        if (isStarTModule(node) || isModularCombustionFrame(node)) {
+            return false;
+        }
+        if (LARGE_COMBUSTION_ENGINE.equals(node.getMultiblockWorkstation())) {
+            return true;
+        }
+        return COMBUSTION_CATEGORY_ID.equals(node.getRecipeCategoryId()) && node.isMultiblock() && node.getTargetTier() == com.gtceu.calcboard.api.type.GTVoltageTier.EV;
     }
 
     public static boolean isExtremeCombustionEngine(RecipeNode node) {
-        return node != null && EXTREME_COMBUSTION_ENGINE.equals(node.getMachineIcon());
+        if (node == null) return false;
+        if (EXTREME_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
+            return true;
+        }
+        if (isStarTModule(node) || isModularCombustionFrame(node)) {
+            return false;
+        }
+        if (EXTREME_COMBUSTION_ENGINE.equals(node.getMultiblockWorkstation())) {
+            return true;
+        }
+        return COMBUSTION_CATEGORY_ID.equals(node.getRecipeCategoryId()) && node.isMultiblock() && node.getTargetTier() == com.gtceu.calcboard.api.type.GTVoltageTier.IV;
     }
 
     public static boolean isStarTCombustionModule(RecipeNode node) {
-        return node != null && START_COMBUSTION_MODULES.contains(node.getMachineIcon());
+        if (node == null) return false;
+        return (node.getMachineIcon() != null && START_COMBUSTION_MODULES.contains(node.getMachineIcon()))
+                || (node.getMultiblockWorkstation() != null && START_COMBUSTION_MODULES.contains(node.getMultiblockWorkstation()));
     }
 
     public static boolean isStarTRocketModule(RecipeNode node) {
-        return node != null && START_ROCKET_MODULES.contains(node.getMachineIcon());
+        if (node == null) return false;
+        return (node.getMachineIcon() != null && START_ROCKET_MODULES.contains(node.getMachineIcon()))
+                || (node.getMultiblockWorkstation() != null && START_ROCKET_MODULES.contains(node.getMultiblockWorkstation()));
     }
 
     public static boolean isStarTModule(RecipeNode node) {
-        return node != null && START_MODULES.contains(node.getMachineIcon());
+        if (node == null) return false;
+        return (node.getMachineIcon() != null && START_MODULES.contains(node.getMachineIcon()))
+                || (node.getMultiblockWorkstation() != null && START_MODULES.contains(node.getMultiblockWorkstation()));
     }
 
     public static boolean isModularCombustionFrame(RecipeNode node) {
-        return node != null && START_MCF.equals(node.getMachineIcon());
+        if (node == null) return false;
+        return START_MCF.equals(node.getMachineIcon()) || START_MCF.equals(node.getMultiblockWorkstation());
     }
 
     public static boolean isCombustionMultiblock(com.gtceu.calcboard.api.type.GTVoltageTier tier) {
@@ -220,6 +275,7 @@ public final class GTCombustionHelper {
         if (adapter != null) {
             adapter.onMachineIconChanged(node, oldIcon, targetMachine);
         }
+        syncCombustionInputs(node);
         return true;
     }
 
@@ -319,5 +375,247 @@ public final class GTCombustionHelper {
             return 0.9;
         }
         return 1.0;
+    }
+
+    public static boolean isOxygenBoosted(RecipeNode node) {
+        return node != null && Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.OXYGEN_BOOST));
+    }
+
+    public static boolean isLiquidOxygenBoosted(RecipeNode node) {
+        return node != null && Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LIQUID_OXYGEN_BOOST));
+    }
+
+    public static boolean isOxidizerBoosted(RecipeNode node) {
+        return node != null && isStarTModuleBoosted(node);
+    }
+
+    public static boolean isCoolantBoosted(RecipeNode node) {
+        if (node == null) return false;
+        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        return coolant != null && !coolant.isEmpty() && !"none".equalsIgnoreCase(coolant);
+    }
+
+    public static String getOxidizerDisplayName(String oxidizer) {
+        if (oxidizer == null || "none".equalsIgnoreCase(oxidizer)) return "None";
+        return switch (oxidizer.toLowerCase(java.util.Locale.ROOT)) {
+            case "white_fuming_nitric_acid" -> "WFNA";
+            case "red_fuming_nitric_acid" -> "RFNA";
+            case "dioxygen_difluoride" -> "O₂F₂";
+            case "ferrocenium_superoxide" -> "FcSO₂";
+            default -> oxidizer;
+        };
+    }
+
+    public static String getCoolantDisplayName(String coolant) {
+        if (coolant == null || "none".equalsIgnoreCase(coolant)) return "None";
+        return switch (coolant.toLowerCase(java.util.Locale.ROOT)) {
+            case "distilled_water" -> "Distilled (+20%)";
+            case "deionized_water" -> "Deionized (+40%)";
+            default -> coolant;
+        };
+    }
+
+    public static double getCombustionAuxiliaryRate(RecipeNode node, ResourceLocation fluidId) {
+        if (node == null || fluidId == null || !COMBUSTION_AUXILIARY_FLUIDS.contains(fluidId) || !isCombustionEngine(node)) {
+            return 0.0;
+        }
+        if (isLargeCombustionEngine(node)) {
+            return (OXYGEN.equals(fluidId) && isOxygenBoosted(node)) ? 20.0 : 0.0;
+        }
+        if (isExtremeCombustionEngine(node)) {
+            return (LIQUID_OXYGEN.equals(fluidId) && isLiquidOxygenBoosted(node)) ? 80.0 : 0.0;
+        }
+        if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
+            double coolantRate = getCoolantRate(node, fluidId);
+            if (coolantRate > 0.0) {
+                return coolantRate;
+            }
+            return getStarTModuleAuxiliaryRate(node, fluidId);
+        }
+        if (isModularCombustionFrame(node)) {
+            return getCoolantRate(node, fluidId);
+        }
+        return 0.0;
+    }
+
+    private static double getCoolantRate(RecipeNode node, ResourceLocation fluidId) {
+        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        if ("distilled_water".equalsIgnoreCase(coolant) && DISTILLED_WATER.equals(fluidId)) {
+            return 500000.0 / 3600.0;
+        }
+        if ("deionized_water".equalsIgnoreCase(coolant) && DEIONIZED_WATER.equals(fluidId)) {
+            return 500000.0 / 3600.0;
+        }
+        return 0.0;
+    }
+
+    public static ResourceLocation getExpectedLubricantFluid(RecipeNode node) {
+        if (node == null || node.getMachineIcon() == null) return null;
+        ResourceLocation icon = node.getMachineIcon();
+        if (START_T1_COMBUSTION.equals(icon) || START_T2_COMBUSTION.equals(icon)) return LUBRICANT;
+        if (START_T3_ROCKET.equals(icon) || START_T4_ROCKET.equals(icon)) return TUNGSTEN_DISULFIDE;
+        return null;
+    }
+
+    public static ResourceLocation getExpectedOxidizerFluid(RecipeNode node) {
+        if (node == null || node.getMachineIcon() == null) return null;
+        ResourceLocation icon = node.getMachineIcon();
+        if (START_T1_COMBUSTION.equals(icon)) return WHITE_FUMING_NITRIC_ACID;
+        if (START_T2_COMBUSTION.equals(icon)) return RED_FUMING_NITRIC_ACID;
+        if (START_T3_ROCKET.equals(icon)) return DIOXYGEN_DIFLUORIDE;
+        if (START_T4_ROCKET.equals(icon)) return FERROCENIUM_SUPEROXIDE;
+        return null;
+    }
+
+    public static String getExpectedOxidizerAddonId(RecipeNode node) {
+        if (node == null || node.getMachineIcon() == null) return null;
+        ResourceLocation icon = node.getMachineIcon();
+        if (START_T1_COMBUSTION.equals(icon)) return "start_core:t1_oxidizer_boost";
+        if (START_T2_COMBUSTION.equals(icon)) return "start_core:t2_oxidizer_boost";
+        if (START_T3_ROCKET.equals(icon)) return "start_core:t3_oxidizer_boost";
+        if (START_T4_ROCKET.equals(icon)) return "start_core:t4_oxidizer_boost";
+        return null;
+    }
+
+    public static String getExpectedOxidizerPropertyType(RecipeNode node) {
+        if (node == null || node.getMachineIcon() == null) return null;
+        ResourceLocation icon = node.getMachineIcon();
+        if (START_T1_COMBUSTION.equals(icon)) return "white_fuming_nitric_acid";
+        if (START_T2_COMBUSTION.equals(icon)) return "red_fuming_nitric_acid";
+        if (START_T3_ROCKET.equals(icon)) return "dioxygen_difluoride";
+        if (START_T4_ROCKET.equals(icon)) return "ferrocenium_superoxide";
+        return null;
+    }
+
+    private static double getStarTModuleAuxiliaryRate(RecipeNode node, ResourceLocation fluidId) {
+        ResourceLocation icon = node.getMachineIcon();
+        if (START_T1_COMBUSTION.equals(icon)) {
+            if (LUBRICANT.equals(fluidId)) return 100.0 / 3.6;
+            if (WHITE_FUMING_NITRIC_ACID.equals(fluidId) && isStarTModuleBoosted(node)) return 324.0 / 3.6;
+        } else if (START_T2_COMBUSTION.equals(icon)) {
+            if (LUBRICANT.equals(fluidId)) return 200.0 / 3.6;
+            if (RED_FUMING_NITRIC_ACID.equals(fluidId) && isStarTModuleBoosted(node)) return 432.0 / 3.6;
+        } else if (START_T3_ROCKET.equals(icon)) {
+            if (TUNGSTEN_DISULFIDE.equals(fluidId)) return 200.0 / 3.6;
+            if (DIOXYGEN_DIFLUORIDE.equals(fluidId) && isStarTModuleBoosted(node)) return 756.0 / 3.6;
+        } else if (START_T4_ROCKET.equals(icon)) {
+            if (TUNGSTEN_DISULFIDE.equals(fluidId)) return 400.0 / 3.6;
+            if (FERROCENIUM_SUPEROXIDE.equals(fluidId) && isStarTModuleBoosted(node)) return 864.0 / 3.6;
+        }
+        return 0.0;
+    }
+
+    public static void syncCombustionInputs(RecipeNode node) {
+        if (node == null) {
+            return;
+        }
+        removeCombustionAuxiliaryInputs(node);
+        if (!isCombustionEngine(node)) {
+            return;
+        }
+
+        double durSec = Math.max(0.05, node.getBaseDurationTicks() / 20.0);
+        int parallel = Math.max(1, GTPowerCalculator.computeEffectiveParallel(node));
+
+        if (isLargeCombustionEngine(node)) {
+            if (isOxygenBoosted(node)) {
+                double batchAmount = (20.0 * durSec) / parallel;
+                node.addInput(IngredientStack.fluid(OXYGEN, "Oxygen", batchAmount));
+            }
+        } else if (isExtremeCombustionEngine(node)) {
+            if (isLiquidOxygenBoosted(node)) {
+                double batchAmount = (80.0 * durSec) / parallel;
+                node.addInput(IngredientStack.fluid(LIQUID_OXYGEN, "Liquid Oxygen", batchAmount));
+            }
+        } else if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
+            syncStarTModuleInputs(node, durSec, parallel);
+        } else if (isModularCombustionFrame(node)) {
+            syncCoolantInput(node, durSec, parallel);
+        }
+        node.markOverclockDirty();
+    }
+
+    private static void removeCombustionAuxiliaryInputs(RecipeNode node) {
+        node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && COMBUSTION_AUXILIARY_FLUIDS.contains(in.getId()));
+    }
+
+    private static void syncStarTModuleInputs(RecipeNode node, double durSec, int parallel) {
+        ResourceLocation icon = node.getMachineIcon();
+        if (START_T1_COMBUSTION.equals(icon)) {
+            node.addInput(IngredientStack.fluid(LUBRICANT, "Lubricant", ((100.0 / 3.6) * durSec) / parallel));
+            if (isStarTModuleBoosted(node)) {
+                node.addInput(IngredientStack.fluid(WHITE_FUMING_NITRIC_ACID, "White Fuming Nitric Acid", ((324.0 / 3.6) * durSec) / parallel));
+            }
+        } else if (START_T2_COMBUSTION.equals(icon)) {
+            node.addInput(IngredientStack.fluid(LUBRICANT, "Lubricant", ((200.0 / 3.6) * durSec) / parallel));
+            if (isStarTModuleBoosted(node)) {
+                node.addInput(IngredientStack.fluid(RED_FUMING_NITRIC_ACID, "Red Fuming Nitric Acid", ((432.0 / 3.6) * durSec) / parallel));
+            }
+        } else if (START_T3_ROCKET.equals(icon)) {
+            node.addInput(IngredientStack.fluid(TUNGSTEN_DISULFIDE, "Tungsten Disulfide", ((200.0 / 3.6) * durSec) / parallel));
+            if (isStarTModuleBoosted(node)) {
+                node.addInput(IngredientStack.fluid(DIOXYGEN_DIFLUORIDE, "Dioxygen Difluoride", ((756.0 / 3.6) * durSec) / parallel));
+            }
+        } else if (START_T4_ROCKET.equals(icon)) {
+            node.addInput(IngredientStack.fluid(TUNGSTEN_DISULFIDE, "Tungsten Disulfide", ((400.0 / 3.6) * durSec) / parallel));
+            if (isStarTModuleBoosted(node)) {
+                node.addInput(IngredientStack.fluid(FERROCENIUM_SUPEROXIDE, "Ferrocenium Superoxide", ((864.0 / 3.6) * durSec) / parallel));
+            }
+        }
+        syncCoolantInput(node, durSec, parallel);
+    }
+
+    private static void syncCoolantInput(RecipeNode node, double durSec, int parallel) {
+        String coolant = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        double coolantRate = 500000.0 / 3600.0;
+        double batchAmount = (coolantRate * durSec) / parallel;
+        if ("distilled_water".equalsIgnoreCase(coolant)) {
+            node.addInput(IngredientStack.fluid(DISTILLED_WATER, "Distilled Water", batchAmount));
+        } else if ("deionized_water".equalsIgnoreCase(coolant)) {
+            node.addInput(IngredientStack.fluid(DEIONIZED_WATER, "Deionized Water", batchAmount));
+        }
+    }
+
+    public static void ensureCombustionInputs(RecipeNode node) {
+        if (node == null || !isCombustionEngine(node)) {
+            return;
+        }
+        if (areCombustionInputsOutOfSync(node)) {
+            syncCombustionInputs(node);
+        }
+    }
+
+    public static boolean areCombustionInputsOutOfSync(RecipeNode node) {
+        if (node == null || !isCombustionEngine(node)) {
+            return false;
+        }
+        if (isLargeCombustionEngine(node)) {
+            return isOxygenBoosted(node) != hasAuxiliaryFluid(node, OXYGEN);
+        }
+        if (isExtremeCombustionEngine(node)) {
+            return isLiquidOxygenBoosted(node) != hasAuxiliaryFluid(node, LIQUID_OXYGEN);
+        }
+        if (isStarTCombustionModule(node) || isStarTRocketModule(node)) {
+            ResourceLocation expectedLube = getExpectedLubricantFluid(node);
+            if (expectedLube != null && !hasAuxiliaryFluid(node, expectedLube)) {
+                return true;
+            }
+            ResourceLocation expectedOx = getExpectedOxidizerFluid(node);
+            boolean hasOx = expectedOx != null && hasAuxiliaryFluid(node, expectedOx);
+            if (isStarTModuleBoosted(node) != hasOx) {
+                return true;
+            }
+        }
+        boolean hasCoolant = hasAuxiliaryFluid(node, DISTILLED_WATER) || hasAuxiliaryFluid(node, DEIONIZED_WATER);
+        return isCoolantBoosted(node) != hasCoolant;
+    }
+
+    private static boolean hasAuxiliaryFluid(RecipeNode node, ResourceLocation fluidId) {
+        for (IngredientStack in : node.getInputs()) {
+            if (in.isFluid() && fluidId.equals(in.getId())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

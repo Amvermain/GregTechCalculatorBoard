@@ -63,6 +63,8 @@ public class MachineAddon {
     private boolean upgradeTierKit = false;
     private int magneticForce = 0;
     private String discoverySource;
+    private transient String cachedResolvedName;
+    private transient String cachedResolvedDescription;
 
     public MachineAddon(String id, String name, AddonCategory category, String description, ResourceLocation itemIcon) {
         this.id = id;
@@ -94,6 +96,14 @@ public class MachineAddon {
     }
 
     public String getName() {
+        if (cachedResolvedName != null) {
+            return cachedResolvedName;
+        }
+        cachedResolvedName = resolveName();
+        return cachedResolvedName;
+    }
+
+    private String resolveName() {
         if ("gtceu:rotor_standard".equals(id) || "gtceu:reflector_none".equals(id)) {
             if (name != null && !name.isEmpty()) {
                 if (name.startsWith("gui.gtcalcboard.") || name.contains(".")) {
@@ -145,6 +155,7 @@ public class MachineAddon {
 
     public void setName(String name) {
         this.name = name;
+        this.cachedResolvedName = null;
     }
 
     public AddonCategory getCategory() {
@@ -156,6 +167,14 @@ public class MachineAddon {
     }
 
     public String getDescription() {
+        if (cachedResolvedDescription != null) {
+            return cachedResolvedDescription;
+        }
+        cachedResolvedDescription = resolveDescription();
+        return cachedResolvedDescription;
+    }
+
+    private String resolveDescription() {
         if (description != null && !description.trim().isEmpty()) {
             if (description.startsWith("gui.gtcalcboard.") || description.startsWith("item.") || description.startsWith("block.")) {
                 try {
@@ -209,6 +228,7 @@ public class MachineAddon {
 
     public void setDescription(String description) {
         this.description = description;
+        this.cachedResolvedDescription = null;
     }
 
     public ResourceLocation getItemIcon() {
@@ -217,6 +237,8 @@ public class MachineAddon {
 
     public void setItemIcon(ResourceLocation itemIcon) {
         this.itemIcon = itemIcon;
+        this.cachedResolvedName = null;
+        this.cachedResolvedDescription = null;
     }
 
     public ItemStack getItemStackSample() {
@@ -242,6 +264,8 @@ public class MachineAddon {
 
     public void setItemStackSample(ItemStack itemStackSample) {
         this.itemStackSample = itemStackSample;
+        this.cachedResolvedName = null;
+        this.cachedResolvedDescription = null;
     }
 
     public double getDurationMultiplier() {
@@ -302,6 +326,10 @@ public class MachineAddon {
 
     public static boolean isTurbineMachine(RecipeNode node) {
         return node != null && node.isTurbine();
+    }
+
+    public static boolean isCombustionMachine(RecipeNode node) {
+        return com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node);
     }
 
     public static boolean isThermalMachine(RecipeNode node) {

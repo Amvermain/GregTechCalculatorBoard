@@ -11,6 +11,12 @@ import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.Holder;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -30,6 +36,10 @@ public final class BoardHotkeyHandler {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             if (screen.getCanvasHandler() != null && screen.getCanvasHandler().getContextMenuManager().isOpen()) {
                 screen.getCanvasHandler().getContextMenuManager().close();
+                return true;
+            }
+            if (screen.getToolbarWidget() != null && screen.getToolbarWidget().isOverflowMenuOpen()) {
+                screen.getToolbarWidget().closeDropdown();
                 return true;
             }
             if (screen.getCanvasHandler() != null && screen.getCanvasHandler().isDraggingWire()) {
@@ -134,10 +144,33 @@ public final class BoardHotkeyHandler {
             }
         }
 
-        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
-            if (handleControlHotkeys(screen, keyCode, modifiers, lastMouseX, lastMouseY)) {
-                return true;
-            }
+        boolean isControl = isControlDown(modifiers);
+        boolean isAlt = isAltDown(modifiers);
+        boolean isShift = isShiftDown(modifiers);
+
+        if (isControl && handleControlHotkeys(screen, keyCode, modifiers, lastMouseX, lastMouseY)) {
+            return true;
+        }
+
+        if (isAlt && handleAltHotkeys(screen, keyCode, isShift, isControl)) {
+            return true;
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_C && isShift && !isControl && !isAlt) {
+            closePopups(screen);
+            screen.getToolbarWidget().performAutoConnect();
+            return true;
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_G && !isControl && !isAlt && !isShift) {
+            boolean snap = !BoardManager.getInstance().isGridSnapEnabled();
+            BoardManager.getInstance().setGridSnapEnabled(snap);
+            BoardManager.getInstance().saveForCurrentContext();
+            BoardToast.show(net.minecraft.network.chat.Component.literal(snap ? "§a▦ " : "§7▦ ")
+                    .append(net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toolbar.grid_snap"))
+                    .append(": " + (snap ? "ON" : "OFF")));
+            playUiSound(SoundEvents.UI_BUTTON_CLICK, 1.0F);
+            return true;
         }
 
         if (keyCode == GLFW.GLFW_KEY_TAB && modifiers == 0) {
@@ -148,7 +181,7 @@ public final class BoardHotkeyHandler {
         }
 
         // 4.5 Insert Junction at Cursor: J
-        if (keyCode == GLFW.GLFW_KEY_J && (modifiers & GLFW.GLFW_MOD_CONTROL) == 0) {
+        if (keyCode == GLFW.GLFW_KEY_J && !isControl && !isAlt) {
             screen.addRerouteNodeAt(screen.toCanvasX(lastMouseX), screen.toCanvasY(lastMouseY));
             return true;
         }
@@ -162,7 +195,7 @@ public final class BoardHotkeyHandler {
         }
 
         // 6. Recipe lookup under cursor [R] / [U] (EMI, JEI, etc.)
-        if (keyCode == GLFW.GLFW_KEY_R || keyCode == GLFW.GLFW_KEY_U) {
+        if (!isControl && !isAlt && (keyCode == GLFW.GLFW_KEY_R || keyCode == GLFW.GLFW_KEY_U)) {
             double canvasMouseX = screen.toCanvasX(lastMouseX);
             double canvasMouseY = screen.toCanvasY(lastMouseY);
             List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
@@ -238,9 +271,7 @@ public final class BoardHotkeyHandler {
                     net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.toast.time_unit_changed", next.getSuffix(), net.minecraft.network.chat.Component.translatable(next.getTranslationKey()).getString())
                 ));
             }
-            net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F)
-            );
+            playUiSound(SoundEvents.UI_BUTTON_CLICK, 1.0F);
             screen.markSummaryDirty();
             return true;
         }
@@ -292,9 +323,28 @@ public final class BoardHotkeyHandler {
         return isW || isS || isA || isD;
     }
 
+    private static boolean isControlDown(int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) return true;
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasControlDown();
+    }
+
+    private static boolean isAltDown(int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_ALT) != 0) return true;
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasAltDown();
+    }
+
+    private static boolean isShiftDown(int modifiers) {
+        if ((modifiers & GLFW.GLFW_MOD_SHIFT) != 0) return true;
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasShiftDown();
+    }
+
     private static boolean handleControlHotkeys(BoardScreen screen, int keyCode, int modifiers, double lastMouseX, double lastMouseY) {
-        boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
+        boolean shift = isShiftDown(modifiers);
         if (keyCode == GLFW.GLFW_KEY_K || keyCode == GLFW.GLFW_KEY_P) {
+            closePopups(screen);
             screen.openQuickPageSwitcher();
             return true;
         }
@@ -343,12 +393,49 @@ public final class BoardHotkeyHandler {
             String toastKey = enabled ? "gui.gtcalcboard.toast.debug_enabled" : "gui.gtcalcboard.toast.debug_disabled";
             BoardToast.show(net.minecraft.network.chat.Component.literal(enabled ? "§a⚙ " : "§7⚙ ")
                     .append(net.minecraft.network.chat.Component.translatable(toastKey)));
-            net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F)
-            );
+            playUiSound(SoundEvents.UI_BUTTON_CLICK, 1.0F);
             return true;
         }
         return false;
+    }
+
+    private static boolean handleAltHotkeys(BoardScreen screen, int keyCode, boolean isShift, boolean isControl) {
+        if (isControl) return false;
+
+        if (keyCode == GLFW.GLFW_KEY_R) {
+            closePopups(screen);
+            if (isShift) {
+                screen.getToolbarWidget().performAutoRatio(false, true);
+            } else {
+                screen.getToolbarWidget().performAutoRatio(false, false);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void closePopups(BoardScreen screen) {
+        if (screen == null) return;
+        if (screen.getToolbarWidget() != null && screen.getToolbarWidget().isOverflowMenuOpen()) {
+            screen.getToolbarWidget().closeDropdown();
+        }
+        if (screen.getCanvasHandler() != null && screen.getCanvasHandler().getContextMenuManager().isOpen()) {
+            screen.getCanvasHandler().getContextMenuManager().close();
+        }
+    }
+
+    private static void playUiSound(SoundEvent sound, float pitch) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null && sound != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch));
+        }
+    }
+
+    private static void playUiSound(Holder<SoundEvent> sound, float pitch) {
+        if (sound != null && sound.isBound()) {
+            playUiSound(sound.value(), pitch);
+        }
     }
 
     private static boolean handleHoveredRecipeLookup(NodeWidget widget, double canvasX, double canvasY, int keyCode) {

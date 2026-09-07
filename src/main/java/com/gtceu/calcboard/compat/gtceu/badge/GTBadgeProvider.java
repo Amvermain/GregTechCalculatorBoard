@@ -29,7 +29,7 @@ public final class GTBadgeProvider {
         NodeBadgeRegistry.register((node, store) -> {
             if (node == null || store == null) return List.of();
             long startEU = store.get(GTCEuProperties.FUSION_START_EU);
-            boolean isFusionCat = node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion_reactor");
+            boolean isFusionCat = com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.isFusionCategory(node.getRecipeCategoryId());
             if (startEU <= 0 && !isFusionCat && !node.isFusion()) return List.of();
 
             GTVoltageTier ctrlTier = GTCEuModAdapter.extractVoltageTierFromIcon(node.getMachineIcon());
@@ -191,6 +191,52 @@ public final class GTBadgeProvider {
                 return List.of(new NodeBadge(badgeText, 0xFFFFAA00, 0xEE3D2E1E, 0xFFFFAA00, tooltip));
             }
             return List.of();
+        });
+
+        // 6. Combustion Engine Boost Badge Provider
+        NodeBadgeRegistry.register((node, store) -> {
+            if (node == null || store == null) return List.of();
+            if (!com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node)) return List.of();
+
+            List<NodeBadge> badges = new ArrayList<>();
+            if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isOxygenBoosted(node)) {
+                List<Component> tt = List.of(
+                        Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.oxygen_boost").getString()),
+                        Component.literal("§7" + Component.translatable("gui.gtcalcboard.addon.oxygen_boost.desc").getString()),
+                        Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.node_badge.oxygen_boost").getString())
+                );
+                badges.add(new NodeBadge("💨 Boost (3.0x)", 0xFF55FFAA, 0xEE1E3D2D, 0xFF55FFAA, tt));
+            } else if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isLiquidOxygenBoosted(node)) {
+                List<Component> tt = List.of(
+                        Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost").getString()),
+                        Component.literal("§7" + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost.desc").getString()),
+                        Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.node_badge.liquid_oxygen_boost").getString())
+                );
+                badges.add(new NodeBadge("💨 Boost (4.0x)", 0xFF55FFAA, 0xEE1E3D2D, 0xFF55FFAA, tt));
+            }
+
+            if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isOxidizerBoosted(node)) {
+                String ox = store.get(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE);
+                String oxName = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getOxidizerDisplayName(ox);
+                List<Component> tt = List.of(
+                        Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.tooltip.oxidizer_boost").getString()),
+                        Component.literal("§7Oxidizer: §f" + oxName),
+                        Component.literal("§a✔ 2x Fuel, Amp Boost")
+                );
+                badges.add(new NodeBadge("💨 " + oxName, 0xFF55FFAA, 0xEE1E3D2D, 0xFF55FFAA, tt));
+            }
+
+            if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCoolantBoosted(node)) {
+                String cl = store.get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+                String clName = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getCoolantDisplayName(cl);
+                List<Component> tt = List.of(
+                        Component.literal("§b❄ " + Component.translatable("gui.gtcalcboard.tooltip.coolant_boost").getString()),
+                        Component.literal("§7Coolant: §f" + clName)
+                );
+                badges.add(new NodeBadge("❄ " + clName, 0xFF58D3FF, 0xEE1E2E3D, 0xFF58D3FF, tt));
+            }
+
+            return badges;
         });
     }
 }

@@ -25,12 +25,14 @@ public class MultiblockStructureCatalog {
 
     private static final Map<ResourceLocation, MultiblockStructureDef> STRUCTURES = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, List<MultiblockStructureDef>> STRUCTURE_VARIANTS = new ConcurrentHashMap<>();
+    private static final Set<ResourceLocation> NEGATIVE_CACHE = ConcurrentHashMap.newKeySet();
     private static volatile boolean initialized = false;
     private static volatile boolean initializing = false;
 
     public static void clear() {
         STRUCTURES.clear();
         STRUCTURE_VARIANTS.clear();
+        NEGATIVE_CACHE.clear();
         initialized = false;
         initializing = false;
     }
@@ -39,6 +41,7 @@ public class MultiblockStructureCatalog {
         if (id == null) return;
         STRUCTURES.remove(id);
         STRUCTURE_VARIANTS.remove(id);
+        NEGATIVE_CACHE.remove(id);
     }
 
     public static boolean isInitialized() {
@@ -99,6 +102,7 @@ public class MultiblockStructureCatalog {
 
     public static void registerManualStructure(MultiblockStructureDef def) {
         if (def != null && def.controllerId() != null) {
+            NEGATIVE_CACHE.remove(def.controllerId());
             STRUCTURES.put(def.controllerId(), def);
             STRUCTURE_VARIANTS.computeIfAbsent(def.controllerId(), k -> new ArrayList<>()).add(def);
         }
@@ -107,12 +111,14 @@ public class MultiblockStructureCatalog {
     public static void registerStructure(MultiblockStructureDef canonicalDef, List<MultiblockStructureDef> variants) {
         if (canonicalDef == null || canonicalDef.controllerId() == null) return;
         ResourceLocation controllerId = canonicalDef.controllerId();
+        NEGATIVE_CACHE.remove(controllerId);
         STRUCTURES.put(controllerId, canonicalDef);
         if (variants != null && !variants.isEmpty()) {
             STRUCTURE_VARIANTS.put(controllerId, variants);
         }
         ResourceLocation infoAlias = ResourceLocation.tryParse(controllerId.getNamespace() + ":multiblock_info/" + controllerId.getPath());
         if (infoAlias != null) {
+            NEGATIVE_CACHE.remove(infoAlias);
             STRUCTURES.put(infoAlias, canonicalDef);
             if (variants != null && !variants.isEmpty()) {
                 STRUCTURE_VARIANTS.put(infoAlias, variants);
@@ -143,8 +149,15 @@ public class MultiblockStructureCatalog {
         if (id == null) return null;
         MultiblockStructureDef def = getStructureCached(id);
         if (def != null) return def;
+        if (NEGATIVE_CACHE.contains(id)) return null;
 
-        return scanStructureFromAdapters(id);
+        MultiblockStructureDef scanned = scanStructureFromAdapters(id);
+        if (scanned != null) {
+            STRUCTURES.put(id, scanned);
+            return scanned;
+        }
+        NEGATIVE_CACHE.add(id);
+        return null;
     }
 
     private static MultiblockStructureDef scanStructureFromAdapters(ResourceLocation id) {

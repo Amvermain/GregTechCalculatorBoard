@@ -17,82 +17,40 @@ public final class ProductionETACalculator {
     /**
      * Calculates the net inflow rate (units per second) into a specific input port of the target node.
      */
-    private record SupplyHop(String nodeId, int inIdx, double weight) {}
-
     public static double calculateNetInflowRate(FlowGraph graph, RecipeNode targetNode, int inputPortIndex) {
         if (graph == null || targetNode == null) return 0.0;
         if (targetNode.isReroute() && targetNode.isInfiniteSupply()) {
             return Double.POSITIVE_INFINITY;
         }
 
-        Queue<SupplyHop> queue = new ArrayDeque<>();
-        Set<String> visited = new HashSet<>();
-
-        queue.add(new SupplyHop(targetNode.getId(), inputPortIndex, 1.0));
-        visited.add(targetNode.getId() + ":" + inputPortIndex);
-
         double totalIncomingSupply = targetNode.isReroute() && targetNode.isExternalSupply()
                 ? targetNode.getExternalSupplyRate()
                 : 0.0;
 
-        while (!queue.isEmpty()) {
-            SupplyHop hop = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (!edge.toNodeId().equals(hop.nodeId) || edge.inputIndex() != hop.inIdx) {
-                    continue;
-                }
-                totalIncomingSupply += processSupplyEdge(graph, edge, hop, queue, visited);
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(targetNode.getId()) || edge.inputIndex() != inputPortIndex) {
+                continue;
             }
+            RecipeNode producer = graph.findNodeById(edge.fromNodeId());
+            if (producer == null) continue;
+            if (isInfiniteProducer(graph, producer, new HashSet<>())) {
+                return Double.POSITIVE_INFINITY;
+            }
+            totalIncomingSupply += FlowEdgeAllocator.getEdgeAllocatedFlow(graph, edge, null);
         }
         return totalIncomingSupply;
     }
 
-    private static double processSupplyEdge(FlowGraph graph, FlowGraph.ConnectionEdge edge, SupplyHop hop, Queue<SupplyHop> queue, Set<String> visited) {
-        RecipeNode p = graph.findNodeById(edge.fromNodeId());
-        if (p == null) return 0.0;
-
-        if (p.isReroute()) {
-            if (p.isInfiniteSupply()) {
-                return Double.POSITIVE_INFINITY;
-            }
-            if (p.isExternalSupply()) {
-                int outDegree = countProducerPortOutDegree(graph, p.getId(), 0);
-                return (p.getExternalSupplyRate() * hop.weight) / Math.max(1, outDegree);
-            }
-            enqueueRerouteHop(graph, p, hop.weight, queue, visited);
-            return 0.0;
+    private static boolean isInfiniteProducer(FlowGraph graph, RecipeNode producer, Set<String> visited) {
+        if (producer == null || !visited.add(producer.getId())) return false;
+        if (producer.isInfiniteSupply()) return true;
+        if (!producer.isReroute()) return false;
+        for (FlowGraph.ConnectionEdge inEdge : graph.getConnections()) {
+            if (!inEdge.toNodeId().equals(producer.getId()) || inEdge.inputIndex() != 0) continue;
+            RecipeNode upstream = graph.findNodeById(inEdge.fromNodeId());
+            if (isInfiniteProducer(graph, upstream, visited)) return true;
         }
-        if (edge.outputIndex() >= p.getOutputs().size() || !p.isOperational(graph)) {
-            return 0.0;
-        }
-
-        IngredientStack outStack = p.getOutputs().get(edge.outputIndex());
-        double pRate = p.calculateSingleMachineOutputRate(outStack) * p.getMachineCount() * p.getEfficiency();
-        int outDegree = countProducerPortOutDegree(graph, p.getId(), edge.outputIndex());
-        return (pRate * hop.weight) / Math.max(1, outDegree);
-    }
-
-    private static void enqueueRerouteHop(FlowGraph graph, RecipeNode p, double currentWeight, Queue<SupplyHop> queue, Set<String> visited) {
-        int outDegree = 0;
-        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-            if (outEdge.fromNodeId().equals(p.getId())) {
-                outDegree++;
-            }
-        }
-        double nextWeight = currentWeight / Math.max(1, outDegree);
-        if (visited.add(p.getId() + ":0")) {
-            queue.add(new SupplyHop(p.getId(), 0, nextWeight));
-        }
-    }
-
-    private static int countProducerPortOutDegree(FlowGraph graph, String producerId, int outputIndex) {
-        int outDegree = 0;
-        for (FlowGraph.ConnectionEdge outEdge : graph.getConnections()) {
-            if (outEdge.fromNodeId().equals(producerId) && outEdge.outputIndex() == outputIndex) {
-                outDegree++;
-            }
-        }
-        return outDegree;
+        return false;
     }
 
     private static final double EPSILON = 1e-7;

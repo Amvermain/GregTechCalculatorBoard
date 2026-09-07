@@ -2,6 +2,7 @@ package com.gtceu.calcboard.compat.gtceu;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
@@ -311,20 +312,20 @@ public class CombustionAndGeneratorOverclockTest {
 
         // LuV (Unreal Combustion Module)
         RecipeNode luv = new RecipeNode("n-luv", "UCM", 100.0, -32.0, GTVoltageTier.LuV);
+        luv.getInputs().add(hogInput);
         luv.setMachineIcon(GTCombustionHelper.START_T1_COMBUSTION);
         luv.setGenerator(true);
         luv.setMultiblock(true);
-        luv.getInputs().add(hogInput);
         Assertions.assertEquals(1024, GTPowerCalculator.computeEffectiveParallel(luv));
         Assertions.assertEquals(32768.0, GTPowerCalculator.computeSingleMachinePower(luv), 0.001);
         Assertions.assertEquals(10.24, luv.getInputSlotRate(0, false) / 20.0, 0.0001); // mB/t
 
         // ZPM (Supreme Combustion Module)
         RecipeNode zpm = new RecipeNode("n-zpm", "SCM", 100.0, -32.0, GTVoltageTier.ZPM);
+        zpm.getInputs().add(hogInput);
         zpm.setMachineIcon(GTCombustionHelper.START_T2_COMBUSTION);
         zpm.setGenerator(true);
         zpm.setMultiblock(true);
-        zpm.getInputs().add(hogInput);
         Assertions.assertEquals(4096, GTPowerCalculator.computeEffectiveParallel(zpm));
         Assertions.assertEquals(131072.0, GTPowerCalculator.computeSingleMachinePower(zpm), 0.001);
         Assertions.assertEquals(40.96, zpm.getInputSlotRate(0, false) / 20.0, 0.0001); // mB/t
@@ -440,5 +441,228 @@ public class CombustionAndGeneratorOverclockTest {
         Assertions.assertTrue(adapter.supportsAddons(eceNode));
         Assertions.assertFalse(adapter.isAddonCompatible(eceNode, oxygenBoost));
         Assertions.assertTrue(adapter.isAddonCompatible(eceNode, liquidOxygenBoost));
+    }
+
+    @Test
+    @DisplayName("Test LCE and ECE Never Classified as Turbine and Never Accept Rotors")
+    public void testCombustionEnginesNeverAcceptRotors() {
+        RecipeNode lce = new RecipeNode("test-lce", "Large Combustion Engine", 100.0, -160.0, GTVoltageTier.EV);
+        lce.setMachineIcon(GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        lce.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
+        adapter.onMachineIconChanged(lce, null, GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+
+        RecipeNode ece = new RecipeNode("test-ece", "Extreme Combustion Engine", 100.0, -160.0, GTVoltageTier.IV);
+        ece.setMachineIcon(GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
+        ece.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
+        adapter.onMachineIconChanged(ece, null, GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
+
+        Assertions.assertFalse(lce.isTurbine(), "LCE must never be classified as a turbine");
+        Assertions.assertFalse(ece.isTurbine(), "ECE must never be classified as a turbine");
+        Assertions.assertFalse(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(lce), "GTTurbineHelper.isTurbine(LCE) must be false");
+        Assertions.assertFalse(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(ece), "GTTurbineHelper.isTurbine(ECE) must be false");
+
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.supportsTurbineRotor(GTCombustionHelper.LARGE_COMBUSTION_ENGINE, null));
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.supportsTurbineRotor(GTCombustionHelper.EXTREME_COMBUSTION_ENGINE, null));
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.supportsTurbineRotor(GTCombustionHelper.START_T1_COMBUSTION, null));
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.isTurbineMachine(GTCombustionHelper.LARGE_COMBUSTION_ENGINE));
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.isTurbineMachine(GTCombustionHelper.EXTREME_COMBUSTION_ENGINE));
+        Assertions.assertFalse(com.gtceu.calcboard.api.catalog.MultiblockDetector.isTurbineRecipeCategory(ResourceLocation.tryParse("gtceu:combustion_generator")));
+
+        MachineAddon dummyRotor = new MachineAddon("gtceu:test_rotor", "Test Rotor", MachineAddon.Category.ROTOR, "desc", null);
+        Assertions.assertFalse(adapter.isAddonCompatible(lce, dummyRotor), "LCE must reject rotor addons");
+        Assertions.assertFalse(adapter.isAddonCompatible(ece, dummyRotor), "ECE must reject rotor addons");
+
+        MachineAddon oxygenBoost = MachineAddonCatalog.getInstance().getAddon("gtceu:oxygen_boost");
+        MachineAddon liquidOxygenBoost = MachineAddonCatalog.getInstance().getAddon("gtceu:liquid_oxygen_boost");
+        Assertions.assertNotNull(oxygenBoost);
+        Assertions.assertNotNull(liquidOxygenBoost);
+
+        Assertions.assertTrue(adapter.isAddonCompatible(lce, oxygenBoost), "LCE must accept oxygen boost");
+        Assertions.assertTrue(adapter.isAddonCompatible(ece, liquidOxygenBoost), "ECE must accept liquid oxygen boost");
+
+        var lceCats = adapter.getApplicableAddonCategories(lce);
+        Assertions.assertFalse(lceCats.contains(MachineAddon.Category.ROTOR), "LCE applicable categories must not contain ROTOR");
+        Assertions.assertTrue(lceCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT), "LCE must contain MULTIBLOCK_TRAIT");
+
+        var eceCats = adapter.getApplicableAddonCategories(ece);
+        Assertions.assertFalse(eceCats.contains(MachineAddon.Category.ROTOR), "ECE applicable categories must not contain ROTOR");
+        Assertions.assertTrue(eceCats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MULTIBLOCK_TRAIT), "ECE must contain MULTIBLOCK_TRAIT");
+    }
+
+    @Test
+    @DisplayName("Test Large Combustion Engine Oxygen Boost Input Slot Generation and Removal")
+    public void testLargeCombustionEngineOxygenBoostInputSlotSync() {
+        RecipeNode lce = new RecipeNode("test-lce", "LCE", 100.0, -32.0, GTVoltageTier.EV);
+        lce.setMachineIcon(GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        lce.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
+        lce.setGenerator(true);
+        lce.setMultiblock(true);
+        IngredientStack fuel = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diesel"), "Diesel", 1.0);
+        lce.addInput(fuel);
+        adapter.onMachineIconChanged(lce, null, GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+
+        Assertions.assertEquals(1, lce.getInputs().size());
+        Assertions.assertEquals(fuel, lce.getInputs().get(0));
+
+        MachineAddon oxygenBoost = MachineAddonCatalog.getInstance().getAddon("gtceu:oxygen_boost");
+        Assertions.assertNotNull(oxygenBoost);
+        adapter.onAddonInstalled(lce, oxygenBoost);
+
+        Assertions.assertEquals(2, lce.getInputs().size());
+        IngredientStack o2 = lce.getInputs().get(1);
+        Assertions.assertEquals(GTCombustionHelper.OXYGEN, o2.getId());
+        Assertions.assertEquals(20.0, lce.getInputSlotRate(1, false), 0.001);
+
+        lce.setMachineCount(2.0);
+        Assertions.assertEquals(40.0, lce.getInputSlotRate(1, false), 0.001);
+
+        adapter.onAddonRemoved(lce, oxygenBoost);
+        Assertions.assertEquals(1, lce.getInputs().size());
+        Assertions.assertEquals(fuel, lce.getInputs().get(0));
+    }
+
+    @Test
+    @DisplayName("Test Extreme Combustion Engine Liquid Oxygen Boost Input Slot Generation and Removal")
+    public void testExtremeCombustionEngineLiquidOxygenBoostInputSlotSync() {
+        RecipeNode ece = new RecipeNode("test-ece", "ECE", 100.0, -32.0, GTVoltageTier.IV);
+        ece.setMachineIcon(GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
+        ece.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
+        ece.setGenerator(true);
+        ece.setMultiblock(true);
+        IngredientStack fuel = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:bio_diesel"), "Bio Diesel", 1.0);
+        ece.addInput(fuel);
+        adapter.onMachineIconChanged(ece, null, GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
+
+        Assertions.assertEquals(1, ece.getInputs().size());
+        Assertions.assertEquals(fuel, ece.getInputs().get(0));
+
+        MachineAddon loxBoost = MachineAddonCatalog.getInstance().getAddon("gtceu:liquid_oxygen_boost");
+        Assertions.assertNotNull(loxBoost);
+        adapter.onAddonInstalled(ece, loxBoost);
+
+        Assertions.assertEquals(2, ece.getInputs().size());
+        IngredientStack lox = ece.getInputs().get(1);
+        Assertions.assertEquals(GTCombustionHelper.LIQUID_OXYGEN, lox.getId());
+        Assertions.assertEquals(80.0, ece.getInputSlotRate(1, false), 0.001);
+
+        ece.setMachineCount(3.0);
+        Assertions.assertEquals(240.0, ece.getInputSlotRate(1, false), 0.001);
+
+        adapter.onAddonRemoved(ece, loxBoost);
+        Assertions.assertEquals(1, ece.getInputs().size());
+        Assertions.assertEquals(fuel, ece.getInputs().get(0));
+    }
+
+    @Test
+    @DisplayName("Test StarT Combustion Module Auxiliary Inputs Sync and Machine Switching")
+    public void testStarTCombustionModuleAuxiliaryInputs() {
+        RecipeNode ucm = new RecipeNode("test-ucm", "UCM", 100.0, -32.0, GTVoltageTier.LuV);
+        ucm.setMachineIcon(GTCombustionHelper.START_T1_COMBUSTION);
+        ucm.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
+        ucm.setGenerator(true);
+        ucm.setMultiblock(true);
+        IngredientStack fuel = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diesel"), "Diesel", 1.0);
+        ucm.addInput(fuel);
+        adapter.onMachineIconChanged(ucm, null, GTCombustionHelper.START_T1_COMBUSTION);
+
+        Assertions.assertEquals(2, ucm.getInputs().size());
+        Assertions.assertEquals(fuel, ucm.getInputs().get(0));
+        Assertions.assertEquals(GTCombustionHelper.LUBRICANT, ucm.getInputs().get(1).getId());
+        Assertions.assertEquals(100.0 / 3.6, ucm.getInputSlotRate(1, false), 0.001);
+
+        MachineAddon oxidizer = MachineAddonCatalog.getInstance().getAddon("start_core:t1_oxidizer_boost");
+        Assertions.assertNotNull(oxidizer);
+        adapter.onAddonInstalled(ucm, oxidizer);
+        Assertions.assertEquals(3, ucm.getInputs().size());
+        Assertions.assertEquals(GTCombustionHelper.LUBRICANT, ucm.getInputs().get(1).getId());
+        Assertions.assertEquals(GTCombustionHelper.WHITE_FUMING_NITRIC_ACID, ucm.getInputs().get(2).getId());
+        Assertions.assertEquals(100.0 / 3.6, ucm.getInputSlotRate(1, false), 0.001);
+        Assertions.assertEquals(324.0 / 3.6, ucm.getInputSlotRate(2, false), 0.001);
+
+        MachineAddon coolant = MachineAddonCatalog.getInstance().getAddon("start_core:distilled_water_coolant");
+        Assertions.assertNotNull(coolant);
+        adapter.onAddonInstalled(ucm, coolant);
+
+        Assertions.assertEquals(4, ucm.getInputs().size());
+        Assertions.assertEquals(GTCombustionHelper.DISTILLED_WATER, ucm.getInputs().get(3).getId());
+        Assertions.assertEquals(500000.0 / 3600.0, ucm.getInputSlotRate(3, false), 0.001);
+
+        adapter.onAddonRemoved(ucm, oxidizer);
+        Assertions.assertEquals(3, ucm.getInputs().size());
+        Assertions.assertEquals(GTCombustionHelper.LUBRICANT, ucm.getInputs().get(1).getId());
+        Assertions.assertEquals(GTCombustionHelper.DISTILLED_WATER, ucm.getInputs().get(2).getId());
+
+        adapter.onMachineIconChanged(ucm, GTCombustionHelper.START_T1_COMBUSTION, GTCombustionHelper.LV_COMBUSTION_GENERATOR);
+        Assertions.assertEquals(1, ucm.getInputs().size());
+        Assertions.assertEquals(fuel, ucm.getInputs().get(0));
+    }
+
+    @Test
+    @DisplayName("Test StarT Supreme Rocket Module T3 WS2 Lubricant and O2F2 Boosting")
+    public void testStarTSupremeRocketModuleT3AuxiliaryInputs() {
+        RecipeNode srm = new RecipeNode("test-srm", "SRM", 20.0, -524288.0, GTVoltageTier.UV);
+        srm.setMachineIcon(GTCombustionHelper.START_T3_ROCKET);
+        srm.setRecipeCategoryId(ResourceLocation.tryParse("start_core:modular_rocket_module"));
+        srm.setGenerator(true);
+        srm.setMultiblock(true);
+        IngredientStack rocketFuel = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:rocket_fuel"), "Rocket Fuel", 1000.0);
+        srm.addInput(rocketFuel);
+        adapter.onMachineIconChanged(srm, null, GTCombustionHelper.START_T3_ROCKET);
+
+        Assertions.assertEquals(2, srm.getInputs().size());
+        Assertions.assertEquals(rocketFuel, srm.getInputs().get(0));
+        Assertions.assertEquals(GTCombustionHelper.TUNGSTEN_DISULFIDE, srm.getInputs().get(1).getId());
+        Assertions.assertEquals(200.0 / 3.6, srm.getInputSlotRate(1, false), 0.001);
+        Assertions.assertEquals(1048576.0, GTPowerCalculator.computeSingleMachinePower(srm), 0.001);
+
+        MachineAddon t3Boost = MachineAddonCatalog.getInstance().getAddon("start_core:t3_oxidizer_boost");
+        Assertions.assertNotNull(t3Boost);
+        adapter.onAddonInstalled(srm, t3Boost);
+
+        Assertions.assertEquals(3, srm.getInputs().size());
+        Assertions.assertEquals(GTCombustionHelper.TUNGSTEN_DISULFIDE, srm.getInputs().get(1).getId());
+        Assertions.assertEquals(GTCombustionHelper.DIOXYGEN_DIFLUORIDE, srm.getInputs().get(2).getId());
+        Assertions.assertEquals(200.0 / 3.6, srm.getInputSlotRate(1, false), 0.001);
+        Assertions.assertEquals(756.0 / 3.6, srm.getInputSlotRate(2, false), 0.001);
+        Assertions.assertEquals(4194304.0, GTPowerCalculator.computeSingleMachinePower(srm), 0.001);
+
+        adapter.onAddonRemoved(srm, t3Boost);
+        Assertions.assertEquals(2, srm.getInputs().size());
+        Assertions.assertEquals(GTCombustionHelper.TUNGSTEN_DISULFIDE, srm.getInputs().get(1).getId());
+        Assertions.assertEquals(1048576.0, GTPowerCalculator.computeSingleMachinePower(srm), 0.001);
+
+        adapter.onMachineIconChanged(srm, GTCombustionHelper.START_T3_ROCKET, GTCombustionHelper.LV_COMBUSTION_GENERATOR);
+        Assertions.assertEquals(1, srm.getInputs().size());
+        Assertions.assertEquals(rocketFuel, srm.getInputs().get(0));
+    }
+
+    @Test
+    @DisplayName("Test StarT SRM Immunity to Parallel Pollution and Runaway Power Scaling")
+    public void testStarTSupremeRocketModuleParallelPollutionImmunity() {
+        RecipeNode srm = new RecipeNode("polluted-srm", "Polluted SRM", 160.0, -32.0, GTVoltageTier.UV);
+        srm.setMachineIcon(GTCombustionHelper.START_T3_ROCKET);
+        srm.setRecipeCategoryId(ResourceLocation.tryParse("start_core:modular_rocket_module"));
+        srm.setGenerator(true);
+        srm.setMultiblock(true);
+        IngredientStack rocketFuel = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:rocket_fuel"), "Rocket Fuel", 1.0);
+        srm.addInput(rocketFuel);
+        adapter.onMachineIconChanged(srm, null, GTCombustionHelper.START_T3_ROCKET);
+
+        // Intentionally pollute parallel and customParallel as previously happened via dialog
+        srm.setParallel(1024);
+        srm.setCustomParallel(1024);
+
+        // 1. Single machine power must stay deterministic at exactly 2A UV (1,048,576 EU/t), NOT 1.07G EU/t
+        Assertions.assertEquals(1048576.0, GTPowerCalculator.computeCombustionPower(srm), 0.001);
+        Assertions.assertEquals(1048576.0, GTPowerCalculator.computeSingleMachinePower(srm), 0.001);
+
+        // 2. Effective combustion parallel must only reflect base parallels (524288 / 32 = 16384), NOT multiplied by 1024
+        Assertions.assertEquals(16384, GTPowerCalculator.getEffectiveCombustionParallel(srm));
+        Assertions.assertEquals(1, GTPowerCalculator.getMaxParallelCapacity(srm));
+
+        // 3. Validation auto-heals corrupted parallel values for combustion machines
+        adapter.validateNode(srm, null);
+        Assertions.assertEquals(1, srm.getParallel());
+        Assertions.assertEquals(0, srm.getCustomParallel());
     }
 }

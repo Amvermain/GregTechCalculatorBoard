@@ -48,6 +48,7 @@ public class FavoritesDockWidget {
         }
         if (!expanded && emiImpl instanceof EmiFavoritesDockImpl impl) {
             impl.closeFlyout();
+            impl.resetScrollBarDrag();
         }
     }
 
@@ -164,6 +165,13 @@ public class FavoritesDockWidget {
         private static final int ROW_HEIGHT = 22;
         private static final int SUB_WIDTH = 185;
         private static final int SUB_ROW_HEIGHT = 28;
+        private static final int SCROLLBAR_TRACK_WIDTH = 3;
+        private static final int SCROLLBAR_HIT_WIDTH = 6;
+        private static final int MIN_SCROLLBAR_HEIGHT = 12;
+
+        private boolean isDraggingScrollBar = false;
+        private boolean isDraggingSubScrollBar = false;
+        private double scrollDragGrabOffsetY = 0;
 
         // Drag-and-drop state
         private dev.emi.emi.runtime.EmiFavorite draggingFavorite = null;
@@ -183,6 +191,23 @@ public class FavoritesDockWidget {
         private EmiFavoritesDockImpl(FavoritesDockWidget parent, BoardScreen screen) {
             this.parent = parent;
             this.screen = screen;
+            RecipeFilterConfig.getInstance().addChangeListener(this::onFilterConfigChanged);
+        }
+
+        private void onFilterConfigChanged() {
+            clearCache();
+            if (activeFlyoutFavorite != null) {
+                activeFlyoutRecipes = findRecipesForFavorite(activeFlyoutFavorite);
+                if (activeFlyoutRecipes.isEmpty()) {
+                    closeFlyout();
+                } else {
+                    int subH = screen.height - 40;
+                    int totalH = activeFlyoutRecipes.size() * SUB_ROW_HEIGHT;
+                    int listH = subH - HEADER_HEIGHT - 4;
+                    subMaxScrollY = Math.max(0, totalH - listH);
+                    subScrollY = Math.max(0, Math.min(subMaxScrollY, subScrollY));
+                }
+            }
         }
 
         private int getDockX() {
@@ -197,8 +222,14 @@ public class FavoritesDockWidget {
             activeFlyoutFavorite = null;
             activeFlyoutRecipes = Collections.emptyList();
             subScrollY = 0;
+            isDraggingSubScrollBar = false;
             activePreviewRecipe = null;
             hoveredFavorite = null;
+        }
+
+        private void resetScrollBarDrag() {
+            isDraggingScrollBar = false;
+            isDraggingSubScrollBar = false;
         }
 
         private boolean isEmiLoading() {
@@ -218,7 +249,37 @@ public class FavoritesDockWidget {
             FAVORITE_RECIPES_CACHE.clear();
         }
 
+        private static boolean isCategoryExcluded(dev.emi.emi.api.recipe.EmiRecipeCategory category) {
+            if (category == null || category.getId() == null) return false;
+            RecipeFilterConfig config = RecipeFilterConfig.getInstance();
+            return config.isCategoryExcluded(category.getId().toString())
+                    || config.isCategoryExcluded(category.getId().getPath());
+        }
+
+        private static boolean isRecipeExcluded(dev.emi.emi.api.recipe.EmiRecipe recipe) {
+            if (recipe == null) return false;
+            return isCategoryExcluded(recipe.getCategory());
+        }
+
+        private static boolean isFavoriteRecipeExcluded(dev.emi.emi.runtime.EmiFavorite fav) {
+            if (fav == null) return false;
+            return isRecipeExcluded(fav.getRecipe());
+        }
+
         private List<dev.emi.emi.runtime.EmiFavorite> getFavorites() {
+            List<dev.emi.emi.runtime.EmiFavorite> raw = getRawFavorites();
+            if (raw.isEmpty()) return List.of();
+
+            List<dev.emi.emi.runtime.EmiFavorite> filtered = new ArrayList<>(raw.size());
+            for (dev.emi.emi.runtime.EmiFavorite fav : raw) {
+                if (!isFavoriteRecipeExcluded(fav)) {
+                    filtered.add(fav);
+                }
+            }
+            return filtered;
+        }
+
+        private List<dev.emi.emi.runtime.EmiFavorite> getRawFavorites() {
             try {
                 if (dev.emi.emi.runtime.EmiFavorites.favoriteSidebar != null && !dev.emi.emi.runtime.EmiFavorites.favoriteSidebar.isEmpty()) {
                     return dev.emi.emi.runtime.EmiFavorites.favoriteSidebar;
@@ -235,81 +296,98 @@ public class FavoritesDockWidget {
             List<dev.emi.emi.api.recipe.EmiRecipe> cached = FAVORITE_RECIPES_CACHE.get(fav);
             if (cached != null) return cached;
 
-            List<dev.emi.emi.api.recipe.EmiRecipe> list = new ArrayList<>();
             if (fav.getRecipe() != null) {
-                list.add(fav.getRecipe());
-                List<dev.emi.emi.api.recipe.EmiRecipe> unmodifiable = Collections.unmodifiableList(list);
-                FAVORITE_RECIPES_CACHE.put(fav, unmodifiable);
-                return unmodifiable;
+                return cacheSingleFavoriteRecipe(fav);
             }
 
+            List<dev.emi.emi.api.recipe.EmiRecipe> list = new ArrayList<>();
             if (!fav.getEmiStacks().isEmpty()) {
-                var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
-                if (rm != null) {
-                    var filterConfig = com.gtceu.calcboard.client.gui.search.RecipeFilterConfig.getInstance();
-                    dev.emi.emi.api.recipe.EmiRecipe defaultRecipe = null;
-                    try {
-                        for (var stack : fav.getEmiStacks()) {
-                            dev.emi.emi.api.recipe.EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(stack);
-                            if (def != null) {
-                                defaultRecipe = def;
-                                break;
-                            }
-                        }
-                    } catch (Throwable ignored) {}
-
-                    for (var stack : fav.getEmiStacks()) {
-                        var outRecipes = rm.getRecipesByOutput(stack);
-                        if (outRecipes != null && !outRecipes.isEmpty()) {
-                            for (var r : outRecipes) {
-                                if (r != null && !list.contains(r)) {
-                                    if (r.getCategory() != null && r.getCategory().getId() != null) {
-                                        String catId = r.getCategory().getId().toString();
-                                        if (filterConfig.isCategoryExcluded(catId)) {
-                                            continue;
-                                        }
-                                    }
-                                    list.add(r);
-                                }
-                            }
-                        }
-
-                        try {
-                            for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : rm.getCategories()) {
-                                if (cat == null || cat.getId() == null) continue;
-                                if (filterConfig.isCategoryExcluded(cat.getId().toString())) continue;
-
-                                var workstations = rm.getWorkstations(cat);
-                                if (workstations != null) {
-                                    boolean isWs = false;
-                                    for (dev.emi.emi.api.stack.EmiIngredient wsIng : workstations) {
-                                        if (wsIng != null && wsIng.getEmiStacks() != null) {
-                                            for (dev.emi.emi.api.stack.EmiStack wsStack : wsIng.getEmiStacks()) {
-                                                if (wsStack != null && wsStack.isEqual(stack)) {
-                                                    isWs = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        if (isWs) break;
-                                    }
-                                    if (isWs) {
-                                        collectMatchingCategoryRecipes(rm, cat, stack, list);
-                                    }
-                                }
-                            }
-                        } catch (Throwable ignored) {}
-                    }
-
-                    if (defaultRecipe != null && list.contains(defaultRecipe)) {
-                        list.remove(defaultRecipe);
-                        list.add(0, defaultRecipe);
-                    }
-                }
+                collectStackRecipes(fav, list);
             }
+
             List<dev.emi.emi.api.recipe.EmiRecipe> unmodifiable = Collections.unmodifiableList(list);
             FAVORITE_RECIPES_CACHE.put(fav, unmodifiable);
             return unmodifiable;
+        }
+
+        private List<dev.emi.emi.api.recipe.EmiRecipe> cacheSingleFavoriteRecipe(dev.emi.emi.runtime.EmiFavorite fav) {
+            if (isRecipeExcluded(fav.getRecipe())) {
+                FAVORITE_RECIPES_CACHE.put(fav, List.of());
+                return List.of();
+            }
+            List<dev.emi.emi.api.recipe.EmiRecipe> list = List.of(fav.getRecipe());
+            FAVORITE_RECIPES_CACHE.put(fav, list);
+            return list;
+        }
+
+        private void collectStackRecipes(dev.emi.emi.runtime.EmiFavorite fav, List<dev.emi.emi.api.recipe.EmiRecipe> list) {
+            var rm = dev.emi.emi.api.EmiApi.getRecipeManager();
+            if (rm == null) return;
+
+            dev.emi.emi.api.recipe.EmiRecipe defaultRecipe = findDefaultRecipe(fav);
+            for (var stack : fav.getEmiStacks()) {
+                collectOutputRecipes(rm, stack, list);
+                collectWorkstationRecipes(rm, stack, list);
+            }
+
+            if (defaultRecipe != null && list.contains(defaultRecipe)) {
+                list.remove(defaultRecipe);
+                list.add(0, defaultRecipe);
+            }
+        }
+
+        private dev.emi.emi.api.recipe.EmiRecipe findDefaultRecipe(dev.emi.emi.runtime.EmiFavorite fav) {
+            try {
+                for (var stack : fav.getEmiStacks()) {
+                    dev.emi.emi.api.recipe.EmiRecipe def = dev.emi.emi.bom.BoM.getRecipe(stack);
+                    if (def != null && !isRecipeExcluded(def)) {
+                        return def;
+                    }
+                }
+            } catch (Throwable ignored) {}
+            return null;
+        }
+
+        private void collectOutputRecipes(dev.emi.emi.api.recipe.EmiRecipeManager rm, dev.emi.emi.api.stack.EmiStack stack, List<dev.emi.emi.api.recipe.EmiRecipe> list) {
+            var outRecipes = rm.getRecipesByOutput(stack);
+            if (outRecipes == null || outRecipes.isEmpty()) return;
+            for (var r : outRecipes) {
+                if (r != null && !list.contains(r) && !isRecipeExcluded(r)) {
+                    list.add(r);
+                }
+            }
+        }
+
+        private void collectWorkstationRecipes(dev.emi.emi.api.recipe.EmiRecipeManager rm, dev.emi.emi.api.stack.EmiStack stack, List<dev.emi.emi.api.recipe.EmiRecipe> list) {
+            try {
+                for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : rm.getCategories()) {
+                    if (isCategoryExcluded(cat)) continue;
+                    if (isMatchingWorkstationCategory(rm, cat, stack)) {
+                        collectMatchingCategoryRecipes(rm, cat, stack, list);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        private boolean isMatchingWorkstationCategory(dev.emi.emi.api.recipe.EmiRecipeManager rm, dev.emi.emi.api.recipe.EmiRecipeCategory cat, dev.emi.emi.api.stack.EmiStack stack) {
+            var workstations = rm.getWorkstations(cat);
+            if (workstations == null) return false;
+            for (dev.emi.emi.api.stack.EmiIngredient wsIng : workstations) {
+                if (containsMatchingIngredient(wsIng, stack)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean containsMatchingIngredient(dev.emi.emi.api.stack.EmiIngredient wsIng, dev.emi.emi.api.stack.EmiStack stack) {
+            if (wsIng == null || wsIng.getEmiStacks() == null) return false;
+            for (dev.emi.emi.api.stack.EmiStack wsStack : wsIng.getEmiStacks()) {
+                if (wsStack != null && wsStack.isEqual(stack)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void collectMatchingCategoryRecipes(dev.emi.emi.api.recipe.EmiRecipeManager rm, dev.emi.emi.api.recipe.EmiRecipeCategory cat,
@@ -317,7 +395,7 @@ public class FavoritesDockWidget {
             List<dev.emi.emi.api.recipe.EmiRecipe> catRecipes = rm.getRecipes(cat);
             if (catRecipes == null) return;
             for (dev.emi.emi.api.recipe.EmiRecipe cr : catRecipes) {
-                if (cr != null && !list.contains(cr) && matchesRecipeWorkstation(cr, stack)) {
+                if (cr != null && !list.contains(cr) && !isRecipeExcluded(cr) && matchesRecipeWorkstation(cr, stack)) {
                     list.add(cr);
                 }
             }
@@ -412,7 +490,7 @@ public class FavoritesDockWidget {
                     mouseInBridge = mouseX >= bridgeLeft && mouseX <= bridgeRight && mouseY >= bridgeTop && mouseY <= bridgeBottom;
                 }
 
-                if (!mouseInDockArea && !mouseInPreview && !mouseInBridge) {
+                if (!isDraggingScrollBar && !isDraggingSubScrollBar && !isDragging && !mouseInDockArea && !mouseInPreview && !mouseInBridge) {
                     closeFlyout();
                 }
 
@@ -452,7 +530,9 @@ public class FavoritesDockWidget {
                         if (rowY + ROW_HEIGHT < listY || rowY > listY + listH) continue;
 
                         boolean isFlyoutActive = (activeFlyoutFavorite == fav);
-                        boolean rowHover = !drawerBlocking && mouseX >= getDockX() + 2 && mouseX <= getDockX() + EXPANDED_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
+                        boolean mouseOverScrollBar = maxScrollY > 0 && mouseX >= getDockX() + EXPANDED_WIDTH - SCROLLBAR_HIT_WIDTH;
+                        boolean rowHover = !drawerBlocking && !isDraggingScrollBar && !isDraggingSubScrollBar && !mouseOverScrollBar
+                                && mouseX >= getDockX() + 2 && mouseX <= getDockX() + EXPANDED_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
 
                         if (rowHover) {
                             hoveredFavorite = fav;
@@ -479,8 +559,9 @@ public class FavoritesDockWidget {
                         int textColor = isFlyoutActive ? 0xFF38BDF8 : (rowHover ? 0xFFFFD700 : 0xFFE2E8F0);
                         graphics.drawString(font, font.plainSubstrByWidth(name, EXPANDED_WIDTH - 42), getDockX() + 24, rowY + 7, textColor, false);
 
-                        int removeBtnX = getDockX() + EXPANDED_WIDTH - 16;
-                        boolean removeHover = !drawerBlocking && mouseX >= removeBtnX && mouseX <= removeBtnX + 12 && mouseY >= rowY + 5 && mouseY <= rowY + 17;
+                        int removeBtnX = getDockX() + EXPANDED_WIDTH - 17;
+                        boolean removeHover = !drawerBlocking && !isDraggingScrollBar && !isDraggingSubScrollBar
+                                && mouseX >= removeBtnX && mouseX <= removeBtnX + 10 && mouseY >= rowY + 5 && mouseY <= rowY + 17;
                         if (rowHover || isFlyoutActive) {
                             graphics.drawString(font, "✕", removeBtnX, rowY + 6, removeHover ? 0xFFFF5555 : 0xFF64748B, false);
                         }
@@ -489,10 +570,15 @@ public class FavoritesDockWidget {
                     BoardScissorHelper.disableScissor(graphics);
 
                     if (maxScrollY > 0) {
-                        int scrollBarH = Math.max(10, (int) ((float) listH / totalH * listH));
+                        int scrollBarH = Math.max(MIN_SCROLLBAR_HEIGHT, (int) ((float) listH / totalH * listH));
                         int scrollBarY = (int) (listY + (scrollY / maxScrollY) * (listH - scrollBarH));
-                        graphics.fill(getDockX() + EXPANDED_WIDTH - 3, listY, getDockX() + EXPANDED_WIDTH - 1, listY + listH, 0x44000000);
-                        graphics.fill(getDockX() + EXPANDED_WIDTH - 3, scrollBarY, getDockX() + EXPANDED_WIDTH - 1, scrollBarY + scrollBarH, 0xFF38BDF8);
+                        int trackX = getDockX() + EXPANDED_WIDTH - SCROLLBAR_TRACK_WIDTH - 1;
+                        boolean barHover = !drawerBlocking && mouseX >= getDockX() + EXPANDED_WIDTH - SCROLLBAR_HIT_WIDTH
+                                && mouseX <= getDockX() + EXPANDED_WIDTH && mouseY >= listY && mouseY <= listY + listH;
+                        int thumbColor = (isDraggingScrollBar || barHover) ? 0xFF7DD3FC : 0xFF38BDF8;
+
+                        graphics.fill(trackX, listY, trackX + SCROLLBAR_TRACK_WIDTH, listY + listH, 0x44000000);
+                        graphics.fill(trackX, scrollBarY, trackX + SCROLLBAR_TRACK_WIDTH, scrollBarY + scrollBarH, thumbColor);
                     }
                 }
 
@@ -547,7 +633,9 @@ public class FavoritesDockWidget {
 
                 if (rowY + SUB_ROW_HEIGHT < listY || rowY > listY + listH) continue;
 
-                boolean rowHover = mouseX >= subX + 2 && mouseX <= subX + subW - 2 && mouseY >= rowY && mouseY <= rowY + SUB_ROW_HEIGHT;
+                boolean mouseOverSubScrollBar = subMaxScrollY > 0 && mouseX >= subX + subW - SCROLLBAR_HIT_WIDTH;
+                boolean rowHover = !isDraggingScrollBar && !isDraggingSubScrollBar && !mouseOverSubScrollBar
+                        && mouseX >= subX + 2 && mouseX <= subX + subW - 2 && mouseY >= rowY && mouseY <= rowY + SUB_ROW_HEIGHT;
 
                 boolean isDefault = false;
                 if (activeFlyoutFavorite != null && !activeFlyoutFavorite.getEmiStacks().isEmpty()) {
@@ -585,7 +673,8 @@ public class FavoritesDockWidget {
 
                 int addBtnX = subX + subW - 24;
                 int addBtnY = rowY + 6;
-                boolean addHover = mouseX >= addBtnX && mouseX <= addBtnX + 18 && mouseY >= addBtnY && mouseY <= addBtnY + 16;
+                boolean addHover = !isDraggingScrollBar && !isDraggingSubScrollBar
+                        && mouseX >= addBtnX && mouseX <= addBtnX + 18 && mouseY >= addBtnY && mouseY <= addBtnY + 16;
                 graphics.fill(addBtnX, addBtnY, addBtnX + 18, addBtnY + 16, addHover ? 0xFF2B4466 : 0xFF1C2C44);
                 graphics.renderOutline(addBtnX, addBtnY, 18, 16, addHover ? 0xFF55AAFF : 0xFF355580);
                 graphics.drawCenteredString(font, "➕", addBtnX + 9, addBtnY + 4, 0xFFFFFFFF);
@@ -594,10 +683,14 @@ public class FavoritesDockWidget {
             BoardScissorHelper.disableScissor(graphics);
 
             if (subMaxScrollY > 0) {
-                int scrollBarH = Math.max(10, (int) ((float) listH / totalH * listH));
+                int scrollBarH = Math.max(MIN_SCROLLBAR_HEIGHT, (int) ((float) listH / totalH * listH));
                 int scrollBarY = (int) (listY + (subScrollY / subMaxScrollY) * (listH - scrollBarH));
-                graphics.fill(subX + subW - 3, listY, subX + subW - 1, listY + listH, 0x44000000);
-                graphics.fill(subX + subW - 3, scrollBarY, subX + subW - 1, scrollBarY + scrollBarH, 0xFF38BDF8);
+                int trackX = subX + subW - SCROLLBAR_TRACK_WIDTH - 1;
+                boolean barHover = mouseX >= subX + subW - SCROLLBAR_HIT_WIDTH && mouseX <= subX + subW && mouseY >= listY && mouseY <= listY + listH;
+                int thumbColor = (isDraggingSubScrollBar || barHover) ? 0xFF7DD3FC : 0xFF38BDF8;
+
+                graphics.fill(trackX, listY, trackX + SCROLLBAR_TRACK_WIDTH, listY + listH, 0x44000000);
+                graphics.fill(trackX, scrollBarY, trackX + SCROLLBAR_TRACK_WIDTH, scrollBarY + scrollBarH, thumbColor);
             }
         }
 
@@ -783,66 +876,12 @@ public class FavoritesDockWidget {
                 return true;
             }
 
-            dev.emi.emi.api.recipe.EmiRecipe activeEmi = (activePreviewRecipe != null) ? activePreviewRecipe : (hoveredFavorite != null && hoveredFavorite.getRecipe() != null ? hoveredFavorite.getRecipe() : null);
-            int activeEmiRowY = (activePreviewRecipe != null) ? activePreviewRowY : hoveredFavRowY;
-            int subX = getDockX() + EXPANDED_WIDTH + 3;
-            int previewAnchorX = (activeFlyoutFavorite != null) ? (subX + SUB_WIDTH + 6) : (getDockX() + EXPANDED_WIDTH + 6);
-            int screenW = screen.width;
-            int screenH = screen.height;
-
-            if (activeEmi != null) {
-                int[] bounds = com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer.calculateEmiPreviewBounds(activeEmi, previewAnchorX, activeEmiRowY, screenW, screenH);
-                if (bounds != null && mouseX >= bounds[0] && mouseX <= bounds[0] + bounds[2] && mouseY >= bounds[1] && mouseY <= bounds[1] + bounds[3]) {
-                    var ing = com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer.getEmiHoveredIngredient(activeEmi, previewAnchorX, activeEmiRowY, (int) mouseX, (int) mouseY, screenW, screenH);
-                    if (ing instanceof dev.emi.emi.api.stack.EmiIngredient emiIng) {
-                        if (button == 0) {
-                            dev.emi.emi.api.EmiApi.displayRecipes(emiIng);
-                            return true;
-                        } else if (button == 1) {
-                            dev.emi.emi.api.EmiApi.displayUses(emiIng);
-                            return true;
-                        }
-                    }
-                    if (button == 0) {
-                        double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
-                        spawnRecipeNode(activeEmi, pos[0], pos[1]);
-                        return true;
-                    }
-                    return true;
-                }
+            if (handleActivePreviewClick(mouseX, mouseY, button)) {
+                return true;
             }
 
             if (activeFlyoutFavorite != null && !activeFlyoutRecipes.isEmpty()) {
-                if (mouseX >= subX && mouseX <= subX + SUB_WIDTH && mouseY >= dockY && mouseY <= dockY + maxH) {
-                    int listY = dockY + HEADER_HEIGHT + 2;
-                    int listH = maxH - HEADER_HEIGHT - 4;
-
-                    for (int i = 0; i < activeFlyoutRecipes.size(); i++) {
-                        dev.emi.emi.api.recipe.EmiRecipe recipe = activeFlyoutRecipes.get(i);
-                        int rowY = (int) (listY + (i * SUB_ROW_HEIGHT) - subScrollY);
-
-                        if (rowY + SUB_ROW_HEIGHT < listY || rowY > listY + listH) continue;
-
-                        if (mouseX >= subX + 2 && mouseX <= subX + SUB_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + SUB_ROW_HEIGHT) {
-                            int addBtnX = subX + SUB_WIDTH - 24;
-                            int addBtnY = rowY + 6;
-                            boolean addHover = mouseX >= addBtnX && mouseX <= addBtnX + 18 && mouseY >= addBtnY && mouseY <= addBtnY + 16;
-
-                            if (button == 0 && addHover) {
-                                double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
-                                spawnRecipeNode(recipe, pos[0], pos[1]);
-                                return true;
-                            }
-
-                            if (button == 0) {
-                                draggingFlyoutRecipe = recipe;
-                                dragStartX = mouseX;
-                                dragStartY = mouseY;
-                                isDragging = false;
-                                return true;
-                            }
-                        }
-                    }
+                if (handleFlyoutPanelClick(mouseX, mouseY, button, dockY, maxH)) {
                     return true;
                 }
             }
@@ -850,16 +889,101 @@ public class FavoritesDockWidget {
             int listY = dockY + HEADER_HEIGHT + 2;
             int listH = maxH - HEADER_HEIGHT - 4;
             List<dev.emi.emi.runtime.EmiFavorite> favorites = getFavorites();
+            int totalH = favorites.size() * ROW_HEIGHT;
 
+            if (button == 0 && handleMainScrollBarClick(mouseX, mouseY, listY, listH, totalH)) {
+                return true;
+            }
+
+            return handleFavoritesListClick(mouseX, mouseY, button, listY, listH, favorites);
+        }
+
+        private boolean handleActivePreviewClick(double mouseX, double mouseY, int button) {
+            dev.emi.emi.api.recipe.EmiRecipe activeEmi = (activePreviewRecipe != null) ? activePreviewRecipe : (hoveredFavorite != null && hoveredFavorite.getRecipe() != null ? hoveredFavorite.getRecipe() : null);
+            if (activeEmi == null) return false;
+
+            int activeEmiRowY = (activePreviewRecipe != null) ? activePreviewRowY : hoveredFavRowY;
+            int subX = getDockX() + EXPANDED_WIDTH + 3;
+            int previewAnchorX = (activeFlyoutFavorite != null) ? (subX + SUB_WIDTH + 6) : (getDockX() + EXPANDED_WIDTH + 6);
+            int screenW = screen.width;
+            int screenH = screen.height;
+
+            int[] bounds = com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer.calculateEmiPreviewBounds(activeEmi, previewAnchorX, activeEmiRowY, screenW, screenH);
+            if (bounds == null || mouseX < bounds[0] || mouseX > bounds[0] + bounds[2] || mouseY < bounds[1] || mouseY > bounds[1] + bounds[3]) {
+                return false;
+            }
+
+            var ing = com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer.getEmiHoveredIngredient(activeEmi, previewAnchorX, activeEmiRowY, (int) mouseX, (int) mouseY, screenW, screenH);
+            if (ing instanceof dev.emi.emi.api.stack.EmiIngredient emiIng) {
+                if (button == 0) {
+                    dev.emi.emi.api.EmiApi.displayRecipes(emiIng);
+                    return true;
+                }
+                if (button == 1) {
+                    dev.emi.emi.api.EmiApi.displayUses(emiIng);
+                    return true;
+                }
+            }
+
+            if (button == 0) {
+                double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+                spawnRecipeNode(activeEmi, pos[0], pos[1]);
+                return true;
+            }
+            return true;
+        }
+
+        private boolean handleFlyoutPanelClick(double mouseX, double mouseY, int button, int dockY, int maxH) {
+            int subX = getDockX() + EXPANDED_WIDTH + 3;
+            if (mouseX < subX || mouseX > subX + SUB_WIDTH || mouseY < dockY || mouseY > dockY + maxH) {
+                return false;
+            }
+
+            int listY = dockY + HEADER_HEIGHT + 2;
+            int listH = maxH - HEADER_HEIGHT - 4;
+            int totalH = activeFlyoutRecipes.size() * SUB_ROW_HEIGHT;
+
+            if (button == 0 && handleSubScrollBarClick(mouseX, mouseY, subX, listY, listH, totalH)) {
+                return true;
+            }
+
+            for (int i = 0; i < activeFlyoutRecipes.size(); i++) {
+                dev.emi.emi.api.recipe.EmiRecipe recipe = activeFlyoutRecipes.get(i);
+                int rowY = (int) (listY + (i * SUB_ROW_HEIGHT) - subScrollY);
+                if (rowY + SUB_ROW_HEIGHT < listY || rowY > listY + listH) continue;
+
+                if (mouseX >= subX + 2 && mouseX <= subX + SUB_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + SUB_ROW_HEIGHT) {
+                    int addBtnX = subX + SUB_WIDTH - 24;
+                    int addBtnY = rowY + 6;
+                    boolean addHover = mouseX >= addBtnX && mouseX <= addBtnX + 18 && mouseY >= addBtnY && mouseY <= addBtnY + 16;
+
+                    if (button == 0 && addHover) {
+                        double[] pos = BoardScreen.getNextNodeCenterPosition(screen.width, screen.height);
+                        spawnRecipeNode(recipe, pos[0], pos[1]);
+                        return true;
+                    }
+
+                    if (button == 0) {
+                        draggingFlyoutRecipe = recipe;
+                        dragStartX = mouseX;
+                        dragStartY = mouseY;
+                        isDragging = false;
+                        return true;
+                    }
+                }
+            }
+            return true;
+        }
+
+        private boolean handleFavoritesListClick(double mouseX, double mouseY, int button, int listY, int listH, List<dev.emi.emi.runtime.EmiFavorite> favorites) {
             for (int i = 0; i < favorites.size(); i++) {
                 dev.emi.emi.runtime.EmiFavorite fav = favorites.get(i);
                 int rowY = (int) (listY + (i * ROW_HEIGHT) - scrollY);
-
                 if (rowY + ROW_HEIGHT < listY || rowY > listY + listH) continue;
 
                 if (mouseX >= getDockX() + 2 && mouseX <= getDockX() + EXPANDED_WIDTH - 2 && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT) {
-                    int removeBtnX = getDockX() + EXPANDED_WIDTH - 16;
-                    boolean removeHover = mouseX >= removeBtnX && mouseX <= removeBtnX + 12 && mouseY >= rowY + 5 && mouseY <= rowY + 17;
+                    int removeBtnX = getDockX() + EXPANDED_WIDTH - 17;
+                    boolean removeHover = mouseX >= removeBtnX && mouseX <= removeBtnX + 10 && mouseY >= rowY + 5 && mouseY <= rowY + 17;
 
                     if (button == 0 && removeHover) {
                         dev.emi.emi.runtime.EmiFavorites.removeFavorite(fav);
@@ -880,12 +1004,69 @@ public class FavoritesDockWidget {
                     }
                 }
             }
-
             return false;
         }
 
+        private boolean handleMainScrollBarClick(double mouseX, double mouseY, int listY, int listH, int totalH) {
+            if (maxScrollY <= 0) return false;
+            int barX = getDockX() + EXPANDED_WIDTH - SCROLLBAR_HIT_WIDTH;
+            if (mouseX < barX || mouseX > getDockX() + EXPANDED_WIDTH || mouseY < listY || mouseY > listY + listH) {
+                return false;
+            }
+
+            int scrollBarH = Math.max(MIN_SCROLLBAR_HEIGHT, (int) ((float) listH / totalH * listH));
+            int scrollBarY = (int) (listY + (scrollY / maxScrollY) * (listH - scrollBarH));
+
+            if (mouseY >= scrollBarY && mouseY <= scrollBarY + scrollBarH) {
+                isDraggingScrollBar = true;
+                scrollDragGrabOffsetY = mouseY - scrollBarY;
+            } else {
+                double relativeY = mouseY - listY - scrollBarH / 2.0;
+                double ratio = relativeY / Math.max(1.0, listH - scrollBarH);
+                scrollY = Math.max(0, Math.min(maxScrollY, ratio * maxScrollY));
+                isDraggingScrollBar = true;
+                scrollDragGrabOffsetY = scrollBarH / 2.0;
+            }
+            return true;
+        }
+
+        private boolean handleSubScrollBarClick(double mouseX, double mouseY, int subX, int listY, int listH, int totalH) {
+            if (subMaxScrollY <= 0) return false;
+            int subBarX = subX + SUB_WIDTH - SCROLLBAR_HIT_WIDTH;
+            if (mouseX < subBarX || mouseX > subX + SUB_WIDTH || mouseY < listY || mouseY > listY + listH) {
+                return false;
+            }
+
+            int scrollBarH = Math.max(MIN_SCROLLBAR_HEIGHT, (int) ((float) listH / totalH * listH));
+            int scrollBarY = (int) (listY + (subScrollY / subMaxScrollY) * (listH - scrollBarH));
+
+            if (mouseY >= scrollBarY && mouseY <= scrollBarY + scrollBarH) {
+                isDraggingSubScrollBar = true;
+                scrollDragGrabOffsetY = mouseY - scrollBarY;
+            } else {
+                double relativeY = mouseY - listY - scrollBarH / 2.0;
+                double ratio = relativeY / Math.max(1.0, listH - scrollBarH);
+                subScrollY = Math.max(0, Math.min(subMaxScrollY, ratio * subMaxScrollY));
+                isDraggingSubScrollBar = true;
+                scrollDragGrabOffsetY = scrollBarH / 2.0;
+            }
+            return true;
+        }
+
         private boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-            if ((draggingFavorite != null || draggingFlyoutRecipe != null) && button == 0) {
+            if (button != 0) return false;
+
+            if (isDraggingScrollBar) {
+                updateMainScrollBarDrag(mouseY);
+                return true;
+            }
+
+            if (isDraggingSubScrollBar) {
+                updateSubScrollBarDrag(mouseY);
+                return true;
+            }
+
+            if (draggingFavorite != null || draggingFlyoutRecipe != null) {
                 if (!isDragging && Math.hypot(mouseX - dragStartX, mouseY - dragStartY) > 5) {
                     isDragging = true;
                 }
@@ -894,7 +1075,39 @@ public class FavoritesDockWidget {
             return false;
         }
 
+        private void updateMainScrollBarDrag(double mouseY) {
+            if (maxScrollY <= 0) return;
+            int dockY = getDockY();
+            int maxH = Math.min(240, screen.height - dockY - 60);
+            int listY = dockY + HEADER_HEIGHT + 2;
+            int listH = maxH - HEADER_HEIGHT - 4;
+            int totalH = getFavorites().size() * ROW_HEIGHT;
+            int scrollBarH = Math.max(MIN_SCROLLBAR_HEIGHT, (int) ((float) listH / totalH * listH));
+            double relativeY = mouseY - listY - scrollDragGrabOffsetY;
+            double ratio = relativeY / Math.max(1.0, listH - scrollBarH);
+            scrollY = Math.max(0, Math.min(maxScrollY, ratio * maxScrollY));
+        }
+
+        private void updateSubScrollBarDrag(double mouseY) {
+            if (subMaxScrollY <= 0 || activeFlyoutFavorite == null) return;
+            int dockY = getDockY();
+            int maxH = Math.min(240, screen.height - dockY - 60);
+            int listY = dockY + HEADER_HEIGHT + 2;
+            int listH = maxH - HEADER_HEIGHT - 4;
+            int totalH = activeFlyoutRecipes.size() * SUB_ROW_HEIGHT;
+            int scrollBarH = Math.max(MIN_SCROLLBAR_HEIGHT, (int) ((float) listH / totalH * listH));
+            double relativeY = mouseY - listY - scrollDragGrabOffsetY;
+            double ratio = relativeY / Math.max(1.0, listH - scrollBarH);
+            subScrollY = Math.max(0, Math.min(subMaxScrollY, ratio * subMaxScrollY));
+        }
+
         private boolean mouseReleased(double mouseX, double mouseY, int button) {
+            if (button == 0 && (isDraggingScrollBar || isDraggingSubScrollBar)) {
+                isDraggingScrollBar = false;
+                isDraggingSubScrollBar = false;
+                return true;
+            }
+
             if (draggingFlyoutRecipe != null) {
                 if (isDragging) {
                     double canvasX = screen.toCanvasX(mouseX);

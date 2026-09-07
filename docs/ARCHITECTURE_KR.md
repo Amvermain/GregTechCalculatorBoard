@@ -7,7 +7,7 @@
 > 📘 **상세 코드 명세서 시리즈**:
 > * 🇰🇷 **한국어 에디션**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **영문 에디션**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> 전체 v2.2.0 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
+> 전체 v2.2.0-alpha.4 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
 
 본 문서는 **GregTech Calculator Board (그렉텍 계산기 보드)**의 내부 시스템 아키텍처, 수학적 솔버 엔진, 캔버스 렌더링 파이프라인, 및 멀티 모드 호환성 계층(SPI)을 설명합니다.
 
@@ -26,29 +26,34 @@ graph TD
         BAH["BoardActionHandler (Undo/Redo 액션 기록 및 노드/와이어 삭제 수집)"]
         BVT["BoardViewportTransform (가상 GUI 배율 독립 좌표 변환 엔진)"]
         CIH["CanvasInteractionHandler & CanvasStateMachine (유한 상태 머신 기반 상호 배타성 보장)"]
+        NLB["NodeLayoutBounds & NodeLayoutCalculator (단일 출처화된 히트박스 & 레이아웃 모델)"]
+        RP["RenderProfiler (F3 실시간 렌더링 & 연산 소요 시간 및 FPS 모니터링)"]
+        CUN["ClientUpdateNotifier (백그라운드 버전 확인 & 인게임 알림 뱃지)"]
         RENDER["Two-Pass Z-Order 렌더링 & 포화도 기반 와이어 펄스 셰이더"]
         WSI["WireSpatialIndex (128x128 AABB 균일 그리드 O(log E) 공간 분할)"]
         NCTC["NodeCardTextCache (dirty 기반 텍스트 절삭 및 단위 포맷팅 캐시)"]
-        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay)"]
-        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog)"]
+        Widgets["widget.* (NodeWidget, ToolbarWidget, PageTabBarWidget, HotkeyHudWidget, SummaryOverlay, FavoritesDockWidget)"]
+        Dialogs["dialog.* (BoardSettingsDialog, MachineConfigDialog, BOMDialog, SearchDialog, GlobalBalanceDialog, JunctionSupplyDialog, FrameEditDialog)"]
         Search["search.* (RecipeSearchCacheManager, RecipeSearchQueryEngine & 합성 가능 명세 패턴)"]
     end
 
     subgraph Core["2. 코어 수학 & 도메인 엔진 (com.gtceu.calcboard.api)"]
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec, RecipeNodeSerializer)"]
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
-        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, NodeRateCalculator, NodeWorkstationResolver)"]
+        Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, CanvasGroupFrame, NodeRateCalculator, NodeWorkstationResolver)"]
         Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
-        Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode)"]
-        Prop["property.* (NodeProperties, NodePropertyStore)"]
+        Linear["solver.linear.* (TwoStageLinearFlowSolver, GaussJordanEliminator, LinearEquationSystem)"]
+        Stability["solver.* (ProcessStabilityAnalyzer, HarmonizedRatioOptimizer, AutoRatioEngine)"]
+        Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory, MultiblockDetector)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode, AutoRatioMode)"]
+        Prop["property.* (NodeProperties, NodePropertyStore, NodeBadgeRegistry)"]
     end
 
     subgraph Compat["3. 모드 호환성 공용 SPI 계층 (com.gtceu.calcboard.compat)"]
         MAR["ModAdapterRegistry (우선순위 기반 동적 라우팅 SPI)"]
         IMA["IModAdapter & 6대 Extension Provider (에너지, 레시피, 애드온, BOM, 부스터, 기능)"]
         subgraph Adapters["도메인 모드 어댑터 (100% 헤드리스 안전)"]
-            GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, BOMResolver)"]
+            GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, physics.GTFusionHelper, helper.GTCombustionHelper, BOMResolver)"]
             CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, 스트레스 용량, 키네틱 기계)"]
             CDG["createdieselgenerators (디젤 엔진 3종, SU 발전/연료 소모, 분별 증류)"]
             CNA["createnewage (모터, 발전기 코일, 자석 링, FE/SU 변환)"]
@@ -134,6 +139,18 @@ graph TD
 ### 2.7 합성 가능 레시피 검색 명세 패턴 및 Extension Object SPI (ADR-028 & ADR-029)
 * **명세 패턴 쿼리 엔진 (`RecipeSearchQueryEngine`)**: 다중 필터 조건(`@mod`, `#tag`, `tier:`, `eut:`)을 선언적 Predicate로 합성하고 토큰 인덱스를 메모이제이션하여 대규모 레시피 검색 성능을 극대화합니다.
 * **인터페이스 분리 및 Extension Object 패턴 (`IModAdapter`)**: 코어 생명주기 인터페이스를 86줄로 슬림화하고, 6대 도메인 Provider(`IEnergySimulationProvider`, `ICompoundRecipeProvider`, `IHardwareAddonProvider`, `IMultiblockBOMProvider`, `IBoosterProvider`, `ICapabilityMatrixProvider`)로 역할을 분리하여 100% 하위 호환성을 유지하면서 높은 확장성을 확보했습니다.
+
+### 2.8 단일 출처 노드 레이아웃 바운즈 모델 (`NodeLayoutBounds`, ADR-030)
+* **렌더러와 상호작용 간 결합도 해소**: 노드 카드 렌더링 코드와 마우스 히트박스 판정 코드 사이에 중복 존재하던 좌표/오프셋 하드코딩을 제거하고, `NodeLayoutBounds` 및 `NodeLayoutCalculator` 불변 모델을 단일 진실 공급원(Single Source of Truth)으로 구축했습니다.
+* **슬림 카드 모드 조작 무결성**: 표준 카드와 슬림 카드 간 전환, 사용자 정의 세로 리사이징 시 히트박스와 포트 연결 지점이 수학적으로 정확히 일치하여 $O(1)$ 빠른 히트 테스트를 수행합니다.
+
+### 2.9 공유 기계 풀 스케일링 & 공정 발산 방어 매트릭스 (ADR-031 ~ ADR-033)
+* **공유 기계 풀 용량 스케일링 (`CanvasGroupFrame`)**: 단일 기계에서 여러 공정을 순차 처리하는 공유 기계 풀 프레임에서, 물리적 기계 용량($M_{\text{target}}$, 기본 1.0대)을 기준으로 연결된 전체 공정을 비례 스케일링($S = M_{\text{target}} / D_{\text{current}}$)합니다.
+* **포괄적 공정 발산 방어 매트릭스 (`ProcessStabilityAnalyzer`)**: 외부 원료 공급이 부족한 폐순환 루프, 자원 증식 루프, 촉매 감쇠 루프, 복수 앵커 충돌, 극미세 수율 등 7대 발산 시나리오를 자동 감지하여 기계 대수 폭주를 방어하고, `NodeBadgeRegistry`를 통해 상황별 진단 뱃지(`[⚠️ Loop]`, `[⚠️ Growth]` 등)와 액션 가이드 툴팁을 제공합니다.
+
+### 2.10 2단계 선형 연립방정식 유량 솔버 & 정션 앵커링 (ADR-034 & ADR-035)
+* **2단계 선형 연립방정식 유량 솔버 (`TwoStageLinearFlowSolver`)**: 복합 순환 및 분기 공정에서 1단계 연속 유량 균형 연산(가우스-요르단 소거법)과 2단계 정수 양자화(천장 함수 및 비례 스케일링)를 통해 단 1회의 클릭으로 결정론적 수렴을 보장합니다.
+* **정션 완충 배선 및 유량 앵커 시스템**: 포트 드래그를 통한 잉여 배출, 결핍 공급, 보이드 싱크 원클릭 생성과, 고정 정션 노드를 기준 앵커로 설정하여 목표 유량에 맞춘 상·하류 기계 대수 연쇄 자동 역산을 지원합니다.
 
 ---
 

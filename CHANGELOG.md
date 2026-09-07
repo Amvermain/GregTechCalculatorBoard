@@ -6,11 +6,84 @@
 
 ## [Unreleased]
 
+## [2.2.0-alpha.4] - 2026-09-08
+
 ### Added
+- **Contextual Junction Buffer Wiring & Flow Rate Anchoring**:
+  - Added quick-add flyout submenus when dragging wires from ports into empty canvas space to create surplus drain, deficit supply, void sink, or infinite supply junction nodes with exact calculated rates in one click.
+  - Added the ability to pin external supply or fixed drain junction nodes as reference Anchors via right-click, automatically scaling upstream or downstream machine counts to match the target flow rate.
+  - Added a one-click match button (`[⚡]`) in the junction configuration dialog to automatically fill the rate with the total connected inflow or downstream demand.
+- **Auto-Ratio Recirculation Loop Runaway Warning Badges & Interactive Guidance**:
+  - Displays an amber warning badge (`[⚠️ Loop]`) on machines in closed loops where automatic scaling was suppressed due to missing external ingredient supplies, preventing runaway machine count calculations.
+  - Hovering over the warning badge displays clear explanations and recommended actions, with a one-click shortcut to pin the machine as an Anchor.
+- **Contextual Process Instability Warnings & Diagnostic Guidance**:
+  - Added dedicated warning badges for positive feedback growth loops (`[⚠️ Growth]`), catalyst decay loops (`[⚠️ Catalyst]`), conflicting multiple anchors (`[⚠️ Conflict]`), and extreme micro-yield recipes (`[⚠️ Yield]`).
+  - Provides customized 5-line diagnostic tooltips and one-click actions (such as unpinning conflicting anchors or fixing operating scale) to help troubleshoot and balance complex automated setups.
+- **Shared Machine Pool Capacity-Driven Auto-Ratio**:
+  - Added an auto-ratio button (`[⚖]`) to shared machine pool frame headers to proportionally scale all connected processes to match target physical machine capacity (default 1.0x).
+  - Supports fractional precision scaling on regular click and integer ceiling scaling when holding [Alt], with configurable target machine capacity in the frame settings dialog.
+- **Configurable In-Game Mod Update Notifications**:
+  - Added an unobtrusive notification badge on the Settings button inside the Calculator Board when a new version of the mod is released, allowing players to view the latest version and download link directly from the settings dialog.
+  - Added update notification preferences in the Settings dialog, allowing players to freely enable or disable automatic update checks, in-board badges, and login chat notifications (disabled by default to prevent chat spam in modpacks).
+- **Real-Time Rendering & Calculation Profiler HUD**:
+  - Added a real-time profiler HUD in the bottom-right corner of the screen when debug mode (`F3`) is enabled, displaying per-section rendering and calculation times along with frames per second (FPS).
 
 ### Changed & Improved
+- **Addon Performance & Tooltip Display Improvements**:
+  - Added full performance breakdowns (Power Output, Fuel Energy, Process Duration, and multi-copy combined effects) to Thermal and Systeams augment hover tooltips.
+  - Improved addon grid card subtitles and dual-multiplier badges with compact layouts, preventing text truncation in machine configuration menus.
+- **Draggable Favorites Menu Scrollbar**:
+  - Made the scrollbar in the Favorites menu and its recipe list panel draggable by clicking and holding, allowing smooth navigation without relying only on mouse wheel scrolling.
+  - Enhanced scrollbar thickness and added hover/drag highlights for easier grabbing and clearer visual feedback.
 
 ### Fixed
+- **Fixed Large Gas Turbine Power Output & Fuel Consumption Fallback**:
+  - Fixed an issue where Large Gas Turbines erroneously fell back to HV base tier (1,024 EU/t) instead of EV (4,096 EU/t), resulting in lower calculated power output, distorted fuel consumption rates, and incorrect parallel counts.
+  - Equipping a turbine rotor on a singleblock gas turbine node now automatically promotes the workstation to the large multiblock turbine.
+- **Fixed Flow Allocation and Match Flow Button for Continuous Drain Junctions in Branching Networks**:
+  - Fixed an issue where branching a producer's output to multiple consumers and a continuous drain junction displayed an inaccurate naive split supply rate on the junction tooltip, or caused the match flow (`[⚡]`) button to fill the entire producer output rather than the true available surplus.
+  - Improved the junction configuration dialog to preserve precise decimal rates up to 4 decimal places without truncation.
+- **Fixed Multi-Click Requirement on Long Recirculation Loops in Auto-Ratio**:
+  - Fixed an issue where long closed recirculation loops (such as multi-step nether star crafting) required clicking the Auto-Ratio button multiple times to reach balanced machine counts and clear false-positive loop warning badges.
+- **Fixed False-Positive Growth and Loop Warnings on Anchored Recirculation Cycles**:
+  - Fixed an issue where output branching or mixed voltage tiers across balanced recirculation loops were falsely diagnosed as growth or deficit loops after setting an anchor.
+  - Clicking the anchor action on warning badges now strictly preserves a single anchor across the board instead of creating duplicate anchor conflicts.
+  - Warning badges on already-anchored machines now properly indicate that the anchor scale is fixed, rather than redundantly suggesting pinning as an anchor.
+- **Fixed Shift Detailed Rate Tooltip Missing on Buckets Fluid Notation**:
+  - Fixed an issue where port tooltips did not display detailed exact rates when holding [Shift] if fluid rates were represented in Buckets (e.g. 1.64 B/s) due to premature decimal rounding.
+  - Holding [Shift] now accurately displays full-precision exact rates (e.g. 1.64 B/s (1.6384 B/s)) across all fluid unit modes.
+- **Fixed Reroute Node Dragging/Editing Inoperability and Vertical Card Resize Issues**:
+  - Resolved an issue where reroute nodes could not be dragged across the canvas or double-clicked to edit target batch amounts.
+  - Fixed an issue where vertical card resizing caused hitboxes and resize handles to remain at their previous heights, and corrected wire connection endpoints on hidden ports.
+- **Fixed Machine Config Dialog Frame Drops and Addon Catalog Stutter**:
+  - Fixed an issue where opening the machine configuration dialog caused a significant frame drop by optimizing background node rendering behind dialogs and caching addon card presentation data.
+  - Machine configuration dialogs now open and scroll smoothly without UI lag or frame drops.
+- **Fixed Excluded Recipe Categories Appearing in Favorites Menu**:
+  - Fixed an issue where recipes belonging to categories disabled in the Recipe Category Filter modal still appeared in the Favorites dock sidebar and sub-recipe flyouts.
+  - Category exclusions now apply immediately and dynamically filter recipes across both search results and Favorites menus.
+- **Fixed Multiblock Parallel and Overclock Calculation with Energy & Parallel Hatches**:
+  - Fixed an issue where multiblock machines always attempted maximum parallel processing even when installed energy hatches lacked sufficient power, causing excessive power consumption calculations. Parallel processing is now accurately capped by the total power capacity of the installed energy hatches.
+  - Aligned recipe calculation order so recipes are batched by parallel capacity before overclocking, ensuring lower-tier recipes running with high parallel in higher-tier multiblocks correctly calculate within machine power limits instead of consuming excessive higher-tier energy.
+- **Fixed Alternative Input Cycling in Slim Card Mode**:
+  - Fixed an issue where scrolling over an input port with alternative ingredients in Slim Card Mode changed the machine voltage tier instead of cycling items.
+- **Fixed Star Technology Large/Extreme Chemical Reactor Coil Overclock Bonuses**:
+  - Fixed an issue where Large Chemical Reactor (LCR) and Extreme Chemical Reactor (ECR) failed to apply recipe duration reduction and EU/t discount bonuses when equipped with heating coils in Star Technology.
+  - Accurately applies chemical reactor processing speed and energy consumption bonuses across all 11 heating coil tiers (from Cupronickel to Abyssal Alloy).
+- **Fixed Turbine Misidentification and Restored Boost Options on Combustion Engines**:
+  - Fixed an issue where Extreme Combustion Engine (ECE) and Large Combustion Engine (LCE) erroneously opened the turbine rotor configuration and rotor catalog instead of combustion engine controls.
+  - Restored oxygen boost (LCE), liquid oxygen boost (ECE), oxidizer boost, and frame coolant boost options in the machine configuration dialog, power tooltips, and node badges.
+- **Fixed Runaway Power Generation and Cycle Distortion on Combustion Engines & Rocket Modules**:
+  - Fixed an issue where opening the machine configuration dialog on combustion engines and rocket modules caused power generation and cycle speeds to multiply uncontrollably.
+  - Combustion generators and rocket modules now reliably maintain their intended base generation (such as 2A UV on SRM) and physical running cycles without parallel hatch corruption.
+- **Fixed Missing Auxiliary Fluid Input Slots on Combustion Engine & Rocket Modules**:
+  - Fixed an issue where Star Technology combustion and rocket modules (T1–T4) and combustion engine boosters failed to generate required auxiliary fluid input slots (lubricants, oxidizers, coolants) on the node card.
+  - Essential operating fluids (Lubricant, Tungsten Disulfide) and optional booster fluids (WFNA, RFNA, O₂F₂, FcSO₂, coolants) now accurately generate input slots with precise consumption rates synced to tooltips and mass balance solving.
+- **Fixed Runaway Machine Count Explosion in Closed Recirculation Loops during Auto-Ratio**:
+  - Fixed an issue where running Auto-Ratio on production lines containing closed byproduct recirculation loops (such as fuel desulfurization with hydrogen recycling) caused machine counts to multiply uncontrollably into millions due to cyclic feedback amplification.
+  - Auto-Ratio now reliably protects closed recirculation loops from infinite scaling while accurately balancing external supply and demand.
+- **Fixed Inactive Canvas Hotkeys (Alt+R, Shift+C, G) & Dropdown Esc Close**:
+  - Resolved an issue where canvas keyboard shortcuts such as Auto-Ratio (`Alt+R`), Fractional Auto-Ratio (`Shift+Alt+R`), Auto-Connect (`Shift+C`), and Grid Snap toggle (`G`) did not trigger when pressed on the board.
+  - Added Auto-Ratio (`Alt+R`) and Auto-Connect (`Shift+C`) to the shortcut help guide (`H`), and enabled pressing `Esc` to close open toolbar dropdown menus.
 
 ## [2.2.0-alpha.3] - 2026-09-07
 

@@ -301,6 +301,13 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        boolean showDebug = BoardManager.getInstance().isShowDebugInfo();
+        com.gtceu.calcboard.client.gui.util.RenderProfiler profiler = com.gtceu.calcboard.client.gui.util.RenderProfiler.getInstance();
+        if (showDebug) {
+            profiler.startFrame();
+            profiler.startSection("Pan / Viewport");
+        }
+
         updateSmoothPan();
         if (this.minecraft != null) {
             viewportTransform.update(this.minecraft);
@@ -317,20 +324,31 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         this.lastMouseX = localMouseX;
         this.lastMouseY = localMouseY;
 
+        if (showDebug) profiler.startSection("Summary Solver");
         updateGraphSummaryIfDirty();
 
         graphics.pose().pushPose();
         viewportTransform.applyPose(graphics.pose());
 
+        if (showDebug) profiler.startSection("Background");
         renderBackground(graphics);
         BoardHudRenderer.renderGridBackground(graphics, width, height, panX, panY, zoom);
         BoardHudRenderer.renderEmptyCanvasWatermark(graphics, font, width, height, getGraph().getNodes().size());
 
         canvasRenderer.renderCanvasScene(graphics, this, getGraph(), nodeWidgets, wireRenderer, canvasHandler, panX, panY, zoom, width, height, localMouseX, localMouseY, partialTicks);
 
+        if (showDebug) profiler.startSection("UI Widgets");
         renderScreenWidgets(graphics, localMouseX, localMouseY, partialTicks);
         clearForeignWidgets();
+
+        if (showDebug) profiler.startSection("Overlays / Modals");
         renderTopOverlays(graphics, localMouseX, localMouseY, partialTicks);
+
+        if (showDebug) {
+            profiler.endSection();
+            profiler.render(graphics, font, width, height, AdaptiveStatusBar.BAR_HEIGHT);
+            profiler.endFrame();
+        }
 
         graphics.pose().popPose();
     }

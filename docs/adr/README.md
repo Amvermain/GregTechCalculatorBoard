@@ -53,10 +53,17 @@ stateDiagram-v2
 | **[ADR-022](ADR_022_CLOSED_LOOP_RECIRCULATION_AND_SUPPLY_ALLOCATION.md)** | 폐쇄 순환 공정 자급 자원 보호 및 공급 우선 할당 알고리즘 명세<br/>*(Closed-Loop Recirculation Self-Sustaining Protection & Supply-Filling Allocation Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | Tarjan SCC 기반 자급 순환 자원 불변식 감쇠 나선 차단, Greedy Demand-Filling 엣지 할당, 실효 소비량 결손 판정 및 상류 감속(↓) 인디케이터 |
 | **[ADR-023](ADR_023_PER_CRAFT_BATCH_VIEW_AND_STOICHIOMETRIC_LOOP_VERIFICATION.md)** | 레시피 1회(배치) 기준 뷰 모드 및 화학양론적 순환 루프 검증 명세<br/>*(Per-Craft Batch View & Stoichiometric Recirculation Loop Verification Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 시간 단위 소거형 1회(1x) 뷰 모드(RateTimeUnit.PER_RECIPE), 모델 B 독립 1회 레시피 뷰, 화학양론적 포트 보존 및 밸런스(✔) 인디케이터 |
 | **[ADR-024](ADR_024_TARGET_OUTPUT_RATE_AND_FRACTIONAL_AUTO_RATIO.md)** | 목표 생산량 기반 기계 대수 자동 역산 및 정밀 소수점 Auto-Ratio 명세<br/>*(Target Output Rate Inverse Solver & Fractional Auto-Ratio Precision Scaling Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 출력 포트 Ctrl+클릭 목표치(예: 1/12s, 5/min) 기계 대수 O(1) 역산, 정밀 소수점 Auto-Ratio(Alt+클릭), 앵커 소수점 보존 모드 |
+| **[ADR-025](ADR_025_UNIFIED_CANVAS_WORKSPACE_AND_CONTEXT_DRIVEN_UI.md)** | 3-패널 통합 워크스페이스 및 컨텍스트 중심 UI/UX 현대화 명세<br/>*(Unified Canvas Workspace & Context-Driven UI/UX Modernization Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | 캔버스/노드 우클릭 컨텍스트 메뉴, 스마트 커넥트 추천, 노드 카드 슬림화 및 비모달 우측 인스펙터, 3-패널 통합 워크스페이스 구축 |
 | **[ADR-026](ADR_026_MODAL_DIALOG_STACK_AND_REGISTRY.md)** | 모달 다이얼로그 스택 및 레지스트리 아키텍처<br/>*(Modal Dialog Stack & Registry Architecture)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | IBoardModal 공통 인터페이스, LIFO 기반 ModalStack 및 BoardDialogManager 26개 if-else 분기 평탄화 O(1) 디스패치 |
 | **[ADR-027](ADR_027_CANVAS_INTERACTION_FINITE_STATE_MACHINE.md)** | 캔버스 인터랙션 유한 상태 머신 명세<br/>*(Canvas Interaction Finite State Machine Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | CanvasInteractionState FSM 전면 도입, 10여 개 불리언 플래그 제거, 결정론적 상태 전이 및 $O(1)$ 단일 활성 상태 보장 |
 | **[ADR-028](ADR_028_COMPOSABLE_RECIPE_SEARCH_SPECIFICATION.md)** | 합성 가능한 레시피 검색 쿼리 명세 패턴<br/>*(Composable Recipe Search Specification Pattern)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | 검색 필터 로직의 Specification Pattern 모듈화, And/Or/Not 선언적 합성 및 비용 기반 단락 평가(Short-Circuit) 최적화 |
 | **[ADR-029](ADR_029_MOD_ADAPTER_INTERFACE_SEGREGATION_AND_EXTENSIONS.md)** | IModAdapter 인터페이스 분리(ISP) 및 Extension Object 패턴 명세<br/>*(IModAdapter Interface Segregation & Extension Object Pattern Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.3` | 2026-09-06 | IModAdapter 824줄에서 86줄 슬림화, 6대 도메인 Provider 분리 및 Extension Object 패턴 확립, 100% 하위 호환성 유지 |
+| **[ADR-030](ADR_030_UNIFIED_NODE_LAYOUT_BOUNDS_AND_HITBOX_MODEL.md)** | 노드 카드 레이아웃 바운즈 단일 출처화 및 통합 히트박스 모델 명세<br/>*(Unified Node Layout Bounds & Single-Source Hitbox Architecture Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 렌더러와 이벤트 판정 코드 간의 오프셋 중복 하드코딩 제거, `NodeLayoutBounds` 기반 $O(1)$ 히트박스 일원화 및 슬림 모드 조작 간섭 해소 |
+| **[ADR-031](ADR_031_SHARED_MACHINE_POOL_AUTO_RATIO.md)** | 공유 기계 풀(Shared Machine Pool) 용량 기반 자동 비율 맞춤 명세<br/>*(Shared Machine Pool Capacity-Driven Auto-Ratio Architecture)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 물리 기계 대수/용량(기본 1.0대) 기준 공정 비례 스케일링, 정밀 소수점/정수 올림 분리 지원, 프레임 헤더 원클릭 비율 맞춤 |
+| **[ADR-032](ADR_032_AUTO_RATIO_DIVERGENCE_ALERT_AND_GUIDANCE.md)** | 자동 비율 맞춤 폐순환 루프 발산 방어, 경고 뱃지 및 액션 가이드 툴팁<br/>*(Auto-Ratio Recirculation Divergence Detection, Node Warning Badges & Interactive Actionable Guidance)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 폐순환 루프 발산 억제 노드 감지, 노드 카드 [⚠️] 경고 뱃지 렌더링, 원인 및 해결책 안내 가상 툴팁, 원클릭 앵커 지정 및 알림 토스트 |
+| **[ADR-033](ADR_033_COMPREHENSIVE_DIVERGENCE_DEFENSE_MATRIX.md)** | 포괄적 공정 발산 방어 매트릭스 및 상황별 진단 가이드 시스템 명세<br/>*(Comprehensive Process Divergence Defense Matrix & Contextual Diagnostic Guidance System)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 증식 루프, 복합 8자 루프, 촉매 감쇠, 앵커 모순, 극미세 수율 7대 발산 시나리오 자동 방어 및 상황별 5행 진단 뱃지/가이드 |
+| **[ADR-034](ADR_034_JUNCTION_BUFFER_AND_ANCHOR_SYSTEM.md)** | 정션 노드 동적 잉여/결핍 완충 배선 및 Auto-Ratio 유량 앵커 시스템<br/>*(Junction Dynamic Buffer/Sink Wiring & Auto-Ratio Flow Anchoring System)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 퀵 마커 컨텍스트 드래그(잉여 배출/결핍 공급 1클릭 생성), Void Sink 오버플로우 스필웨이 우선 배분, Fixed 정션 유량 앵커 Auto-Ratio 지원 |
+| **[ADR-035](ADR_035_TWO_STAGE_LINEAR_FLOW_SOLVER.md)** | 2단계 선형 연립방정식 유량 솔버 및 정수 양자화 아키텍처<br/>*(Two-Stage Linear Flow Balance Solver & Integer Quantization Architecture)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-08 | 가우스 소거법 기반 1단계 연속 유량 균형 연산 및 2단계 정수 양자화를 통한 단 1회 클릭 결정론적 수렴 보장 및 질량 보존 정합 |
 
 ---
 
@@ -65,7 +72,9 @@ stateDiagram-v2
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :--- :---: | :---: | :---: | :--- |
 | **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PARTIALLY_IMPLEMENTED` | `v2.2.0` | 2026-09-02 | Trait 기반 물리/승수(5A~12A, 냉각 1.2x/1.4x) 및 머신 설정 UI 통합 완료(Phase 1), 부수 유체 입력 주입 대기(Phase 2) |
-| **[RFC-025](../RFC_025_UNIFIED_CANVAS_WORKSPACE_AND_CONTEXT_DRIVEN_UI.md)** | 3-패널 통합 워크스페이스 및 컨텍스트 중심 UI/UX 현대화 명세<br/>*(Unified Canvas Workspace & Context-Driven UI/UX Modernization Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.2` | 2026-09-05 | 캔버스/노드 우클릭 컨텍스트 메뉴, 스마트 커넥트 추천, 노드 카드 슬림화 및 비모달 우측 인스펙터, 3-패널 통합 워크스페이스 구축 |
+
+
+
 
 
 

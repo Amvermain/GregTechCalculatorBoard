@@ -112,6 +112,9 @@ public class ActiveAddonsView {
             tooltip.add(Component.literal("§f" + hoveredActiveAddon.getName()));
             IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
             adapter.buildAddonTooltip(node, hoveredActiveAddon, true, tooltip);
+            if (tooltip.size() <= 1 && hoveredActiveAddon.getDescription() != null && !hoveredActiveAddon.getDescription().isEmpty()) {
+                tooltip.add(Component.literal("§7" + hoveredActiveAddon.getDescription()));
+            }
             tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             MachineConfigDialog.appendAdvancedTooltipDebugInfo(tooltip, hoveredActiveAddon);
             dialog.setDeferredTooltip(tooltip);

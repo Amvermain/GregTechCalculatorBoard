@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -85,21 +86,21 @@ public class GTCEuRecipeHandler {
             catId = EmiGTCEuHelper.getCategoryId(emiRecipeObj);
         }
 
+        ResourceLocation recipeTypeId = null;
+        if (backing != null && isGTRecipe(backing)) {
+            try {
+                Field recipeTypeField = backing.getClass().getField("recipeType");
+                Object rt = recipeTypeField.get(backing);
+                recipeTypeId = com.gtceu.calcboard.api.catalog.MultiblockDetector.extractRecipeTypeId(rt);
+            } catch (Throwable ignored) {}
+        }
+
         boolean isGT = isGTRecipe(backing) || (catId != null && isGTCategoryNamespace(catId.getNamespace()));
         if (!isGT && backing == null) return false;
 
-        boolean isGTBoiler = false;
-        if (catId != null && (catId.getPath().contains("boiler") || catId.getPath().contains("steam_boiler"))) {
-            isGTBoiler = true;
-        }
-        if (!isGTBoiler && com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
-            isGTBoiler = EmiGTCEuHelper.isBoiler(emiRecipeObj);
-        }
-        if (!isGTBoiler && backing != null && isGTRecipe(backing)) {
-            if (catId != null && catId.getPath().contains("boiler")) {
-                isGTBoiler = true;
-            }
-        }
+        boolean isGTBoiler = (catId != null && com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isBoilerCategory(catId))
+                || (recipeTypeId != null && com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isBoilerCategory(recipeTypeId))
+                || (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded() && EmiGTCEuHelper.isBoiler(emiRecipeObj));
 
         if (isGTBoiler) {
             if (backing != null) {
@@ -132,22 +133,9 @@ public class GTCEuRecipeHandler {
                 isLiquidFuel = EmiGTCEuHelper.isLiquidFuel(emiRecipeObj);
             }
 
-            boolean isLargeBoiler = false;
-            if (catId != null && catId.getPath().contains("large_boiler")) {
-                isLargeBoiler = true;
-            }
-            if (!isLargeBoiler && com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
-                isLargeBoiler = EmiGTCEuHelper.isLargeBoiler(emiRecipeObj);
-            }
-            if (!isLargeBoiler && backing != null && isGTRecipe(backing)) {
-                try {
-                    Field recipeTypeField = backing.getClass().getField("recipeType");
-                    Object rt = recipeTypeField.get(backing);
-                    if (rt != null && rt.toString().toLowerCase(Locale.ROOT).contains("large_boiler")) {
-                        isLargeBoiler = true;
-                    }
-                } catch (Throwable ignored) {}
-            }
+            boolean isLargeBoiler = (catId != null && com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isLargeBoilerCategory(catId))
+                    || (recipeTypeId != null && com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isLargeBoilerCategory(recipeTypeId))
+                    || (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded() && EmiGTCEuHelper.isLargeBoiler(emiRecipeObj));
 
             double baseSteamPerTick;
             if (isLargeBoiler) {
@@ -189,16 +177,16 @@ public class GTCEuRecipeHandler {
 
         private static boolean isBoiler(Object emiRecipeObj) {
             if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
-                if (er.getId() != null && er.getId().getPath().contains("boiler")) return true;
-                if (er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("boiler")) return true;
+                if (er.getCategory() != null && GTBoilerPhysics.isBoilerCategory(er.getCategory().getId())) return true;
+                if (er.getId() != null && GTBoilerPhysics.isBoilerCategory(er.getId())) return true;
             }
             return false;
         }
 
         private static boolean isLargeBoiler(Object emiRecipeObj) {
             if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe er) {
-                if (er.getId() != null && er.getId().getPath().contains("large_boiler")) return true;
-                if (er.getCategory() != null && er.getCategory().getId() != null && er.getCategory().getId().getPath().contains("large_boiler")) return true;
+                if (er.getCategory() != null && GTBoilerPhysics.isLargeBoilerCategory(er.getCategory().getId())) return true;
+                if (er.getId() != null && GTBoilerPhysics.isLargeBoilerCategory(er.getId())) return true;
             }
             return false;
         }

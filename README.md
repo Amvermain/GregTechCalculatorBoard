@@ -155,7 +155,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.3.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.4.jar`.
 
 ---
 
@@ -189,6 +189,12 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.3
 - [SatisFlow](https://satisflow.app/) - Interactive node-graph factory calculator and flowchart planner for Satisfactory.
 - [Foreman 2](https://github.com/DanielKote/Foreman2) - Node-based visual flowchart production line calculator for Factorio.
 - [Helmod](https://mods.factorio.com/mod/helmod) - Feature-rich in-game factory calculation and recipe matrix solver mod for Factorio.
+
+---
+
+## AI Disclosure
+
+This project was developed through pair programming between the maintainer and an AI coding assistant (Google Antigravity / Gemini). System architecture, domain requirements, code reviews, in-game verification, and final decision-making were strictly guided and validated by the maintainer.
 
 ---
 

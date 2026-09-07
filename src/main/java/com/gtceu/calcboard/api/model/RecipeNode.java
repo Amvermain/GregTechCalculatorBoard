@@ -58,6 +58,8 @@ public class RecipeNode {
     private transient int cachedTotalParallel = -1;
     private transient double cachedNominalCps = -1.0;
     private transient double cachedSingleMachinePower = -1.0;
+    private transient Boolean cachedOperational = null;
+    private transient FlowGraph cachedOperationalGraph = null;
 
     // Canvas position & Dimensions
     private double posX;
@@ -952,11 +954,33 @@ public class RecipeNode {
         return isOperational(null);
     }
 
+    public void markOperationalDirty() {
+        this.cachedOperational = null;
+        this.cachedOperationalGraph = null;
+    }
+
     public boolean isOperational(FlowGraph graph) {
         if (isReroute) return true;
-        if (!hasValidReflector()) return false;
+        if (cachedOperational != null) {
+            if (Boolean.FALSE.equals(cachedOperational)) {
+                return false;
+            }
+            if (graph == null || cachedOperationalGraph == graph) {
+                return cachedOperational;
+            }
+        }
+        if (!hasValidReflector()) {
+            cachedOperational = false;
+            cachedOperationalGraph = null;
+            return false;
+        }
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(this);
-        return adapter != null ? adapter.validateNode(this, graph, null) : true;
+        boolean op = adapter != null ? adapter.validateNode(this, graph, null) : true;
+        if (graph != null || !op) {
+            cachedOperational = op;
+            cachedOperationalGraph = graph;
+        }
+        return op;
     }
 
     public boolean isMultiblock() {
@@ -1090,6 +1114,7 @@ public class RecipeNode {
         this.cachedNominalCps = -1.0;
         this.cachedSingleMachinePower = -1.0;
         this.cachedModAdapter = null;
+        this.cachedOperational = null;
     }
 
     public IModAdapter getCachedModAdapter() {

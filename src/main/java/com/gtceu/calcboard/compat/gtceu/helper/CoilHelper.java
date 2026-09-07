@@ -26,15 +26,28 @@ public class CoilHelper {
 
     private static final Map<String, CoilStats> STATS_CACHE = new ConcurrentHashMap<>();
 
+    private static void registerCoil(String key, int temp, int pyro, int crack, int chemSpd, int chemEut, int smelterPar) {
+        CoilStats stats = new CoilStats(temp, pyro, crack, chemSpd, chemEut, smelterPar);
+        STATS_CACHE.put(key, stats);
+        if (key.endsWith("_block")) {
+            STATS_CACHE.put(key.substring(0, key.length() - "_block".length()), stats);
+        } else {
+            STATS_CACHE.put(key + "_block", stats);
+        }
+    }
+
     static {
-        STATS_CACHE.put("gtceu:cupronickel_coil_block", new CoilStats(1800, 100, 100, 100, 100, 16));
-        STATS_CACHE.put("gtceu:kanthal_coil_block", new CoilStats(2700, 100, 90, 125, 95, 32));
-        STATS_CACHE.put("gtceu:nichrome_coil_block", new CoilStats(3600, 150, 80, 150, 90, 64));
-        STATS_CACHE.put("gtceu:rtm_alloy_coil_block", new CoilStats(4500, 200, 70, 175, 85, 128));
-        STATS_CACHE.put("gtceu:hssg_coil_block", new CoilStats(5400, 250, 60, 200, 80, 256));
-        STATS_CACHE.put("gtceu:naquadah_coil_block", new CoilStats(7200, 300, 50, 225, 75, 2048));
-        STATS_CACHE.put("gtceu:trinium_coil_block", new CoilStats(9001, 350, 40, 250, 70, 4096));
-        STATS_CACHE.put("gtceu:tritanium_coil_block", new CoilStats(10800, 400, 30, 275, 65, 8192));
+        registerCoil("gtceu:cupronickel_coil_block", 1800, 100, 100, 75, 100, 16);
+        registerCoil("gtceu:kanthal_coil_block", 2700, 100, 90, 100, 95, 32);
+        registerCoil("gtceu:nichrome_coil_block", 3600, 150, 80, 125, 90, 64);
+        registerCoil("gtceu:rtm_alloy_coil_block", 4500, 200, 70, 150, 85, 128);
+        registerCoil("gtceu:hssg_coil_block", 5400, 250, 60, 175, 80, 256);
+        registerCoil("gtceu:naquadah_coil_block", 7200, 300, 50, 200, 75, 2048);
+        registerCoil("gtceu:trinium_coil_block", 9001, 350, 40, 225, 70, 4096);
+        registerCoil("gtceu:tritanium_coil_block", 10800, 400, 30, 250, 65, 8192);
+        registerCoil("kubejs:zalloy_coil_block", 13499, 450, 20, 275, 60, 4096);
+        registerCoil("kubejs:magmada_alloy_coil_block", 16199, 500, 10, 300, 55, 8192);
+        registerCoil("kubejs:abyssal_alloy_coil_block", 18888, 550, 7, 325, 50, 16384);
     }
 
     public record CoilStats(
@@ -45,7 +58,7 @@ public class CoilHelper {
             int chemicalEnergyPercent,
             int smelterParallel
     ) {
-        public static final CoilStats DEFAULT = new CoilStats(1800, 100, 100, 100, 100, 16);
+        public static final CoilStats DEFAULT = new CoilStats(1800, 100, 100, 75, 100, 16);
     }
 
     public static boolean isHeatingCoil(ResourceLocation id) {
@@ -89,7 +102,7 @@ public class CoilHelper {
         }
 
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
-        return id != null ? STATS_CACHE.get(id.toString()) : null;
+        return id != null ? getCoilStats(id.toString()) : null;
     }
 
     public static CoilStats getCoilStats(String coilIdentifier) {
@@ -100,6 +113,18 @@ public class CoilHelper {
         String key = sanitizeCoilKey(coilIdentifier);
         if (STATS_CACHE.containsKey(key)) {
             return STATS_CACHE.get(key);
+        }
+
+        if (key.endsWith("_block")) {
+            String withoutBlock = key.substring(0, key.length() - "_block".length());
+            if (STATS_CACHE.containsKey(withoutBlock)) {
+                return STATS_CACHE.get(withoutBlock);
+            }
+        } else {
+            String withBlock = key + "_block";
+            if (STATS_CACHE.containsKey(withBlock)) {
+                return STATS_CACHE.get(withBlock);
+            }
         }
 
         CoilStats computed = computeCoilStatsFromRegistry(key);

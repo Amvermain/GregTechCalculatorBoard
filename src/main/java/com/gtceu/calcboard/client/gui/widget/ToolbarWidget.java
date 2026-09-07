@@ -10,6 +10,7 @@ import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 
+import com.gtceu.calcboard.api.solver.AutoRatioResult;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BlueprintCodec;
 import com.gtceu.calcboard.api.model.FlowGraph;
@@ -21,8 +22,10 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.*;
@@ -68,6 +71,10 @@ public class ToolbarWidget {
 
     public boolean isOverflowMenuOpen() {
         return activeDropdown != DropdownMenu.NONE;
+    }
+
+    public void closeDropdown() {
+        this.activeDropdown = DropdownMenu.NONE;
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -582,9 +589,19 @@ public class ToolbarWidget {
         return false;
     }
 
+    private static boolean isShiftDownSafe() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasShiftDown();
+    }
+
+    private static boolean isAltDownSafe() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc != null && mc.getWindow() != null && Screen.hasAltDown();
+    }
+
     public void performAutoConnect() {
         if (!screen.ensureEditPermission()) return;
-        if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+        if (isShiftDownSafe()) {
             performAutoConnectWithFilter(screen, null);
         } else {
             screen.openAutoConnectDialog();
@@ -801,8 +818,8 @@ public class ToolbarWidget {
     }
 
     public void performAutoRatio() {
-        boolean isShift = Screen.hasShiftDown();
-        boolean isAlt = Screen.hasAltDown();
+        boolean isShift = isShiftDownSafe();
+        boolean isAlt = isAltDownSafe();
         boolean isFractionalDefault = BoardManager.getInstance().isAutoRatioFractionalDefault();
         if (isAlt) {
             performAutoRatio(false, true);
@@ -823,11 +840,11 @@ public class ToolbarWidget {
         RecipeNode baseNode = findAnchorNode(graph);
 
         Map<String, Double> oldCounts = captureMachineCounts(graph);
-        executeAutoRatioAlgorithm(graph, baseNode, harmonized, fractional);
+        AutoRatioResult result = executeAutoRatioAlgorithm(graph, baseNode, harmonized, fractional);
         recordAutoRatioHistory(graph, baseNode, oldCounts, harmonized, fractional);
 
         refreshWidgetsAfterAutoRatio();
-        notifyAutoRatioResult(baseNode, harmonized, fractional);
+        notifyAutoRatioResult(baseNode, harmonized, fractional, result);
     }
 
     private RecipeNode findAnchorNode(FlowGraph graph) {
@@ -848,14 +865,14 @@ public class ToolbarWidget {
         return counts;
     }
 
-    private void executeAutoRatioAlgorithm(FlowGraph graph, RecipeNode baseNode, boolean harmonized, boolean fractional) {
-        if (graph == null || baseNode == null) return;
+    private AutoRatioResult executeAutoRatioAlgorithm(FlowGraph graph, RecipeNode baseNode, boolean harmonized, boolean fractional) {
+        if (graph == null || baseNode == null) return null;
         if (harmonized) {
-            graph.autoRatioHarmonized(baseNode);
+            return graph.autoRatioHarmonized(baseNode);
         } else if (fractional) {
-            graph.autoRatioFractional(baseNode);
+            return graph.autoRatioFractional(baseNode);
         } else {
-            graph.autoRatioFromAnchor(baseNode);
+            return graph.autoRatioFromAnchor(baseNode);
         }
     }
 
@@ -886,27 +903,45 @@ public class ToolbarWidget {
         com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onAutoRatioTriggered();
     }
 
-    private void notifyAutoRatioResult(RecipeNode baseNode, boolean harmonized, boolean fractional) {
+    private static void playUiSound(SoundEvent sound, float pitch) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null && sound != null) {
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch));
+        }
+    }
+
+    private static void playUiSound(Holder<SoundEvent> sound, float pitch) {
+        if (sound != null && sound.isBound()) {
+            playUiSound(sound.value(), pitch);
+        }
+    }
+
+    private void notifyAutoRatioResult(RecipeNode baseNode, boolean harmonized, boolean fractional, AutoRatioResult result) {
+        if (result != null && result.hasDivergence()) {
+            BoardToast.show(Component.literal("§6⚠️ ").append(Component.translatable("message.gtcalcboard.auto_ratio_divergence_toast", result.divergentNodeIds().size())));
+            playUiSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8F);
+            return;
+        }
         String baseName = baseNode != null ? baseNode.getName() : "Graph";
         if (harmonized && baseNode != null) {
             BoardToast.show(Component.literal("§6✨ ").append(Component.translatable("message.gtcalcboard.auto_ratio_harmonized", baseName, (int) baseNode.getMachineCount())));
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            playUiSound(SoundEvents.PLAYER_LEVELUP, 1.2F);
             return;
         }
         if (fractional && baseNode != null) {
             BoardToast.show(Component.literal("§b⚡ ").append(Component.translatable("message.gtcalcboard.auto_ratio_fractional", baseName)));
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            playUiSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F);
             return;
         }
         BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.auto_ratio_matched", baseName)));
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+        playUiSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F);
     }
 
     public void performMaxThroughputOptimization() {
         if (!screen.ensureEditPermission()) return;
         runMaxFlow();
         BoardToast.show(Component.literal("§6▲ ").append(Component.translatable("message.gtcalcboard.max_flow_optimized", "MAX")));
-        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+        playUiSound(SoundEvents.PLAYER_LEVELUP, 1.2F);
     }
 
     private void runMaxFlow() {

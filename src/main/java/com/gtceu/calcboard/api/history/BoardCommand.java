@@ -1102,12 +1102,24 @@ public interface BoardCommand {
         private final int newColor;
         private final boolean oldShared;
         private final boolean newShared;
+        private final double oldTargetCapacity;
+        private final double newTargetCapacity;
 
         public ModifyFramePropertiesCommand(
                 String frameId,
                 String oldTitle, String newTitle,
                 int oldColor, int newColor,
                 boolean oldShared, boolean newShared
+        ) {
+            this(frameId, oldTitle, newTitle, oldColor, newColor, oldShared, newShared, 1.0, 1.0);
+        }
+
+        public ModifyFramePropertiesCommand(
+                String frameId,
+                String oldTitle, String newTitle,
+                int oldColor, int newColor,
+                boolean oldShared, boolean newShared,
+                double oldTargetCapacity, double newTargetCapacity
         ) {
             this.frameId = frameId;
             this.oldTitle = oldTitle;
@@ -1116,6 +1128,8 @@ public interface BoardCommand {
             this.newColor = newColor;
             this.oldShared = oldShared;
             this.newShared = newShared;
+            this.oldTargetCapacity = oldTargetCapacity;
+            this.newTargetCapacity = newTargetCapacity;
         }
 
         @Override
@@ -1125,6 +1139,7 @@ public interface BoardCommand {
                 frame.setTitle(oldTitle);
                 frame.setColor(oldColor);
                 frame.setSharedMachineFrame(oldShared);
+                frame.setTargetPoolCapacity(oldTargetCapacity);
             }
         }
 
@@ -1135,6 +1150,7 @@ public interface BoardCommand {
                 frame.setTitle(newTitle);
                 frame.setColor(newColor);
                 frame.setSharedMachineFrame(newShared);
+                frame.setTargetPoolCapacity(newTargetCapacity);
             }
         }
 

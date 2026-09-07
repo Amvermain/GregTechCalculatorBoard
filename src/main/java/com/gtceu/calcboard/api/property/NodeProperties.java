@@ -51,6 +51,17 @@ public final class NodeProperties {
             NodePropertyKey.ofDouble("junction_buffer_size", 0.0)
     );
 
+    // Auto-Ratio Recirculation Divergence Properties (RFC-032 / RFC-033)
+    public static final NodePropertyKey<Boolean> DIVERGENCE_WARNING = register(
+            NodePropertyKey.ofBoolean("divergence_warning", false)
+    );
+    public static final NodePropertyKey<String> DIVERGENCE_REASON = register(
+            NodePropertyKey.ofString("divergence_reason", "")
+    );
+    public static final NodePropertyKey<String> DIVERGENCE_DETAIL = register(
+            NodePropertyKey.ofString("divergence_detail", "")
+    );
+
     private NodeProperties() {}
 
     public static <T> NodePropertyKey<T> register(NodePropertyKey<T> key) {

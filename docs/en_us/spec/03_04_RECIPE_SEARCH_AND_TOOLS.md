@@ -220,6 +220,9 @@ Dedicated sidebar dock located at the top-left of the board to view pinned EMI f
 * **One-Click & Drag-and-Drop Spawning**:
   - Click: Automatically places node at the next available canvas position.
   - Drag: Drag any recipe row and release anywhere on the canvas to spawn at that exact coordinate.
+* **Draggable Scrollbar Interaction**:
+  - Automatically activates a minimal scrollbar along the right border when pinned favorite items exceed the available panel height.
+  - Supports thumb dragging and track click jumping in addition to mouse wheel scrolling for rapid navigation across extensive favorite lists.
 
 #### `FavoritesDockWidget` UI Wireframe
 
@@ -405,6 +408,36 @@ IDE-style lightweight modal activated via `Ctrl + K` for instant fuzzy searching
 
 * **Fuzzy Search & Substring Highlighting**: Instant prefix and subsequence matching across page names and folder paths.
 * **Keyboard Flow**: `↑` / `↓` navigation, `Enter` to switch pages instantly, `Esc` to dismiss.
+
+---
+
+## 9. Real-Time Rendering & Calculation Performance Profiler HUD (`RenderProfiler`, F3) (ADR-031)
+
+An in-game diagnostic profiler overlay designed to assess rendering and linear solver computational performance across large flowsheets:
+
+* **Toggle Shortcut**: Press `F3` to toggle the performance profiler HUD on and off in real time.
+* **Tracked Metrics & Timing**:
+  - `Layout Time`: Time spent calculating node and wire bounding boxes ($\mu\text{s}$).
+  - `Render Time`: Time spent rendering node cards, bezier curves, and badge overlays ($\mu\text{s}$).
+  - `Solve Time`: Time spent evaluating the 2-stage linear flow solver and cyclic loops ($\mu\text{s}$).
+  - `FPS & Frame Time`: Current screen refresh rate and total frame time ($\text{ms}$).
+* **Visual Graph & Color Thresholds**:
+  - Displays a 60-frame rolling time histogram mini-chart at the top-right corner.
+  - Visualizes headroom against the 60 FPS frame budget ($16.6\text{ms}$) with green (healthy), amber (warning), and red (over-budget) indicators.
+
+---
+
+## 10. In-Game Mod Version Update Notification System (`ClientUpdateNotifier`) (ADR-035)
+
+Performs background release checks to inform users of the latest improvements and bug fixes:
+
+* **Asynchronous Release Polling (`ClientUpdateNotifier`)**:
+  - Periodically polls the remote release manifest (`update.json`) on an isolated background daemon thread to query the latest release tags and changelog summaries.
+  - Gracefully falls back on timeouts or network unreachability without causing client frame drops or UI hitching.
+* **In-Game Notification Badge & Settings Tab**:
+  - Renders an update notification badge (`[NEW vX.Y.Z]`) on the settings gear icon and settings dialog.
+  - Clicking displays a release summary popup with direct navigation to mod download assets.
+  - Features an explicit enable/disable toggle within the `SettingsTab` configuration panel.
 
 ---
 

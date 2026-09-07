@@ -19,7 +19,7 @@ import java.util.Locale;
 public class CanvasGroupFrameRenderer {
 
     public enum FrameAction {
-        NONE, COLOR, COLLAPSE, DELETE, RESIZE, CONFIG, AUTOFIT
+        NONE, COLOR, COLLAPSE, DELETE, RESIZE, CONFIG, AUTOFIT, AUTO_RATIO
     }
 
     public enum ResizeDirection {
@@ -99,7 +99,7 @@ public class CanvasGroupFrameRenderer {
         String prefix = frame.isSharedMachineFrame() ? "↔ " : (frame.isCompoundFrame() ? "▦ " : "");
         String displayTitle = prefix + title;
 
-        int btnCount = (frame.isSharedMachineFrame() ? 4 : 3) + 1;
+        int btnCount = 4 + (frame.isSharedMachineFrame() ? 2 : 0);
         int rightButtonsBoundary = x + w - (BTN_SIZE * btnCount + BTN_SPACING * (btnCount - 1) + 8);
 
         // Shared Machine Frame Load Badge & Incompatible Warning
@@ -192,6 +192,10 @@ public class CanvasGroupFrameRenderer {
             curBtnX -= (BTN_SIZE + BTN_SPACING);
             boolean cfgHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
             drawIconButton(graphics, font, "⚙", curBtnX, btnY, BTN_SIZE, BTN_SIZE, cfgHover, 0xFFFCD34D, 0x55F59E0B);
+
+            curBtnX -= (BTN_SIZE + BTN_SPACING);
+            boolean ratioHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
+            drawIconButton(graphics, font, "⚖", curBtnX, btnY, BTN_SIZE, BTN_SIZE, ratioHover, 0xFF60A5FA, 0x553B82F6);
         }
 
         // 5. Corner Grips & Edge Hover Highlight
@@ -233,85 +237,112 @@ public class CanvasGroupFrameRenderer {
         if (graph == null || graph.getFrames().isEmpty()) return;
 
         for (CanvasGroupFrame frame : graph.getFrames()) {
-            int x = (int) frame.getPosX();
-            int y = (int) frame.getPosY();
-            int w = (int) frame.getWidth();
+            if (renderSingleFrameTooltip(graphics, font, graph, frame, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
+                return;
+            }
+        }
+    }
 
-            int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
-            if (canvasMouseY >= y && canvasMouseY <= y + headerH && canvasMouseX >= x && canvasMouseX <= x + w) {
-                int btnY = y + 4;
-                int curBtnX = x + w - BTN_SIZE - 5;
+    private static boolean renderSingleFrameTooltip(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        int x = (int) frame.getPosX();
+        int y = (int) frame.getPosY();
+        int w = (int) frame.getWidth();
+        int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
 
-                // [✕ Delete]
-                if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
-                    return;
-                }
-                curBtnX -= (BTN_SIZE + BTN_SPACING);
+        if (canvasMouseY < y || canvasMouseY > y + headerH || canvasMouseX < x || canvasMouseX > x + w) {
+            return false;
+        }
 
-                // [▦ Collapse]
-                if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
-                    return;
-                }
-                curBtnX -= (BTN_SIZE + BTN_SPACING);
+        if (renderHeaderButtonsTooltip(graphics, font, frame, canvasMouseX, canvasMouseY, x, y, w, mouseX, mouseY)) {
+            return true;
+        }
 
-                // [⛶ Auto-Fit]
-                if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_autofit")), mouseX, mouseY);
-                    return;
-                }
-                curBtnX -= (BTN_SIZE + BTN_SPACING);
+        if (frame.isSharedMachineFrame()) {
+            renderSharedMachineBreakdownTooltip(graphics, font, graph, frame, mouseX, mouseY);
+            return true;
+        }
 
-                // [✦ Color]
-                if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                    BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e✦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
-                    return;
-                }
+        return false;
+    }
 
-                // [⚙ Configure Shared Machine]
-                if (frame.isSharedMachineFrame()) {
-                    curBtnX -= (BTN_SIZE + BTN_SPACING);
-                    if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-                        BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
-                        return;
-                    }
-                }
+    private static boolean renderHeaderButtonsTooltip(GuiGraphics graphics, Font font, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int x, int y, int w, int mouseX, int mouseY) {
+        int btnY = y + 4;
+        int curBtnX = x + w - BTN_SIZE - 5;
 
-                // If hovering on header text / badge area of Shared Machine Frame -> Show comprehensive Breakdown tooltip
-                if (frame.isSharedMachineFrame()) {
-                    double totalDuty = frame.computeTotalMachineDuty(graph);
-                    int reqMachines = frame.computeRequiredMachines(graph);
-                    boolean isCompatible = frame.isMachineCompatible(graph);
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
+            return true;
+        }
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-                    List<Component> tooltipLines = new ArrayList<>();
-                    tooltipLines.add(Component.literal("§b↔ " + frame.getTitle() + " §7(").append(Component.translatable("gui.gtcalcboard.frame.shared_machine_tag")).append(Component.literal("§7)")));
-                    tooltipLines.add(Component.translatable("gui.gtcalcboard.frame.total_duty_tooltip",
-                            String.format(Locale.ROOT, "%.1f%%", totalDuty * 100.0),
-                            String.valueOf(reqMachines)));
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
+            return true;
+        }
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-                    List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
-                    if (!enclosed.isEmpty()) {
-                        tooltipLines.add(Component.translatable("gui.gtcalcboard.frame.breakdown_header"));
-                        for (RecipeNode n : enclosed) {
-                            if (n != null && !n.isReroute()) {
-                                double nDuty = n.getMachineCount();
-                                String nodeName = n.getName() != null && !n.getName().isBlank() ? n.getName() : n.getMachineDisplayName();
-                                String tierTag = n.getTargetTier() != null ? " §8[" + n.getTargetTier().name() + "]" : "";
-                                tooltipLines.add(Component.literal("  §7• §f" + nodeName + tierTag + ": §e" + String.format(Locale.ROOT, "%.1f%%", nDuty * 100.0)));
-                            }
-                        }
-                    }
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§a⛶ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_autofit")), mouseX, mouseY);
+            return true;
+        }
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-                    if (!isCompatible) {
-                        tooltipLines.add(Component.literal("§c\u26A0 ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
-                    }
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e✦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_color")), mouseX, mouseY);
+            return true;
+        }
 
-                    BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY);
-                    return;
+        if (frame.isSharedMachineFrame()) {
+            return renderSharedHeaderButtonsTooltip(graphics, font, frame, canvasMouseX, canvasMouseY, curBtnX, btnY, mouseX, mouseY);
+        }
+        return false;
+    }
+
+    private static boolean renderSharedHeaderButtonsTooltip(GuiGraphics graphics, Font font, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int curBtnX, int btnY, int mouseX, int mouseY) {
+        int cfgBtnX = curBtnX - (BTN_SIZE + BTN_SPACING);
+        if (isMouseOver(canvasMouseX, canvasMouseY, cfgBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
+            return true;
+        }
+
+        int ratioBtnX = cfgBtnX - (BTN_SIZE + BTN_SPACING);
+        if (isMouseOver(canvasMouseX, canvasMouseY, ratioBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio", capacityStr)), mouseX, mouseY);
+            return true;
+        }
+        return false;
+    }
+
+    private static void renderSharedMachineBreakdownTooltip(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int mouseX, int mouseY) {
+        double totalDuty = frame.computeTotalMachineDuty(graph);
+        int reqMachines = frame.computeRequiredMachines(graph);
+        boolean isCompatible = frame.isMachineCompatible(graph);
+
+        List<Component> tooltipLines = new ArrayList<>();
+        tooltipLines.add(Component.literal("§b↔ " + frame.getTitle() + " §7(").append(Component.translatable("gui.gtcalcboard.frame.shared_machine_tag")).append(Component.literal("§7)")));
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.frame.total_duty_tooltip",
+                String.format(Locale.ROOT, "%.1f%%", totalDuty * 100.0),
+                String.valueOf(reqMachines)));
+
+        List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
+        if (!enclosed.isEmpty()) {
+            tooltipLines.add(Component.translatable("gui.gtcalcboard.frame.breakdown_header"));
+            for (RecipeNode n : enclosed) {
+                if (n != null && !n.isReroute()) {
+                    double nDuty = n.getMachineCount();
+                    String nodeName = n.getName() != null && !n.getName().isBlank() ? n.getName() : n.getMachineDisplayName();
+                    String tierTag = n.getTargetTier() != null ? " §8[" + n.getTargetTier().name() + "]" : "";
+                    tooltipLines.add(Component.literal("  §7• §f" + nodeName + tierTag + ": §e" + String.format(Locale.ROOT, "%.1f%%", nDuty * 100.0)));
                 }
             }
         }
+
+        if (!isCompatible) {
+            tooltipLines.add(Component.literal("§c\u26A0 ").append(Component.translatable("gui.gtcalcboard.frame.incompatible_warning")));
+        }
+
+        BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY);
     }
 
     private static void drawIconButton(GuiGraphics graphics, Font font, String icon, int bx, int by, int bw, int bh, boolean hover, int textCol, int hoverBg) {
@@ -442,6 +473,10 @@ public class CanvasGroupFrameRenderer {
                 curBtnX -= (BTN_SIZE + BTN_SPACING);
                 if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                     return FrameAction.CONFIG;
+                }
+                curBtnX -= (BTN_SIZE + BTN_SPACING);
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.AUTO_RATIO;
                 }
             }
         }

@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.compat.gtceu;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
@@ -10,11 +11,15 @@ import com.gtceu.calcboard.client.gui.compat.GenericModGuiHandler;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
+import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
+import com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ReflectorHelper;
+import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -61,10 +66,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
     private static boolean isFusionMachine(RecipeNode node) {
         if (node == null) return false;
-        if (node.isFusion()) return true;
-        if (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("fusion")) return true;
-        if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().getPath().contains("fusion")) return true;
-        return false;
+        return node.isFusion() || GTFusionHelper.isFusion(node);
     }
 
     private static boolean isCoilMultiblock(RecipeNode node) {
@@ -122,6 +124,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 break;
             }
             if (mouseX >= nextCtrlX && mouseX <= nextCtrlX + badgeW && mouseY >= row2Y && mouseY <= row2Y + 14) {
+                if (triggerBadgeClick(widget, badge)) return true;
                 widget.commitCountEdit();
                 if (badge.text().startsWith("♨")) {
                     com.gtceu.calcboard.compat.gtceu.helper.CoilHelper.cycleCoil(node);
@@ -159,6 +162,27 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         }
 
         return super.handleControlClick(widget, node, mouseX, mouseY, button);
+    }
+
+    private boolean triggerBadgeClick(NodeWidget widget, com.gtceu.calcboard.api.property.NodeBadge badge) {
+        if (badge.onClick() == null) return false;
+        widget.commitCountEdit();
+        badge.onClick().run();
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+        );
+        widget.invalidateCache();
+        notifyWidgetParentUpdated(widget);
+        return true;
+    }
+
+    private void notifyWidgetParentUpdated(NodeWidget widget) {
+        if (widget.getParent() == null) return;
+        if (widget.getNode() != null && widget.getNode().isBaseNode() && widget.getParent().getGraph() != null) {
+            widget.getParent().getGraph().setBaseNode(widget.getNode());
+        }
+        widget.getParent().rebuildWidgets();
+        widget.getParent().markSummaryDirty();
     }
 
     @Override
@@ -378,7 +402,9 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 }
             }
 
-            String parLabel = "⚙ " + node.getTotalParallel() + "x";
+            String parLabel = GTCombustionHelper.isCombustionEngine(node)
+                    ? "⚙ 1x"
+                    : "⚙ " + node.getTotalParallel() + "x";
             if (!node.getAddons().isEmpty()) {
                 parLabel += " (+" + node.getAddons().size() + ")";
             }
@@ -576,6 +602,8 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
                 }
             }
+        } else if (GTCombustionHelper.isCombustionEngine(node)) {
+            renderCombustionDialogHeader(dialog, graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
         } else if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
             graphics.drawString(font, "§6♨ " + Component.translatable("gui.gtcalcboard.boiler_type_title").getString(), x + 10, y + 30, 0xFFFFFFFF, false);
             com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
@@ -1238,9 +1266,287 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
         return "▦ " + id.getPath();
     }
 
+    private void renderCombustionDialogHeader(MachineConfigDialog dialog, GuiGraphics graphics, Font font, RecipeNode node,
+                                              int x, int y, int dialogW, int mouseX, int mouseY, float partialTicks,
+                                              EditBox parallelBox, BoardScreen parent) {
+        double totEUt = node.getEffectiveTotalEUt();
+        GTVoltageTier tier = node.getTargetTier() != null ? node.getTargetTier() : GTVoltageTier.EV;
+        double amps = totEUt / (double) Math.max(1L, tier.getVoltage());
+        String name = node.getName() != null && !node.getName().isEmpty() ? node.getName() : "Combustion Engine";
+
+        int resetBtnW = Math.max(48, font.width("↺ " + Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString()) + 8);
+        int resetBtnX = x + dialogW - 10 - resetBtnW;
+        boolean resetHover = mouseX >= resetBtnX && mouseX <= resetBtnX + resetBtnW && mouseY >= y + 28 && mouseY <= y + 42;
+        graphics.fill(resetBtnX, y + 28, resetBtnX + resetBtnW, y + 42, resetHover ? 0xFF3E485A : 0xFF242A35);
+        graphics.renderOutline(resetBtnX, y + 28, resetBtnW, 14, resetHover ? 0xFF58D3FF : 0xFF4A556B);
+        graphics.drawCenteredString(font, "↺ " + Component.translatable("gui.gtcalcboard.rotor.reset_btn").getString(), resetBtnX + resetBtnW / 2, y + 31, 0xFFFFFFFF);
+
+        String info = String.format(Locale.ROOT, "§6⚙ §f%s §7| §a⚡ +%,.1f EU/t §7(§e%.2fA %s§7)", name, totEUt, amps, tier.getName());
+        graphics.drawString(font, info, x + 10, y + 31, 0xFFFFFFFF, false);
+
+        int btnY = y + 46;
+        int curX = x + 10;
+        int gap = 4;
+
+        boolean isLCE = GTCombustionHelper.isLargeCombustionEngine(node);
+        boolean isECE = GTCombustionHelper.isExtremeCombustionEngine(node);
+        boolean isStarT = GTCombustionHelper.isStarTModule(node) || GTCombustionHelper.isModularCombustionFrame(node);
+
+        boolean boostBtnHover = false;
+        boolean coolantBtnHover = false;
+
+        if (isLCE) {
+            boolean o2 = GTCombustionHelper.isOxygenBoosted(node);
+            String label = (o2 ? "§b💨 " : "§7💨 ") + Component.translatable("gui.gtcalcboard.addon.oxygen_boost").getString() + (o2 ? " §a[ON]" : " §7[OFF]");
+            int btnW = Math.max(140, font.width(label) + 12);
+            boostBtnHover = mouseX >= curX && mouseX <= curX + btnW && mouseY >= btnY && mouseY <= btnY + 16;
+            graphics.fill(curX, btnY, curX + btnW, btnY + 16, o2 ? (boostBtnHover ? 0xFF1C4535 : 0xFF143025) : (boostBtnHover ? 0xFF2A3548 : 0xFF1E2430));
+            graphics.renderOutline(curX, btnY, btnW, 16, o2 ? (boostBtnHover ? 0xFF55FFAA : 0xFF33CC88) : (boostBtnHover ? 0xFF58D3FF : 0xFF3D4B60));
+            graphics.drawCenteredString(font, label, curX + btnW / 2, btnY + 4, o2 ? 0xFF55FFAA : 0xFF8FA0B8);
+            curX += btnW + gap;
+        } else if (isECE) {
+            boolean lox = GTCombustionHelper.isLiquidOxygenBoosted(node);
+            String label = (lox ? "§b💨 " : "§7💨 ") + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost").getString() + (lox ? " §a[ON]" : " §7[OFF]");
+            int btnW = Math.max(140, font.width(label) + 12);
+            boostBtnHover = mouseX >= curX && mouseX <= curX + btnW && mouseY >= btnY && mouseY <= btnY + 16;
+            graphics.fill(curX, btnY, curX + btnW, btnY + 16, lox ? (boostBtnHover ? 0xFF1C4535 : 0xFF143025) : (boostBtnHover ? 0xFF2A3548 : 0xFF1E2430));
+            graphics.renderOutline(curX, btnY, btnW, 16, lox ? (boostBtnHover ? 0xFF55FFAA : 0xFF33CC88) : (boostBtnHover ? 0xFF58D3FF : 0xFF3D4B60));
+            graphics.drawCenteredString(font, label, curX + btnW / 2, btnY + 4, lox ? 0xFF55FFAA : 0xFF8FA0B8);
+            curX += btnW + gap;
+        } else if (isStarT) {
+            if (GTCombustionHelper.isStarTModule(node)) {
+                String ox = node.getProperties().get(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE);
+                boolean oxActive = ox != null && !ox.isEmpty() && !"none".equalsIgnoreCase(ox);
+                String oxLabel = "💨 " + (oxActive ? ("§b" + GTCombustionHelper.getOxidizerDisplayName(ox) + " §a(2x Fuel, Amp Boost)") : "§7Oxidizer: None");
+                int oxBtnW = Math.max(120, font.width(oxLabel) + 12);
+                boostBtnHover = mouseX >= curX && mouseX <= curX + oxBtnW && mouseY >= btnY && mouseY <= btnY + 16;
+                graphics.fill(curX, btnY, curX + oxBtnW, btnY + 16, oxActive ? (boostBtnHover ? 0xFF1C4535 : 0xFF143025) : (boostBtnHover ? 0xFF2A3548 : 0xFF1E2430));
+                graphics.renderOutline(curX, btnY, oxBtnW, 16, oxActive ? 0xFF33CC88 : 0xFF3D4B60);
+                graphics.drawCenteredString(font, oxLabel, curX + oxBtnW / 2, btnY + 4, oxActive ? 0xFF55FFAA : 0xFF8FA0B8);
+                curX += oxBtnW + gap;
+            }
+
+            String cl = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+            boolean clActive = cl != null && !cl.isEmpty() && !"none".equalsIgnoreCase(cl);
+            String clLabel = "❄ " + (clActive ? ("§b" + GTCombustionHelper.getCoolantDisplayName(cl)) : "§7Coolant: None");
+            int clBtnW = Math.max(110, font.width(clLabel) + 12);
+            coolantBtnHover = mouseX >= curX && mouseX <= curX + clBtnW && mouseY >= btnY && mouseY <= btnY + 16;
+            graphics.fill(curX, btnY, curX + clBtnW, btnY + 16, clActive ? (coolantBtnHover ? 0xFF1B3854 : 0xFF14273D) : (coolantBtnHover ? 0xFF2A3548 : 0xFF1E2430));
+            graphics.renderOutline(curX, btnY, clBtnW, 16, clActive ? 0xFF58D3FF : 0xFF3D4B60);
+            graphics.drawCenteredString(font, clLabel, curX + clBtnW / 2, btnY + 4, clActive ? 0xFF58D3FF : 0xFF8FA0B8);
+        }
+
+        if (boostBtnHover) {
+            List<Component> tt = new ArrayList<>();
+            if (isLCE) {
+                tt.add(Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.oxygen_boost").getString()));
+                tt.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.addon.oxygen_boost.desc").getString()));
+                tt.add(Component.literal("§8* " + Component.translatable("gui.gtcalcboard.tooltip.click_toggle").getString()));
+            } else if (isECE) {
+                tt.add(Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost").getString()));
+                tt.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost.desc").getString()));
+                tt.add(Component.literal("§8* " + Component.translatable("gui.gtcalcboard.tooltip.click_toggle").getString()));
+            } else if (isStarT) {
+                tt.add(Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon_cat.trait").getString() + ": " + Component.translatable("gui.gtcalcboard.tooltip.oxidizer_boost").getString()));
+                tt.add(Component.literal("§8* " + Component.translatable("gui.gtcalcboard.tooltip.click_toggle").getString()));
+            }
+            if (!tt.isEmpty()) {
+                showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
+            }
+        } else if (coolantBtnHover && isStarT) {
+            List<Component> tt = new ArrayList<>();
+            tt.add(Component.literal("§b❄ " + Component.translatable("gui.gtcalcboard.tooltip.coolant_boost").getString()));
+            tt.add(Component.literal("§8* " + Component.translatable("gui.gtcalcboard.tooltip.click_toggle").getString()));
+            showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
+        }
+    }
+
+    private boolean handleCombustionDialogHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
+                                                     double mouseX, double mouseY, int button, EditBox parallelBox, BoardScreen parent) {
+        int resetBtnW = 54;
+        int resetBtnX = x + dialogW - 10 - resetBtnW;
+        if (mouseX >= resetBtnX && mouseX <= resetBtnX + resetBtnW && mouseY >= y + 28 && mouseY <= y + 42) {
+            clearCombustionBoosts(node);
+            if (dialog != null) dialog.invalidateFilteredCatalog();
+            if (parent != null) parent.markSummaryDirty();
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+            return true;
+        }
+
+        int btnY = y + 46;
+        int curX = x + 10;
+        Font font = Minecraft.getInstance().font;
+        if (font == null) {
+            return false;
+        }
+
+        if (GTCombustionHelper.isLargeCombustionEngine(node)) {
+            return handleLceBoostClick(dialog, node, curX, btnY, font, mouseX, mouseY, parent);
+        }
+        if (GTCombustionHelper.isExtremeCombustionEngine(node)) {
+            return handleEceBoostClick(dialog, node, curX, btnY, font, mouseX, mouseY, parent);
+        }
+        if (GTCombustionHelper.isStarTModule(node) || GTCombustionHelper.isModularCombustionFrame(node)) {
+            return handleStarTHeaderClick(dialog, node, curX, btnY, font, mouseX, mouseY, parent);
+        }
+        return false;
+    }
+
+    private boolean handleStarTHeaderClick(MachineConfigDialog dialog, RecipeNode node, int curX, int btnY,
+                                          Font font, double mouseX, double mouseY, BoardScreen parent) {
+        int gap = 4;
+        if (GTCombustionHelper.isStarTModule(node)) {
+            String ox = node.getProperties().get(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE);
+            boolean oxActive = ox != null && !ox.isEmpty() && !"none".equalsIgnoreCase(ox);
+            String oxLabel = "💨 " + (oxActive ? ("§b" + GTCombustionHelper.getOxidizerDisplayName(ox) + " §a(2x Fuel, Amp Boost)") : "§7Oxidizer: None");
+            int oxBtnW = Math.max(120, font.width(oxLabel) + 12);
+
+            if (mouseX >= curX && mouseX <= curX + oxBtnW && mouseY >= btnY && mouseY <= btnY + 16) {
+                toggleStarTOxidizer(node);
+                if (dialog != null) dialog.invalidateFilteredCatalog();
+                if (parent != null) parent.markSummaryDirty();
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+                return true;
+            }
+            curX += oxBtnW + gap;
+        }
+
+        String cl = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        boolean clActive = cl != null && !cl.isEmpty() && !"none".equalsIgnoreCase(cl);
+        String clLabel = "❄ " + (clActive ? ("§b" + GTCombustionHelper.getCoolantDisplayName(cl)) : "§7Coolant: None");
+        int clBtnW = Math.max(110, font.width(clLabel) + 12);
+
+        if (mouseX >= curX && mouseX <= curX + clBtnW && mouseY >= btnY && mouseY <= btnY + 16) {
+            cycleStarTCoolant(node);
+            if (dialog != null) dialog.invalidateFilteredCatalog();
+            if (parent != null) parent.markSummaryDirty();
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+            return true;
+        }
+
+        return false;
+    }
+
+    private void toggleStarTOxidizer(RecipeNode node) {
+        boolean cur = GTCombustionHelper.isOxidizerBoosted(node);
+        if (cur) {
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "none");
+        } else {
+            String addonId = GTCombustionHelper.getExpectedOxidizerAddonId(node);
+            String oxType = GTCombustionHelper.getExpectedOxidizerPropertyType(node);
+            if (addonId != null && oxType != null) {
+                node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+                MachineAddon addon = MachineAddonCatalog.getInstance().getAddon(addonId);
+                if (addon != null) {
+                    node.getAddons().add(addon);
+                }
+                node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, oxType);
+            }
+        }
+        GTCombustionHelper.syncCombustionInputs(node);
+    }
+
+    private void cycleStarTCoolant(RecipeNode node) {
+        String cur = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+        node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
+        if (cur == null || "none".equalsIgnoreCase(cur) || cur.isEmpty()) {
+            MachineAddon dist = MachineAddonCatalog.getInstance().getAddon("start_core:distilled_water_coolant");
+            if (dist != null) {
+                node.getAddons().add(dist);
+            }
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "distilled_water");
+        } else if ("distilled_water".equalsIgnoreCase(cur)) {
+            MachineAddon deion = MachineAddonCatalog.getInstance().getAddon("start_core:deionized_water_coolant");
+            if (deion != null) {
+                node.getAddons().add(deion);
+            }
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "deionized_water");
+        } else {
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
+        }
+        GTCombustionHelper.syncCombustionInputs(node);
+    }
+
+    private boolean handleLceBoostClick(MachineConfigDialog dialog, RecipeNode node, int curX, int btnY,
+                                       Font font, double mouseX, double mouseY, BoardScreen parent) {
+        boolean o2 = GTCombustionHelper.isOxygenBoosted(node);
+        String label = (o2 ? "§b💨 " : "§7💨 ") + Component.translatable("gui.gtcalcboard.addon.oxygen_boost").getString() + (o2 ? " §a[ON]" : " §7[OFF]");
+        int btnW = Math.max(140, font.width(label) + 12);
+        if (mouseX < curX || mouseX > curX + btnW || mouseY < btnY || mouseY > btnY + 16) {
+            return false;
+        }
+        toggleOxygenBoost(node);
+        if (dialog != null) dialog.invalidateFilteredCatalog();
+        if (parent != null) parent.markSummaryDirty();
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+        return true;
+    }
+
+    private boolean handleEceBoostClick(MachineConfigDialog dialog, RecipeNode node, int curX, int btnY,
+                                       Font font, double mouseX, double mouseY, BoardScreen parent) {
+        boolean lox = GTCombustionHelper.isLiquidOxygenBoosted(node);
+        String label = (lox ? "§b💨 " : "§7💨 ") + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost").getString() + (lox ? " §a[ON]" : " §7[OFF]");
+        int btnW = Math.max(140, font.width(label) + 12);
+        if (mouseX < curX || mouseX > curX + btnW || mouseY < btnY || mouseY > btnY + 16) {
+            return false;
+        }
+        toggleLiquidOxygenBoost(node);
+        if (dialog != null) dialog.invalidateFilteredCatalog();
+        if (parent != null) parent.markSummaryDirty();
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+        return true;
+    }
+
+    private void clearCombustionBoosts(RecipeNode node) {
+        node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT);
+        node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, false);
+        node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, false);
+        node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "none");
+        node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
+        node.setParallel(1);
+        node.setCustomParallel(0);
+        GTCombustionHelper.syncCombustionInputs(node);
+    }
+
+    private void toggleOxygenBoost(RecipeNode node) {
+        boolean cur = GTCombustionHelper.isOxygenBoosted(node);
+        if (cur) {
+            node.getAddons().removeIf(a -> "gtceu:oxygen_boost".equals(a.getId()));
+            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, false);
+        } else {
+            MachineAddon addon = MachineAddonCatalog.getInstance().getAddon("gtceu:oxygen_boost");
+            if (addon != null) {
+                node.getAddons().removeIf(a -> "gtceu:oxygen_boost".equals(a.getId()));
+                node.getAddons().add(addon);
+            }
+            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, true);
+        }
+        GTCombustionHelper.syncCombustionInputs(node);
+    }
+
+    private void toggleLiquidOxygenBoost(RecipeNode node) {
+        boolean cur = GTCombustionHelper.isLiquidOxygenBoosted(node);
+        if (cur) {
+            node.getAddons().removeIf(a -> "gtceu:liquid_oxygen_boost".equals(a.getId()));
+            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, false);
+        } else {
+            MachineAddon addon = MachineAddonCatalog.getInstance().getAddon("gtceu:liquid_oxygen_boost");
+            if (addon != null) {
+                node.getAddons().removeIf(a -> "gtceu:liquid_oxygen_boost".equals(a.getId()));
+                node.getAddons().add(addon);
+            }
+            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, true);
+        }
+        GTCombustionHelper.syncCombustionInputs(node);
+    }
+
     @Override
     public boolean handleDialogHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
                                            double mouseX, double mouseY, int button, EditBox parallelBox, BoardScreen parent) {
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            return handleCombustionDialogHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
+        }
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
             int pmax = GTPowerCalculator.getMaxParallelCapacity(node);
             int pmaxBtnW = 74;
@@ -1613,6 +1919,9 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
     @Override
     public boolean handleDialogHeaderScroll(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
                                              double mouseX, double mouseY, double delta) {
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            return false;
+        }
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
             int btnY = y + 46;
             if (mouseY >= btnY && mouseY <= btnY + 16) {

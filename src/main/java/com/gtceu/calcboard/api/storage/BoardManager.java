@@ -127,11 +127,12 @@ public class BoardManager {
         }
         this.openPageIds.clear();
         this.openPageIds.add(this.pages.get(0).getId());
-        this.autoLoaded = false;
+        this.autoLoaded = true;
     }
 
     public void reloadForCurrentContext() {
         resetToDefault();
+        this.autoLoaded = false;
         ensureLoaded();
     }
 
@@ -1008,7 +1009,7 @@ public class BoardManager {
         try {
             gameDir = net.minecraftforge.fml.loading.FMLPaths.GAMEDIR.get().toFile();
         } catch (Throwable t) {
-            gameDir = new File(".");
+            gameDir = new File("build/tmp");
         }
         File dir = new File(gameDir, "gtcalcboard");
         if (!dir.exists()) {

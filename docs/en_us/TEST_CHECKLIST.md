@@ -69,6 +69,9 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `Ctrl + Left/Right` jumps across word boundaries; `Ctrl + Backspace/Delete` deletes words.
   - [ ] `Ctrl + A` selects all text; `Ctrl + C / X / V` copies, cuts, and pastes clipboard text.
   - [ ] Global hotkeys are not triggered while typing in inline text editors.
+- [ ] **Alternative Input Cycling & Slim Card Mode Port Isolation**:
+  - [ ] Scrolling over an input port with alternative ingredients cycles alternative items without altering the machine voltage tier (`SlimCardInteractionTest`).
+  - [ ] In Slim Card Mode, hidden card controls (tier buttons, overclock badges, etc.) do not intercept port hover, scroll, or mouse clicks.
 - [ ] **ArchUnit Architectural Boundary Enforcement**:
   - [ ] `ArchitectureTest` automated JUnit suite passes 100% without architectural violations.
 
@@ -103,6 +106,24 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Validate complex closed loops (e.g. ethylbenzene recycling, platinum group refinement) traversing reroute junctions.
 - [ ] **10-Pass Fixed-Point Bottleneck Relaxation**:
   - [ ] In supply-deficient DAGs, converge downstream machine efficiencies ($\eta_v \in [0.0, 1.0]$) within 10 iterations ($\Delta\eta < 10^{-4}$).
+- [ ] **Auto-Ratio Bottleneck Resolution & Recirculation Guard (`AutoRatioBottleneckTest`)**:
+  - [ ] Resolve single-slot limiting reagent and chance bottlenecks by scaling upstream producers.
+  - [ ] Cyclic loop detection excludes strongly connected components (SCCs) and directed feedback cycles from bottleneck amplification, preventing runaway scaling in closed recirculation loops.
+  - [ ] `AutoRatioBottleneckTest` automated JUnit regression suite passes 100%.
+  - [ ] **Multi-Step Recirculation Single-Pass Convergence (`testDrainJunctionWithUpstreamRecirculationConvergesInSinglePass`)**: Validate that AutoRatio from a drain junction or downstream product anchor converges to the balanced machine ratio in a single execution without requiring repeated clicks, and does not emit false loop warnings on balanced cycles.
+- [ ] **Auto-Ratio Recirculation Divergence Detection & Guidance (`AutoRatioDivergenceTest`, ADR-032)**:
+  - [ ] Suppress runaway machine scaling on closed recirculation loops lacking external supplies and return `AutoRatioResult(hasDivergence = true)`.
+  - [ ] Flag affected nodes with `NodeProperties.DIVERGENCE_WARNING` and display amber warning badge `[⚠️ Loop]` / `[⚠️ 루프]` on node card headers.
+  - [ ] Render 5-line actionable guidance tooltip on hover explaining root cause and recommended actions.
+  - [ ] Clicking the warning badge promotes the node to an Anchor (`node.setBaseNode(true)`) and clears the warning.
+  - [ ] Self-healing lifecycle automatically clears divergence warning when balanced external supply is connected.
+  - [ ] `AutoRatioDivergenceTest` automated JUnit regression suite passes 100%.
+- [ ] **Comprehensive Process Divergence Defense Matrix (`ComprehensiveDivergenceMatrixTest`, ADR-033)**:
+  - [ ] Detect positive feedback growth loops ($\rho > 1.0$) lacking external sinks, clamp machine counts to 1 cycle, and display `[⚠️ Growth]` / `[⚠️ 증식]` cyan warning badge.
+  - [ ] Detect catalyst/solvent decay loops ($0.95 \le \rho < 1.0$) lacking external makeup, and display `[⚠️ Catalyst]` / `[⚠️ 촉매]` warning badge.
+  - [ ] Detect conflicting multiple anchors with stoichiometric mismatches, display `[⚠️ Conflict]` / `[⚠️ 충돌]` red badge, and permit one-click unpin.
+  - [ ] Differentiate extreme micro-yield recipes ($< 10^{-4}$) from cascade runaway and display `[⚠️ Yield]` / `[⚠️ 극소]` warning badge.
+  - [ ] `ComprehensiveDivergenceMatrixTest` automated JUnit regression suite passes 100%.
 - [ ] **Target Batch ETA & Total Resource Integration (`ProductionETACalculator`)**:
   - [ ] Compute batch duration $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$.
   - [ ] Compute total cumulative energy $E_{\text{total}} = \sum (n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}})\text{ [EU]}$ and raw material totals.

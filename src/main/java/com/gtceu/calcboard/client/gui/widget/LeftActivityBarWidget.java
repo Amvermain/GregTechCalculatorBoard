@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.widget;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
+import com.gtceu.calcboard.client.update.ClientUpdateNotifier;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
@@ -101,10 +102,20 @@ public class LeftActivityBarWidget {
 
         this.settingsBtnY = bottomY - BTN_SIZE - 4;
         renderButton(graphics, font, 2, settingsBtnY, "⚙", false, mouseX, mouseY, 0xFFF59E0B);
+        if (ClientUpdateNotifier.getInstance().isBadgeVisible()) {
+            renderUpdateBadge(graphics, 2, settingsBtnY);
+        }
 
         this.helpBtnY = settingsBtnY - BTN_SIZE - BTN_SPACING;
         boolean helpActive = screen.getHotkeyHudWidget() != null && screen.getHotkeyHudWidget().isExpanded();
         renderButton(graphics, font, 2, helpBtnY, "?", helpActive, mouseX, mouseY, 0xFF38BDF8);
+    }
+
+    private void renderUpdateBadge(GuiGraphics graphics, int btnX, int btnY) {
+        int dotX = btnX + BTN_SIZE - 5;
+        int dotY = btnY + 2;
+        graphics.fill(dotX, dotY, dotX + 4, dotY + 4, 0xFF10B981);
+        graphics.renderOutline(dotX, dotY, 4, 4, 0xFF064E3B);
     }
 
     private void renderButton(GuiGraphics graphics, Font font, int x, int y, String icon, boolean active, int mouseX, int mouseY, int iconColor) {
@@ -279,7 +290,11 @@ public class LeftActivityBarWidget {
             return;
         }
         if (isHovered(mouseX, mouseY, 2, settingsBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.settings"), mouseX, mouseY, screen.width, screen.height);
+            Component tooltip = Component.translatable("gui.gtcalcboard.activity_bar.settings");
+            if (ClientUpdateNotifier.getInstance().isBadgeVisible()) {
+                tooltip = tooltip.copy().append(" ").append(Component.translatable("gui.gtcalcboard.update.badge_tooltip", ClientUpdateNotifier.getInstance().getLatestVersion()));
+            }
+            BoardTooltipRenderer.renderTooltip(graphics, font, tooltip, mouseX, mouseY, screen.width, screen.height);
         }
     }
 

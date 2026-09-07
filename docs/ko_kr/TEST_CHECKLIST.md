@@ -70,6 +70,9 @@
   - [ ] `Ctrl + 좌우 방향키` 단어 단위 점프 및 `Ctrl + Backspace/Delete` 단어 단위 삭제 확인
   - [ ] `Ctrl + A` 전체 선택 및 `Ctrl + C / X / V` 클립보드 복사/잘라내기/붙여넣기 확인
   - [ ] 인라인 편집 중 입력하는 키가 캔버스 전역 단축키로 오작동하지 않는지 확인
+- [ ] **대안 입력(Alternative Input) 순환 및 슬림 카드 모드 포트 상호작용 격리**:
+  - [ ] 대안 재료가 있는 입력 포트에 마우스 오버 후 휠 스크롤 시, 전압 티어가 바뀌지 않고 대안 재료 목록이 정상 순환되는지 확인 (`SlimCardInteractionTest`)
+  - [ ] 슬림 카드 모드(`Slim Card Mode`) 활성화 시, 카드 상의 숨겨진 Row 2 컨트롤(티어/오버클록 등)이 포트 스크롤 및 마우스 클릭을 가로채지 않는지 확인
 - [ ] **ArchUnit 클린 아키텍처 자동 정적 검증**:
   - [ ] `ArchitectureTest` JUnit 테스트 스위트가 아키텍처 위반 없이 100% 통과하는지 확인
 
@@ -104,6 +107,24 @@
   - [ ] 분기점(Reroute)을 통과하는 다중 루프에서도 순수 유효 기계 대수 벡터 $\mathbf{x}$가 완벽히 수렴하는지 확인
 - [ ] **10-Pass 고정점 병목 완화 (Bottleneck Relaxation)**:
   - [ ] 상류 공급 부족 발생 시 모든 하류 기계의 정상 상태 가동률($\eta_v \in [0.0, 1.0]$)이 10-Pass 이내에 수렴($\Delta\eta < 10^{-4}$)하는지 확인
+- [ ] **자동 비율 맞춤(Auto-Ratio) 병목 해소 및 폐순환 루프 가드 (`AutoRatioBottleneckTest`)**:
+  - [ ] 단일 슬롯 병목 원료 및 확률 생산품에 대해 상류 공급 설비를 정수/소수점 비율로 자동 스케일링하는지 확인
+  - [ ] 강결합 컴포넌트(SCC) 및 방향성 폐순환 루프를 병목 증폭 대상에서 제외하여, 수소 재순환 등 폐루프 공정에서 기계 대수가 무한 폭주하지 않고 현실적으로 수렴하는지 검증
+  - [ ] `AutoRatioBottleneckTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
+  - [ ] **다단계 재순환 루프 단일 패스 수렴 검증 (`testDrainJunctionWithUpstreamRecirculationConvergesInSinglePass`)**: 정션 앵커 또는 단말 설비 기준 자동 비율 맞춤 실행 시 상류에 재순환 루프가 포함되어 있어도 여러 번 클릭할 필요 없이 1회 실행만으로 완전한 균형 비율로 수렴하고 오진단 경고가 뜨지 않는지 확인
+- [ ] **자동 비율 맞춤 폐순환 발산 감지 및 인터랙티브 가이드 (`AutoRatioDivergenceTest`, ADR-032)**:
+  - [ ] 외부 원료 미공급 폐순환 루프에서 연쇄 증폭을 차단하고 `AutoRatioResult(hasDivergence = true)` 결과 반환 검증
+  - [ ] 발산 억제 노드에 `NodeProperties.DIVERGENCE_WARNING` 플래그 설정 및 노드 카드 헤더 `[⚠️ 루프]` 앰버 경고 뱃지 표시 확인
+  - [ ] 뱃지 마우스 호버 시 원인 및 권장 조치 방안을 안내하는 5행 가상 툴팁 노출 확인
+  - [ ] 경고 뱃지 클릭 시 해당 노드를 기준 기계(Anchor)로 승격(`node.setBaseNode(true)`)하고 경고를 해제하는 액션 검증
+  - [ ] 외부 공급선 연결 시 다음 자동 맞춤 연산에서 경고가 자동 소멸(Self-Healing)하는 라이프사이클 검증
+  - [ ] `AutoRatioDivergenceTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
+- [ ] **포괄적 공정 발산 방어 매트릭스 및 상황별 진단 (`ComprehensiveDivergenceMatrixTest`, ADR-033)**:
+  - [ ] 잉여 배출선이 없는 양의 피드백 증식 루프($\rho > 1.0$) 감지, 1사이클 기준 기계 대수 클램핑 및 `[⚠️ 증식]` 청록색 경고 뱃지 표시 확인
+  - [ ] 외부 보충선이 없는 촉매/용매 감쇠 루프($0.95 \le \rho < 1.0$) 감지 및 `[⚠️ 촉매]` 앰버 경고 뱃지 표시 확인
+  - [ ] 수급 모순이 발생한 복수 앵커(Anchor) 충돌 감지, `[⚠️ 충돌]` 적색 경고 뱃지 표시 및 원클릭 앵커 해제 액션 검증
+  - [ ] 극미세 수율 레시피($< 10^{-4}$)의 상한선 도달을 연쇄 발산과 구분하여 `[⚠️ 극소]` 경고 뱃지 표시 확인
+  - [ ] `ComprehensiveDivergenceMatrixTest` JUnit 자동화 헤드리스 회귀 테스트 100% 통과 확인
 - [ ] **목표 배치 생산 소요 시간(ETA) 및 총 소요 자원 연산 (`ProductionETACalculator`)**:
   - [ ] 단말 노드의 목표 생산량 $A_{\text{target}}$ 기준 소요 시간 $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$ 산출 검증
   - [ ] 전체 상류 노드의 총 소비 전력량 $E_{\text{total}} = \sum (n.\text{getTotalEUt}() \times 20 \times T_{\text{ET}})\text{ [EU]}$ 및 순 원자재 소요량 집계 확인

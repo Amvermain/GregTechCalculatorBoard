@@ -155,7 +155,7 @@ public class ThermalModAdapter implements IModAdapter {
             return String.format("§d⚡%dx", addon.getParallelMultiplier());
         }
         if (addon.getDurationMultiplier() != 1.0 && addon.getEutMultiplier() != 1.0) {
-            return String.format("§e⚡%.1f ⏱%.1f", addon.getEutMultiplier(), addon.getDurationMultiplier());
+            return String.format("§e⚡%.1fx ⏱%.1fx", addon.getEutMultiplier(), addon.getDurationMultiplier());
         }
         if (addon.getEutMultiplier() != 1.0) {
             return String.format("§e⚡%.1fx", addon.getEutMultiplier());

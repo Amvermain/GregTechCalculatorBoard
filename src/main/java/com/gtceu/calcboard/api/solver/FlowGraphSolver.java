@@ -1,9 +1,11 @@
 package com.gtceu.calcboard.api.solver;
 
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Pure calculation & graph algorithm solver facade for Calculator Board.
@@ -86,12 +88,16 @@ public final class FlowGraphSolver {
     /**
      * Propagates machine counts across the graph starting from the anchor node.
      */
-    public static void autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
-        FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, integerCounts);
+    public static AutoRatioResult autoRatioFromAnchor(FlowGraph graph, RecipeNode anchor, boolean integerCounts) {
+        return FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, integerCounts);
     }
 
-    public static void autoRatioFractional(FlowGraph graph, RecipeNode anchor) {
-        FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, false);
+    public static AutoRatioResult autoRatioFractional(FlowGraph graph, RecipeNode anchor) {
+        return FlowBalanceMatrixSolver.autoRatioFromAnchor(graph, anchor, false);
+    }
+
+    public static int autoRatioFromSharedPool(FlowGraph graph, CanvasGroupFrame poolFrame, double targetMachines, AutoRatioMode mode) {
+        return FlowBalanceMatrixSolver.autoRatioFromSharedPool(graph, poolFrame, targetMachines, mode);
     }
 
     /**
@@ -166,8 +172,12 @@ public final class FlowGraphSolver {
      * Executes Harmonized Auto-Ratio: scales the anchor and all upstream/downstream machines
      * to the minimal clean integer ratio with zero waste/bottleneck.
      */
-    public static void autoRatioHarmonized(FlowGraph graph, RecipeNode anchor) {
-        FlowBalanceMatrixSolver.autoRatioHarmonized(graph, anchor);
+    public static AutoRatioResult autoRatioHarmonized(FlowGraph graph, RecipeNode anchor) {
+        return FlowBalanceMatrixSolver.autoRatioHarmonized(graph, anchor);
+    }
+
+    public static Set<String> findUnfedDeficitLoopNodeIds(FlowGraph graph) {
+        return FlowBalanceMatrixSolver.findUnfedDeficitLoopNodeIds(graph);
     }
 
     /**

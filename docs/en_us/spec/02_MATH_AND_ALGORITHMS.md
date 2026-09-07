@@ -333,4 +333,63 @@ Integrates physical Junction void sinks (`SupplyMode.VOID_SINK`) and direct port
 
 ---
 
+### [Algorithm 10] Shared Machine Pool Capacity-Driven Auto-Ratio (`CanvasGroupFrame`, `HarmonizedRatioOptimizer`) (ADR-031)
+
+Proportionally scales processes sharing a physical machine frame to match a designated target machine capacity:
+
+1. **Sum Current Operational Duty**:
+   For node set $N = \{n_1, n_2, \dots, n_k\}$ enclosed within the shared frame:
+   $$D_{\text{current}} = \sum_{i=1}^{k} n_i.\text{getMachineCount}()$$
+2. **Compute Scaling Multiplier ($S$)**:
+   Given target physical capacity $M_{\text{target}}$ (default $1.0$):
+   $$S = \frac{M_{\text{target}}}{D_{\text{current}}}$$
+3. **Machine Count Updates**:
+   - **Continuous Mode (Default Click)**: Preserves decimal precision via $n_i.\text{setMachineCount}(n_i.\text{getMachineCount}() \times S)$.
+   - **Integer Ceiling Mode (Alt+Click)**: Quantizes to full physical machine units via $\lceil n_i.\text{getMachineCount}() \times S \rceil$.
+
+---
+
+### [Algorithm 11] Comprehensive Process Stability & Divergence Defense Matrix (`ProcessStabilityAnalyzer`) (ADR-032, ADR-033)
+
+Detects 7 potential operational instability scenarios across closed recirculation loops and external feeds, preventing calculation runaway while attaching diagnostic metadata:
+
+1. **Unfed Deficit Recirculation Loop**:
+   When Auto-Ratio is executed on a closed cycle with self-sufficiency ratio $\rho_{\text{cycle}} < 1.0$ lacking external inputs, machine count runaway is suppressed, operational scale is frozen safely, and an amber `[⚠️ Loop]` warning badge is displayed.
+2. **Positive Feedback Growth Loop**:
+   Detects cycles where byproduct generation exceeds consumption ($\rho_{\text{cycle}} > 1.0$), displaying a `[⚠️ Growth]` badge suggesting connection to an overflow drain.
+3. **Catalyst Decay Loop**:
+   Identifies closed loops with fractional stoichiometric catalyst decay lacking replenishment, presenting `[⚠️ Catalyst]`.
+4. **Anchor Contradiction**:
+   Resolves conflicting reference anchors situated along the same path by prioritizing the primary anchor and presenting `[⚠️ Conflict]` with 1-click dismissal actions.
+5. **Micro-Yield Defense**:
+   Prevents floating-point precision overflow on recipes yielding $< 10^{-5}$ units per craft, activating `[⚠️ Yield]`.
+
+---
+
+### [Algorithm 12] Junction Dynamic Buffer Wiring, Spillway Allocation & Rate Anchoring (`FlowEdgeAllocator`, `CanvasContextMenuManager`) (ADR-034)
+
+Supports contextual wire-drag buffer instantiation and rate-anchored inverse scaling:
+
+1. **Contextual Buffer Creation (Port Drag)**:
+   Dragging a wire from an output port onto empty canvas space displays quick flyout actions to create surplus drain junctions (`SupplyMode.SURPLUS_DRAIN`), deficit supply junctions (`SupplyMode.DEFICIT_SUPPLY`), or void sinks (`SupplyMode.VOID_SINK`) with pre-calculated rates in one click.
+2. **Two-Stage Spillway Flow Allocation**:
+   In 1:N split graphs, supply is allocated with first priority to productive downstream machines. Only residual surplus is routed to continuous drain junctions, avoiding starvation on productive lines.
+3. **Junction Flow Rate Anchoring**:
+   Pinning a fixed-rate junction node as an Anchor scales connected upstream producers or downstream consumers to match the target flow rate $R_{\text{fixed}}$.
+
+---
+
+### [Algorithm 13] Two-Stage Linear Flow Balance Solver & Integer Quantization (`TwoStageLinearFlowSolver`, `GaussJordanEliminator`) (ADR-035)
+
+Guarantees single-click deterministic mass balance convergence across coupled recirculation loops, anchors, and shared pools:
+
+1. **Stage 1: Continuous Flow Balance Linear System ($A\mathbf{x} = \mathbf{b}$)**:
+   - Constructs an augmented matrix $[A | \mathbf{b}]$ mapping unknown machine scale vector $\mathbf{x}$ against mass conservation equations $\sum_i C_{ji} x_i = 0$ and anchor constraints $x_{\text{anchor}} = S_{\text{fixed}}$.
+   - Applies partial pivoting Gauss-Jordan elimination for robust numerical stability, resolving continuous scale vector $\mathbf{x}^*$ in $O(N^3)$ time.
+2. **Stage 2: Integer Quantization**:
+   - Applies ceiling quantization ($\lceil x_i^* \rceil$) with bottleneck-preserving scaling when integer machine counts are required.
+   - Ensures multi-step closed loops converge deterministically on the first click without requiring repeated button presses.
+
+---
+
 > ➡️ **Next Chapter**: [[03] UI & Canvas Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md)

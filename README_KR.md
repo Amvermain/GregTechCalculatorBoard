@@ -155,7 +155,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.3.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.4.jar` 경로에 생성됩니다.
 
 ---
 
@@ -189,6 +189,12 @@ cd GregTechCalculatorBoard
 - [SatisFlow](https://satisflow.app/) - 노드 그래프 기반의 Satisfactory 웹 공정 계산기 및 플로우차트 플래너.
 - [Foreman 2](https://github.com/DanielKote/Foreman2) - Factorio의 노드 기반 시각적 플로우차트 생산 라인 계산기.
 - [Helmod](https://mods.factorio.com/mod/helmod) - Factorio의 대표적인 인게임 공정 계산 및 레시피 매트릭스 솔버 모드.
+
+---
+
+## AI 활용 고지 (AI Disclosure)
+
+본 프로젝트는 메인테이너와 AI 코딩 에이전트(Google Antigravity / Gemini) 간의 페어 프로그래밍을 통해 개발되었습니다. 시스템 아키텍처 설계, 도메인 요구사항 정의, 코드 검토, 인게임 실기 검증 및 최종 의사결정은 전적으로 메인테이너가 직접 총괄하고 검증했습니다.
 
 ---
 

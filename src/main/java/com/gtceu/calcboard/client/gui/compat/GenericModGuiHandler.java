@@ -22,6 +22,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
+import java.util.List;
+
 /**
  * Generic fallback implementation of {@link IModGuiHandler}.
  */
@@ -46,6 +48,13 @@ public class GenericModGuiHandler implements IModGuiHandler {
         NodeCardRenderer.drawBtn(graphics, font, tier.getName(), x + 6, row2Y, 32, 14, mouseX, mouseY, tier.getColor());
 
         int nextCtrlX = x + 42;
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node);
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int badgeW = font.width(badge.text()) + 8;
+            if (nextCtrlX + badgeW > x + cardW - 46) break;
+            NodeCardRenderer.drawBtn(graphics, font, badge.text(), nextCtrlX, row2Y, badgeW, 14, mouseX, mouseY, badge.outlineColor(), badge.isWarning(), false);
+            nextCtrlX += badgeW + 3;
+        }
         if (node.isGenerator()) {
             String genBadge = Component.translatable("gui.gtcalcboard.gen_badge").getString();
             int genW = Math.max(28, font.width(genBadge) + 4);
@@ -138,6 +147,20 @@ public class GenericModGuiHandler implements IModGuiHandler {
 
     @Override
     public boolean handleControlClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int button) {
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int row2Y = y + 20 + 6 + 18;
+        int nextCtrlX = x + 42;
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node);
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int badgeW = safeFontWidth(badge.text(), 30) + 8;
+            if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;
+            if (mouseX >= nextCtrlX && mouseX <= nextCtrlX + badgeW && mouseY >= row2Y && mouseY <= row2Y + 14) {
+                if (triggerBadgeClick(widget, badge)) return true;
+            }
+            nextCtrlX += badgeW + 3;
+        }
+
         if (isTierOrSpeedControlHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
             var adapter = ModAdapterRegistry.getAdapterForNode(node);
@@ -178,6 +201,27 @@ public class GenericModGuiHandler implements IModGuiHandler {
         }
 
         return false;
+    }
+
+    private boolean triggerBadgeClick(NodeWidget widget, com.gtceu.calcboard.api.property.NodeBadge badge) {
+        if (badge.onClick() == null) return false;
+        widget.commitCountEdit();
+        badge.onClick().run();
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+        );
+        widget.invalidateCache();
+        notifyWidgetParentUpdated(widget);
+        return true;
+    }
+
+    private void notifyWidgetParentUpdated(NodeWidget widget) {
+        if (widget.getParent() == null) return;
+        if (widget.getNode() != null && widget.getNode().isBaseNode() && widget.getParent().getGraph() != null) {
+            widget.getParent().getGraph().setBaseNode(widget.getNode());
+        }
+        widget.getParent().rebuildWidgets();
+        widget.getParent().markSummaryDirty();
     }
 
     @Override

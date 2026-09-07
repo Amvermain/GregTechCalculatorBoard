@@ -42,6 +42,10 @@ public class MultiblockDetector {
     private static volatile boolean initialized = false;
     private static volatile boolean initializing = false;
 
+    static {
+        registerBaselineTurbines();
+    }
+
     public static void registerMultiblock(ResourceLocation id) {
         if (id != null) {
             MULTIBLOCK_RECIPE_CONTROLLERS.add(id);
@@ -60,6 +64,10 @@ public class MultiblockDetector {
 
     public static void registerTurbine(ResourceLocation controllerId, ResourceLocation recipeCategoryId, GTVoltageTier baseTier, double baseProduction) {
         if (controllerId != null) {
+            if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(controllerId)
+                    || com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(controllerId)) {
+                return;
+            }
             TURBINE_CONTROLLERS.add(controllerId);
             MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
             if (baseTier != null) TURBINE_BASE_TIERS.put(controllerId, baseTier);
@@ -74,10 +82,51 @@ public class MultiblockDetector {
             }
         }
         if (recipeCategoryId != null) {
+            if (ResourceLocation.tryParse("gtceu:combustion_generator").equals(recipeCategoryId)) {
+                return;
+            }
             TURBINE_RECIPE_CATEGORIES.add(recipeCategoryId);
             if (baseTier != null) TURBINE_BASE_TIERS.put(recipeCategoryId, baseTier);
             if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(recipeCategoryId, baseProduction);
         }
+    }
+
+    public static void registerBaselineTurbines() {
+        ResourceLocation lst1 = ResourceLocation.tryParse("gtceu:large_steam_turbine");
+        ResourceLocation lst2 = ResourceLocation.tryParse("gtceu:steam_large_turbine");
+        ResourceLocation lgt1 = ResourceLocation.tryParse("gtceu:large_gas_turbine");
+        ResourceLocation lgt2 = ResourceLocation.tryParse("gtceu:gas_large_turbine");
+        ResourceLocation lpt1 = ResourceLocation.tryParse("gtceu:large_plasma_turbine");
+        ResourceLocation lpt2 = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
+        ResourceLocation spt = ResourceLocation.tryParse("gtceu:supreme_plasma_turbine");
+        ResourceLocation sptStart = ResourceLocation.tryParse("start_core:supreme_plasma_turbine");
+        ResourceLocation npt = ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine");
+        ResourceLocation nptStart = ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine");
+
+        ResourceLocation st = ResourceLocation.tryParse("gtceu:steam_turbine");
+        ResourceLocation stFuels = ResourceLocation.tryParse("gtceu:steam_turbine_fuels");
+        ResourceLocation stSuper = ResourceLocation.tryParse("gtceu:steam_turbine_superheated");
+        ResourceLocation gt = ResourceLocation.tryParse("gtceu:gas_turbine");
+        ResourceLocation gtFuels = ResourceLocation.tryParse("gtceu:gas_turbine_fuels");
+        ResourceLocation pt = ResourceLocation.tryParse("gtceu:plasma_turbine");
+        ResourceLocation plasmaGen = ResourceLocation.tryParse("gtceu:plasma_generator");
+        ResourceLocation plasmaGenFuels = ResourceLocation.tryParse("gtceu:plasma_generator_fuels");
+
+        registerTurbine(lst1, st, GTVoltageTier.HV, 1024.0);
+        registerTurbine(lst2, stFuels, GTVoltageTier.HV, 1024.0);
+        registerTurbine(null, stSuper, GTVoltageTier.HV, 1024.0);
+
+        registerTurbine(lgt1, gt, GTVoltageTier.EV, 4096.0);
+        registerTurbine(lgt2, gtFuels, GTVoltageTier.EV, 4096.0);
+
+        registerTurbine(lpt1, pt, GTVoltageTier.IV, 16384.0);
+        registerTurbine(lpt2, plasmaGen, GTVoltageTier.IV, 16384.0);
+        registerTurbine(null, plasmaGenFuels, GTVoltageTier.IV, 16384.0);
+
+        registerTurbine(spt, null, GTVoltageTier.IV, 98304.0);
+        registerTurbine(sptStart, null, GTVoltageTier.IV, 98304.0);
+        registerTurbine(npt, null, GTVoltageTier.IV, 196608.0);
+        registerTurbine(nptStart, null, GTVoltageTier.IV, 196608.0);
     }
 
     public static ResourceLocation getTurbineAlias(ResourceLocation id) {
@@ -511,10 +560,16 @@ public class MultiblockDetector {
     }
 
     public static boolean supportsTurbineRotor(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
+        if (machineIcon != null && (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(machineIcon)
+                || com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(machineIcon))) {
+            return false;
+        }
         if (isTurbineMachine(machineIcon)) return true;
         if (availableWorkstations == null) return false;
         for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && isTurbineMachine(ws)) return true;
+            if (ws != null && !com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(ws)
+                    && !com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(ws)
+                    && isTurbineMachine(ws)) return true;
         }
         return false;
     }
@@ -601,20 +656,55 @@ public class MultiblockDetector {
     public static GTVoltageTier getTurbineBaseTier(RecipeNode node) {
         if (node == null) return GTVoltageTier.HV;
         if (node.getMachineIcon() != null) {
-            GTVoltageTier t = TURBINE_BASE_TIERS.get(node.getMachineIcon());
+            GTVoltageTier t = getTurbineBaseTier(node.getMachineIcon());
             if (t != null) return t;
         }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null) {
-                GTVoltageTier t = TURBINE_BASE_TIERS.get(ws);
+                GTVoltageTier t = getTurbineBaseTier(ws);
                 if (t != null) return t;
             }
         }
         if (node.getRecipeCategoryId() != null) {
-            GTVoltageTier t = TURBINE_BASE_TIERS.get(node.getRecipeCategoryId());
+            GTVoltageTier t = getTurbineBaseTier(node.getRecipeCategoryId());
             if (t != null) return t;
         }
+        ResourceLocation cat = node.getRecipeCategoryId();
+        if (cat != null) {
+            String path = cat.getPath().toLowerCase(Locale.ROOT);
+            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) return GTVoltageTier.EV;
+            if (path.contains("plasma")) return GTVoltageTier.IV;
+            if (path.contains("steam")) return GTVoltageTier.HV;
+        }
+        ResourceLocation icon = node.getMachineIcon();
+        if (icon != null) {
+            String path = icon.getPath().toLowerCase(Locale.ROOT);
+            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) return GTVoltageTier.EV;
+            if (path.contains("plasma")) return GTVoltageTier.IV;
+            if (path.contains("steam")) return GTVoltageTier.HV;
+        }
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return GTVoltageTier.HV;
         return GTVoltageTier.HV;
+    }
+
+    public static double getTurbineBaseProduction(RecipeNode node) {
+        if (node == null) return 1024.0;
+        if (node.getMachineIcon() != null) {
+            Double prod = getTurbineBaseProduction(node.getMachineIcon());
+            if (prod != null && prod > 0) return prod;
+        }
+        for (ResourceLocation ws : node.getAvailableWorkstations()) {
+            if (ws != null) {
+                Double prod = getTurbineBaseProduction(ws);
+                if (prod != null && prod > 0) return prod;
+            }
+        }
+        if (node.getRecipeCategoryId() != null) {
+            Double prod = getTurbineBaseProduction(node.getRecipeCategoryId());
+            if (prod != null && prod > 0) return prod;
+        }
+        GTVoltageTier baseTier = getTurbineBaseTier(node);
+        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 1024.0;
     }
 
     public static boolean requiresMinimumBaseTier(ResourceLocation turbineId) {
@@ -633,6 +723,16 @@ public class MultiblockDetector {
             ResourceLocation alias = getTurbineAlias(id);
             if (alias != null) tier = TURBINE_BASE_TIERS.get(alias);
         }
+        if (tier == null) {
+            String path = id.getPath().toLowerCase(Locale.ROOT);
+            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) {
+                tier = GTVoltageTier.EV;
+            } else if (path.contains("plasma")) {
+                tier = GTVoltageTier.IV;
+            } else if (path.contains("steam")) {
+                tier = GTVoltageTier.HV;
+            }
+        }
         return tier;
     }
 
@@ -645,6 +745,12 @@ public class MultiblockDetector {
         if (prod == null) {
             ResourceLocation alias = getTurbineAlias(id);
             if (alias != null) prod = TURBINE_BASE_PRODUCTIONS.get(alias);
+        }
+        if (prod == null) {
+            GTVoltageTier tier = getTurbineBaseTier(id);
+            if (tier != null) {
+                prod = (double) (tier.getVoltage() * 2L);
+            }
         }
         return prod;
     }
@@ -723,6 +829,10 @@ public class MultiblockDetector {
 
     public static boolean isTurbineMachine(ResourceLocation workstationId) {
         if (workstationId == null) return false;
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(workstationId)
+                || com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(workstationId)) {
+            return false;
+        }
         if (!initialized && !initializing) {
             initialize();
         }
@@ -739,7 +849,7 @@ public class MultiblockDetector {
             def = com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.getStructure(alias);
         }
         if (def != null && def.supportsAbility("ROTOR_HOLDER")) {
-            if (!isCoilMultiblock(workstationId) && (workstationId.getPath().contains("turbine") || (alias != null && alias.getPath().contains("turbine")))) { // lint:allow-heuristic: catalog pattern fallback
+            if (!isCoilMultiblock(workstationId)) {
                 registerTurbine(workstationId, null, null, 0.0);
                 return true;
             }
@@ -750,6 +860,9 @@ public class MultiblockDetector {
 
     public static boolean isTurbineRecipeCategory(ResourceLocation categoryId) {
         if (categoryId == null) return false;
+        if (ResourceLocation.tryParse("gtceu:combustion_generator").equals(categoryId)) {
+            return false;
+        }
         if (!initialized && !initializing) {
             initialize();
         }
@@ -1014,7 +1127,7 @@ public class MultiblockDetector {
             return true;
         }
         return defStruct.candidateBlocks().stream().anyMatch(b ->
-                b.getPath().contains("threading_controller") || b.getPath().contains("thread_helix") || b.getPath().contains("threading_helix")); // lint:allow-heuristic: candidate block path check
+                isHelixPart(b) || (b != null && "start_core".equals(b.getNamespace()) && "threading_controller".equals(b.getPath())));
     }
 
     private static int detectHelixCountFromCatalog(ResourceLocation id) {

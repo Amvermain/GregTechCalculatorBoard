@@ -90,11 +90,19 @@ public class StarTTurbineHelper {
         syncBoosterInputs(node);
     }
 
+    public static final ResourceLocation TUNGSTEN_DISULFIDE = ResourceLocation.tryParse("gtceu:tungsten_disulfide");
+    public static final ResourceLocation SUPERSTATE_HELIUM_3 = ResourceLocation.tryParse("gtceu:superstate_helium_3");
+    public static final ResourceLocation BEC_OG = ResourceLocation.tryParse("gtceu:bec_og");
+
+    private static final java.util.Set<ResourceLocation> STAR_T_BOOSTER_FLUIDS = java.util.Set.of(
+            TUNGSTEN_DISULFIDE,
+            SUPERSTATE_HELIUM_3,
+            BEC_OG
+    );
+
     public static boolean isBoosterFluid(com.gtceu.calcboard.api.model.IngredientStack in) {
         if (in == null || !in.isFluid() || in.getId() == null) return false;
-        String p = in.getId().getPath();
-        return p.contains("tungsten_disulfide") || p.contains("superstate_helium_3")
-                || p.contains("superstate") || p.contains("bec_og") || p.contains("oganesson");
+        return STAR_T_BOOSTER_FLUIDS.contains(in.getId());
     }
 
     public static void syncBoosterInputs(RecipeNode node) {

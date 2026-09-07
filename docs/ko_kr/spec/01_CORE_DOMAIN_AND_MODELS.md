@@ -430,4 +430,28 @@ public class MachineHardwareTemplate {
 
 ---
 
+## 12. 공정 제어 및 목표 수량 앵커 도메인 모델 (`TargetAnchor`, `SharedMachinePool`) (ADR-030, ADR-032)
+
+### 12.1 정션 및 노드 유량 앵커 (`TargetAnchor`)
+복잡한 순환 공정 및 단말 배치 계산에서 유량 스케일링의 기준이 되는 고정점(Anchor) 모델입니다:
+
+* **앵커 판정 및 속성**:
+  - `isTargetAnchor()`: 해당 노드가 사용자에 의해 고정 유량 또는 목표 배치 수량이 고정된 기준 노드인지 판별.
+  - `targetBatchAmount`, `targetBatchTimeSec`: 단말 노드의 목표 생산 수량과 소요 시간 제약 조건.
+  - 2단계 선형 솔버(`TwoStageLinearFlowSolver`)는 이 앵커들을 경계 조건(Boundary Conditions)으로 삼아 상호 모순 없는 유일한 유량 해를 역산합니다.
+* **충돌 탐지 (`AnchorConflict`)**:
+  - 동일한 연결 컴포넌트 내에 상호 양립할 수 없는 복수의 유량 앵커가 지정된 경우 충돌 플래그를 설정하고 `[⚠️ Conflict]` 배지를 활성화합니다.
+
+### 12.2 공유 기계 풀 프레임 도메인 명세 (`SharedMachinePool`)
+복수의 서로 다른 레시피 노드를 하나의 물리적 기계 풀로 묶어 시간 분할(Time-Sharing) 가동하는 프레임 도메인 모델입니다:
+
+* **분담률 및 기계 대수 연산**:
+  $$\text{Total Duty} = \sum_{i=1}^N \text{machineCount}_i$$
+  $$\text{Required Physical Machines} = \lceil \text{Total Duty} \rceil$$
+* **BOM(자재 청구서) 및 전력 집계 연동**:
+  - 자재 청구서(`GTCEuBOMHelper`) 생성 시 각 레시피의 소수점 기계 대수를 개별 올림하지 않고, 풀 단위로 합산된 $\lceil \text{Total Duty} \rceil$ 대의 본체 및 멀티블록 구조물 재료만 정확히 청구합니다.
+  - 유휴 상태에서는 전력 소모가 발생하지 않으며, 실효 가동률($\text{Total Duty} / \text{Required Physical Machines}$)에 비례한 유효 전력 부하를 산출합니다.
+
+---
+
 > ➡️ **다음 장으로 이동**: [[02] 수학적 연산 엔진 및 그래프 해석 알고리즘](02_MATH_AND_ALGORITHMS.md)

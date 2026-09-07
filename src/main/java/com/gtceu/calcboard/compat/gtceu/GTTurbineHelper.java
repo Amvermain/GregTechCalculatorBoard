@@ -29,6 +29,10 @@ public final class GTTurbineHelper {
         if (node == null || node.getEnergyType() == EnergyType.KINETIC_SU) return false;
         if (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU && node.getEnergyTypeOverride() != EnergyType.NONE) return false;
 
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionFamily(node)) {
+            return false;
+        }
+
         // Coil multiblocks (EBF, CHEF, Pyrolyse, etc.) are smelting furnaces and never turbines
         if (MultiblockDetector.isCoilMultiblock(node.getMachineIcon()) || MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId())) {
             return false;
@@ -99,24 +103,7 @@ public final class GTTurbineHelper {
      */
     public static GTVoltageTier getTurbineBaseTier(RecipeNode node) {
         if (node == null) return GTVoltageTier.HV;
-        ResourceLocation machineIcon = node.getMachineIcon();
-        if (machineIcon != null) {
-            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(machineIcon);
-            if (tier != null) return tier;
-        }
-        ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
-        if (recipeCategoryId != null) {
-            GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(recipeCategoryId);
-            if (tier != null) return tier;
-        }
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                GTVoltageTier tier = MultiblockDetector.getTurbineBaseTier(ws);
-                if (tier != null) return tier;
-            }
-        }
-        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return GTVoltageTier.HV;
-        return GTVoltageTier.HV;
+        return MultiblockDetector.getTurbineBaseTier(node);
     }
 
     /**
@@ -124,24 +111,7 @@ public final class GTTurbineHelper {
      */
     public static double getTurbineBaseProduction(RecipeNode node) {
         if (node == null) return 1024.0;
-        ResourceLocation machineIcon = node.getMachineIcon();
-        if (machineIcon != null) {
-            Double prod = MultiblockDetector.getTurbineBaseProduction(machineIcon);
-            if (prod != null) return prod;
-        }
-        ResourceLocation recipeCategoryId = node.getRecipeCategoryId();
-        if (recipeCategoryId != null) {
-            Double prod = MultiblockDetector.getTurbineBaseProduction(recipeCategoryId);
-            if (prod != null) return prod;
-        }
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                Double prod = MultiblockDetector.getTurbineBaseProduction(ws);
-                if (prod != null) return prod;
-            }
-        }
-        GTVoltageTier baseTier = getTurbineBaseTier(node);
-        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 1024.0;
+        return MultiblockDetector.getTurbineBaseProduction(node);
     }
 
 

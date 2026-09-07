@@ -20,10 +20,6 @@ public final class GTCEuCoilModifierHelper {
 
     private GTCEuCoilModifierHelper() {}
 
-    private static boolean isStarTCoilReactor() {
-        return ModCompatHelper.isStarTLoaded();
-    }
-
     public enum CoilMachineKind {
         BLAST_FURNACE,
         PYROLYSE_OVEN,
@@ -52,6 +48,9 @@ public final class GTCEuCoilModifierHelper {
     }
 
     private static final Class<?> COIL_WORKABLE_CLS;
+    private static final Field CONFIG_HOLDER_INSTANCE_FIELD;
+    private static final Field MACHINES_CONFIG_FIELD;
+    private static final Field LCR_COIL_BENEFITS_FIELD;
     private static final Map<ResourceLocation, CoilMachineSpec> SPEC_CACHE = new ConcurrentHashMap<>();
 
     static {
@@ -64,6 +63,38 @@ public final class GTCEuCoilModifierHelper {
             } catch (Throwable ignored) {}
         }
         COIL_WORKABLE_CLS = cls;
+
+        Field instanceField = null;
+        Field machinesField = null;
+        Field lcrField = null;
+        try {
+            Class<?> configHolderCls = Class.forName("com.gregtechceu.gtceu.config.ConfigHolder");
+            instanceField = configHolderCls.getField("INSTANCE");
+            machinesField = configHolderCls.getField("machines");
+            Class<?> machineConfigsCls = Class.forName("com.gregtechceu.gtceu.config.ConfigHolder$MachineConfigs");
+            lcrField = machineConfigsCls.getField("lcrCoilBenefits");
+        } catch (Throwable ignored) {}
+        CONFIG_HOLDER_INSTANCE_FIELD = instanceField;
+        MACHINES_CONFIG_FIELD = machinesField;
+        LCR_COIL_BENEFITS_FIELD = lcrField;
+    }
+
+    private static boolean isStarTCoilReactor() {
+        if (ModCompatHelper.isStarTLoaded() || StarTReflectionBridge.isStarTLoaded()) {
+            return true;
+        }
+        if (LCR_COIL_BENEFITS_FIELD != null && MACHINES_CONFIG_FIELD != null && CONFIG_HOLDER_INSTANCE_FIELD != null) {
+            try {
+                Object instance = CONFIG_HOLDER_INSTANCE_FIELD.get(null);
+                if (instance != null) {
+                    Object machines = MACHINES_CONFIG_FIELD.get(instance);
+                    if (machines != null) {
+                        return LCR_COIL_BENEFITS_FIELD.getBoolean(machines);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+        return false;
     }
 
     public static CoilMachineSpec getCoilMachineSpec(ResourceLocation machineId) {
@@ -170,7 +201,10 @@ public final class GTCEuCoilModifierHelper {
         if (desc.contains("ebf") || desc.contains("blastfurnace") || desc.contains("blast_furnace")) return CoilMachineKind.BLAST_FURNACE;
         if (desc.contains("cracker") || desc.contains("cracking")) return CoilMachineKind.CRACKING_UNIT;
         if (desc.contains("smelter") || desc.contains("multismelter")) return CoilMachineKind.MULTI_SMELTER;
-        if (desc.contains("chemical") || desc.contains("chemicalreactor")) {
+        if (desc.contains("chemical_reactor_oc") || desc.contains("chemical_reactor") || desc.contains("chemicalreactor")) {
+            return CoilMachineKind.CHEMICAL_REACTOR;
+        }
+        if (desc.contains("chemical")) {
             return isStarTCoilReactor() ? CoilMachineKind.CHEMICAL_REACTOR : CoilMachineKind.GENERIC;
         }
         return null;
@@ -254,7 +288,8 @@ public final class GTCEuCoilModifierHelper {
         if (path.contains("cracker") || path.contains("cracking") || path.contains("super_cracker")) {
             return new CoilMachineSpec(CoilMachineKind.CRACKING_UNIT, CustomCoilMultiplier.DEFAULT);
         }
-        if (path.contains("large_chemical") || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {
+        if (path.contains("large_chemical") || path.contains("extreme_chemical") || path.contains("industrial_chemical")
+                || path.contains("lcr") || path.contains("ecr") || path.contains("icr")) {
             return isStarTCoilReactor()
                     ? new CoilMachineSpec(CoilMachineKind.CHEMICAL_REACTOR, CustomCoilMultiplier.DEFAULT)
                     : CoilMachineSpec.GENERIC;
@@ -318,8 +353,10 @@ public final class GTCEuCoilModifierHelper {
             }
             case CHEMICAL_REACTOR -> {
                 node.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_PERFECT_OC_COUNT, 0);
-                coilAddon.setDurationMultiplier(100.0 / Math.max(1, chemSpeed));
-                coilAddon.setEutMultiplier(chemEnergy / 100.0);
+                int effectiveChemSpeed = chemSpeed > 0 ? chemSpeed : (75 + Math.max(0, (coilTemp - 1800) / 900) * 25);
+                int effectiveChemEnergy = chemEnergy > 0 ? chemEnergy : Math.max(50, 100 - (Math.max(0, (coilTemp - 1800) / 900) * 5));
+                coilAddon.setDurationMultiplier(100.0 / Math.max(1, effectiveChemSpeed));
+                coilAddon.setEutMultiplier(effectiveChemEnergy / 100.0);
                 coilAddon.setParallelMultiplier(1);
             }
             case MULTI_SMELTER -> {

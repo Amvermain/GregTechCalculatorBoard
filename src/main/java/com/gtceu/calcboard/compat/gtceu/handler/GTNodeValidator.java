@@ -23,7 +23,12 @@ public final class GTNodeValidator {
     public static boolean validateNode(RecipeNode node, FlowGraph graph, List<Component> warnings) {
         if (node == null) return true;
         boolean valid = true;
-
+        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node)) {
+            if (node.getParallel() != 1 || node.getCustomParallel() != 0) {
+                node.setParallel(1);
+                node.setCustomParallel(0);
+            }
+        }
 
         // 1. Reflector requirement check (RFC-001 & RFC-002)
         int req = node.getProperties().get(GTCEuProperties.REQUIRED_REFLECTOR_TIER);

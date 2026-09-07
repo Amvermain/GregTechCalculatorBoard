@@ -76,7 +76,7 @@ public class HotkeyHudWidget {
         graphics.drawString(font, "▶", tutBtnX + 2, tutBtnY + 2, tutHovered ? 0xFF00FF88 : 0xFF10B981, false);
 
         int contentH = panelH - 20;
-        int totalContentH = 18 * 12 + 4;
+        int totalContentH = 20 * 12 + 4;
         int maxScrollY = Math.max(0, totalContentH - contentH);
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY));
 
@@ -96,6 +96,10 @@ public class HotkeyHudWidget {
         renderKeyLine(graphics, font, panelX + 6, curY, "Shift + T", "gui.gtcalcboard.hotkey_hud.fluid_unit");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "G", "gui.gtcalcboard.hotkey_hud.grid_snap");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Alt + R", "gui.gtcalcboard.auto_ratio");
+        curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "Shift + C", "gui.gtcalcboard.auto_connect");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "J", "gui.gtcalcboard.hotkey_hud.junction");
         curY += 12;
@@ -143,7 +147,7 @@ public class HotkeyHudWidget {
         int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
         int panelY = screenH - panelH - 8;
         int contentH = panelH - 20;
-        int totalContentH = 18 * 12 + 4;
+        int totalContentH = 20 * 12 + 4;
         int maxScrollY = Math.max(0, totalContentH - contentH);
         if (maxScrollY > 0 && mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + panelH) {
             scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * 12.0));

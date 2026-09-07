@@ -40,7 +40,7 @@ public final class GTCEuBOMHelper {
         int reqFluidOut = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
         int reqItemOut = (int) node.getOutputs().stream().filter(IngredientStack::isItem).count();
 
-        boolean isDT = machineId.getPath().contains("distillation_tower");
+        boolean isDT = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.DISTILLATION_TOWER_ID.equals(machineId);
         for (MachineAddon addon : node.getAddons()) {
             if (addon instanceof GTHatchAddon gh) {
                 int cap = gh.getSlotCapacity();

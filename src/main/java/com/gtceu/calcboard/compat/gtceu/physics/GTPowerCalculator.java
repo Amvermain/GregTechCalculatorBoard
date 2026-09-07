@@ -9,6 +9,7 @@ import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.util.NumberFormatUtil;
+import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
@@ -101,6 +102,7 @@ public final class GTPowerCalculator {
     }
 
     public static double computeCombustionPower(RecipeNode node) {
+        GTCombustionHelper.ensureCombustionInputs(node);
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0.0) {
             return 0.0;
@@ -110,14 +112,13 @@ public final class GTPowerCalculator {
             baseVoltage = node.getTargetTier().getVoltage();
         }
         int baseParallels = (int) Math.max(1, Math.floor((double) baseVoltage / recipeEUt));
-        int userPar = Math.max(1, node.getParallel());
         double mult = GTCombustionHelper.getCombustionPowerMultiplier(node);
         int parallelMult = GTCombustionHelper.getCombustionParallelMultiplier(node);
 
         if (GTCombustionHelper.isLargeCombustionEngine(node) || GTCombustionHelper.isExtremeCombustionEngine(node)) {
-            return recipeEUt * baseParallels * parallelMult * userPar * mult;
+            return recipeEUt * baseParallels * parallelMult * mult;
         }
-        return recipeEUt * baseParallels * userPar * mult;
+        return recipeEUt * baseParallels * mult;
     }
 
     public static OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
@@ -283,7 +284,9 @@ public final class GTPowerCalculator {
             if (GTTurbineHelper.isLargeTurbine(node)) {
                 par = GTTurbineHelper.getEffectiveTurbineParallel(node) * node.getCombinedParallelMultiplier();
             } else if (GTCombustionHelper.isCombustionEngine(node)) {
-                par = getEffectiveCombustionParallel(node) * node.getCombinedParallelMultiplier();
+                int boostMult = GTCombustionHelper.getCombustionParallelMultiplier(node);
+                int addonMult = node.getCombinedParallelMultiplier();
+                par = getEffectiveCombustionParallel(node) * Math.max(boostMult, addonMult);
             } else if (isGTGenerator(node)) {
                 par = getEffectiveSingleblockParallel(node) * node.getCombinedParallelMultiplier();
             } else {
@@ -318,6 +321,20 @@ public final class GTPowerCalculator {
                 par = Math.max(1, baseSmelterPar * nonCoilParallelMultiplier);
             } else {
                 par = Math.max(1, effectiveBase * node.getCombinedParallelMultiplier());
+            }
+            if (!node.hasPowerConstantAddon() && node.getEnergyType() == EnergyType.ELECTRIC_EU
+                    && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
+                double singleRecipeEUt = node.getBaseEUt() * node.getCombinedEutMultiplier();
+                if (node.hasThreading()) {
+                    singleRecipeEUt *= node.getThreadingConfig().getFinalPowerMultiplier();
+                }
+                if (singleRecipeEUt > 0.0) {
+                    long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
+                    if (maxCapacity > 0 && maxCapacity < Long.MAX_VALUE) {
+                        int energyParCap = (int) Math.max(1, Math.floor((double) maxCapacity / singleRecipeEUt));
+                        par = Math.min(par, energyParCap);
+                    }
+                }
             }
         }
         if (node.hasThreading()) {
@@ -383,15 +400,13 @@ public final class GTPowerCalculator {
     public static int getEffectiveCombustionParallel(RecipeNode node) {
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0.0) {
-            return Math.max(1, node.getParallel());
+            return 1;
         }
         long baseVoltage = GTCombustionHelper.getBaseCombustionVoltage(node);
         if (baseVoltage <= 0L && node.getTargetTier() != null) {
             baseVoltage = node.getTargetTier().getVoltage();
         }
-        int baseParallels = (int) Math.max(1, Math.floor((double) baseVoltage / recipeEUt));
-        int userPar = Math.max(1, node.getParallel());
-        return baseParallels * userPar;
+        return (int) Math.max(1, Math.floor((double) baseVoltage / recipeEUt));
     }
 
     public static int getEffectiveSingleblockParallel(RecipeNode node) {
@@ -406,6 +421,9 @@ public final class GTPowerCalculator {
 
     public static int getMaxParallelCapacity(RecipeNode node) {
         if (node == null) return 1;
+        if (GTCombustionHelper.isCombustionEngine(node)) {
+            return 1;
+        }
         if (node.isGenerator() || GTTurbineHelper.isTurbine(node)) {
             double cap = GTTurbineHelper.getGeneratorMaxEUt(node);
             double recipeEUt = Math.abs(node.getBaseEUt());
@@ -420,9 +438,8 @@ public final class GTPowerCalculator {
         int hatchAndHardware = getHatchAndHardwareParallelLimit(node);
         int energyLimit = Integer.MAX_VALUE;
         long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
-        if (maxCapacity > 0 && maxCapacity < Long.MAX_VALUE) {
-            OverclockMode.OverclockResult oc = computeOverclock(node, node.getTargetTier(), false);
-            double singleRecipeEUt = oc.eut() * node.getCombinedEutMultiplier()
+        if (maxCapacity > 0 && maxCapacity < Long.MAX_VALUE && !node.hasPowerConstantAddon()) {
+            double singleRecipeEUt = node.getBaseEUt() * node.getCombinedEutMultiplier()
                     * (node.hasThreading() ? node.getThreadingConfig().getFinalPowerMultiplier() : 1.0);
             if (singleRecipeEUt > 0.0) {
                 energyLimit = (int) Math.max(1, Math.floor((double) maxCapacity / singleRecipeEUt));
@@ -456,6 +473,17 @@ public final class GTPowerCalculator {
             }
         }
         return Math.min(hatchLimit, hardwareLimit);
+    }
+
+    public static boolean hasParallelHatch(RecipeNode node) {
+        if (node == null) return false;
+        for (MachineAddon a : node.getAddons()) {
+            if (a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon
+                    || a.getCategory() == MachineAddon.Category.PARALLEL) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static final java.util.Set<ResourceLocation> MACERATOR_CATEGORIES = java.util.Set.of(
@@ -567,7 +595,10 @@ public final class GTPowerCalculator {
             double amps = totEUt / (double) tier.getVoltage();
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Generation: §a+%,.2f EU/t", totEUt)));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Current: §a+%,.4fA %s", amps, tier.getName())));
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
+            double dispCps = GTCombustionHelper.isCombustionEngine(node)
+                    ? (1.0 / Math.max(0.05, node.getEffectiveDurationSeconds())) * node.getMachineCount()
+                    : node.getEffectiveCyclesPerSecond();
+            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), dispCps)));
 
             if (GTTurbineHelper.isTurbine(node)) {
                 GTVoltageTier holderTier = GTTurbineHelper.getRotorHolderTier(node);
@@ -595,10 +626,25 @@ public final class GTPowerCalculator {
                         }
                     }
                 }
-            }
 
-            if (node.getEfficiency() < 0.999) {
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§e⚡ Rotor Efficiency: §f%.1f%%", node.getEfficiency() * 100.0)));
+                if (node.getEfficiency() < 0.999) {
+                    tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§e⚡ Rotor Efficiency: §f%.1f%%", node.getEfficiency() * 100.0)));
+                }
+            } else if (GTCombustionHelper.isCombustionEngine(node)) {
+                if (GTCombustionHelper.isOxygenBoosted(node)) {
+                    tooltipLines.add(Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.oxygen_boost").getString() + " §a(+50% EU/t, 2x Fuel)"));
+                } else if (GTCombustionHelper.isLiquidOxygenBoosted(node)) {
+                    tooltipLines.add(Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost").getString() + " §a(+100% EU/t, 2x Fuel)"));
+                }
+
+                if (GTCombustionHelper.isOxidizerBoosted(node)) {
+                    String ox = node.getProperties().get(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE);
+                    tooltipLines.add(Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.tooltip.oxidizer_boost").getString() + ": §e" + GTCombustionHelper.getOxidizerDisplayName(ox) + " §a(2x Fuel, Amp Boost)"));
+                }
+                if (GTCombustionHelper.isCoolantBoosted(node)) {
+                    String cl = node.getProperties().get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
+                    tooltipLines.add(Component.literal("§b❄ " + Component.translatable("gui.gtcalcboard.tooltip.coolant_boost").getString() + ": §e" + GTCombustionHelper.getCoolantDisplayName(cl)));
+                }
             }
         } else {
             double totEUt = node.getEffectiveTotalEUt();

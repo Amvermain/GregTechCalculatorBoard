@@ -266,8 +266,27 @@ public class UiFormattingTest {
 
         config.setCategoryExcluded("gtceu:chemical_reactor", true);
         Assertions.assertTrue(config.isCategoryExcluded("gtceu:chemical_reactor"));
+        Assertions.assertTrue(config.isCategoryExcluded("chemical_reactor"));
         config.setCategoryExcluded("gtceu:chemical_reactor", false);
         Assertions.assertFalse(config.isCategoryExcluded("gtceu:chemical_reactor"));
+        Assertions.assertFalse(config.isCategoryExcluded("chemical_reactor"));
+
+        // Test path-only exclusion matching namespace ID
+        config.setCategoryExcluded("ore_processing_diagram", true);
+        Assertions.assertTrue(config.isCategoryExcluded("ore_processing_diagram"));
+        Assertions.assertTrue(config.isCategoryExcluded("gtceu:ore_processing_diagram"));
+        config.setCategoryExcluded("ore_processing_diagram", false);
+        Assertions.assertFalse(config.isCategoryExcluded("ore_processing_diagram"));
+        Assertions.assertFalse(config.isCategoryExcluded("gtceu:ore_processing_diagram"));
+
+        // Test listener
+        boolean[] listenerFired = new boolean[]{false};
+        Runnable listener = () -> listenerFired[0] = true;
+        config.addChangeListener(listener);
+        config.setCategoryExcluded("test_cat", true);
+        Assertions.assertTrue(listenerFired[0]);
+        config.removeChangeListener(listener);
+        config.setCategoryExcluded("test_cat", false);
 
         SearchableRecipe r1 = new SearchableRecipe(
                 new Object(), "Reaction 1", "gtceu", "chemical_reactor", "Chemical Reactor",
@@ -321,7 +340,7 @@ public class UiFormattingTest {
             Assertions.assertTrue(inPerDay.contains("864k/d"));
 
             String exactPerMin = com.gtceu.calcboard.client.gui.util.FormatUtil.formatExactRate(50.0, true);
-            Assertions.assertTrue(exactPerMin.contains("4,320.00 B/d"));
+            Assertions.assertTrue(exactPerMin.contains("4,320 B/d") || exactPerMin.contains("4,320.00 B/d"));
 
             Assertions.assertEquals(RateTimeUnit.PER_RECIPE, RateTimeUnit.PER_DAY.next());
             Assertions.assertEquals(RateTimeUnit.PER_TICK, RateTimeUnit.PER_RECIPE.next());

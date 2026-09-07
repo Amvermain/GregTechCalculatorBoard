@@ -19,6 +19,7 @@ import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
 import com.gtceu.calcboard.compat.start.StarTAddonCrawler;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import org.junit.jupiter.api.Assertions;
@@ -1354,6 +1355,63 @@ public class MachineAddonTest {
         Assertions.assertEquals(182.0, absNode.getEffectiveDurationSeconds(), 0.001);
         // CPS = (20 / 3640) * 1024 = 5.62637 cycles/sec
         Assertions.assertEquals(5.62637, absNode.getCyclesPerSecond(), 0.001);
+    }
+
+    @Test
+    public void testThermalAndSysteamsAddonBadgeAndTooltipCompleteness() {
+        CompoundTag arcTag = new CompoundTag();
+        CompoundTag augData = new CompoundTag();
+        augData.putString("Type", "Dynamo");
+        augData.putFloat("DynamoPower", 3.0f);
+        augData.putFloat("DynamoEnergy", 0.8f);
+        arcTag.put("AugmentData", augData);
+
+        MachineAddon arcAddon = ThermalAugmentHelper.parseThermalAugmentTag(arcTag, "EV Auxiliary Reaction Chamber Kit", ResourceLocation.tryParse("thermal:dynamo_output_augment"));
+        Assertions.assertNotNull(arcAddon);
+        Assertions.assertEquals(4.0, arcAddon.getEutMultiplier(), 0.001);
+        Assertions.assertEquals(0.8, arcAddon.getDurationMultiplier(), 0.001);
+
+        var thermalAdapter = new com.gtceu.calcboard.compat.thermal.ThermalModAdapter();
+        var systeamsAdapter = new com.gtceu.calcboard.compat.systeams.SysteamsModAdapter();
+
+        RecipeNode dynamoNode = RecipeNode.create("Steam Dynamo", 100.0, 1000.0, GTVoltageTier.EV);
+        dynamoNode.setRecipeCategoryId(ResourceLocation.tryParse("systeams:steam_dynamo"));
+        dynamoNode.setGenerator(true);
+
+        String thermalBadge = thermalAdapter.formatAddonBadge(dynamoNode, arcAddon);
+        String systeamsBadge = systeamsAdapter.formatAddonBadge(dynamoNode, arcAddon);
+        Assertions.assertEquals("§e⚡4.0x ⏱0.8x", thermalBadge);
+        Assertions.assertEquals("§e⚡4.0x ⏱0.8x", systeamsBadge);
+
+        List<Component> tooltip = new ArrayList<>();
+        ThermalAugmentHelper.buildThermalAddonTooltip(dynamoNode, arcAddon, false, tooltip);
+
+        Assertions.assertFalse(tooltip.isEmpty());
+        Assertions.assertTrue(hasTranslatableKey(tooltip, "gui.gtcalcboard.addon.thermal.power_output"), "Tooltip must include power output key");
+        Assertions.assertTrue(hasTranslatableKey(tooltip, "gui.gtcalcboard.addon.thermal.fuel_energy"), "Tooltip must include fuel energy key");
+        Assertions.assertTrue(hasTranslatableKey(tooltip, "gui.gtcalcboard.addon.thermal.slots"), "Tooltip must include slot key");
+
+        dynamoNode.addAddon(arcAddon);
+        dynamoNode.addAddon(arcAddon);
+        List<Component> multiTooltip = new ArrayList<>();
+        ThermalAugmentHelper.buildThermalAddonTooltip(dynamoNode, arcAddon, false, multiTooltip);
+
+        Assertions.assertTrue(hasTranslatableKey(multiTooltip, "gui.gtcalcboard.addon.thermal.combined_effect"), "Tooltip for multiple installed copies must include combined effect key");
+    }
+
+    private static boolean hasTranslatableKey(List<Component> tooltip, String key) {
+        for (Component c : tooltip) {
+            if (matchesKey(c, key)) return true;
+            for (Component sib : c.getSiblings()) {
+                if (matchesKey(sib, key)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesKey(Component comp, String key) {
+        if (comp == null) return false;
+        return comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc && key.equals(tc.getKey());
     }
 }
 

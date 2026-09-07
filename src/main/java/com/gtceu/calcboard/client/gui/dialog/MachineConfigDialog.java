@@ -145,8 +145,12 @@ public class MachineConfigDialog implements IBoardModal {
         this.visible = true;
         if (initialCategory != null) {
             this.selectedCategory = initialCategory;
+        } else if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
+            this.selectedCategory = MachineAddon.Category.ROTOR;
+        } else if (MachineAddon.isCombustionMachine(node) && node.isMultiblock()) {
+            this.selectedCategory = AddonCategory.MULTIBLOCK_TRAIT;
         } else {
-            this.selectedCategory = (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) ? MachineAddon.Category.ROTOR : null;
+            this.selectedCategory = null;
         }
         this.isCustomBuilderActive = (this.selectedCategory == AddonCategory.CUSTOM);
         this.activeAddonsView.resetScroll();
@@ -163,8 +167,17 @@ public class MachineConfigDialog implements IBoardModal {
         if (mc != null && mc.font != null) {
             this.parallelBox = new EditBox(mc.font, 0, 0, 48, 16, Component.translatable("gui.gtcalcboard.config.parallel"));
             this.parallelBox.setMaxLength(6);
-            this.parallelBox.setValue(String.valueOf(node.getTotalParallel()));
+            boolean isCombustion = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node);
+            if (isCombustion) {
+                node.setParallel(1);
+                node.setCustomParallel(0);
+            }
+            int initParallel = isCombustion ? 1 : Math.max(1, node.getParallel());
+            this.parallelBox.setValue(String.valueOf(initParallel));
             this.parallelBox.setResponder(text -> {
+                if (isCombustion) {
+                    return;
+                }
                 try {
                     int p = Integer.parseInt(text.trim());
                     if (p >= 1 && p <= 100000) {
@@ -174,6 +187,9 @@ public class MachineConfigDialog implements IBoardModal {
                     }
                 } catch (NumberFormatException ignored) {}
             });
+            if (isCombustion) {
+                this.parallelBox.setEditable(false);
+            }
         }
 
         syncThreadingAddons(node);

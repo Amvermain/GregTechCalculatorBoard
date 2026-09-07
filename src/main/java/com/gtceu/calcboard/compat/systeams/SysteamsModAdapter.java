@@ -205,6 +205,13 @@ public class SysteamsModAdapter implements IModAdapter {
     @Override
     public String formatAddonBadge(RecipeNode node, MachineAddon addon) {
         if (addon == null) return "";
+        boolean isKit = (addon instanceof com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon ta && ta.isUpgradeKit()) || addon.getParallelMultiplier() > 1;
+        if (isKit) {
+            return String.format("§d⚡%dx", addon.getParallelMultiplier());
+        }
+        if (addon.getDurationMultiplier() != 1.0 && addon.getEutMultiplier() != 1.0) {
+            return String.format("§e⚡%.1fx ⏱%.1fx", addon.getEutMultiplier(), addon.getDurationMultiplier());
+        }
         if (addon.getEutMultiplier() != 1.0) {
             return String.format("§e⚡%.1fx", addon.getEutMultiplier());
         }
@@ -243,7 +250,7 @@ public class SysteamsModAdapter implements IModAdapter {
         }
         double steamRate = 0.0;
         for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
-            if (entry.getKey().isFluid() && entry.getKey().getId() != null && entry.getKey().getId().getPath().contains("steam")) {
+            if (entry.getKey().isFluid() && isSteamFluid(entry.getKey().getId())) {
                 steamRate += entry.getValue();
             }
         }
@@ -279,7 +286,7 @@ public class SysteamsModAdapter implements IModAdapter {
         tooltipLines.add(Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.boiler_badge").getString()));
         double steamRate = 0.0;
         for (var entry : node.calculateEffectiveOutputRates().entrySet()) {
-            if (entry.getKey().isFluid() && entry.getKey().getId() != null && entry.getKey().getId().getPath().contains("steam")) {
+            if (entry.getKey().isFluid() && isSteamFluid(entry.getKey().getId())) {
                 steamRate += entry.getValue();
             }
         }

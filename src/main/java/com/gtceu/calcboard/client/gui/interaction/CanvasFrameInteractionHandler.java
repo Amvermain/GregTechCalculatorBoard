@@ -7,14 +7,22 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer;
+import com.gtceu.calcboard.api.solver.AutoRatioMode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -112,7 +120,87 @@ public class CanvasFrameInteractionHandler {
             screen.openSharedFrameConfigDialog(frame);
             return true;
         }
+        if (action == CanvasGroupFrameRenderer.FrameAction.AUTO_RATIO && button == 0) {
+            return executeSharedPoolAutoRatio(frame, screen);
+        }
         return false;
+    }
+
+    private boolean executeSharedPoolAutoRatio(CanvasGroupFrame frame, BoardScreen screen) {
+        FlowGraph graph = screen.getGraph();
+        if (graph == null || frame == null) return false;
+
+        AutoRatioMode mode = resolveAutoRatioMode();
+        Map<String, Double> oldCounts = snapshotMachineCounts(graph);
+
+        int changed = FlowGraphSolver.autoRatioFromSharedPool(graph, frame, frame.getTargetPoolCapacity(), mode);
+        if (changed <= 0) {
+            notifyEmptyPool();
+            return true;
+        }
+
+        recordAutoRatioHistory(graph, frame, oldCounts, mode, screen);
+        notifySuccessPool(frame, changed, mode);
+        screen.markSummaryDirty();
+        screen.rebuildWidgets();
+        return true;
+    }
+
+    private AutoRatioMode resolveAutoRatioMode() {
+        if (Screen.hasAltDown()) {
+            return AutoRatioMode.FRACTIONAL;
+        }
+        if (Screen.hasShiftDown()) {
+            return AutoRatioMode.HARMONIZED;
+        }
+        return BoardManager.getInstance().isAutoRatioFractionalDefault()
+                ? AutoRatioMode.FRACTIONAL
+                : AutoRatioMode.INTEGER_CEIL;
+    }
+
+    private Map<String, Double> snapshotMachineCounts(FlowGraph graph) {
+        Map<String, Double> counts = new HashMap<>();
+        for (RecipeNode n : graph.getNodes()) {
+            counts.put(n.getId(), n.getMachineCount());
+        }
+        return counts;
+    }
+
+    private void recordAutoRatioHistory(FlowGraph graph, CanvasGroupFrame frame, Map<String, Double> oldCounts, AutoRatioMode mode, BoardScreen screen) {
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : graph.getNodes()) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        if (subCmds.isEmpty()) return;
+
+        String modeTag = switch (mode) {
+            case FRACTIONAL -> " (Fractional)";
+            case HARMONIZED -> " (Harmonized)";
+            case INTEGER_CEIL -> "";
+        };
+        String actionName = "Pool Auto Ratio: " + frame.getTitle() + modeTag;
+        screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, actionName));
+    }
+
+    private void notifySuccessPool(CanvasGroupFrame frame, int changedCount, AutoRatioMode mode) {
+        String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
+        String icon = switch (mode) {
+            case FRACTIONAL -> "§b⚡ ";
+            case HARMONIZED -> "§6✨ ";
+            case INTEGER_CEIL -> "§a⚖ ";
+        };
+        BoardToast.show(Component.literal(icon).append(Component.translatable("message.gtcalcboard.pool_auto_ratio_success", changedCount, frame.getTitle(), capacityStr)));
+        SoundEvent sound = (mode == AutoRatioMode.HARMONIZED) ? SoundEvents.PLAYER_LEVELUP : SoundEvents.EXPERIENCE_ORB_PICKUP;
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.2F));
+    }
+
+    private void notifyEmptyPool() {
+        BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.pool_auto_ratio_empty")));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F));
     }
 
     private boolean startFrameResize(CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY) {

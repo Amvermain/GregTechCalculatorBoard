@@ -1,10 +1,15 @@
 package com.gtceu.calcboard.client.gui.interaction;
 
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -134,6 +139,25 @@ public class CanvasContextMenuManager {
                 widget.getTargetBatchEditor().updateBuffer();
                 widget.invalidateCache();
                 screen.markSummaryDirty();
+            }));
+        }
+        if (widget.getNode().isExternalSupply() || widget.getNode().isFixedDrain()) {
+            this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.toggle_base_anchor", "⌖", null, () -> {
+                boolean nowBase = !widget.getNode().isBaseNode();
+                screen.getGraph().setBaseNode(nowBase ? widget.getNode() : null);
+                screen.rebuildWidgets();
+                screen.markSummaryDirty();
+                Minecraft mc = Minecraft.getInstance();
+                if (nowBase) {
+                    IngredientStack rStack = widget.getNode().getRerouteIngredient();
+                    String name = rStack != null ? rStack.getDisplayName() : "Junction";
+                    BoardToast.show(Component.literal("§6⌖ ").append(Component.translatable("message.gtcalcboard.base_set", name)));
+                    if (mc != null && mc.getSoundManager() != null) {
+                        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+                    }
+                } else {
+                    BoardToast.show(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")));
+                }
             }));
         }
         this.items.add(ContextMenuItem.separator());

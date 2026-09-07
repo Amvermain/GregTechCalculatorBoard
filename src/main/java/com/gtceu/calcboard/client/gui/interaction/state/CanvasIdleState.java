@@ -5,6 +5,8 @@ import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.gui.screens.Screen;
@@ -166,7 +168,9 @@ public final class CanvasIdleState implements CanvasInteractionState {
                 startNodeDrag(ctx, widget, canvasX, canvasY);
                 return true;
             }
-            return true;
+            if (button == 0) {
+                return true;
+            }
         }
         return false;
     }
@@ -256,6 +260,10 @@ public final class CanvasIdleState implements CanvasInteractionState {
         double markerX = ctx.getQuickAddMarkerHandler().getQuickAddMarkerCanvasX();
         double markerY = ctx.getQuickAddMarkerHandler().getQuickAddMarkerCanvasY();
 
+        if (handleQuickAddFlyoutClick(ctx, markerX, markerY, canvasX, canvasY)) {
+            return true;
+        }
+
         boolean inSearchBtn = canvasX >= markerX - 44 && canvasX <= markerX - 24 && canvasY >= markerY - 10 && canvasY <= markerY + 10;
         boolean inJunctionBtn = canvasX >= markerX - 21 && canvasX <= markerX - 1 && canvasY >= markerY - 10 && canvasY <= markerY + 10;
         boolean inFrameBtn = canvasX >= markerX + 2 && canvasX <= markerX + 22 && canvasY >= markerY - 10 && canvasY <= markerY + 10;
@@ -280,6 +288,124 @@ public final class CanvasIdleState implements CanvasInteractionState {
             return true;
         }
         return false;
+    }
+
+    private boolean handleQuickAddFlyoutClick(CanvasInteractionContext ctx, double markerX, double markerY, double canvasX, double canvasY) {
+        var markerHandler = ctx.getQuickAddMarkerHandler();
+        if (!markerHandler.hasQuickAddWireContext()) return false;
+
+        boolean inFlyoutColumn = canvasX >= markerX - 21 && canvasX <= markerX - 1;
+        if (!inFlyoutColumn) return false;
+
+        boolean inSub1 = canvasY >= markerY - 34 && canvasY <= markerY - 14;
+        boolean inSub2 = canvasY >= markerY - 58 && canvasY <= markerY - 38;
+        if (!inSub1 && !inSub2) return false;
+
+        RecipeNode srcNode = markerHandler.getQuickAddWireSourceNode();
+        int portIdx = markerHandler.getQuickAddWirePortIdx();
+        boolean isInput = markerHandler.isQuickAddWireInput();
+        FlowGraph graph = ctx.getScreen() != null ? ctx.getScreen().getGraph() : null;
+
+        if (isInput) {
+            return handleInputFlyoutClick(ctx, markerX, markerY, inSub1, inSub2, srcNode, portIdx, graph);
+        } else {
+            return handleOutputFlyoutClick(ctx, markerX, markerY, inSub1, inSub2, srcNode, portIdx, graph);
+        }
+    }
+
+    private boolean handleOutputFlyoutClick(
+            CanvasInteractionContext ctx,
+            double markerX,
+            double markerY,
+            boolean inSub1,
+            boolean inSub2,
+            RecipeNode srcNode,
+            int portIdx,
+            FlowGraph graph
+    ) {
+        FlowGraphSolver.PortFlowStats stats = (graph != null && srcNode != null) ? graph.getOutputPortStats(srcNode, portIdx) : null;
+        double surplus = stats != null ? Math.max(0.0, stats.requiredOrProducedRate() - stats.connectedRate()) : 0.0;
+
+        if (surplus > 0.0001) {
+            if (inSub1) {
+                createAndWireJunction(ctx, markerX, markerY, SupplyMode.FIXED_DRAIN, surplus, false);
+                return true;
+            }
+            if (inSub2) {
+                createAndWireJunction(ctx, markerX, markerY, SupplyMode.VOID_SINK, 0.0, false);
+                return true;
+            }
+        } else if (inSub1) {
+            createAndWireJunction(ctx, markerX, markerY, SupplyMode.VOID_SINK, 0.0, false);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleInputFlyoutClick(
+            CanvasInteractionContext ctx,
+            double markerX,
+            double markerY,
+            boolean inSub1,
+            boolean inSub2,
+            RecipeNode srcNode,
+            int portIdx,
+            FlowGraph graph
+    ) {
+        FlowGraphSolver.PortFlowStats stats = (graph != null && srcNode != null) ? graph.getInputPortStats(srcNode, portIdx) : null;
+        double deficit = stats != null ? Math.max(0.0, stats.requiredOrProducedRate() - stats.connectedRate()) : 0.0;
+
+        if (deficit > 0.0001) {
+            if (inSub1) {
+                createAndWireJunction(ctx, markerX, markerY, SupplyMode.FIXED_RATE, deficit, true);
+                return true;
+            }
+            if (inSub2) {
+                createAndWireJunction(ctx, markerX, markerY, SupplyMode.INFINITE, 0.0, true);
+                return true;
+            }
+        } else if (inSub1) {
+            createAndWireJunction(ctx, markerX, markerY, SupplyMode.INFINITE, 0.0, true);
+            return true;
+        }
+        return false;
+    }
+
+    private void createAndWireJunction(
+            CanvasInteractionContext ctx,
+            double markerX,
+            double markerY,
+            SupplyMode mode,
+            double rate,
+            boolean isInput
+    ) {
+        BoardScreen screen = ctx.getScreen();
+        if (screen == null || !screen.ensureEditPermission()) return;
+        var markerHandler = ctx.getQuickAddMarkerHandler();
+
+        RecipeNode reroute = RecipeNode.createReroute(markerX - 16, markerY - 16);
+        if (markerHandler.getQuickAddWireStack() != null) {
+            reroute.bindRerouteIngredient(markerHandler.getQuickAddWireStack());
+        }
+        reroute.setSupplyMode(mode);
+        if (mode == SupplyMode.FIXED_RATE) {
+            reroute.setExternalSupplyRate(rate);
+        } else if (mode == SupplyMode.FIXED_DRAIN) {
+            reroute.setExternalDrainRate(rate);
+        }
+
+        screen.getGraph().addNode(reroute);
+        if (isInput) {
+            screen.getGraph().addConnection(reroute.getId(), 0, markerHandler.getQuickAddWireSourceNode().getId(), markerHandler.getQuickAddWirePortIdx());
+        } else {
+            screen.getGraph().addConnection(markerHandler.getQuickAddWireSourceNode().getId(), markerHandler.getQuickAddWirePortIdx(), reroute.getId(), 0);
+        }
+
+        screen.recordCommand(new BoardCommand.AddNodesCommand(List.of(reroute), List.of(), "Add " + mode.name() + " Junction Node"));
+        screen.rebuildWidgets();
+        screen.markSummaryDirty();
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionInserted(screen.getGraph(), null, reroute));
+        markerHandler.clearQuickAddMarker();
     }
 
     private void openSearchFromMarker(CanvasInteractionContext ctx, double markerX, double markerY) {

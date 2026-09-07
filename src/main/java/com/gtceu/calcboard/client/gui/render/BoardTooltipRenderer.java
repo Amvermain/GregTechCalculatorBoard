@@ -10,6 +10,7 @@ import com.gtceu.calcboard.client.gui.CanvasInteractionHandler;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import com.gtceu.calcboard.client.gui.interaction.CanvasQuickAddMarkerHandler;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
@@ -175,6 +176,10 @@ public final class BoardTooltipRenderer {
                     return;
                 }
 
+                if (renderNodeBadgeTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
+                    return;
+                }
+
                 if (renderCountBoxTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
                     return;
                 }
@@ -208,22 +213,7 @@ public final class BoardTooltipRenderer {
                 double qx = canvasHandler.getQuickAddMarkerCanvasX();
                 double qy = canvasHandler.getQuickAddMarkerCanvasY();
 
-                boolean searchHovered = canvasMouseX >= qx - 44 && canvasMouseX <= qx - 24 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-                boolean junctionHovered = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-                boolean frameHovered = canvasMouseX >= qx + 2 && canvasMouseX <= qx + 22 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-                boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
-
-                if (searchHovered) {
-                    renderTooltip(graphics, font, Component.literal("§a? ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_search")), mouseX, mouseY, screen.width, screen.height);
-                    return;
-                } else if (junctionHovered) {
-                    renderTooltip(graphics, font, Component.literal("§b↔ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_junction")), mouseX, mouseY, screen.width, screen.height);
-                    return;
-                } else if (frameHovered) {
-                    renderTooltip(graphics, font, Component.literal("§d▦ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_frame")), mouseX, mouseY, screen.width, screen.height);
-                    return;
-                } else if (noteHovered) {
-                    renderTooltip(graphics, font, Component.literal("§e▪ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_note")), mouseX, mouseY, screen.width, screen.height);
+                if (renderQuickAddMarkerTooltips(graphics, font, screen, canvasHandler, qx, qy, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
                     return;
                 }
             }
@@ -261,6 +251,63 @@ public final class BoardTooltipRenderer {
 
         renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
         return true;
+    }
+
+    private static boolean renderNodeBadgeTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        RecipeNode node = widget.getNode();
+        if (node == null || node.isReroute()) return false;
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node);
+        if (badges.isEmpty()) return false;
+
+        int x = (int) node.getPosX();
+        int y = (int) node.getPosY();
+        int row2Y = y + 20 + 6 + 18;
+        if (canvasMouseY < row2Y || canvasMouseY > row2Y + 14) {
+            return false;
+        }
+
+        int nextCtrlX = computeRow2ControlsStartX(node, font);
+        int cardW = node.getCardWidth();
+
+        for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
+            int badgeW = font.width(badge.text()) + 8;
+            if (nextCtrlX + badgeW > x + cardW - 46) break;
+            if (canvasMouseX >= nextCtrlX && canvasMouseX <= nextCtrlX + badgeW) {
+                if (badge.tooltipLines() != null && !badge.tooltipLines().isEmpty()) {
+                    renderComponentTooltip(graphics, font, badge.tooltipLines(), mouseX, mouseY, screen.width, screen.height);
+                    return true;
+                }
+            }
+            nextCtrlX += badgeW + 3;
+        }
+        return false;
+    }
+
+    private static int computeRow2ControlsStartX(RecipeNode node, Font font) {
+        int x = (int) node.getPosX();
+        if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
+            return x + 42;
+        }
+        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        if (node.isLiquidBoilerRecipe() || (adapter != null && adapter.isBoilerRecipe(node))) {
+            var bTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
+            String boilerText = bTier.getDisplayName();
+            if (bTier.isMultiblock() && node.getBoilerThrottle() < 100) {
+                boilerText += " (" + node.getBoilerThrottle() + "%)";
+            }
+            int tierBtnW = Math.max(54, font.width(boilerText) + 8);
+            return x + 6 + tierBtnW + 4;
+        }
+        if (!node.isMultiblock() && node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            String steamText = node.getSteamMode().getDisplayName();
+            int tierBtnW = Math.max(48, font.width(steamText) + 8);
+            return x + 6 + tierBtnW + 4;
+        }
+        com.gtceu.calcboard.api.type.GTVoltageTier tier = node.getTargetTier();
+        String tierName = (tier != null ? tier.getName() : "LV");
+        if (node.isMultiblock()) tierName = "▦ " + tierName;
+        int tierBtnW = Math.max(32, font.width(tierName) + 8);
+        return x + 6 + tierBtnW + 4;
     }
 
     private static List<Component> buildGreateTierTooltipLines(RecipeNode n) {
@@ -927,6 +974,134 @@ public final class BoardTooltipRenderer {
         double totalEU = com.gtceu.calcboard.api.solver.ProductionETACalculator.calculateTotalEnergyForBatch(graph, rNode, targetAmount);
         if (totalEU > 0) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.eta.tooltip.total_energy").getString() + ": §e" + FormatUtil.formatCompactNumber(totalEU) + " EU"));
+        }
+    }
+
+    private static boolean renderQuickAddMarkerTooltips(
+            GuiGraphics graphics,
+            Font font,
+            BoardScreen screen,
+            CanvasInteractionHandler canvasHandler,
+            double qx,
+            double qy,
+            double canvasMouseX,
+            double canvasMouseY,
+            int mouseX,
+            int mouseY
+    ) {
+        var markerHandler = canvasHandler.getQuickAddMarkerHandler();
+        boolean inJunctionCol = canvasMouseX >= qx - 21 && canvasMouseX <= qx - 1;
+
+        if (inJunctionCol && markerHandler.hasQuickAddWireContext()) {
+            boolean inSub1 = canvasMouseY >= qy - 34 && canvasMouseY <= qy - 14;
+            boolean inSub2 = canvasMouseY >= qy - 58 && canvasMouseY <= qy - 38;
+            if (inSub1 || inSub2) {
+                renderFlyoutTooltip(graphics, font, screen, markerHandler, inSub1, inSub2, mouseX, mouseY);
+                return true;
+            }
+        }
+
+        boolean searchHovered = canvasMouseX >= qx - 44 && canvasMouseX <= qx - 24 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+        boolean junctionHovered = inJunctionCol && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+        boolean frameHovered = canvasMouseX >= qx + 2 && canvasMouseX <= qx + 22 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+        boolean noteHovered = canvasMouseX >= qx + 25 && canvasMouseX <= qx + 45 && canvasMouseY >= qy - 10 && canvasMouseY <= qy + 10;
+
+        if (searchHovered) {
+            renderTooltip(graphics, font, Component.literal("§a? ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_search")), mouseX, mouseY, screen.width, screen.height);
+            return true;
+        } else if (junctionHovered) {
+            renderTooltip(graphics, font, Component.literal("§b↔ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_junction")), mouseX, mouseY, screen.width, screen.height);
+            return true;
+        } else if (frameHovered) {
+            renderTooltip(graphics, font, Component.literal("§d▦ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_frame")), mouseX, mouseY, screen.width, screen.height);
+            return true;
+        } else if (noteHovered) {
+            renderTooltip(graphics, font, Component.literal("§e▪ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_note")), mouseX, mouseY, screen.width, screen.height);
+            return true;
+        }
+        return false;
+    }
+
+    private static void renderFlyoutTooltip(
+            GuiGraphics graphics,
+            Font font,
+            BoardScreen screen,
+            CanvasQuickAddMarkerHandler markerHandler,
+            boolean inSub1,
+            boolean inSub2,
+            int mouseX,
+            int mouseY
+    ) {
+        RecipeNode srcNode = markerHandler.getQuickAddWireSourceNode();
+        int portIdx = markerHandler.getQuickAddWirePortIdx();
+        boolean isInput = markerHandler.isQuickAddWireInput();
+        FlowGraph graph = screen.getGraph();
+        IngredientStack stack = markerHandler.getQuickAddWireStack();
+        String stackName = stack != null ? stack.getDisplayName() : "Ingredient";
+        boolean isFluid = stack != null && stack.isFluid();
+
+        if (isInput) {
+            renderInputFlyoutTooltip(graphics, font, screen, srcNode, portIdx, inSub1, inSub2, stackName, isFluid, graph, mouseX, mouseY);
+        } else {
+            renderOutputFlyoutTooltip(graphics, font, screen, srcNode, portIdx, inSub1, inSub2, stackName, isFluid, graph, mouseX, mouseY);
+        }
+    }
+
+    private static void renderOutputFlyoutTooltip(
+            GuiGraphics graphics,
+            Font font,
+            BoardScreen screen,
+            RecipeNode srcNode,
+            int portIdx,
+            boolean inSub1,
+            boolean inSub2,
+            String stackName,
+            boolean isFluid,
+            FlowGraph graph,
+            int mouseX,
+            int mouseY
+    ) {
+        FlowGraphSolver.PortFlowStats stats = (graph != null && srcNode != null) ? graph.getOutputPortStats(srcNode, portIdx) : null;
+        double surplus = stats != null ? Math.max(0.0, stats.requiredOrProducedRate() - stats.connectedRate()) : 0.0;
+
+        if (surplus > 0.0001) {
+            if (inSub1) {
+                String rateStr = FormatUtil.formatRate(surplus, isFluid);
+                renderTooltip(graphics, font, Component.literal("§6↓ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_drain", stackName, rateStr)), mouseX, mouseY, screen.width, screen.height);
+            } else if (inSub2) {
+                renderTooltip(graphics, font, Component.literal("§d✕ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_void_sink", stackName)), mouseX, mouseY, screen.width, screen.height);
+            }
+        } else if (inSub1) {
+            renderTooltip(graphics, font, Component.literal("§d✕ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_void_sink", stackName)), mouseX, mouseY, screen.width, screen.height);
+        }
+    }
+
+    private static void renderInputFlyoutTooltip(
+            GuiGraphics graphics,
+            Font font,
+            BoardScreen screen,
+            RecipeNode srcNode,
+            int portIdx,
+            boolean inSub1,
+            boolean inSub2,
+            String stackName,
+            boolean isFluid,
+            FlowGraph graph,
+            int mouseX,
+            int mouseY
+    ) {
+        FlowGraphSolver.PortFlowStats stats = (graph != null && srcNode != null) ? graph.getInputPortStats(srcNode, portIdx) : null;
+        double deficit = stats != null ? Math.max(0.0, stats.requiredOrProducedRate() - stats.connectedRate()) : 0.0;
+
+        if (deficit > 0.0001) {
+            if (inSub1) {
+                String rateStr = FormatUtil.formatRate(deficit, isFluid);
+                renderTooltip(graphics, font, Component.literal("§a↑ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_supply", stackName, rateStr)), mouseX, mouseY, screen.width, screen.height);
+            } else if (inSub2) {
+                renderTooltip(graphics, font, Component.literal("§b∞ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_infinite", stackName)), mouseX, mouseY, screen.width, screen.height);
+            }
+        } else if (inSub1) {
+            renderTooltip(graphics, font, Component.literal("§b∞ ").append(Component.translatable("gui.gtcalcboard.tooltip.quick_infinite", stackName)), mouseX, mouseY, screen.width, screen.height);
         }
     }
 }

@@ -44,6 +44,119 @@ public final class NodeBadgeRegistry {
             }
             return List.of();
         });
+
+        // RFC-032 / RFC-033: Auto-Ratio Divergence Warning Badge Provider
+        register((node, store) -> {
+            if (node == null || store == null) return List.of();
+            if (!Boolean.TRUE.equals(store.get(NodeProperties.DIVERGENCE_WARNING))) {
+                return List.of();
+            }
+            String reason = store.get(NodeProperties.DIVERGENCE_REASON);
+            if ("positive_feedback".equals(reason)) {
+                return List.of(createPositiveFeedbackBadge(node, store));
+            }
+            if ("catalyst_decay".equals(reason)) {
+                return List.of(createCatalystDecayBadge(node, store));
+            }
+            if ("anchor_conflict".equals(reason)) {
+                return List.of(createAnchorConflictBadge(node, store));
+            }
+            if ("micro_yield_clamp".equals(reason)) {
+                return List.of(createMicroYieldBadge(node, store));
+            }
+            return List.of(createRecirculationBadge(node, store));
+        });
+    }
+
+    private static NodeBadge createPositiveFeedbackBadge(RecipeNode node, NodePropertyStore store) {
+        String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.positive_feedback").getString();
+        List<net.minecraft.network.chat.Component> tooltip = List.of(
+                net.minecraft.network.chat.Component.literal("§b§l[⚠️ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.positive_feedback_title").getString() + "]"),
+                net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.positive_feedback_desc").getString()),
+                net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.positive_feedback_hint_1").getString()),
+                resolveHint2(node, "gui.gtcalcboard.node_badge.positive_feedback_hint_2"),
+                createActionOrStatusLine(node)
+        );
+        return new NodeBadge(badgeText, 0xFF06B6D4, 0xEE083344, 0xFF0891B2, tooltip, true, resolveAnchorAction(node, store));
+    }
+
+    private static NodeBadge createCatalystDecayBadge(RecipeNode node, NodePropertyStore store) {
+        String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.catalyst_decay").getString();
+        List<net.minecraft.network.chat.Component> tooltip = List.of(
+                net.minecraft.network.chat.Component.literal("§6§l[⚠️ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.catalyst_decay_title").getString() + "]"),
+                net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.catalyst_decay_desc").getString()),
+                net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.catalyst_decay_hint_1").getString()),
+                resolveHint2(node, "gui.gtcalcboard.node_badge.catalyst_decay_hint_2"),
+                createActionOrStatusLine(node)
+        );
+        return new NodeBadge(badgeText, 0xFFFBBF24, 0xEE451A03, 0xFFD97706, tooltip, true, resolveAnchorAction(node, store));
+    }
+
+    private static NodeBadge createAnchorConflictBadge(RecipeNode node, NodePropertyStore store) {
+        String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.anchor_conflict").getString();
+        List<net.minecraft.network.chat.Component> tooltip = List.of(
+                net.minecraft.network.chat.Component.literal("§c§l[⚠️ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.anchor_conflict_title").getString() + "]"),
+                net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.anchor_conflict_desc").getString()),
+                net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.anchor_conflict_hint_1").getString()),
+                net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.anchor_conflict_hint_2").getString()),
+                net.minecraft.network.chat.Component.literal("§b§n[" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.anchor_conflict_action").getString() + "]")
+        );
+        return new NodeBadge(badgeText, 0xFFEF4444, 0xEE450A0A, 0xFFDC2626, tooltip, true, () -> {
+            node.setBaseNode(false);
+            store.set(NodeProperties.DIVERGENCE_WARNING, false);
+            store.set(NodeProperties.DIVERGENCE_REASON, "");
+        });
+    }
+
+    private static NodeBadge createMicroYieldBadge(RecipeNode node, NodePropertyStore store) {
+        String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.micro_yield").getString();
+        List<net.minecraft.network.chat.Component> tooltip = List.of(
+                net.minecraft.network.chat.Component.literal("§6§l[⚠️ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.micro_yield_title").getString() + "]"),
+                net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.micro_yield_desc").getString()),
+                net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.micro_yield_hint_1").getString()),
+                resolveHint2(node, "gui.gtcalcboard.node_badge.micro_yield_hint_2"),
+                createActionOrStatusLine(node)
+        );
+        return new NodeBadge(badgeText, 0xFFF59E0B, 0xEE451A03, 0xFFD97706, tooltip, true, resolveAnchorAction(node, store));
+    }
+
+    private static NodeBadge createRecirculationBadge(RecipeNode node, NodePropertyStore store) {
+        String badgeText = net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning").getString();
+        List<net.minecraft.network.chat.Component> tooltip = List.of(
+                net.minecraft.network.chat.Component.literal("§6§l[⚠️ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning_title").getString() + "]"),
+                net.minecraft.network.chat.Component.literal("§7" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning_desc").getString()),
+                net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning_hint_1").getString()),
+                resolveHint2(node, "gui.gtcalcboard.node_badge.divergence_warning_hint_2"),
+                createActionOrStatusLine(node)
+        );
+        return new NodeBadge(badgeText, 0xFFF59E0B, 0xEE451A03, 0xFFD97706, tooltip, true, resolveAnchorAction(node, store));
+    }
+
+    private static net.minecraft.network.chat.Component resolveHint2(RecipeNode node, String defaultKey) {
+        if (node != null && node.isBaseNode()) {
+            return net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning_hint_2_anchored").getString());
+        }
+        return net.minecraft.network.chat.Component.literal("§e💡 " + net.minecraft.network.chat.Component.translatable(defaultKey).getString());
+    }
+
+    private static net.minecraft.network.chat.Component createActionOrStatusLine(RecipeNode node) {
+        if (node != null && node.isBaseNode()) {
+            return net.minecraft.network.chat.Component.literal("§e⚓ " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning_already_anchor").getString());
+        }
+        return net.minecraft.network.chat.Component.literal("§b§n[" + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.node_badge.divergence_warning_action").getString() + "]");
+    }
+
+    private static Runnable resolveAnchorAction(RecipeNode node, NodePropertyStore store) {
+        if (node != null && node.isBaseNode()) {
+            return () -> {};
+        }
+        return () -> clearWarningAsAnchor(node, store);
+    }
+
+    private static void clearWarningAsAnchor(RecipeNode node, NodePropertyStore store) {
+        node.setBaseNode(true);
+        store.set(NodeProperties.DIVERGENCE_WARNING, false);
+        store.set(NodeProperties.DIVERGENCE_REASON, "");
     }
 
     private NodeBadgeRegistry() {}

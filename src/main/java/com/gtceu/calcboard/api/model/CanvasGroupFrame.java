@@ -46,6 +46,7 @@ public class CanvasGroupFrame {
     private boolean isCompoundFrame = false;
     private String compoundGroupId = "";
     private boolean isSharedMachineFrame = false;
+    private double targetPoolCapacity = 1.0;
 
     public CanvasGroupFrame(String id, String title, int color, double posX, double posY, double width, double height) {
         this.id = id != null ? id : UUID.randomUUID().toString();
@@ -259,6 +260,7 @@ public class CanvasGroupFrame {
         }
         if (isSharedMachineFrame) {
             tag.putBoolean("isSharedMachineFrame", true);
+            tag.putDouble("targetPoolCapacity", targetPoolCapacity);
         }
 
         ListTag nodesTag = new ListTag();
@@ -287,6 +289,9 @@ public class CanvasGroupFrame {
         }
         if (tag.getBoolean("isSharedMachineFrame")) {
             frame.setSharedMachineFrame(true);
+            if (tag.contains("targetPoolCapacity")) {
+                frame.setTargetPoolCapacity(tag.getDouble("targetPoolCapacity"));
+            }
         }
 
         if (tag.contains("nodes", Tag.TAG_LIST)) {
@@ -401,6 +406,14 @@ public class CanvasGroupFrame {
         this.isSharedMachineFrame = sharedMachineFrame;
     }
 
+    public double getTargetPoolCapacity() {
+        return targetPoolCapacity;
+    }
+
+    public void setTargetPoolCapacity(double targetPoolCapacity) {
+        this.targetPoolCapacity = Math.max(0.01, targetPoolCapacity);
+    }
+
     /**
      * Computes the aggregated duty cycle (total machine load) for all operational recipe nodes
      * enclosed within this shared machine frame.
@@ -409,7 +422,7 @@ public class CanvasGroupFrame {
         if (graph == null) return 0.0;
         double totalDuty = 0.0;
         for (RecipeNode node : getEnclosedNodes(graph)) {
-            if (node != null && !node.isReroute() && node.isOperational()) {
+            if (node != null && !node.isReroute() && node.isOperational(graph)) {
                 totalDuty += node.getMachineCount();
             }
         }

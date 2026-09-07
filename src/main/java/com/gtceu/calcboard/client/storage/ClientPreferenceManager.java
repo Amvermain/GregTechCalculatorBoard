@@ -21,6 +21,8 @@ public final class ClientPreferenceManager {
     private static final String FILE_NAME = "client_preferences.json";
 
     private boolean hasSeenWelcomeMessage = false;
+    private String dismissedUpdateVersion = "";
+    private boolean hasSeenUpdateChatMessage = false;
     private boolean loaded = false;
 
     private ClientPreferenceManager() {}
@@ -54,6 +56,36 @@ public final class ClientPreferenceManager {
         save();
     }
 
+    public synchronized String getDismissedUpdateVersion() {
+        ensureLoaded();
+        return dismissedUpdateVersion != null ? dismissedUpdateVersion : "";
+    }
+
+    public synchronized void setDismissedUpdateVersion(String version) {
+        ensureLoaded();
+        this.dismissedUpdateVersion = version != null ? version : "";
+        save();
+    }
+
+    public synchronized boolean isUpdateChatMessageSeen() {
+        ensureLoaded();
+        return hasSeenUpdateChatMessage;
+    }
+
+    public synchronized void markUpdateChatMessageSeen() {
+        ensureLoaded();
+        if (!this.hasSeenUpdateChatMessage) {
+            this.hasSeenUpdateChatMessage = true;
+            save();
+        }
+    }
+
+    public synchronized void setUpdateChatMessageSeen(boolean seen) {
+        ensureLoaded();
+        this.hasSeenUpdateChatMessage = seen;
+        save();
+    }
+
     public synchronized void load() {
         this.loaded = true;
         File file = getPreferencesFile();
@@ -65,6 +97,12 @@ public final class ClientPreferenceManager {
             JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
             if (json.has("hasSeenWelcomeMessage")) {
                 this.hasSeenWelcomeMessage = json.get("hasSeenWelcomeMessage").getAsBoolean();
+            }
+            if (json.has("dismissedUpdateVersion")) {
+                this.dismissedUpdateVersion = json.get("dismissedUpdateVersion").getAsString();
+            }
+            if (json.has("hasSeenUpdateChatMessage")) {
+                this.hasSeenUpdateChatMessage = json.get("hasSeenUpdateChatMessage").getAsBoolean();
             }
         } catch (Throwable t) {
             GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Failed to load client preferences: {}", t.getMessage());
@@ -83,6 +121,8 @@ public final class ClientPreferenceManager {
 
             JsonObject json = new JsonObject();
             json.addProperty("hasSeenWelcomeMessage", this.hasSeenWelcomeMessage);
+            json.addProperty("dismissedUpdateVersion", this.dismissedUpdateVersion != null ? this.dismissedUpdateVersion : "");
+            json.addProperty("hasSeenUpdateChatMessage", this.hasSeenUpdateChatMessage);
 
             try (FileWriter writer = new FileWriter(file, StandardCharsets.UTF_8)) {
                 GSON.toJson(json, writer);
@@ -94,6 +134,8 @@ public final class ClientPreferenceManager {
 
     public synchronized void resetForTesting() {
         this.hasSeenWelcomeMessage = false;
+        this.dismissedUpdateVersion = "";
+        this.hasSeenUpdateChatMessage = false;
         this.loaded = false;
     }
 

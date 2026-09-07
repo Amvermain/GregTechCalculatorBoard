@@ -766,6 +766,7 @@ public class GTCEuModAdapter implements IModAdapter {
 
         // Machine Preset Setup
         applyMachinePresets(node, oldIcon, newIcon);
+        GTCombustionHelper.syncCombustionInputs(node);
     }
 
     private void purgeIncompatibleAddons(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
@@ -777,9 +778,10 @@ public class GTCEuModAdapter implements IModAdapter {
         // (B) Parallel Hatch Purge
         if (!MultiblockDetector.supportsParallelHatch(newIcon, null, null)) {
             boolean hadParAddon = node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
-            if (hadParAddon) {
+            if (hadParAddon || GTCombustionHelper.isCombustionEngine(newIcon)) {
                 int defPar = MultiblockDetector.getDefaultParallel(newIcon);
                 node.setParallel(Math.max(1, defPar));
+                node.setCustomParallel(0);
             }
         }
 
@@ -815,6 +817,22 @@ public class GTCEuModAdapter implements IModAdapter {
         }
         if (!MultiblockDetector.supportsOverpressure(newIcon)) {
             node.getAddons().removeIf(a -> a.getId() != null && a.getId().equals("gtceu:overpressure_autoclave"));
+        }
+        if (!GTCombustionHelper.isLargeCombustionEngine(node)) {
+            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, false);
+            node.getAddons().removeIf(a -> "gtceu:oxygen_boost".equals(a.getId()));
+        }
+        if (!GTCombustionHelper.isExtremeCombustionEngine(node)) {
+            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, false);
+            node.getAddons().removeIf(a -> "gtceu:liquid_oxygen_boost".equals(a.getId()));
+        }
+        if (!GTCombustionHelper.isStarTCombustionModule(node) && !GTCombustionHelper.isStarTRocketModule(node)) {
+            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "none");
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
+        }
+        if (!GTCombustionHelper.isModularCombustionFrame(node) && !GTCombustionHelper.isStarTCombustionModule(node) && !GTCombustionHelper.isStarTRocketModule(node)) {
+            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
+            node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
         }
         if (!GTCombustionHelper.isCombustionEngine(node) || !node.isMultiblock()) {
             node.getAddons().removeIf(GTAddonCompatibilityHandler::isCombustionBoostAddon);
@@ -942,32 +960,74 @@ public class GTCEuModAdapter implements IModAdapter {
         }
     }
 
+    private double computeSteamRate(RecipeNode node, IngredientStack stack) {
+        if (node == null || stack == null || node.getSteamMode() == null || !node.getSteamMode().isSteam()) {
+            return -1.0;
+        }
+        if (!"gtceu:steam".equals(stack.getId().toString())) {
+            return -1.0;
+        }
+        if (node.isMultiblock() || MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
+            double steamRatePerTick = MultiblockDetector.getSteamMultiblockConsumption(node.getMachineIcon(), node.getSteamMode());
+            return steamRatePerTick * 20.0 * node.getMachineCount();
+        }
+        return (node.getBaseEUt() * 2.0 * 20.0) * node.getMachineCount();
+    }
+
+    private double computeSingleMachineSteamRate(RecipeNode node, IngredientStack stack) {
+        if (node == null || stack == null || node.getSteamMode() == null || !node.getSteamMode().isSteam()) {
+            return -1.0;
+        }
+        if (!"gtceu:steam".equals(stack.getId().toString())) {
+            return -1.0;
+        }
+        if (node.isMultiblock() || MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
+            double steamRatePerTick = MultiblockDetector.getSteamMultiblockConsumption(node.getMachineIcon(), node.getSteamMode());
+            return steamRatePerTick * 20.0;
+        }
+        return node.getBaseEUt() * 2.0 * 20.0;
+    }
+
     @Override
     public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
-        if (isInput && stack != null && stack.isFluid() && stack.getId() != null && "gtceu:steam".equals(stack.getId().toString())) {
-            if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-                if (node.isMultiblock() || MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
-                    double steamRatePerTick = MultiblockDetector.getSteamMultiblockConsumption(node.getMachineIcon(), node.getSteamMode());
-                    return steamRatePerTick * 20.0 * node.getMachineCount();
-                } else {
-                    return (node.getBaseEUt() * 2.0 * 20.0) * node.getMachineCount();
-                }
+        if (!isInput || stack == null || !stack.isFluid() || stack.getId() == null) {
+            return defaultRate;
+        }
+        double steamRate = computeSteamRate(node, stack);
+        if (steamRate >= 0.0) {
+            return steamRate;
+        }
+        if (!GTCombustionHelper.COMBUSTION_AUXILIARY_FLUIDS.contains(stack.getId())) {
+            return defaultRate;
+        }
+        double boostRate = GTCombustionHelper.getCombustionAuxiliaryRate(node, stack.getId());
+        if (boostRate > 0.0) {
+            if (!node.isOperational()) {
+                return 0.0;
             }
+            return boostRate * node.getMachineCount();
         }
         return defaultRate;
     }
 
     @Override
     public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
-        if (isInput && stack != null && stack.isFluid() && stack.getId() != null && "gtceu:steam".equals(stack.getId().toString())) {
-            if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-                if (node.isMultiblock() || MultiblockDetector.isSteamMultiblock(node.getMachineIcon())) {
-                    double steamRatePerTick = MultiblockDetector.getSteamMultiblockConsumption(node.getMachineIcon(), node.getSteamMode());
-                    return steamRatePerTick * 20.0;
-                } else {
-                    return node.getBaseEUt() * 2.0 * 20.0;
-                }
+        if (!isInput || stack == null || !stack.isFluid() || stack.getId() == null) {
+            return defaultRate;
+        }
+        double steamRate = computeSingleMachineSteamRate(node, stack);
+        if (steamRate >= 0.0) {
+            return steamRate;
+        }
+        if (!GTCombustionHelper.COMBUSTION_AUXILIARY_FLUIDS.contains(stack.getId())) {
+            return defaultRate;
+        }
+        double boostRate = GTCombustionHelper.getCombustionAuxiliaryRate(node, stack.getId());
+        if (boostRate > 0.0) {
+            if (!node.isOperational()) {
+                return 0.0;
             }
+            return boostRate;
         }
         return defaultRate;
     }

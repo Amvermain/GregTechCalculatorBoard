@@ -33,6 +33,44 @@ public class SysteamsRecipeHandler {
             "disenchantment", ResourceLocation.tryParse("systeams:disenchantment")
     );
 
+    private static final Map<ResourceLocation, ResourceLocation> KNOWN_BOILER_CATEGORY_MAP = Map.ofEntries(
+            Map.entry(ResourceLocation.tryParse("thermal:lapidary_fuel"), ResourceLocation.tryParse("systeams:lapidary")),
+            Map.entry(ResourceLocation.tryParse("thermal:stirling_fuel"), ResourceLocation.tryParse("systeams:stirling")),
+            Map.entry(ResourceLocation.tryParse("thermal:compression_fuel"), ResourceLocation.tryParse("systeams:compression")),
+            Map.entry(ResourceLocation.tryParse("thermal:gourmand_fuel"), ResourceLocation.tryParse("systeams:gourmand")),
+            Map.entry(ResourceLocation.tryParse("thermal:magmatic_fuel"), ResourceLocation.tryParse("systeams:magmatic")),
+            Map.entry(ResourceLocation.tryParse("thermal:pneumatic_fuel"), ResourceLocation.tryParse("systeams:pneumatic")),
+            Map.entry(ResourceLocation.tryParse("thermal:disenchantment_fuel"), ResourceLocation.tryParse("systeams:disenchantment")),
+            Map.entry(ResourceLocation.tryParse("systeams:lapidary_boiler"), ResourceLocation.tryParse("systeams:lapidary")),
+            Map.entry(ResourceLocation.tryParse("systeams:stirling_boiler"), ResourceLocation.tryParse("systeams:stirling")),
+            Map.entry(ResourceLocation.tryParse("systeams:compression_boiler"), ResourceLocation.tryParse("systeams:compression")),
+            Map.entry(ResourceLocation.tryParse("systeams:gourmand_boiler"), ResourceLocation.tryParse("systeams:gourmand")),
+            Map.entry(ResourceLocation.tryParse("systeams:magmatic_boiler"), ResourceLocation.tryParse("systeams:magmatic")),
+            Map.entry(ResourceLocation.tryParse("systeams:pneumatic_boiler"), ResourceLocation.tryParse("systeams:pneumatic")),
+            Map.entry(ResourceLocation.tryParse("systeams:disenchantment_boiler"), ResourceLocation.tryParse("systeams:disenchantment")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_lapidary"), ResourceLocation.tryParse("systeams:lapidary")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_stirling"), ResourceLocation.tryParse("systeams:stirling")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_compression"), ResourceLocation.tryParse("systeams:compression")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_gourmand"), ResourceLocation.tryParse("systeams:gourmand")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_magmatic"), ResourceLocation.tryParse("systeams:magmatic")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_pneumatic"), ResourceLocation.tryParse("systeams:pneumatic")),
+            Map.entry(ResourceLocation.tryParse("thermal:dynamo_disenchantment"), ResourceLocation.tryParse("systeams:disenchantment")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/lapidary"), ResourceLocation.tryParse("systeams:lapidary")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/stirling"), ResourceLocation.tryParse("systeams:stirling")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/compression"), ResourceLocation.tryParse("systeams:compression")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/gourmand"), ResourceLocation.tryParse("systeams:gourmand")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/magmatic"), ResourceLocation.tryParse("systeams:magmatic")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/pneumatic"), ResourceLocation.tryParse("systeams:pneumatic")),
+            Map.entry(ResourceLocation.tryParse("systeams:boiling/disenchantment"), ResourceLocation.tryParse("systeams:disenchantment"))
+    );
+
+    private static final java.util.Set<ResourceLocation> STEAM_DYNAMO_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("thermal:dynamo_steam"),
+            ResourceLocation.tryParse("systeams:steam_dynamo"),
+            ResourceLocation.tryParse("thermal:steam"),
+            ResourceLocation.tryParse("systeams:steam")
+    );
+
     private static final Map<ResourceLocation, String> SYSTEAMS_FLUID_NAMES = Map.of(
             ResourceLocation.tryParse("systeams:steamier"), "Warm Steam",
             ResourceLocation.tryParse("systeams:steamiest"), "Hot Steam",
@@ -165,7 +203,7 @@ public class SysteamsRecipeHandler {
         if (energyRF <= 0) return false;
 
         ResourceLocation effectiveCat = catId;
-        if (effectiveCat == null || effectiveCat.getPath().contains("boil")) { // lint:allow-heuristic: Systeams boiler category discriminator
+        if (effectiveCat == null || com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics.isBoilerCategory(effectiveCat)) {
             effectiveCat = resolveEffectiveBoilerCategory(backing, catId);
         }
 
@@ -193,20 +231,14 @@ public class SysteamsRecipeHandler {
     }
 
     private static ResourceLocation resolveEffectiveBoilerCategory(Object backing, ResourceLocation fallbackCatId) {
+        if (fallbackCatId != null) {
+            ResourceLocation mapped = KNOWN_BOILER_CATEGORY_MAP.get(fallbackCatId);
+            if (mapped != null) return mapped;
+        }
         if (backing instanceof net.minecraft.world.item.crafting.Recipe<?> recipe) {
             ResourceLocation recipeId = recipe.getId();
-            for (Map.Entry<String, ResourceLocation> entry : DYNAMO_BOILER_TYPES.entrySet()) {
-                if (recipeId.getPath().contains(entry.getKey())) { // lint:allow-heuristic: Systeams recipe ID naming
-                    return entry.getValue();
-                }
-            }
-        }
-        if (fallbackCatId != null) {
-            for (Map.Entry<String, ResourceLocation> entry : DYNAMO_BOILER_TYPES.entrySet()) {
-                if (fallbackCatId.getPath().contains(entry.getKey())) { // lint:allow-heuristic: Systeams category ID naming
-                    return entry.getValue();
-                }
-            }
+            ResourceLocation mapped = KNOWN_BOILER_CATEGORY_MAP.get(recipeId);
+            if (mapped != null) return mapped;
         }
         return fallbackCatId;
     }
@@ -327,23 +359,22 @@ public class SysteamsRecipeHandler {
 
     public static boolean isSteamDynamoNode(RecipeNode node) {
         if (node == null) return false;
-        if (node.getMachineIcon() != null && node.getMachineIcon().getPath().contains("steam_dynamo")) return true; // lint:allow-heuristic: Systeams icon name matching
-        if (node.getRecipeCategoryId() != null && (node.getRecipeCategoryId().getPath().equals("steam") || node.getRecipeCategoryId().getPath().contains("steam_dynamo"))) return true; // lint:allow-heuristic: Systeams category name matching
+        if (node.getMachineIcon() != null && STEAM_DYNAMO_IDS.contains(node.getMachineIcon())) return true;
+        if (node.getRecipeCategoryId() != null && STEAM_DYNAMO_IDS.contains(node.getRecipeCategoryId())) return true;
         return false;
     }
 
     public static String getDynamoBoilerType(RecipeNode node) {
         if (node == null) return null;
         if (node.getMachineIcon() != null) {
-            String p = node.getMachineIcon().getPath().toLowerCase(java.util.Locale.ROOT);
-            for (String type : DYNAMO_BOILER_TYPES.keySet()) {
-                if (p.contains(type)) return type; // lint:allow-heuristic: Systeams icon type matching
-            }
+            ResourceLocation mapped = KNOWN_BOILER_CATEGORY_MAP.get(node.getMachineIcon());
+            if (mapped != null) return mapped.getPath();
         }
         if (node.getRecipeCategoryId() != null) {
-            String p = node.getRecipeCategoryId().getPath().toLowerCase(java.util.Locale.ROOT);
-            for (String type : DYNAMO_BOILER_TYPES.keySet()) {
-                if (p.contains(type)) return type;
+            ResourceLocation mapped = KNOWN_BOILER_CATEGORY_MAP.get(node.getRecipeCategoryId());
+            if (mapped != null) return mapped.getPath();
+            if (DYNAMO_BOILER_TYPES.containsKey(node.getRecipeCategoryId().getPath())) {
+                return node.getRecipeCategoryId().getPath();
             }
         }
         return null;

@@ -55,7 +55,7 @@ public final class GTCEuMachineAnalyzer {
                 || GTCEuCoilModifierHelper.getCoilMachineSpec(id).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC
                 || MultiblockDetector.isCoilMultiblock(id));
 
-        boolean isTurbine = isMb && !isCoil && (
+        boolean isTurbine = isMb && !isCoil && !GTCombustionHelper.isCombustionEngine(id) && (
                 GTCEuReflectionBridge.isLargeTurbineClass(mCls)
                         || GTCEuReflectionBridge.isITurbineClass(mCls)
                         || (scannedAbilities.contains("ROTOR_HOLDER") && GTCEuReflectionBridge.hasTurbineSignature(def))

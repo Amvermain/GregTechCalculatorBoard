@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver;
+import com.gtceu.calcboard.api.solver.FlowEdgeAllocator;
 import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.BoardScreen;
@@ -38,6 +39,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     private int activeTab = 0;
     private SupplyMode selectedMode = SupplyMode.NONE;
     private EditBox rateEditBox;
+    private boolean isAnchor = false;
 
     private boolean isBuffer = false;
     private EditBox bufferSizeEditBox;
@@ -57,6 +59,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         this.targetNode = node;
         this.selectedMode = node.getSupplyMode();
         this.isBuffer = node.isJunctionBuffer();
+        this.isAnchor = node.isBaseNode();
         this.activeTab = 0;
         this.outgoingScrollOffset = 0;
         this.visible = true;
@@ -74,7 +77,7 @@ public class JunctionSupplyDialog implements IBoardModal {
             this.rateEditBox = new EditBox(font, editBoxX, editBoxY, 75, 14, Component.translatable("gui.gtcalcboard.junction.supply_rate"));
             this.rateEditBox.setMaxLength(16);
             double curRate = (selectedMode == SupplyMode.FIXED_DRAIN) ? node.getExternalDrainRate() : node.getExternalSupplyRate();
-            this.rateEditBox.setValue(curRate > 0 ? String.format("%.2f", curRate) : "100.0");
+            this.rateEditBox.setValue(curRate > 0 ? formatRateForEditBox(curRate) : "100.0");
 
             this.bufferSizeEditBox = new EditBox(font, x + DIALOG_WIDTH - 90, y + 84, 75, 14, Component.translatable("gui.gtcalcboard.junction.buffer_size"));
             this.bufferSizeEditBox.setMaxLength(16);
@@ -213,10 +216,61 @@ public class JunctionSupplyDialog implements IBoardModal {
             graphics.drawString(font, modeLabel, x + 30, optY + 3, textColor, false);
 
             if ((mode == SupplyMode.FIXED_RATE || mode == SupplyMode.FIXED_DRAIN) && isSelected) {
-                rateEditBox.setX(x + DIALOG_WIDTH - 85);
-                rateEditBox.setY(optY);
-                rateEditBox.render(graphics, mouseX, mouseY, 0);
+                renderRateEditBoxWithMatchButton(graphics, font, x, optY, mode, mouseX, mouseY);
             }
+        }
+
+        if (selectedMode == SupplyMode.FIXED_RATE || selectedMode == SupplyMode.FIXED_DRAIN) {
+            renderAnchorCheckbox(graphics, font, x, y + 178, mouseX, mouseY);
+        }
+    }
+
+    private void renderRateEditBoxWithMatchButton(GuiGraphics graphics, Font font, int x, int optY, SupplyMode mode, int mouseX, int mouseY) {
+        int boxW = 56;
+        int btnW = 16;
+        rateEditBox.setX(x + DIALOG_WIDTH - 24 - boxW - 4);
+        rateEditBox.setWidth(boxW);
+        rateEditBox.setY(optY);
+        rateEditBox.render(graphics, mouseX, mouseY, 0);
+
+        int matchX = x + DIALOG_WIDTH - 24;
+        int matchY = optY;
+        boolean matchHover = mouseX >= matchX && mouseX <= matchX + btnW && mouseY >= matchY && mouseY <= matchY + 14;
+        graphics.fill(matchX, matchY, matchX + btnW, matchY + 14, matchHover ? 0xFF0284C7 : 0xFF0369A1);
+        graphics.renderOutline(matchX, matchY, btnW, 14, matchHover ? 0xFF38BDF8 : 0xFF0284C7);
+        graphics.drawString(font, "⚡", matchX + 4, matchY + 3, 0xFFFFFFFF, false);
+
+        if (matchHover) {
+            double rate = (mode == SupplyMode.FIXED_RATE) ? calculateConnectedDownstreamDemand() : calculateConnectedUpstreamInflow();
+            IngredientStack rStack = targetNode.getRerouteIngredient();
+            boolean isFluid = rStack != null && rStack.isFluid();
+            String formatted = FormatUtil.formatRate(rate, isFluid);
+            Component tip = Component.translatable(
+                    mode == SupplyMode.FIXED_RATE
+                            ? "gui.gtcalcboard.junction.match_demand_tooltip"
+                            : "gui.gtcalcboard.junction.match_inflow_tooltip",
+                    formatted
+            );
+            graphics.renderTooltip(font, tip, mouseX, mouseY);
+        }
+    }
+
+    private void renderAnchorCheckbox(GuiGraphics graphics, Font font, int x, int anchorY, int mouseX, int mouseY) {
+        int cbX = x + 14;
+        int cbY = anchorY + 2;
+        boolean isHover = mouseX >= x + 10 && mouseX <= x + DIALOG_WIDTH - 10 && mouseY >= anchorY && mouseY <= anchorY + 16;
+        graphics.fill(cbX, cbY, cbX + 10, cbY + 10, isAnchor ? 0xFF886600 : (isHover ? 0xFF35445C : 0xFF232B3A));
+        graphics.renderOutline(cbX, cbY, 10, 10, isAnchor ? 0xFFFFD700 : 0xFF475569);
+        if (isAnchor) {
+            graphics.drawString(font, "✔", cbX + 2, cbY + 1, 0xFFFFEE55, false);
+        }
+        String label = "⌖ " + Component.translatable("gui.gtcalcboard.junction.anchor_checkbox").getString();
+        int textColor = isAnchor ? 0xFFFFD700 : (isHover ? 0xFFCBD5E1 : 0xFF94A3B8);
+        graphics.drawString(font, label, x + 30, anchorY + 3, textColor, false);
+
+        if (isHover) {
+            Component tip = Component.translatable("gui.gtcalcboard.junction.anchor_tooltip");
+            graphics.renderTooltip(font, tip, mouseX, mouseY);
         }
     }
 
@@ -348,7 +402,11 @@ public class JunctionSupplyDialog implements IBoardModal {
 
         if (activeTab == 0) {
             boolean isRateMode = (selectedMode == SupplyMode.FIXED_RATE || selectedMode == SupplyMode.FIXED_DRAIN);
-            if (isRateMode && checkEditBoxClicked(rateEditBox, mouseX, mouseY, button)) return true;
+            if (isRateMode) {
+                if (checkEditBoxClicked(rateEditBox, mouseX, mouseY, button)) return true;
+                if (checkMatchFlowClicked(x, y, mouseX, mouseY)) return true;
+                if (checkAnchorCheckboxClicked(x, y, mouseX, mouseY)) return true;
+            }
             if (checkRadioSelection(x, y, mouseX, mouseY)) return true;
         } else {
             if (isBuffer && checkEditBoxClicked(bufferSizeEditBox, mouseX, mouseY, button)) return true;
@@ -392,6 +450,87 @@ public class JunctionSupplyDialog implements IBoardModal {
         return false;
     }
 
+    private boolean checkMatchFlowClicked(int x, int y, double mouseX, double mouseY) {
+        int optStartY = y + 72;
+        int optH = 20;
+        int modeIdx = selectedMode.ordinal();
+        int optY = optStartY + modeIdx * optH;
+        int matchX = x + DIALOG_WIDTH - 24;
+        int matchY = optY;
+        if (mouseX >= matchX && mouseX <= matchX + 16 && mouseY >= matchY && mouseY <= matchY + 14) {
+            double rate = (selectedMode == SupplyMode.FIXED_RATE)
+                    ? calculateConnectedDownstreamDemand()
+                    : calculateConnectedUpstreamInflow();
+            rateEditBox.setValue(formatRateForEditBox(rate));
+            playClickSound();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean checkAnchorCheckboxClicked(int x, int y, double mouseX, double mouseY) {
+        int anchorY = y + 178;
+        if (mouseX >= x + 10 && mouseX <= x + DIALOG_WIDTH - 10 && mouseY >= anchorY && mouseY <= anchorY + 16) {
+            this.isAnchor = !isAnchor;
+            playClickSound();
+            return true;
+        }
+        return false;
+    }
+
+    private double calculateConnectedDownstreamDemand() {
+        FlowGraph graph = parent != null ? parent.getGraph() : null;
+        if (graph == null || targetNode == null) return 0.0;
+        double totalDeficit = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.fromNodeId().equals(targetNode.getId()) || edge.outputIndex() != 0) continue;
+            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+            if (consumer == null) continue;
+            double demand = FlowEdgeAllocator.getConnectedConsumerDemand(graph, consumer, edge.inputIndex());
+            double otherSupply = calculateOtherProducersSupply(graph, consumer.getId(), edge.inputIndex(), targetNode.getId());
+            totalDeficit += Math.max(0.0, demand - otherSupply);
+        }
+        return totalDeficit;
+    }
+
+    private static double calculateOtherProducersSupply(FlowGraph graph, String consumerId, int inputIndex, String excludeNodeId) {
+        double otherSupply = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(consumerId) || edge.inputIndex() != inputIndex) continue;
+            if (edge.fromNodeId().equals(excludeNodeId)) continue;
+            otherSupply += FlowEdgeAllocator.getEdgeAllocatedFlow(graph, edge, null);
+        }
+        return otherSupply;
+    }
+
+    private double calculateConnectedUpstreamInflow() {
+        FlowGraph graph = parent != null ? parent.getGraph() : null;
+        if (graph == null || targetNode == null) return 0.0;
+        double totalAvailable = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.toNodeId().equals(targetNode.getId()) || edge.inputIndex() != 0) continue;
+            RecipeNode producer = graph.findNodeById(edge.fromNodeId());
+            if (producer == null) continue;
+            double prodRate = FlowEdgeAllocator.getEffectiveProducerOutputRate(graph, producer, edge.outputIndex());
+            double otherDemand = calculateOtherConsumersDemand(graph, producer.getId(), edge.outputIndex(), targetNode.getId());
+            totalAvailable += Math.max(0.0, prodRate - otherDemand);
+        }
+        return totalAvailable;
+    }
+
+    private static double calculateOtherConsumersDemand(FlowGraph graph, String producerId, int outputIndex, String excludeNodeId) {
+        double otherDemand = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (!edge.fromNodeId().equals(producerId) || edge.outputIndex() != outputIndex) continue;
+            if (edge.toNodeId().equals(excludeNodeId)) continue;
+            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+            if (consumer != null) {
+                otherDemand += FlowEdgeAllocator.getConnectedConsumerDemand(graph, consumer, edge.inputIndex());
+            }
+        }
+        return otherDemand;
+    }
+
     private boolean checkCloseClicked(int x, int y, double mouseX, double mouseY) {
         int closeX = x + DIALOG_WIDTH - 18;
         int closeY = y + 4;
@@ -417,20 +556,29 @@ public class JunctionSupplyDialog implements IBoardModal {
         for (int i = 0; i < modes.length; i++) {
             SupplyMode mode = modes[i];
             int optY = optStartY + i * optH;
-            int rightBound = (mode == SupplyMode.FIXED_RATE && selectedMode == mode && rateEditBox != null)
-                    ? rateEditBox.getX() - 4
-                    : x + DIALOG_WIDTH - 10;
+            boolean hasRateBox = (mode == SupplyMode.FIXED_RATE || mode == SupplyMode.FIXED_DRAIN)
+                    && selectedMode == mode && rateEditBox != null;
+            int rightBound = hasRateBox ? rateEditBox.getX() - 4 : x + DIALOG_WIDTH - 10;
+            if (mouseX < x + 10 || mouseX > rightBound || mouseY < optY || mouseY > optY + 16) continue;
 
-            if (mouseX >= x + 10 && mouseX <= rightBound && mouseY >= optY && mouseY <= optY + 16) {
-                this.selectedMode = mode;
-                if (rateEditBox != null) {
-                    rateEditBox.setFocused(mode == SupplyMode.FIXED_RATE);
-                }
-                playClickSound();
-                return true;
-            }
+            selectMode(mode);
+            playClickSound();
+            return true;
         }
         return false;
+    }
+
+    private void selectMode(SupplyMode mode) {
+        this.selectedMode = mode;
+        if (rateEditBox == null) return;
+        boolean isRateMode = (mode == SupplyMode.FIXED_RATE || mode == SupplyMode.FIXED_DRAIN);
+        rateEditBox.setFocused(isRateMode);
+        if (isRateMode && targetNode != null) {
+            double cur = (mode == SupplyMode.FIXED_DRAIN) ? targetNode.getExternalDrainRate() : targetNode.getExternalSupplyRate();
+            if (cur > 0.0) {
+                rateEditBox.setValue(formatRateForEditBox(cur));
+            }
+        }
     }
 
     private boolean checkFooterButtons(int x, int y, double mouseX, double mouseY) {
@@ -469,6 +617,13 @@ public class JunctionSupplyDialog implements IBoardModal {
         }
 
         if (graph != null) {
+            boolean isRateMode = (selectedMode == SupplyMode.FIXED_RATE || selectedMode == SupplyMode.FIXED_DRAIN);
+            if (isAnchor && isRateMode) {
+                graph.setBaseNode(targetNode);
+            } else if (targetNode.isBaseNode()) {
+                graph.setBaseNode(null);
+            }
+
             for (Map.Entry<FlowGraph.ConnectionEdge, EditBox> entry : edgeLimitEditBoxes.entrySet()) {
                 FlowGraph.ConnectionEdge edge = entry.getKey();
                 double limit = Math.max(0.0, parseDoubleSafe(entry.getValue().getValue()));
@@ -486,6 +641,17 @@ public class JunctionSupplyDialog implements IBoardModal {
 
         playClickSound();
         close();
+    }
+
+    private static String formatRateForEditBox(double rate) {
+        if (rate <= 0.0) return "0.0";
+        if (rate >= 100.0) {
+            return String.format(java.util.Locale.ROOT, "%.2f", rate).replaceAll("\\.?0+$", "");
+        } else if (rate >= 1.0) {
+            return String.format(java.util.Locale.ROOT, "%.3f", rate).replaceAll("\\.?0+$", "");
+        } else {
+            return String.format(java.util.Locale.ROOT, "%.4f", rate).replaceAll("\\.?0+$", "");
+        }
     }
 
     private double parseDoubleSafe(String s) {

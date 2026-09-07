@@ -62,14 +62,77 @@ public class NodeWidget {
     }
 
     private final com.gtceu.calcboard.client.gui.render.NodeCardTextCache textCache = new com.gtceu.calcboard.client.gui.render.NodeCardTextCache();
+    private LayoutCacheKey layoutCacheKey = null;
+    private com.gtceu.calcboard.client.gui.layout.NodeLayoutBounds layoutBounds = null;
+
+    private record LayoutCacheKey(
+            double posX,
+            double posY,
+            int cardWidth,
+            int cardHeight,
+            boolean isFlipped,
+            int inCount,
+            int outCount,
+            int visInCount,
+            int visOutCount,
+            int hiddenCount,
+            int addonCount,
+            com.gtceu.calcboard.api.type.EnergyType energyType,
+            boolean hasTargetBatch,
+            boolean isModule,
+            boolean slimMode,
+            boolean targetBatchEditing,
+            String countText
+    ) {}
 
     public com.gtceu.calcboard.client.gui.render.NodeCardTextCache getTextCache() {
         return textCache;
     }
 
+    public com.gtceu.calcboard.client.gui.layout.NodeLayoutBounds getLayoutBounds() {
+        boolean slim = com.gtceu.calcboard.api.storage.BoardManager.getInstance().isSlimCardMode();
+        boolean targetBatchEditing = targetBatchEditor != null && targetBatchEditor.isEditing();
+        String countText = countEditor != null ? countEditor.getDisplayText() : "";
+
+        LayoutCacheKey currentKey = new LayoutCacheKey(
+                node.getPosX(),
+                node.getPosY(),
+                node.getCardWidth(),
+                node.getCardHeight(),
+                node.isFlipped(),
+                node.getInputs().size(),
+                node.getOutputs().size(),
+                node.getVisibleInputIndices().size(),
+                node.getVisibleOutputIndices().size(),
+                node.getTotalHiddenCount(),
+                node.getAddons().size(),
+                node.getEnergyType(),
+                node.hasTargetBatch(),
+                node.isModule(),
+                slim,
+                targetBatchEditing,
+                countText
+        );
+
+        if (layoutBounds == null || !currentKey.equals(layoutCacheKey)) {
+            int fontW = 20;
+            try {
+                var mc = Minecraft.getInstance();
+                if (mc != null && mc.font != null) {
+                    fontW = mc.font.width(countText);
+                }
+            } catch (Throwable ignored) {}
+            this.layoutBounds = com.gtceu.calcboard.client.gui.layout.NodeLayoutCalculator.compute(node, slim, fontW, targetBatchEditing);
+            this.layoutCacheKey = currentKey;
+        }
+        return layoutBounds;
+    }
+
     public void invalidateCache() {
         this.cachedInputRates = null;
         this.cachedOutputRates = null;
+        this.layoutBounds = null;
+        this.layoutCacheKey = null;
         this.textCache.markDirty();
         if (parent != null) {
             parent.markSummaryDirty();
@@ -122,249 +185,95 @@ public class NodeWidget {
     }
 
     public int getContentStartY() {
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        if (com.gtceu.calcboard.api.storage.BoardManager.getInstance().isSlimCardMode()) {
-            return ctrlY + 18 + 2;
-        }
-        int row2H = node.isModule() ? 0 : 18;
-        int infoY = ctrlY + row2H + 18;
-        int sepY = infoY + 14;
-        return sepY + 4;
+        return getLayoutBounds().getContentStartY();
     }
 
     public int calculateAutoHeight() {
-        if (node.isReroute()) return 32;
-        int maxRows = Math.max(node.getVisibleInputIndices().size(), node.getVisibleOutputIndices().size());
-        int contentStartY = getContentStartY();
-        int extraHidden = node.getTotalHiddenCount() > 0 ? 14 : 0;
-        int contentEndY = contentStartY + Math.max(1, maxRows) * 18 + 8 + extraHidden;
-        return (int) (contentEndY - node.getPosY());
+        return getLayoutBounds().getAutoHeight();
     }
 
     public int getHeight() {
-        if (node.isReroute()) return 32;
-        return Math.max(calculateAutoHeight(), node.getCardHeight());
+        return getLayoutBounds().getCardHeight();
     }
 
     public float getOutputPortX(int index) {
-        if (node.isReroute()) {
-            return (float) (node.getPosX() + (node.isFlipped() ? 0 : 32));
-        }
+        var port = getLayoutBounds().findPort(false, index);
+        if (port != null) return port.anchorX();
+        if (node.isReroute()) return (float) (node.getPosX() + (node.isFlipped() ? 0 : 32));
         return (float) (node.getPosX() + (node.isFlipped() ? 6 : getWidth() - 6));
     }
 
     public float getOutputPortY(int index) {
-        if (node.isReroute()) {
-            return (float) (node.getPosY() + 16);
-        }
-        int contentY = getContentStartY();
-        int visIdx = node.getVisibleOutputIndices().indexOf(index);
-        if (visIdx < 0) {
-            return (float) (contentY + index * 18 + 8);
-        }
-        return contentY + visIdx * 18 + 8;
+        var port = getLayoutBounds().findPort(false, index);
+        if (port != null) return port.anchorY();
+        if (node.isReroute()) return (float) (node.getPosY() + 16);
+        return (float) (getContentStartY() + index * 18 + 8);
     }
 
     public float getInputPortX(int index) {
-        if (node.isReroute()) {
-            return (float) (node.getPosX() + (node.isFlipped() ? 32 : 0));
-        }
+        var port = getLayoutBounds().findPort(true, index);
+        if (port != null) return port.anchorX();
+        if (node.isReroute()) return (float) (node.getPosX() + (node.isFlipped() ? 32 : 0));
         return (float) (node.getPosX() + (node.isFlipped() ? getWidth() - 6 : 6));
     }
 
     public float getInputPortY(int index) {
-        if (node.isReroute()) {
-            return (float) (node.getPosY() + 16);
-        }
-        int contentY = getContentStartY();
-        int visIdx = node.getVisibleInputIndices().indexOf(index);
-        if (visIdx < 0) {
-            return (float) (contentY + index * 18 + 8);
-        }
-        return contentY + visIdx * 18 + 8;
+        var port = getLayoutBounds().findPort(true, index);
+        if (port != null) return port.anchorY();
+        if (node.isReroute()) return (float) (node.getPosY() + 16);
+        return (float) (getContentStartY() + index * 18 + 8);
     }
 
     public boolean isMachineIconHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute() || node.isModule()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        return canvasMouseX >= x + 2 && canvasMouseX <= x + 20 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+        return getLayoutBounds().isMachineIconHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isTargetBatchBadgeHovered(double canvasMouseX, double canvasMouseY) {
-        if (!node.isReroute()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        if (node.hasTargetBatch() || targetBatchEditor.isEditing()) {
-            return canvasMouseX >= x - 16 && canvasMouseX <= x + 48 && canvasMouseY >= y + 18 && canvasMouseY <= y + 46;
-        }
-        return false;
+        return getLayoutBounds().isTargetBatchBadgeHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isHeaderHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute()) {
-            return isPointInside(canvasMouseX, canvasMouseY)
-                    && getHoveredInputPortIndex(canvasMouseX, canvasMouseY) < 0
-                    && getHoveredOutputPortIndex(canvasMouseX, canvasMouseY) < 0;
-        }
-        if (isMachineIconHovered(canvasMouseX, canvasMouseY)) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int headerBtnWidth = 74;
-        return canvasMouseX >= x && canvasMouseX <= x + getWidth() - headerBtnWidth && canvasMouseY >= y && canvasMouseY <= y + HEADER_HEIGHT;
+        return getLayoutBounds().isHeaderHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isSwitchButtonHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute() || node.isModule()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int switchX = x + getWidth() - 72;
-        return canvasMouseX >= switchX && canvasMouseX <= switchX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+        return getLayoutBounds().isSwitchButtonHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isExpandButtonHovered(double canvasMouseX, double canvasMouseY) {
-        if (!node.isModule() || node.isReroute()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int expandX = x + getWidth() - 72;
-        return canvasMouseX >= expandX && canvasMouseX <= expandX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+        return getLayoutBounds().isExpandButtonHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isFlipButtonHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int flipX = x + getWidth() - 54;
-        return canvasMouseX >= flipX && canvasMouseX <= flipX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+        return getLayoutBounds().isFlipButtonHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isTargetButtonHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int targetX = x + getWidth() - 36;
-        return canvasMouseX >= targetX && canvasMouseX <= targetX + 18 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+        return getLayoutBounds().isTargetButtonHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isCloseButtonHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int closeX = x + getWidth() - 18;
-        return canvasMouseX >= closeX && canvasMouseX <= closeX + 16 && canvasMouseY >= y + 2 && canvasMouseY <= y + 18;
+        return getLayoutBounds().isCloseButtonHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isResizeHandleHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute()) return false;
-        int right = (int) (node.getPosX() + getWidth());
-        int bottom = (int) (node.getPosY() + getHeight());
-        return canvasMouseX >= right - 12 && canvasMouseX <= right && canvasMouseY >= bottom - 12 && canvasMouseY <= bottom;
+        return getLayoutBounds().isResizeHandleHovered(canvasMouseX, canvasMouseY);
     }
 
     public boolean isPointInside(double canvasMouseX, double canvasMouseY) {
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        if (node.isReroute()) {
-            boolean insideBox = canvasMouseX >= x && canvasMouseX <= x + 32 && canvasMouseY >= y && canvasMouseY <= y + 32;
-            if (insideBox) return true;
-            return isTargetBatchBadgeHovered(canvasMouseX, canvasMouseY);
-        }
-        return canvasMouseX >= x && canvasMouseX <= x + getWidth() && canvasMouseY >= y && canvasMouseY <= y + getHeight();
+        return getLayoutBounds().isPointInside(canvasMouseX, canvasMouseY);
     }
 
     public int getHoveredInputPortIndex(double canvasMouseX, double canvasMouseY) {
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        if (node.isReroute()) {
-            boolean isFlipped = node.isFlipped();
-            int minX = isFlipped ? (x + 22) : (x - 4);
-            int maxX = isFlipped ? (x + 36) : (x + 10);
-            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= y + 6 && canvasMouseY <= y + 26) {
-                return 0;
-            }
-            return -1;
-        }
-        int contentY = getContentStartY();
-        boolean isFlipped = node.isFlipped();
-        List<Integer> visInputs = node.getVisibleInputIndices();
-
-        for (int r = 0; r < visInputs.size(); r++) {
-            int i = visInputs.get(r);
-            int rowY = contentY + r * 18;
-            int minX = isFlipped ? (x + getWidth() - 40) : x;
-            int maxX = isFlipped ? (x + getWidth() + 4) : (x + 40);
-            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
-                return i;
-            }
-        }
-        return -1;
+        return getLayoutBounds().getHoveredInputPortIndex(canvasMouseX, canvasMouseY);
     }
 
     public int getHoveredOutputPortIndex(double canvasMouseX, double canvasMouseY) {
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        if (node.isReroute()) {
-            boolean isFlipped = node.isFlipped();
-            int minX = isFlipped ? (x - 4) : (x + 22);
-            int maxX = isFlipped ? (x + 10) : (x + 36);
-            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= y + 6 && canvasMouseY <= y + 26) {
-                return 0;
-            }
-            return -1;
-        }
-        int contentY = getContentStartY();
-        boolean isFlipped = node.isFlipped();
-        List<Integer> visOutputs = node.getVisibleOutputIndices();
-
-        for (int r = 0; r < visOutputs.size(); r++) {
-            int i = visOutputs.get(r);
-            int rowY = contentY + r * 18;
-            int minX = isFlipped ? x : (x + getWidth() - 40);
-            int maxX = isFlipped ? (x + 40) : (x + getWidth() + 4);
-            if (canvasMouseX >= minX && canvasMouseX <= maxX && canvasMouseY >= rowY - 3 && canvasMouseY <= rowY + 19) {
-                return i;
-            }
-        }
-        return -1;
+        return getLayoutBounds().getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
     }
 
     public double[] getPortBounds(boolean isInput, int index) {
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int cardW = getWidth();
-        if (node.isReroute()) {
-            boolean isFlipped = node.isFlipped();
-            if (isInput) {
-                int minX = isFlipped ? (x + 22) : (x - 4);
-                int maxX = isFlipped ? (x + 36) : (x + 10);
-                return new double[]{minX, y + 6, maxX, y + 26};
-            } else {
-                int minX = isFlipped ? (x - 4) : (x + 22);
-                int maxX = isFlipped ? (x + 10) : (x + 36);
-                return new double[]{minX, y + 6, maxX, y + 26};
-            }
-        }
-        int contentY = getContentStartY();
-        boolean isFlipped = node.isFlipped();
-        boolean hasBoth = !node.getInputs().isEmpty() && !node.getOutputs().isEmpty();
-        int slotW = hasBoth ? ((cardW / 2) - 4) : (cardW - 4);
-
-        if (isInput) {
-            List<Integer> visInputs = node.getVisibleInputIndices();
-            int r = visInputs.indexOf(index);
-            if (r < 0) return null;
-            int rowY = contentY + r * 18;
-            int startX = (!isFlipped || !hasBoth) ? (x + 2) : (x + (cardW / 2) + 2);
-            return new double[]{startX, rowY - 2, startX + slotW, rowY + 16};
-        } else {
-            List<Integer> visOutputs = node.getVisibleOutputIndices();
-            int r = visOutputs.indexOf(index);
-            if (r < 0) return null;
-            int rowY = contentY + r * 18;
-            int startX = (isFlipped || !hasBoth) ? (x + 2) : (x + (cardW / 2) + 2);
-            return new double[]{startX, rowY - 2, startX + slotW, rowY + 16};
-        }
+        return getLayoutBounds().getPortBounds(isInput, index);
     }
 
     public boolean isPortOverlapping(boolean isInput, int index, double minX, double minY, double maxX, double maxY) {
@@ -374,12 +283,7 @@ public class NodeWidget {
     }
 
     public boolean isHiddenPortsBadgeHovered(double canvasMouseX, double canvasMouseY) {
-        if (node.isReroute() || node.getTotalHiddenCount() <= 0) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int w = getWidth();
-        int h = getHeight();
-        return canvasMouseX >= x + w - 120 && canvasMouseX <= x + w - 4 && canvasMouseY >= y + h - 16 && canvasMouseY <= y + h;
+        return getLayoutBounds().isHiddenPortsBadgeHovered(canvasMouseX, canvasMouseY);
     }
 
     public void hidePortAndDisconnectWires(boolean isInput, int portIndex) {
@@ -482,41 +386,27 @@ public class NodeWidget {
     }
 
     public boolean isModuleBadgeHovered(double mouseX, double mouseY) {
-        if (!node.isModule()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int cardW = getWidth();
-        String machinesBadge = String.format("§d▦ %d%s", node.getContainedMachineCount(), Component.translatable("gui.gtcalcboard.machine_unit").getString());
-        int badgeW = Minecraft.getInstance().font.width(machinesBadge);
-        int badgeX = x + cardW - 6 - badgeW;
-        return mouseX >= badgeX - 4 && mouseX <= x + cardW && mouseY >= ctrlY && mouseY <= ctrlY + 16;
+        return getLayoutBounds().isModuleBadgeHovered(mouseX, mouseY);
     }
 
     public boolean isTierButtonHovered(double mouseX, double mouseY) {
-        if (node.isModule()) return false;
+        if (!getLayoutBounds().hasRow2Controls()) return false;
         var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
         return handler.isTierOrSpeedControlHovered(node, mouseX, mouseY);
     }
 
     public boolean isOcButtonHovered(double mouseX, double mouseY) {
-        if (node.isModule()) return false;
+        if (!getLayoutBounds().hasRow2Controls()) return false;
         var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
         return handler.isSecondaryControlHovered(node, mouseX, mouseY);
     }
 
     public boolean isAddonTrayHovered(double mouseX, double mouseY) {
-        if (node.isModule() || node.getAddons().isEmpty()) return false;
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int cardW = getWidth();
-        int trayWidth = Math.min(node.getAddons().size(), 3) * 16 + (node.getAddons().size() > 3 ? 16 : 0);
-        return mouseX >= x + cardW - 6 - trayWidth && mouseX <= x + cardW - 6 && mouseY >= ctrlY - 2 && mouseY <= ctrlY + 16;
+        return getLayoutBounds().isAddonTrayHovered(mouseX, mouseY);
     }
 
     public boolean isMachineConfigButtonHovered(double mouseX, double mouseY) {
-        if (node.isModule()) return false;
+        if (!getLayoutBounds().hasRow2Controls()) return false;
         if (isAddonTrayHovered(mouseX, mouseY)) return true;
         var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
         return handler.isMachineConfigHovered(node, mouseX, mouseY);
@@ -704,9 +594,17 @@ public class NodeWidget {
 
         if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
             if (node.hasMultiblockOption()) {
+                GTVoltageTier oldTier = node.getTargetTier();
+                GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
                 node.setMultiblock(true);
+                node.setTargetTier(newTier);
+                com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setRotorHolderTier(node, newTier);
+                com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
                 syncSharedFrameHardware(node);
-                if (parent != null) parent.markSummaryDirty();
+                if (parent != null) {
+                    parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
+                    parent.markSummaryDirty();
+                }
                 invalidateCache();
                 return true;
             } else {
@@ -750,50 +648,62 @@ public class NodeWidget {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (!node.isModule()) {
+        var bounds = getLayoutBounds();
+        int inIdx = bounds.getHoveredInputPortIndex(mouseX, mouseY);
+        if (inIdx >= 0 && inIdx < node.getInputs().size()) {
+            return handleInputPortScroll(inIdx, delta);
+        }
+
+        if (bounds.hasRow2Controls()) {
             var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
             if (handler.handleControlScroll(this, node, mouseX, mouseY, delta)) {
                 return true;
             }
         }
+        return false;
+    }
 
-        int inIdx = getHoveredInputPortIndex(mouseX, mouseY);
-        if (inIdx >= 0 && inIdx < node.getInputs().size()) {
-            if (parent != null && !parent.ensureEditPermission()) return true;
-            IngredientStack in = node.getInputs().get(inIdx);
-            if (in.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
-                var allFluids = com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.getAllBoilingFluidInputs();
-                if (in.getAlternatives().size() != allFluids.size() || in.getAlternatives().stream().anyMatch(id -> !allFluids.contains(id))) {
-                    in.setAlternatives(allFluids);
-                }
-            }
-            if (in.hasAlternatives()) {
-                net.minecraft.resources.ResourceLocation oldAlt = in.getId();
-                in.cycleAlternative(delta > 0 ? -1 : 1);
-                if (in.isFluid()) {
-                    if (com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
-                        com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(node, in.getId());
-                    }
-                }
-                invalidateCache();
-                if (parent != null) {
-                    net.minecraft.resources.ResourceLocation newAlt = in.getId();
-                    if (oldAlt != null && !oldAlt.equals(newAlt)) {
-                        parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
-                                node.getId(), inIdx, true, oldAlt, newAlt));
-                    }
-                    parent.getGraph().cleanupInvalidConnections();
-                    parent.markSummaryDirty();
-                }
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.4F
-                    )
-                );
-                return true;
+    private boolean handleInputPortScroll(int inIdx, double delta) {
+        if (parent != null && !parent.ensureEditPermission()) return true;
+        IngredientStack in = node.getInputs().get(inIdx);
+        if (in.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
+            var allFluids = com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.getAllBoilingFluidInputs();
+            if (in.getAlternatives().size() != allFluids.size() || in.getAlternatives().stream().anyMatch(id -> !allFluids.contains(id))) {
+                in.setAlternatives(allFluids);
             }
         }
-        return false;
+        if (!in.hasAlternatives()) {
+            return false;
+        }
+
+        net.minecraft.resources.ResourceLocation oldAlt = in.getId();
+        in.cycleAlternative(delta > 0 ? -1 : 1);
+        if (in.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
+            com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(node, in.getId());
+        }
+        invalidateCache();
+        if (parent != null) {
+            net.minecraft.resources.ResourceLocation newAlt = in.getId();
+            if (oldAlt != null && !oldAlt.equals(newAlt)) {
+                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
+                        node.getId(), inIdx, true, oldAlt, newAlt));
+            }
+            parent.getGraph().cleanupInvalidConnections();
+            parent.markSummaryDirty();
+        }
+        playUiSound(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.4F);
+        return true;
+    }
+
+    private void playUiSound(net.minecraft.sounds.SoundEvent sound, float pitch) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.getSoundManager() != null && sound != null) {
+                mc.getSoundManager().play(
+                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(sound, pitch)
+                );
+            }
+        } catch (Throwable ignored) {}
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -839,40 +749,7 @@ public class NodeWidget {
         }
 
         if (node.isReroute()) {
-            if (button == 0) {
-                // If clicked explicitly on the Target Batch / ET badge area, start inline editing!
-                if (isTargetBatchBadgeHovered(mouseX, mouseY) && getHoveredInputPortIndex(mouseX, mouseY) < 0 && getHoveredOutputPortIndex(mouseX, mouseY) < 0) {
-                    commitCountEdit();
-                    targetBatchEditor.startEditing();
-                    Minecraft.getInstance().getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-                    );
-                    return true;
-                }
-            } else if (button == 1) {
-                // Right click on Reroute Node body (Shift+RightClick resets target batch)
-                if (getHoveredInputPortIndex(mouseX, mouseY) < 0 && getHoveredOutputPortIndex(mouseX, mouseY) < 0) {
-                    if (Screen.hasShiftDown()) {
-                        node.setTargetBatchAmount(0.0);
-                        targetBatchEditor.updateBuffer();
-                        invalidateCache();
-                        if (parent != null) parent.markSummaryDirty();
-                        Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.8F)
-                        );
-                        return true;
-                    } else {
-                        if (parent != null) {
-                            parent.openJunctionSupplyDialog(node);
-                            Minecraft.getInstance().getSoundManager().play(
-                                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-                            );
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
+            return handleRerouteClick(mouseX, mouseY, button);
         }
 
         // Machine Icon Click -> Open Machine / Controller Selector Dialog
@@ -962,11 +839,10 @@ public class NodeWidget {
             return true;
         }
 
-        int ctrlY = y + HEADER_HEIGHT + 6;
-        int countMinusX = x + 36;
+        var bounds = getLayoutBounds();
 
         // Machine Count Decrement [-]
-        if (mouseX >= countMinusX && mouseX <= countMinusX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+        if (bounds.getCountMinusBtnBounds().contains(mouseX, mouseY)) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
             double step = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0.1 : (oldVal <= 1.0 ? 0.05 : 1.0);
@@ -997,30 +873,20 @@ public class NodeWidget {
         }
 
         // Count Input Box Click
-        int countBoxX = countMinusX + 16;
-        int textW = 20;
-        try {
-            var mc = Minecraft.getInstance();
-            if (mc != null && mc.font != null) {
-                textW = mc.font.width(countEditor.getDisplayText());
-            }
-        } catch (Throwable ignored) {}
-        int countBoxW = Math.max(28, textW + 6);
-        if (mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+        if (bounds.getCountBoxBounds().contains(mouseX, mouseY)) {
             if (!countEditor.isEditing()) {
                 countEditor.startEditing();
             } else {
                 var mc = Minecraft.getInstance();
                 if (mc != null && mc.font != null) {
-                    countEditor.onClick(mc.font, mouseX, countBoxX + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+                    countEditor.onClick(mc.font, mouseX, bounds.getCountBoxBounds().x() + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
                 }
             }
             return true;
         }
 
         // Machine Count Increment [+]
-        int afterCountX = countBoxX + countBoxW + 2;
-        if (mouseX >= afterCountX && mouseX <= afterCountX + 14 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+        if (bounds.getCountPlusBtnBounds().contains(mouseX, mouseY)) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
             double step = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0.1 : (oldVal < 1.0 ? 0.05 : 1.0);
@@ -1038,7 +904,7 @@ public class NodeWidget {
         }
 
         // Machine Count Half [/2]
-        if (mouseX >= afterCountX + 16 && mouseX <= afterCountX + 32 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+        if (bounds.getCountHalfBtnBounds().contains(mouseX, mouseY)) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
             double newVal = Math.max(0.01, Math.round((oldVal / 2.0) * 1000.0) / 1000.0);
@@ -1057,7 +923,7 @@ public class NodeWidget {
         }
 
         // Machine Count Double [x2]
-        if (mouseX >= afterCountX + 34 && mouseX <= afterCountX + 50 && mouseY >= ctrlY && mouseY <= ctrlY + 14) {
+        if (bounds.getCountDoubleBtnBounds().contains(mouseX, mouseY)) {
             commitCountEdit();
             double oldVal = node.getMachineCount();
             double newVal = Math.round((oldVal * 2.0) * 1000.0) / 1000.0;
@@ -1074,7 +940,7 @@ public class NodeWidget {
         }
 
         // Delegate row 2 control clicks (Tier/Speed, OC Mode, Machine Config) to IModGuiHandler
-        if (!node.isModule()) {
+        if (bounds.hasRow2Controls()) {
             var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
             if (handler.handleControlClick(this, node, mouseX, mouseY, button)) {
                 if (node.isCompoundNode() && parent != null) {
@@ -1162,6 +1028,28 @@ public class NodeWidget {
         if (countEditor.charTyped(codePoint, modifiers)) return true;
         if (parallelEditor.charTyped(codePoint, modifiers)) return true;
         if (targetBatchEditor.charTyped(codePoint, modifiers)) return true;
+        return false;
+    }
+
+    private boolean handleRerouteClick(double mouseX, double mouseY, int button) {
+        if (getHoveredInputPortIndex(mouseX, mouseY) >= 0 || getHoveredOutputPortIndex(mouseX, mouseY) >= 0) {
+            return false;
+        }
+        if (button == 0 && isTargetBatchBadgeHovered(mouseX, mouseY)) {
+            commitCountEdit();
+            targetBatchEditor.startEditing();
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+            );
+            return true;
+        }
+        if (button == 1 && net.minecraft.client.gui.screens.Screen.hasShiftDown() && parent != null) {
+            parent.openJunctionSupplyDialog(node);
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
+            );
+            return true;
+        }
         return false;
     }
 }

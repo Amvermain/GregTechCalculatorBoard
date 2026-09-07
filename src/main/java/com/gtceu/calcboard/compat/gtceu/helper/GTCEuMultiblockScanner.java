@@ -36,7 +36,11 @@ public class GTCEuMultiblockScanner {
 
             for (Object def : iterable) {
                 if (def == null) continue;
-                processScannedMachineDefinition(def);
+                try {
+                    processScannedMachineDefinition(def);
+                } catch (Throwable t) {
+                    GregTechCalcBoard.LOGGER.debug("[GTCalcBoard] [GTCEuMultiblockScanner] Failed to process machine definition: {}", t.getMessage());
+                }
             }
         } catch (Throwable t) {
             GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] [GTCEuMultiblockScanner] GTCEu Registry scan failed: {}", t.getMessage());

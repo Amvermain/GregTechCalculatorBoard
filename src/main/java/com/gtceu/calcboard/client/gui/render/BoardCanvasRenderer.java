@@ -47,18 +47,24 @@ public class BoardCanvasRenderer {
         double screenTop = -panY / zoom - 100;
         double screenBottom = (-panY + height) / zoom + 100;
 
+        boolean showDebug = com.gtceu.calcboard.api.storage.BoardManager.getInstance().isShowDebugInfo();
+        com.gtceu.calcboard.client.gui.util.RenderProfiler profiler = com.gtceu.calcboard.client.gui.util.RenderProfiler.getInstance();
+
+        if (showDebug) profiler.startSection("Frames");
         CanvasGroupFrameRenderer.renderFrames(graphics, graph, canvasMouseX, canvasMouseY, null, screen.getSelectedFrameIds(), screenLeft, screenRight, screenTop, screenBottom);
         CanvasStickyNoteRenderer.renderNotes(graphics, graph, canvasMouseX, canvasMouseY, screen.getSelectedNoteIds(), screenLeft, screenRight, screenTop, screenBottom);
 
+        if (showDebug) profiler.startSection("Wires");
         if (wireRenderer != null) {
             wireRenderer.renderWires(graphics, screen, graph, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, zoom);
         }
 
+        if (showDebug) profiler.startSection("Nodes");
         renderNodeWidgets(graphics, screen, nodeWidgets, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, partialTicks);
         graphics.flush();
         RenderSystem.disableDepthTest();
 
-        renderQuickActionAndMarquee(graphics, canvasHandler, canvasMouseX, canvasMouseY);
+        renderQuickActionAndMarquee(graphics, canvasHandler, graph, canvasMouseX, canvasMouseY);
 
         graphics.pose().popPose();
         graphics.flush();
@@ -119,12 +125,21 @@ public class BoardCanvasRenderer {
         graphics.pose().popPose();
     }
 
-    private void renderQuickActionAndMarquee(GuiGraphics graphics, CanvasInteractionHandler canvasHandler, double mouseX, double mouseY) {
+    private void renderQuickActionAndMarquee(GuiGraphics graphics, CanvasInteractionHandler canvasHandler, FlowGraph graph, double mouseX, double mouseY) {
         if (canvasHandler == null) return;
         canvasHandler.checkMarkerCursorDistance(mouseX, mouseY);
         if (canvasHandler.hasQuickAddMarker()) {
             Font font = Minecraft.getInstance().font;
-            BoardHudRenderer.renderQuickAddMarker(graphics, font, canvasHandler.getQuickAddMarkerCanvasX(), canvasHandler.getQuickAddMarkerCanvasY(), mouseX, mouseY);
+            BoardHudRenderer.renderQuickAddMarker(
+                    graphics,
+                    font,
+                    canvasHandler.getQuickAddMarkerCanvasX(),
+                    canvasHandler.getQuickAddMarkerCanvasY(),
+                    mouseX,
+                    mouseY,
+                    canvasHandler.getQuickAddMarkerHandler(),
+                    graph
+            );
         }
         graphics.pose().pushPose();
         graphics.pose().translate(0.0f, 0.0f, 5000.0f);

@@ -414,15 +414,21 @@ public class JeiRecipeIntegrationTest {
         Assertions.assertEquals(0.0, node.getBaseEUt());
         Assertions.assertEquals(ResourceLocation.tryParse("minecraft:furnace"), node.getMachineIcon());
 
-        // 9. Test Mouse Click on Passive Banner (row 2 at y + 44)
-        node.setPosX(100);
-        node.setPosY(100);
-        int bannerCenterX = 100 + 50;
-        int bannerCenterY = 100 + 20 + 6 + 18 + 7; // y + HEADER_HEIGHT + 6 + 18 + 7 = 151
-        boolean clicked = widget.mouseClicked(bannerCenterX, bannerCenterY, 0); // Left Click
-        Assertions.assertTrue(clicked, "Click on Passive banner should trigger tier step up to LP Steam");
-        Assertions.assertEquals(com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE, node.getSteamMode());
-        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_furnace"), node.getMachineIcon());
+        // 9. Test Mouse Click on Passive Banner (row 2 at y + 44 in Standard Card mode)
+        boolean prevSlim = com.gtceu.calcboard.api.storage.BoardManager.getInstance().isSlimCardMode();
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().setSlimCardMode(false);
+        try {
+            node.setPosX(100);
+            node.setPosY(100);
+            int bannerCenterX = 100 + 50;
+            int bannerCenterY = 100 + 20 + 6 + 18 + 7; // y + HEADER_HEIGHT + 6 + 18 + 7 = 151
+            boolean clicked = widget.mouseClicked(bannerCenterX, bannerCenterY, 0); // Left Click
+            Assertions.assertTrue(clicked, "Click on Passive banner should trigger tier step up to LP Steam");
+            Assertions.assertEquals(com.gtceu.calcboard.api.type.SteamMode.LOW_PRESSURE, node.getSteamMode());
+            Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lp_steam_furnace"), node.getMachineIcon());
+        } finally {
+            com.gtceu.calcboard.api.storage.BoardManager.getInstance().setSlimCardMode(prevSlim);
+        }
     }
 
     @Test

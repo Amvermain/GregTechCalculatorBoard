@@ -51,8 +51,9 @@ public class NodeCardRenderer {
             return;
         }
 
+        boolean isModalOpen = (Minecraft.getInstance().screen instanceof BoardScreen bs) && bs.isAnyModalOpen();
         double zoom = (Minecraft.getInstance().screen instanceof BoardScreen bs) ? bs.getZoom() : BoardScreen.lastZoom;
-        if (zoom < 0.28) {
+        if (isModalOpen || zoom < 0.28) {
             renderLOD(widget, graphics, font, x, y, cardW, height, node);
             return;
         }
@@ -325,11 +326,12 @@ public class NodeCardRenderer {
         }
 
         // Separator Line
-        int sepY = slim ? (ctrlY + 16) : ((node.isModule() ? (ctrlY + 18) : (row2Y + 18)) + 14);
+        var bounds = widget.getLayoutBounds();
+        int sepY = bounds.getSeparatorY();
         graphics.fill(x + 4, sepY, x + cardW - 4, sepY + 1, !isOperational ? 0xFF5A2228 : 0xFF353C4D);
 
         // 9. Input & Output Ports Listing
-        int contentY = sepY + 4;
+        int contentY = bounds.getContentStartY();
         List<IngredientStack> inputs = node.getInputs();
         List<IngredientStack> outputs = node.getOutputs();
         List<Integer> visInputs = node.getVisibleInputIndices();
@@ -359,7 +361,8 @@ public class NodeCardRenderer {
                     graphics.fill(x + 2, rowY - 2, x + 2 + slotW, rowY + 16, 0x4438BDF8);
                 }
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF) : (left != null ? left.portColor() : 0xFF5599FF));
-                boolean portHover = mouseX >= x && mouseX <= x + 28 && mouseY >= rowY - 2 && mouseY <= rowY + 16;
+                var inPort = widget.getLayoutBounds().findPort(true, inOrigIdx);
+                boolean portHover = inPort != null && inPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(inPortX, inPortY, inPortX + 6, inPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -388,7 +391,8 @@ public class NodeCardRenderer {
                 }
                 boolean isVoided = node.isOutputPortVoided(outOrigIdx);
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isVoided ? 0xFFA855F7 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (left != null ? left.portColor() : 0xFF55FF88)));
-                boolean portHover = mouseX >= x && mouseX <= x + 28 && mouseY >= rowY - 2 && mouseY <= rowY + 16;
+                var outPort = widget.getLayoutBounds().findPort(false, outOrigIdx);
+                boolean portHover = outPort != null && outPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -420,7 +424,8 @@ public class NodeCardRenderer {
                 }
                 boolean isVoided = node.isOutputPortVoided(outOrigIdx);
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isVoided ? 0xFFA855F7 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (right != null ? right.portColor() : 0xFF55FF88)));
-                boolean portHover = mouseX >= x + cardW - 28 && mouseX <= x + cardW && mouseY >= rowY - 2 && mouseY <= rowY + 16;
+                var outPort = widget.getLayoutBounds().findPort(false, outOrigIdx);
+                boolean portHover = outPort != null && outPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -448,7 +453,8 @@ public class NodeCardRenderer {
                     graphics.fill(startSlotX, rowY - 2, startSlotX + slotW, rowY + 16, 0x4438BDF8);
                 }
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF) : (right != null ? right.portColor() : 0xFF5599FF));
-                boolean portHover = mouseX >= x + cardW - 28 && mouseX <= x + cardW && mouseY >= rowY - 2 && mouseY <= rowY + 16;
+                var inPort = widget.getLayoutBounds().findPort(true, inOrigIdx);
+                boolean portHover = inPort != null && inPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(inPortX, inPortY, inPortX + 6, inPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -614,6 +620,8 @@ public class NodeCardRenderer {
             border = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF00FF88);
         } else if (isSelected) {
             border = 0xFF00FFFF;
+        } else if (node.isBaseNode()) {
+            border = 0xFFFFD700;
         } else if (node.isVoidSink()) {
             border = 0xFFA855F7;
         } else if (node.isFixedDrain()) {
@@ -630,6 +638,8 @@ public class NodeCardRenderer {
             graphics.renderOutline(x + 1, y + 1, 30, 30, border);
         } else if (isSelected) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x8800FFFF);
+        } else if (node.isBaseNode()) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x88FFD700);
         } else if (node.isVoidSink()) {
             graphics.renderOutline(x + 1, y + 1, 30, 30, 0x44A855F7);
         } else if (node.isFixedDrain()) {
@@ -673,6 +683,12 @@ public class NodeCardRenderer {
             int ry = (int) ((y + 1) / 0.7f);
             graphics.drawString(font, rateStr, rx, ry, 0xFF34D399, true);
             graphics.pose().popPose();
+        }
+
+        if (node.isBaseNode()) {
+            graphics.fill(x + 1, y + 21, x + 11, y + 31, 0xEE2A2005);
+            graphics.renderOutline(x + 1, y + 21, 10, 10, 0xFFFFD700);
+            graphics.drawString(font, "⌖", x + 3, y + 22, 0xFFFFEE55, false);
         }
 
         // 2. Input Port Dot (Left: x, y + 14..18 if !isFlipped, Right: x + 28..32 if isFlipped)

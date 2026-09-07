@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.api.model;
 
+import com.gtceu.calcboard.api.solver.AutoRatioResult;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.solver.FlowGraphModuleHandler;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
@@ -28,6 +29,9 @@ public class FlowGraph {
 
     public void invalidatePortStatsCache() {
         portStatsCache.clear();
+        for (RecipeNode n : nodes) {
+            n.markOperationalDirty();
+        }
     }
 
     public record ConnectionEdge(
@@ -394,20 +398,28 @@ public class FlowGraph {
     // Solver Delegations (FlowGraphSolver)
     // =========================================================================
 
-    public void autoRatioFromAnchor(RecipeNode anchor) {
-        FlowGraphSolver.autoRatioFromAnchor(this, anchor, true);
+    public AutoRatioResult autoRatioFromAnchor(RecipeNode anchor) {
+        return FlowGraphSolver.autoRatioFromAnchor(this, anchor, true);
     }
 
-    public void autoRatioFromAnchor(RecipeNode anchor, boolean integerCounts) {
-        FlowGraphSolver.autoRatioFromAnchor(this, anchor, integerCounts);
+    public AutoRatioResult autoRatioFromAnchor(RecipeNode anchor, boolean integerCounts) {
+        return FlowGraphSolver.autoRatioFromAnchor(this, anchor, integerCounts);
     }
 
-    public void autoRatioHarmonized(RecipeNode anchor) {
-        FlowGraphSolver.autoRatioHarmonized(this, anchor);
+    public AutoRatioResult autoRatioHarmonized(RecipeNode anchor) {
+        return FlowGraphSolver.autoRatioHarmonized(this, anchor);
     }
 
-    public void autoRatioFractional(RecipeNode anchor) {
-        FlowGraphSolver.autoRatioFractional(this, anchor);
+    public AutoRatioResult autoRatioFractional(RecipeNode anchor) {
+        return FlowGraphSolver.autoRatioFractional(this, anchor);
+    }
+
+    public Set<String> findUnfedDeficitLoopNodeIds() {
+        return FlowGraphSolver.findUnfedDeficitLoopNodeIds(this);
+    }
+
+    public int autoRatioFromSharedPool(CanvasGroupFrame poolFrame, double targetMachines, com.gtceu.calcboard.api.solver.AutoRatioMode mode) {
+        return FlowGraphSolver.autoRatioFromSharedPool(this, poolFrame, targetMachines, mode);
     }
 
     public Map<String, Double> computeNodeEfficiencies() {

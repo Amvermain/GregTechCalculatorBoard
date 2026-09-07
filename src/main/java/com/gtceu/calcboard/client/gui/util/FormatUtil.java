@@ -450,7 +450,9 @@ public final class FormatUtil {
             } else {
                 double abs = Math.abs(scaled);
                 if (abs >= 1000.0) {
-                    return String.format(Locale.ROOT, "%,.2f B%s", scaled / 1000.0, suffix);
+                    return String.format(Locale.ROOT, "%,.4f B%s", scaled / 1000.0, suffix).replaceAll("\\.?0+ B" + suffix, " B" + suffix);
+                } else if (abs < 1.0) {
+                    return String.format(Locale.ROOT, "%,.4f mB%s", scaled, suffix).replaceAll("\\.?0+ mB" + suffix, " mB" + suffix);
                 } else {
                     return String.format(Locale.ROOT, "%,.2f mB%s", scaled, suffix);
                 }

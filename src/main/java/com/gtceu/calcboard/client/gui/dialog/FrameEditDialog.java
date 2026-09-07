@@ -2,11 +2,19 @@ package com.gtceu.calcboard.client.gui.dialog;
 
 import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.AutoRatioMode;
+import com.gtceu.calcboard.api.solver.FlowGraphSolver;
+import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
@@ -14,6 +22,11 @@ import org.lwjgl.glfw.GLFW;
 import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -25,11 +38,13 @@ public class FrameEditDialog implements IBoardModal {
     private CanvasGroupFrame targetFrame = null;
 
     private EditBox titleInput;
+    private EditBox targetCapacityInput;
     private int selectedColor;
     private boolean sharedMachineMode;
     private String initialTitle;
     private int initialColor;
     private boolean initialSharedMode;
+    private double initialTargetCapacity;
 
     public FrameEditDialog(BoardScreen parent) {
         this.parent = parent;
@@ -43,11 +58,12 @@ public class FrameEditDialog implements IBoardModal {
         this.initialTitle = frame.getTitle() != null ? frame.getTitle() : "";
         this.initialColor = frame.getColor();
         this.initialSharedMode = frame.isSharedMachineFrame();
+        this.initialTargetCapacity = frame.getTargetPoolCapacity();
         this.visible = true;
 
         Font font = Minecraft.getInstance().font;
         int dialogW = 280;
-        int dialogH = 158;
+        int dialogH = sharedMachineMode ? 186 : 158;
         int x = (parent.width - dialogW) / 2;
         int y = (parent.height - dialogH) / 2;
 
@@ -56,12 +72,18 @@ public class FrameEditDialog implements IBoardModal {
         this.titleInput.setCanLoseFocus(true);
         this.titleInput.setValue(frame.getTitle() != null ? frame.getTitle() : "");
         this.titleInput.setFocused(true);
+
+        this.targetCapacityInput = new EditBox(font, x + 110, y + 124, 45, 16, Component.literal("Capacity"));
+        this.targetCapacityInput.setMaxLength(8);
+        this.targetCapacityInput.setCanLoseFocus(true);
+        this.targetCapacityInput.setValue(String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity()));
     }
 
     public void close() {
         this.visible = false;
         this.targetFrame = null;
         this.titleInput = null;
+        this.targetCapacityInput = null;
     }
 
     public boolean isVisible() {
@@ -78,7 +100,7 @@ public class FrameEditDialog implements IBoardModal {
 
         Font font = Minecraft.getInstance().font;
         int dialogW = 280;
-        int dialogH = 158;
+        int dialogH = sharedMachineMode ? 186 : 158;
         int x = (screenW - dialogW) / 2;
         int y = (screenH - dialogH) / 2;
 
@@ -128,6 +150,32 @@ public class FrameEditDialog implements IBoardModal {
         String cbLabel = Component.translatable("gui.gtcalcboard.frame_label_shared_machine").getString();
         graphics.drawString(font, cbLabel, cbX + cbSize + 6, cbY + 2, cbHover ? 0xFFFFFFFF : 0xFFCBD5E1, false);
 
+        // Target Capacity Field & Auto Ratio Button (Shared Machine Mode Only)
+        if (sharedMachineMode) {
+            int capY = y + 124;
+            graphics.drawString(font, Component.translatable("gui.gtcalcboard.frame.target_capacity").getString(), x + 16, capY + 4, 0xFF94A3B8, false);
+
+            int capInputX = x + 112;
+            int capInputW = 42;
+            if (targetCapacityInput != null) {
+                targetCapacityInput.setX(capInputX);
+                targetCapacityInput.setY(capY + 1);
+                targetCapacityInput.render(graphics, mouseX, mouseY, 0);
+            }
+
+            int ratioBtnX = capInputX + capInputW + 6;
+            int ratioBtnW = (x + dialogW - 16) - ratioBtnX;
+            int ratioBtnH = 16;
+            boolean ratioHover = mouseX >= ratioBtnX && mouseX <= ratioBtnX + ratioBtnW && mouseY >= capY && mouseY <= capY + ratioBtnH;
+
+            graphics.fill(ratioBtnX, capY, ratioBtnX + ratioBtnW, capY + ratioBtnH, ratioHover ? 0xFF2563EB : 0xFF1D4ED8);
+            graphics.renderOutline(ratioBtnX, capY, ratioBtnW, ratioBtnH, ratioHover ? 0xFF93C5FD : 0xFF3B82F6);
+            String ratioTxt = "⚖ " + Component.translatable("gui.gtcalcboard.frame.btn_auto_ratio").getString();
+            int txtW = font.width(ratioTxt);
+            int drawX = ratioBtnX + Math.max(2, (ratioBtnW - txtW) / 2);
+            graphics.drawString(font, ratioTxt, drawX, capY + 4, 0xFFFFFFFF, false);
+        }
+
         // Render Inputs
         if (titleInput != null) {
             titleInput.setX(x + 16);
@@ -163,7 +211,7 @@ public class FrameEditDialog implements IBoardModal {
         if (!visible || targetFrame == null) return false;
 
         int dialogW = 280;
-        int dialogH = 158;
+        int dialogH = sharedMachineMode ? 186 : 158;
         int x = (parent.width - dialogW) / 2;
         int y = (parent.height - dialogH) / 2;
 
@@ -178,6 +226,7 @@ public class FrameEditDialog implements IBoardModal {
         int swatchSize = 14;
         int swatchSpacing = 5;
         for (int i = 0; i < CanvasGroupFrame.PALETTE.length; i++) {
+            int col = CanvasGroupFrame.PALETTE[i];
             int sx = x + 16 + i * (swatchSize + swatchSpacing);
             if (mouseX >= sx && mouseX <= sx + swatchSize && mouseY >= swatchY && mouseY <= swatchY + swatchSize) {
                 selectedColor = CanvasGroupFrame.PALETTE[i];
@@ -194,6 +243,27 @@ public class FrameEditDialog implements IBoardModal {
             sharedMachineMode = !sharedMachineMode;
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.1F));
             return true;
+        }
+
+        // Target Capacity Input and Auto Ratio Button Click
+        if (sharedMachineMode) {
+            int capY = y + 124;
+            int capInputX = x + 112;
+            int capInputW = 42;
+            if (targetCapacityInput != null && targetCapacityInput.mouseClicked(mouseX, mouseY, button)) {
+                targetCapacityInput.setFocused(true);
+                return true;
+            }
+
+            int ratioBtnX = capInputX + capInputW + 6;
+            int ratioBtnW = (x + dialogW - 16) - ratioBtnX;
+            int ratioBtnH = 16;
+            if (mouseX >= ratioBtnX && mouseX <= ratioBtnX + ratioBtnW && mouseY >= capY && mouseY <= capY + ratioBtnH) {
+                double cap = parseTargetCapacity();
+                commitSave();
+                executeAutoRatioFromDialog(cap);
+                return true;
+            }
         }
 
         if (titleInput != null) {
@@ -241,6 +311,9 @@ public class FrameEditDialog implements IBoardModal {
         if (titleInput != null && titleInput.isFocused()) {
             if (titleInput.keyPressed(keyCode, scanCode, modifiers)) return true;
         }
+        if (targetCapacityInput != null && targetCapacityInput.isFocused()) {
+            if (targetCapacityInput.keyPressed(keyCode, scanCode, modifiers)) return true;
+        }
 
         return true;
     }
@@ -249,6 +322,9 @@ public class FrameEditDialog implements IBoardModal {
         if (!visible) return false;
         if (titleInput != null && titleInput.isFocused()) {
             return titleInput.charTyped(codePoint, modifiers);
+        }
+        if (targetCapacityInput != null && targetCapacityInput.isFocused()) {
+            return targetCapacityInput.charTyped(codePoint, modifiers);
         }
         return true;
     }
@@ -261,26 +337,79 @@ public class FrameEditDialog implements IBoardModal {
             }
             int newColor = selectedColor;
             boolean newShared = sharedMachineMode;
+            double newCapacity = parseTargetCapacity();
 
             boolean changed = !Objects.equals(initialTitle, newTitle)
                     || initialColor != newColor
-                    || initialSharedMode != newShared;
+                    || initialSharedMode != newShared
+                    || Math.abs(initialTargetCapacity - newCapacity) > 0.0001;
 
             if (changed) {
                 targetFrame.setTitle(newTitle);
                 targetFrame.setColor(newColor);
                 targetFrame.setSharedMachineFrame(newShared);
+                targetFrame.setTargetPoolCapacity(newCapacity);
                 parent.recordCommand(new BoardCommand.ModifyFramePropertiesCommand(
                         targetFrame.getId(),
                         initialTitle, newTitle,
                         initialColor, newColor,
-                        initialSharedMode, newShared
+                        initialSharedMode, newShared,
+                        initialTargetCapacity, newCapacity
                 ));
                 parent.markSummaryDirty();
             }
-            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F));
         }
         close();
+    }
+
+    private double parseTargetCapacity() {
+        if (targetCapacityInput == null) return initialTargetCapacity;
+        try {
+            double parsed = Double.parseDouble(targetCapacityInput.getValue().trim());
+            return Math.max(0.01, parsed);
+        } catch (NumberFormatException ignored) {
+            return initialTargetCapacity;
+        }
+    }
+
+    private void executeAutoRatioFromDialog(double targetCapacity) {
+        FlowGraph graph = parent.getGraph();
+        if (graph == null || targetFrame == null) return;
+
+        Map<String, Double> oldCounts = new HashMap<>();
+        for (RecipeNode n : graph.getNodes()) {
+            oldCounts.put(n.getId(), n.getMachineCount());
+        }
+
+        AutoRatioMode mode = Screen.hasAltDown() ? AutoRatioMode.FRACTIONAL
+                : (Screen.hasShiftDown() ? AutoRatioMode.HARMONIZED
+                : (BoardManager.getInstance().isAutoRatioFractionalDefault() ? AutoRatioMode.FRACTIONAL : AutoRatioMode.INTEGER_CEIL));
+
+        int changed = FlowGraphSolver.autoRatioFromSharedPool(graph, targetFrame, targetCapacity, mode);
+        if (changed <= 0) {
+            BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.pool_auto_ratio_empty")));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 0.8F));
+            return;
+        }
+
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : graph.getNodes()) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        if (!subCmds.isEmpty()) {
+            parent.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Pool Auto Ratio: " + targetFrame.getTitle()));
+        }
+
+        String capStr = String.format(Locale.ROOT, "%.1f", targetCapacity);
+        BoardToast.show(Component.literal("§a⚖ ").append(Component.translatable("message.gtcalcboard.pool_auto_ratio_success", changed, targetFrame.getTitle(), capStr)));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+        parent.markSummaryDirty();
+        parent.rebuildWidgets();
     }
 }
 

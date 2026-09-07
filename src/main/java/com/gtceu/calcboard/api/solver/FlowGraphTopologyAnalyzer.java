@@ -97,20 +97,95 @@ public final class FlowGraphTopologyAnalyzer {
             int currInIdx = Integer.parseInt(curr.substring(colonIdx + 1));
 
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (edge.toNodeId().equals(currNodeId) && edge.inputIndex() == currInIdx) {
-                    RecipeNode src = graph.findNodeById(edge.fromNodeId());
-                    if (src != null) {
-                        if (src.isReroute()) {
-                            String nextKey = src.getId() + ":0";
-                            if (visited.add(nextKey)) {
-                                queue.add(nextKey);
-                            }
-                        } else {
-                            result.add(src);
-                        }
-                    }
-                }
+                processFeedingEdge(graph, edge, currNodeId, currInIdx, visited, queue, result);
             }
         }
     }
+
+    private static void processFeedingEdge(
+            FlowGraph graph,
+            FlowGraph.ConnectionEdge edge,
+            String currNodeId,
+            int currInIdx,
+            Set<String> visited,
+            Queue<String> queue,
+            Set<RecipeNode> result
+    ) {
+        if (!edge.toNodeId().equals(currNodeId) || edge.inputIndex() != currInIdx) return;
+        RecipeNode src = graph.findNodeById(edge.fromNodeId());
+        if (src == null) return;
+
+        if (!src.isReroute()) {
+            result.add(src);
+            return;
+        }
+
+        if (src.isExternalSupply() || src.isInfiniteSupply() || src.isBaseNode()) {
+            result.add(src);
+        }
+        String nextKey = src.getId() + ":0";
+        if (visited.add(nextKey)) {
+            queue.add(nextKey);
+        }
+    }
+
+    public static Set<String> findConnectedComponent(FlowGraph graph, Collection<String> startNodeIds) {
+        if (graph == null || startNodeIds == null || startNodeIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        Set<String> connected = new LinkedHashSet<>();
+        Queue<String> queue = new ArrayDeque<>();
+        for (String id : startNodeIds) {
+            if (id != null && connected.add(id)) {
+                queue.add(id);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            String currId = queue.poll();
+            collectAdjacentNodeIds(graph, currId, connected, queue);
+        }
+        return connected;
+    }
+
+    private static void collectAdjacentNodeIds(FlowGraph graph, String currId, Set<String> connected, Queue<String> queue) {
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.fromNodeId().equals(currId)) {
+                offerConnectedNode(edge.toNodeId(), connected, queue);
+            } else if (edge.toNodeId().equals(currId)) {
+                offerConnectedNode(edge.fromNodeId(), connected, queue);
+            }
+        }
+    }
+
+    private static void offerConnectedNode(String nodeId, Set<String> connected, Queue<String> queue) {
+        if (connected.add(nodeId)) {
+            queue.add(nodeId);
+        }
+    }
+
+    public static boolean hasDirectedPath(FlowGraph graph, String fromId, String toId) {
+        if (graph == null || fromId == null || toId == null) return false;
+        if (fromId.equals(toId)) return true;
+
+        Queue<String> queue = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        queue.add(fromId);
+        visited.add(fromId);
+
+        while (!queue.isEmpty()) {
+            String currId = queue.poll();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                if (!edge.fromNodeId().equals(currId)) continue;
+                String nextId = edge.toNodeId();
+                if (nextId.equals(toId)) return true;
+                if (visited.add(nextId)) {
+                    queue.add(nextId);
+                }
+            }
+        }
+        return false;
+    }
 }
+

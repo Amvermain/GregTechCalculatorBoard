@@ -237,5 +237,110 @@ public class CoilModifierDeductionTest {
         GTCEuCoilModifierHelper.CoilMachineKind kind = GTCEuCoilModifierHelper.classifyModifierObject(simulatedKubeJsProxy);
         Assertions.assertEquals(GTCEuCoilModifierHelper.CoilMachineKind.PYROLYSE_OVEN, kind);
     }
+
+    @Test
+    @DisplayName("Test Chemical Reactor OC modifier directly classified without mod gating")
+    public void testDirectModifierClassificationWithoutModGating() {
+        Object modifierWithId = new Object() {
+            public String getId() {
+                return "chemical_reactor_oc";
+            }
+        };
+
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", false);
+        try {
+            GTCEuCoilModifierHelper.CoilMachineKind kind = GTCEuCoilModifierHelper.classifyModifierObject(modifierWithId);
+            Assertions.assertEquals(GTCEuCoilModifierHelper.CoilMachineKind.CHEMICAL_REACTOR, kind);
+        } finally {
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
+    }
+
+    @Test
+    @DisplayName("Test Star Technology LCR and ECR coil bonuses across all 11 heating coils")
+    public void testStarTLcrAndEcrCoilMultipliersAllTiers() {
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", true);
+
+        try {
+            ResourceLocation[] reactors = new ResourceLocation[]{
+                    ResourceLocation.tryParse("gtceu:large_chemical_reactor"),
+                    ResourceLocation.tryParse("gtceu:extreme_chemical_reactor")
+            };
+
+            String[] coilIds = new String[]{
+                    "gtceu:cupronickel_coil_block",
+                    "gtceu:kanthal_coil_block",
+                    "gtceu:nichrome_coil_block",
+                    "gtceu:rtm_alloy_coil_block",
+                    "gtceu:hssg_coil_block",
+                    "gtceu:naquadah_coil_block",
+                    "gtceu:trinium_coil_block",
+                    "gtceu:tritanium_coil_block",
+                    "kubejs:zalloy_coil_block",
+                    "kubejs:magmada_alloy_coil_block",
+                    "kubejs:abyssal_alloy_coil_block"
+            };
+
+            for (ResourceLocation reactorId : reactors) {
+                RecipeNode node = new RecipeNode("node-reactor", reactorId.getPath(), 8.0, 7.0, GTVoltageTier.LV);
+                node.setMachineIcon(reactorId);
+                node.setMultiblock(true);
+
+                for (int tier = 0; tier < coilIds.length; tier++) {
+                    String coilId = coilIds[tier];
+                    CoilHelper.CoilStats stats = CoilHelper.getCoilStats(coilId);
+                    Assertions.assertNotNull(stats, "CoilStats must not be null for " + coilId);
+
+                    GTCoilAddon coil = new GTCoilAddon(coilId, coilId, "", null, stats);
+                    MachineAddon tailored = CoilHelper.tailorCoilAddon(coil, node);
+
+                    double expectedSpeed = 0.75 + (tier * 0.25);
+                    double expectedDurationMult = 1.0 / expectedSpeed;
+                    double expectedEutMult = 1.0 - (tier * 0.05);
+
+                    Assertions.assertEquals(expectedDurationMult, tailored.getDurationMultiplier(), 0.005,
+                            "Duration multiplier mismatch on " + reactorId + " with tier " + tier + " (" + coilId + ")");
+                    Assertions.assertEquals(expectedEutMult, tailored.getEutMultiplier(), 0.005,
+                            "EUt multiplier mismatch on " + reactorId + " with tier " + tier + " (" + coilId + ")");
+                }
+            }
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
+    }
+
+    @Test
+    @DisplayName("Verify TFG and vanilla GTCEu Modern without StarT does not grant coil bonuses to LCR")
+    public void testTfgAndVanillaGtceuLcrHasNoCoilBonus() {
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+        com.gtceu.calcboard.api.util.ModCompatHelper.setTestOverride("start_core", false);
+
+        try {
+            ResourceLocation lcrId = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+            var spec = com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(lcrId);
+            Assertions.assertEquals(com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC, spec.kind());
+
+            RecipeNode node = new RecipeNode("node-lcr", "Large Chemical Reactor", 8.0, 7.0, GTVoltageTier.LV);
+            node.setMachineIcon(lcrId);
+            node.setMultiblock(true);
+            node.setRecipeTemperature(0);
+
+            CoilHelper.CoilStats nichromeStats = CoilHelper.getCoilStats("gtceu:nichrome_coil_block");
+            GTCoilAddon coil = new GTCoilAddon("gtceu:nichrome_coil_block", "Nichrome Coil", "", null, nichromeStats);
+            MachineAddon tailored = CoilHelper.tailorCoilAddon(coil, node);
+
+            Assertions.assertEquals(1.0, tailored.getDurationMultiplier(), 0.001,
+                    "In TFG/Vanilla, LCR must have duration multiplier 1.0 (no bonus)");
+            Assertions.assertEquals(1.0, tailored.getEutMultiplier(), 0.001,
+                    "In TFG/Vanilla, LCR must have EU/t multiplier 1.0 (no discount)");
+            Assertions.assertEquals(1, tailored.getParallelMultiplier(),
+                    "In TFG/Vanilla, LCR coil must not multiply parallels");
+        } finally {
+            com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.clearCache();
+            com.gtceu.calcboard.api.util.ModCompatHelper.clearTestOverrides();
+        }
+    }
 }
 

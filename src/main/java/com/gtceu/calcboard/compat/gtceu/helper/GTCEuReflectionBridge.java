@@ -15,6 +15,7 @@ public final class GTCEuReflectionBridge {
     private static final Class<?> COIL_WORKABLE_CLASS;
     private static final Class<?> LARGE_TURBINE_CLASS;
     private static final Class<?> I_TURBINE_CLASS;
+    private static final Class<?> LARGE_COMBUSTION_ENGINE_CLASS;
     private static final Class<?> MUFFLER_PART_CLASS;
     private static final Class<?> MAINTENANCE_HATCH_CLASS;
     private static final Class<?> CONFIGURABLE_MAINT_HATCH_CLASS;
@@ -31,6 +32,7 @@ public final class GTCEuReflectionBridge {
     private static final Method IS_MULTIBLOCK_METHOD;
     private static final Method GET_RECIPE_MODIFIERS_METHOD;
     private static final Method GET_RECIPE_MODIFIER_METHOD;
+    private static final Method GET_PAGINATED_TOOLTIPS_METHOD;
     private static final Field PAGINATED_TOOLTIPS_FIELD;
     private static final Method IS_GENERATOR_METHOD;
     private static final Field GENERATOR_FIELD;
@@ -75,6 +77,7 @@ public final class GTCEuReflectionBridge {
         COIL_WORKABLE_CLASS = coilCls;
         LARGE_TURBINE_CLASS = loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.generator.LargeTurbineMachine");
         I_TURBINE_CLASS = loadClassQuietly("com.gregtechceu.gtceu.api.machine.feature.multiblock.ITurbineMachine");
+        LARGE_COMBUSTION_ENGINE_CLASS = loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.generator.LargeCombustionEngineMachine");
 
         Class<?> mPart = loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.part.MufflerPartMachine");
         MUFFLER_PART_CLASS = mPart != null ? mPart : loadClassQuietly("com.gregtechceu.gtceu.common.machine.multiblock.part.MufflerHatchPartMachine");
@@ -96,6 +99,7 @@ public final class GTCEuReflectionBridge {
         IS_MULTIBLOCK_METHOD = findMethod(targetDefClass, "isMultiblock");
         GET_RECIPE_MODIFIERS_METHOD = findMethod(targetDefClass, "getRecipeModifiers");
         GET_RECIPE_MODIFIER_METHOD = findMethod(targetDefClass, "getRecipeModifier");
+        GET_PAGINATED_TOOLTIPS_METHOD = findMethod(targetDefClass, "getPaginatedTooltips");
         PAGINATED_TOOLTIPS_FIELD = findField(targetDefClass, "paginatedTooltips");
         Class<?> mbDefCls = MULTIBLOCK_DEF_CLASS != null ? MULTIBLOCK_DEF_CLASS : targetDefClass;
         IS_GENERATOR_METHOD = findMethod(mbDefCls, "isGenerator");
@@ -142,8 +146,13 @@ public final class GTCEuReflectionBridge {
             if (REGISTRY_GET_METHOD != null) {
                 return REGISTRY_GET_METHOD.invoke(registry, id);
             }
-            Method getMethod = registry.getClass().getMethod("get", ResourceLocation.class);
-            return getMethod.invoke(registry, id);
+            try {
+                Method getMethod = registry.getClass().getMethod("get", ResourceLocation.class);
+                return getMethod.invoke(registry, id);
+            } catch (NoSuchMethodException e) {
+                Method getMethod = registry.getClass().getMethod("get", Object.class);
+                return getMethod.invoke(registry, id);
+            }
         } catch (Throwable ignored) {}
         return null;
     }
@@ -191,62 +200,132 @@ public final class GTCEuReflectionBridge {
             return new TurbineSpecs(GTVoltageTier.HV, 1024.0);
         }
 
-        GTVoltageTier foundTier = null;
-        double foundBaseEnergy = 0.0;
-
-        if (PAGINATED_TOOLTIPS_FIELD != null) {
-            try {
-                Object raw = PAGINATED_TOOLTIPS_FIELD.get(def);
-                if (raw instanceof List<?> pages) {
-                    for (Object pageObj : pages) {
-                        if (pageObj instanceof List<?> compList) {
-                            for (Object compObj : compList) {
-                                if (compObj instanceof net.minecraft.network.chat.Component comp) {
-                                    if (comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
-                                        String key = tc.getKey();
-                                        if ("gtceu.universal.tooltip.base_production_eut".equals(key) && tc.getArgs().length > 0) {
-                                            Object arg = tc.getArgs()[0];
-                                            if (arg instanceof Number num) {
-                                                foundBaseEnergy = num.doubleValue();
-                                                long voltage = Math.round(foundBaseEnergy / 2.0);
-                                                foundTier = GTVoltageTier.fromVoltage(voltage);
-                                            }
-                                        } else if ("gtceu.multiblock.turbine.efficiency_tooltip".equals(key) && tc.getArgs().length > 0) {
-                                            if (foundTier == null) {
-                                                Object arg = tc.getArgs()[0];
-                                                String tierName = (arg instanceof net.minecraft.network.chat.Component c) ? c.getString() : String.valueOf(arg);
-                                                foundTier = GTVoltageTier.fromName(tierName);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
-        }
+        Object raw = fetchRawPaginatedTooltips(def);
+        TurbineSpecs tooltipSpecs = parseTooltipsForTurbineSpecs(raw);
+        GTVoltageTier foundTier = tooltipSpecs.tier();
+        double foundBaseEnergy = tooltipSpecs.baseEnergy();
 
         if (foundTier == null) {
             foundTier = getMachineTier(def);
         }
 
-        if (foundTier == null || foundBaseEnergy <= 0.0) {
-            ResourceLocation id = getMachineId(def);
-            if (id != null) {
-                if (foundTier == null) {
-                    foundTier = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseTier(id);
-                }
-                if (foundBaseEnergy <= 0.0) {
-                    foundBaseEnergy = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseProduction(id);
-                }
+        ResourceLocation id = getMachineId(def);
+        if (id != null) {
+            if (foundTier == null) {
+                foundTier = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseTier(id);
+            }
+            if (foundBaseEnergy <= 0.0) {
+                Double baseEnergy = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseProduction(id);
+                if (baseEnergy != null && baseEnergy > 0.0) foundBaseEnergy = baseEnergy;
             }
         }
 
-        if (foundTier == null) foundTier = GTVoltageTier.HV;
-        if (foundBaseEnergy <= 0.0) foundBaseEnergy = (double) (foundTier.getVoltage() * 2L);
+        if (foundTier == null || foundBaseEnergy <= 0.0) {
+            TurbineSpecs rtSpecs = inspectRecipeTypesForTurbineSpecs(def);
+            if (foundTier == null) foundTier = rtSpecs.tier();
+            if (foundBaseEnergy <= 0.0) foundBaseEnergy = rtSpecs.baseEnergy();
+        }
+
+        if (foundTier == null) {
+            foundTier = resolveTurbineBaseTierFallback(id);
+        }
+        if (foundBaseEnergy <= 0.0) {
+            foundBaseEnergy = (double) (foundTier.getVoltage() * 2L);
+        }
 
         return new TurbineSpecs(foundTier, foundBaseEnergy);
+    }
+
+    private static Object fetchRawPaginatedTooltips(Object def) {
+        if (GET_PAGINATED_TOOLTIPS_METHOD != null) {
+            Object raw = invokeMethodQuietly(GET_PAGINATED_TOOLTIPS_METHOD, def, Object.class);
+            if (raw != null) return raw;
+        }
+        if (PAGINATED_TOOLTIPS_FIELD != null) {
+            try {
+                return PAGINATED_TOOLTIPS_FIELD.get(def);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private static TurbineSpecs parseTooltipsForTurbineSpecs(Object raw) {
+        if (!(raw instanceof List<?> pages)) {
+            return new TurbineSpecs(null, 0.0);
+        }
+        GTVoltageTier foundTier = null;
+        double foundBaseEnergy = 0.0;
+        for (Object pageObj : pages) {
+            if (!(pageObj instanceof List<?> compList)) continue;
+            TurbineSpecs pageSpecs = parseSingleTooltipPage(compList);
+            if (foundTier == null && pageSpecs.tier() != null) {
+                foundTier = pageSpecs.tier();
+            }
+            if (foundBaseEnergy <= 0.0 && pageSpecs.baseEnergy() > 0.0) {
+                foundBaseEnergy = pageSpecs.baseEnergy();
+            }
+        }
+        if (foundTier == null && foundBaseEnergy > 0.0) {
+            foundTier = GTVoltageTier.fromVoltage(Math.round(foundBaseEnergy / 2.0));
+        }
+        return new TurbineSpecs(foundTier, foundBaseEnergy);
+    }
+
+    private static TurbineSpecs parseSingleTooltipPage(List<?> compList) {
+        GTVoltageTier foundTier = null;
+        double foundBaseEnergy = 0.0;
+        for (Object compObj : compList) {
+            if (foundBaseEnergy <= 0.0) {
+                foundBaseEnergy = extractTurbineBaseEnergy(compObj);
+            }
+            if (foundTier == null) {
+                foundTier = extractTurbineTooltipTier(compObj);
+            }
+        }
+        return new TurbineSpecs(foundTier, foundBaseEnergy);
+    }
+
+    private static double extractTurbineBaseEnergy(Object compObj) {
+        if (!(compObj instanceof net.minecraft.network.chat.Component comp)) return 0.0;
+        if (!(comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc)) return 0.0;
+        if (!"gtceu.universal.tooltip.base_production_eut".equals(tc.getKey()) || tc.getArgs().length == 0) return 0.0;
+        return (tc.getArgs()[0] instanceof Number num) ? num.doubleValue() : 0.0;
+    }
+
+    private static GTVoltageTier extractTurbineTooltipTier(Object compObj) {
+        if (!(compObj instanceof net.minecraft.network.chat.Component comp)) return null;
+        if (!(comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc)) return null;
+        if (!"gtceu.multiblock.turbine.efficiency_tooltip".equals(tc.getKey()) || tc.getArgs().length == 0) return null;
+        Object arg = tc.getArgs()[0];
+        String tierName = (arg instanceof net.minecraft.network.chat.Component c) ? c.getString() : String.valueOf(arg);
+        return GTVoltageTier.fromName(tierName);
+    }
+
+    private static TurbineSpecs inspectRecipeTypesForTurbineSpecs(Object def) {
+        GTVoltageTier foundTier = null;
+        double foundBaseEnergy = 0.0;
+        for (Object rt : getRecipeTypes(def)) {
+            ResourceLocation rtId = com.gtceu.calcboard.api.catalog.MultiblockDetector.extractRecipeTypeId(rt);
+            if (rtId == null) continue;
+            if (foundTier == null) {
+                foundTier = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseTier(rtId);
+            }
+            if (foundBaseEnergy <= 0.0) {
+                Double e = com.gtceu.calcboard.api.catalog.MultiblockDetector.getTurbineBaseProduction(rtId);
+                if (e != null && e > 0.0) foundBaseEnergy = e;
+            }
+        }
+        return new TurbineSpecs(foundTier, foundBaseEnergy);
+    }
+
+    private static GTVoltageTier resolveTurbineBaseTierFallback(ResourceLocation id) {
+        String path = id != null ? id.getPath().toLowerCase(Locale.ROOT) : "";
+        if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) {
+            return GTVoltageTier.EV;
+        } else if (path.contains("plasma")) {
+            return GTVoltageTier.IV;
+        }
+        return GTVoltageTier.HV;
     }
 
     public static boolean isGenerator(Object def) {
@@ -263,31 +342,31 @@ public final class GTCEuReflectionBridge {
         return false;
     }
 
+    public static boolean isCombustionMachineClass(Class<?> mCls) {
+        if (mCls == null) return false;
+        return LARGE_COMBUSTION_ENGINE_CLASS != null && LARGE_COMBUSTION_ENGINE_CLASS.isAssignableFrom(mCls);
+    }
+
     public static boolean hasTurbineSignature(Object def) {
         if (def == null) return false;
-        if (isGenerator(def)) return true;
 
-        if (PAGINATED_TOOLTIPS_FIELD != null) {
-            try {
-                Object raw = PAGINATED_TOOLTIPS_FIELD.get(def);
-                if (raw instanceof List<?> pages) {
-                    for (Object pageObj : pages) {
-                        if (pageObj instanceof List<?> compList) {
-                            for (Object compObj : compList) {
-                                if (compObj instanceof net.minecraft.network.chat.Component comp) {
-                                    if (comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc) {
-                                        String key = tc.getKey();
-                                        if ("gtceu.multiblock.turbine.efficiency_tooltip".equals(key)
-                                                || "gtceu.universal.tooltip.base_production_eut".equals(key)) {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {}
+        ResourceLocation id = getMachineId(def);
+        if (id != null && (GTCombustionHelper.isCombustionEngine(id)
+                || GTCombustionHelper.isSingleblockCombustionGenerator(id))) {
+            return false;
+        }
+
+        Class<?> mCls = getMachineClass(def);
+        if (mCls != null && isCombustionMachineClass(mCls)) {
+            return false;
+        }
+
+        if (mCls != null && (isLargeTurbineClass(mCls) || isITurbineClass(mCls))) {
+            return true;
+        }
+
+        if (hasTurbineTooltipKey(def)) {
+            return true;
         }
 
         String modName = getRecipeModifierName(def);
@@ -295,13 +374,40 @@ public final class GTCEuReflectionBridge {
             return true;
         }
 
-        Class<?> mCls = getMachineClass(def);
-        if (mCls != null && (isLargeTurbineClass(mCls) || isITurbineClass(mCls))) {
-            return true;
-        }
-
-        ResourceLocation id = getMachineId(def);
         return id != null && com.gtceu.calcboard.api.catalog.MultiblockDetector.isTurbine(id);
+    }
+
+    private static boolean hasTurbineTooltipKey(Object def) {
+        if (PAGINATED_TOOLTIPS_FIELD == null) {
+            return false;
+        }
+        try {
+            Object raw = PAGINATED_TOOLTIPS_FIELD.get(def);
+            if (raw instanceof List<?> pages) {
+                return containsTurbineTooltipPage(pages);
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    private static boolean containsTurbineTooltipPage(List<?> pages) {
+        for (Object pageObj : pages) {
+            if (pageObj instanceof List<?> compList && containsTurbineTooltipKey(compList)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsTurbineTooltipKey(List<?> compList) {
+        for (Object compObj : compList) {
+            if (compObj instanceof net.minecraft.network.chat.Component comp
+                    && comp.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents tc
+                    && "gtceu.multiblock.turbine.efficiency_tooltip".equals(tc.getKey())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isSteamMachine(Object def) {
@@ -526,7 +632,11 @@ public final class GTCEuReflectionBridge {
             if (MACHINES_REGISTRY_FIELD == null) return null;
             Object registry = MACHINES_REGISTRY_FIELD.get(null);
             if (registry != null) {
-                return registry.getClass().getMethod("get", ResourceLocation.class);
+                try {
+                    return registry.getClass().getMethod("get", ResourceLocation.class);
+                } catch (NoSuchMethodException e) {
+                    return registry.getClass().getMethod("get", Object.class);
+                }
             }
         } catch (Throwable ignored) {}
         return null;
@@ -559,7 +669,9 @@ public final class GTCEuReflectionBridge {
         Class<?> current = targetClass;
         while (current != null && current != Object.class) {
             try {
-                return current.getDeclaredField(fieldName);
+                Field f = current.getDeclaredField(fieldName);
+                f.setAccessible(true);
+                return f;
             } catch (NoSuchFieldException e) {
                 current = current.getSuperclass();
             }
