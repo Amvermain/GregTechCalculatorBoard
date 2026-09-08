@@ -53,9 +53,6 @@ public class EmiRecipeConverter {
     }
 
     public static RecipeNode convert(EmiRecipe recipe, ResourceLocation preferredWorkstation) {
-        if (recipe instanceof KineticGenerationEmiRecipe kg) {
-            return kg.toRecipeNode();
-        }
         String catName = null;
         if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
             String catPath = recipe.getCategory().getId().getPath();
@@ -365,7 +362,6 @@ public class EmiRecipeConverter {
         List<ResourceLocation> list = new ArrayList<>();
         if (recipe == null) return list;
 
-        // 1. Check recipe.getWorkstations()
         try {
             Method m = recipe.getClass().getMethod("getWorkstations");
             Object res = m.invoke(recipe);
@@ -376,7 +372,6 @@ public class EmiRecipeConverter {
             }
         } catch (Throwable ignored) {}
 
-        // 2. Check recipe.getCategory() workstations
         try {
             if (recipe.getCategory() != null) {
                 try {

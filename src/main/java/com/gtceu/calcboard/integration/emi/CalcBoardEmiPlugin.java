@@ -2,8 +2,6 @@ package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.model.RecipeNode;
@@ -32,37 +30,8 @@ public class CalcBoardEmiPlugin implements EmiPlugin {
                 registry.addRecipeHandler(ModMenus.BOARD_MENU.get(), new BoardEmiRecipeHandler());
             } catch (Throwable ignored) {}
         }
-        registerKineticRecipes(registry);
         com.gtceu.calcboard.api.catalog.MachineAddonCatalog.getInstance().markDirty();
         com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.invalidateCache();
-    }
-
-    private void registerKineticRecipes(EmiRegistry registry) {
-        var iconItem = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse("create:large_water_wheel"));
-        var iconStack = (iconItem != null && iconItem != net.minecraft.world.item.Items.AIR) ? EmiStack.of(iconItem) : EmiStack.of(net.minecraft.world.item.Items.WATER_BUCKET);
-        var category = new dev.emi.emi.api.recipe.EmiRecipeCategory(ResourceLocation.tryParse("gtcalcboard:kinetic_generation"), iconStack);
-        registry.addCategory(category);
-
-        java.util.Set<net.minecraft.world.item.Item> activeRecipeItems = new java.util.HashSet<>();
-        try {
-            var rm = registry.getRecipeManager();
-            if (rm != null) {
-                for (var r : rm.getRecipes()) {
-                    try {
-                        net.minecraft.world.item.ItemStack res = r.getResultItem(net.minecraft.core.RegistryAccess.EMPTY);
-                        if (res != null && !res.isEmpty() && res.getItem() != net.minecraft.world.item.Items.AIR) {
-                            activeRecipeItems.add(res.getItem());
-                        }
-                    } catch (Throwable ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
-
-        for (com.gtceu.calcboard.compat.IModAdapter adapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
-            try {
-                adapter.registerSyntheticEmiRecipes(registry, category, activeRecipeItems);
-            } catch (Throwable ignored) {}
-        }
     }
 
     public static void addRecipeToBoard(EmiRecipe recipe) {

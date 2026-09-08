@@ -691,7 +691,7 @@ public final class BoardTooltipRenderer {
     public static String formatPortRate(double rate, IngredientStack stack, boolean showExact, boolean[] hiddenExactRef) {
         if (stack != null && stack.isStressUnit()) {
             String compact = FormatUtil.formatRate(rate, stack);
-            String exact = FormatUtil.formatExactRate(rate, false);
+            String exact = FormatUtil.formatExactRate(rate, stack);
             if (!compact.equals(exact)) {
                 if (hiddenExactRef != null && !showExact) {
                     hiddenExactRef[0] = true;

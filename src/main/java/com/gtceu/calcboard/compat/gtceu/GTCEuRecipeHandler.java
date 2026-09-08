@@ -245,7 +245,6 @@ public class GTCEuRecipeHandler {
             details.durationTicks = duration;
         }
 
-        // 1. Check generator (Output EU)
         double outputEUt = extractOutputEUt(backing);
         if (outputEUt > 0.0) {
             details.eut = outputEUt;
@@ -253,7 +252,6 @@ public class GTCEuRecipeHandler {
             details.energyType = EnergyType.ELECTRIC_EU;
             details.isGenerator = true;
         } else {
-            // 2. Check consumer (Input EU)
             double inputEUt = extractInputEUt(backing);
             if (inputEUt > 0.0) {
                 details.eut = inputEUt;

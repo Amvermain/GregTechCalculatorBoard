@@ -8,12 +8,11 @@ import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-
-import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
 import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
@@ -392,13 +391,9 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         return 15.0 / 512.0;
     }
 
-    public static List<SearchableRecipe> getVirtualSearchRecipes() {
-        return CreateNewAgeRecipeHandler.getVirtualSearchRecipes();
-    }
-
     @Override
-    public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        CreateNewAgeRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
+    public void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        CreateNewAgeRecipeHandler.collectNativeCatalogRecipes(collector);
     }
 }
 

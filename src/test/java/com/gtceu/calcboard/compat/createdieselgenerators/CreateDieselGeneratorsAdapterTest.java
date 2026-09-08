@@ -2,7 +2,6 @@ package com.gtceu.calcboard.compat.createdieselgenerators;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
@@ -126,15 +125,19 @@ public class CreateDieselGeneratorsAdapterTest {
     }
 
     @Test
-    @DisplayName("가상 검색 레시피 생성 검증")
-    void testVirtualSearchRecipes() {
-        List<SearchableRecipe> recipes = adapter.getVirtualSearchRecipes();
-        assertNotNull(recipes);
-        assertEquals(3, recipes.size());
+    @DisplayName("디젤 엔진 키네틱 발전 노드 생성 검증")
+    void testDieselEngineNodeCreation() {
+        RecipeNode engine = CDGRecipeHandler.createKineticGeneratorNode(CDGRecipeHandler.ITEM_DIESEL_ENGINE, "Diesel Engine");
+        assertNotNull(engine);
+        assertEquals("Diesel Engine", engine.getName());
+        assertEquals(EnergyType.KINETIC_SU, engine.getEnergyType());
+        assertTrue(engine.isGenerator());
 
-        assertTrue(recipes.stream().anyMatch(r -> r.displayName().contains("Diesel Engine")));
-        assertTrue(recipes.stream().anyMatch(r -> r.displayName().contains("Modular Diesel Engine")));
-        assertTrue(recipes.stream().anyMatch(r -> r.displayName().contains("Huge Diesel Engine")));
+        RecipeNode modular = CDGRecipeHandler.createKineticGeneratorNode(CDGRecipeHandler.ITEM_MODULAR_DIESEL_ENGINE, "Modular Diesel Engine");
+        assertNotNull(modular);
+
+        RecipeNode huge = CDGRecipeHandler.createKineticGeneratorNode(CDGRecipeHandler.ITEM_HUGE_DIESEL_ENGINE, "Huge Diesel Engine");
+        assertNotNull(huge);
     }
 
     @Test

@@ -158,7 +158,7 @@ public final class RecipeSearchQueryEngine {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactInputName(targetName)) {
                                 contextualScore = 50000;
-                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units") || (ModCompatHelper.isEmiLoaded() && !com.gtceu.calcboard.integration.emi.EmiSearchHelper.isKineticGenerator(sr.recipe())))) {
+                            } else if (isStress && (sr.inputIndex().contains("stress_units") || sr.inputIndex().contains("create:stress_units"))) {
                                 contextualScore = 90000;
                             }
                         } else {
@@ -169,7 +169,7 @@ public final class RecipeSearchQueryEngine {
                                 contextualScore = 80000;
                             } else if (targetName != null && sr.hasExactOutputName(targetName)) {
                                 contextualScore = 50000;
-                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units") || (ModCompatHelper.isEmiLoaded() && com.gtceu.calcboard.integration.emi.EmiSearchHelper.isKineticGenerator(sr.recipe())))) {
+                            } else if (isStress && (sr.outputIndex().contains("stress_units") || sr.outputIndex().contains("create:stress_units"))) {
                                 contextualScore = 90000;
                             }
                         }

@@ -2,6 +2,7 @@ package com.gtceu.calcboard.compat;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.extension.IBoosterProvider;
 import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
@@ -99,5 +100,8 @@ public interface IModAdapter extends
 
     default boolean validateNode(RecipeNode node, FlowGraph graph, List<Component> warnings) {
         return validateNode(node, warnings);
+    }
+
+    default void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
     }
 }

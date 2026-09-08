@@ -84,6 +84,7 @@ public class ClientForgeEvents {
 
         // Load client-wide preferences & determine welcome chat delay
         ClientPreferenceManager.getInstance().ensureLoaded();
+        ClientPreferenceManager.getInstance().applyPreferencesTo(BoardManager.getInstance());
         if (CalcBoardClientConfig.SHOW_WELCOME_CHAT_MESSAGE.get() && !ClientPreferenceManager.getInstance().isWelcomeMessageSeen()) {
             welcomeMessageDelayTicks = 50; // ~2.5 seconds delay after logging in
         } else {

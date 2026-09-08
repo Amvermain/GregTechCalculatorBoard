@@ -84,53 +84,6 @@ public final class EmiRecipeSearchIndexer {
             }
         }
 
-        if (er instanceof KineticGenerationEmiRecipe kg) {
-            if (kg.getDisplayName() != null && !kg.getDisplayName().isEmpty()) {
-                displayName = kg.getDisplayName();
-            }
-            if (kg.getMachineIconId() != null) {
-                modId = kg.getMachineIconId().getNamespace().toLowerCase(Locale.ROOT).intern();
-                outputIds.add(kg.getMachineIconId());
-                outSb.append(' ').append(kg.getMachineIconId().toString().toLowerCase(Locale.ROOT));
-                outSb.append(' ').append(kg.getMachineIconId().getPath().toLowerCase(Locale.ROOT));
-            }
-            if (kg.getDisplayName() != null) {
-                outputNames.add(kg.getDisplayName());
-                outSb.append(' ').append(kg.getDisplayName().toLowerCase(Locale.ROOT));
-            }
-            for (com.gtceu.calcboard.api.model.IngredientStack out : kg.getOutputStacks()) {
-                if (out != null && out.getId() != null) {
-                    outputIds.add(out.getId());
-                    if (out.getDisplayName() != null) {
-                        outputNames.add(out.getDisplayName());
-                        outSb.append(' ').append(out.getDisplayName().toLowerCase(Locale.ROOT));
-                    }
-                    outSb.append(' ').append(out.getId().toString().toLowerCase(Locale.ROOT));
-                    outSb.append(' ').append(out.getId().getPath().toLowerCase(Locale.ROOT));
-                    if (out.isStressUnit()) {
-                        outSb.append(" su stress units kinetic 스트레스");
-                        outputNames.add("stress units");
-                        outputNames.add("Stress Units");
-                    }
-                }
-            }
-            for (com.gtceu.calcboard.api.model.IngredientStack in : kg.getInputStacks()) {
-                if (in != null && in.getId() != null) {
-                    inputIds.add(in.getId());
-                    if (in.getDisplayName() != null) {
-                        inputNames.add(in.getDisplayName());
-                        inSb.append(' ').append(in.getDisplayName().toLowerCase(Locale.ROOT));
-                    }
-                    inSb.append(' ').append(in.getId().toString().toLowerCase(Locale.ROOT));
-                    inSb.append(' ').append(in.getId().getPath().toLowerCase(Locale.ROOT));
-                    if (in.isStressUnit()) {
-                        inSb.append(" su stress units kinetic 스트레스");
-                        inputNames.add("stress units");
-                        inputNames.add("Stress Units");
-                    }
-                }
-            }
-        }
 
         if (cat != null && cat.getId() != null && com.gtceu.calcboard.api.util.ModCompatHelper.isCreateFamilyNamespace(cat.getId().getNamespace())) {
             inSb.append(" create:stress_units stress_units stress units su kinetic 스트레스");
@@ -183,8 +136,7 @@ public final class EmiRecipeSearchIndexer {
         String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
 
         ResourceLocation catResId = (cat != null) ? cat.getId() : null;
-        boolean isSupported = (er instanceof KineticGenerationEmiRecipe)
-                || com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catResId);
+        boolean isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catResId);
         if (!isSupported && modId != null && !modId.isEmpty()) {
             isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isRecipeSupported(modId, catResId);
         }

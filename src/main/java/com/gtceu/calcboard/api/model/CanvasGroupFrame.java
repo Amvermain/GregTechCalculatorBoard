@@ -170,12 +170,10 @@ public class CanvasGroupFrame {
     public boolean autoFit(FlowGraph graph, double padding) {
         if (graph == null) return false;
         List<RecipeNode> targets = new ArrayList<>();
-        // 1. Check contained nodes
         for (String nid : containedNodeIds) {
             RecipeNode n = graph.findNodeById(nid);
             if (n != null && !targets.contains(n)) targets.add(n);
         }
-        // 2. Also check spatially intersecting/enclosed nodes
         for (RecipeNode n : graph.getNodes()) {
             if (!targets.contains(n)) {
                 int w = n.getCardWidth() > 0 ? n.getCardWidth() : (n.isReroute() ? 32 : 180);

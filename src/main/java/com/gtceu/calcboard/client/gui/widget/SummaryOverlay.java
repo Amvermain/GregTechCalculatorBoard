@@ -305,7 +305,7 @@ public class SummaryOverlay {
         IngredientRenderer.render(graphics, stack, x + 8, y - 2);
 
         String ratePrefix = rate > 0 ? "+" : "";
-        String rateStr = ratePrefix + formatRate(rate, stack.isFluid());
+        String rateStr = ratePrefix + formatRate(rate, stack);
         int rateW = font.width(rateStr);
 
         int textPaddingRight = hasActionButton ? 18 : 0;
@@ -403,7 +403,7 @@ public class SummaryOverlay {
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
-            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack.isFluid());
+            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7Rate: §f" + ratePrefix + exactRateStr));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
@@ -411,8 +411,11 @@ public class SummaryOverlay {
         }
     }
 
-    private String formatRate(double rate, boolean isFluid) {
-        return NodeCardRenderer.formatRate(rate, isFluid);
+    private String formatRate(double rate, IngredientStack stack) {
+        if (stack != null && stack.isStressUnit()) {
+            return FormatUtil.formatRate(rate, stack);
+        }
+        return NodeCardRenderer.formatRate(rate, stack != null && stack.isFluid());
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta, int screenWidth, int screenHeight) {

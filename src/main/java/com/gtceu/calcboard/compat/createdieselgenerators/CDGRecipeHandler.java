@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.compat.createdieselgenerators;
 
+import com.gtceu.calcboard.api.catalog.DynamicAddonCrawler;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
@@ -372,166 +373,49 @@ public class CDGRecipeHandler {
         return fallback;
     }
 
-    public static List<SearchableRecipe> getVirtualKineticSearchRecipes() {
-        if (!ModCompatHelper.isCreateDieselGeneratorsLoaded()) {
-            return Collections.emptyList();
-        }
-        List<SearchableRecipe> list = new ArrayList<>();
-        String catId = CAT_DIESEL_COMBUSTION.toString();
-        String catName = getCombustionCategoryName();
+    public static void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        if (!ModCompatHelper.isCreateDieselGeneratorsLoaded()) return;
 
         ResourceLocation[] items = { ITEM_DIESEL_ENGINE, ITEM_MODULAR_DIESEL_ENGINE, ITEM_HUGE_DIESEL_ENGINE };
-        String[] fallbackNames = { "Diesel Engine", "Modular Diesel Engine", "Huge Diesel Engine" };
+        String[] defaultNames = { "Diesel Engine", "Modular Diesel Engine", "Huge Diesel Engine" };
+
+        String catId = com.gtceu.calcboard.compat.create.KineticCategory.FUEL_ENGINE.getCategoryId().toString();
+        String catName = Component.translatable(com.gtceu.calcboard.compat.create.KineticCategory.FUEL_ENGINE.getLangKey()).getString();
 
         for (int i = 0; i < items.length; i++) {
-            RecipeNode node = createKineticGeneratorNode(items[i], fallbackNames[i]);
-            if (node != null) {
-                list.add(buildSearchableRecipe(node, items[i], catId, catName));
-            }
-        }
-        return list;
-    }
+            ResourceLocation itemId = items[i];
+            String name = defaultNames[i];
 
-    private static String getCombustionCategoryName() {
-        String catName = Component.translatable("category.gtcalcboard.createdieselgenerators_combustion").getString();
-        if (catName.isEmpty() || catName.startsWith("category.gtcalcboard")) {
-            return "Diesel Engine Combustion";
-        }
-        return catName;
-    }
-
-    private static SearchableRecipe buildSearchableRecipe(RecipeNode node, ResourceLocation itemId, String catId, String catName) {
-        String displayName = node.getName();
-        List<String> outputNames = new ArrayList<>();
-        List<String> outputIds = new ArrayList<>();
-        for (IngredientStack out : node.getOutputs()) {
-            outputNames.add(out.getDisplayName().toLowerCase(Locale.ROOT));
-            if (out.getId() != null) outputIds.add(out.getId().toString().toLowerCase(Locale.ROOT));
-            if (out.isStressUnit()) {
-                outputNames.add("stress");
-                outputNames.add("unit");
-                outputNames.add("su");
-                outputNames.add("su/s");
-                outputNames.add("kinetic");
-                outputNames.add("스트레스");
-            }
-        }
-        outputNames.add(displayName.toLowerCase(Locale.ROOT));
-        if (itemId != null) {
-            outputIds.add(itemId.toString().toLowerCase(Locale.ROOT));
-            outputIds.add(itemId.getPath().toLowerCase(Locale.ROOT));
-        }
-
-        List<String> inputNames = new ArrayList<>();
-        List<String> inputIds = new ArrayList<>();
-        for (IngredientStack in : node.getInputs()) {
-            inputNames.add(in.getDisplayName().toLowerCase(Locale.ROOT));
-            if (in.getId() != null) inputIds.add(in.getId().toString().toLowerCase(Locale.ROOT));
-        }
-        inputNames.add("diesel");
-        inputNames.add("디젤");
-        inputNames.add("fuel");
-        inputNames.add("연료");
-
-        String modId = itemId != null ? itemId.getNamespace() : MOD_ID;
-        String outputSearchIndex = (String.join(" ", outputNames) + " " + String.join(" ", outputIds)).trim();
-        String inputSearchIndex = (String.join(" ", inputNames) + " " + String.join(" ", inputIds) + " " + displayName.toLowerCase(Locale.ROOT) + " kinetic stress units generator create diesel combustion su").trim();
-
-        List<ResourceLocation> inIdsList = new ArrayList<>();
-        for (IngredientStack in : node.getInputs()) {
-            if (in.getId() != null) inIdsList.add(in.getId());
-        }
-        List<ResourceLocation> outIdsList = new ArrayList<>();
-        for (IngredientStack out : node.getOutputs()) {
-            if (out.getId() != null) outIdsList.add(out.getId());
-        }
-        ResourceLocation[] inArr = inIdsList.isEmpty() ? null : inIdsList.toArray(new ResourceLocation[0]);
-        ResourceLocation[] outArr = outIdsList.isEmpty() ? null : outIdsList.toArray(new ResourceLocation[0]);
-        String[] inNamesArr = inputNames.isEmpty() ? null : inputNames.toArray(new String[0]);
-        String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
-
-        return new SearchableRecipe(
-                node,
-                displayName,
-                modId.intern(),
-                catId.intern(),
-                catName.intern(),
-                inputSearchIndex,
-                outputSearchIndex,
-                inArr,
-                outArr,
-                inNamesArr,
-                outNamesArr
-        );
-    }
-
-    public static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        if (!ModCompatHelper.isEmiLoaded()) return;
-        EmiCDGHelper.registerSyntheticEmiRecipes(emiRegistryObj, emiCategoryObj, activeRecipeItems);
-    }
-
-    private static class EmiCDGHelper {
-        private static void registerSyntheticEmiRecipes(Object emiRegistryObj, Object emiCategoryObj, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-            if (!(emiRegistryObj instanceof dev.emi.emi.api.EmiRegistry registry)) {
-                return;
-            }
-
-            var iconItem = ForgeRegistries.ITEMS.getValue(ITEM_DIESEL_ENGINE);
-            var iconStack = (iconItem != null && iconItem != net.minecraft.world.item.Items.AIR)
-                    ? dev.emi.emi.api.stack.EmiStack.of(iconItem)
-                    : dev.emi.emi.api.stack.EmiStack.of(net.minecraft.world.item.Items.FURNACE);
-            var category = new dev.emi.emi.api.recipe.EmiRecipeCategory(
-                    ResourceLocation.tryParse("gtcalcboard:createdieselgenerators_combustion"),
-                    iconStack
-            );
-            registry.addCategory(category);
-
-            ResourceLocation[] items = { ITEM_DIESEL_ENGINE, ITEM_MODULAR_DIESEL_ENGINE, ITEM_HUGE_DIESEL_ENGINE };
-            String[] defaultNames = { "Diesel Engine", "Modular Diesel Engine", "Huge Diesel Engine" };
-
-            for (int i = 0; i < items.length; i++) {
-                ResourceLocation itemId = items[i];
+            if (isRealModLoaded(MOD_ID) && ForgeRegistries.ITEMS != null) {
                 var item = ForgeRegistries.ITEMS.getValue(itemId);
                 if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
-
-                if (com.gtceu.calcboard.api.catalog.DynamicAddonCrawler.isItemDisabledOrHidden(
-                        item,
-                        (activeRecipeItems != null && !activeRecipeItems.isEmpty()) ? activeRecipeItems : null
-                )) {
-                    continue;
+                if (DynamicAddonCrawler.isItemDisabledOrHidden(item, null)) continue;
+                String hover = new ItemStack(item).getHoverName().getString();
+                if (hover != null && !hover.isEmpty()) {
+                    name = hover;
                 }
-
-                RecipeNode node = createKineticGeneratorNode(itemId, defaultNames[i]);
-                if (node == null) continue;
-
-                var stack = new ItemStack(item);
-                String name = stack.getHoverName().getString();
-                if (name == null || name.isEmpty()) name = defaultNames[i];
-
-                double amount = node.getBaseEUt();
-                List<IngredientStack> outStacks = new ArrayList<>();
-                outStacks.add(IngredientStack.stressUnit(amount));
-
-                final String finalName = name;
-                var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
-                        ResourceLocation.tryParse("gtcalcboard:kinetic_gen/" + itemId.getNamespace() + "/" + itemId.getPath()),
-                        category,
-                        itemId,
-                        name,
-                        20.0,
-                        amount,
-                        GTVoltageTier.LV,
-                        EnergyType.KINETIC_SU,
-                        true,
-                        node.getInputs(),
-                        outStacks,
-                        stack,
-                        () -> createKineticGeneratorNode(itemId, finalName)
-                );
-
-                registry.addWorkstation(category, dev.emi.emi.api.stack.EmiStack.of(stack));
-                registry.addRecipe(recipe);
             }
+
+            final String finalName = name;
+            RecipeNode templateNode = createKineticGeneratorNode(itemId, finalName);
+            if (templateNode == null) continue;
+
+            collector.add(com.gtceu.calcboard.api.catalog.NativeCatalogSearchHelper.createRecipe(
+                    templateNode,
+                    itemId,
+                    catId,
+                    catName,
+                    () -> createKineticGeneratorNode(itemId, finalName)
+            ));
+        }
+    }
+
+    private static boolean isRealModLoaded(String modId) {
+        try {
+            var list = net.minecraftforge.fml.ModList.get();
+            return list != null && list.isLoaded(modId);
+        } catch (Throwable t) {
+            return false;
         }
     }
 }

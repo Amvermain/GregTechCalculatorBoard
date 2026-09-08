@@ -29,6 +29,7 @@ public class RecipeNode {
     private String id;
     private String name;
     private ResourceLocation machineIcon;
+    private boolean hasCustomName = false;
 
     private double baseDurationTicks;
     private double baseEUt;
@@ -187,12 +188,20 @@ public class RecipeNode {
         return name != null ? name : "";
     }
 
+    public boolean hasCustomName() {
+        return hasCustomName;
+    }
+
+    public void setHasCustomName(boolean hasCustomName) {
+        this.hasCustomName = hasCustomName;
+    }
+
     public String getMachineDisplayName() {
+        if (machineIcon != null) {
+            return NodeWorkstationResolver.getWorkstationDisplayName(machineIcon);
+        }
         if (name != null && !name.isEmpty()) {
             return name;
-        }
-        if (machineIcon != null) {
-            return machineIcon.getPath();
         }
         return "Unknown Machine";
     }

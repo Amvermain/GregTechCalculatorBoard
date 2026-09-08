@@ -159,4 +159,50 @@ public final class NodeWorkstationResolver {
         String sanitized = base.toLowerCase(Locale.ROOT).trim().replace(" ", "_");
         return ResourceLocation.tryParse("gtceu:" + sanitized);
     }
+
+    public static String formatId(ResourceLocation id) {
+        if (id == null) return "";
+        String path = id.getPath();
+        StringBuilder sb = new StringBuilder();
+        for (String part : path.split("_")) {
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1)).append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    public static String getWorkstationDisplayName(ResourceLocation id) {
+        if (id == null) return "Unknown";
+        try {
+            String itemName = resolveItemDisplayName(id);
+            if (itemName != null) return itemName;
+            String blockName = resolveBlockDisplayName(id);
+            if (blockName != null) return blockName;
+        } catch (Throwable ignored) {}
+        return formatId(id);
+    }
+
+    private static String resolveItemDisplayName(ResourceLocation id) {
+        var reg = net.minecraftforge.registries.ForgeRegistries.ITEMS;
+        if (reg == null || reg.isEmpty()) return null;
+        var item = reg.getValue(id);
+        if (item == null || item == net.minecraft.world.item.Items.AIR) return null;
+        return sanitizeComponentString(item.getDescription());
+    }
+
+    private static String resolveBlockDisplayName(ResourceLocation id) {
+        var reg = net.minecraftforge.registries.ForgeRegistries.BLOCKS;
+        if (reg == null || reg.isEmpty()) return null;
+        var block = reg.getValue(id);
+        if (block == null || block.asItem() == net.minecraft.world.item.Items.AIR) return null;
+        return sanitizeComponentString(block.getName());
+    }
+
+    private static String sanitizeComponentString(net.minecraft.network.chat.Component component) {
+        if (component == null) return null;
+        String str = component.getString();
+        if (str.isEmpty() || str.startsWith("item.") || str.startsWith("block.")) return null;
+        return str;
+    }
 }

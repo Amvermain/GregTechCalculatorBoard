@@ -120,7 +120,10 @@ public record CategoryCapability(
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
             }
-            if (!isSteamMb && (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations(), node.getRecipeCategoryId()) || (def != null && def.supportsAbility("PARALLEL_HATCH")))) {
+            boolean supportsPar = mbId != null
+                    ? (MultiblockDetector.supportsParallelHatch(mbId) || (def != null && def.supportsAbility("PARALLEL_HATCH")))
+                    : MultiblockDetector.supportsParallelHatch(null, node.getAvailableWorkstations(), node.getRecipeCategoryId());
+            if (!isSteamMb && supportsPar) {
                 cats.add(AddonCategory.PARALLEL);
             }
             if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {

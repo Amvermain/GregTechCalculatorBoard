@@ -163,6 +163,10 @@ public class BoardActionHandler {
     }
 
     public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) {
+        switchMachineWorkstation(node, newWs, null);
+    }
+
+    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs, String newMachineDisplayName) {
         if (!screen.ensureEditPermission() || node == null || newWs == null) return;
         if (Objects.equals(node.getMachineIcon(), newWs)) return;
 
@@ -171,16 +175,43 @@ public class BoardActionHandler {
         int oldPar = node.getParallel();
         SteamMode oldSteam = node.getSteamMode();
         GTVoltageTier oldTier = node.getTargetTier();
+        String oldName = node.getName();
 
         node.setMachineIcon(newWs);
         TutorialManager.getInstance().onMachineSwitched(node, newWs);
 
-        screen.recordCommand(new BoardCommand.SetMachineIconCommand(node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier));
+        String machineDisplayName = (newMachineDisplayName != null && !newMachineDisplayName.isBlank())
+                ? newMachineDisplayName
+                : com.gtceu.calcboard.api.model.NodeWorkstationResolver.getWorkstationDisplayName(newWs);
+
+        String newName = oldName;
+        if (!node.hasCustomName()) {
+            newName = computeSwitchedNodeName(oldName, machineDisplayName);
+            node.setName(newName);
+        }
+
+        screen.recordCommand(new BoardCommand.SetMachineIconCommand(
+                node, oldIcon, newWs, oldMb, oldPar, oldSteam, oldTier, oldName, newName
+        ));
         screen.markSummaryDirty();
         screen.rebuildWidgets();
 
-        String machineName = node.getMachineDisplayName();
-        BoardToast.show(Component.literal("§b▦ ").append(Component.translatable("message.gtcalcboard.machine_switched", machineName)));
+        BoardToast.show(Component.literal("§b▦ ").append(Component.translatable("message.gtcalcboard.machine_switched", machineDisplayName)));
+    }
+
+    public static String computeSwitchedNodeName(String oldName, String newMachineName) {
+        if (newMachineName == null || newMachineName.isBlank()) {
+            return oldName != null ? oldName : "";
+        }
+        if (oldName == null || oldName.isBlank()) {
+            return newMachineName;
+        }
+        int parenIdx = oldName.indexOf(" (");
+        if (parenIdx >= 0 && oldName.endsWith(")")) {
+            String suffix = oldName.substring(parenIdx);
+            return newMachineName + suffix;
+        }
+        return newMachineName;
     }
 
     public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) {

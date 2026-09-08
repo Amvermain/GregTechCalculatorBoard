@@ -121,6 +121,10 @@ public final class GTCombustionHelper {
         return icon != null && SINGLEBLOCK_COMBUSTION_GENERATORS.contains(icon);
     }
 
+    public static boolean isCombustionMachine(ResourceLocation icon) {
+        return isCombustionEngine(icon) || isSingleblockCombustionGenerator(icon);
+    }
+
     public static boolean isCombustionEngine(ResourceLocation icon) {
         return icon != null && COMBUSTION_ENGINES.contains(icon);
     }
@@ -506,7 +510,7 @@ public final class GTCombustionHelper {
     }
 
     public static void syncCombustionInputs(RecipeNode node) {
-        if (node == null) {
+        if (node == null || !isCombustionFamily(node)) {
             return;
         }
         removeCombustionAuxiliaryInputs(node);
@@ -535,7 +539,8 @@ public final class GTCombustionHelper {
         node.markOverclockDirty();
     }
 
-    private static void removeCombustionAuxiliaryInputs(RecipeNode node) {
+    public static void removeCombustionAuxiliaryInputs(RecipeNode node) {
+        if (node == null) return;
         node.getInputs().removeIf(in -> in.isFluid() && in.getId() != null && COMBUSTION_AUXILIARY_FLUIDS.contains(in.getId()));
     }
 

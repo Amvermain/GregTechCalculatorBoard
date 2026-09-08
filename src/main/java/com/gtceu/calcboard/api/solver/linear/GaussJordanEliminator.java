@@ -52,6 +52,10 @@ public final class GaussJordanEliminator {
         int pivotRow = 0;
         int[] pivotColToRow = new int[colCount];
         Arrays.fill(pivotColToRow, -1);
+        int[] rowMapping = new int[rowCount];
+        for (int i = 0; i < rowCount; i++) {
+            rowMapping[i] = i;
+        }
 
         for (int col = 0; col < colCount && pivotRow < rowCount; col++) {
             int maxRow = findMaxPivotRow(augmented, pivotRow, rowCount, col);
@@ -59,7 +63,7 @@ public final class GaussJordanEliminator {
                 continue;
             }
 
-            swapRows(augmented, pivotRow, maxRow);
+            swapRows(augmented, rowMapping, pivotRow, maxRow);
             normalizePivotRow(augmented, pivotRow, colCount, col);
             eliminateOtherRows(augmented, pivotRow, rowCount, colCount, col);
 
@@ -67,14 +71,17 @@ public final class GaussJordanEliminator {
             pivotRow++;
         }
 
-        if (hasContradictoryRow(augmented, rowCount, colCount, allowSurplus)) {
-            return Solution.infeasible(findFirstContradictoryRow(augmented, rowCount, colCount, allowSurplus));
+        int contradictionRow = findFirstContradictoryRow(augmented, rowCount, colCount, allowSurplus);
+        if (contradictionRow >= 0) {
+            return Solution.infeasible(rowMapping[contradictionRow]);
+        }
+
+        int negPivotRow = findFirstNegativePivotRow(augmented, pivotColToRow, colCount);
+        if (negPivotRow >= 0) {
+            return Solution.infeasible(rowMapping[negPivotRow]);
         }
 
         double[] result = extractSolutionValues(augmented, pivotColToRow, colCount);
-        if (hasNegativeValues(result)) {
-            return Solution.infeasible(-1);
-        }
 
         if (hasUnboundVariables(pivotColToRow)) {
             return Solution.underDetermined(result);
@@ -105,11 +112,14 @@ public final class GaussJordanEliminator {
         return maxRow;
     }
 
-    private static void swapRows(double[][] augmented, int r1, int r2) {
+    private static void swapRows(double[][] augmented, int[] rowMapping, int r1, int r2) {
         if (r1 == r2) return;
         double[] temp = augmented[r1];
         augmented[r1] = augmented[r2];
         augmented[r2] = temp;
+        int tempMap = rowMapping[r1];
+        rowMapping[r1] = rowMapping[r2];
+        rowMapping[r2] = tempMap;
     }
 
     private static void normalizePivotRow(double[][] augmented, int pivotRow, int colCount, int col) {
@@ -172,12 +182,14 @@ public final class GaussJordanEliminator {
         return result;
     }
 
-    private static boolean hasNegativeValues(double[] values) {
-        if (values == null) return false;
-        for (double v : values) {
-            if (v < -EPSILON) return true;
+    private static int findFirstNegativePivotRow(double[][] augmented, int[] pivotColToRow, int colCount) {
+        for (int c = 0; c < colCount; c++) {
+            int r = pivotColToRow[c];
+            if (r >= 0 && augmented[r][colCount] < -EPSILON) {
+                return r;
+            }
         }
-        return false;
+        return -1;
     }
 
     private static boolean hasUnboundVariables(int[] pivotColToRow) {

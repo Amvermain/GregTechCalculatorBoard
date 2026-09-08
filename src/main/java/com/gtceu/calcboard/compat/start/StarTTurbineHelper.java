@@ -21,6 +21,11 @@ public class StarTTurbineHelper {
         return NYINSANE_PLASMA_TURBINE_ID.equals(icon) || GTCEU_NYINSANE_PLASMA_TURBINE_ID.equals(icon);
     }
 
+    public static boolean isPlasmaTurbineIcon(ResourceLocation icon) {
+        if (icon == null) return false;
+        return isSptIcon(icon) || isNptIcon(icon);
+    }
+
     public static boolean isStarTTurbine(RecipeNode node) {
         if (node == null) return false;
         GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);
@@ -105,11 +110,14 @@ public class StarTTurbineHelper {
         return STAR_T_BOOSTER_FLUIDS.contains(in.getId());
     }
 
-    public static void syncBoosterInputs(RecipeNode node) {
+    public static void removeBoosterInputs(RecipeNode node) {
         if (node == null) return;
         node.getInputs().removeIf(StarTTurbineHelper::isBoosterFluid);
+    }
 
-        if (!supportsBoost(node)) return;
+    public static void syncBoosterInputs(RecipeNode node) {
+        if (node == null || !supportsBoost(node)) return;
+        removeBoosterInputs(node);
 
         GTPlasmaTurbineModel model = GTPlasmaTurbineModel.getModel(node);
         boolean lub = Boolean.TRUE.equals(node.getProperties().get(GTCEuProperties.LUBRICANT_BOOST));

@@ -328,7 +328,13 @@ public class BoardSettingsDialog implements IBoardModal {
         drawButton(graphics, font, powerBtnTxt, btnX, rowY, btnW, 20, mouseX, mouseY, 0xFFFFCC66, 0xFF222834, 0xFF35445E);
         rowY += 26;
 
-        // 4. Singleplayer Pause Toggle
+        // 4. Preserve Unit Preferences Toggle
+        drawCheckbox(graphics, font, x, rowY, w, 22, mouseX, mouseY,
+                Component.translatable("gui.gtcalcboard.settings.preserve_units").getString(),
+                ClientPreferenceManager.getInstance().isPreserveUnitPreferences());
+        rowY += 24;
+
+        // 5. Singleplayer Pause Toggle
         Minecraft mc = Minecraft.getInstance();
         if (mc.hasSingleplayerServer()) {
             drawCheckbox(graphics, font, x, rowY, w, 22, mouseX, mouseY,
@@ -758,7 +764,20 @@ public class BoardSettingsDialog implements IBoardModal {
         }
         rowY += 26;
 
-        // 4. Singleplayer Pause
+        // 4. Preserve Unit Preferences
+        if (isInsideRow(mouseX, mouseY, x, rowY, w, 22)) {
+            boolean cur = ClientPreferenceManager.getInstance().isPreserveUnitPreferences();
+            ClientPreferenceManager.getInstance().setPreserveUnitPreferences(!cur);
+            if (!cur) {
+                ClientPreferenceManager.getInstance().onTimeUnitChanged(bm.getTimeUnit());
+                ClientPreferenceManager.getInstance().onFluidUnitModeChanged(bm.getFluidUnitMode());
+            }
+            onSettingsChanged();
+            return;
+        }
+        rowY += 24;
+
+        // 5. Singleplayer Pause
         Minecraft mc = Minecraft.getInstance();
         if (mc.hasSingleplayerServer() && isInsideRow(mouseX, mouseY, x, rowY, w, 22)) {
             bm.setPauseGameInSingleplayer(!bm.isPauseGameInSingleplayer());

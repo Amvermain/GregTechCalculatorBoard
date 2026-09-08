@@ -2,12 +2,10 @@ package com.gtceu.calcboard.compat.create;
 
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
-import com.gtceu.calcboard.api.type.PowerDisplayMode;
-
-import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.compat.IModAdapter;
 import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
@@ -19,6 +17,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
 
+import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -27,12 +27,13 @@ import java.util.Set;
 /**
  * Mod Adapter facade for Create kinetic generators and processing machinery.
  */
-public class CreateModAdapter extends AbstractKineticModAdapter {
+public class CreateModAdapter extends AbstractKineticModAdapter implements IHardwareAddonProvider {
 
     private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
             IEnergySimulationProvider.class,
             ICompoundRecipeProvider.class,
-            ICapabilityMatrixProvider.class
+            ICapabilityMatrixProvider.class,
+            IHardwareAddonProvider.class
     );
 
     @Override
@@ -45,6 +46,12 @@ public class CreateModAdapter extends AbstractKineticModAdapter {
 
     static {
         CreateProperties.init();
+        com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(
+                com.gtceu.calcboard.api.catalog.AddonCategory.HEATER,
+                (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                        id, name, desc, icon, (id != null && id.contains("superheated")) ? 2 : 1
+                )
+        );
     }
 
     @Override
@@ -121,8 +128,70 @@ public class CreateModAdapter extends AbstractKineticModAdapter {
     }
 
     @Override
-    public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        CreateRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
+    public boolean supportsAddons(RecipeNode node) {
+        return CreateProperties.isCreateBoiler(node);
+    }
+
+    @Override
+    public List<com.gtceu.calcboard.api.catalog.AddonCategory> getApplicableAddonCategories(RecipeNode node) {
+        if (CreateProperties.isCreateBoiler(node)) {
+            return List.of(com.gtceu.calcboard.api.catalog.AddonCategory.HEATER, com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM);
+        }
+        return List.of();
+    }
+
+    @Override
+    public void discoverAddons(List<com.gtceu.calcboard.api.catalog.MachineAddon> collector, List<ItemStack> recipeOutputStacks) {
+        collector.add(new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                "create:blaze_burner_heated",
+                "gui.gtcalcboard.addon.create_heater",
+                "gui.gtcalcboard.addon.create_heater_desc",
+                ResourceLocation.tryParse("create:blaze_burner"),
+                1
+        ));
+        collector.add(new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                "create:blaze_burner_superheated",
+                "gui.gtcalcboard.addon.create_superheated_heater",
+                "gui.gtcalcboard.addon.create_superheated_heater_desc",
+                ResourceLocation.tryParse("create:blaze_burner"),
+                2
+        ));
+    }
+
+    @Override
+    public boolean isAddonCompatible(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (node == null || addon == null) return false;
+        if (addon.getCategory().equals(com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM)) return true;
+        return CreateProperties.isCreateBoiler(node) && addon.getCategory().equals(com.gtceu.calcboard.api.catalog.AddonCategory.HEATER);
+    }
+
+    @Override
+    public boolean canInstallAddon(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (!isAddonCompatible(node, addon)) return false;
+        if (addon instanceof com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon heater) {
+            long currentBurners = node.getAddons().stream().filter(a -> a instanceof com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon).count();
+            if (currentBurners >= 9) return false;
+            int currentHeat = CreateProperties.calculateTotalHeatFromAddons(node);
+            return currentHeat + heater.getHeatLevel() <= 18;
+        }
+        return true;
+    }
+
+    @Override
+    public void onAddonInstalled(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (node == null || addon == null) return;
+        node.getAddons().add(addon);
+        int totalHeat = CreateProperties.calculateTotalHeatFromAddons(node);
+        CreateProperties.setBoilerHeat(node, totalHeat);
+        node.markOverclockDirty();
+    }
+
+    @Override
+    public void onAddonRemoved(RecipeNode node, com.gtceu.calcboard.api.catalog.MachineAddon addon) {
+        if (node == null || addon == null) return;
+        int totalHeat = CreateProperties.calculateTotalHeatFromAddons(node);
+        CreateProperties.setBoilerHeat(node, totalHeat);
+        node.markOverclockDirty();
     }
 
     public static RecipeNode createKineticGeneratorNode(ItemStack stack) {
@@ -145,11 +214,9 @@ public class CreateModAdapter extends AbstractKineticModAdapter {
         return com.gtceu.calcboard.compat.createdieselgenerators.CDGRecipeHandler.createKineticGeneratorNode(itemId, displayName);
     }
 
-    public static List<SearchableRecipe> getVirtualKineticSearchRecipes() {
-        List<SearchableRecipe> list = new ArrayList<>(CreateRecipeHandler.getVirtualKineticSearchRecipes());
-        list.addAll(com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler.getVirtualSearchRecipes());
-        list.addAll(com.gtceu.calcboard.compat.createdieselgenerators.CDGRecipeHandler.getVirtualKineticSearchRecipes());
-        return list;
+    @Override
+    public void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        CreateRecipeHandler.collectNativeCatalogRecipes(collector);
     }
 }
 

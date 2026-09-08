@@ -106,7 +106,6 @@ public final class GlobalBalanceAggregator {
             }
         }
 
-        // 5. Compute global net balances (Produced - Consumed)
         Map<IngredientStack, Double> rawInputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> netOutputs = new LinkedHashMap<>();
         Map<IngredientStack, Double> fullyBalanced = new LinkedHashMap<>();

@@ -574,13 +574,19 @@ public class MultiblockDetector {
         return false;
     }
 
+    public static boolean supportsParallelHatch(ResourceLocation controllerId) {
+        return supportsParallelHatch(controllerId, null, null);
+    }
+
     public static boolean supportsParallelHatch(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
         return supportsParallelHatch(machineIcon, availableWorkstations, null);
     }
 
     public static boolean supportsParallelHatch(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations, ResourceLocation categoryId) {
         ensureInitialized();
-        if (checkParallelHatch(machineIcon)) return true;
+        if (machineIcon != null) {
+            return checkParallelHatch(machineIcon);
+        }
         if (availableWorkstations != null) {
             for (ResourceLocation ws : availableWorkstations) {
                 if (checkParallelHatch(ws)) return true;
@@ -613,7 +619,9 @@ public class MultiblockDetector {
 
     public static boolean supportsBatchMode(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
         ensureInitialized();
-        if (checkBatchMode(machineIcon)) return true;
+        if (machineIcon != null) {
+            return checkBatchMode(machineIcon);
+        }
         if (availableWorkstations != null) {
             for (ResourceLocation ws : availableWorkstations) {
                 if (checkBatchMode(ws)) return true;
@@ -850,8 +858,14 @@ public class MultiblockDetector {
         }
         if (def != null && def.supportsAbility("ROTOR_HOLDER")) {
             if (!isCoilMultiblock(workstationId)) {
-                registerTurbine(workstationId, null, null, 0.0);
-                return true;
+                Object gtDef = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
+                if (gtDef == null && alias != null) {
+                    gtDef = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(alias);
+                }
+                if (gtDef != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.hasTurbineSignature(gtDef)) {
+                    registerTurbine(workstationId, null, null, 0.0);
+                    return true;
+                }
             }
         }
 

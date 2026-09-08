@@ -112,4 +112,103 @@ public class MultiblockEnergyParallelOverclockTest {
         Assertions.assertEquals(1.25, node.getEffectiveDurationSeconds(), 1e-4, "Duration should be quartered (1.25s)");
         Assertions.assertEquals(1920.0, node.getSingleMachineEUt(), 1e-4, "Total consumption must be 1,920 EU/t");
     }
+
+    @Test
+    public void testLVRecipeInLVMultiblockWith2AEnergyHatchDoesNotParallel() {
+        ResourceLocation machineId = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        RecipeNode node = RecipeNode.create(machineId, "Ammonia Borane Dust", 80.0, 30.0, GTVoltageTier.LV);
+        node.setMultiblock(true);
+        node.setTargetTier(GTVoltageTier.LV);
+
+        // Install 4x parallel hatch
+        ResourceLocation parHatchId = ResourceLocation.tryParse("gtceu:ev_parallel_hatch");
+        GTParallelHatchAddon parHatch = new GTParallelHatchAddon(
+                parHatchId.toString(), "EV Parallel Hatch", "4x Parallel", parHatchId, 4, false
+        );
+        node.getAddons().add(parHatch);
+
+        // Install standard 2A LV Energy Hatch (2A * 32V = 64 EU/t buffer, but 1A overclock voltage = 32V)
+        ResourceLocation energyHatchId = ResourceLocation.tryParse("gtceu:lv_energy_input_hatch");
+        GTEnergyHatchAddon energyHatch = new GTEnergyHatchAddon(
+                energyHatchId.toString(), "LV Energy Hatch", "2A LV", energyHatchId,
+                GTVoltageTier.LV, 2, false, false, false
+        );
+        node.getAddons().add(energyHatch);
+        node.markOverclockDirty();
+
+        // 32V / 30 EU/t = 1 parallel. Even though hatch buffer is 64 EU/t, GTCEu multiblock operates on 1A voltage (32V).
+        Assertions.assertEquals(1, node.getTotalParallel(), "30 EU/t recipe must not parallel on 1A LV voltage");
+        Assertions.assertEquals(1, GTPowerCalculator.getMaxParallelCapacity(node), "Max parallel capacity must be 1");
+        Assertions.assertEquals(30.0, node.getSingleMachineEUt(), 1e-4, "Power consumption must remain 30.0 EU/t");
+        Assertions.assertEquals(4.0, node.getEffectiveDurationSeconds(), 1e-4, "Duration must remain 4.0s");
+    }
+
+    @Test
+    public void testLVRecipeInLVMultiblockWith4AEnergyHatchAllows4xParallel() {
+        ResourceLocation machineId = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        RecipeNode node = RecipeNode.create(machineId, "Ammonia Borane Dust", 80.0, 30.0, GTVoltageTier.LV);
+        node.setMultiblock(true);
+        node.setTargetTier(GTVoltageTier.LV);
+
+        // Install 4x parallel hatch
+        ResourceLocation parHatchId = ResourceLocation.tryParse("gtceu:ev_parallel_hatch");
+        GTParallelHatchAddon parHatch = new GTParallelHatchAddon(
+                parHatchId.toString(), "EV Parallel Hatch", "4x Parallel", parHatchId, 4, false
+        );
+        node.getAddons().add(parHatch);
+
+        // Install 4A LV Energy Hatch (4A power-of-4 elevates overclock voltage to 1A MV = 128V)
+        ResourceLocation energyHatchId = ResourceLocation.tryParse("gtceu:lv_energy_input_hatch_4a");
+        GTEnergyHatchAddon energyHatch = new GTEnergyHatchAddon(
+                energyHatchId.toString(), "4A LV Energy Hatch", "4A LV", energyHatchId,
+                GTVoltageTier.LV, 4, false, false, false
+        );
+        node.getAddons().add(energyHatch);
+        node.markOverclockDirty();
+
+        // 128V / 30 EU/t = 4 parallels
+        Assertions.assertEquals(4, node.getTotalParallel(), "4A hatch provides 128V effective overclock voltage for 4x parallel");
+        Assertions.assertEquals(4, GTPowerCalculator.getMaxParallelCapacity(node), "Max parallel capacity must be 4");
+        Assertions.assertEquals(120.0, node.getSingleMachineEUt(), 1e-4, "Total consumption must be 120.0 EU/t");
+    }
+
+    @Test
+    public void testEnergyDiscountDoesNotIncreaseParallelAmount() {
+        ResourceLocation machineId = ResourceLocation.tryParse("gtceu:large_chemical_reactor");
+        // Recipe consuming 500 EU/t (HV tier, 512V)
+        RecipeNode node = RecipeNode.create(machineId, "HV Recipe with Coil Discount", 100.0, 500.0, GTVoltageTier.HV);
+        node.setMultiblock(true);
+        node.setTargetTier(GTVoltageTier.HV);
+
+        // Install 4x parallel hatch
+        ResourceLocation parHatchId = ResourceLocation.tryParse("gtceu:ev_parallel_hatch");
+        GTParallelHatchAddon parHatch = new GTParallelHatchAddon(
+                parHatchId.toString(), "EV Parallel Hatch", "4x Parallel", parHatchId, 4, false
+        );
+        node.getAddons().add(parHatch);
+
+        // Install standard 2A HV Energy Hatch (2A * 512V buffer, but 1A overclock voltage = 512V)
+        ResourceLocation energyHatchId = ResourceLocation.tryParse("gtceu:hv_energy_input_hatch");
+        GTEnergyHatchAddon energyHatch = new GTEnergyHatchAddon(
+                energyHatchId.toString(), "HV Energy Hatch", "2A HV", energyHatchId,
+                GTVoltageTier.HV, 2, false, false, false
+        );
+        node.getAddons().add(energyHatch);
+
+        // Install custom addon with 50% EU/t discount (simulating coil discount)
+        com.gtceu.calcboard.api.catalog.MachineAddon coilAddon = new com.gtceu.calcboard.api.catalog.MachineAddon(
+                "custom:discount_coil", "Super Coil", com.gtceu.calcboard.api.catalog.MachineAddon.Category.COIL,
+                "50% EU/t discount", ResourceLocation.tryParse("minecraft:iron_block")
+        );
+        coilAddon.setEutMultiplier(0.5);
+        node.getAddons().add(coilAddon);
+        node.markOverclockDirty();
+
+        // Without discount: 512V / 500 EU/t = 1 parallel.
+        // If discount were applied before parallel: 512V / 250 EU/t = 2 parallels (INCORRECT).
+        // GTCEu runs PARALLEL_HATCH before discount, so parallels must remain 1.
+        Assertions.assertEquals(1, node.getTotalParallel(), "Parallel must be calculated BEFORE coil discounts");
+        Assertions.assertEquals(1, GTPowerCalculator.getMaxParallelCapacity(node), "Max parallel capacity must remain 1");
+        Assertions.assertEquals(250.0, node.getSingleMachineEUt(), 1e-4, "Total power must reflect 50% discount on single parallel: 250 EU/t");
+    }
 }

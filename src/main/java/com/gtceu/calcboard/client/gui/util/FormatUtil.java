@@ -40,6 +40,9 @@ public final class FormatUtil {
             try {
                 BoardManager.getInstance().setTimeUnit(unit);
             } catch (Throwable ignored) {}
+            try {
+                com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().onTimeUnitChanged(unit);
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -57,6 +60,9 @@ public final class FormatUtil {
             try {
                 BoardManager.getInstance().setFluidUnitMode(mode);
             } catch (Throwable ignored) {}
+            try {
+                com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().onFluidUnitModeChanged(mode);
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -72,26 +78,27 @@ public final class FormatUtil {
      * Formats ingredient rates (fluid in B/s, mB/s or item in /s) with SI units and active time unit.
      */
     public static String formatRate(double rate, IngredientStack stack) {
-        if (activeTimeUnit.isRecipeBatchMode()) {
-            return formatRecipeBatchAmount(rate, stack);
-        }
         if (stack != null && stack.isStressUnit()) {
-            double scaledRate = rate * activeTimeUnit.getFactor();
-            String suffix = activeTimeUnit.getSuffix();
-            return formatCompactNumber(scaledRate) + " SU" + suffix;
+            return formatCompactNumber(rate) + " SU";
+        }
+        RateTimeUnit timeUnit = getActiveTimeUnit();
+        if (timeUnit.isRecipeBatchMode()) {
+            return formatRecipeBatchAmount(rate, stack);
         }
         return formatRate(rate, stack != null && stack.isFluid());
     }
 
     public static String formatRate(double rate, boolean isFluid) {
-        if (activeTimeUnit.isRecipeBatchMode()) {
+        RateTimeUnit timeUnit = getActiveTimeUnit();
+        if (timeUnit.isRecipeBatchMode()) {
             return formatRecipeBatchAmount(rate, isFluid);
         }
-        double scaledRate = rate * activeTimeUnit.getFactor();
-        String suffix = activeTimeUnit.getSuffix();
+        double scaledRate = rate * timeUnit.getFactor();
+        String suffix = timeUnit.getSuffix();
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
         if (scaledRate == 0.0) {
             if (isFluid) {
-                return (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) ? ("0 B" + suffix) : ("0 mB" + suffix);
+                return (fluidMode == FluidUnitMode.ALWAYS_B) ? ("0 B" + suffix) : ("0 mB" + suffix);
             } else {
                 return "0" + suffix;
             }
@@ -99,7 +106,7 @@ public final class FormatUtil {
         double abs = Math.abs(scaledRate);
 
         if (isFluid) {
-            if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+            if (fluidMode == FluidUnitMode.ALWAYS_MB) {
                 if (abs >= 10_000.0) {
                     return formatCompactNumber(scaledRate) + " mB" + suffix;
                 } else if (abs >= 100.0) {
@@ -113,7 +120,7 @@ public final class FormatUtil {
                 } else {
                     return formatCompactNumber(scaledRate) + " mB" + suffix;
                 }
-            } else if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+            } else if (fluidMode == FluidUnitMode.ALWAYS_B) {
                 double scaledB = scaledRate / 1000.0;
                 double absB = Math.abs(scaledB);
                 if (absB >= 10_000.0) {
@@ -198,12 +205,9 @@ public final class FormatUtil {
 
     public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit, boolean isBuffered, boolean isThrottled) {
         if (stack != null && stack.isStressUnit()) {
-            double scaledSup = supplied * activeTimeUnit.getFactor();
-            double scaledReq = required * activeTimeUnit.getFactor();
-            String suffix = activeTimeUnit.getSuffix();
-            String unit = " SU" + suffix;
-            String supStr = formatCompactNumber(scaledSup);
-            String reqStr = formatCompactNumber(scaledReq);
+            String unit = " SU";
+            String supStr = formatCompactNumber(supplied);
+            String reqStr = formatCompactNumber(required);
             if (isDeficit) {
                 return isBuffered
                         ? "§6+" + supStr + " §7-" + reqStr + unit + " §e⏳"
@@ -226,19 +230,21 @@ public final class FormatUtil {
     }
 
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit, boolean isBuffered, boolean isThrottled) {
-        double scaledSup = supplied * activeTimeUnit.getFactor();
-        double scaledReq = required * activeTimeUnit.getFactor();
-        String suffix = activeTimeUnit.getSuffix();
+        RateTimeUnit timeUnit = getActiveTimeUnit();
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
+        double scaledSup = supplied * timeUnit.getFactor();
+        double scaledReq = required * timeUnit.getFactor();
+        String suffix = timeUnit.getSuffix();
         String unit;
         String supStr;
         String reqStr;
 
         if (isFluid) {
-            if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+            if (fluidMode == FluidUnitMode.ALWAYS_MB) {
                 unit = " mB" + suffix;
                 supStr = formatCompactNumber(scaledSup);
                 reqStr = formatCompactNumber(scaledReq);
-            } else if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+            } else if (fluidMode == FluidUnitMode.ALWAYS_B) {
                 unit = " B" + suffix;
                 supStr = formatCompactNumber(scaledSup / 1000.0);
                 reqStr = formatCompactNumber(scaledReq / 1000.0);
@@ -271,12 +277,9 @@ public final class FormatUtil {
 
     public static String formatConnectedOutput(double produced, double demanded, IngredientStack stack, boolean isDeficit) {
         if (stack != null && stack.isStressUnit()) {
-            double scaledProd = produced * activeTimeUnit.getFactor();
-            double scaledDem = demanded * activeTimeUnit.getFactor();
-            String suffix = activeTimeUnit.getSuffix();
-            String unit = " SU" + suffix;
-            String prodStr = formatCompactNumber(scaledProd);
-            String demStr = formatCompactNumber(scaledDem);
+            String unit = " SU";
+            String prodStr = formatCompactNumber(produced);
+            String demStr = formatCompactNumber(demanded);
             if (isDeficit) {
                 return "§a+" + prodStr + " §c-" + demStr + unit + " §c⚠";
             } else {
@@ -287,19 +290,21 @@ public final class FormatUtil {
     }
 
     public static String formatConnectedOutput(double produced, double demanded, boolean isFluid, boolean isDeficit) {
-        double scaledProd = produced * activeTimeUnit.getFactor();
-        double scaledDem = demanded * activeTimeUnit.getFactor();
-        String suffix = activeTimeUnit.getSuffix();
+        RateTimeUnit timeUnit = getActiveTimeUnit();
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
+        double scaledProd = produced * timeUnit.getFactor();
+        double scaledDem = demanded * timeUnit.getFactor();
+        String suffix = timeUnit.getSuffix();
         String unit;
         String prodStr;
         String demStr;
 
         if (isFluid) {
-            if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+            if (fluidMode == FluidUnitMode.ALWAYS_MB) {
                 unit = " mB" + suffix;
                 prodStr = formatCompactNumber(scaledProd);
                 demStr = formatCompactNumber(scaledDem);
-            } else if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+            } else if (fluidMode == FluidUnitMode.ALWAYS_B) {
                 unit = " B" + suffix;
                 prodStr = formatCompactNumber(scaledProd / 1000.0);
                 demStr = formatCompactNumber(scaledDem / 1000.0);
@@ -335,9 +340,10 @@ public final class FormatUtil {
     }
 
     public static String formatRecipeBatchAmount(double rawAmount, boolean isFluid) {
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
         if (rawAmount == 0.0) {
             if (isFluid) {
-                return (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) ? "0 B" : "0 mB";
+                return (fluidMode == FluidUnitMode.ALWAYS_B) ? "0 B" : "0 mB";
             }
             return "0";
         }
@@ -349,13 +355,14 @@ public final class FormatUtil {
     }
 
     private static String formatFluidBatch(double rawAmount, double abs) {
-        if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
+        if (fluidMode == FluidUnitMode.ALWAYS_MB) {
             if (abs >= 10_000.0) {
                 return formatCompactNumber(rawAmount) + " mB";
             }
             return formatWithTrimmedZeros(rawAmount, selectBatchDecimals(abs), " mB", "");
         }
-        if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+        if (fluidMode == FluidUnitMode.ALWAYS_B) {
             double bVal = rawAmount / 1000.0;
             double absB = Math.abs(bVal);
             if (absB >= 10_000.0) {
@@ -433,19 +440,35 @@ public final class FormatUtil {
         return NumberFormatUtil.formatAmps(amps, tier);
     }
 
+    public static String formatExactRate(double rate, IngredientStack stack) {
+        if (stack != null && stack.isStressUnit()) {
+            return formatExactStress(rate);
+        }
+        return formatExactRate(rate, stack != null && stack.isFluid());
+    }
+
+    public static String formatExactStress(double rate) {
+        if (Math.abs(rate - Math.round(rate)) < 0.0001) {
+            return String.format(Locale.ROOT, "%,.0f SU", rate);
+        }
+        return String.format(Locale.ROOT, "%,.2f SU", rate).replaceAll("\\.?0+ SU", " SU");
+    }
+
     /**
      * Formats an exact raw rate with thousand separators (e.g. "1,080,000.00 B/s" or "3,200,000/s").
      */
     public static String formatExactRate(double rate, boolean isFluid) {
-        if (activeTimeUnit.isRecipeBatchMode()) {
+        RateTimeUnit timeUnit = getActiveTimeUnit();
+        if (timeUnit.isRecipeBatchMode()) {
             return formatExactBatchAmount(rate, isFluid);
         }
-        double scaled = rate * activeTimeUnit.getFactor();
-        String suffix = activeTimeUnit.getSuffix();
+        double scaled = rate * timeUnit.getFactor();
+        String suffix = timeUnit.getSuffix();
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
         if (isFluid) {
-            if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+            if (fluidMode == FluidUnitMode.ALWAYS_MB) {
                 return String.format(Locale.ROOT, "%,.2f mB%s", scaled, suffix);
-            } else if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+            } else if (fluidMode == FluidUnitMode.ALWAYS_B) {
                 return String.format(Locale.ROOT, "%,.4f B%s", scaled / 1000.0, suffix).replaceAll("\\.?0+ B" + suffix, " B" + suffix);
             } else {
                 double abs = Math.abs(scaled);
@@ -463,9 +486,10 @@ public final class FormatUtil {
     }
 
     public static String formatExactBatchAmount(double rawAmount, boolean isFluid) {
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
         if (rawAmount == 0.0) {
             if (isFluid) {
-                return (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) ? "0 B" : "0 mB";
+                return (fluidMode == FluidUnitMode.ALWAYS_B) ? "0 B" : "0 mB";
             }
             return "0";
         }
@@ -477,13 +501,14 @@ public final class FormatUtil {
     }
 
     private static String formatExactFluidBatch(double rawAmount, double abs) {
-        if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
+        if (fluidMode == FluidUnitMode.ALWAYS_MB) {
             if (Math.abs(rawAmount - Math.round(rawAmount)) < 0.0001) {
                 return String.format(Locale.ROOT, "%,.0f mB", rawAmount);
             }
             return String.format(Locale.ROOT, "%,.2f mB", rawAmount);
         }
-        if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+        if (fluidMode == FluidUnitMode.ALWAYS_B) {
             double bVal = rawAmount / 1000.0;
             if (Math.abs(bVal - Math.round(bVal)) < 0.0001) {
                 return String.format(Locale.ROOT, "%,.0f B", bVal);
@@ -566,10 +591,11 @@ public final class FormatUtil {
      */
     public static String formatBatchAmount(double amount, boolean isFluid) {
         if (amount <= 0.0) return "0";
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
         if (isFluid) {
-            if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+            if (fluidMode == FluidUnitMode.ALWAYS_MB) {
                 return formatCompactNumber(amount) + " mB";
-            } else if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+            } else if (fluidMode == FluidUnitMode.ALWAYS_B) {
                 return formatCompactNumber(amount / 1000.0) + " B";
             } else if (amount >= 1000.0) {
                 return formatCompactNumber(amount / 1000.0) + " B";
@@ -663,16 +689,17 @@ public final class FormatUtil {
      * Formats an amount into an editable string representation for input fields.
      */
     public static String formatEditAmount(double amount, boolean isFluid) {
+        FluidUnitMode fluidMode = getActiveFluidUnitMode();
         if (amount <= 0.0) {
             if (isFluid) {
-                return (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) ? "10000mB" : "10B";
+                return (fluidMode == FluidUnitMode.ALWAYS_MB) ? "10000mB" : "10B";
             }
             return "100";
         }
         if (isFluid) {
-            if (activeFluidUnitMode == FluidUnitMode.ALWAYS_MB) {
+            if (fluidMode == FluidUnitMode.ALWAYS_MB) {
                 return formatCleanNumber(amount) + "mB";
-            } else if (activeFluidUnitMode == FluidUnitMode.ALWAYS_B) {
+            } else if (fluidMode == FluidUnitMode.ALWAYS_B) {
                 return formatCleanNumber(amount / 1000.0) + "B";
             } else if (amount >= 1000.0) {
                 double buckets = amount / 1000.0;

@@ -6,6 +6,28 @@
 
 ## [Unreleased]
 
+### Added
+- Added sail count (8–128) configuration for the Create Windmill Bearing in the machine setup menu, calculating exact operating speed (1–16 RPM) and rotational stress generation (512–8,192 SU) based on the physical sail assembly.
+- Categorized rotational machines and energy converters into 4 distinct groups (Kinetic Sources, Fuel & Steam Engines, Electric Motors, and Kinetic Alternators) for cleaner recipe browsing.
+- Added independent configuration for Create Steam Boiler tank size (4–72 blocks), heat level (0–18), and water supply (10–180 mB/t) with real-time bottleneck indicators, quick presets, and a one-click water auto-match button.
+- Added support for configuring Create Steam Boiler heat levels (Passive / Levels 1–18) with water and steam fluid consumption modes, allowing boilers to scale kinetic capacity up to 294k SU.
+- Added Heated Blaze Burner (+1 level) and Superheated Blaze Burner (+2 levels) hardware addons to the boiler configuration, automatically synchronizing boiler level, fluid inputs, and kinetic stress capacity.
+- Added the ability to drag and click the scrollbar in the Add Recipe dialog, allowing smooth navigation through recipe search results using the mouse.
+- Added a unit preference preservation toggle in the board settings menu, ensuring selected rate time units (such as per second or per minute) and fluid display units are remembered across game restarts and between world sessions.
+- Improved the Smart Auto-Connect feature to automatically wire matching resources in recirculation and feedback loops, allowing setups like Nether Star production and catalyst recycling to be connected with a single click.
+
+### Fixed
+- Fixed an issue where kinetic generators (such as the Large Water Wheel) appeared twice in the recipe search dialog by decoupling internal generator definitions from external recipe viewers.
+- Cleaned up external recipe viewer (EMI) registries by moving kinetic generators into the board's native machine catalog, keeping viewer searches pristine without synthetic recipe pollution.
+- Fixed an issue where Create stress units (SU) scaled with the active time unit (such as per-minute or per-hour), ensuring rotational stress and capacity consistently display as a constant SU value across all time settings.
+- Fixed an issue where required recipe fluid inputs (such as Liquid Oxygen) were unintentionally removed when switching machine models (such as singleblock to multiblock) on processing machines.
+- Fixed an issue where the Distillation Tower was incorrectly recognized as a turbine generator, preventing turbine-specific rotor slots from appearing on distillation processing setups.
+- Fixed an issue where the parallel hatch button and addon category appeared on multiblocks that do not support parallel hatches (such as the Distillation Tower) when sharing recipe categories with parallel-capable machines.
+- Fixed an issue where multiblock machines equipped with standard 2A energy hatches incorrectly allowed additional parallels for recipes consuming near 1A, and ensured parallel limits are calculated prior to coil and energy discounts.
+- Fixed an issue where running Auto Ratio on a loop setup with a fixed-rate junction anchor incorrectly reset all machine counts to 0.01 or 1, and ensured physically infeasible deficit loops trigger proper divergence warnings.
+- Fixed an issue where typing 'W', 'A', 'S', or 'D' while renaming a page tab or searching for recipes in external recipe viewers caused the canvas to unintentionally pan.
+- Fixed an issue where the machine card header title was not updated when switching the node to another machine or controller block.
+
 ## [2.2.0-alpha.4] - 2026-09-08
 
 ### Added

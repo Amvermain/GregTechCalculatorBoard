@@ -64,6 +64,7 @@ stateDiagram-v2
 | **[ADR-033](ADR_033_COMPREHENSIVE_DIVERGENCE_DEFENSE_MATRIX.md)** | 포괄적 공정 발산 방어 매트릭스 및 상황별 진단 가이드 시스템 명세<br/>*(Comprehensive Process Divergence Defense Matrix & Contextual Diagnostic Guidance System)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 증식 루프, 복합 8자 루프, 촉매 감쇠, 앵커 모순, 극미세 수율 7대 발산 시나리오 자동 방어 및 상황별 5행 진단 뱃지/가이드 |
 | **[ADR-034](ADR_034_JUNCTION_BUFFER_AND_ANCHOR_SYSTEM.md)** | 정션 노드 동적 잉여/결핍 완충 배선 및 Auto-Ratio 유량 앵커 시스템<br/>*(Junction Dynamic Buffer/Sink Wiring & Auto-Ratio Flow Anchoring System)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 퀵 마커 컨텍스트 드래그(잉여 배출/결핍 공급 1클릭 생성), Void Sink 오버플로우 스필웨이 우선 배분, Fixed 정션 유량 앵커 Auto-Ratio 지원 |
 | **[ADR-035](ADR_035_TWO_STAGE_LINEAR_FLOW_SOLVER.md)** | 2단계 선형 연립방정식 유량 솔버 및 정수 양자화 아키텍처<br/>*(Two-Stage Linear Flow Balance Solver & Integer Quantization Architecture)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-08 | 가우스 소거법 기반 1단계 연속 유량 균형 연산 및 2단계 정수 양자화를 통한 단 1회 클릭 결정론적 수렴 보장 및 질량 보존 정합 |
+| **[ADR-036](ADR_036_KINETIC_GENERATOR_AND_ENERGY_CONVERTER_TAXONOMY.md)** | 회전 운동 동력원 및 에너지 상호 변환기 분류 체계, 가변 RPM 동적 산출 및 뷰어 UI 개편 명세<br/>*(Kinetic Sources & Energy Converter Taxonomy, Dynamic RPM Calculation & Viewer UI Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0` | 2026-09-08 | 4대 카테고리 분리, Windmill Bearing 가변 돛/RPM 수식 산출 모델링, EMI 자가 복제 슬롯 해소 및 단일 소스(SSOT) 검색 인덱싱 일원화 |
 
 ---
 

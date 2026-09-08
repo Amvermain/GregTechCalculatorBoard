@@ -102,12 +102,8 @@ public class CreateDieselGeneratorsModAdapter extends AbstractKineticModAdapter 
         return super.buildEnergyTooltip(node);
     }
 
-    public static List<SearchableRecipe> getVirtualSearchRecipes() {
-        return CDGRecipeHandler.getVirtualKineticSearchRecipes();
-    }
-
     @Override
-    public void registerSyntheticEmiRecipes(Object emiRegistry, Object emiCategory, java.util.Set<net.minecraft.world.item.Item> activeRecipeItems) {
-        CDGRecipeHandler.registerSyntheticEmiRecipes(emiRegistry, emiCategory, activeRecipeItems);
+    public void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
+        CDGRecipeHandler.collectNativeCatalogRecipes(collector);
     }
 }

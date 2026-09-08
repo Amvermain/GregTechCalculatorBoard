@@ -159,6 +159,9 @@ public final class GTPowerCalculator {
         double combinedEutMult = node.getCombinedEutMultiplier();
         double threadingPowerMult = node.hasThreading() ? node.getThreadingConfig().getFinalPowerMultiplier() : 1.0;
         long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
+        if (GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            maxCapacity = Math.min(maxCapacity, GTAddonCompatibilityHandler.getOverclockVoltage(node));
+        }
 
         double baseDuration = node.getBaseDurationTicks();
         double currentEUt = node.getBaseEUt();
@@ -222,6 +225,9 @@ public final class GTPowerCalculator {
         }
         int maxTierDelta = node.getTierDelta();
         long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
+        if (GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            maxCapacity = Math.min(maxCapacity, GTAddonCompatibilityHandler.getOverclockVoltage(node));
+        }
         if (maxCapacity >= Long.MAX_VALUE || node.getRecipeTier() == null) {
             return maxTierDelta;
         }
@@ -322,16 +328,16 @@ public final class GTPowerCalculator {
             } else {
                 par = Math.max(1, effectiveBase * node.getCombinedParallelMultiplier());
             }
-            if (!node.hasPowerConstantAddon() && node.getEnergyType() == EnergyType.ELECTRIC_EU
+            if (!node.hasPowerConstantAddon() && !isCoilParallelNode(node) && node.getEnergyType() == EnergyType.ELECTRIC_EU
                     && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
-                double singleRecipeEUt = node.getBaseEUt() * node.getCombinedEutMultiplier();
+                double singleRecipeEUt = node.getBaseEUt();
                 if (node.hasThreading()) {
                     singleRecipeEUt *= node.getThreadingConfig().getFinalPowerMultiplier();
                 }
                 if (singleRecipeEUt > 0.0) {
-                    long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
-                    if (maxCapacity > 0 && maxCapacity < Long.MAX_VALUE) {
-                        int energyParCap = (int) Math.max(1, Math.floor((double) maxCapacity / singleRecipeEUt));
+                    long maxVoltage = GTAddonCompatibilityHandler.getOverclockVoltage(node);
+                    if (maxVoltage > 0 && maxVoltage < Long.MAX_VALUE) {
+                        int energyParCap = (int) Math.max(1, Math.floor((double) maxVoltage / singleRecipeEUt));
                         par = Math.min(par, energyParCap);
                     }
                 }
@@ -437,12 +443,12 @@ public final class GTPowerCalculator {
         // Processing machine
         int hatchAndHardware = getHatchAndHardwareParallelLimit(node);
         int energyLimit = Integer.MAX_VALUE;
-        long maxCapacity = GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
-        if (maxCapacity > 0 && maxCapacity < Long.MAX_VALUE && !node.hasPowerConstantAddon()) {
-            double singleRecipeEUt = node.getBaseEUt() * node.getCombinedEutMultiplier()
+        long maxVoltage = GTAddonCompatibilityHandler.getOverclockVoltage(node);
+        if (maxVoltage > 0 && maxVoltage < Long.MAX_VALUE && !node.hasPowerConstantAddon() && !isCoilParallelNode(node)) {
+            double singleRecipeEUt = node.getBaseEUt()
                     * (node.hasThreading() ? node.getThreadingConfig().getFinalPowerMultiplier() : 1.0);
             if (singleRecipeEUt > 0.0) {
-                energyLimit = (int) Math.max(1, Math.floor((double) maxCapacity / singleRecipeEUt));
+                energyLimit = (int) Math.max(1, Math.floor((double) maxVoltage / singleRecipeEUt));
             }
         }
 

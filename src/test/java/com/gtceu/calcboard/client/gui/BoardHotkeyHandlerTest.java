@@ -84,4 +84,60 @@ public class BoardHotkeyHandlerTest {
         boolean handled = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_R, 0, GLFW.GLFW_MOD_ALT, 0, 0);
         Assertions.assertTrue(handled);
     }
+
+    @Test
+    public void testWasdPanBlockedWhenPageTabEditing() {
+        BoardScreen screen = new BoardScreen();
+        Assertions.assertFalse(screen.isSmoothPanBlocked());
+
+        screen.getPageTabBar().setEditingForTest(true);
+        Assertions.assertTrue(screen.isSmoothPanBlocked());
+
+        boolean handledTab = screen.getPageTabBar().keyPressed(GLFW.GLFW_KEY_W, 0, 0);
+        Assertions.assertTrue(handledTab);
+
+        boolean dispatcherHandled = com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher.handleKeyPressed(screen, GLFW.GLFW_KEY_W, 0, 0, 0, 0);
+        Assertions.assertTrue(dispatcherHandled);
+    }
+
+    @Test
+    public void testWasdPanBlockedWhenRecipeViewerSearchFocused() {
+        BoardScreen screen = new BoardScreen();
+        com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.init();
+
+        com.gtceu.calcboard.integration.spi.IRecipeViewerAdapter mockAdapter = new com.gtceu.calcboard.integration.vanilla.VanillaRecipeViewerAdapter() {
+            @Override
+            public String getViewerId() {
+                return "mock_focused_viewer";
+            }
+
+            @Override
+            public int getPriority() {
+                return 10000;
+            }
+
+            @Override
+            public boolean isSearchFieldFocused() {
+                return true;
+            }
+        };
+
+        try {
+            com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.register(mockAdapter);
+            Assertions.assertTrue(com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.isAnySearchFocused());
+            Assertions.assertTrue(screen.isSmoothPanBlocked());
+
+            boolean handledWasd = BoardHotkeyHandler.handleKeyPressed(screen, GLFW.GLFW_KEY_W, 0, 0, 0, 0);
+            Assertions.assertFalse(handledWasd);
+
+            boolean handledDispatcher = com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher.handleKeyPressed(screen, GLFW.GLFW_KEY_W, 0, 0, 0, 0);
+            Assertions.assertFalse(handledDispatcher);
+
+            boolean handledChar = com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher.handleCharTyped(screen, 'w', 0);
+            Assertions.assertFalse(handledChar);
+        } finally {
+            com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.unregister("mock_focused_viewer");
+            com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.reset();
+        }
+    }
 }

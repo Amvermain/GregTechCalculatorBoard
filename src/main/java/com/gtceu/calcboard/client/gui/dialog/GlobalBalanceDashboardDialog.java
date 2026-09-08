@@ -468,9 +468,8 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         int tagX = x + w - 6 - tagW;
         graphics.drawString(font, tagStr, tagX, y + 5, 0xFFFFFFFF, false);
 
-        // 3. Net Rate: e.g. -1.08M B/s or +282.01/s
         String sign = item.netRate > 0.0001 ? "+" : "";
-        String rateFormatted = sign + NodeCardRenderer.formatRate(item.netRate, item.stack.isFluid());
+        String rateFormatted = sign + (item.stack.isStressUnit() ? FormatUtil.formatRate(item.netRate, item.stack) : NodeCardRenderer.formatRate(item.netRate, item.stack.isFluid()));
         int rateColor = item.statusType == 0 ? 0xFFFF5555 : (item.statusType == 1 ? 0xFF55FF55 : 0xFF55FFFF);
         int rateW = font.width(rateFormatted);
         int rateX = tagX - 6 - rateW;
@@ -524,7 +523,7 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         if (hoveredStack != null) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
-            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack.isFluid());
+            String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.global_balance.net_rate").getString() + ": §f" + ratePrefix + exactRateStr));
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.global_balance.click_drilldown_hint").getString()));

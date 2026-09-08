@@ -15,6 +15,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BlueprintCodec;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.ToolbarDisplayMode;
 import net.minecraft.client.Minecraft;
@@ -647,80 +648,77 @@ public class ToolbarWidget {
 
         for (RecipeNode from : graph.getNodes()) {
             for (int outIdx = 0; outIdx < from.getOutputs().size(); outIdx++) {
-                var out = from.getOutputs().get(outIdx);
-                boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
-
-                for (RecipeNode to : graph.getNodes()) {
-                    if (from == to) continue;
-                    for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
-                        var in = to.getInputs().get(inIdx);
-
-                        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
-                        if (inputAlreadyFed) {
-                            if (!out.equals(in) && !Objects.equals(out.getId(), in.getId())) {
-                                continue;
-                            }
-                        } else {
-                            if (!out.equals(in) && !in.matchesOrAlternative(out)) {
-                                continue;
-                            }
-                        }
-
-                        ResourceLocation itemKey = out.getId() != null ? out.getId() : in.getId();
-                        if (allowedItemIds != null && (itemKey == null || !allowedItemIds.contains(itemKey))) {
-                            continue;
-                        }
-
-                        // Check if a path already exists (directly or via intermediate reroute junctions)
-                        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
-                            continue;
-                        }
-
-                        // If this output is already routed to a junction hub, do not create direct bypass wires to normal nodes
-                        if (fromFeedsReroute && !to.isReroute()) {
-                            continue;
-                        }
-
-                        // Prevent creating cyclic dependencies
-                        if (isReachable(graph, to.getId(), from.getId())) {
-                            continue;
-                        }
-
-                        // If target input is already fed by a reroute junction, route into that junction instead of bypassing it
-                        RecipeNode targetNode = to;
-                        int targetInIdx = inIdx;
-                        if (!from.isReroute() && !to.isReroute()) {
-                            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
-                            if (feedingReroute != null) {
-                                targetNode = feedingReroute;
-                                targetInIdx = 0;
-                                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
-                                    continue;
-                                }
-                            }
-                        }
-
-                        if (!inputAlreadyFed && !out.equals(in) && in.hasAlternatives() && subCommands != null) {
-                            ResourceLocation oldAlt = in.getId();
-                            in.selectAlternative(out.getId());
-                            ResourceLocation newAlt = in.getId();
-                            if (!Objects.equals(oldAlt, newAlt)) {
-                                subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
-                                    to.getId(), inIdx, true, oldAlt, newAlt
-                                ));
-                            }
-                        }
-
-                        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                        if (!graph.getConnections().contains(edge)) {
-                            graph.addConnection(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                            addedEdges.add(edge);
-                        }
-                    }
-                }
+                connectOutputToGraph(graph, from, outIdx, allowedItemIds, addedEdges, subCommands);
             }
         }
         return addedEdges;
+    }
+
+    private static void connectOutputToGraph(FlowGraph graph, RecipeNode from, int outIdx, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands) {
+        var out = from.getOutputs().get(outIdx);
+        boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
+
+        for (RecipeNode to : graph.getNodes()) {
+            if (from == to) continue;
+            connectOutputToNode(graph, from, outIdx, out, fromFeedsReroute, to, allowedItemIds, addedEdges, subCommands);
+        }
+    }
+
+    private static void connectOutputToNode(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands) {
+        for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
+            var in = to.getInputs().get(inIdx);
+            tryConnectPortPair(graph, from, outIdx, out, fromFeedsReroute, to, inIdx, in, allowedItemIds, addedEdges, subCommands);
+        }
+    }
+
+    private static void tryConnectPortPair(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, int inIdx, IngredientStack in, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<com.gtceu.calcboard.api.history.BoardCommand> subCommands) {
+        if (!canConnectPort(graph, from, out, to, inIdx, in)) {
+            return;
+        }
+
+        ResourceLocation itemKey = out.getId() != null ? out.getId() : in.getId();
+        if (allowedItemIds != null && (itemKey == null || !allowedItemIds.contains(itemKey))) {
+            return;
+        }
+
+        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+            return;
+        }
+
+        if (fromFeedsReroute && !to.isReroute()) {
+            return;
+        }
+
+        RecipeNode targetNode = to;
+        int targetInIdx = inIdx;
+        if (!from.isReroute() && !to.isReroute()) {
+            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+            if (feedingReroute != null) {
+                targetNode = feedingReroute;
+                targetInIdx = 0;
+                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                    return;
+                }
+            }
+        }
+
+        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
+        if (!inputAlreadyFed && !out.equals(in) && in.hasAlternatives() && subCommands != null) {
+            ResourceLocation oldAlt = in.getId();
+            in.selectAlternative(out.getId());
+            ResourceLocation newAlt = in.getId();
+            if (!Objects.equals(oldAlt, newAlt)) {
+                subCommands.add(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
+                    to.getId(), inIdx, true, oldAlt, newAlt
+                ));
+            }
+        }
+
+        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+        if (!graph.getConnections().contains(edge)) {
+            graph.addConnection(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+            addedEdges.add(edge);
+        }
     }
 
     private static boolean isPortConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
@@ -815,6 +813,17 @@ public class ToolbarWidget {
             }
         }
         return false;
+    }
+
+    private static boolean canConnectPort(FlowGraph graph, RecipeNode from, IngredientStack out, RecipeNode to, int inIdx, IngredientStack in) {
+        boolean isExactMatch = out.equals(in) || Objects.equals(out.getId(), in.getId());
+        if (isInputPortFed(graph, to.getId(), inIdx)) {
+            return isExactMatch;
+        }
+        if (isExactMatch) {
+            return true;
+        }
+        return in.matchesOrAlternative(out) && !isReachable(graph, to.getId(), from.getId());
     }
 
     public void performAutoRatio() {

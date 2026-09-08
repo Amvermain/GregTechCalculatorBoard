@@ -31,6 +31,7 @@ public class MachineAddon {
         public static final AddonCategory HATCH_BUS = AddonCategory.HATCH_BUS;
         public static final AddonCategory MAINTENANCE = AddonCategory.MAINTENANCE;
         public static final AddonCategory COIL = AddonCategory.COIL;
+        public static final AddonCategory HEATER = AddonCategory.HEATER;
         public static final AddonCategory ROTOR = AddonCategory.ROTOR;
         public static final AddonCategory REFLECTOR = AddonCategory.REFLECTOR;
         public static final AddonCategory THREADING = AddonCategory.THREADING;

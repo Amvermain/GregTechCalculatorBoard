@@ -30,6 +30,22 @@ import java.util.*;
  */
 public class UiFormattingTest {
 
+    @org.junit.jupiter.api.BeforeEach
+    public void setUp() {
+        com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().resetForTesting();
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().resetToDefault();
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_SECOND);
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveFluidUnitMode(com.gtceu.calcboard.api.type.FluidUnitMode.AUTO);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    public void tearDown() {
+        com.gtceu.calcboard.client.storage.ClientPreferenceManager.getInstance().resetForTesting();
+        com.gtceu.calcboard.api.storage.BoardManager.getInstance().resetToDefault();
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(com.gtceu.calcboard.api.type.RateTimeUnit.PER_SECOND);
+        com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveFluidUnitMode(com.gtceu.calcboard.api.type.FluidUnitMode.AUTO);
+    }
+
     @Test
     public void testTutorialStepEnumProperties() {
         Assertions.assertEquals(1, com.gtceu.calcboard.client.gui.tutorial.TutorialStep.STEP_1_ADD_RECIPE.getStepNumber());
@@ -347,6 +363,22 @@ public class UiFormattingTest {
             Assertions.assertEquals(RateTimeUnit.PER_SECOND, RateTimeUnit.PER_TICK.next());
         } finally {
             com.gtceu.calcboard.client.gui.util.FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testBoardManagerTimeUnitDirectReflection() {
+        try {
+            BoardManager.getInstance().setTimeUnit(RateTimeUnit.PER_MINUTE);
+            Assertions.assertEquals("3 B/min", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("600/min", FormatUtil.formatRate(10.0, false));
+
+            BoardManager.getInstance().setTimeUnit(RateTimeUnit.PER_TICK);
+            Assertions.assertEquals("2.5 mB/t", FormatUtil.formatRate(50.0, true));
+            Assertions.assertEquals("0.5/t", FormatUtil.formatRate(10.0, false));
+        } finally {
+            BoardManager.getInstance().setTimeUnit(RateTimeUnit.PER_SECOND);
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }
     }
 
@@ -813,6 +845,30 @@ public class UiFormattingTest {
             String connectedOut = FormatUtil.formatBatchConnectedOutput(4.0, 4.0, item, false);
             Assertions.assertTrue(connectedOut.contains("4"));
             Assertions.assertFalse(connectedOut.contains("/s"));
+        } finally {
+            FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
+        }
+    }
+
+    @Test
+    public void testStressUnitConstantAcrossTimeUnits() {
+        IngredientStack su = IngredientStack.stressUnit(2048);
+        try {
+            for (RateTimeUnit unit : RateTimeUnit.values()) {
+                FormatUtil.setActiveTimeUnit(unit);
+                Assertions.assertEquals("2.05k SU", FormatUtil.formatRate(2048.0, su));
+                Assertions.assertEquals("2,048 SU", FormatUtil.formatExactRate(2048.0, su));
+                Assertions.assertFalse(FormatUtil.formatRate(2048.0, su).contains("/"));
+                Assertions.assertFalse(FormatUtil.formatExactRate(2048.0, su).contains("/"));
+
+                String connectedIn = FormatUtil.formatConnectedInput(2048.0, 2048.0, su, false);
+                Assertions.assertTrue(connectedIn.contains("2.05k SU"));
+                Assertions.assertFalse(connectedIn.contains("/s") || connectedIn.contains("/min") || connectedIn.contains("/h") || connectedIn.contains("/t"));
+
+                String connectedOut = FormatUtil.formatConnectedOutput(2048.0, 2048.0, su, false);
+                Assertions.assertTrue(connectedOut.contains("2.05k SU"));
+                Assertions.assertFalse(connectedOut.contains("/s") || connectedOut.contains("/min") || connectedOut.contains("/h") || connectedOut.contains("/t"));
+            }
         } finally {
             FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }

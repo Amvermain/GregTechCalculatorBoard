@@ -288,7 +288,15 @@ public class StarTModAdapter extends GTCEuModAdapter {
     @Override
     public void onMachineIconChanged(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
         super.onMachineIconChanged(node, oldIcon, newIcon);
-        StarTTurbineHelper.syncBoosterInputs(node);
+        boolean wasPlasmaTurbine = StarTTurbineHelper.isPlasmaTurbineIcon(oldIcon);
+        boolean isPlasmaTurbine = StarTTurbineHelper.supportsBoost(node);
+        if (wasPlasmaTurbine || isPlasmaTurbine) {
+            if (wasPlasmaTurbine && !isPlasmaTurbine) {
+                StarTTurbineHelper.removeBoosterInputs(node);
+            } else {
+                StarTTurbineHelper.syncBoosterInputs(node);
+            }
+        }
     }
 }
 

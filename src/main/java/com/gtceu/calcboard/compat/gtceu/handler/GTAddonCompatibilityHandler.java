@@ -69,10 +69,15 @@ public final class GTAddonCompatibilityHandler {
         return def.maintenanceSlotCount() > 0 || def.supportsAbility("MAINTENANCE");
     }
 
+    public static boolean isDistillationTower(ResourceLocation id) {
+        return DISTILLATION_TOWER_ID != null && DISTILLATION_TOWER_ID.equals(id);
+    }
+
     public static boolean isDistillationTower(RecipeNode node) {
         if (node == null) return false;
-        if (DISTILLATION_TOWER_ID.equals(node.getMachineIcon())) return true;
-        if (DISTILLATION_TOWER_ID.equals(node.getRecipeCategoryId())) return true;
+        if (isDistillationTower(node.getMachineIcon())) return true;
+        if (isDistillationTower(node.getMultiblockWorkstation())) return true;
+        if (isDistillationTower(node.getRecipeCategoryId())) return true;
         return false;
     }
 
@@ -177,7 +182,10 @@ public final class GTAddonCompatibilityHandler {
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);
             }
-            if (!isSteamMb && (MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations()) || (def != null && def.supportsAbility("PARALLEL_HATCH")))) {
+            boolean supportsPar = mbId != null
+                    ? (MultiblockDetector.supportsParallelHatch(mbId) || (def != null && def.supportsAbility("PARALLEL_HATCH")))
+                    : MultiblockDetector.supportsParallelHatch(null, node.getAvailableWorkstations());
+            if (!isSteamMb && supportsPar) {
                 cats.add(AddonCategory.PARALLEL);
             }
             if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {
@@ -254,7 +262,13 @@ public final class GTAddonCompatibilityHandler {
             return true;
         }
         if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
-            return node.isMultiblock() && MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+            if (!node.isMultiblock()) return false;
+            ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+            if (mbId != null) {
+                var def = MultiblockStructureCatalog.getStructure(mbId);
+                return MultiblockDetector.supportsParallelHatch(mbId) || (def != null && def.supportsAbility("PARALLEL_HATCH"));
+            }
+            return MultiblockDetector.supportsParallelHatch(null, node.getAvailableWorkstations());
         }
         if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
             return isMaintenanceAddonCompatible(node, addon);
@@ -362,7 +376,11 @@ public final class GTAddonCompatibilityHandler {
             }
             if (node.isTurbine()) return false;
             if (addon.getId().equals("gtceu:batch_processing")) {
-                return !isGen && node.isMultiblock() && MultiblockDetector.supportsBatchMode(node.getMachineIcon(), node.getAvailableWorkstations());
+                ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+                boolean supportsBatch = mbId != null
+                        ? MultiblockDetector.supportsBatchMode(mbId)
+                        : MultiblockDetector.supportsBatchMode(null, node.getAvailableWorkstations());
+                return !isGen && node.isMultiblock() && supportsBatch;
             }
             if (addon.getId().equals("gtceu:throughput_boosting")) {
                 return !isGen && node.isMultiblock() && MultiblockDetector.supportsThroughputBoosting(node.getMachineIcon());
@@ -827,6 +845,77 @@ public final class GTAddonCompatibilityHandler {
             }
         }
         return Long.MAX_VALUE;
+    }
+
+    public static long getOverclockVoltage(RecipeNode node) {
+        if (node == null) return Long.MAX_VALUE;
+        List<GTEnergyHatchAddon> hatches = new ArrayList<>();
+        for (MachineAddon a : node.getAddons()) {
+            if (a instanceof GTEnergyHatchAddon eh) {
+                hatches.add(eh);
+            }
+        }
+        if (!hatches.isEmpty()) {
+            long totalInputVoltage = 0;
+            long inputAmperage = 0;
+            for (var h : hatches) {
+                totalInputVoltage += (long) h.getTier().getVoltage() * h.getAmperage();
+                inputAmperage += h.getAmperage();
+            }
+            if (totalInputVoltage <= 1 || inputAmperage <= 1) {
+                return totalInputVoltage;
+            }
+            long voltage = totalInputVoltage;
+            long amperage = inputAmperage;
+            if (hasPrimeFactorGreaterThanTwo(amperage) || isPowerOfFour(amperage)) {
+                amperage = 1;
+            } else if (amperage % 4 == 0) {
+                while (amperage > 4) {
+                    amperage /= 4;
+                }
+                voltage /= amperage;
+            } else if (amperage == 2) {
+                voltage /= amperage;
+            } else {
+                amperage = 1;
+            }
+
+            if (amperage == 1) {
+                GTVoltageTier floorTier = GTVoltageTier.getMaxTierProvided(voltage);
+                return floorTier != null ? floorTier.getVoltage() : voltage;
+            } else {
+                return voltage;
+            }
+        }
+        if (node.isMultiblock() && node.getTargetTier() != null) {
+            boolean hasParallelHatch = node.getAddons().stream().anyMatch(a ->
+                    a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon
+                            || a.getCategory() == MachineAddon.Category.PARALLEL);
+            if (hasParallelHatch && node.getRecipeTier() != null && node.getTargetTier().ordinal() > node.getRecipeTier().ordinal()) {
+                return node.getTargetTier().getVoltage();
+            }
+        }
+        return Long.MAX_VALUE;
+    }
+
+    private static boolean hasPrimeFactorGreaterThanTwo(long l) {
+        int i = 2;
+        long max = l / 2;
+        while (i <= max) {
+            if (l % i == 0) {
+                if (i > 2) return true;
+                l /= i;
+            } else {
+                i++;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPowerOfFour(long l) {
+        if (l == 0) return false;
+        if ((l & (l - 1)) != 0) return false;
+        return (l & 0x55555555L) != 0;
     }
 
     public static boolean hasEnergyHatch(RecipeNode node) {

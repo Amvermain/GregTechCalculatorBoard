@@ -1045,9 +1045,17 @@ public interface BoardCommand {
         private final com.gtceu.calcboard.api.type.SteamMode newSteamMode;
         private final com.gtceu.calcboard.api.type.GTVoltageTier oldTier;
         private final com.gtceu.calcboard.api.type.GTVoltageTier newTier;
+        private final String oldName;
+        private final String newName;
 
         public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon,
                                      boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier) {
+            this(node, oldIcon, newIcon, oldMultiblock, oldParallel, oldSteamMode, oldTier, null, null);
+        }
+
+        public SetMachineIconCommand(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon,
+                                     boolean oldMultiblock, int oldParallel, com.gtceu.calcboard.api.type.SteamMode oldSteamMode, com.gtceu.calcboard.api.type.GTVoltageTier oldTier,
+                                     String oldName, String newName) {
             this.nodeId = node.getId();
             this.oldIcon = oldIcon;
             this.newIcon = newIcon;
@@ -1059,6 +1067,8 @@ public interface BoardCommand {
             this.newSteamMode = node.getSteamMode();
             this.oldTier = oldTier;
             this.newTier = node.getTargetTier();
+            this.oldName = oldName;
+            this.newName = newName;
         }
 
         @Override
@@ -1070,6 +1080,9 @@ public interface BoardCommand {
                 node.setParallel(oldParallel);
                 node.setSteamMode(oldSteamMode);
                 node.setTargetTier(oldTier);
+                if (oldName != null) {
+                    node.setName(oldName);
+                }
             }
         }
 
@@ -1082,6 +1095,9 @@ public interface BoardCommand {
                 node.setParallel(newParallel);
                 node.setSteamMode(newSteamMode);
                 node.setTargetTier(newTier);
+                if (newName != null) {
+                    node.setName(newName);
+                }
             }
         }
 

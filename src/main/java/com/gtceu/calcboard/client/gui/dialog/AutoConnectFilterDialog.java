@@ -105,58 +105,7 @@ public class AutoConnectFilterDialog implements IBoardModal {
 
         for (RecipeNode from : graph.getNodes()) {
             for (int outIdx = 0; outIdx < from.getOutputs().size(); outIdx++) {
-                IngredientStack out = from.getOutputs().get(outIdx);
-                boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
-
-                for (RecipeNode to : graph.getNodes()) {
-                    if (from == to) continue;
-                    for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
-                        IngredientStack in = to.getInputs().get(inIdx);
-
-                        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
-                        if (inputAlreadyFed) {
-                            if (!out.equals(in) && !Objects.equals(out.getId(), in.getId())) {
-                                continue;
-                            }
-                        } else {
-                            if (!out.equals(in) && !in.matchesOrAlternative(out)) {
-                                continue;
-                            }
-                        }
-
-                        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
-                            continue;
-                        }
-                        if (fromFeedsReroute && !to.isReroute()) {
-                            continue;
-                        }
-                        if (isReachable(graph, to.getId(), from.getId())) {
-                            continue;
-                        }
-
-                        RecipeNode targetNode = to;
-                        int targetInIdx = inIdx;
-                        if (!from.isReroute() && !to.isReroute()) {
-                            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
-                            if (feedingReroute != null) {
-                                targetNode = feedingReroute;
-                                targetInIdx = 0;
-                                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
-                                    continue;
-                                }
-                            }
-                        }
-
-                        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-                        if (!graph.getConnections().contains(edge)) {
-                            ResourceLocation key = out.getId() != null ? out.getId() : in.getId();
-                            if (key != null) {
-                                sampleStacks.putIfAbsent(key, out.copy());
-                                wireCounts.put(key, wireCounts.getOrDefault(key, 0) + 1);
-                            }
-                        }
-                    }
-                }
+                scanOutputsForNode(graph, from, outIdx, sampleStacks, wireCounts);
             }
         }
 
@@ -176,6 +125,58 @@ public class AutoConnectFilterDialog implements IBoardModal {
         });
 
         return list;
+    }
+
+    private static void scanOutputsForNode(FlowGraph graph, RecipeNode from, int outIdx, Map<ResourceLocation, IngredientStack> sampleStacks, Map<ResourceLocation, Integer> wireCounts) {
+        IngredientStack out = from.getOutputs().get(outIdx);
+        boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
+
+        for (RecipeNode to : graph.getNodes()) {
+            if (from == to) continue;
+            scanCandidateInputsForNode(graph, from, outIdx, out, fromFeedsReroute, to, sampleStacks, wireCounts);
+        }
+    }
+
+    private static void scanCandidateInputsForNode(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, Map<ResourceLocation, IngredientStack> sampleStacks, Map<ResourceLocation, Integer> wireCounts) {
+        for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
+            IngredientStack in = to.getInputs().get(inIdx);
+            tryRegisterCandidateWire(graph, from, outIdx, out, fromFeedsReroute, to, inIdx, in, sampleStacks, wireCounts);
+        }
+    }
+
+    private static void tryRegisterCandidateWire(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, int inIdx, IngredientStack in, Map<ResourceLocation, IngredientStack> sampleStacks, Map<ResourceLocation, Integer> wireCounts) {
+        if (!canConnectPort(graph, from, out, to, inIdx, in)) {
+            return;
+        }
+
+        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) {
+            return;
+        }
+        if (fromFeedsReroute && !to.isReroute()) {
+            return;
+        }
+
+        RecipeNode targetNode = to;
+        int targetInIdx = inIdx;
+        if (!from.isReroute() && !to.isReroute()) {
+            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+            if (feedingReroute != null) {
+                targetNode = feedingReroute;
+                targetInIdx = 0;
+                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                    return;
+                }
+            }
+        }
+
+        FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
+        if (!graph.getConnections().contains(edge)) {
+            ResourceLocation key = out.getId() != null ? out.getId() : in.getId();
+            if (key != null) {
+                sampleStacks.putIfAbsent(key, out.copy());
+                wireCounts.put(key, wireCounts.getOrDefault(key, 0) + 1);
+            }
+        }
     }
 
     private static boolean isPortConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
@@ -270,6 +271,17 @@ public class AutoConnectFilterDialog implements IBoardModal {
             }
         }
         return false;
+    }
+
+    private static boolean canConnectPort(FlowGraph graph, RecipeNode from, IngredientStack out, RecipeNode to, int inIdx, IngredientStack in) {
+        boolean isExactMatch = out.equals(in) || Objects.equals(out.getId(), in.getId());
+        if (isInputPortFed(graph, to.getId(), inIdx)) {
+            return isExactMatch;
+        }
+        if (isExactMatch) {
+            return true;
+        }
+        return in.matchesOrAlternative(out) && !isReachable(graph, to.getId(), from.getId());
     }
 
     @Override

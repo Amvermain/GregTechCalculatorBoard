@@ -36,6 +36,9 @@ public final class RecipeNodeSerializer {
         if (node.getName() != null && !node.getName().isEmpty()) {
             tag.putString("name", node.getName());
         }
+        if (node.hasCustomName()) {
+            tag.putBoolean("hasCustomName", true);
+        }
         if (node.getMachineIcon() != null) {
             tag.putString("icon", node.getMachineIcon().toString());
         }
@@ -226,6 +229,9 @@ public final class RecipeNodeSerializer {
         }
 
         RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+        if (tag.contains("hasCustomName")) {
+            node.setHasCustomName(tag.getBoolean("hasCustomName"));
+        }
         if (tag.contains("properties", Tag.TAG_COMPOUND)) {
             node.getProperties().deserializeNBT(tag.getCompound("properties"));
         }

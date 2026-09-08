@@ -40,6 +40,7 @@ public class NodeNameEditor {
 
         if (!text.isEmpty() && !text.equals(oldName)) {
             node.setName(text);
+            node.setHasCustomName(true);
             if (widget != null && widget.getParent() != null) {
                 widget.getParent().recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.customName(
                     node.getId(),

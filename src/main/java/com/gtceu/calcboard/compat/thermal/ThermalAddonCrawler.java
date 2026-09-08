@@ -25,7 +25,6 @@ public class ThermalAddonCrawler {
         java.util.Map<Item, ItemStack> nbtItemSamples = new java.util.HashMap<>();
         java.util.Set<Item> activeRecipeItems = new java.util.HashSet<>();
 
-        // 1. Scan active recipe output stacks (e.g. customized NBT kits or augments)
         if (recipeOutputStacks != null && !recipeOutputStacks.isEmpty()) {
             for (ItemStack s : recipeOutputStacks) {
                 try {
@@ -46,7 +45,6 @@ public class ThermalAddonCrawler {
             }
         }
 
-        // 2. Scan Forge Item Registry with NBT samples fallback
         try {
             if (ForgeRegistries.ITEMS != null) {
                 for (Item item : ForgeRegistries.ITEMS) {

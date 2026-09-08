@@ -346,9 +346,8 @@ public final class GTCEuReflectionBridge {
         if (mCls == null) return false;
         return LARGE_COMBUSTION_ENGINE_CLASS != null && LARGE_COMBUSTION_ENGINE_CLASS.isAssignableFrom(mCls);
     }
-
     public static boolean hasTurbineSignature(Object def) {
-        if (def == null) return false;
+        if (def == null || !isGenerator(def)) return false;
 
         ResourceLocation id = getMachineId(def);
         if (id != null && (GTCombustionHelper.isCombustionEngine(id)
@@ -374,7 +373,7 @@ public final class GTCEuReflectionBridge {
             return true;
         }
 
-        return id != null && com.gtceu.calcboard.api.catalog.MultiblockDetector.isTurbine(id);
+        return id != null && com.gtceu.calcboard.api.catalog.MultiblockDetector.getAllTurbineControllers().contains(id);
     }
 
     private static boolean hasTurbineTooltipKey(Object def) {

@@ -391,38 +391,14 @@ public class FavoritesDockWidget {
         }
 
         private void collectMatchingCategoryRecipes(dev.emi.emi.api.recipe.EmiRecipeManager rm, dev.emi.emi.api.recipe.EmiRecipeCategory cat,
-                                                     dev.emi.emi.api.stack.EmiStack stack, List<dev.emi.emi.api.recipe.EmiRecipe> list) {
+                                                    dev.emi.emi.api.stack.EmiStack stack, List<dev.emi.emi.api.recipe.EmiRecipe> list) {
             List<dev.emi.emi.api.recipe.EmiRecipe> catRecipes = rm.getRecipes(cat);
             if (catRecipes == null) return;
             for (dev.emi.emi.api.recipe.EmiRecipe cr : catRecipes) {
-                if (cr != null && !list.contains(cr) && !isRecipeExcluded(cr) && matchesRecipeWorkstation(cr, stack)) {
+                if (cr != null && !list.contains(cr) && !isRecipeExcluded(cr)) {
                     list.add(cr);
                 }
             }
-        }
-
-        private boolean matchesRecipeWorkstation(dev.emi.emi.api.recipe.EmiRecipe recipe, dev.emi.emi.api.stack.EmiStack stack) {
-            if (recipe instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg) {
-                List<dev.emi.emi.api.stack.EmiIngredient> workstations = kg.getWorkstations();
-                if (workstations == null || workstations.isEmpty()) {
-                    return true;
-                }
-                for (dev.emi.emi.api.stack.EmiIngredient ws : workstations) {
-                    if (containsMatchingStack(ws, stack)) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            return true;
-        }
-
-        private boolean containsMatchingStack(dev.emi.emi.api.stack.EmiIngredient ingredient, dev.emi.emi.api.stack.EmiStack target) {
-            if (ingredient == null || ingredient.getEmiStacks() == null) return false;
-            for (dev.emi.emi.api.stack.EmiStack s : ingredient.getEmiStacks()) {
-                if (s != null && s.isEqual(target)) return true;
-            }
-            return false;
         }
 
         private void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {

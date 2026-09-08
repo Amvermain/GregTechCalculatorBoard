@@ -29,11 +29,15 @@ public final class GTTurbineHelper {
         if (node == null || node.getEnergyType() == EnergyType.KINETIC_SU) return false;
         if (node.getEnergyTypeOverride() != null && node.getEnergyTypeOverride() != EnergyType.ELECTRIC_EU && node.getEnergyTypeOverride() != EnergyType.NONE) return false;
 
+        boolean hasRotorAddon = node.getAddons().stream().anyMatch(a -> a.getCategory() == MachineAddon.Category.ROTOR);
+        if (!node.isGenerator() && !hasRotorAddon) {
+            return false;
+        }
+
         if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionFamily(node)) {
             return false;
         }
 
-        // Coil multiblocks (EBF, CHEF, Pyrolyse, etc.) are smelting furnaces and never turbines
         if (MultiblockDetector.isCoilMultiblock(node.getMachineIcon()) || MultiblockDetector.isCoilRecipeCategory(node.getRecipeCategoryId())) {
             return false;
         }

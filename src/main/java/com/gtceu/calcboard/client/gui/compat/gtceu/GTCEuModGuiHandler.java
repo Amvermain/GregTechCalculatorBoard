@@ -907,7 +907,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
             int defPar = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
             int totalCount = mbWorkstations.size();
-            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon());
             int parBtnW = supportsParHatch ? 120 : 0;
             int parBtnX = x + dialogW - 10 - parBtnW;
             int controllersAreaW = supportsParHatch ? (parBtnX - (x + 10) - 6) : (dialogW - 20);
@@ -1113,7 +1113,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
 
             int defPar = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
             int totalCount = mbWorkstations.size();
-            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon());
             int parBtnW = supportsParHatch ? 130 : 0;
             int parBtnX = x + dialogW - 10 - parBtnW;
             int controllersAreaW = supportsParHatch ? (parBtnX - (x + 10) - 8) : (dialogW - 20);
@@ -1729,7 +1729,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
         } else if (isFusionMachine(node) || isCoilMultiblock(node)) {
             if (isCoilMultiblock(node)) {
-                boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+                boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon());
                 int parBtnW = supportsParHatch ? 120 : 0;
                 int parBtnX = x + dialogW - 10 - parBtnW;
                 if (supportsParHatch && mouseX >= parBtnX && mouseX <= parBtnX + parBtnW && mouseY >= y + 38 && mouseY <= y + 50) {
@@ -1786,7 +1786,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
 
             int totalCount = mbWorkstations.size();
-            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon());
             int parBtnW = supportsParHatch ? 130 : 0;
             int parBtnX = x + dialogW - 10 - parBtnW;
             int controllersAreaW = supportsParHatch ? (parBtnX - (x + 10) - 8) : (dialogW - 20);
@@ -1824,26 +1824,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             for (int i = startIdx; i < endIdx; i++) {
                 ResourceLocation mbWs = mbWorkstations.get(i);
                 if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= y + 44 && mouseY <= y + 60) {
-                    boolean isThreading = MultiblockDetector.isThreadingMultiblock(mbWs);
-                    node.setMachineIcon(mbWs);
-                    node.setThreadingActive(isThreading);
-                    if (!MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations())) {
-                        node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
-                        node.setParallel(1);
-                        if (dialog != null && dialog.getSelectedCategory() == MachineAddon.Category.PARALLEL) {
-                            dialog.setSelectedCategory(null);
-                        }
-                    }
-                    if (dialog != null) {
-                        if (!isThreading && dialog.getSelectedCategory() == com.gtceu.calcboard.api.catalog.AddonCategory.THREADING) {
-                            dialog.setSelectedCategory(null);
-                        }
-                        dialog.invalidateFilteredCatalog();
-                    }
-                    if (parent != null) parent.markSummaryDirty();
-                    Minecraft.getInstance().getSoundManager().play(
-                            SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
-                    );
+                    switchControllerInHeader(node, mbWs, dialog, parent);
                     return true;
                 }
                 curX += btnW + 4;
@@ -2040,7 +2021,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                 mbWorkstations = List.of(node.getMachineIcon());
             }
 
-            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+            boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon());
             int parBtnW = supportsParHatch ? 120 : 0;
             int parBtnX = x + dialogW - 10 - parBtnW;
             int controllersAreaW = supportsParHatch ? (parBtnX - (x + 10) - 6) : (dialogW - 20);
@@ -2052,26 +2033,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
                     String label = getMultiblockShortLabel(mbWs);
                     int w = Math.max(64, font.width(label) + 12);
                     if (vMouseX >= curX && vMouseX <= curX + w) {
-                        boolean isThreading = MultiblockDetector.isThreadingMultiblock(mbWs);
-                        node.setMachineIcon(mbWs);
-                        node.setThreadingActive(isThreading);
-                        if (!MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations())) {
-                            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
-                            node.setParallel(1);
-                            if (dialog != null && dialog.getSelectedCategory() == MachineAddon.Category.PARALLEL) {
-                                dialog.setSelectedCategory(null);
-                            }
-                        }
-                        if (dialog != null) {
-                            if (!isThreading && dialog.getSelectedCategory() == com.gtceu.calcboard.api.catalog.AddonCategory.THREADING) {
-                                dialog.setSelectedCategory(null);
-                            }
-                            dialog.invalidateFilteredCatalog();
-                        }
-                        if (parent != null) parent.markSummaryDirty();
-                        Minecraft.getInstance().getSoundManager().play(
-                                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
-                        );
+                        switchControllerInHeader(node, mbWs, dialog, parent);
                         return true;
                     }
                     curX += w + 3;
@@ -2107,7 +2069,7 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             mbWorkstations = List.of(node.getMachineIcon());
         }
         int totalCount = mbWorkstations.size();
-        boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
+        boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon());
         int parBtnW = supportsParHatch ? 130 : 0;
         int controllersAreaW = supportsParHatch ? (460 - 20 - parBtnW - 8) : (460 - 20);
         int minBtnW = 80;
@@ -2130,5 +2092,29 @@ public class GTCEuModGuiHandler extends GenericModGuiHandler {
             }
         }
         return false;
+    }
+
+    private static void switchControllerInHeader(RecipeNode node, ResourceLocation mbWs,
+                                                MachineConfigDialog dialog, BoardScreen parent) {
+        boolean isThreading = MultiblockDetector.isThreadingMultiblock(mbWs);
+        node.setMachineIcon(mbWs);
+        node.setThreadingActive(isThreading);
+        if (!MultiblockDetector.supportsParallelHatch(node.getMachineIcon())) {
+            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
+            node.setParallel(1);
+            if (dialog != null && dialog.getSelectedCategory() == MachineAddon.Category.PARALLEL) {
+                dialog.setSelectedCategory(null);
+            }
+        }
+        if (dialog != null) {
+            if (!isThreading && dialog.getSelectedCategory() == com.gtceu.calcboard.api.catalog.AddonCategory.THREADING) {
+                dialog.setSelectedCategory(null);
+            }
+            dialog.invalidateFilteredCatalog();
+        }
+        if (parent != null) parent.markSummaryDirty();
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+        );
     }
 }

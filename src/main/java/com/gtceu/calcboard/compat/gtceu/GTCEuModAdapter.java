@@ -314,6 +314,10 @@ public class GTCEuModAdapter implements IModAdapter {
         return GTAddonCompatibilityHandler.getMaxEUtCapacity(node);
     }
 
+    public static long getOverclockVoltage(RecipeNode node) {
+        return GTAddonCompatibilityHandler.getOverclockVoltage(node);
+    }
+
     @Override
     public void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {
         if (addon == null || tooltip == null) return;
@@ -766,7 +770,15 @@ public class GTCEuModAdapter implements IModAdapter {
 
         // Machine Preset Setup
         applyMachinePresets(node, oldIcon, newIcon);
-        GTCombustionHelper.syncCombustionInputs(node);
+        boolean wasCombustion = GTCombustionHelper.isCombustionMachine(oldIcon);
+        boolean isCombustion = GTCombustionHelper.isCombustionFamily(node);
+        if (wasCombustion || isCombustion) {
+            if (wasCombustion && !isCombustion) {
+                GTCombustionHelper.removeCombustionAuxiliaryInputs(node);
+            } else {
+                GTCombustionHelper.syncCombustionInputs(node);
+            }
+        }
     }
 
     private void purgeIncompatibleAddons(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {

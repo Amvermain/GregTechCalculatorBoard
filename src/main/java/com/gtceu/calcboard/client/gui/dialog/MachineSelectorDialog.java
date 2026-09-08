@@ -240,14 +240,7 @@ public class MachineSelectorDialog implements IBoardModal {
     }
 
     private String formatId(ResourceLocation id) {
-        String path = id.getPath();
-        StringBuilder sb = new StringBuilder();
-        for (String part : path.split("_")) {
-            if (!part.isEmpty()) {
-                sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1)).append(" ");
-            }
-        }
-        return sb.toString().trim();
+        return NodeWorkstationResolver.formatId(id);
     }
 
     private GTVoltageTier extractTier(ResourceLocation ws) {
@@ -524,7 +517,7 @@ public class MachineSelectorDialog implements IBoardModal {
             int clickedIdx = (int) (vMouseY / ROW_HEIGHT);
             if (clickedIdx >= 0 && clickedIdx < filteredEntries.size()) {
                 MachineEntry selected = filteredEntries.get(clickedIdx);
-                parent.switchMachineWorkstation(node, selected.id());
+                parent.switchMachineWorkstation(node, selected.id(), selected.displayName());
                 Minecraft.getInstance().getSoundManager().play(
                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F)
                 );
@@ -559,7 +552,7 @@ public class MachineSelectorDialog implements IBoardModal {
             }
             if (keyCode == GLFW.GLFW_KEY_ENTER && !filteredEntries.isEmpty()) {
                 MachineEntry selected = filteredEntries.get(0);
-                parent.switchMachineWorkstation(node, selected.id());
+                parent.switchMachineWorkstation(node, selected.id(), selected.displayName());
                 Minecraft.getInstance().getSoundManager().play(
                         net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.1F)
                 );

@@ -25,13 +25,6 @@ public final class EmiSearchHelper {
         return null;
     }
 
-    public static boolean isKineticGenerator(Object recipeObj) {
-        if (recipeObj instanceof KineticGenerationEmiRecipe kg) {
-            return kg.isGenerator();
-        }
-        return false;
-    }
-
     public static ResourceLocation resolveContextualDefaultRecipeId(IngredientStack sourceStack, boolean targetIsFluid) {
         try {
             ResourceLocation id = sourceStack.getId();

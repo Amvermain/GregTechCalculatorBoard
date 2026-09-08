@@ -161,7 +161,6 @@ public final class RecipePropertyExtractorPipeline {
             }
         });
 
-        // 3. GTCEu Cleanroom Condition Extractor
         register(new IRecipePropertyExtractor() {
             @Override
             public String getModId() {
@@ -185,7 +184,6 @@ public final class RecipePropertyExtractorPipeline {
             }
         });
 
-        // 4. Create Kinetic Speed / RPM Extractor
         register(new IRecipePropertyExtractor() {
             @Override
             public String getModId() {

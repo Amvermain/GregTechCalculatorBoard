@@ -43,7 +43,7 @@ class ModAdapterExtensionTest {
         assertTrue(adapter.hasExtension(IEnergySimulationProvider.class));
         assertTrue(adapter.hasExtension(ICompoundRecipeProvider.class));
         assertTrue(adapter.hasExtension(ICapabilityMatrixProvider.class));
-        assertFalse(adapter.hasExtension(IHardwareAddonProvider.class));
+        assertTrue(adapter.hasExtension(IHardwareAddonProvider.class));
         assertFalse(adapter.hasExtension(IMultiblockBOMProvider.class));
         assertFalse(adapter.hasExtension(IBoosterProvider.class));
     }

@@ -229,6 +229,10 @@ public class RecipeSearchDialog implements IBoardModal {
         setVisible(true, false, 0, 0);
     }
 
+    public String getSearchQuery() {
+        return searchBox != null ? searchBox.getValue() : "";
+    }
+
     public void openForSwitch(RecipeNode targetNode) {
         if (targetNode == null) return;
         this.switchTargetNode = targetNode;
@@ -245,11 +249,13 @@ public class RecipeSearchDialog implements IBoardModal {
         } else if (targetNode.getMachineIcon() != null) {
             prefill = "[" + targetNode.getMachineIcon().getPath() + "] ";
         }
-        searchBox.setValue(prefill);
-        searchBox.setFocused(true);
+        if (searchBox != null) {
+            searchBox.setValue(prefill);
+            searchBox.setFocused(true);
+        }
         ensureGlobalRecipesCachedAsync(() -> {
             if (this.visible) {
-                updateSearchResults(searchBox.getValue());
+                updateSearchResults(getSearchQuery());
             }
         });
         updateSearchResultsSynchronously(prefill);
@@ -268,11 +274,13 @@ public class RecipeSearchDialog implements IBoardModal {
             this.targetSpawnCanvasY = canvasY;
             this.stickyHoverRecipe = null;
             this.lastObservedGlobalVersion = RecipeSearchCacheManager.getGlobalVersion();
-            searchBox.setValue("");
-            searchBox.setFocused(true);
+            if (searchBox != null) {
+                searchBox.setValue("");
+                searchBox.setFocused(true);
+            }
             ensureGlobalRecipesCachedAsync(() -> {
                 if (this.visible) {
-                    updateSearchResults(searchBox.getValue());
+                    updateSearchResults(getSearchQuery());
                 }
             });
             updateSearchResultsSynchronously("");
@@ -280,6 +288,7 @@ public class RecipeSearchDialog implements IBoardModal {
             this.contextualWireTarget = null;
             this.switchTargetNode = null;
             this.stickyHoverRecipe = null;
+            this.isDraggingScrollBar = false;
         }
     }
 
@@ -326,7 +335,7 @@ public class RecipeSearchDialog implements IBoardModal {
         if (!RecipeSearchCacheManager.isGlobalCached() && !RecipeSearchCacheManager.isCaching()) {
             ensureGlobalRecipesCachedAsync(() -> {
                 if (this.visible) {
-                    updateSearchResults(searchBox.getValue());
+                    updateSearchResults(getSearchQuery());
                 }
             });
         }
@@ -335,7 +344,7 @@ public class RecipeSearchDialog implements IBoardModal {
         long currentGlobalVer = RecipeSearchCacheManager.getGlobalVersion();
         if (currentGlobalVer != lastObservedGlobalVersion) {
             lastObservedGlobalVersion = currentGlobalVer;
-            updateSearchResults(searchBox.getValue());
+            updateSearchResults(getSearchQuery());
         }
 
         this.lastMouseX = mouseX;
@@ -398,10 +407,12 @@ public class RecipeSearchDialog implements IBoardModal {
         int helpBtnX = favBtnX - topBtnW - 3;
         int searchBoxW = dialogW - 24 - (topBtnW * 3) - 9;
 
-        searchBox.setX(x + 12);
-        searchBox.setY(y + 30);
-        searchBox.setWidth(searchBoxW);
-        searchBox.render(graphics, mouseX, mouseY, 0);
+        if (searchBox != null) {
+            searchBox.setX(x + 12);
+            searchBox.setY(y + 30);
+            searchBox.setWidth(searchBoxW);
+            searchBox.render(graphics, mouseX, mouseY, 0);
+        }
 
         // Help / Search Syntax Guide Button [?]
         boolean helpHover = mouseX >= helpBtnX && mouseX <= helpBtnX + topBtnW && mouseY >= y + 30 && mouseY <= y + 30 + topBtnH;
@@ -519,7 +530,8 @@ public class RecipeSearchDialog implements IBoardModal {
                 int btnY = rowY + 7;
                 boolean btnHover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
 
-                boolean rowHover = mouseX >= listX && mouseX <= listX + listW && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
+                boolean mouseOverScrollBar = (filteredRecipes.size() > visibleRows) && (mouseX >= listX + listW - 8);
+                boolean rowHover = !isDraggingScrollBar && !mouseOverScrollBar && mouseX >= listX && mouseX <= listX + listW && mouseY >= rowY && mouseY <= rowY + ROW_HEIGHT;
                 if (rowHover) {
                     newlyHoveredRecipe = sr;
                     newlyHoveredRowY = rowY;
@@ -607,7 +619,10 @@ public class RecipeSearchDialog implements IBoardModal {
                 int barH = Math.max(16, (int) ((double) visibleRows / filteredRecipes.size() * scrollTrackH));
                 int barY = listY + 2 + (int) ((double) scrollOffset / maxScroll * (scrollTrackH - barH));
                 int barX = listX + listW - 4;
-                graphics.fill(barX, barY, barX + 3, barY + barH, 0xFF657595);
+                boolean barHover = mouseX >= barX - 4 && mouseX <= barX + 8 && mouseY >= listY + 2 && mouseY <= listY + 2 + scrollTrackH;
+                int thumbColor = (isDraggingScrollBar || barHover) ? 0xFF8EA5C8 : 0xFF657595;
+                graphics.fill(barX, listY + 2, barX + 3, listY + 2 + scrollTrackH, 0x44000000);
+                graphics.fill(barX, barY, barX + 3, barY + barH, thumbColor);
             }
         }
 
@@ -702,6 +717,39 @@ public class RecipeSearchDialog implements IBoardModal {
         }
     }
 
+    private boolean handlePrefixSidePanelClick(double mouseX, double mouseY, int sideX, int y, int sideW, int dialogH) {
+        if (mouseX < sideX || mouseX > sideX + sideW || mouseY < y || mouseY > y + dialogH) {
+            return false;
+        }
+
+        int itemW = sideW - 12;
+        int itemSpacing = 28;
+        for (int i = 0; i < PREFIX_ITEMS.size(); i++) {
+            int itemY = y + 28 + i * itemSpacing;
+            if (mouseX >= sideX + 6 && mouseX <= sideX + 6 + itemW && mouseY >= itemY && mouseY <= itemY + 24) {
+                appendSearchPrefix(PREFIX_ITEMS.get(i).prefix());
+                return true;
+            }
+        }
+        return true;
+    }
+
+    private void appendSearchPrefix(String prefix) {
+        if (searchBox != null) {
+            String current = searchBox.getValue();
+            String spacePrefix = (!current.isEmpty() && !current.endsWith(" ")) ? " " : "";
+            searchBox.setValue(current + spacePrefix + prefix);
+            searchBox.setFocused(true);
+            searchBox.setCursorPosition(searchBox.getValue().length());
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null) {
+            mc.getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
+            );
+        }
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         return mouseClicked(mouseX, mouseY, button, parent.width, parent.height);
@@ -726,27 +774,7 @@ public class RecipeSearchDialog implements IBoardModal {
         int y = (screenHeight - dialogH) / 2;
 
         // Side panel click handling
-        if (hasSideSpace && mouseX >= sideX && mouseX <= sideX + sideW && mouseY >= y && mouseY <= y + dialogH) {
-            int itemW = sideW - 12;
-            int itemH = 24;
-            int itemSpacing = 28;
-            for (int i = 0; i < PREFIX_ITEMS.size(); i++) {
-                int itemY = y + 28 + i * itemSpacing;
-                if (mouseX >= sideX + 6 && mouseX <= sideX + 6 + itemW && mouseY >= itemY && mouseY <= itemY + itemH) {
-                    PrefixGuideItem item = PREFIX_ITEMS.get(i);
-                    String current = searchBox.getValue();
-                    if (!current.isEmpty() && !current.endsWith(" ")) {
-                        current += " ";
-                    }
-                    searchBox.setValue(current + item.prefix());
-                    searchBox.setFocused(true);
-                    searchBox.setCursorPosition(searchBox.getValue().length());
-                    Minecraft.getInstance().getSoundManager().play(
-                        SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
-                    );
-                    return true;
-                }
-            }
+        if (hasSideSpace && handlePrefixSidePanelClick(mouseX, mouseY, sideX, y, sideW, dialogH)) {
             return true;
         }
 
@@ -797,7 +825,7 @@ public class RecipeSearchDialog implements IBoardModal {
         // Favorites toggle button [⭐]
         if (mouseX >= favBtnX && mouseX <= favBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
             showFavoritesOnly = !showFavoritesOnly;
-            updateSearchResultsSynchronously(searchBox.getValue());
+            updateSearchResultsSynchronously(getSearchQuery());
             Minecraft.getInstance().getSoundManager().play(
                 SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), showFavoritesOnly ? 1.4F : 1.0F)
             );
@@ -817,12 +845,14 @@ public class RecipeSearchDialog implements IBoardModal {
         int searchBoxX = x + 12;
         int searchBoxY = y + 30;
         int searchBoxH = 16;
-        if (mouseX >= searchBoxX && mouseX <= searchBoxX + searchBoxW && mouseY >= searchBoxY && mouseY <= searchBoxY + searchBoxH) {
-            searchBox.setFocused(true);
-            searchBox.mouseClicked(mouseX, mouseY, button);
-            return true;
-        } else {
-            searchBox.setFocused(false);
+        if (searchBox != null) {
+            if (mouseX >= searchBoxX && mouseX <= searchBoxX + searchBoxW && mouseY >= searchBoxY && mouseY <= searchBoxY + searchBoxH) {
+                searchBox.setFocused(true);
+                searchBox.mouseClicked(mouseX, mouseY, button);
+                return true;
+            } else {
+                searchBox.setFocused(false);
+            }
         }
 
         // Click anywhere on a row in the list to select & add that recipe
@@ -874,7 +904,7 @@ public class RecipeSearchDialog implements IBoardModal {
                 if (isStarClicked || button == 1) {
                     if (sr.recipe() != null) {
                         toggleFavoriteRecipe(sr.recipe());
-                        updateSearchResultsSynchronously(searchBox.getValue());
+                        updateSearchResultsSynchronously(getSearchQuery());
                         Minecraft.getInstance().getSoundManager().play(
                             SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
                         );
@@ -953,10 +983,19 @@ public class RecipeSearchDialog implements IBoardModal {
             setVisible(false);
             return;
         }
-
-        RecipeNode node = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
-        if (node == null && sr.recipe() instanceof com.gtceu.calcboard.integration.jei.JeiRecipeWrapper<?> jrw) {
-            node = com.gtceu.calcboard.integration.jei.JeiRecipeConverter.convert(jrw);
+        RecipeNode node = null;
+        if (sr.recipe() instanceof java.util.function.Supplier<?> supp) {
+            Object obj = supp.get();
+            if (obj instanceof RecipeNode rn) {
+                node = rn;
+            }
+        } else if (sr.recipe() instanceof RecipeNode rn) {
+            node = rn.copy();
+        } else {
+            node = com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().convertToNode(sr.recipe());
+            if (node == null && sr.recipe() instanceof com.gtceu.calcboard.integration.jei.JeiRecipeWrapper<?> jrw) {
+                node = com.gtceu.calcboard.integration.jei.JeiRecipeConverter.convert(jrw);
+            }
         }
         if (node != null) {
             node.setPosX(spawnX);
@@ -1133,22 +1172,19 @@ public class RecipeSearchDialog implements IBoardModal {
         if (filterDialog.isVisible()) {
             return filterDialog.charTyped(codePoint, modifiers);
         }
-        return searchBox.charTyped(codePoint, modifiers);
+        return searchBox != null && searchBox.charTyped(codePoint, modifiers);
     }
 
-    public boolean mouseDragged(double mouseX, double mouseY, int button, int screenWidth, int screenHeight) {
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY, int screenWidth, int screenHeight) {
         if (!visible || !isDraggingScrollBar || button != 0) return false;
 
-        int dialogW = getDialogWidth(screenWidth);
         int dialogH = getDialogHeight(screenHeight);
         int listH = dialogH - 60;
         int visibleRows = Math.max(1, listH / ROW_HEIGHT);
         int maxScroll = Math.max(0, filteredRecipes.size() - visibleRows);
         if (maxScroll <= 0) return false;
 
-        int sideW = 104;
-        int gap = 6;
-        boolean hasSideSpace = screenWidth >= (dialogW + sideW + gap + 16);
         int y = (screenHeight - dialogH) / 2;
         int listY = y + 52;
         int scrollTrackH = listH - 4;
@@ -1160,12 +1196,36 @@ public class RecipeSearchDialog implements IBoardModal {
         return true;
     }
 
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        return mouseDragged(mouseX, mouseY, button, dragX, dragY, parent != null ? parent.width : 800, parent != null ? parent.height : 600);
+    }
+
+    @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (isDraggingScrollBar && button == 0) {
             isDraggingScrollBar = false;
             return true;
         }
         return false;
+    }
+
+    public boolean isDraggingScrollBar() {
+        return isDraggingScrollBar;
+    }
+
+    public int getScrollOffset() {
+        return scrollOffset;
+    }
+
+    public void setScrollOffset(int scrollOffset) {
+        this.scrollOffset = scrollOffset;
+    }
+
+    public void setFilteredRecipesForTesting(List<SearchableRecipe> recipes) {
+        this.filteredRecipes.clear();
+        if (recipes != null) {
+            this.filteredRecipes.addAll(recipes);
+        }
     }
 
     private boolean handlePreviewCardClick(Object hoveredIngredient, int button) {
@@ -1181,26 +1241,21 @@ public class RecipeSearchDialog implements IBoardModal {
     }
 
     private static String resolveGenerationInfo(SearchableRecipe sr) {
-        if (sr.recipe() instanceof RecipeNode rn && rn.isGenerator()) {
+        RecipeNode rn = null;
+        if (sr.recipe() instanceof RecipeNode directNode) {
+            rn = directNode;
+        } else if (sr.recipe() instanceof java.util.function.Supplier<?> supp) {
+            Object obj = supp.get();
+            if (obj instanceof RecipeNode suppliedNode) {
+                rn = suppliedNode;
+            }
+        }
+        if (rn != null && rn.isGenerator()) {
             String unit = (rn.getEnergyType() != null) ? rn.getEnergyType().getUnitLabel() : "EU";
             String rate = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(rn.getBaseEUt(), false);
             return "§a(+" + rate + " " + unit + ")";
         }
-        if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
-            return EmiGenHelper.getEmiGenInfo(sr.recipe());
-        }
         return null;
-    }
-
-    private static class EmiGenHelper {
-        private static String getEmiGenInfo(Object recipe) {
-            if (recipe instanceof com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe kg && kg.isGenerator()) {
-                String unit = (kg.getEnergyType() != null) ? kg.getEnergyType().getUnitLabel() : "SU";
-                String rate = com.gtceu.calcboard.client.gui.util.FormatUtil.formatRate(kg.getEut(), false);
-                return "§a(+" + rate + " " + unit + ")";
-            }
-            return null;
-        }
     }
 }
 

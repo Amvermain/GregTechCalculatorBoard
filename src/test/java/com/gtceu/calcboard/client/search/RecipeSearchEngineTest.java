@@ -451,16 +451,15 @@ public class RecipeSearchEngineTest {
     public void testStressUnitsProducerConsumerMatch() {
         var stressId = net.minecraft.resources.ResourceLocation.tryParse("create:stress_units");
         var waterWheelId = net.minecraft.resources.ResourceLocation.tryParse("create:large_water_wheel");
-        var mixerId = net.minecraft.resources.ResourceLocation.tryParse("create:mechanical_mixer");
 
-        // Create virtual kinetic recipes
-        List<SearchableRecipe> kineticRecipes = com.gtceu.calcboard.compat.create.CreateRecipeHandler.getVirtualKineticSearchRecipes();
-        assertFalse(kineticRecipes.isEmpty());
-
-        SearchableRecipe waterWheel = kineticRecipes.stream()
-                .filter(r -> r.displayName().contains("Large Water Wheel"))
-                .findFirst()
-                .orElse(null);
+        var node = com.gtceu.calcboard.compat.create.CreateRecipeHandler.createKineticGeneratorNode(waterWheelId, "Large Water Wheel");
+        SearchableRecipe waterWheel = com.gtceu.calcboard.api.catalog.NativeCatalogSearchHelper.createRecipe(
+                node,
+                waterWheelId,
+                "gtcalcboard:kinetic_source",
+                "Kinetic Source",
+                () -> com.gtceu.calcboard.compat.create.CreateRecipeHandler.createKineticGeneratorNode(waterWheelId, "Large Water Wheel")
+        );
         assertNotNull(waterWheel);
 
         // Verify water wheel produces Stress Units
@@ -531,26 +530,16 @@ public class RecipeSearchEngineTest {
 
     @Test
     public void testKineticGenerationRecipeIndexingAndSearch() {
-        var cat = new dev.emi.emi.api.recipe.EmiRecipeCategory(
-                ResourceLocation.tryParse("gtcalcboard:kinetic_generation"),
-                dev.emi.emi.api.stack.EmiStack.EMPTY
-        );
-        var recipe = new com.gtceu.calcboard.integration.emi.KineticGenerationEmiRecipe(
-                ResourceLocation.tryParse("gtcalcboard:kinetic_gen/create/water_wheel"),
-                cat,
-                ResourceLocation.tryParse("create:water_wheel"),
-                "Water Wheel",
-                20.0,
-                256.0,
-                com.gtceu.calcboard.api.type.GTVoltageTier.LV,
-                com.gtceu.calcboard.api.type.EnergyType.KINETIC_SU,
-                true,
-                List.of(),
-                List.of(com.gtceu.calcboard.api.model.IngredientStack.stressUnit(256.0)),
-                null
+        var wheelId = ResourceLocation.tryParse("create:water_wheel");
+        var node = com.gtceu.calcboard.compat.create.CreateRecipeHandler.createKineticGeneratorNode(wheelId, "Water Wheel");
+        SearchableRecipe sr = com.gtceu.calcboard.api.catalog.NativeCatalogSearchHelper.createRecipe(
+                node,
+                wheelId,
+                "gtcalcboard:kinetic_source",
+                "Kinetic Source",
+                () -> com.gtceu.calcboard.compat.create.CreateRecipeHandler.createKineticGeneratorNode(wheelId, "Water Wheel")
         );
 
-        SearchableRecipe sr = RecipeSearchEngine.buildIndex(recipe);
         assertNotNull(sr);
         assertTrue(sr.isSupported(), "Kinetic generation recipes must be natively supported");
         assertEquals("create", sr.modId());
@@ -559,7 +548,7 @@ public class RecipeSearchEngineTest {
         // Test search queries
         assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("water wheel")));
         assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("@create")));
-        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("[kinetic_generation]")));
+        assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("[kinetic_source]")));
         assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("su")));
         assertTrue(RecipeSearchEngine.matches(sr, RecipeSearchEngine.parseQuery("kinetic")));
     }

@@ -409,7 +409,7 @@ public class CategoryCapabilityMatrix {
         );
     }
 
-    private void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,
+    public void registerMockCategory(ResourceLocation catId, List<ResourceLocation> ws, ResourceLocation defWs,
                                       boolean single, boolean multi, boolean coil, boolean turbine, boolean thermal,
                                       boolean hasLp, boolean hasHp, ResourceLocation lpWs, ResourceLocation hpWs,
                                       GTVoltageTier tTier, double tProd) {

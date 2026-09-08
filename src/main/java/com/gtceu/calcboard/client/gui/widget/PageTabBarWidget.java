@@ -488,8 +488,14 @@ public class PageTabBarWidget {
         return false;
     }
 
+    private boolean testEditing = false;
+
     public boolean isEditing() {
-        return editingPageIndex >= 0 && renameBox != null;
+        return testEditing || (editingPageIndex >= 0 && renameBox != null);
+    }
+
+    public void setEditingForTest(boolean editing) {
+        this.testEditing = editing;
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -503,7 +509,9 @@ public class PageTabBarWidget {
                 renameBox = null;
                 return true;
             }
-            renameBox.keyPressed(keyCode, scanCode, modifiers);
+            if (renameBox != null) {
+                renameBox.keyPressed(keyCode, scanCode, modifiers);
+            }
             return true;
         }
         return false;

@@ -30,6 +30,7 @@ import com.gtceu.calcboard.client.gui.util.BoardViewportTransform;
 import com.gtceu.calcboard.client.gui.widget.*;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.integration.emi.BoardMenu;
+import com.gtceu.calcboard.integration.spi.RecipeViewerRegistry;
 import com.gtceu.calcboard.network.NetworkHandler;
 import com.gtceu.calcboard.network.packet.c2s.C2SAcquireLockPacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
@@ -41,6 +42,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import org.lwjgl.glfw.GLFW;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -394,15 +396,27 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         applyVelocityDamping(dirX, dirY, speed, dt);
     }
 
-    private boolean isSmoothPanBlocked() {
-        if (net.minecraft.client.gui.screens.Screen.hasControlDown() || net.minecraft.client.gui.screens.Screen.hasAltDown()) return true;
+    boolean isSmoothPanBlocked() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getWindow() != null) {
+            if (Screen.hasControlDown() || Screen.hasAltDown()) return true;
+        }
         if (isAnyModalOpen()) return true;
         if (pageBrowserDrawer != null && pageBrowserDrawer.isOpen()) return true;
-        if (dialogManager.getSearchDialog() != null && dialogManager.getSearchDialog().isVisible()) return true;
-        for (NodeWidget nw : nodeWidgets) {
-            if (nw.isAnyEditorActive()) return true;
+        if (pageTabBar != null && pageTabBar.isEditing()) return true;
+        if (dialogManager != null && dialogManager.getSearchDialog() != null && dialogManager.getSearchDialog().isVisible()) return true;
+        if (RecipeViewerRegistry.isAnySearchFocused()) return true;
+        if (isScreenTextTypingActive()) return true;
+        if (nodeWidgets != null) {
+            for (NodeWidget nw : nodeWidgets) {
+                if (nw.isAnyEditorActive()) return true;
+            }
         }
         return false;
+    }
+
+    private boolean isScreenTextTypingActive() {
+        return getFocused() instanceof EditBox editBox && editBox.canConsumeInput();
     }
 
     private void applyVelocityDamping(double dirX, double dirY, double speed, double dt) {
@@ -774,6 +788,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public void removeNode(NodeWidget widget) { actionHandler.removeNode(widget); }
     public void flipSelectedNodes() { actionHandler.flipSelectedNodes(lastMouseX, lastMouseY); }
     public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs) { actionHandler.switchMachineWorkstation(node, newWs); }
+    public void switchMachineWorkstation(RecipeNode node, ResourceLocation newWs, String newMachineDisplayName) { actionHandler.switchMachineWorkstation(node, newWs, newMachineDisplayName); }
     public void switchNodeRecipe(RecipeNode targetNode, RecipeNode newRecipeTemplate) { actionHandler.switchNodeRecipe(targetNode, newRecipeTemplate); }
     public void createFrameFromSelection() { actionHandler.createFrameFromSelection(); }
     public void createSharedMachineFrameFromSelection() { actionHandler.createSharedMachineFrameFromSelection(); }

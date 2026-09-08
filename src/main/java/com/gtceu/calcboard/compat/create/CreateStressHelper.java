@@ -226,4 +226,13 @@ public final class CreateStressHelper {
         cachedGenerators = Collections.unmodifiableList(list);
         return cachedGenerators;
     }
+
+    public static KineticStats calculateWindmillStats(int sails) {
+        int clampedSails = Math.max(8, Math.min(128, sails));
+        int tier = Math.min(16, clampedSails / 8);
+        int rpm = Math.max(1, tier);
+        double totalSu = clampedSails * 64.0;
+        double capPerRpm = totalSu / rpm;
+        return new KineticStats(capPerRpm, rpm, totalSu, -1);
+    }
 }

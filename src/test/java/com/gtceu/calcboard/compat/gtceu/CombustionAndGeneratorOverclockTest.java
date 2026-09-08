@@ -665,4 +665,59 @@ public class CombustionAndGeneratorOverclockTest {
         Assertions.assertEquals(1, srm.getParallel());
         Assertions.assertEquals(0, srm.getCustomParallel());
     }
+
+    @Test
+    @DisplayName("Test Machine Switch Preserves Non-Combustion Recipe Ingredients (e.g. Liquid Oxygen in Mixer)")
+    public void testMachineSwitchPreservesNonCombustionRecipeIngredients() {
+        RecipeNode mixer = new RecipeNode("mixer-lo", "Mixer (Liquid Oxygen)", 120.0, 960.0, GTVoltageTier.EV);
+        mixer.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:mixer"));
+        mixer.setMachineIcon(ResourceLocation.tryParse("gtceu:ev_mixer"));
+
+        IngredientStack liquidOxygen = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:liquid_oxygen"), "Liquid Oxygen", 2000.0);
+        IngredientStack liquidNitrogen = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:liquid_nitrogen"), "Liquid Nitrogen", 2000.0);
+        mixer.addInput(liquidOxygen);
+        mixer.addInput(liquidNitrogen);
+
+        Assertions.assertEquals(2, mixer.getInputs().size());
+        Assertions.assertTrue(mixer.getInputs().stream().anyMatch(in -> ResourceLocation.tryParse("gtceu:liquid_oxygen").equals(in.getId())));
+
+        // Switch from Singleblock EV Mixer to Multiblock Large Mixing Vessel
+        ResourceLocation oldIcon = ResourceLocation.tryParse("gtceu:ev_mixer");
+        ResourceLocation newIcon = ResourceLocation.tryParse("gtceu:large_mixer");
+        mixer.setMachineIcon(newIcon);
+        adapter.onMachineIconChanged(mixer, oldIcon, newIcon);
+
+        Assertions.assertEquals(2, mixer.getInputs().size());
+        Assertions.assertTrue(mixer.getInputs().stream().anyMatch(in -> ResourceLocation.tryParse("gtceu:liquid_oxygen").equals(in.getId())));
+        Assertions.assertTrue(mixer.getInputs().stream().anyMatch(in -> ResourceLocation.tryParse("gtceu:liquid_nitrogen").equals(in.getId())));
+    }
+
+    @Test
+    @DisplayName("Test Combustion to Non-Combustion Switch Cleans Auxiliary Inputs")
+    public void testCombustionToNonCombustionCleansAuxiliaryInputs() {
+        RecipeNode lce = new RecipeNode("lce-node", "Large Combustion Engine", 20.0, -160.0, GTVoltageTier.EV);
+        lce.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
+        lce.setMachineIcon(GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        IngredientStack fuel = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:diesel"), "Diesel", 100.0);
+        lce.addInput(fuel);
+
+        adapter.onMachineIconChanged(lce, null, GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        MachineAddon boostAddon = MachineAddonCatalog.getInstance().getAddon("gtceu:oxygen_boost");
+        adapter.onAddonInstalled(lce, boostAddon);
+
+        // Verify oxygen boost input was added
+        Assertions.assertEquals(2, lce.getInputs().size());
+        Assertions.assertTrue(lce.getInputs().stream().anyMatch(in -> GTCombustionHelper.OXYGEN.equals(in.getId())));
+
+        // Switch from LCE to Mixer
+        ResourceLocation oldIcon = GTCombustionHelper.LARGE_COMBUSTION_ENGINE;
+        ResourceLocation newIcon = ResourceLocation.tryParse("gtceu:mixer");
+        lce.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:mixer"));
+        lce.setMachineIcon(newIcon);
+        adapter.onMachineIconChanged(lce, oldIcon, newIcon);
+
+        // Auxiliary oxygen must be cleaned up, fuel remains
+        Assertions.assertEquals(1, lce.getInputs().size());
+        Assertions.assertEquals(fuel, lce.getInputs().get(0));
+    }
 }

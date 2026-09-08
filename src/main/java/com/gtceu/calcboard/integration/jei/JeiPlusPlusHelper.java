@@ -78,7 +78,6 @@ public class JeiPlusPlusHelper {
             rootOutput.setCount(1);
             outputList.add(rootOutput);
 
-            // 2. Resolve a valid IRecipeCategory so RecipeTreeScreen.drawNode won't NPE on category().getIcon()
             IRecipeCategory<?> primaryCategory = null;
             try {
                 var rm = jeiRuntime.getRecipeManager();
@@ -100,7 +99,6 @@ public class JeiPlusPlusHelper {
                 "gtcalcboard:multiblock_bom"
             );
 
-            // 3. Build RecipeSnapshot
             Constructor<?> snapshotCtor = snapshotCls.getConstructor(
                 recipeRefCls,
                 List.class,
@@ -109,19 +107,16 @@ public class JeiPlusPlusHelper {
             );
             Object snapshotObj = snapshotCtor.newInstance(refObj, inputList, inputList.size(), outputList);
 
-            // 4. Build Tree
             Constructor<?> treeCtor = treeCls.getDeclaredConstructor(snapshotCls, ItemStack.class);
             treeCtor.setAccessible(true);
             Object treeObj = treeCtor.newInstance(snapshotObj, rootOutput);
 
-            // Set Tree.setCraftingMode(true) and rebuild
             Method setCraftingModeMethod = treeCls.getMethod("setCraftingMode", boolean.class);
             setCraftingModeMethod.invoke(treeObj, true);
 
             Method rebuildMethod = treeCls.getMethod("rebuild");
             rebuildMethod.invoke(treeObj);
 
-            // 5. Set into RecipeTreeSession
             Field treeField = sessionCls.getDeclaredField("tree");
             treeField.setAccessible(true);
             treeField.set(null, treeObj);
@@ -133,7 +128,6 @@ public class JeiPlusPlusHelper {
             Method sessionSetCraftingMode = sessionCls.getMethod("setCraftingMode", boolean.class);
             sessionSetCraftingMode.invoke(null, true);
 
-            // 6. Refresh RecipeTreeFavorites
             try {
                 Class<?> favCls = Class.forName("com.lingmu0.JeiPlusPlusMod.client.RecipeTreeFavorites");
                 Method refreshMethod = favCls.getMethod("refreshNow");

@@ -31,6 +31,7 @@ public final class BoardHotkeyHandler {
 
     public static boolean handleKeyPressed(BoardScreen screen, int keyCode, int scanCode, int modifiers, double lastMouseX, double lastMouseY) {
         if (screen == null) return false;
+        if (RecipeViewerRegistry.isAnySearchFocused()) return false;
 
         // Priority ESC handlers (Active wire drag, QuickPageSwitcher, TemplateClone, Drawer, Welcome dialog, active tutorial, modals)
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
@@ -308,7 +309,13 @@ public final class BoardHotkeyHandler {
         if (screen.isAnyModalOpen() || (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen())) {
             return false;
         }
+        if (screen.getPageTabBar() != null && screen.getPageTabBar().isEditing()) {
+            return false;
+        }
         if (screen.getSearchDialog() != null && screen.getSearchDialog().isVisible()) {
+            return false;
+        }
+        if (RecipeViewerRegistry.isAnySearchFocused()) {
             return false;
         }
         for (NodeWidget w : screen.getNodeWidgets()) {

@@ -58,6 +58,7 @@ public class MachineConfigDialog implements IBoardModal {
     private final AddonCatalogView addonCatalogView;
     private final CustomAddonBuilderView customAddonBuilderView;
     private final ThreadingHelixView threadingHelixView;
+    private final com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView createBoilerConfigView;
 
     // Top Base Parallel EditBox
     private EditBox parallelBox;
@@ -84,6 +85,7 @@ public class MachineConfigDialog implements IBoardModal {
         this.addonCatalogView = new AddonCatalogView(this);
         this.customAddonBuilderView = new CustomAddonBuilderView(this);
         this.threadingHelixView = new ThreadingHelixView(this);
+        this.createBoilerConfigView = new com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView(this);
     }
 
     public BoardScreen getParent() {
@@ -96,6 +98,10 @@ public class MachineConfigDialog implements IBoardModal {
 
     public AddonCatalogView getAddonCatalogView() {
         return addonCatalogView;
+    }
+
+    public com.gtceu.calcboard.client.gui.compat.create.CreateBoilerConfigView getCreateBoilerConfigView() {
+        return createBoilerConfigView;
     }
 
     public CustomAddonBuilderView getCustomAddonBuilderView() {
@@ -145,6 +151,8 @@ public class MachineConfigDialog implements IBoardModal {
         this.visible = true;
         if (initialCategory != null) {
             this.selectedCategory = initialCategory;
+        } else if (com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            this.selectedCategory = AddonCategory.HEATER;
         } else if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
             this.selectedCategory = MachineAddon.Category.ROTOR;
         } else if (MachineAddon.isCombustionMachine(node) && node.isMultiblock()) {
@@ -464,6 +472,8 @@ public class MachineConfigDialog implements IBoardModal {
             customAddonBuilderView.render(graphics, font, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else if (selectedCategory == AddonCategory.THREADING) {
             threadingHelixView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
+        } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            createBoilerConfigView.render(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         } else {
             addonCatalogView.renderCatalogGrid(graphics, font, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, virtualMouseX, virtualMouseY);
         }
@@ -742,6 +752,8 @@ public class MachineConfigDialog implements IBoardModal {
                 if (parent != null) parent.markSummaryDirty();
                 return true;
             }
+        } else if (selectedCategory == AddonCategory.HEATER && com.gtceu.calcboard.compat.create.CreateProperties.isCreateBoiler(node)) {
+            return createBoilerConfigView.mouseClicked(node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, mX, mY, button, parent);
         } else {
             return addonCatalogView.mouseClicked(mX, mY, button, node, catalogStartX + 4, catalogStartY + 4, catalogW - 8, catalogH - 8, parent);
         }

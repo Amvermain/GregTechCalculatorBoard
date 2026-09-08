@@ -177,20 +177,17 @@ public class FTBTeamsProvider implements ITeamProvider {
     private boolean isActualPartyTeam(Object team) {
         if (team == null) return false;
         try {
-            // 1. Check isParty() or isPartyTeam() method
             for (Method m : team.getClass().getMethods()) {
                 if ((m.getName().equals("isParty") || m.getName().equals("isPartyTeam")) && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
                     return (boolean) m.invoke(team);
                 }
             }
-            // 2. Check isPlayerTeam() method (if true -> NOT a shared party team)
             for (Method m : team.getClass().getMethods()) {
                 if (m.getName().equals("isPlayerTeam") && m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
                     boolean isPlayer = (boolean) m.invoke(team);
                     if (isPlayer) return false;
                 }
             }
-            // 3. Check getType() -> TeamType.isParty() or enum name
             for (Method m : team.getClass().getMethods()) {
                 if (m.getName().equals("getType") && m.getParameterCount() == 0) {
                     Object typeObj = m.invoke(team);

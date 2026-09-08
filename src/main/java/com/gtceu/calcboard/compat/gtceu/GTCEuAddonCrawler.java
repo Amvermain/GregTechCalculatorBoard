@@ -35,10 +35,8 @@ public class GTCEuAddonCrawler {
             if (a != null && a.getId() != null) seenIds.add(a.getId());
         }
 
-        // 1. Built-in GT Multiblock Traits & Configurable Maintenance Hatch modes
         addBuiltinTraits(collector, seenIds);
 
-        // 2. Discover standard GT coils, rotors, energy hatches, hatches & buses, parallel hatches, and fusion reflectors via helpers
         try {
             TurbineRotorHelper.discoverGTCEuRotors(collector);
             CoilHelper.discoverGTCEuCoils(collector);
@@ -51,7 +49,6 @@ public class GTCEuAddonCrawler {
             }
         } catch (Throwable ignored) {}
 
-        // 3. Scan active recipe stacks (e.g. custom material rotors, parts with NBT)
         if (recipeOutputStacks != null) {
             for (ItemStack s : recipeOutputStacks) {
                 if (s == null || s.isEmpty()) continue;
