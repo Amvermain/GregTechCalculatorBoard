@@ -187,6 +187,12 @@ cd GregTechCalculatorBoard
 
 ---
 
+## AI 활용 고지 (AI Disclosure)
+
+본 프로젝트는 메인테이너와 AI 코딩 에이전트(Google Antigravity / Gemini) 간의 페어 프로그래밍을 통해 개발되었습니다. 시스템 아키텍처 설계, 도메인 요구사항 정의, 코드 검토, 인게임 실기 검증 및 최종 의사결정은 전적으로 메인테이너가 직접 총괄하고 검증했습니다.
+
+---
+
 ## 라이선스
 
 MIT License - 자세한 내용은 [LICENSE](LICENSE) 파일을 참고하세요.
