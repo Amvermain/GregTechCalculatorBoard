@@ -30,6 +30,14 @@ public class C2SReleaseLockPacket {
         buf.writeUtf(pageId != null ? pageId : "default");
     }
 
+    public UUID getTeamId() {
+        return teamId;
+    }
+
+    public String getPageId() {
+        return pageId;
+    }
+
     public void handle(Supplier<NetworkEvent.Context> ctxSupplier) {
         NetworkEvent.Context ctx = ctxSupplier.get();
         ctx.enqueueWork(() -> {

@@ -51,16 +51,16 @@ public final class GTBadgeProvider {
 
             String tierBadgeText = "⚛ " + mkLabel;
             List<Component> tierTooltip = List.of(
-                    Component.literal(String.format(Locale.ROOT, "§d⚛ Fusion Reactor %s", mkLabel)),
-                    Component.literal(String.format(Locale.ROOT, "§7Operating Voltage Tier: §f%s", node.getTargetTier().getName()))
+                    Component.literal("§d⚛ ").append(Component.translatable("gui.gtcalcboard.badge.fusion_reactor_title", mkLabel)),
+                    Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.operating_voltage_tier", "§f" + node.getTargetTier().getName()))
             );
             NodeBadge tierBadge = new NodeBadge(tierBadgeText, 0xFFFFFFFF, 0xEE3D1B5E, 0xFFCC44FF, tierTooltip);
 
             if (startEU > 0) {
                 String startText = "⚡ " + NumberFormatUtil.formatCompactNumber(startEU) + " EU";
                 List<Component> startTooltip = List.of(
-                        Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()),
-                        Component.literal(String.format(Locale.ROOT, "§7Required Ignition Energy: §e%,d EU", startEU)),
+                        Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.fusion_start_buffer_title")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_ignition_energy", String.format(Locale.ROOT, "§e%,d", startEU))),
                         Component.literal(String.format(Locale.ROOT, "§7Formatted: §f%s EU", NumberFormatUtil.formatCompactNumber(startEU)))
                 );
                 NodeBadge startBadge = new NodeBadge(startText, 0xFFFFAA00, 0xEE3D2B1E, 0xFFFFAA00, startTooltip);
@@ -76,10 +76,10 @@ public final class GTBadgeProvider {
             String cleanroom = store.get(GTCEuProperties.CLEANROOM_TYPE);
             if (cleanroom == null || cleanroom.isEmpty()) return List.of();
 
-            String label = cleanroom.toLowerCase(Locale.ROOT).contains("sterile") ? "☣ Sterile" : "★ Cleanroom";
+            String label = cleanroom.toLowerCase(Locale.ROOT).startsWith("sterile") ? "☣ Sterile" : "★ Cleanroom";
             List<Component> tooltip = List.of(
-                    Component.literal("§b★ Cleanroom Required"),
-                    Component.literal("§7Type: §f" + cleanroom)
+                    Component.literal("§b★ ").append(Component.translatable("gui.gtcalcboard.badge.cleanroom_required")),
+                    Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.cleanroom_type", "§f" + cleanroom))
             );
             return List.of(new NodeBadge(label, 0xFF55FFFF, 0xEE1E2D3D, 0xFF55FFFF, tooltip));
         });
@@ -95,31 +95,31 @@ public final class GTBadgeProvider {
                 if (instTier >= reqTier) {
                     String badgeText = "✦ T" + instTier;
                     List<Component> tooltip = new ArrayList<>();
-                    tooltip.add(Component.literal("§b✦ " + Component.translatable("gui.gtcalcboard.reflector_valid_title").getString()));
-                    tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Installed Reflector: §aTier %d", instTier)));
-                    tooltip.add(Component.literal(String.format(Locale.ROOT, "§7Required Reflector: §fTier %d", reqTier)));
+                    tooltip.add(Component.literal("§b✦ ").append(Component.translatable("gui.gtcalcboard.reflector_valid_title")));
+                    tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.installed_reflector", "§aTier " + instTier)));
+                    tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_reflector", reqTier)));
                     int boost = instTier - reqTier;
                     if (boost > 0) {
                         int speed = 1 << boost;
-                        tooltip.add(Component.literal(String.format(Locale.ROOT, "§e⚡ " + Component.translatable("gui.gtcalcboard.reflector_boost_tooltip", boost, speed).getString())));
+                        tooltip.add(Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.reflector_boost_tooltip", boost, speed)));
                     }
-                    tooltip.add(Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.reflector_met").getString()));
+                    tooltip.add(Component.literal("§a✔ ").append(Component.translatable("gui.gtcalcboard.reflector_met")));
                     return List.of(new NodeBadge(badgeText, 0xFF55FFFF, 0xEE1E3D3D, 0xFF55FFFF, tooltip));
                 } else {
                     String badgeText = Component.translatable("gui.gtcalcboard.node_badge.reflector_required", reqTier).getString();
                     List<Component> tooltip = List.of(
-                            Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.reflector_missing_title").getString()),
-                            Component.literal(String.format(Locale.ROOT, "§7Required Reflector: §cTier %d", reqTier)),
-                            Component.literal(String.format(Locale.ROOT, "§7Installed Reflector: §e%s", instTier > 0 ? ("Tier " + instTier) : Component.translatable("gui.gtcalcboard.reflector.none").getString())),
-                            Component.literal("§c❌ " + String.format(Locale.ROOT, Component.translatable("gui.gtcalcboard.reflector_missing_desc").getString(), reqTier))
+                            Component.literal("§c⚠ ").append(Component.translatable("gui.gtcalcboard.reflector_missing_title")),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_reflector", reqTier)),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.installed_reflector", instTier > 0 ? ("§eTier " + instTier) : Component.translatable("gui.gtcalcboard.reflector.none").getString())),
+                            Component.literal("§c❌ ").append(Component.translatable("gui.gtcalcboard.reflector_missing_desc", reqTier))
                     );
                     return List.of(new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
                 }
             } else if (instTier > 0) {
                 String badgeText = "✦ T" + instTier;
                 List<Component> tooltip = List.of(
-                        Component.literal("§b✦ " + Component.translatable("gui.gtcalcboard.reflector_installed_title").getString()),
-                        Component.literal(String.format(Locale.ROOT, "§7Installed Reflector: §bTier %d", instTier))
+                        Component.literal("§b✦ ").append(Component.translatable("gui.gtcalcboard.reflector_installed_title")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.installed_reflector", "§bTier " + instTier))
                 );
                 return List.of(new NodeBadge(badgeText, 0xFF55FFFF, 0xEE1E3D3D, 0xFF55FFFF, tooltip));
             }
@@ -166,27 +166,27 @@ public final class GTBadgeProvider {
                 if (instTemp >= reqTemp) {
                     String badgeText = String.format(Locale.ROOT, "♨ %,dK", instTemp);
                     List<Component> tooltip = List.of(
-                            Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.coil_valid_title").getString()),
-                            Component.literal(String.format(Locale.ROOT, "§7Installed Coil: §a%,d K", instTemp)),
-                            Component.literal(String.format(Locale.ROOT, "§7Required Temp: §f%,d K", reqTemp)),
-                            Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.coil_met").getString())
+                            Component.literal("§6♨ ").append(Component.translatable("gui.gtcalcboard.coil_valid_title")),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.installed_coil", String.format(Locale.ROOT, "§a%,d", instTemp))),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_temp", String.format(Locale.ROOT, "§f%,d", reqTemp))),
+                            Component.literal("§a✔ ").append(Component.translatable("gui.gtcalcboard.coil_met"))
                     );
                     return List.of(new NodeBadge(badgeText, 0xFFFFAA00, 0xEE3D2E1E, 0xFFFFAA00, tooltip));
                 } else {
                     String badgeText = String.format(Locale.ROOT, "♨ ⚠ %,dK", instTemp);
                     List<Component> tooltip = List.of(
-                            Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.coil_missing_title").getString()),
-                            Component.literal(String.format(Locale.ROOT, "§7Required Temp: §c%,d K", reqTemp)),
-                            Component.literal(String.format(Locale.ROOT, "§7Installed Coil: §e%,d K", instTemp)),
-                            Component.literal("§c❌ " + String.format(Locale.ROOT, Component.translatable("gui.gtcalcboard.coil_missing_desc").getString(), reqTemp))
+                            Component.literal("§c⚠ ").append(Component.translatable("gui.gtcalcboard.coil_missing_title")),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_temp", String.format(Locale.ROOT, "§c%,d", reqTemp))),
+                            Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.installed_coil", String.format(Locale.ROOT, "§e%,d", instTemp))),
+                            Component.literal("§c❌ ").append(Component.translatable("gui.gtcalcboard.coil_missing_desc", reqTemp))
                     );
                     return List.of(new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
                 }
             } else if (instTemp > 0 && isCoilMb) {
                 String badgeText = String.format(Locale.ROOT, "♨ %,dK", instTemp);
                 List<Component> tooltip = List.of(
-                        Component.literal("§6♨ " + Component.translatable("gui.gtcalcboard.coil_installed_title").getString()),
-                        Component.literal(String.format(Locale.ROOT, "§7Installed Coil: §e%,d K", instTemp))
+                        Component.literal("§6♨ ").append(Component.translatable("gui.gtcalcboard.coil_installed_title")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.installed_coil", String.format(Locale.ROOT, "§e%,d", instTemp)))
                 );
                 return List.of(new NodeBadge(badgeText, 0xFFFFAA00, 0xEE3D2E1E, 0xFFFFAA00, tooltip));
             }
@@ -201,16 +201,16 @@ public final class GTBadgeProvider {
             List<NodeBadge> badges = new ArrayList<>();
             if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isOxygenBoosted(node)) {
                 List<Component> tt = List.of(
-                        Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.oxygen_boost").getString()),
-                        Component.literal("§7" + Component.translatable("gui.gtcalcboard.addon.oxygen_boost.desc").getString()),
-                        Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.node_badge.oxygen_boost").getString())
+                        Component.literal("§b💨 ").append(Component.translatable("gui.gtcalcboard.addon.oxygen_boost")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.oxygen_boost.desc")),
+                        Component.literal("§a✔ ").append(Component.translatable("gui.gtcalcboard.node_badge.oxygen_boost"))
                 );
                 badges.add(new NodeBadge("💨 Boost (3.0x)", 0xFF55FFAA, 0xEE1E3D2D, 0xFF55FFAA, tt));
             } else if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isLiquidOxygenBoosted(node)) {
                 List<Component> tt = List.of(
-                        Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost").getString()),
-                        Component.literal("§7" + Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost.desc").getString()),
-                        Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.node_badge.liquid_oxygen_boost").getString())
+                        Component.literal("§b💨 ").append(Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.addon.liquid_oxygen_boost.desc")),
+                        Component.literal("§a✔ ").append(Component.translatable("gui.gtcalcboard.node_badge.liquid_oxygen_boost"))
                 );
                 badges.add(new NodeBadge("💨 Boost (4.0x)", 0xFF55FFAA, 0xEE1E3D2D, 0xFF55FFAA, tt));
             }
@@ -219,9 +219,9 @@ public final class GTBadgeProvider {
                 String ox = store.get(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE);
                 String oxName = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getOxidizerDisplayName(ox);
                 List<Component> tt = List.of(
-                        Component.literal("§b💨 " + Component.translatable("gui.gtcalcboard.tooltip.oxidizer_boost").getString()),
-                        Component.literal("§7Oxidizer: §f" + oxName),
-                        Component.literal("§a✔ 2x Fuel, Amp Boost")
+                        Component.literal("§b💨 ").append(Component.translatable("gui.gtcalcboard.tooltip.oxidizer_boost")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.oxidizer_label", "§f" + oxName)),
+                        Component.literal("§a✔ ").append(Component.translatable("gui.gtcalcboard.badge.oxidizer_boost_active"))
                 );
                 badges.add(new NodeBadge("💨 " + oxName, 0xFF55FFAA, 0xEE1E3D2D, 0xFF55FFAA, tt));
             }
@@ -230,8 +230,8 @@ public final class GTBadgeProvider {
                 String cl = store.get(GTCEuProperties.COMBUSTION_COOLANT_TYPE);
                 String clName = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getCoolantDisplayName(cl);
                 List<Component> tt = List.of(
-                        Component.literal("§b❄ " + Component.translatable("gui.gtcalcboard.tooltip.coolant_boost").getString()),
-                        Component.literal("§7Coolant: §f" + clName)
+                        Component.literal("§b❄ ").append(Component.translatable("gui.gtcalcboard.tooltip.coolant_boost")),
+                        Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.coolant_label", "§f" + clName))
                 );
                 badges.add(new NodeBadge("❄ " + clName, 0xFF58D3FF, 0xEE1E2E3D, 0xFF58D3FF, tt));
             }

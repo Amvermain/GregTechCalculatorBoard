@@ -62,31 +62,48 @@ public class NodeWidget {
     }
 
     private final com.gtceu.calcboard.client.gui.render.NodeCardTextCache textCache = new com.gtceu.calcboard.client.gui.render.NodeCardTextCache();
-    private LayoutCacheKey layoutCacheKey = null;
     private com.gtceu.calcboard.client.gui.layout.NodeLayoutBounds layoutBounds = null;
-
-    private record LayoutCacheKey(
-            double posX,
-            double posY,
-            int cardWidth,
-            int cardHeight,
-            boolean isFlipped,
-            int inCount,
-            int outCount,
-            int visInCount,
-            int visOutCount,
-            int hiddenCount,
-            int addonCount,
-            com.gtceu.calcboard.api.type.EnergyType energyType,
-            boolean hasTargetBatch,
-            boolean isModule,
-            boolean slimMode,
-            boolean targetBatchEditing,
-            String countText
-    ) {}
+    private double lastPosX = Double.NaN;
+    private double lastPosY = Double.NaN;
+    private int lastCardWidth = -1;
+    private int lastCardHeight = -1;
+    private boolean lastFlipped = false;
+    private int lastInCount = -1;
+    private int lastOutCount = -1;
+    private int lastVisInCount = -1;
+    private int lastVisOutCount = -1;
+    private int lastHiddenCount = -1;
+    private int lastAddonCount = -1;
+    private com.gtceu.calcboard.api.type.EnergyType lastEnergyType = null;
+    private boolean lastHasTargetBatch = false;
+    private boolean lastIsModule = false;
+    private boolean lastSlimMode = false;
+    private boolean lastTargetBatchEditing = false;
+    private String lastCountText = null;
 
     public com.gtceu.calcboard.client.gui.render.NodeCardTextCache getTextCache() {
         return textCache;
+    }
+
+    private boolean isLayoutDirty(boolean slim, boolean targetBatchEditing, String countText) {
+        if (layoutBounds == null) return true;
+        return node.getPosX() != lastPosX
+                || node.getPosY() != lastPosY
+                || node.getCardWidth() != lastCardWidth
+                || node.getCardHeight() != lastCardHeight
+                || node.isFlipped() != lastFlipped
+                || node.getInputs().size() != lastInCount
+                || node.getOutputs().size() != lastOutCount
+                || node.getVisibleInputIndices().size() != lastVisInCount
+                || node.getVisibleOutputIndices().size() != lastVisOutCount
+                || node.getTotalHiddenCount() != lastHiddenCount
+                || node.getAddons().size() != lastAddonCount
+                || node.getEnergyType() != lastEnergyType
+                || node.hasTargetBatch() != lastHasTargetBatch
+                || node.isModule() != lastIsModule
+                || slim != lastSlimMode
+                || targetBatchEditing != lastTargetBatchEditing
+                || !Objects.equals(countText, lastCountText);
     }
 
     public com.gtceu.calcboard.client.gui.layout.NodeLayoutBounds getLayoutBounds() {
@@ -94,27 +111,7 @@ public class NodeWidget {
         boolean targetBatchEditing = targetBatchEditor != null && targetBatchEditor.isEditing();
         String countText = countEditor != null ? countEditor.getDisplayText() : "";
 
-        LayoutCacheKey currentKey = new LayoutCacheKey(
-                node.getPosX(),
-                node.getPosY(),
-                node.getCardWidth(),
-                node.getCardHeight(),
-                node.isFlipped(),
-                node.getInputs().size(),
-                node.getOutputs().size(),
-                node.getVisibleInputIndices().size(),
-                node.getVisibleOutputIndices().size(),
-                node.getTotalHiddenCount(),
-                node.getAddons().size(),
-                node.getEnergyType(),
-                node.hasTargetBatch(),
-                node.isModule(),
-                slim,
-                targetBatchEditing,
-                countText
-        );
-
-        if (layoutBounds == null || !currentKey.equals(layoutCacheKey)) {
+        if (isLayoutDirty(slim, targetBatchEditing, countText)) {
             int fontW = 20;
             try {
                 var mc = Minecraft.getInstance();
@@ -123,7 +120,23 @@ public class NodeWidget {
                 }
             } catch (Throwable ignored) {}
             this.layoutBounds = com.gtceu.calcboard.client.gui.layout.NodeLayoutCalculator.compute(node, slim, fontW, targetBatchEditing);
-            this.layoutCacheKey = currentKey;
+            this.lastPosX = node.getPosX();
+            this.lastPosY = node.getPosY();
+            this.lastCardWidth = node.getCardWidth();
+            this.lastCardHeight = node.getCardHeight();
+            this.lastFlipped = node.isFlipped();
+            this.lastInCount = node.getInputs().size();
+            this.lastOutCount = node.getOutputs().size();
+            this.lastVisInCount = node.getVisibleInputIndices().size();
+            this.lastVisOutCount = node.getVisibleOutputIndices().size();
+            this.lastHiddenCount = node.getTotalHiddenCount();
+            this.lastAddonCount = node.getAddons().size();
+            this.lastEnergyType = node.getEnergyType();
+            this.lastHasTargetBatch = node.hasTargetBatch();
+            this.lastIsModule = node.isModule();
+            this.lastSlimMode = slim;
+            this.lastTargetBatchEditing = targetBatchEditing;
+            this.lastCountText = countText;
         }
         return layoutBounds;
     }
@@ -132,7 +145,7 @@ public class NodeWidget {
         this.cachedInputRates = null;
         this.cachedOutputRates = null;
         this.layoutBounds = null;
-        this.layoutCacheKey = null;
+        this.lastPosX = Double.NaN;
         this.textCache.markDirty();
         if (parent != null) {
             parent.markSummaryDirty();
@@ -392,13 +405,13 @@ public class NodeWidget {
     public boolean isTierButtonHovered(double mouseX, double mouseY) {
         if (!getLayoutBounds().hasRow2Controls()) return false;
         var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-        return handler.isTierOrSpeedControlHovered(node, mouseX, mouseY);
+        return handler.isTierOrSpeedControlHovered(this, node, mouseX, mouseY);
     }
 
     public boolean isOcButtonHovered(double mouseX, double mouseY) {
         if (!getLayoutBounds().hasRow2Controls()) return false;
         var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-        return handler.isSecondaryControlHovered(node, mouseX, mouseY);
+        return handler.isSecondaryControlHovered(this, node, mouseX, mouseY);
     }
 
     public boolean isAddonTrayHovered(double mouseX, double mouseY) {
@@ -409,7 +422,7 @@ public class NodeWidget {
         if (!getLayoutBounds().hasRow2Controls()) return false;
         if (isAddonTrayHovered(mouseX, mouseY)) return true;
         var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-        return handler.isMachineConfigHovered(node, mouseX, mouseY);
+        return handler.isMachineConfigHovered(this, node, mouseX, mouseY);
     }
 
     public boolean isRotorButtonHovered(double mouseX, double mouseY) {
@@ -421,538 +434,19 @@ public class NodeWidget {
     }
 
     public boolean changeTier(int direction) {
-        if (parent != null && !parent.ensureEditPermission()) return false;
-
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
-        if (adapter != null && adapter.isBoilerRecipe(node)) {
-            com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
-            com.gtceu.calcboard.api.type.GTBoilerTier[] vals = com.gtceu.calcboard.api.type.GTBoilerTier.values();
-            int newIdx = (curTier.ordinal() + direction + vals.length) % vals.length;
-            com.gtceu.calcboard.api.type.GTBoilerTier nextTier = vals[newIdx];
-            node.setMachineIcon(nextTier.getDefaultIcon());
-            node.setMultiblock(nextTier.isMultiblock());
-            if (parent != null) parent.markSummaryDirty();
-            invalidateCache();
-            return true;
-        }
-
-        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionFamily(node)) {
-            GTVoltageTier curTier = node.getTargetTier();
-            if (curTier == null) {
-                curTier = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getCombustionTierForMachine(node.getMachineIcon());
-                if (curTier == null) curTier = GTVoltageTier.LV;
-            }
-            int curOrdinal = curTier.ordinal();
-            int minOrdinal = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getMinCombustionTier().ordinal();
-            int maxOrdinal = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.getMaxCombustionTier().ordinal();
-            int nextOrdinal = curOrdinal + direction;
-            if (nextOrdinal < minOrdinal || nextOrdinal > maxOrdinal || nextOrdinal == curOrdinal) {
-                return false;
-            }
-            GTVoltageTier nextTier = GTVoltageTier.getByIndex(nextOrdinal);
-            GTVoltageTier oldTier = node.getTargetTier();
-            boolean ok = com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.syncCombustionMachine(node, nextTier);
-            if (ok) {
-                syncSharedFrameHardware(node);
-                if (parent != null) {
-                    parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, nextTier));
-                    parent.markSummaryDirty();
-                }
-                invalidateCache();
-                return true;
-            }
-            return false;
-        }
-
-        boolean isVanillaCooking = node.getRecipeCategoryId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
-        boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE;
-
-        int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
-        if (adapter != null && !isVanillaCooking && !isPassiveOrSteam) {
-            GTVoltageTier minWsTier = adapter.getMinimumWorkstationTier(node);
-            if (minWsTier != null) {
-                minIdx = Math.max(minIdx, minWsTier.ordinal());
-            }
-        }
-        int maxIdx = GTVoltageTier.values().length - 1;
-        if (node.isTurbine()) {
-            if (node.isMultiblock()) {
-                GTVoltageTier baseTier = com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getTurbineBaseTier(node);
-                if (baseTier != null) {
-                    minIdx = Math.max(minIdx, baseTier.ordinal());
-                }
-            } else {
-                maxIdx = GTVoltageTier.HV.ordinal();
-            }
-        }
-
-        if (!node.isMultiblock() && node.supportsSteamMode()) {
-            SteamMode curSteam = node.getSteamMode();
-            if (curSteam == SteamMode.LOW_PRESSURE) {
-                if (direction > 0) {
-                    node.setSteamMode(SteamMode.HIGH_PRESSURE);
-                    if (parent != null) parent.markSummaryDirty();
-                    invalidateCache();
-                    return true;
-                } else if (direction < 0) {
-                    if (isVanillaCooking) {
-                        node.setSteamMode(SteamMode.NONE);
-                        node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
-                        syncSharedFrameHardware(node);
-                        if (parent != null) parent.markSummaryDirty();
-                        invalidateCache();
-                        return true;
-                    }
-                    return false; // LP Steam is the absolute lowest tier for standard steam machines
-                }
-            } else if (curSteam == SteamMode.HIGH_PRESSURE) {
-                if (direction > 0) {
-                    node.setSteamMode(SteamMode.NONE);
-                    GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
-                    node.setTargetTier(lowestElectric);
-                    ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
-                    if (sbWs != null) {
-                        node.setMachineIcon(sbWs);
-                    } else if (isVanillaCooking) {
-                        node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
-                    }
-                    syncSharedFrameHardware(node);
-                    if (parent != null) parent.markSummaryDirty();
-                    invalidateCache();
-                    return true;
-                } else if (direction < 0) {
-                    node.setSteamMode(SteamMode.LOW_PRESSURE);
-                    syncSharedFrameHardware(node);
-                    if (parent != null) parent.markSummaryDirty();
-                    invalidateCache();
-                    return true;
-                }
-            } else {
-                if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
-                    if (direction > 0) {
-                        if (node.supportsSteamMode()) {
-                            node.setSteamMode(SteamMode.LOW_PRESSURE);
-                        } else {
-                            GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
-                            node.setTargetTier(lowestElectric);
-                            ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
-                            if (sbWs != null) {
-                                node.setMachineIcon(sbWs);
-                            } else if (isVanillaCooking) {
-                                node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
-                            }
-                        }
-                        syncSharedFrameHardware(node);
-                        if (parent != null) parent.markSummaryDirty();
-                        invalidateCache();
-                        return true;
-                    }
-                    return false;
-                }
-
-                int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
-                int lowestAllowedElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV.ordinal() : GTVoltageTier.LV.ordinal();
-                if (direction < 0) {
-                    if (curIdx <= lowestAllowedElectric) {
-                        if (node.supportsSteamMode()) {
-                            node.setSteamMode(SteamMode.HIGH_PRESSURE);
-                            syncSharedFrameHardware(node);
-                            if (parent != null) parent.markSummaryDirty();
-                            invalidateCache();
-                            return true;
-                        } else if (isVanillaCooking) {
-                            node.setMachineIcon(ResourceLocation.tryParse("minecraft:furnace"));
-                            syncSharedFrameHardware(node);
-                            if (parent != null) parent.markSummaryDirty();
-                            invalidateCache();
-                            return true;
-                        }
-                        return false;
-                    }
-                }
-            }
-        } else if (node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.NONE) {
-            if (direction > 0) {
-                GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
-                node.setTargetTier(lowestElectric);
-                ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
-                if (sbWs != null) {
-                    node.setMachineIcon(sbWs);
-                }
-                syncSharedFrameHardware(node);
-                if (parent != null) parent.markSummaryDirty();
-                invalidateCache();
-                return true;
-            }
-            return false;
-        }
-
-        int curIdx = node.isLargeTurbine()
-                ? com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.getRotorHolderTier(node).ordinal()
-                : (node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal());
-        int newIdx = curIdx + direction;
-
-        if (node.isTurbine() && !node.isMultiblock() && newIdx > GTVoltageTier.HV.ordinal()) {
-            if (node.hasMultiblockOption()) {
-                GTVoltageTier oldTier = node.getTargetTier();
-                GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
-                node.setMultiblock(true);
-                node.setTargetTier(newTier);
-                com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setRotorHolderTier(node, newTier);
-                com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
-                syncSharedFrameHardware(node);
-                if (parent != null) {
-                    parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
-                    parent.markSummaryDirty();
-                }
-                invalidateCache();
-                return true;
-            } else {
-                return false;
-            }
-        } else if (newIdx < minIdx || newIdx > maxIdx || newIdx == curIdx) {
-            return false;
-        }
-
-        GTVoltageTier oldTier = node.getTargetTier();
-        GTVoltageTier newTier = GTVoltageTier.getByIndex(newIdx);
-
-        node.setTargetTier(newTier);
-        if (node.isLargeTurbine()) {
-            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setRotorHolderTier(node, newTier);
-        }
-        if (!node.isMultiblock()) {
-            ResourceLocation sbWs = node.getWorkstationForTier(newTier);
-            if (sbWs != null) {
-                node.setMachineIcon(sbWs);
-            }
-        }
-        com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter.syncTurbineMachineIcon(node);
-        syncSharedFrameHardware(node);
-        if (parent != null) {
-            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.targetTier(node.getId(), oldTier, newTier));
-            parent.markSummaryDirty();
-        }
-        invalidateCache();
-        return true;
+        return NodeTierChangeHandler.changeTier(this, node, parent, direction);
     }
 
-    private void syncSharedFrameHardware(RecipeNode node) {
-        if (parent != null && parent.getGraph() != null) {
-            var frame = parent.getGraph().findFrameEnclosingNode(node);
-            if (frame != null && frame.isSharedMachineFrame()) {
-                frame.syncHardwareConfig(node, parent.getGraph());
-                parent.rebuildWidgets();
-            }
-        }
+    public void syncSharedFrameHardware(RecipeNode node) {
+        NodeTierChangeHandler.syncSharedFrameHardware(parent, node);
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        var bounds = getLayoutBounds();
-        int inIdx = bounds.getHoveredInputPortIndex(mouseX, mouseY);
-        if (inIdx >= 0 && inIdx < node.getInputs().size()) {
-            return handleInputPortScroll(inIdx, delta);
-        }
-
-        if (bounds.hasRow2Controls()) {
-            var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-            if (handler.handleControlScroll(this, node, mouseX, mouseY, delta)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean handleInputPortScroll(int inIdx, double delta) {
-        if (parent != null && !parent.ensureEditPermission()) return true;
-        IngredientStack in = node.getInputs().get(inIdx);
-        if (in.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
-            var allFluids = com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.getAllBoilingFluidInputs();
-            if (in.getAlternatives().size() != allFluids.size() || in.getAlternatives().stream().anyMatch(id -> !allFluids.contains(id))) {
-                in.setAlternatives(allFluids);
-            }
-        }
-        if (!in.hasAlternatives()) {
-            return false;
-        }
-
-        net.minecraft.resources.ResourceLocation oldAlt = in.getId();
-        in.cycleAlternative(delta > 0 ? -1 : 1);
-        if (in.isFluid() && com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.isDynamoToBoilerConvertible(node)) {
-            com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler.updateBoilerFluidRecipe(node, in.getId());
-        }
-        invalidateCache();
-        if (parent != null) {
-            net.minecraft.resources.ResourceLocation newAlt = in.getId();
-            if (oldAlt != null && !oldAlt.equals(newAlt)) {
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.SelectAlternativeCommand(
-                        node.getId(), inIdx, true, oldAlt, newAlt));
-            }
-            parent.getGraph().cleanupInvalidConnections();
-            parent.markSummaryDirty();
-        }
-        playUiSound(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.get(), 1.4F);
-        return true;
-    }
-
-    private void playUiSound(net.minecraft.sounds.SoundEvent sound, float pitch) {
-        try {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc != null && mc.getSoundManager() != null && sound != null) {
-                mc.getSoundManager().play(
-                        net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(sound, pitch)
-                );
-            }
-        } catch (Throwable ignored) {}
+        return NodeWidgetInteractionHandler.mouseScrolled(this, mouseX, mouseY, delta);
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int x = (int) node.getPosX();
-        int y = (int) node.getPosY();
-
-        if (hiddenPortsPopup.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-
-        if (!isPointInside(mouseX, mouseY)) {
-            commitCountEdit();
-            return false;
-        }
-
-        if (button == 1) {
-            // Right click on input or output port -> Hide and disconnect wires
-            int inPort = getHoveredInputPortIndex(mouseX, mouseY);
-            if (inPort >= 0) {
-                hidePortAndDisconnectWires(true, inPort);
-                return true;
-            }
-            int outPort = getHoveredOutputPortIndex(mouseX, mouseY);
-            if (outPort >= 0) {
-                if (isVoidToggleModifier()) {
-                    toggleOutputPortVoid(outPort);
-                    return true;
-                }
-                hidePortAndDisconnectWires(false, outPort);
-                return true;
-            }
-        }
-
-        if (button == 0) {
-            // Left click on Hidden Ports badge
-            if (isHiddenPortsBadgeHovered(mouseX, mouseY)) {
-                hiddenPortsPopup.toggle();
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-                );
-                return true;
-            }
-        }
-
-        if (node.isReroute()) {
-            return handleRerouteClick(mouseX, mouseY, button);
-        }
-
-        // Machine Icon Click -> Open Machine / Controller Selector Dialog
-        if (button == 0 && isMachineIconHovered(mouseX, mouseY)) {
-            if (parent != null) {
-                parent.openMachineSelectorDialog(node);
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-                );
-                return true;
-            }
-        }
-
-        // Switch Recipe Button [⟲]
-        if (isSwitchButtonHovered(mouseX, mouseY)) {
-            if (parent != null) {
-                parent.openRecipeSwitchDialog(node);
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-                );
-            }
-            return true;
-        }
-
-        // Module Expand Button [⤢]
-        if (isExpandButtonHovered(mouseX, mouseY)) {
-            List<FlowGraph.ConnectionEdge> moduleEdges = new ArrayList<>();
-            for (FlowGraph.ConnectionEdge e : parent.getGraph().getConnections()) {
-                if (e.fromNodeId().equals(node.getId()) || e.toNodeId().equals(node.getId())) {
-                    moduleEdges.add(e);
-                }
-            }
-            List<RecipeNode> subNodes = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getNodes()) : Collections.emptyList();
-            List<FlowGraph.ConnectionEdge> subEdges = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getConnections()) : Collections.emptyList();
-            List<com.gtceu.calcboard.api.model.CanvasGroupFrame> subFrames = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getFrames()) : Collections.emptyList();
-            List<com.gtceu.calcboard.api.model.CanvasStickyNote> subNotes = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getStickyNotes()) : Collections.emptyList();
-
-            boolean expanded = parent.getGraph().expandModule(node);
-            if (expanded) {
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.ExpandModuleCommand(node, subNodes, subEdges, moduleEdges, subFrames, subNotes));
-                parent.rebuildWidgets();
-                parent.markSummaryDirty();
-                com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().onModuleExpanded();
-                Minecraft.getInstance().getSoundManager().play(
-                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_STONECUTTER_TAKE_RESULT, 1.2F)
-                );
-            }
-            return true;
-        }
-
-        // Close Button [X]
-        if (isCloseButtonHovered(mouseX, mouseY)) {
-            parent.removeNode(this);
-            return true;
-        }
-
-        // Direction / Flip Button [➔] or [⬅]
-        if (isFlipButtonHovered(mouseX, mouseY)) {
-            boolean oldFlipped = node.isFlipped();
-            boolean newFlipped = !oldFlipped;
-            node.setFlipped(newFlipped);
-            if (parent != null) {
-                parent.recordCommand(new com.gtceu.calcboard.api.history.BoardCommand.FlipNodesCommand(node, oldFlipped, newFlipped));
-                parent.markSummaryDirty();
-            }
-            invalidateCache();
-            Minecraft mc = Minecraft.getInstance();
-            mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F));
-            return true;
-        }
-
-        // Target Base Node Toggle Button [⌖]
-        if (isTargetButtonHovered(mouseX, mouseY)) {
-            boolean nowBase = !node.isBaseNode();
-            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.baseAnchor(node.getId(), !nowBase, nowBase));
-            parent.getGraph().setBaseNode(nowBase ? node : null);
-            parent.rebuildWidgets();
-            parent.markSummaryDirty();
-
-            Minecraft mc = Minecraft.getInstance();
-            if (nowBase) {
-                BoardToast.show(Component.literal("§6⌖ ").append(Component.translatable("message.gtcalcboard.base_set", node.getName())));
-                mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.2F));
-            } else {
-                BoardToast.show(Component.literal("§7").append(Component.translatable("message.gtcalcboard.base_cleared")));
-            }
-            return true;
-        }
-
-        var bounds = getLayoutBounds();
-
-        // Machine Count Decrement [-]
-        if (bounds.getCountMinusBtnBounds().contains(mouseX, mouseY)) {
-            commitCountEdit();
-            double oldVal = node.getMachineCount();
-            double step = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0.1 : (oldVal <= 1.0 ? 0.05 : 1.0);
-            double newVal = Math.max(0.01, Math.round((oldVal - step) * 1000.0) / 1000.0);
-            if (oldVal != newVal) {
-                node.setMachineCount(newVal);
-                parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
-                if (node.isCompoundNode()) {
-                    parent.getGraph().syncCompoundParameters(node);
-                    parent.rebuildWidgets();
-                    parent.markSummaryDirty();
-                }
-            }
-            updateCountBuffer();
-            invalidateCache();
-            return true;
-        }
-
-        // If NameEditor is already editing and clicked inside header
-        if (button == 0 && nameEditor.isEditing() && isHeaderHovered(mouseX, mouseY)) {
-            var mc = Minecraft.getInstance();
-            var font = mc != null ? mc.font : null;
-            if (font != null) {
-                int titleX = x + (node.getMachineIcon() != null ? 22 : 6);
-                nameEditor.onClick(font, mouseX, titleX + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
-                return true;
-            }
-        }
-
-        // Count Input Box Click
-        if (bounds.getCountBoxBounds().contains(mouseX, mouseY)) {
-            if (!countEditor.isEditing()) {
-                countEditor.startEditing();
-            } else {
-                var mc = Minecraft.getInstance();
-                if (mc != null && mc.font != null) {
-                    countEditor.onClick(mc.font, mouseX, bounds.getCountBoxBounds().x() + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
-                }
-            }
-            return true;
-        }
-
-        // Machine Count Increment [+]
-        if (bounds.getCountPlusBtnBounds().contains(mouseX, mouseY)) {
-            commitCountEdit();
-            double oldVal = node.getMachineCount();
-            double step = net.minecraft.client.gui.screens.Screen.hasShiftDown() ? 0.1 : (oldVal < 1.0 ? 0.05 : 1.0);
-            double newVal = Math.round((oldVal + step) * 1000.0) / 1000.0;
-            node.setMachineCount(newVal);
-            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
-            if (node.isCompoundNode()) {
-                parent.getGraph().syncCompoundParameters(node);
-                parent.rebuildWidgets();
-                parent.markSummaryDirty();
-            }
-            updateCountBuffer();
-            invalidateCache();
-            return true;
-        }
-
-        // Machine Count Half [/2]
-        if (bounds.getCountHalfBtnBounds().contains(mouseX, mouseY)) {
-            commitCountEdit();
-            double oldVal = node.getMachineCount();
-            double newVal = Math.max(0.01, Math.round((oldVal / 2.0) * 1000.0) / 1000.0);
-            if (oldVal != newVal) {
-                node.setMachineCount(newVal);
-                parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
-                if (node.isCompoundNode()) {
-                    parent.getGraph().syncCompoundParameters(node);
-                    parent.rebuildWidgets();
-                    parent.markSummaryDirty();
-                }
-            }
-            updateCountBuffer();
-            invalidateCache();
-            return true;
-        }
-
-        // Machine Count Double [x2]
-        if (bounds.getCountDoubleBtnBounds().contains(mouseX, mouseY)) {
-            commitCountEdit();
-            double oldVal = node.getMachineCount();
-            double newVal = Math.round((oldVal * 2.0) * 1000.0) / 1000.0;
-            node.setMachineCount(newVal);
-            parent.recordCommand(com.gtceu.calcboard.api.history.BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
-            if (node.isCompoundNode()) {
-                parent.getGraph().syncCompoundParameters(node);
-                parent.rebuildWidgets();
-                parent.markSummaryDirty();
-            }
-            updateCountBuffer();
-            invalidateCache();
-            return true;
-        }
-
-        // Delegate row 2 control clicks (Tier/Speed, OC Mode, Machine Config) to IModGuiHandler
-        if (bounds.hasRow2Controls()) {
-            var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
-            if (handler.handleControlClick(this, node, mouseX, mouseY, button)) {
-                if (node.isCompoundNode() && parent != null) {
-                    parent.getGraph().syncCompoundParameters(node);
-                    parent.rebuildWidgets();
-                    parent.markSummaryDirty();
-                }
-                return true;
-            }
-        }
-
-        return false;
+        return NodeWidgetInteractionHandler.mouseClicked(this, mouseX, mouseY, button);
     }
 
     public boolean checkHeaderDoubleClick(double canvasMouseX, double canvasMouseY) {
@@ -974,7 +468,6 @@ public class NodeWidget {
         }
         return false;
     }
-
 
     public boolean mouseDragged(double canvasMouseX, double canvasMouseY, int button, double dragX, double dragY) {
         if (button != 0) return false;
@@ -1030,30 +523,4 @@ public class NodeWidget {
         if (targetBatchEditor.charTyped(codePoint, modifiers)) return true;
         return false;
     }
-
-    private boolean handleRerouteClick(double mouseX, double mouseY, int button) {
-        if (getHoveredInputPortIndex(mouseX, mouseY) >= 0 || getHoveredOutputPortIndex(mouseX, mouseY) >= 0) {
-            return false;
-        }
-        if (button == 0 && isTargetBatchBadgeHovered(mouseX, mouseY)) {
-            commitCountEdit();
-            targetBatchEditor.startEditing();
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-            );
-            return true;
-        }
-        if (button == 1 && net.minecraft.client.gui.screens.Screen.hasShiftDown() && parent != null) {
-            parent.openJunctionSupplyDialog(node);
-            Minecraft.getInstance().getSoundManager().play(
-                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.1F)
-            );
-            return true;
-        }
-        return false;
-    }
 }
-
-
-
-

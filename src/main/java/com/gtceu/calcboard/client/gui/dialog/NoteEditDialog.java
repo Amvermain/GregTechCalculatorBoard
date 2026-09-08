@@ -7,7 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.MultiLineEditBox;
+import com.gtceu.calcboard.client.gui.widget.BoardMultiLineEditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import org.lwjgl.glfw.GLFW;
@@ -26,7 +26,7 @@ public class NoteEditDialog implements IBoardModal {
     private CanvasStickyNote targetNote = null;
 
     private EditBox titleInput;
-    private MultiLineEditBox contentInput;
+    private BoardMultiLineEditBox contentInput;
     private int selectedColor;
     private String initialTitle;
     private String initialContent;
@@ -57,7 +57,7 @@ public class NoteEditDialog implements IBoardModal {
         this.titleInput.setValue(note.getTitle() != null ? note.getTitle() : "");
         this.titleInput.setFocused(false);
 
-        this.contentInput = new MultiLineEditBox(font, x + 16, y + 82, dialogW - 32, 90, Component.literal(""), Component.literal("Content"));
+        this.contentInput = new BoardMultiLineEditBox(font, x + 16, y + 82, dialogW - 32, 90, Component.literal(""), Component.literal("Content"));
         this.contentInput.setCharacterLimit(1024);
         this.contentInput.setValue(note.getContent() != null ? note.getContent() : "");
         this.contentInput.setFocused(true);
@@ -222,6 +222,44 @@ public class NoteEditDialog implements IBoardModal {
         }
 
         return true;
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (!visible) return false;
+        if (contentInput != null && contentInput.mouseReleased(mouseX, mouseY, button)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY, int screenWidth, int screenHeight) {
+        if (!visible) return false;
+        if (contentInput != null && contentInput.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (!visible) return false;
+        if (contentInput != null && contentInput.mouseScrolled(mouseX, mouseY, delta)) {
+            return true;
+        }
+        return true;
+    }
+
+    @Override
+    public void tick() {
+        if (!visible) return;
+        if (titleInput != null) {
+            titleInput.tick();
+        }
+        if (contentInput != null) {
+            contentInput.tick();
+        }
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

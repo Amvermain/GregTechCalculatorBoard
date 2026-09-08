@@ -52,6 +52,10 @@ public class CanvasContextMenuManager {
         return open;
     }
 
+    public List<ContextMenuItem> getItems() {
+        return java.util.Collections.unmodifiableList(items);
+    }
+
     public void close() {
         this.open = false;
         this.items.clear();
@@ -60,23 +64,28 @@ public class CanvasContextMenuManager {
     public void openForCanvas(double screenX, double screenY, double canvasX, double canvasY) {
         this.items.clear();
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.add_recipe", "+", "Space", () -> {
-            if (screen.getSearchDialog() != null) {
+            if (screen != null && screen.getSearchDialog() != null) {
                 screen.getSearchDialog().openAt(canvasX, canvasY);
             }
         }));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.add_junction", "J", "J", () -> {
-            screen.addRerouteNodeAt(canvasX, canvasY);
+            if (screen != null) screen.addRerouteNodeAt(canvasX, canvasY);
+        }));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.add_sticky_note", "📝", "N", () -> {
+            if (screen != null) screen.createNoteAt(canvasX, canvasY);
         }));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.paste", "📋", "Ctrl+V", () -> {
-            screen.pasteSelection(canvasX, canvasY);
+            if (screen != null) screen.pasteSelection(canvasX, canvasY);
         }));
         this.items.add(ContextMenuItem.separator());
-        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.fit_view", "⌖", "Home", screen::fitToView));
+        this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.fit_view", "⌖", "Home", () -> {
+            if (screen != null) screen.fitToView();
+        }));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.auto_connect", "↔", "Shift+C", () -> {
-            screen.getToolbarWidget().performAutoConnect();
+            if (screen != null && screen.getToolbarWidget() != null) screen.getToolbarWidget().performAutoConnect();
         }));
         this.items.add(ContextMenuItem.item("gui.gtcalcboard.menu.auto_ratio", "⚖", "Alt+R", () -> {
-            screen.getToolbarWidget().performAutoRatio(false, false);
+            if (screen != null && screen.getToolbarWidget() != null) screen.getToolbarWidget().performAutoRatio(false, false);
         }));
 
         this.menuX = (int) screenX;

@@ -67,7 +67,7 @@ public class CreateKineticTest {
         Assertions.assertTrue(node.isGenerator());
         Assertions.assertEquals(2048.0, node.getBaseEUt(), 0.001);
         Assertions.assertFalse(node.getInputs().isEmpty());
-        Assertions.assertEquals("gtceu:steam", node.getInputs().get(0).getId().toString());
+        Assertions.assertEquals("minecraft:water", node.getInputs().get(0).getId().toString());
     }
 
     @Test
@@ -397,32 +397,25 @@ public class CreateKineticTest {
         Assertions.assertNotNull(boiler);
         Assertions.assertTrue(CreateProperties.isCreateBoiler(boiler));
         Assertions.assertEquals(0, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
-        Assertions.assertFalse(boiler.getProperties().get(CreateProperties.BOILER_WATER_MODE));
+        Assertions.assertTrue(boiler.getProperties().get(CreateProperties.BOILER_WATER_MODE));
         Assertions.assertEquals(2048.0, boiler.getBaseEUt(), 0.001);
         Assertions.assertEquals(16, boiler.getRpm());
-        Assertions.assertEquals("gtceu:steam", boiler.getInputs().get(0).getId().toString());
+        Assertions.assertEquals("minecraft:water", boiler.getInputs().get(0).getId().toString());
+        Assertions.assertEquals(200.0, boiler.getInputs().get(0).getAmount(), 0.001);
 
         CreateProperties.applyBoilerLevel(boiler, 9);
         Assertions.assertEquals(9, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
         Assertions.assertEquals(147456.0, boiler.getBaseEUt(), 0.001);
         Assertions.assertEquals(64, boiler.getRpm());
-        Assertions.assertEquals(2880.0, boiler.getInputs().get(0).getAmount(), 0.001);
+        Assertions.assertEquals("minecraft:water", boiler.getInputs().get(0).getId().toString());
+        Assertions.assertEquals(1800.0, boiler.getInputs().get(0).getAmount(), 0.001);
 
         CreateProperties.applyBoilerLevel(boiler, 18);
         Assertions.assertEquals(18, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
         Assertions.assertEquals(294912.0, boiler.getBaseEUt(), 0.001);
         Assertions.assertEquals(64, boiler.getRpm());
-        Assertions.assertEquals(5760.0, boiler.getInputs().get(0).getAmount(), 0.001);
-
-        CreateProperties.toggleBoilerFluidMode(boiler);
-        Assertions.assertTrue(boiler.getProperties().get(CreateProperties.BOILER_WATER_MODE));
         Assertions.assertEquals("minecraft:water", boiler.getInputs().get(0).getId().toString());
         Assertions.assertEquals(3600.0, boiler.getInputs().get(0).getAmount(), 0.001);
-
-        CreateProperties.toggleBoilerFluidMode(boiler);
-        Assertions.assertFalse(boiler.getProperties().get(CreateProperties.BOILER_WATER_MODE));
-        Assertions.assertEquals("gtceu:steam", boiler.getInputs().get(0).getId().toString());
-        Assertions.assertEquals(5760.0, boiler.getInputs().get(0).getAmount(), 0.001);
     }
 
     @Test

@@ -73,6 +73,7 @@ stateDiagram-v2
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :--- :---: | :---: | :---: | :--- |
 | **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PARTIALLY_IMPLEMENTED` | `v2.2.0` | 2026-09-02 | Trait 기반 물리/승수(5A~12A, 냉각 1.2x/1.4x) 및 머신 설정 UI 통합 완료(Phase 1), 부수 유체 입력 주입 대기(Phase 2) |
+| **[RFC-037](../RFC_037_DOMAIN_PURITY_AND_DETERMINISTIC_DEDUCTION_REFACTORING.md)** | 도메인 엔티티 순수성 회복, 역방향 의존성 격리 및 결정론적 스펙 연역 무결성 개편 명세<br/>*(Domain Purity Restoration, Reverse Dependency Isolation & Deterministic Spec Deduction Refactoring)* | 🔵 `PROPOSED` | `v2.2.0-beta.2` | 2026-09-08 | api.catalog의 compat 역방향 참조 제거(ICapabilityMatrixProvider), RecipeNode 특화 필드 NodePropertyStore 이전, 최후 폴백 path.contains 제거 및 Set Exact Match 일원화, 리플렉션 static 캐싱 |
 
 
 

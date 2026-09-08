@@ -1,7 +1,5 @@
 package com.gtceu.calcboard.client.gui.compat.ae2;
 
-import appeng.api.stacks.AEFluidKey;
-import appeng.api.stacks.AEItemKey;
 import com.gtceu.calcboard.GregTechCalcBoard;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
@@ -12,6 +10,8 @@ import com.gtceu.calcboard.integration.ae2.model.Ae2PlanEvaluationResult;
 import com.gtceu.calcboard.integration.ae2.model.Ae2PlanStep;
 import com.gtceu.calcboard.integration.ae2.model.PatternId;
 import com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEFluidKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -26,7 +26,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.lang.reflect.Method;
@@ -36,7 +35,6 @@ import java.util.*;
  * Client Forge screen event hook for AE2 CraftConfirmScreen and item tooltips.
  * Renders an unobtrusive top header Total ETA banner, linked graph indicators, step breakdowns, and interactive bottleneck deep-link badges.
  */
-@Mod.EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientAe2CraftConfirmHook {
 
     private static int lastBottleneckX = 0;
@@ -45,9 +43,11 @@ public class ClientAe2CraftConfirmHook {
     private static int lastBottleneckH = 0;
     private static String lastBottleneckPageId = "";
 
+    private static Class<?> craftConfirmScreenClass = null;
     private static Method getPlanMethod = null;
     private static Method getEntriesMethod = null;
     private static Method getCpuCoProcessorsMethod = null;
+    private static Method isEncodedPatternMethod = null;
     private static boolean reflectionInitialized = false;
 
     static {
@@ -57,12 +57,16 @@ public class ClientAe2CraftConfirmHook {
     private static void initReflection() {
         if (reflectionInitialized) return;
         try {
+            craftConfirmScreenClass = Class.forName("appeng.client.gui.me.CraftConfirmScreen");
             Class<?> menuClass = Class.forName("appeng.menu.me.crafting.CraftConfirmMenu");
             getCpuCoProcessorsMethod = menuClass.getMethod("getCpuCoProcessors");
             getPlanMethod = menuClass.getMethod("getPlan");
 
             Class<?> planSummaryClass = Class.forName("appeng.menu.me.crafting.CraftingPlanSummary");
             getEntriesMethod = planSummaryClass.getMethod("getEntries");
+
+            Class<?> patternHelperClass = Class.forName("appeng.api.crafting.PatternDetailsHelper");
+            isEncodedPatternMethod = patternHelperClass.getMethod("isEncodedPattern", ItemStack.class);
         } catch (Throwable ignored) {
         }
         reflectionInitialized = true;
@@ -106,14 +110,23 @@ public class ClientAe2CraftConfirmHook {
             return;
         }
 
-        if (appeng.api.crafting.PatternDetailsHelper.isEncodedPattern(stack)) {
+        if (isEncodedPattern(stack)) {
             event.getToolTip().add(Component.literal("§8• " + Component.translatable("gui.gtcalcboard.ae2.tooltip.create_hint").getString()));
         }
     }
 
+    private static boolean isEncodedPattern(ItemStack stack) {
+        if (isEncodedPatternMethod == null || stack == null || stack.isEmpty()) return false;
+        try {
+            return Boolean.TRUE.equals(isEncodedPatternMethod.invoke(null, stack));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     private static boolean isCraftConfirmScreen(Screen screen) {
-        if (screen == null) return false;
-        return screen.getClass().getName().contains("CraftConfirmScreen");
+        if (screen == null || craftConfirmScreenClass == null) return false;
+        return craftConfirmScreenClass.isInstance(screen);
     }
 
     private static Ae2PlanEvaluationResult resolveEtaResult(AbstractContainerScreen<?> containerScreen) {

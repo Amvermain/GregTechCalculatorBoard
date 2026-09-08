@@ -375,8 +375,8 @@ public final class FlowGraphModuleHandler {
             graph.removeNode(n);
         }
         graph.addNode(moduleNode);
-        graph.getConnections().clear();
-        graph.getConnections().addAll(externalEdges);
+        graph.clearConnections();
+        graph.addConnections(externalEdges);
     }
 
     /**
@@ -448,8 +448,8 @@ public final class FlowGraphModuleHandler {
             rewiredEdges.add(new FlowGraph.ConnectionEdge(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex()));
         }
 
-        graph.getConnections().clear();
-        graph.getConnections().addAll(rewiredEdges);
+        graph.clearConnections();
+        graph.addConnections(rewiredEdges);
 
         // 5. Restore subGraph frames
         for (CanvasGroupFrame f : subGraph.getFrames()) {

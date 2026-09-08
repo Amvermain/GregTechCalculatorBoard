@@ -35,8 +35,6 @@ public class MultiblockDetector {
     private static final Set<ResourceLocation> LASER_HATCH_CONTROLLERS = new HashSet<>();
     private static final Set<ResourceLocation> STEAM_MULTIBLOCKS = new HashSet<>();
     private static final Map<ResourceLocation, Double> STEAM_MULTIBLOCK_CONSUMPTIONS = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
-    private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new HashMap<>();
     private static final Map<ResourceLocation, Integer> THREADING_MAX_HELIX_CAPACITY = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, Integer> DEFAULT_MULTIBLOCK_PARALLELS = new ConcurrentHashMap<>();
     private static volatile boolean initialized = false;
@@ -70,15 +68,13 @@ public class MultiblockDetector {
             }
             TURBINE_CONTROLLERS.add(controllerId);
             MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
-            if (baseTier != null) TURBINE_BASE_TIERS.put(controllerId, baseTier);
-            if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(controllerId, baseProduction);
+            TurbineCatalog.registerTurbineTierAndProduction(controllerId, baseTier, baseProduction);
 
             ResourceLocation alias = getTurbineAlias(controllerId);
             if (alias != null && !alias.equals(controllerId)) {
                 TURBINE_CONTROLLERS.add(alias);
                 MULTIBLOCK_RECIPE_CONTROLLERS.add(alias);
-                if (baseTier != null) TURBINE_BASE_TIERS.put(alias, baseTier);
-                if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(alias, baseProduction);
+                TurbineCatalog.registerTurbineTierAndProduction(alias, baseTier, baseProduction);
             }
         }
         if (recipeCategoryId != null) {
@@ -86,60 +82,16 @@ public class MultiblockDetector {
                 return;
             }
             TURBINE_RECIPE_CATEGORIES.add(recipeCategoryId);
-            if (baseTier != null) TURBINE_BASE_TIERS.put(recipeCategoryId, baseTier);
-            if (baseProduction > 0) TURBINE_BASE_PRODUCTIONS.put(recipeCategoryId, baseProduction);
+            TurbineCatalog.registerTurbineTierAndProduction(recipeCategoryId, baseTier, baseProduction);
         }
     }
 
     public static void registerBaselineTurbines() {
-        ResourceLocation lst1 = ResourceLocation.tryParse("gtceu:large_steam_turbine");
-        ResourceLocation lst2 = ResourceLocation.tryParse("gtceu:steam_large_turbine");
-        ResourceLocation lgt1 = ResourceLocation.tryParse("gtceu:large_gas_turbine");
-        ResourceLocation lgt2 = ResourceLocation.tryParse("gtceu:gas_large_turbine");
-        ResourceLocation lpt1 = ResourceLocation.tryParse("gtceu:large_plasma_turbine");
-        ResourceLocation lpt2 = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
-        ResourceLocation spt = ResourceLocation.tryParse("gtceu:supreme_plasma_turbine");
-        ResourceLocation sptStart = ResourceLocation.tryParse("start_core:supreme_plasma_turbine");
-        ResourceLocation npt = ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine");
-        ResourceLocation nptStart = ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine");
-
-        ResourceLocation st = ResourceLocation.tryParse("gtceu:steam_turbine");
-        ResourceLocation stFuels = ResourceLocation.tryParse("gtceu:steam_turbine_fuels");
-        ResourceLocation stSuper = ResourceLocation.tryParse("gtceu:steam_turbine_superheated");
-        ResourceLocation gt = ResourceLocation.tryParse("gtceu:gas_turbine");
-        ResourceLocation gtFuels = ResourceLocation.tryParse("gtceu:gas_turbine_fuels");
-        ResourceLocation pt = ResourceLocation.tryParse("gtceu:plasma_turbine");
-        ResourceLocation plasmaGen = ResourceLocation.tryParse("gtceu:plasma_generator");
-        ResourceLocation plasmaGenFuels = ResourceLocation.tryParse("gtceu:plasma_generator_fuels");
-
-        registerTurbine(lst1, st, GTVoltageTier.HV, 1024.0);
-        registerTurbine(lst2, stFuels, GTVoltageTier.HV, 1024.0);
-        registerTurbine(null, stSuper, GTVoltageTier.HV, 1024.0);
-
-        registerTurbine(lgt1, gt, GTVoltageTier.EV, 4096.0);
-        registerTurbine(lgt2, gtFuels, GTVoltageTier.EV, 4096.0);
-
-        registerTurbine(lpt1, pt, GTVoltageTier.IV, 16384.0);
-        registerTurbine(lpt2, plasmaGen, GTVoltageTier.IV, 16384.0);
-        registerTurbine(null, plasmaGenFuels, GTVoltageTier.IV, 16384.0);
-
-        registerTurbine(spt, null, GTVoltageTier.IV, 98304.0);
-        registerTurbine(sptStart, null, GTVoltageTier.IV, 98304.0);
-        registerTurbine(npt, null, GTVoltageTier.IV, 196608.0);
-        registerTurbine(nptStart, null, GTVoltageTier.IV, 196608.0);
+        TurbineCatalog.registerBaselineTurbines();
     }
 
     public static ResourceLocation getTurbineAlias(ResourceLocation id) {
-        if (id == null) return null;
-        String path = id.getPath();
-        if (path.startsWith("large_") && path.endsWith("_turbine")) {
-            String middle = path.substring("large_".length(), path.length() - "_turbine".length());
-            return ResourceLocation.tryParse(id.getNamespace() + ":" + middle + "_large_turbine");
-        } else if (path.endsWith("_large_turbine")) {
-            String prefix = path.substring(0, path.length() - "_large_turbine".length());
-            return ResourceLocation.tryParse(id.getNamespace() + ":large_" + prefix + "_turbine");
-        }
-        return null;
+        return TurbineCatalog.getTurbineAlias(id);
     }
 
     public static void registerBatchModeMultiblock(ResourceLocation controllerId) {
@@ -524,8 +476,7 @@ public class MultiblockDetector {
         COIL_RECIPE_CATEGORIES.clear();
         TURBINE_CONTROLLERS.clear();
         TURBINE_RECIPE_CATEGORIES.clear();
-        TURBINE_BASE_TIERS.clear();
-        TURBINE_BASE_PRODUCTIONS.clear();
+        TurbineCatalog.clear();
         DEFAULT_MULTIBLOCK_PARALLELS.clear();
         BATCH_MODE_CONTROLLERS.clear();
         THROUGHPUT_BOOSTING_CONTROLLERS.clear();
@@ -662,105 +613,25 @@ public class MultiblockDetector {
     }
 
     public static GTVoltageTier getTurbineBaseTier(RecipeNode node) {
-        if (node == null) return GTVoltageTier.HV;
-        if (node.getMachineIcon() != null) {
-            GTVoltageTier t = getTurbineBaseTier(node.getMachineIcon());
-            if (t != null) return t;
-        }
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                GTVoltageTier t = getTurbineBaseTier(ws);
-                if (t != null) return t;
-            }
-        }
-        if (node.getRecipeCategoryId() != null) {
-            GTVoltageTier t = getTurbineBaseTier(node.getRecipeCategoryId());
-            if (t != null) return t;
-        }
-        ResourceLocation cat = node.getRecipeCategoryId();
-        if (cat != null) {
-            String path = cat.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) return GTVoltageTier.EV;
-            if (path.contains("plasma")) return GTVoltageTier.IV;
-            if (path.contains("steam")) return GTVoltageTier.HV;
-        }
-        ResourceLocation icon = node.getMachineIcon();
-        if (icon != null) {
-            String path = icon.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) return GTVoltageTier.EV;
-            if (path.contains("plasma")) return GTVoltageTier.IV;
-            if (path.contains("steam")) return GTVoltageTier.HV;
-        }
-        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return GTVoltageTier.HV;
-        return GTVoltageTier.HV;
+        return TurbineCatalog.getTurbineBaseTier(node);
     }
 
     public static double getTurbineBaseProduction(RecipeNode node) {
-        if (node == null) return 1024.0;
-        if (node.getMachineIcon() != null) {
-            Double prod = getTurbineBaseProduction(node.getMachineIcon());
-            if (prod != null && prod > 0) return prod;
-        }
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                Double prod = getTurbineBaseProduction(ws);
-                if (prod != null && prod > 0) return prod;
-            }
-        }
-        if (node.getRecipeCategoryId() != null) {
-            Double prod = getTurbineBaseProduction(node.getRecipeCategoryId());
-            if (prod != null && prod > 0) return prod;
-        }
-        GTVoltageTier baseTier = getTurbineBaseTier(node);
-        return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 1024.0;
+        return TurbineCatalog.getTurbineBaseProduction(node);
     }
 
     public static boolean requiresMinimumBaseTier(ResourceLocation turbineId) {
-        if (turbineId == null) return false;
-        GTVoltageTier baseTier = getTurbineBaseTier(turbineId);
-        return baseTier != null && baseTier.ordinal() >= GTVoltageTier.IV.ordinal();
+        return TurbineCatalog.requiresMinimumBaseTier(turbineId);
     }
 
     public static GTVoltageTier getTurbineBaseTier(ResourceLocation id) {
-        if (id == null) return null;
-        if (!initialized && !initializing) {
-            initialize();
-        }
-        GTVoltageTier tier = TURBINE_BASE_TIERS.get(id);
-        if (tier == null) {
-            ResourceLocation alias = getTurbineAlias(id);
-            if (alias != null) tier = TURBINE_BASE_TIERS.get(alias);
-        }
-        if (tier == null) {
-            String path = id.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) {
-                tier = GTVoltageTier.EV;
-            } else if (path.contains("plasma")) {
-                tier = GTVoltageTier.IV;
-            } else if (path.contains("steam")) {
-                tier = GTVoltageTier.HV;
-            }
-        }
-        return tier;
+        ensureInitialized();
+        return TurbineCatalog.getTurbineBaseTier(id);
     }
 
     public static Double getTurbineBaseProduction(ResourceLocation id) {
-        if (id == null) return null;
-        if (!initialized && !initializing) {
-            initialize();
-        }
-        Double prod = TURBINE_BASE_PRODUCTIONS.get(id);
-        if (prod == null) {
-            ResourceLocation alias = getTurbineAlias(id);
-            if (alias != null) prod = TURBINE_BASE_PRODUCTIONS.get(alias);
-        }
-        if (prod == null) {
-            GTVoltageTier tier = getTurbineBaseTier(id);
-            if (tier != null) {
-                prod = (double) (tier.getVoltage() * 2L);
-            }
-        }
-        return prod;
+        ensureInitialized();
+        return TurbineCatalog.getTurbineBaseProduction(id);
     }
 
     public static boolean isMultiblock(ResourceLocation workstationId) {
@@ -931,382 +802,15 @@ public class MultiblockDetector {
     }
 
     public static boolean inspectAndRegisterMachine(ResourceLocation id, Object def, ResourceLocation recipeCategoryId) {
-        if (id == null) return false;
-        if (def == null) {
-            return registerFallbackFromCatalog(id);
-        }
-
-        Class<?> cls = def.getClass();
-        Class<?> mCls = extractMachineClass(cls, def);
-        boolean isMb = isMultiblockDefinition(cls, def, mCls, id);
-
-        if (isMb) {
-            registerMultiblock(id);
-            detectAndRegisterCoilMultiblock(id, mCls, recipeCategoryId);
-            detectAndRegisterParallelAndBatch(id, def, cls);
-            detectAndRegisterLaserHatch(id);
-            detectAndRegisterThreading(id, def, cls, mCls);
-        }
-
-        return isMb;
-    }
-
-    private static final Class<?> COIL_WORKABLE_CLS;
-    private static final Class<?> THREADING_CAPABLE_CLS;
-    private static final Class<?> GT_MODIFIERS_CLS;
-    private static final Class<?> GT_REGISTRIES_CLS;
-    private static final Field RECIPE_TYPES_FIELD;
-
-    static {
-        ClassLoader cl = MultiblockDetector.class.getClassLoader();
-        Class<?> coilCls = null;
-        try {
-            coilCls = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.CoilWorkableElectricMultiblockMachine", false, cl);
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-            try {
-                coilCls = Class.forName("com.gregtechceu.gtceu.common.machine.multiblock.electric.CoilWorkableElectricMultiblockMachine", false, cl);
-            } catch (ReflectiveOperationException | LinkageError ignored2) {}
-        }
-        COIL_WORKABLE_CLS = coilCls;
-
-        Class<?> threadCls = null;
-        try {
-            threadCls = Class.forName("com.startechnology.start_core.machine.threading.StarTThreadingCapableMachine", false, cl);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        THREADING_CAPABLE_CLS = threadCls;
-
-        Class<?> modCls = null;
-        try {
-            modCls = Class.forName("com.gregtechceu.gtceu.api.recipe.modifier.GTRecipeModifiers", false, cl);
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        GT_MODIFIERS_CLS = modCls;
-
-        Class<?> gtRegs = null;
-        Field rtField = null;
-        try {
-            gtRegs = Class.forName("com.gregtechceu.gtceu.api.registry.GTRegistries", false, cl);
-            rtField = gtRegs.getField("RECIPE_TYPES");
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        GT_REGISTRIES_CLS = gtRegs;
-        RECIPE_TYPES_FIELD = rtField;
-    }
-
-    private static boolean registerFallbackFromCatalog(ResourceLocation id) {
-        if (!isMultiblock(id) && MultiblockStructureCatalog.getStructure(id) == null) {
-            return false;
-        }
-        registerMultiblock(id);
-        var defStruct = MultiblockStructureCatalog.getStructure(id);
-        if (defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH")) {
-            registerParallelHatchController(id);
-        }
-        return true;
-    }
-
-    private static Class<?> extractMachineClass(Class<?> cls, Object def) {
-        try {
-            Method mGetMachineClass = cls.getMethod("getMachineClass");
-            mGetMachineClass.setAccessible(true);
-            return (Class<?>) mGetMachineClass.invoke(def);
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-            return null;
-        }
-    }
-
-    private static boolean isMultiblockDefinition(Class<?> cls, Object def, Class<?> mCls, ResourceLocation id) {
-        String clsName = cls.getName().toLowerCase(Locale.ROOT);
-        String simpleName = cls.getSimpleName().toLowerCase(Locale.ROOT);
-        if (simpleName.contains("multiblock") || clsName.contains("multiblock")) {
-            return true;
-        }
-
-        try {
-            Method mIsMb = cls.getMethod("isMultiblock");
-            mIsMb.setAccessible(true);
-            Object res = mIsMb.invoke(def);
-            if (res instanceof Boolean b && b) return true;
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-
-        if (mCls != null) {
-            String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
-            if (mClsName.contains("multiblock") || mClsName.contains("controller")) {
-                return true;
-            }
-        }
-
-        return MultiblockStructureCatalog.getStructure(id) != null;
-    }
-
-    private static void detectAndRegisterCoilMultiblock(ResourceLocation id, Class<?> mCls, ResourceLocation recipeCategoryId) {
-        if (isCoilMachineClass(mCls)
-                || isCoilFromCatalog(id)
-                || com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(id).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
-            registerCoilMultiblock(id, recipeCategoryId);
-        }
-    }
-
-    private static boolean isCoilMachineClass(Class<?> mCls) {
-        if (mCls == null || COIL_WORKABLE_CLS == null) return false;
-        return COIL_WORKABLE_CLS.isAssignableFrom(mCls);
-    }
-
-    private static boolean isCoilFromCatalog(ResourceLocation id) {
-        var defStruct = MultiblockStructureCatalog.getStructure(id);
-        return defStruct != null && defStruct.supportsAbility("HEATING_COILS") && defStruct.coilSlotCount() > 0;
-    }
-
-    private static void detectAndRegisterParallelAndBatch(ResourceLocation id, Object def, Class<?> cls) {
-        if (isTurbineMachine(id)) return;
-
-        boolean supportsParallel = hasParallelModifier(cls, def) || hasParallelFromCatalog(id);
-        boolean supportsBatch = hasBatchModifier(cls, def);
-
-        if (supportsParallel) registerParallelHatchController(id);
-        if (supportsBatch) registerBatchModeController(id);
-    }
-
-    private static boolean hasParallelModifier(Class<?> cls, Object def) {
-        return hasRecipeModifier(cls, def, "PARALLEL_HATCH");
-    }
-
-    private static boolean hasBatchModifier(Class<?> cls, Object def) {
-        return hasRecipeModifier(cls, def, "BATCH_MODE");
-    }
-
-    private static boolean hasRecipeModifier(Class<?> cls, Object def, String targetName) {
-        for (Method m : cls.getMethods()) {
-            if (m.getParameterCount() != 0 || !isRecipeModifierGetter(m.getName())) continue;
-            try {
-                m.setAccessible(true);
-                Object modifiers = m.invoke(def);
-                if (modifiers != null && containsRecipeModifier(modifiers, targetName)) {
-                    return true;
-                }
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
-        }
-        return false;
-    }
-
-    private static boolean isRecipeModifierGetter(String name) {
-        return name.equals("getRecipeModifiers") || name.equals("getRecipeModifier") || name.equals("recipeModifiers");
-    }
-
-    private static boolean hasParallelFromCatalog(ResourceLocation id) {
-        var defStruct = MultiblockStructureCatalog.getStructure(id);
-        return defStruct != null && defStruct.supportsAbility("PARALLEL_HATCH");
-    }
-
-    private static void detectAndRegisterLaserHatch(ResourceLocation id) {
-        var defStruct = MultiblockStructureCatalog.getStructure(id);
-        if (defStruct != null && (defStruct.supportsAbility("INPUT_LASER") || defStruct.supportsAbility("LASER_TARGET_HATCH") || defStruct.supportsAbility("LASER_SOURCE_HATCH"))) {
-            registerLaserHatchController(id);
-        }
-    }
-
-    private static void detectAndRegisterThreading(ResourceLocation id, Object def, Class<?> cls, Class<?> mCls) {
-        boolean isThreading = isThreadingMachineClass(mCls) || hasThreadingModifier(cls, def) || isThreadingFromCatalog(id);
-        if (!isThreading) return;
-
-        int detectedHelixCount = detectHelixCountFromCatalog(id);
-        registerThreadingMultiblock(id, detectedHelixCount > 0 ? detectedHelixCount : 8);
-    }
-
-    private static boolean isThreadingMachineClass(Class<?> mCls) {
-        if (mCls == null) return false;
-        if (THREADING_CAPABLE_CLS != null && THREADING_CAPABLE_CLS.isAssignableFrom(mCls)) {
-            return true;
-        }
-        String mClsName = mCls.getName().toLowerCase(Locale.ROOT);
-        return mClsName.contains("threadingcapable") || mClsName.contains("startthreading");
-    }
-
-    private static boolean hasThreadingModifier(Class<?> cls, Object def) {
-        try {
-            Method mGetModifiers = cls.getMethod("getRecipeModifiers");
-            mGetModifiers.setAccessible(true);
-            Object modifiers = mGetModifiers.invoke(def);
-            if (modifiers != null) {
-                String modStr = modifiers.toString().toLowerCase(Locale.ROOT);
-                return modStr.contains("threading_machine") || modStr.contains("startrecipemodifiers") || modStr.contains("threading");
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        return false;
-    }
-
-    private static boolean isThreadingFromCatalog(ResourceLocation id) {
-        var defStruct = MultiblockStructureCatalog.getStructure(id);
-        if (defStruct == null) return false;
-
-        if (defStruct.supportsAbility("THREADING") || defStruct.supportsAbility("THREADING_HELIX")) {
-            return true;
-        }
-        return defStruct.candidateBlocks().stream().anyMatch(b ->
-                isHelixPart(b) || (b != null && "start_core".equals(b.getNamespace()) && "threading_controller".equals(b.getPath())));
-    }
-
-    private static int detectHelixCountFromCatalog(ResourceLocation id) {
-        var defStruct = MultiblockStructureCatalog.getStructure(id);
-        if (defStruct == null) return 0;
-
-        int count = 0;
-        for (var part : defStruct.parts()) {
-            if (part != null && part.itemId() != null && isHelixPart(part.itemId())) {
-                count = Math.max(count, part.amount());
-            }
-        }
-        return count;
-    }
-
-    private static boolean isHelixPart(ResourceLocation itemId) {
-        if (itemId == null) return false;
-        return com.gtceu.calcboard.api.type.GTThreadingHelix.fromId(itemId) != null
-                || com.gtceu.calcboard.api.type.GTThreadingHelix.fromId(itemId.toString()) != null;
+        return MultiblockMachineInspector.inspectAndRegisterMachine(id, def, recipeCategoryId);
     }
 
     public static ResourceLocation extractRecipeTypeId(Object rt) {
-        if (rt == null) return null;
-        if (rt instanceof ResourceLocation rl) return rl;
-
-        ResourceLocation loc = extractFromForgeRecipeTypes(rt);
-        if (loc != null) return loc;
-
-        ResourceLocation refLoc = extractRecipeTypeIdViaReflection(rt);
-        if (refLoc != null) return refLoc;
-
-        String str = rt.toString();
-        if (str != null && str.contains(":")) {
-            return ResourceLocation.tryParse(str);
-        }
-        return null;
-    }
-
-    private static ResourceLocation extractFromForgeRecipeTypes(Object rt) {
-        if (rt instanceof net.minecraft.world.item.crafting.RecipeType<?> rType && net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES != null) {
-            ResourceLocation loc = net.minecraftforge.registries.ForgeRegistries.RECIPE_TYPES.getKey(rType);
-            if (loc != null && !loc.getPath().equals("air")) return loc;
-        }
-        return null;
-    }
-
-    private static ResourceLocation extractRecipeTypeIdViaReflection(Object rt) {
-        ResourceLocation fromField = extractRegistryNameFromField(rt);
-        if (fromField != null) return fromField;
-
-        ResourceLocation fromMethod = extractRegistryNameFromMethod(rt);
-        if (fromMethod != null) return fromMethod;
-
-        return extractRegistryNameFromGTRegistry(rt);
-    }
-
-    private static ResourceLocation extractRegistryNameFromField(Object rt) {
-        try {
-            Field f = rt.getClass().getField("registryName");
-            f.setAccessible(true);
-            Object val = f.get(rt);
-            if (val instanceof ResourceLocation rl) return rl;
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        return null;
-    }
-
-    private static ResourceLocation extractRegistryNameFromMethod(Object rt) {
-        for (String mName : new String[]{"getRegistryName", "getId"}) {
-            try {
-                Method m = rt.getClass().getMethod(mName);
-                m.setAccessible(true);
-                Object idVal = m.invoke(rt);
-                if (idVal instanceof ResourceLocation rl) return rl;
-            } catch (ReflectiveOperationException | LinkageError ignored) {}
-        }
-        return null;
-    }
-
-    private static ResourceLocation extractRegistryNameFromGTRegistry(Object rt) {
-        if (RECIPE_TYPES_FIELD == null) return null;
-        try {
-            Object recipeTypesReg = RECIPE_TYPES_FIELD.get(null);
-            if (recipeTypesReg != null) {
-                Method mGetKey = recipeTypesReg.getClass().getMethod("getKey", Object.class);
-                mGetKey.setAccessible(true);
-                Object k = mGetKey.invoke(recipeTypesReg, rt);
-                if (k instanceof ResourceLocation rl) return rl;
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        return null;
+        return MultiblockMachineInspector.extractRecipeTypeId(rt);
     }
 
     public static Iterable<?> getRegistryIterable(Object registry) {
-        if (registry == null) return null;
-        if (registry instanceof Iterable<?> iterable) {
-            return iterable;
-        }
-        try {
-            Method valuesMethod = registry.getClass().getMethod("values");
-            valuesMethod.setAccessible(true);
-            Object result = valuesMethod.invoke(registry);
-            if (result instanceof Iterable<?> iterable) {
-                return iterable;
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        return null;
-    }
-
-    private static boolean containsRecipeModifier(Object modifiersObj, String targetName) {
-        if (modifiersObj == null || targetName == null || GT_MODIFIERS_CLS == null) return false;
-        try {
-            Field f = GT_MODIFIERS_CLS.getField(targetName);
-            f.setAccessible(true);
-            Object targetModifier = f.get(null);
-            if (targetModifier != null) {
-                return containsModifierObject(modifiersObj, targetModifier);
-            }
-        } catch (ReflectiveOperationException | LinkageError ignored) {}
-        return false;
-    }
-
-    private static boolean containsModifierObject(Object obj, Object target) {
-        if (obj == null || target == null) return false;
-        if (obj == target || obj.equals(target)) return true;
-
-        if (obj instanceof Object[] arr) {
-            for (Object item : arr) {
-                if (containsModifierObject(item, target)) return true;
-            }
-            return false;
-        }
-
-        if (obj instanceof Iterable<?> it) {
-            for (Object item : it) {
-                if (containsModifierObject(item, target)) return true;
-            }
-            return false;
-        }
-
-        return inspectModifierFields(obj, target);
-    }
-
-    private static boolean inspectModifierFields(Object obj, Object target) {
-        Class<?> cls = obj.getClass();
-        while (cls != null && cls != Object.class) {
-            for (Field f : cls.getDeclaredFields()) {
-                try {
-                    f.setAccessible(true);
-                    Object val = f.get(obj);
-                    if (val != null && val != obj && isMatchingModifierValue(val, target)) {
-                        return true;
-                    }
-                } catch (ReflectiveOperationException | LinkageError ignored) {}
-            }
-            cls = cls.getSuperclass();
-        }
-        return false;
-    }
-
-    private static boolean isMatchingModifierValue(Object val, Object target) {
-        if (val == target || val.equals(target)) return true;
-        if (val instanceof Object[] || val instanceof Iterable<?>) {
-            return containsModifierObject(val, target);
-        }
-        return false;
+        return MultiblockMachineInspector.getRegistryIterable(registry);
     }
 }
 

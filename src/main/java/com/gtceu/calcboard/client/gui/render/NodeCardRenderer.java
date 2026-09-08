@@ -38,6 +38,24 @@ import java.util.Map;
  * Dedicated visual renderer for Recipe Node cards in the Calculator Board.
  */
 public class NodeCardRenderer {
+    private static final Component COUNT_LABEL = Component.translatable("gui.gtcalcboard.count");
+    private static final Map<ResourceLocation, ItemStack> MACHINE_ICON_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static ItemStack getOrCreateMachineIcon(ResourceLocation iconId) {
+        return MACHINE_ICON_CACHE.computeIfAbsent(iconId, id -> {
+            var item = ForgeRegistries.ITEMS.getValue(id);
+            if ((item == null || item == Items.AIR) && ForgeRegistries.BLOCKS != null) {
+                var block = ForgeRegistries.BLOCKS.getValue(id);
+                if (block != null && block.asItem() != Items.AIR) {
+                    item = block.asItem();
+                }
+            }
+            if (item != null && item != Items.AIR) {
+                return item.getDefaultInstance();
+            }
+            return ItemStack.EMPTY;
+        });
+    }
     public static void render(NodeWidget widget, GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         RecipeNode node = widget.getNode();
         Font font = Minecraft.getInstance().font;
@@ -61,19 +79,28 @@ public class NodeCardRenderer {
         FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
         boolean isOperational = node.isOperational(graph);
 
+        boolean isCardHovered = mouseX >= x && mouseX <= x + cardW && mouseY >= y && mouseY <= y + height;
+        int activeMouseX = isCardHovered ? mouseX : -9999;
+        int activeMouseY = isCardHovered ? mouseY : -9999;
+
+        int titleX = (node.getMachineIcon() != null) ? (x + 22) : (x + 6);
+        int headerBtnMargin = node.isModule() ? 76 : 58;
+        NodeCardTextCache textCache = widget.getTextCache();
+        textCache.update(widget, font, graph, node, cardW, titleX, x, headerBtnMargin);
+
         // 1. Card Background & Golden/Metallic/Module Outlines (100% Opaque 0xFF to prevent background bleed-through)
         int cardBg = !isOperational ? 0xFF251417 : (node.isModule() ? 0xFF1D172E : (node.isFusion() ? 0xFF22132D : (node.isGenerator() ? 0xFF122218 : 0xFF1E222B)));
         graphics.fill(x, y, x + cardW, y + height, cardBg);
 
         int headerColor = !isOperational
-                ? (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF521C22 : 0xFF3D1419)
+                ? (widget.isHeaderHovered(activeMouseX, activeMouseY) ? 0xFF521C22 : 0xFF3D1419)
                 : (node.isModule()
-                    ? (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF3D2A5E : 0xFF2A1C42)
+                    ? (widget.isHeaderHovered(activeMouseX, activeMouseY) ? 0xFF3D2A5E : 0xFF2A1C42)
                     : (node.isFusion()
-                        ? (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF4A1E6D : 0xFF35154E)
+                        ? (widget.isHeaderHovered(activeMouseX, activeMouseY) ? 0xFF4A1E6D : 0xFF35154E)
                         : (node.isGenerator()
-                            ? (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF1E482E : 0xFF163824)
-                            : (widget.isHeaderHovered(mouseX, mouseY) ? 0xFF353C4D : 0xFF2A2E39))));
+                            ? (widget.isHeaderHovered(activeMouseX, activeMouseY) ? 0xFF1E482E : 0xFF163824)
+                            : (widget.isHeaderHovered(activeMouseX, activeMouseY) ? 0xFF353C4D : 0xFF2A2E39))));
         graphics.fill(x, y, x + cardW, y + NodeWidget.HEADER_HEIGHT, headerColor);
 
         boolean isSelected = false;
@@ -89,7 +116,7 @@ public class NodeCardRenderer {
             float pulse = (float) (0.60 + 0.40 * Math.sin(System.currentTimeMillis() / 200.0));
             int red = (int) (170 + 85 * pulse);
             outlineColor = 0xFF000000 | (red << 16) | (0x33 << 8) | 0x33;
-        } else if (BoardManager.getInstance().getWireAnimationMode() == WireAnimationMode.RATE_MODULATED && (isStarved = isNodeInputStarved(graph, node))) {
+        } else if (BoardManager.getInstance().getWireAnimationMode() == WireAnimationMode.RATE_MODULATED && (isStarved = textCache.isStarved())) {
             float pulse = (float) (0.65 + 0.35 * Math.sin(System.currentTimeMillis() / 240.0));
             int red = (int) (245 * pulse);
             int green = (int) (158 * pulse);
@@ -124,33 +151,21 @@ public class NodeCardRenderer {
         }
 
         // 2. Machine Icon & Header Title
-        int titleX = x + 6;
         ResourceLocation iconId = node.getMachineIcon();
         if (iconId != null) {
-            var item = ForgeRegistries.ITEMS.getValue(iconId);
-            if ((item == null || item == Items.AIR) && ForgeRegistries.BLOCKS != null) {
-                var block = ForgeRegistries.BLOCKS.getValue(iconId);
-                if (block != null && block.asItem() != Items.AIR) {
-                    item = block.asItem();
-                }
-            }
-            if (item != null && item != Items.AIR) {
+            ItemStack iconStack = getOrCreateMachineIcon(iconId);
+            if (!iconStack.isEmpty()) {
                 if (com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineIconGlowing(node.getId())) {
                     int glowBorder = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFFFFD700);
                     graphics.fill(x + 2, y + 1, x + 20, y + 19, 0x4400E676);
                     graphics.renderOutline(x + 2, y + 1, 18, 18, glowBorder);
                     graphics.renderOutline(x + 1, y, 20, 20, glowBorder & 0x77FFFFFF);
                 }
-                graphics.renderItem(item.getDefaultInstance(), x + 3, y + 2);
-                titleX = x + 22;
+                IngredientRenderer.renderItemStack(graphics, iconStack, x + 3, y + 2);
             }
         }
 
         NodeNameEditor nameEditor = widget.getNameEditor();
-        int headerBtnMargin = node.isModule() ? 76 : 58;
-
-        NodeCardTextCache textCache = widget.getTextCache();
-        textCache.update(widget, font, graph, node, cardW, titleX, x, headerBtnMargin);
 
         if (nameEditor != null && nameEditor.isEditing()) {
             int editW = Math.max(60, cardW - (titleX - x) - headerBtnMargin);
@@ -178,36 +193,36 @@ public class NodeCardRenderer {
         if (node.isModule()) {
             int expandX = x + cardW - 72;
             int expandY = y + 2;
-            boolean expandHover = widget.isExpandButtonHovered(mouseX, mouseY);
+            boolean expandHover = widget.isExpandButtonHovered(activeMouseX, activeMouseY);
             graphics.fill(expandX, expandY, expandX + 16, expandY + 16, expandHover ? 0xFF5A3A8A : 0xFF352055);
             graphics.renderOutline(expandX, expandY, 16, 16, expandHover ? 0xFFCC88FF : 0xFF7744AA);
-            graphics.drawCenteredString(font, "⤢", expandX + 8, expandY + 3, expandHover ? 0xFFFFFFFF : 0xFFDDAAFF);
+            graphics.drawString(font, "⤢", expandX + 4, expandY + 3, expandHover ? 0xFFFFFFFF : 0xFFDDAAFF, false);
         } else if (!node.isReroute()) {
             int switchX = x + cardW - 72;
             int switchY = y + 2;
-            boolean switchHover = widget.isSwitchButtonHovered(mouseX, mouseY);
+            boolean switchHover = widget.isSwitchButtonHovered(activeMouseX, activeMouseY);
             int switchBg = switchHover ? 0xFF2A4866 : 0xFF1D2F44;
             int switchBorder = switchHover ? 0xFF5B9BD5 : 0xFF35587A;
             graphics.fill(switchX, switchY, switchX + 16, switchY + 16, switchBg);
             graphics.renderOutline(switchX, switchY, 16, 16, switchBorder);
-            graphics.drawCenteredString(font, "⟲", switchX + 8, switchY + 4, switchHover ? 0xFFFFFFFF : 0xFF88CCFF);
+            graphics.drawString(font, "⟲", switchX + 4, switchY + 4, switchHover ? 0xFFFFFFFF : 0xFF88CCFF, false);
         }
 
         // 4. Direction / Flip Button [➔] or [⬅]
         int flipX = x + cardW - 54;
         int flipY = y + 2;
-        boolean flipHover = widget.isFlipButtonHovered(mouseX, mouseY);
+        boolean flipHover = widget.isFlipButtonHovered(activeMouseX, activeMouseY);
         int flipBg = flipHover ? 0xFF3A4456 : 0xFF222834;
         int flipBorder = flipHover ? 0xFF88AAFF : 0xFF4A5568;
         graphics.fill(flipX, flipY, flipX + 16, flipY + 16, flipBg);
         graphics.renderOutline(flipX, flipY, 16, 16, flipBorder);
-        graphics.drawCenteredString(font, node.isFlipped() ? "⬅" : "➔", flipX + 8, flipY + 4, flipHover ? 0xFFFFFFFF : 0xFFAAAAAA);
+        graphics.drawString(font, node.isFlipped() ? "⬅" : "➔", flipX + 5, flipY + 4, flipHover ? 0xFFFFFFFF : 0xFFAAAAAA, false);
 
         // 5. Target Base Node Toggle Button [⌖]
         int targetX = x + cardW - 36;
         int targetY = y + 2;
         boolean isTargetGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isNodeBaseTargetButtonGlowing(node.getId());
-        boolean targetHover = widget.isTargetButtonHovered(mouseX, mouseY);
+        boolean targetHover = widget.isTargetButtonHovered(activeMouseX, activeMouseY);
         int targetBg = node.isBaseNode() ? 0xFF886600 : (isTargetGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBgColor(0xFF222834) : (targetHover ? 0xFF3A4456 : 0xFF222834));
         int targetBorder = node.isBaseNode() ? 0xFFFFD700 : (isTargetGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF4A5568) : (targetHover ? 0xFF88AAFF : 0xFF4A5568));
         graphics.fill(targetX, targetY, targetX + 16, targetY + 16, targetBg);
@@ -215,13 +230,13 @@ public class NodeCardRenderer {
         if (isTargetGlowing) {
             graphics.renderOutline(targetX - 1, targetY - 1, 18, 18, targetBorder & 0x77FFFFFF);
         }
-        graphics.drawCenteredString(font, "⌖", targetX + 8, targetY + 4, (node.isBaseNode() || isTargetGlowing) ? 0xFFFFEE55 : 0xFFAAAAAA);
+        graphics.drawString(font, "⌖", targetX + 5, targetY + 4, (node.isBaseNode() || isTargetGlowing) ? 0xFFFFEE55 : 0xFFAAAAAA, false);
 
         // 6. Close/Delete Button [X]
         int closeX = x + cardW - 18;
         int closeY = y + 2;
         boolean isCloseGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isNodeCloseButtonGlowing(node.getId());
-        boolean closeHover = widget.isCloseButtonHovered(mouseX, mouseY);
+        boolean closeHover = widget.isCloseButtonHovered(activeMouseX, activeMouseY);
         int closeBg = (closeHover || isCloseGlowing) ? 0xFFFF4444 : 0x44FF4444;
         graphics.fill(closeX, closeY, closeX + 16, closeY + 16, closeBg);
         if (isCloseGlowing) {
@@ -234,16 +249,17 @@ public class NodeCardRenderer {
         NodeCountEditor countEditor = widget.getCountEditor();
         String countText = countEditor.getDisplayText();
 
-        graphics.drawString(font, Component.translatable("gui.gtcalcboard.count"), x + 6, ctrlY + 3, !isOperational ? 0xFFFF8888 : 0xFFAAAAAA, false);
+        graphics.drawString(font, COUNT_LABEL, x + 6, ctrlY + 3, !isOperational ? 0xFFFF8888 : 0xFFAAAAAA, false);
 
         int countBtnCol = !isOperational ? 0xFFFF8888 : 0xFFFFFFFF;
         int countMinusX = x + 36;
-        drawBtn(graphics, font, "-", countMinusX, ctrlY, 14, 14, mouseX, mouseY, countBtnCol, !isOperational, false);
+        drawBtn(graphics, font, "-", 5, countMinusX, ctrlY, 14, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
 
         // Interactive Numeric Count Box
-        int countBoxW = Math.max(28, font.width(countText) + 6);
+        int countTextW = font.width(countText);
+        int countBoxW = Math.max(28, countTextW + 6);
         int countBoxX = countMinusX + 16;
-        boolean countHover = mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14;
+        boolean countHover = isCardHovered && mouseX >= countBoxX && mouseX <= countBoxX + countBoxW && mouseY >= ctrlY && mouseY <= ctrlY + 14;
         boolean isEditing = countEditor.isEditing();
         int countBg = isEditing ? 0xFF0D1B2A : (!isOperational ? (countHover ? 0xFF36161A : 0xFF220E12) : (countHover ? 0xFF252A36 : 0xFF14171E));
         int countBorder = isEditing ? 0xFF55FFFF : (!isOperational ? (countHover ? 0xFFFF6666 : 0xFF993333) : (countHover ? 0xFF5577AA : 0xFF3D4455));
@@ -262,13 +278,13 @@ public class NodeCardRenderer {
             graphics.fill(startX + beforeW, ctrlY + 2, startX + beforeW + selW, ctrlY + 12, 0xFF0055AA);
             graphics.drawString(font, fullTxt, startX, ctrlY + 3, 0xFFFFFFFF, false);
         } else {
-            graphics.drawCenteredString(font, countText, countBoxX + countBoxW / 2, ctrlY + 3, isEditing ? 0xFF55FFFF : (!isOperational ? 0xFFFFB3B3 : 0xFFFFFFAA));
+            graphics.drawString(font, countText, countBoxX + (countBoxW - countTextW) / 2, ctrlY + 3, isEditing ? 0xFF55FFFF : (!isOperational ? 0xFFFFB3B3 : 0xFFFFFFAA), false);
         }
 
         int afterCountX = countBoxX + countBoxW + 2;
-        drawBtn(graphics, font, "+", afterCountX, ctrlY, 14, 14, mouseX, mouseY, countBtnCol, !isOperational, false);
-        drawBtn(graphics, font, "/2", afterCountX + 16, ctrlY, 16, 14, mouseX, mouseY, countBtnCol, !isOperational, false);
-        drawBtn(graphics, font, "x2", afterCountX + 34, ctrlY, 16, 14, mouseX, mouseY, countBtnCol, !isOperational, false);
+        drawBtn(graphics, font, "+", 7, afterCountX, ctrlY, 14, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
+        drawBtn(graphics, font, "/2", 10, afterCountX + 16, ctrlY, 16, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
+        drawBtn(graphics, font, "x2", 11, afterCountX + 34, ctrlY, 16, 14, activeMouseX, activeMouseY, countBtnCol, !isOperational, false);
 
         int row2Y = ctrlY + 18;
 
@@ -285,7 +301,7 @@ public class NodeCardRenderer {
             for (int a = maxIcons - 1; a >= 0; a--) {
                 var addon = addons.get(a);
                 trayX -= 15;
-                boolean iconHover = mouseX >= trayX && mouseX <= trayX + 14 && mouseY >= ctrlY - 1 && mouseY <= ctrlY + 13;
+                boolean iconHover = isCardHovered && mouseX >= trayX && mouseX <= trayX + 14 && mouseY >= ctrlY - 1 && mouseY <= ctrlY + 13;
                 graphics.fill(trayX, ctrlY - 1, trayX + 14, ctrlY + 13, iconHover ? 0xFF2F3B4D : 0xFF181D26);
                 graphics.renderOutline(trayX, ctrlY - 1, 14, 14, iconHover ? 0xFF58D3FF : 0xFF354054);
                 ItemStack sample = addon.getRenderItemStack();
@@ -293,7 +309,7 @@ public class NodeCardRenderer {
                     graphics.pose().pushPose();
                     graphics.pose().translate(trayX + 2.0, ctrlY + 1.0, 0.0);
                     graphics.pose().scale(0.625f, 0.625f, 1.0f);
-                    graphics.renderItem(sample, 0, 0);
+                    IngredientRenderer.renderItemStack(graphics, sample, 0, 0);
                     if (sample.getCount() > 1) {
                         graphics.renderItemDecorations(font, sample, 0, 0);
                     }
@@ -317,7 +333,7 @@ public class NodeCardRenderer {
             if (!node.isModule()) {
                 var guiHandler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
                 boolean isGlowing = com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getInstance().isMachineConfigButtonGlowing(node.getId());
-                guiHandler.renderCardControls(graphics, font, node, x, row2Y, cardW, mouseX, mouseY, isGlowing);
+                guiHandler.renderCardControls(widget, graphics, font, node, x, row2Y, cardW, activeMouseX, activeMouseY, isGlowing);
             }
 
             int infoY = node.isModule() ? (ctrlY + 18) : (row2Y + 18);
@@ -362,7 +378,7 @@ public class NodeCardRenderer {
                 }
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF) : (left != null ? left.portColor() : 0xFF5599FF));
                 var inPort = widget.getLayoutBounds().findPort(true, inOrigIdx);
-                boolean portHover = inPort != null && inPort.hitBox().contains(mouseX, mouseY);
+                boolean portHover = isCardHovered && inPort != null && inPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(inPortX, inPortY, inPortX + 6, inPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -392,7 +408,7 @@ public class NodeCardRenderer {
                 boolean isVoided = node.isOutputPortVoided(outOrigIdx);
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isVoided ? 0xFFA855F7 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (left != null ? left.portColor() : 0xFF55FF88)));
                 var outPort = widget.getLayoutBounds().findPort(false, outOrigIdx);
-                boolean portHover = outPort != null && outPort.hitBox().contains(mouseX, mouseY);
+                boolean portHover = isCardHovered && outPort != null && outPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -425,7 +441,7 @@ public class NodeCardRenderer {
                 boolean isVoided = node.isOutputPortVoided(outOrigIdx);
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isVoided ? 0xFFA855F7 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF55FF88) : (right != null ? right.portColor() : 0xFF55FF88)));
                 var outPort = widget.getLayoutBounds().findPort(false, outOrigIdx);
-                boolean portHover = outPort != null && outPort.hitBox().contains(mouseX, mouseY);
+                boolean portHover = isCardHovered && outPort != null && outPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(outPortX, outPortY, outPortX + 6, outPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(outPortX - 2, outPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -454,7 +470,7 @@ public class NodeCardRenderer {
                 }
                 int portColor = isPortSelected ? 0xFF38BDF8 : (isPortGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(0xFF5599FF) : (right != null ? right.portColor() : 0xFF5599FF));
                 var inPort = widget.getLayoutBounds().findPort(true, inOrigIdx);
-                boolean portHover = inPort != null && inPort.hitBox().contains(mouseX, mouseY);
+                boolean portHover = isCardHovered && inPort != null && inPort.hitBox().contains(mouseX, mouseY);
                 graphics.fill(inPortX, inPortY, inPortX + 6, inPortY + 6, portHover ? 0xFFFFFFFF : portColor);
                 if (isPortGlowing || isPortSelected) {
                     graphics.renderOutline(inPortX - 2, inPortY - 2, 10, 10, isPortSelected ? 0xFF38BDF8 : portColor);
@@ -491,7 +507,7 @@ public class NodeCardRenderer {
             int textW = font.width(hiddenText);
             int badgeX = x + cardW - textW - 14;
             int badgeY = y + height - 13;
-            boolean badgeHover = widget.isHiddenPortsBadgeHovered(mouseX, mouseY);
+            boolean badgeHover = isCardHovered && widget.isHiddenPortsBadgeHovered(mouseX, mouseY);
             int textColor = badgeHover ? 0xFFFFFFFF : 0xFFB0B0C0;
 
             if (badgeHover) {
@@ -508,7 +524,7 @@ public class NodeCardRenderer {
         // 10. Corner Resize Handle (Bottom-Right ⤡)
         int handleX = x + cardW - 8;
         int handleY = y + height - 8;
-        boolean handleHover = widget.isResizeHandleHovered(mouseX, mouseY);
+        boolean handleHover = isCardHovered && widget.isResizeHandleHovered(mouseX, mouseY);
         int handleColor = handleHover ? 0xFF55FFFF : 0x88657595;
         graphics.drawString(font, "⤡", handleX - 2, handleY - 3, handleColor, false);
     }
@@ -525,18 +541,22 @@ public class NodeCardRenderer {
     }
 
     public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my) {
-        drawBtn(graphics, font, text, bx, by, bw, bh, mx, my, 0xFFFFFFFF, false, false);
+        drawBtn(graphics, font, text, -1, bx, by, bw, bh, mx, my, 0xFFFFFFFF, false, false);
     }
 
     public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int textColor) {
-        drawBtn(graphics, font, text, bx, by, bw, bh, mx, my, textColor, false, false);
+        drawBtn(graphics, font, text, -1, bx, by, bw, bh, mx, my, textColor, false, false);
     }
 
     public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int textColor, boolean isGlowing) {
-        drawBtn(graphics, font, text, bx, by, bw, bh, mx, my, textColor, false, isGlowing);
+        drawBtn(graphics, font, text, -1, bx, by, bw, bh, mx, my, textColor, false, isGlowing);
     }
 
     public static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, int mx, int my, int textColor, boolean isAlert, boolean isGlowing) {
+        drawBtn(graphics, font, text, -1, bx, by, bw, bh, mx, my, textColor, isAlert, isGlowing);
+    }
+
+    public static void drawBtn(GuiGraphics graphics, Font font, String text, int textW, int bx, int by, int bw, int bh, int mx, int my, int textColor, boolean isAlert, boolean isGlowing) {
         boolean hover = mx >= bx && mx <= bx + bw && my >= by && my <= by + bh;
         int defaultBg = isAlert ? 0xFF351818 : 0xFF282E3B;
         int hoverBg = isAlert ? 0xFF4D2222 : 0xFF3E475A;
@@ -548,7 +568,8 @@ public class NodeCardRenderer {
         int border = isGlowing ? com.gtceu.calcboard.client.gui.tutorial.TutorialManager.getGlowBorderColor(defaultBorder) : (hover ? hoverBorder : defaultBorder);
         graphics.fill(bx, by, bx + bw, by + bh, bg);
         graphics.renderOutline(bx, by, bw, bh, border);
-        graphics.drawCenteredString(font, text, bx + bw / 2, by + (bh - 8) / 2, finalTextColor);
+        int actualW = textW >= 0 ? textW : font.width(text);
+        graphics.drawString(font, text, bx + (bw - actualW) / 2, by + (bh - 8) / 2, finalTextColor, false);
     }
 
     public static String formatCompactNumber(double val) {
@@ -802,17 +823,6 @@ public class NodeCardRenderer {
         IngredientRenderer.render(graphics, stack, x, y);
     }
 
-    private static boolean isNodeInputStarved(FlowGraph graph, RecipeNode node) {
-        if (graph == null || node == null) return false;
-        int inputCount = node.getInputs().size();
-        for (int i = 0; i < inputCount; i++) {
-            var stats = graph.getInputPortStats(node, i);
-            if (stats != null && stats.isInputDeficit()) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
 
 

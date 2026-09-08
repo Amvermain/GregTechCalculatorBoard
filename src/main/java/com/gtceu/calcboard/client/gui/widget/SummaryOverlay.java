@@ -355,9 +355,9 @@ public class SummaryOverlay {
             tooltip.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_stress").getString()));
             double totSU = lastSummary.totalSU();
             if (totSU >= 0) {
-                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Capacity Surplus: §a+%,.0f SU", totSU)));
+                tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.capacity_surplus", String.format(java.util.Locale.ROOT, "%,.0f", totSU))));
             } else {
-                tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Stress Deficit: §c-%,.0f SU", -totSU)));
+                tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.stress_deficit", String.format(java.util.Locale.ROOT, "%,.0f", -totSU))));
                 tooltip.add(Component.literal("§4⚠ " + Component.translatable("gui.gtcalcboard.tooltip.overstressed").getString()));
             }
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
@@ -367,7 +367,7 @@ public class SummaryOverlay {
         if (hoveredFusion && lastSummary != null && lastSummary.totalFusionStartupEU() > 0) {
             List<Component> tooltip = new ArrayList<>();
             tooltip.add(Component.literal("§d⚛ " + Component.translatable("gui.gtcalcboard.fusion_start_buffer_title").getString()));
-            tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Total Required Startup Energy: §e%,d EU", lastSummary.totalFusionStartupEU())));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.badge.required_ignition_energy", String.format(java.util.Locale.ROOT, "§e%,d", lastSummary.totalFusionStartupEU()))));
             tooltip.add(Component.literal(String.format(java.util.Locale.ROOT, "§7Formatted: §f%s EU", FormatUtil.formatCompactNumber(lastSummary.totalFusionStartupEU()))));
             tooltip.add(Component.literal("§8§m------------------------"));
             tooltip.add(Component.literal("§b" + Component.translatable("gui.gtcalcboard.fusion_breakdown_title").getString()));
@@ -405,7 +405,7 @@ public class SummaryOverlay {
             tooltip.add(Component.literal(hoveredStack.getDisplayName()));
             String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
-            tooltip.add(Component.literal("§7Rate: §f" + ratePrefix + exactRateStr));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.summary.rate", "§f" + ratePrefix + exactRateStr)));
             tooltip.add(Component.literal("§8").append(Component.translatable("gui.gtcalcboard.tooltip.recipes_uses")));
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY);
         }

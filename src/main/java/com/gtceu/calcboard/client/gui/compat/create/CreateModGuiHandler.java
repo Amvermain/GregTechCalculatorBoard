@@ -57,18 +57,20 @@ public class CreateModGuiHandler implements IModGuiHandler {
     }
 
     private void renderBoilerCardControls(GuiGraphics graphics, Font font, RecipeNode node, int x, int row2Y, int cardW, int mouseX, int mouseY) {
-        boolean waterMode = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_WATER_MODE);
-
         String levelText = getBoilerLevelText(node);
         int levelW = Math.max(48, font.width(levelText) + 8);
         NodeCardRenderer.drawBtn(graphics, font, levelText, x + 6, row2Y, levelW, 14, mouseX, mouseY, 0xFFFF8822);
 
-        int modeX = x + 6 + levelW + 3;
-        int modeW = (x + cardW - 6) - modeX;
-        String modeText = waterMode
-                ? "💧 " + Component.translatable("gui.gtcalcboard.create.boiler_water").getString()
-                : "♨ " + Component.translatable("gui.gtcalcboard.create.boiler_steam").getString();
-        NodeCardRenderer.drawBtn(graphics, font, modeText, modeX, row2Y, modeW, 14, mouseX, mouseY, waterMode ? 0xFF55AAFF : 0xFFFFAA33);
+        int cfgX = x + 6 + levelW + 3;
+        int cfgW = (x + cardW - 6) - cfgX;
+        int addonCount = node.getAddons().size();
+        String cfgBase = Component.translatable("gui.gtcalcboard.create.boiler_config").getString();
+        String cfgText = addonCount > 0 ? "⚙ " + cfgBase + " (+" + addonCount + ")" : "⚙ " + cfgBase;
+        if (font.width(cfgText) > cfgW - 4) {
+            cfgText = addonCount > 0 ? "⚙ (+" + addonCount + ")" : "⚙";
+        }
+        boolean hasAddons = addonCount > 0;
+        NodeCardRenderer.drawBtn(graphics, font, cfgText, cfgX, row2Y, cfgW, 14, mouseX, mouseY, hasAddons ? 0xFF55FFFF : 0xFF58D3FF);
     }
 
     private static String getBoilerLevelText(RecipeNode node) {
@@ -131,9 +133,7 @@ public class CreateModGuiHandler implements IModGuiHandler {
         }
         if (isMachineConfigHovered(node, mouseX, mouseY)) {
             widget.commitCountEdit();
-            com.gtceu.calcboard.compat.create.CreateProperties.toggleBoilerFluidMode(node);
-            if (widget.getParent() != null) widget.getParent().markSummaryDirty();
-            widget.invalidateCache();
+            if (widget.getParent() != null) widget.getParent().openMachineConfigDialog(node);
             playClickSound();
             return true;
         }
@@ -235,16 +235,11 @@ public class CreateModGuiHandler implements IModGuiHandler {
         int size = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_SIZE_BLOCKS);
         int heat = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_HEAT_LEVEL);
         int water = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_WATER_MB_TICK);
-        boolean waterMode = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_WATER_MODE);
         var bn = com.gtceu.calcboard.compat.create.CreateProperties.getBottleneck(size, heat, water);
 
         String levelStr = level == 0
                 ? Component.translatable("gui.gtcalcboard.create.boiler_passive").getString()
                 : Component.translatable("gui.gtcalcboard.create.boiler_level", level).getString();
-        String modeStr = waterMode
-                ? Component.translatable("gui.gtcalcboard.create.boiler_water").getString()
-                : Component.translatable("gui.gtcalcboard.create.boiler_steam").getString();
-        String modeFormatted = Component.translatable("gui.gtcalcboard.create.boiler_mode_desc", modeStr).getString();
         String bnStr = switch (bn) {
             case SIZE -> " §e(⚠ " + Component.translatable("gui.gtcalcboard.create.boiler_bn_size").getString() + ")";
             case WATER -> " §9(⚠ " + Component.translatable("gui.gtcalcboard.create.boiler_bn_water").getString() + ")";
@@ -252,16 +247,15 @@ public class CreateModGuiHandler implements IModGuiHandler {
             case NONE, INACTIVE -> "";
         };
 
-        String title = String.format(Locale.ROOT, "§6♨ %s: §e%s §7(+%,.0f SU, %s)%s",
+        String title = String.format(Locale.ROOT, "§6♨ %s: §e%s §7(+%,.0f SU)%s",
                 Component.translatable("gui.gtcalcboard.create.boiler_title").getString(),
-                levelStr, node.getBaseEUt(), modeFormatted, bnStr);
+                levelStr, node.getBaseEUt(), bnStr);
         graphics.drawString(font, title, x + 10, y + 30, 0xFFFFFFFF, false);
         renderBoilerPresetButtons(graphics, font, node, x + 10, y + 44, mouseX, mouseY);
     }
 
     private void renderBoilerPresetButtons(GuiGraphics graphics, Font font, RecipeNode node, int startX, int startY, int mouseX, int mouseY) {
         int curLevel = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_LEVEL);
-        boolean waterMode = node.getProperties().get(com.gtceu.calcboard.compat.create.CreateProperties.BOILER_WATER_MODE);
         int btnX = startX;
 
         for (int lvl : BOILER_LEVEL_PRESETS) {
@@ -277,13 +271,6 @@ public class CreateModGuiHandler implements IModGuiHandler {
         drawPresetButton(graphics, font, "-", btnX, startY, 20, false, mouseX, mouseY);
         btnX += 24;
         drawPresetButton(graphics, font, "+", btnX, startY, 20, false, mouseX, mouseY);
-        btnX += 24;
-
-        String fluidLabel = waterMode
-                ? "💧 " + Component.translatable("gui.gtcalcboard.create.boiler_water").getString()
-                : "♨ " + Component.translatable("gui.gtcalcboard.create.boiler_steam").getString();
-        int fluidW = Math.max(50, font.width(fluidLabel) + 8);
-        drawPresetButton(graphics, font, fluidLabel, btnX, startY, fluidW, false, mouseX, mouseY);
     }
 
     private void drawPresetButton(GuiGraphics graphics, Font font, String label, int btnX, int startY, int w, boolean active, int mouseX, int mouseY) {
@@ -373,13 +360,6 @@ public class CreateModGuiHandler implements IModGuiHandler {
         btnX += 24;
         if (mouseX >= btnX && mouseX <= btnX + 20 && mouseY >= startY && mouseY <= startY + 16) {
             com.gtceu.calcboard.compat.create.CreateProperties.cycleBoilerLevel(node, 1);
-            if (parent != null) parent.markSummaryDirty();
-            playClickSound();
-            return true;
-        }
-        btnX += 24;
-        if (mouseX >= btnX && mouseX <= btnX + 50 && mouseY >= startY && mouseY <= startY + 16) {
-            com.gtceu.calcboard.compat.create.CreateProperties.toggleBoilerFluidMode(node);
             if (parent != null) parent.markSummaryDirty();
             playClickSound();
             return true;

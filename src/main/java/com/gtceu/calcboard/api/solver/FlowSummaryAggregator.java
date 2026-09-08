@@ -128,12 +128,23 @@ public final class FlowSummaryAggregator {
      * Computes the balance summary using existing node efficiencies and port states without re-evaluating efficiencies.
      * Prevents bottleneck collapse for isolated subgraphs.
      */
+    private static final int MAX_MODULE_DEPTH = 16;
+
     public static BalanceSummary computeSummaryPreservingEfficiencies(FlowGraph graph) {
         return computeSummary(graph, false);
     }
 
     public static BalanceSummary computeSummary(FlowGraph graph, boolean recomputeEfficiencies) {
-        if (graph == null) {
+        return computeSummaryInternal(graph, recomputeEfficiencies, 0, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static BalanceSummary computeSummaryInternal(
+            FlowGraph graph,
+            boolean recomputeEfficiencies,
+            int depth,
+            Set<FlowGraph> visitedGraphs
+    ) {
+        if (graph == null || depth > MAX_MODULE_DEPTH || !visitedGraphs.add(graph)) {
             return new BalanceSummary(0, GTVoltageTier.ULV, 0, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
         }
 
@@ -196,7 +207,7 @@ public final class FlowSummaryAggregator {
                     if (node.isModule()) {
                         int moduleCount = (int) Math.max(1, Math.ceil(node.getMachineCount() - 0.00001));
                         if (node.getSubGraph() != null) {
-                            BalanceSummary subSummary = computeSummaryPreservingEfficiencies(node.getSubGraph());
+                            BalanceSummary subSummary = computeSummaryInternal(node.getSubGraph(), false, depth + 1, visitedGraphs);
                             int subMachines = subSummary.totalMachineCount() * moduleCount;
                             totalMachineCount += subMachines;
                             for (Map.Entry<String, Integer> entry : subSummary.machineBreakdown().entrySet()) {

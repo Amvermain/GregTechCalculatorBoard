@@ -171,6 +171,8 @@ public class MultiblockBOMCalculator {
         }
     }
 
+    private static final int MAX_MODULE_DEPTH = 16;
+
     private static void flattenNodesAndFrames(
             List<RecipeNode> sourceNodes,
             List<CanvasGroupFrame> sourceFrames,
@@ -178,7 +180,27 @@ public class MultiblockBOMCalculator {
             List<RecipeNode> flatNodes,
             List<CanvasGroupFrame> flatFrames
     ) {
-        if (sourceNodes == null) return;
+        flattenNodesAndFrames(
+                sourceNodes,
+                sourceFrames,
+                parentMultiplier,
+                flatNodes,
+                flatFrames,
+                0,
+                Collections.newSetFromMap(new IdentityHashMap<>())
+        );
+    }
+
+    private static void flattenNodesAndFrames(
+            List<RecipeNode> sourceNodes,
+            List<CanvasGroupFrame> sourceFrames,
+            double parentMultiplier,
+            List<RecipeNode> flatNodes,
+            List<CanvasGroupFrame> flatFrames,
+            int depth,
+            Set<FlowGraph> visitedGraphs
+    ) {
+        if (sourceNodes == null || depth > MAX_MODULE_DEPTH) return;
         if (sourceFrames != null) {
             flatFrames.addAll(sourceFrames);
         }
@@ -187,14 +209,17 @@ public class MultiblockBOMCalculator {
             if (node == null || node.isReroute()) continue;
 
             if (node.isModule()) {
-                double moduleMultiplier = parentMultiplier * Math.max(1.0, node.getMachineCount());
-                if (node.getSubGraph() != null) {
+                FlowGraph subGraph = node.getSubGraph();
+                if (subGraph != null && visitedGraphs.add(subGraph)) {
+                    double moduleMultiplier = parentMultiplier * Math.max(1.0, node.getMachineCount());
                     flattenNodesAndFrames(
-                            node.getSubGraph().getNodes(),
-                            node.getSubGraph().getFrames(),
+                            subGraph.getNodes(),
+                            subGraph.getFrames(),
                             moduleMultiplier,
                             flatNodes,
-                            flatFrames
+                            flatFrames,
+                            depth + 1,
+                            visitedGraphs
                     );
                 }
             } else {

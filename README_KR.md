@@ -155,7 +155,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-alpha.4.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-beta.1.jar` 경로에 생성됩니다.
 
 ---
 

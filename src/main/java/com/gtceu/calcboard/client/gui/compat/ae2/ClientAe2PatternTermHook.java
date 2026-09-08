@@ -22,7 +22,6 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,8 +30,22 @@ import java.util.Optional;
  * Client Forge screen event hook for AE2 Pattern Encoding Terminal.
  * Injects a dedicated GTCalcBoard page generation button and handles Shift+A pattern shortcuts.
  */
-@Mod.EventBusSubscriber(modid = GregTechCalcBoard.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientAe2PatternTermHook {
+
+    private static Class<?> patternTermScreenClass = null;
+    private static boolean reflectionInitialized = false;
+
+    static {
+        initReflection();
+    }
+
+    private static void initReflection() {
+        if (reflectionInitialized) return;
+        try {
+            patternTermScreenClass = Class.forName("appeng.client.gui.me.PatternEncodingTermScreen");
+        } catch (Throwable ignored) {}
+        reflectionInitialized = true;
+    }
 
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -131,7 +144,7 @@ public class ClientAe2PatternTermHook {
     }
 
     private static boolean isPatternEncodingScreen(Screen screen) {
-        if (screen == null) return false;
-        return screen.getClass().getName().contains("PatternEncodingTermScreen");
+        if (screen == null || patternTermScreenClass == null) return false;
+        return patternTermScreenClass.isInstance(screen);
     }
 }

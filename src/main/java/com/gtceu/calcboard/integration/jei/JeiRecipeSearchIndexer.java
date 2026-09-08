@@ -214,7 +214,7 @@ public final class JeiRecipeSearchIndexer {
             StringBuilder ssb = new StringBuilder();
             ssb.append(' ').append(id.toString().toLowerCase(Locale.ROOT));
             ssb.append(' ').append(id.getPath().toLowerCase(Locale.ROOT));
-            if (id.getPath().contains("stress_unit") || id.getPath().equals("cogwheel")) {
+            if (com.gtceu.calcboard.compat.RecipeCategoryClassifier.isKineticUnitOrGear(id)) {
                 ssb.append(" su stress units kinetic 스트레스");
             }
             if (!n.isEmpty()) {

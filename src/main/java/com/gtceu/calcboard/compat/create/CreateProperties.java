@@ -166,14 +166,8 @@ public final class CreateProperties {
     }
 
     private static void syncBoilerInput(com.gtceu.calcboard.api.model.RecipeNode node, int level) {
-        boolean waterMode = node.getProperties().get(BOILER_WATER_MODE);
-        if (waterMode) {
-            double rate = level == 0 ? 200.0 : (level * 200.0);
-            updateOrAddFluidInput(node, net.minecraft.resources.ResourceLocation.tryParse("minecraft:water"), "Water", rate);
-        } else {
-            double rate = level == 0 ? 320.0 : (level * 320.0);
-            updateOrAddFluidInput(node, net.minecraft.resources.ResourceLocation.tryParse("gtceu:steam"), "Steam", rate);
-        }
+        double rate = level == 0 ? 200.0 : (level * 200.0);
+        updateOrAddFluidInput(node, net.minecraft.resources.ResourceLocation.tryParse("minecraft:water"), "Water", rate);
     }
 
     private static void updateOrAddFluidInput(com.gtceu.calcboard.api.model.RecipeNode node, net.minecraft.resources.ResourceLocation id, String name, double amount) {
@@ -196,8 +190,7 @@ public final class CreateProperties {
 
     public static void toggleBoilerFluidMode(com.gtceu.calcboard.api.model.RecipeNode node) {
         if (node == null) return;
-        boolean current = node.getProperties().get(BOILER_WATER_MODE);
-        node.getProperties().set(BOILER_WATER_MODE, !current);
+        node.getProperties().set(BOILER_WATER_MODE, true);
         recalculateAndApplyBoiler(node);
     }
 

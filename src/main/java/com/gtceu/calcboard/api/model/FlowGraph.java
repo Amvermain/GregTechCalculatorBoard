@@ -82,15 +82,15 @@ public class FlowGraph {
     }
 
     public List<ConnectionEdge> getConnections() {
-        return connections;
+        return Collections.unmodifiableList(connections);
     }
 
     public List<CanvasGroupFrame> getFrames() {
-        return frames;
+        return Collections.unmodifiableList(frames);
     }
 
     public List<CanvasStickyNote> getStickyNotes() {
-        return stickyNotes;
+        return Collections.unmodifiableList(stickyNotes);
     }
 
     public void addStickyNote(CanvasStickyNote note) {
@@ -324,6 +324,63 @@ public class FlowGraph {
         }
     }
 
+    public void addConnections(Collection<ConnectionEdge> edges) {
+        if (edges == null || edges.isEmpty()) return;
+        for (ConnectionEdge edge : edges) {
+            addConnection(edge);
+        }
+    }
+
+    public boolean removeConnection(ConnectionEdge edge) {
+        if (edge == null) return false;
+        boolean removed = connections.remove(edge);
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+        return removed;
+    }
+
+    public boolean removeConnection(String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+        boolean removed = connections.removeIf(edge ->
+            edge.fromNodeId().equals(fromNodeId) && edge.outputIndex() == outIdx
+            && edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx
+        );
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+        return removed;
+    }
+
+    public boolean removeConnectionIf(java.util.function.Predicate<ConnectionEdge> filter) {
+        if (filter == null) return false;
+        boolean removed = connections.removeIf(filter);
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+        return removed;
+    }
+
+    public void removeConnections(Collection<ConnectionEdge> edges) {
+        if (edges == null || edges.isEmpty()) return;
+        boolean removed = connections.removeAll(edges);
+        if (removed) {
+            invalidatePortStatsCache();
+        }
+    }
+
+    public void clearConnections() {
+        connections.clear();
+        invalidatePortStatsCache();
+    }
+
+    public void clearFrames() {
+        frames.clear();
+    }
+
+    public void clearStickyNotes() {
+        stickyNotes.clear();
+    }
+
     public boolean setConnectionFixedLimit(ConnectionEdge targetEdge, double fixedLimit) {
         if (targetEdge == null) return false;
         for (int i = 0; i < connections.size(); i++) {
@@ -336,12 +393,6 @@ public class FlowGraph {
             }
         }
         return false;
-    }
-
-    public void removeConnection(ConnectionEdge edge) {
-        if (connections.remove(edge)) {
-            invalidatePortStatsCache();
-        }
     }
 
     public boolean cleanupInvalidConnections() {
@@ -362,13 +413,18 @@ public class FlowGraph {
                 if (from.isReroute() || to.isReroute()) return false;
                 return true;
             }
-            if (outStack.getId() == null || inStack.getId() == null) return true;
+            if (outStack.getId() == null || inStack.getId() == null) {
+                if (from.isReroute() || to.isReroute()) return false;
+                return true;
+            }
 
             // Fluid vs Item compatibility check
             if (outStack.isFluid() != inStack.isFluid()) return true;
 
-            // Resource ID compatibility check
+            // Resource compatibility check
             if (outStack.getId().equals(inStack.getId())) return false;
+            if (outStack.matchesOrAlternative(inStack) || inStack.matchesOrAlternative(outStack)) return false;
+            if (outStack.isStressUnit() && inStack.isStressUnit()) return false;
 
             return true;
         });
@@ -493,14 +549,22 @@ public class FlowGraph {
     }
 
     public CompoundTag serializeNBT(double panX, double panY, double zoom) {
+        return serializeNBT(panX, panY, zoom, Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    public CompoundTag serializeNBT(double panX, double panY, double zoom, Set<FlowGraph> visitedGraphs, int depth) {
         CompoundTag tag = new CompoundTag();
         tag.putDouble("panX", panX);
         tag.putDouble("panY", panY);
         tag.putDouble("zoom", zoom);
 
+        if (visitedGraphs != null) {
+            visitedGraphs.add(this);
+        }
+
         ListTag nodeList = new ListTag();
         for (RecipeNode n : nodes) {
-            nodeList.add(n.serializeNBT());
+            nodeList.add(n.serializeNBT(visitedGraphs, depth));
         }
         tag.put("nodes", nodeList);
 

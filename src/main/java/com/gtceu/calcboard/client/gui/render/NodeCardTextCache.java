@@ -25,6 +25,27 @@ public class NodeCardTextCache {
 
     public record PortText(String text, int width, int textColor, int portColor) {}
 
+    public record Row2Button(
+        int relX,
+        int width,
+        String text,
+        int textWidth,
+        int color,
+        boolean isAlert,
+        boolean isGlowing,
+        ButtonRole role,
+        NodeBadge badge
+    ) {
+        public enum ButtonRole {
+            TIER,
+            BADGE,
+            GEN,
+            OC,
+            CONFIG,
+            BANNER
+        }
+    }
+
     private boolean dirty = true;
 
     private String title = "";
@@ -36,10 +57,16 @@ public class NodeCardTextCache {
 
     private final List<PortText> leftPortTexts = new ArrayList<>();
     private final List<PortText> rightPortTexts = new ArrayList<>();
+    private final List<Row2Button> row2Buttons = new ArrayList<>();
     private List<NodeBadge> badges = List.of();
+    private boolean starved = false;
 
     public boolean isDirty() {
         return dirty;
+    }
+
+    public boolean isStarved() {
+        return starved;
     }
 
     public void markDirty() {
@@ -78,6 +105,10 @@ public class NodeCardTextCache {
         return badges;
     }
 
+    public List<Row2Button> getRow2Buttons() {
+        return row2Buttons;
+    }
+
     public void update(NodeWidget widget, Font font, FlowGraph graph, RecipeNode node, int cardW, int titleX, int x, int headerBtnMargin) {
         if (!dirty) return;
 
@@ -87,8 +118,36 @@ public class NodeCardTextCache {
         updatePowerAndDuration(widget, font, node, cardW, isOperational);
         updateBadges(node);
         updatePorts(widget, font, graph, node, cardW, isOperational);
+        updateStarved(graph, node);
+        updateRow2Buttons(widget, font, node, cardW, isOperational);
 
         this.dirty = false;
+    }
+
+    private void updateRow2Buttons(NodeWidget widget, Font font, RecipeNode node, int cardW, boolean isOperational) {
+        this.row2Buttons.clear();
+        if (widget == null || font == null || node == null) return;
+        if (BoardManager.getInstance().isSlimCardMode()) return;
+        var handler = com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry.getHandlerForNode(node);
+        if (handler != null) {
+            handler.populateRow2Buttons(widget, font, node, cardW, isOperational, this.row2Buttons);
+        }
+    }
+
+    private void updateStarved(FlowGraph graph, RecipeNode node) {
+        if (graph == null || node == null) {
+            this.starved = false;
+            return;
+        }
+        int inputCount = node.getInputs().size();
+        for (int i = 0; i < inputCount; i++) {
+            var stats = graph.getInputPortStats(node, i);
+            if (stats != null && stats.isInputDeficit()) {
+                this.starved = true;
+                return;
+            }
+        }
+        this.starved = false;
     }
 
     private void updateTitle(RecipeNode node, int cardW, int titleX, int x, int headerBtnMargin, boolean isOperational) {

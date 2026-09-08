@@ -45,9 +45,7 @@ public class RecipeNode {
     // Inputs and outputs
     private final List<IngredientStack> inputs = new ArrayList<>();
     private final List<IngredientStack> outputs = new ArrayList<>();
-    private final java.util.Set<Integer> hiddenInputIndices = new java.util.LinkedHashSet<>();
-    private final java.util.Set<Integer> hiddenOutputIndices = new java.util.LinkedHashSet<>();
-    private final java.util.Set<Integer> voidedOutputIndices = new java.util.LinkedHashSet<>();
+    private final NodePortVisibility portVisibility = new NodePortVisibility();
 
     // Master base node for Auto Ratio
     private boolean isBaseNode = false;
@@ -576,102 +574,79 @@ public class RecipeNode {
     }
 
     public boolean isInputPortHidden(int index) {
-        return hiddenInputIndices.contains(index);
+        return portVisibility.isInputPortHidden(index);
     }
 
     public boolean isOutputPortHidden(int index) {
-        return hiddenOutputIndices.contains(index);
+        return portVisibility.isOutputPortHidden(index);
     }
 
     public void hideInputPort(int index) {
-        if (index >= 0 && index < inputs.size()) {
-            hiddenInputIndices.add(index);
-        }
+        portVisibility.hideInputPort(index, inputs.size());
     }
 
     public void unhideInputPort(int index) {
-        hiddenInputIndices.remove(index);
+        portVisibility.unhideInputPort(index);
     }
 
     public void hideOutputPort(int index) {
-        if (index >= 0 && index < outputs.size()) {
-            hiddenOutputIndices.add(index);
-        }
+        portVisibility.hideOutputPort(index, outputs.size());
     }
 
     public void unhideOutputPort(int index) {
-        hiddenOutputIndices.remove(index);
+        portVisibility.unhideOutputPort(index);
     }
 
     public void unhideAllPorts() {
-        hiddenInputIndices.clear();
-        hiddenOutputIndices.clear();
+        portVisibility.unhideAllPorts();
     }
 
     public boolean isOutputPortVoided(int index) {
-        return voidedOutputIndices.contains(index);
+        return portVisibility.isOutputPortVoided(index);
     }
 
     public void setOutputPortVoided(int index, boolean voided) {
-        if (index >= 0 && index < outputs.size()) {
-            if (voided) {
-                voidedOutputIndices.add(index);
-            } else {
-                voidedOutputIndices.remove(index);
-            }
-        }
+        portVisibility.setOutputPortVoided(index, voided, outputs.size());
     }
 
     public void clearVoidedOutputPorts() {
-        voidedOutputIndices.clear();
+        portVisibility.clearVoidedOutputPorts();
     }
 
     public java.util.Set<Integer> getVoidedOutputIndices() {
-        return java.util.Collections.unmodifiableSet(voidedOutputIndices);
+        return portVisibility.getVoidedOutputIndices();
     }
 
     public int getVoidedOutputCount() {
-        return voidedOutputIndices.size();
+        return portVisibility.getVoidedOutputCount();
     }
 
     public java.util.Set<Integer> getHiddenInputIndices() {
-        return java.util.Collections.unmodifiableSet(hiddenInputIndices);
+        return portVisibility.getHiddenInputIndices();
     }
 
     public java.util.Set<Integer> getHiddenOutputIndices() {
-        return java.util.Collections.unmodifiableSet(hiddenOutputIndices);
+        return portVisibility.getHiddenOutputIndices();
     }
 
     public int getHiddenInputCount() {
-        return hiddenInputIndices.size();
+        return portVisibility.getHiddenInputCount();
     }
 
     public int getHiddenOutputCount() {
-        return hiddenOutputIndices.size();
+        return portVisibility.getHiddenOutputCount();
     }
 
     public int getTotalHiddenCount() {
-        return hiddenInputIndices.size() + hiddenOutputIndices.size();
+        return portVisibility.getTotalHiddenCount();
     }
 
     public List<Integer> getVisibleInputIndices() {
-        List<Integer> list = new ArrayList<>();
-        for (int i = 0; i < inputs.size(); i++) {
-            if (!hiddenInputIndices.contains(i)) {
-                list.add(i);
-            }
-        }
-        return list;
+        return portVisibility.getVisibleInputIndices(inputs.size());
     }
 
     public List<Integer> getVisibleOutputIndices() {
-        List<Integer> list = new ArrayList<>();
-        for (int i = 0; i < outputs.size(); i++) {
-            if (!hiddenOutputIndices.contains(i)) {
-                list.add(i);
-            }
-        }
-        return list;
+        return portVisibility.getVisibleOutputIndices(outputs.size());
     }
 
     public List<ResourceLocation> getAvailableWorkstations() {
@@ -893,19 +868,15 @@ public class RecipeNode {
     }
 
     public boolean isThreadingAvailable() {
-        return MultiblockDetector.getMaxHelixCount(this) > 0;
+        return RecipeNodeThreadingHelper.isThreadingAvailable(this);
     }
 
     public boolean isExplicitThreadingMachine() {
-        if (machineIcon != null) {
-            return MultiblockDetector.isThreadingMultiblock(machineIcon);
-        }
-        return false;
+        return RecipeNodeThreadingHelper.isExplicitThreadingMachine(this);
     }
 
     public boolean hasThreading() {
-        if (isExplicitThreadingMachine()) return true;
-        return threadingConfig != null && threadingConfig.isActive();
+        return RecipeNodeThreadingHelper.hasThreading(this);
     }
 
     public boolean isThreadingActive() {
@@ -913,50 +884,23 @@ public class RecipeNode {
     }
 
     public void setThreadingActive(boolean active) {
-        if (active) {
-            getThreadingConfig().setActive(true);
-            for (ResourceLocation ws : getAvailableWorkstations()) {
-                if (ws != null && MultiblockDetector.isThreadingMultiblock(ws)) {
-                    setMachineIcon(ws);
-                    break;
-                }
-            }
-        } else {
-            if (threadingConfig != null) {
-                threadingConfig.reset();
-                threadingConfig.setActive(false);
-            }
-            addons.removeIf(a -> a.getCategory() == AddonCategory.THREADING);
-            if (machineIcon != null && MultiblockDetector.isThreadingMultiblock(machineIcon)) {
-                ResourceLocation mbWs = getMultiblockWorkstation();
-                if (mbWs != null && !MultiblockDetector.isThreadingMultiblock(mbWs)) {
-                    setMachineIcon(mbWs);
-                }
-            }
-        }
+        RecipeNodeThreadingHelper.setThreadingActive(this, active);
     }
 
     public int getRequiredReflectorTier() {
-        return properties.getById("required_reflector_tier", 0);
+        return RecipeNodeReflectorHelper.getRequiredReflectorTier(properties);
     }
 
     public void setRequiredReflectorTier(int tier) {
-        properties.setById("required_reflector_tier", Math.max(0, tier));
+        RecipeNodeReflectorHelper.setRequiredReflectorTier(properties, tier);
     }
 
     public int getInstalledReflectorTier() {
-        for (MachineAddon a : addons) {
-            if (a.getCategory() == MachineAddon.Category.REFLECTOR) {
-                return a.getReflectorTier();
-            }
-        }
-        return 0;
+        return RecipeNodeReflectorHelper.getInstalledReflectorTier(addons);
     }
 
     public boolean hasValidReflector() {
-        int req = getRequiredReflectorTier();
-        if (req <= 0) return true;
-        return getInstalledReflectorTier() >= req;
+        return RecipeNodeReflectorHelper.hasValidReflector(properties, addons);
     }
 
     public boolean isOperational() {
@@ -1248,45 +1192,39 @@ public class RecipeNode {
     }
 
     public boolean isCompoundNode() {
-        return properties.has(NodeProperties.COMPOUND_GROUP_ID) && !properties.get(NodeProperties.COMPOUND_GROUP_ID).isEmpty();
+        return RecipeNodeCompoundHelper.isCompoundNode(properties);
     }
 
     public boolean isCompoundMaster() {
-        return isCompoundNode() && getCompoundLayerIndex() == 0;
+        return RecipeNodeCompoundHelper.isCompoundMaster(properties);
     }
 
     public String getCompoundGroupId() {
-        return properties.get(NodeProperties.COMPOUND_GROUP_ID);
+        return RecipeNodeCompoundHelper.getCompoundGroupId(properties);
     }
 
     public int getCompoundLayerIndex() {
-        return properties.get(NodeProperties.COMPOUND_LAYER_INDEX);
+        return RecipeNodeCompoundHelper.getCompoundLayerIndex(properties);
     }
 
     public int getCompoundTotalLayers() {
-        return properties.get(NodeProperties.COMPOUND_TOTAL_LAYERS);
+        return RecipeNodeCompoundHelper.getCompoundTotalLayers(properties);
     }
 
     public String getCompoundMasterNodeId() {
-        return properties.get(NodeProperties.COMPOUND_MASTER_NODE_ID);
+        return RecipeNodeCompoundHelper.getCompoundMasterNodeId(properties);
     }
 
     public void setCompoundMetadata(String groupId, int layerIndex, int totalLayers, String masterId) {
-        if (groupId == null || groupId.isEmpty()) {
-            properties.remove(NodeProperties.COMPOUND_GROUP_ID);
-            properties.remove(NodeProperties.COMPOUND_LAYER_INDEX);
-            properties.remove(NodeProperties.COMPOUND_TOTAL_LAYERS);
-            properties.remove(NodeProperties.COMPOUND_MASTER_NODE_ID);
-        } else {
-            properties.set(NodeProperties.COMPOUND_GROUP_ID, groupId);
-            properties.set(NodeProperties.COMPOUND_LAYER_INDEX, Math.max(0, layerIndex));
-            properties.set(NodeProperties.COMPOUND_TOTAL_LAYERS, Math.max(1, totalLayers));
-            properties.set(NodeProperties.COMPOUND_MASTER_NODE_ID, masterId != null ? masterId : "");
-        }
+        RecipeNodeCompoundHelper.setCompoundMetadata(properties, groupId, layerIndex, totalLayers, masterId);
     }
 
     public CompoundTag serializeNBT() {
         return RecipeNodeSerializer.serialize(this);
+    }
+
+    public CompoundTag serializeNBT(Set<FlowGraph> visitedGraphs, int depth) {
+        return RecipeNodeSerializer.serialize(this, visitedGraphs, depth);
     }
 
     public static RecipeNode deserializeNBT(CompoundTag tag) {

@@ -20,6 +20,9 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 
 import java.util.Locale;
 
+/**
+ * Client GUI view component for configuring Create Steam Boiler physical parameters (ADR-036).
+ */
 @OnlyIn(Dist.CLIENT)
 public class CreateBoilerConfigView {
 
@@ -140,7 +143,6 @@ public class CreateBoilerConfigView {
 
     private void renderWaterControlRow(GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int w, int mx, int my) {
         int water = node.getProperties().get(CreateProperties.BOILER_WATER_MB_TICK);
-        boolean waterMode = node.getProperties().get(CreateProperties.BOILER_WATER_MODE);
         double flowSec = water * 20.0;
 
         graphics.fill(x, y, x + w, y + 26, 0xFF181B24);
@@ -150,22 +152,15 @@ public class CreateBoilerConfigView {
                 Component.translatable("gui.gtcalcboard.create.boiler_water_supply").getString(), water, flowSec);
         graphics.drawString(font, label, x + 6, y + 9, 0xFFFFFFFF, false);
 
-        int bx = x + w - 192;
+        String matchLabel = Component.translatable("gui.gtcalcboard.create.boiler_auto_match").getString();
+        int matchW = Math.max(50, font.width(matchLabel) + 8);
+        int bx = x + w - (48 + matchW);
+
         renderButton(graphics, font, "-", bx, y + 5, 18, 16, mx, my, false);
         bx += 22;
         renderButton(graphics, font, "+", bx, y + 5, 18, 16, mx, my, false);
         bx += 22;
-
-        String matchLabel = Component.translatable("gui.gtcalcboard.create.boiler_auto_match").getString();
-        int matchW = Math.max(50, font.width(matchLabel) + 8);
         renderButton(graphics, font, matchLabel, bx, y + 5, matchW, 16, mx, my, false);
-        bx += matchW + 4;
-
-        String modeLabel = waterMode
-                ? "💧 " + Component.translatable("gui.gtcalcboard.create.boiler_water").getString()
-                : "♨ " + Component.translatable("gui.gtcalcboard.create.boiler_steam").getString();
-        int modeW = Math.max(48, font.width(modeLabel) + 8);
-        renderButton(graphics, font, modeLabel, bx, y + 5, modeW, 16, mx, my, waterMode);
     }
 
     private void renderQuickAddonRow(GuiGraphics graphics, Font font, RecipeNode node, int x, int y, int w, int mx, int my) {
@@ -281,7 +276,8 @@ public class CreateBoilerConfigView {
 
     private boolean handleWaterRowClick(RecipeNode node, int x, int y, int w, double mx, double my, BoardScreen parent) {
         int cur = node.getProperties().get(CreateProperties.BOILER_WATER_MB_TICK);
-        int bx = x + w - 192;
+        int matchW = Math.max(50, Minecraft.getInstance().font.width(Component.translatable("gui.gtcalcboard.create.boiler_auto_match").getString()) + 8);
+        int bx = x + w - (48 + matchW);
 
         if (isInside(mx, my, bx, y + 5, 18, 16)) {
             CreateProperties.setBoilerWater(node, cur - 10);
@@ -296,20 +292,11 @@ public class CreateBoilerConfigView {
         }
         bx += 22;
 
-        int matchW = Math.max(50, Minecraft.getInstance().font.width(Component.translatable("gui.gtcalcboard.create.boiler_auto_match").getString()) + 8);
         if (isInside(mx, my, bx, y + 5, matchW, 16)) {
             int sizeLvl = CreateProperties.getSizeLevel(node.getProperties().get(CreateProperties.BOILER_SIZE_BLOCKS));
             int heatLvl = node.getProperties().get(CreateProperties.BOILER_HEAT_LEVEL);
             int targetLvl = Math.max(1, Math.min(sizeLvl, heatLvl > 0 ? heatLvl : 1));
             CreateProperties.setBoilerWater(node, targetLvl * 10);
-            triggerUpdate(parent);
-            return true;
-        }
-        bx += matchW + 4;
-
-        int modeW = Math.max(48, Minecraft.getInstance().font.width("💧 " + Component.translatable("gui.gtcalcboard.create.boiler_water").getString()) + 8);
-        if (isInside(mx, my, bx, y + 5, modeW, 16)) {
-            CreateProperties.toggleBoilerFluidMode(node);
             triggerUpdate(parent);
             return true;
         }

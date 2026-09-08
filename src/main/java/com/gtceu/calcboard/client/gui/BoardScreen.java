@@ -180,6 +180,19 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
                 getGraph().getNodes().size(), getGraph().getConnections().size(), ClientWorkspaceState.getInstance().isTeamMode());
     }
 
+    @Override
+    public void removed() {
+        super.removed();
+        if (this.dialogManager != null) {
+            this.dialogManager.destroy();
+        }
+        ClientWorkspaceState state = ClientWorkspaceState.getInstance();
+        if (state.isTeamMode()) {
+            state.autoCommitAndRelease(this, state.getActiveTeamPageId());
+            state.releaseCurrentLockIfHeld();
+        }
+    }
+
     public void clearForeignWidgets() {
         this.clearWidgets();
     }

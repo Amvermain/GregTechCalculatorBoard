@@ -31,6 +31,18 @@ public class DomainModelEncapsulationTest {
         Assertions.assertThrows(UnsupportedOperationException.class, () -> {
             graph.getNodes().add(RecipeNode.create(ResourceLocation.tryParse("gtceu:furnace"), "Furnace", 100, 30, null));
         }, "graph.getNodes() must be unmodifiable to protect nodeMap index integrity");
+
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> {
+            graph.getConnections().add(new FlowGraph.ConnectionEdge("a", 0, "b", 0));
+        }, "graph.getConnections() must be unmodifiable to protect connection integrity");
+
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> {
+            graph.getFrames().clear();
+        }, "graph.getFrames() must be unmodifiable");
+
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> {
+            graph.getStickyNotes().clear();
+        }, "graph.getStickyNotes() must be unmodifiable");
     }
 
     @Test

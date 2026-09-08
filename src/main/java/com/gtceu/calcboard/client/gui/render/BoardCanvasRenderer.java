@@ -60,11 +60,11 @@ public class BoardCanvasRenderer {
         }
 
         if (showDebug) profiler.startSection("Nodes");
-        renderNodeWidgets(graphics, screen, nodeWidgets, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, partialTicks);
+        float topZ = renderNodeWidgets(graphics, screen, nodeWidgets, canvasMouseX, canvasMouseY, screenLeft, screenRight, screenTop, screenBottom, partialTicks);
         graphics.flush();
         RenderSystem.disableDepthTest();
 
-        renderQuickActionAndMarquee(graphics, canvasHandler, graph, canvasMouseX, canvasMouseY);
+        renderQuickActionAndMarquee(graphics, canvasHandler, graph, canvasMouseX, canvasMouseY, topZ + 20.0f);
 
         graphics.pose().popPose();
         graphics.flush();
@@ -72,7 +72,7 @@ public class BoardCanvasRenderer {
         RenderSystem.disableDepthTest();
     }
 
-    private void renderNodeWidgets(
+    private float renderNodeWidgets(
             GuiGraphics graphics,
             BoardScreen screen,
             List<NodeWidget> nodeWidgets,
@@ -84,7 +84,7 @@ public class BoardCanvasRenderer {
             double screenBottom,
             float partialTicks
     ) {
-        if (nodeWidgets == null || nodeWidgets.isEmpty()) return;
+        if (nodeWidgets == null || nodeWidgets.isEmpty()) return 1.0f;
 
         List<NodeWidget> deferredSelected = null;
         for (int i = 0; i < nodeWidgets.size(); i++) {
@@ -95,19 +95,22 @@ public class BoardCanvasRenderer {
                 continue;
             }
             if (isWithinViewport(widget, screenLeft, screenRight, screenTop, screenBottom)) {
-                renderSingleNode(graphics, widget, (float) (i * 100.0f + 50.0f), canvasMouseX, canvasMouseY, partialTicks);
+                renderSingleNode(graphics, widget, (float) (i * 0.5f + 1.0f), canvasMouseX, canvasMouseY, partialTicks);
             }
         }
 
+        float topZ = (float) (nodeWidgets.size() * 0.5f + 1.0f);
         if (deferredSelected != null) {
-            float selectedBaseZ = (float) (nodeWidgets.size() * 100.0f + 500.0f);
+            float selectedBaseZ = topZ + 50.0f;
             for (int i = 0; i < deferredSelected.size(); i++) {
                 NodeWidget widget = deferredSelected.get(i);
                 if (isWithinViewport(widget, screenLeft, screenRight, screenTop, screenBottom)) {
-                    renderSingleNode(graphics, widget, selectedBaseZ + (float) (i * 100.0f), canvasMouseX, canvasMouseY, partialTicks);
+                    renderSingleNode(graphics, widget, selectedBaseZ + (float) (i * 0.5f), canvasMouseX, canvasMouseY, partialTicks);
                 }
             }
+            topZ = selectedBaseZ + (float) (deferredSelected.size() * 0.5f);
         }
+        return topZ;
     }
 
     private boolean isWithinViewport(NodeWidget widget, double left, double right, double top, double bottom) {
@@ -119,13 +122,15 @@ public class BoardCanvasRenderer {
     }
 
     private void renderSingleNode(GuiGraphics graphics, NodeWidget widget, float zOffset, double mouseX, double mouseY, float partialTicks) {
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthFunc(GL11.GL_LEQUAL);
         graphics.pose().pushPose();
         graphics.pose().translate(0.0f, 0.0f, zOffset);
         widget.render(graphics, (int) mouseX, (int) mouseY, partialTicks);
         graphics.pose().popPose();
     }
 
-    private void renderQuickActionAndMarquee(GuiGraphics graphics, CanvasInteractionHandler canvasHandler, FlowGraph graph, double mouseX, double mouseY) {
+    private void renderQuickActionAndMarquee(GuiGraphics graphics, CanvasInteractionHandler canvasHandler, FlowGraph graph, double mouseX, double mouseY, float marqueeZ) {
         if (canvasHandler == null) return;
         canvasHandler.checkMarkerCursorDistance(mouseX, mouseY);
         if (canvasHandler.hasQuickAddMarker()) {
@@ -142,7 +147,7 @@ public class BoardCanvasRenderer {
             );
         }
         graphics.pose().pushPose();
-        graphics.pose().translate(0.0f, 0.0f, 5000.0f);
+        graphics.pose().translate(0.0f, 0.0f, marqueeZ);
         canvasHandler.renderMarquee(graphics);
         graphics.pose().popPose();
     }

@@ -3,8 +3,12 @@ package com.gtceu.calcboard.compat.create.addon;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
+/**
+ * Machine addon representation for Create Blaze Burner heating sources (ADR-036).
+ */
 public class CreateHeaterAddon extends MachineAddon {
 
     private final int heatLevel;
@@ -43,5 +47,12 @@ public class CreateHeaterAddon extends MachineAddon {
         cp.setParallelMultiplier(getParallelMultiplier());
         cp.setPowerConstant(isPowerConstant());
         return cp;
+    }
+
+    @Override
+    public CompoundTag serializeNBT() {
+        CompoundTag tag = super.serializeNBT();
+        tag.putInt("heatLevel", heatLevel);
+        return tag;
     }
 }

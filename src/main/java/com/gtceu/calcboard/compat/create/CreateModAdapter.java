@@ -48,9 +48,17 @@ public class CreateModAdapter extends AbstractKineticModAdapter implements IHard
         CreateProperties.init();
         com.gtceu.calcboard.api.catalog.AddonFactoryRegistry.register(
                 com.gtceu.calcboard.api.catalog.AddonCategory.HEATER,
-                (id, name, desc, icon, tag) -> new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
-                        id, name, desc, icon, (id != null && id.contains("superheated")) ? 2 : 1
-                )
+                (id, name, desc, icon, tag) -> {
+                    int heat = 1;
+                    if (tag != null && tag.contains("heatLevel")) {
+                        heat = tag.getInt("heatLevel");
+                    } else if ("create:blaze_burner_superheated".equals(id)) {
+                        heat = 2;
+                    }
+                    return new com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon(
+                            id, name, desc, icon, heat
+                    );
+                }
         );
     }
 

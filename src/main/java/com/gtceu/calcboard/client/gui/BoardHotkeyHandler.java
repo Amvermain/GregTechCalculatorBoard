@@ -182,8 +182,13 @@ public final class BoardHotkeyHandler {
         }
 
         // 4.5 Insert Junction at Cursor: J
-        if (keyCode == GLFW.GLFW_KEY_J && !isControl && !isAlt) {
+        if (keyCode == GLFW.GLFW_KEY_J && !isControl && !isAlt && !isShift) {
             screen.addRerouteNodeAt(screen.toCanvasX(lastMouseX), screen.toCanvasY(lastMouseY));
+            return true;
+        }
+
+        if (keyCode == GLFW.GLFW_KEY_N && !isControl && !isAlt && !isShift) {
+            screen.createNoteAt(screen.toCanvasX(lastMouseX), screen.toCanvasY(lastMouseY));
             return true;
         }
 

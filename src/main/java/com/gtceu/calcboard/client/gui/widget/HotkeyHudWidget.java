@@ -103,6 +103,8 @@ public class HotkeyHudWidget {
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "J", "gui.gtcalcboard.hotkey_hud.junction");
         curY += 12;
+        renderKeyLine(graphics, font, panelX + 6, curY, "N", "gui.gtcalcboard.hotkey_hud.note");
+        curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Space / Dbl-Click", "gui.gtcalcboard.hotkey_hud.add");
         curY += 12;
         renderKeyLine(graphics, font, panelX + 6, curY, "Shift + Drag", "gui.gtcalcboard.hotkey_hud.shift_wire");
@@ -147,7 +149,7 @@ public class HotkeyHudWidget {
         int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
         int panelY = screenH - panelH - 8;
         int contentH = panelH - 20;
-        int totalContentH = 20 * 12 + 4;
+        int totalContentH = 21 * 12 + 4;
         int maxScrollY = Math.max(0, totalContentH - contentH);
         if (maxScrollY > 0 && mouseX >= panelX && mouseX <= panelX + EXPANDED_WIDTH && mouseY >= panelY && mouseY <= panelY + panelH) {
             scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * 12.0));

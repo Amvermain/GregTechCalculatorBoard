@@ -162,11 +162,10 @@ public class CreateRecipeHandler {
         if (isSteam) {
             node.getProperties().set(CreateProperties.IS_CREATE_BOILER, true);
             node.getProperties().set(CreateProperties.BOILER_LEVEL, 0);
-            node.getProperties().set(CreateProperties.BOILER_WATER_MODE, false);
+            node.getProperties().set(CreateProperties.BOILER_WATER_MODE, true);
             node.setRpm(16);
             node.getProperties().set(CreateProperties.BASE_GENERATOR_RPM, 16);
-            double steamMbPerSec = CreateStressHelper.calculateSteamConsumption(tier);
-            node.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", steamMbPerSec, 1.0));
+            node.addInput(IngredientStack.fluid(ResourceLocation.tryParse("minecraft:water"), "Water", 200.0, 1.0));
         }
         return node;
     }

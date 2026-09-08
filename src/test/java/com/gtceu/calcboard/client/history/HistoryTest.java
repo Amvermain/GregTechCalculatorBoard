@@ -345,7 +345,7 @@ public class HistoryTest {
         assertEquals(1, graph.getConnections().size());
 
         FlowGraph.ConnectionEdge edge = graph.getConnections().get(0);
-        graph.getConnections().remove(edge);
+        graph.removeConnection(edge);
         historyManager.record(new BoardCommand.DisconnectWireCommand(edge));
         assertEquals(0, graph.getConnections().size());
 

@@ -228,7 +228,7 @@ public class RecentSavesDialog implements IBoardModal {
                 newPage.getGraph().addNode(n);
             }
             for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge e : copiedGraph.getConnections()) {
-                newPage.getGraph().getConnections().add(e);
+                newPage.getGraph().addConnection(e);
             }
         }
 

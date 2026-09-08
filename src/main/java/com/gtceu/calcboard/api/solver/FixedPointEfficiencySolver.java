@@ -68,7 +68,6 @@ public final class FixedPointEfficiencySolver {
             for (RecipeNode consumer : graph.getNodes()) {
                 double calculatedEff = computeConsumerEfficiency(graph, consumer, loops, effMap, context);
                 double oldEff = effMap.get(consumer.getId());
-                consumer.setEfficiency(calculatedEff);
                 if (Math.abs(oldEff - calculatedEff) > 0.0001) {
                     effMap.put(consumer.getId(), calculatedEff);
                     changed = true;
@@ -80,6 +79,13 @@ public final class FixedPointEfficiencySolver {
             }
 
             if (!changed) break;
+        }
+
+        for (RecipeNode node : graph.getNodes()) {
+            Double finalEff = effMap.get(node.getId());
+            if (finalEff != null) {
+                node.setEfficiency(finalEff);
+            }
         }
 
         return effMap;

@@ -7,7 +7,7 @@
 > 📘 **상세 코드 명세서 시리즈**:
 > * 🇰🇷 **한국어 에디션**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **영문 에디션**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> 전체 v2.2.0-alpha.4 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
+> 전체 v2.2.0-beta.1 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
 
 본 문서는 **GregTech Calculator Board (그렉텍 계산기 보드)**의 내부 시스템 아키텍처, 수학적 솔버 엔진, 캔버스 렌더링 파이프라인, 및 멀티 모드 호환성 계층(SPI)을 설명합니다.
 
@@ -115,14 +115,14 @@ graph TD
 * **10-Pass Fixed-Point Relaxation**: 상류 원자재 공급 제약 하에서 모든 기계의 정상 상태 가동률($\eta \in [0.0, 1.0]$)을 수치적으로 수렴 연산합니다.
 
 ### 2.3 고성능 렌더링 파이프라인 및 가상 뷰포트 배율 독립 엔진
-* **Two-Pass Z-Order 렌더링 및 `glClear` 깊이 버퍼 격리**: 3D 아이템 모델과 2D 배경 간의 Z-clipping 간섭을 원천 차단하기 위해 노드 단위의 깊이 버퍼 격리를 수행하며, 선택 및 조작 중인 노드를 지연 렌더링하여 Z-순서를 완벽히 보장합니다.
+* **Two-Pass Z-Order 렌더링 및 `glClear` 깊이 버퍼 격리**: 3D 아이템 모델과 2D 배경 간의 Z-clipping 간섭을 방지하기 위해 노드 단위의 깊이 버퍼 격리를 수행하며, 선택 및 조작 중인 노드를 지연 렌더링하여 Z-순서를 안전하게 유지합니다.
 * **가상 뷰포트 배율 독립 엔진 (`BoardViewportTransform`)**: 마인크래프트 전역 GUI Scale과 독립적으로 보드 전용 가상 해상도($S = \text{BoardScale} / \text{GameScale}$)를 산출하여 저해상도/고해상도 디스플레이 모두에서 최적의 작업 공간을 제공합니다.
 * **$128 \times 128$ AABB 균일 그리드 공간 분할 (`WireSpatialIndex`)**: 1,000개 이상의 복잡한 와이어 네트워크에서 마우스 호버 및 클릭 감지를 $O(E)$에서 **$O(\log E)$ 공간 분할 색인**으로 가속합니다.
 * **$O(1)$ 포트 플로우 캐싱 및 텍스트 메모이제이션 (`NodeCardTextCache`)**: 노드 카드의 포트 통계와 타이틀 텍스트 렌더링 연산을 사전 연산 캐시로 보호하여 60 FPS 이상의 프레임 레이트를 보장합니다.
 
 ### 2.4 멀티플레이어 스트리밍 및 분산 락
 * **2계층 온디맨드 페이징**: 보드 오픈 시 경량 메타데이터(`S2CSyncWorkspaceMetaPacket`)만 동기화하고, 활성 탭 클릭 시에만 세부 그래프 NBT를 온디맨드로 지연 로드합니다.
-* **512KB 청킹 스트리밍 (`S2CChunkedDataPacket`)**: $512\text{KB}$ 초과 대용량 데이터를 안전하게 분할 스트리밍하여 Netty $2\text{MB}$ 버퍼 오버플로우 크래시를 원천 차단합니다.
+* **512KB 청킹 스트리밍 (`S2CChunkedDataPacket`)**: $512\text{KB}$ 초과 대용량 데이터를 안전하게 분할 스트리밍하여 Netty $2\text{MB}$ 버퍼 오버플로우 크래시를 방지합니다.
 * **분산 임차권 락 (`WorkspaceLockManager`)**: 300초 임차권(Lease) 기반 소프트 락과 낙관적 Revision 번호 검증을 통해 실시간 동시 편집 충돌을 방지합니다.
 
 ### 2.5 애드온 및 스펙 연역적 분석 원칙 (Rule 5)
@@ -133,7 +133,7 @@ graph TD
   3. 결정론적 NBT 수치 데이터 구조(`AugmentData` Float/Int 태그) 및 공식 `TagKey` 직접 검사.
 
 ### 2.6 계층형 모달 다이얼로그 스택 및 캔버스 인터랙션 유한 상태 머신 (ADR-026 & ADR-027)
-* **LIFO 모달 스택 (`ModalStack` 및 `IBoardModal`)**: 캔버스 내 26개 모달 다이얼로그를 LIFO 역순으로 관리하여, `ESC` 키 또는 외부 클릭 시 최상위 모달부터 순차적으로 닫히도록 제어하고 하위 캔버스로의 고스트 클릭 및 입력 누수를 원천 차단합니다.
+* **LIFO 모달 스택 (`ModalStack` 및 `IBoardModal`)**: 캔버스 내 26개 모달 다이얼로그를 LIFO 역순으로 관리하여, `ESC` 키 또는 외부 클릭 시 최상위 모달부터 순차적으로 닫히도록 제어하고 하위 캔버스로의 고스트 클릭 및 입력 누수를 차단합니다.
 * **유한 상태 머신 (`CanvasStateMachine`)**: 상호작용 상태(IDLE, DRAGGING_NODES, WIRING, BOX_SELECTING, RESIZING, PANNING) 간의 상호 배타성을 보장하며, 조작 중 `ESC`나 우클릭 시 임시 버퍼를 정리하고 안전하게 이전 상태로 롤백합니다.
 
 ### 2.7 합성 가능 레시피 검색 명세 패턴 및 Extension Object SPI (ADR-028 & ADR-029)

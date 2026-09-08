@@ -366,7 +366,7 @@ public class TutorialManager {
         if (tutPage == null) return;
 
         ensureBoilerAndTurbineExist(tutPage);
-        tutPage.getGraph().getFrames().clear();
+        tutPage.getGraph().clearFrames();
         if (currentScreen != null) currentScreen.rebuildWidgets();
     }
 

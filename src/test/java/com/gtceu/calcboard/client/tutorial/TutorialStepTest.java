@@ -308,7 +308,7 @@ public class TutorialStepTest {
                 .orElse(null);
         Assertions.assertNotNull(wireEdge);
 
-        tutPage.getGraph().getConnections().remove(wireEdge);
+        tutPage.getGraph().removeConnection(wireEdge);
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.gtceu.calcboard.api.event.FlowGraphEvent.WireDisconnected(tutPage.getGraph(), wireEdge));
 
         // Verify wire is now cut and ports glow

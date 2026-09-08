@@ -19,7 +19,10 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Dedicated serialization helper for RecipeNode NBT storage and blueprint exports.
@@ -29,6 +32,10 @@ public final class RecipeNodeSerializer {
     private RecipeNodeSerializer() {}
 
     public static CompoundTag serialize(RecipeNode node) {
+        return serialize(node, Collections.newSetFromMap(new IdentityHashMap<>()), 0);
+    }
+
+    public static CompoundTag serialize(RecipeNode node, Set<FlowGraph> visitedGraphs, int depth) {
         if (node == null) return new CompoundTag();
 
         CompoundTag tag = new CompoundTag();
@@ -86,8 +93,8 @@ public final class RecipeNodeSerializer {
             if (node.getContainedMachineCount() > 0) {
                 tag.putInt("containedMachineCount", node.getContainedMachineCount());
             }
-            if (node.getSubGraph() != null) {
-                tag.put("subGraph", node.getSubGraph().serializeNBT(0, 0, 1.0));
+            if (node.getSubGraph() != null && depth < 16 && (visitedGraphs == null || visitedGraphs.add(node.getSubGraph()))) {
+                tag.put("subGraph", node.getSubGraph().serializeNBT(0, 0, 1.0, visitedGraphs, depth + 1));
             }
         }
 

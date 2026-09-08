@@ -194,6 +194,13 @@ public class BoardDialogManager {
         }
     }
 
+    public void destroy() {
+        closeAllDialogs();
+        if (this.searchDialog != null) {
+            this.searchDialog.destroy();
+        }
+    }
+
     public ModalStack getModalStack() {
         return modalStack;
     }

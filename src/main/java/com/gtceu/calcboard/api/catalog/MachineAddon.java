@@ -254,7 +254,8 @@ public class MachineAddon {
             if (itemIcon != null) {
                 Item item = ForgeRegistries.ITEMS.getValue(itemIcon);
                 if (item != null && item != Items.AIR) {
-                    return new ItemStack(item);
+                    this.itemStackSample = new ItemStack(item);
+                    return this.itemStackSample;
                 }
             }
             return ItemStack.EMPTY;

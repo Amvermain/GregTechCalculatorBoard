@@ -3,7 +3,7 @@ package com.gtceu.calcboard.compat.create;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * 4대 회전 운동 및 에너지 상호 변환기 카테고리 정의 (RFC-036).
+ * Defines the four rotational kinetic machine and energy converter categories (RFC-036 / ADR-036).
  */
 public enum KineticCategory {
     SOURCE("kinetic_source", "category.gtcalcboard.kinetic_source", ResourceLocation.tryParse("create:large_water_wheel")),

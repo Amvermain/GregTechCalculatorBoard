@@ -6,17 +6,24 @@
 
 ## [Unreleased]
 
+## [2.2.0-beta.1] - 2026-09-08
+
 ### Added
 - Added sail count (8–128) configuration for the Create Windmill Bearing in the machine setup menu, calculating exact operating speed (1–16 RPM) and rotational stress generation (512–8,192 SU) based on the physical sail assembly.
 - Categorized rotational machines and energy converters into 4 distinct groups (Kinetic Sources, Fuel & Steam Engines, Electric Motors, and Kinetic Alternators) for cleaner recipe browsing.
 - Added independent configuration for Create Steam Boiler tank size (4–72 blocks), heat level (0–18), and water supply (10–180 mB/t) with real-time bottleneck indicators, quick presets, and a one-click water auto-match button.
-- Added support for configuring Create Steam Boiler heat levels (Passive / Levels 1–18) with water and steam fluid consumption modes, allowing boilers to scale kinetic capacity up to 294k SU.
+- Added a quick config button (`[⚙]`) on Create Steam Boiler node cards, opening the dedicated boiler hardware setup panel directly for tank size, water supply, and blaze burner management.
 - Added Heated Blaze Burner (+1 level) and Superheated Blaze Burner (+2 levels) hardware addons to the boiler configuration, automatically synchronizing boiler level, fluid inputs, and kinetic stress capacity.
 - Added the ability to drag and click the scrollbar in the Add Recipe dialog, allowing smooth navigation through recipe search results using the mouse.
 - Added a unit preference preservation toggle in the board settings menu, ensuring selected rate time units (such as per second or per minute) and fluid display units are remembered across game restarts and between world sessions.
 - Improved the Smart Auto-Connect feature to automatically wire matching resources in recirculation and feedback loops, allowing setups like Nether Star production and catalyst recycling to be connected with a single click.
+- Added an "Add Sticky Note" option to the canvas right-click context menu (and shortcut 'N') to quickly place memo notes at the mouse cursor position.
 
 ### Fixed
+- Fixed significant frame drops and stuttering when viewing boards with numerous machine nodes by optimizing node card and ingredient rendering.
+- Fixed an issue where machine nodes or selection marquees disappeared when working on large boards with dozens of nodes.
+- Fixed an issue where connections wired between alternative or tag-compatible resources and newly created reroute nodes were unintentionally deleted when opening the board or running solvers.
+- Fixed a potential crash caused by circular or deeply nested module references during material list (BOM) calculation and power summary aggregation.
 - Fixed an issue where kinetic generators (such as the Large Water Wheel) appeared twice in the recipe search dialog by decoupling internal generator definitions from external recipe viewers.
 - Cleaned up external recipe viewer (EMI) registries by moving kinetic generators into the board's native machine catalog, keeping viewer searches pristine without synthetic recipe pollution.
 - Fixed an issue where Create stress units (SU) scaled with the active time unit (such as per-minute or per-hour), ensuring rotational stress and capacity consistently display as a constant SU value across all time settings.
@@ -27,6 +34,7 @@
 - Fixed an issue where running Auto Ratio on a loop setup with a fixed-rate junction anchor incorrectly reset all machine counts to 0.01 or 1, and ensured physically infeasible deficit loops trigger proper divergence warnings.
 - Fixed an issue where typing 'W', 'A', 'S', or 'D' while renaming a page tab or searching for recipes in external recipe viewers caused the canvas to unintentionally pan.
 - Fixed an issue where the machine card header title was not updated when switching the node to another machine or controller block.
+- Fixed an issue where text entered in the sticky note editing dialog was not visible when using custom board GUI scale settings.
 
 ## [2.2.0-alpha.4] - 2026-09-08
 

@@ -234,21 +234,21 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         int targetCount = (int) node.getAddons().stream().filter(a -> a.getId().equals(addon.getId())).count();
 
         if (isActiveAddon) {
-            tooltip.add(Component.literal(String.format("§7Ring Slot: §e%d / 12", totalMagnets)));
-            tooltip.add(Component.literal("§c[Right-Click] Remove 1 Magnet"));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.ring_slot", totalMagnets)));
+            tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.cna.remove_magnet_simple")));
         } else {
-            tooltip.add(Component.literal(String.format("§7Ring Slots: §e%d / 12", totalMagnets)));
+            tooltip.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.ring_slots", totalMagnets)));
             if (targetCount > 0) {
-                tooltip.add(Component.literal(String.format("§aInstalled: §e%d / 12 magnets", targetCount)));
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.cna.installed_magnets", targetCount)));
             }
             if (totalMagnets < 12) {
-                tooltip.add(Component.literal("§a[Left-Click] Add 1 Magnet (+1)"));
-                tooltip.add(Component.literal("§d[Shift+Left-Click] Fill All 12 Slots"));
+                tooltip.add(Component.literal("§a").append(Component.translatable("gui.gtcalcboard.cna.add_magnet_action")));
+                tooltip.add(Component.literal("§d").append(Component.translatable("gui.gtcalcboard.cna.fill_all_action")));
             } else {
-                tooltip.add(Component.literal("§e(Magnet Ring Full: 12/12)"));
+                tooltip.add(Component.literal("§e").append(Component.translatable("gui.gtcalcboard.cna.ring_full")));
             }
             if (targetCount > 0) {
-                tooltip.add(Component.literal("§c[Right-Click] Remove 1 Magnet (-1)"));
+                tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.cna.remove_magnet_action")));
             }
         }
     }
@@ -337,23 +337,23 @@ public class CreateNewAgeModAdapter implements IModAdapter {
             double singlePower = node.getSingleMachineEUt();
             double totPower = node.getTotalEUt();
             if (node.isGenerator()) {
-                tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.single_gen").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Generation: §a+%,.2f FE/t §7(§a+%,.2f EU/t eq§7)", singlePower, singlePower / 4.0)));
+                tooltipLines.add(Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.single_gen")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.generation", String.format(Locale.ROOT, "%,.2f", singlePower), String.format(Locale.ROOT, "%,.2f", singlePower / 4.0))));
             } else {
-                tooltipLines.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.single_power").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Consumption: §c%,.2f FE/t §7(§c%,.2f EU/t eq§7)", singlePower, singlePower / 4.0)));
+                tooltipLines.add(Component.literal("§e⚡ ").append(Component.translatable("gui.gtcalcboard.single_power")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.consumption", String.format(Locale.ROOT, "%,.2f", singlePower), String.format(Locale.ROOT, "%,.2f", singlePower / 4.0))));
             }
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         } else {
             double totSU = node.getEffectiveTotalEUt();
             if (node.isGenerator()) {
-                tooltipLines.add(Component.literal("§6⚙ " + Component.translatable("gui.gtcalcboard.total_gen").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Capacity: §6+%,.0f SU", totSU)));
+                tooltipLines.add(Component.literal("§6⚙ ").append(Component.translatable("gui.gtcalcboard.total_gen")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.total_capacity", String.format(Locale.ROOT, "%,.0f", totSU))));
             } else {
-                tooltipLines.add(Component.literal("§e⚙ " + Component.translatable("gui.gtcalcboard.total_power").getString()));
-                tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Total Stress Impact: §e%,.0f SU", totSU)));
+                tooltipLines.add(Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.total_power")));
+                tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.total_stress_impact", String.format(Locale.ROOT, "%,.0f", totSU))));
             }
-            tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Rotation Speed: §6%d RPM", node.getRpm())));
+            tooltipLines.add(Component.literal("§7").append(Component.translatable("gui.gtcalcboard.cna.rotation_speed", node.getRpm())));
             tooltipLines.add(Component.literal(String.format(Locale.ROOT, "§7Duration: §f%.4fs §7(§f%,.4f cycles/s§7)", node.getEffectiveDurationSeconds(), node.getEffectiveCyclesPerSecond())));
         }
         return tooltipLines;
