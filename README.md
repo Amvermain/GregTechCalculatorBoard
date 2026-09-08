@@ -187,7 +187,12 @@ The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.1.0.jar`.
 
 ---
 
+## AI Disclosure
+
+This project was developed through pair programming between the maintainer and an AI coding assistant (Google Antigravity / Gemini). System architecture, domain requirements, code reviews, in-game verification, and final decision-making were strictly guided and validated by the maintainer.
+
+---
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
