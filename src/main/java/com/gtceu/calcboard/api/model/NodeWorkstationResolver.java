@@ -4,8 +4,8 @@ import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
@@ -42,16 +42,14 @@ public final class NodeWorkstationResolver {
         String catName = node.getRecipeCategoryId() != null ? node.getRecipeCategoryId().getPath().toLowerCase(Locale.ROOT) : null;
         ResourceLocation bestMatch = null;
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
-                String path = ws.getPath().toLowerCase(Locale.ROOT);
-                if (path.startsWith(prefix) || path.contains("_" + prefix)) {
-                    if (catName != null && path.contains(catName)) {
-                        return ws;
-                    }
-                    if (bestMatch == null) {
-                        bestMatch = ws;
-                    }
-                }
+            if (ws == null || MultiblockDetector.isMultiblock(ws)) continue;
+            String path = ws.getPath().toLowerCase(Locale.ROOT);
+            if (!path.startsWith(prefix) && !path.contains("_" + prefix)) continue;
+            if (catName != null && (path.endsWith(catName) || path.endsWith("_" + catName) || path.equals(catName))) {
+                return ws;
+            }
+            if (bestMatch == null) {
+                bestMatch = ws;
             }
         }
         return bestMatch;
@@ -108,13 +106,12 @@ public final class NodeWorkstationResolver {
         String catName = catId != null ? catId.getPath().toLowerCase(Locale.ROOT) : null;
         ResourceLocation bestMatch = null;
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null && !MultiblockDetector.isMultiblock(ws)) {
-                if (catName != null && ws.getPath().toLowerCase(Locale.ROOT).contains(catName)) {
-                    return ws;
-                }
-                if (bestMatch == null) {
-                    bestMatch = ws;
-                }
+            if (ws == null || MultiblockDetector.isMultiblock(ws)) continue;
+            if (catName != null && (ws.getPath().equalsIgnoreCase(catName) || ws.getPath().endsWith("_" + catName))) {
+                return ws;
+            }
+            if (bestMatch == null) {
+                bestMatch = ws;
             }
         }
         if (bestMatch != null) return bestMatch;

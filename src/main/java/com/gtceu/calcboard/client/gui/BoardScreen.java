@@ -66,7 +66,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.screen == null) return false;
         if (mc.screen instanceof BoardScreen) return true;
-        if (mc.screen.getClass().getName().contains("RecipeScreen") || mc.screen.getClass().getName().contains("Emi")) {
+        if (RecipeViewerRegistry.isAnyViewerScreen(mc.screen)) {
             return (System.currentTimeMillis() - lastBoardScreenActiveTime) < 30000;
         }
         return false;
@@ -471,10 +471,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         favoritesDockWidget.render(graphics, mouseX, mouseY, partialTicks);
         pageBrowserDrawer.render(graphics, mouseX, mouseY, partialTicks);
 
-        if (summaryDirty || cachedSummary == null) {
-            cachedSummary = FlowGraphSolver.computeSummary(getGraph());
-            summaryDirty = false;
-        }
+        updateGraphSummaryIfDirty();
         summaryOverlay.setRightOffset(getSummaryRightOffset());
         summaryOverlay.render(graphics, width, height, cachedSummary, mouseX, mouseY);
 
@@ -613,6 +610,9 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         double canvasMouseY = toCanvasY(vy);
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             if (nodeWidgets.get(i).mouseScrolled(canvasMouseX, canvasMouseY, delta)) return true;
+        }
+        if (canvasHandler.getWireHandler().handleWireScroll(canvasMouseX, canvasMouseY, delta, this)) {
+            return true;
         }
         if (canvasHandler.mouseScrolled(vx, vy, delta)) return true;
         return super.mouseScrolled(mouseX, mouseY, delta);

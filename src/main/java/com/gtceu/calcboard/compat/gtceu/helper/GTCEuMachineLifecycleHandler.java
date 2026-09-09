@@ -12,8 +12,12 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
+import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.model.StarTProperties;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Locale;
@@ -26,12 +30,18 @@ public final class GTCEuMachineLifecycleHandler {
         if (node == null || newIcon == null) return;
 
         ResourceLocation normalized = GTCombustionHelper.normalizeMachineIcon(newIcon);
-        if (!normalized.equals(newIcon)) {
+        if (normalized != null && !normalized.equals(node.getMachineIcon())) {
             node.setMachineIcon(normalized);
             return;
         }
 
-        if (MultiblockDetector.isSteamMultiblock(newIcon)) {
+        if (GTCombustionHelper.isSingleblockCombustionGenerator(newIcon)) {
+            node.setMultiblock(false);
+            node.setGenerator(true);
+            if (node.getSteamMode().isSteam()) {
+                node.setSteamMode(SteamMode.NONE);
+            }
+        } else if (MultiblockDetector.isSteamMultiblock(newIcon)) {
             node.setMultiblock(true);
             int defPar = MultiblockDetector.getDefaultParallel(newIcon);
             node.setParallel(Math.max(1, defPar));
@@ -94,7 +104,12 @@ public final class GTCEuMachineLifecycleHandler {
         }
 
         if (MultiblockDetector.getMaxHelixCount(newIcon) == 0) {
-            node.setThreadingConfig(null);
+            RecipeNodeThreadingHelper.setThreadingConfig(node, null);
+        } else {
+            NodeThreadingConfig cfg = node.getProperties().get(StarTProperties.THREADING_CONFIG);
+            if (cfg != null) {
+                cfg.setMaxHelixCapacity(MultiblockDetector.getMaxHelixCount(newIcon));
+            }
         }
 
         if (!node.isFusion() && node.getRequiredReflectorTier() <= 0) {
@@ -132,9 +147,18 @@ public final class GTCEuMachineLifecycleHandler {
     }
 
     public static void applyMachinePresets(RecipeNode node, ResourceLocation oldIcon, ResourceLocation newIcon) {
-        if (GTCombustionHelper.isCombustionEngine(node)) {
+        boolean isGen = GTCombustionHelper.isCombustionMachine(newIcon)
+                || GTTurbineHelper.isTurbineMachine(newIcon)
+                || isNodeRecipeGenerator(node);
+        boolean wasGen = GTCombustionHelper.isCombustionMachine(oldIcon)
+                || GTTurbineHelper.isTurbineMachine(oldIcon);
+
+        if (isGen) {
             node.setGenerator(true);
+        } else if (wasGen) {
+            node.setGenerator(false);
         }
+
         if (MultiblockDetector.isTurbineMachine(newIcon)) {
             node.setGenerator(true);
             GTVoltageTier baseTier = MultiblockDetector.getTurbineBaseTier(newIcon);
@@ -191,6 +215,15 @@ public final class GTCEuMachineLifecycleHandler {
         if (addon != null) {
             node.addAddon(addon);
         }
+    }
+
+    private static boolean isNodeRecipeGenerator(RecipeNode node) {
+        if (node == null) return false;
+        ResourceLocation catId = node.getRecipeCategoryId();
+        if (catId == null) return false;
+        return MultiblockDetector.isTurbineRecipeCategory(catId)
+                || GTCombustionHelper.COMBUSTION_GENERATOR.equals(catId)
+                || ResourceLocation.tryParse("gtceu:combustion_generator_fuels").equals(catId);
     }
 
     public static void onSteamModeChanged(RecipeNode node, SteamMode oldMode, SteamMode newMode) {

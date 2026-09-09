@@ -503,18 +503,21 @@ public class AutoRatioBottleneckTest {
         graph.addNode(elec);
 
         RecipeNode cracker1 = RecipeNode.create(idCracker, "Cracker Heavy", 20, 30, GTVoltageTier.HV);
+        cracker1.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
         cracker1.getInputs().add(IngredientStack.fluid(fluidHeavy, "Heavy Fuel", 0.25));
         cracker1.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.05));
         cracker1.getOutputs().add(IngredientStack.fluid(fluidCrackedHeavy, "Cracked Heavy", 0.25));
         graph.addNode(cracker1);
 
         RecipeNode cracker2 = RecipeNode.create(idCracker, "Cracker Light", 20, 30, GTVoltageTier.HV);
+        cracker2.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
         cracker2.getInputs().add(IngredientStack.fluid(fluidLight, "Light Fuel", 0.24));
         cracker2.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.05));
         cracker2.getOutputs().add(IngredientStack.fluid(fluidCrackedLight, "Cracked Light", 0.24));
         graph.addNode(cracker2);
 
         RecipeNode cracker3 = RecipeNode.create(idCracker, "Cracker Naphtha", 20, 30, GTVoltageTier.HV);
+        cracker3.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
         cracker3.getInputs().add(IngredientStack.fluid(fluidNaphtha, "Naphtha", 0.50));
         cracker3.getInputs().add(IngredientStack.fluid(fluidH2, "H2", 0.05));
         cracker3.getOutputs().add(IngredientStack.fluid(fluidCrackedNaphtha, "Cracked Naphtha", 0.50));

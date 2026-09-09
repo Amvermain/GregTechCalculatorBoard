@@ -3,7 +3,8 @@ package com.gtceu.calcboard.client.gui.dialog.config;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
-import com.gtceu.calcboard.api.type.NodeThreadingConfig;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
+import com.gtceu.calcboard.compat.start.model.NodeThreadingConfig;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -18,7 +19,7 @@ public class ThreadingHelixView {
     }
 
     public void render(GuiGraphics graphics, Font font, RecipeNode node, int startX, int startY, int width, int height, int mouseX, int mouseY) {
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getThreadingConfig(node);
         int maxHelix = MultiblockDetector.getMaxHelixCount(node);
         if (maxHelix > 0) {
             cfg.setMaxHelixCapacity(maxHelix);
@@ -147,7 +148,7 @@ public class ThreadingHelixView {
     }
 
     public boolean mouseClicked(int startX, int startY, int width, int height, double mouseX, double mouseY, RecipeNode node) {
-        NodeThreadingConfig cfg = node.getThreadingConfig();
+        NodeThreadingConfig cfg = RecipeNodeThreadingHelper.getThreadingConfig(node);
 
         int leftW = 184;
         if (mouseX >= startX && mouseX <= startX + leftW && mouseY >= startY && mouseY <= startY + height) {

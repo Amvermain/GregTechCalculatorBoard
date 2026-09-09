@@ -22,14 +22,24 @@ public final class NodePropertyKey<T> {
     private final BiConsumer<CompoundTag, T> serializer;
     private final Function<CompoundTag, T> deserializer;
 
+    private final java.util.function.Predicate<CompoundTag> presenceChecker;
+
     public NodePropertyKey(String id, Class<T> type, T defaultValue,
                            BiConsumer<CompoundTag, T> serializer,
                            Function<CompoundTag, T> deserializer) {
+        this(id, type, defaultValue, serializer, deserializer, tag -> tag != null && tag.contains(id));
+    }
+
+    public NodePropertyKey(String id, Class<T> type, T defaultValue,
+                           BiConsumer<CompoundTag, T> serializer,
+                           Function<CompoundTag, T> deserializer,
+                           java.util.function.Predicate<CompoundTag> presenceChecker) {
         this.id = Objects.requireNonNull(id, "Property key ID must not be null");
         this.type = Objects.requireNonNull(type, "Property key type must not be null");
         this.defaultValue = defaultValue;
         this.serializer = serializer != null ? serializer : (tag, val) -> {};
         this.deserializer = deserializer != null ? deserializer : tag -> defaultValue;
+        this.presenceChecker = presenceChecker != null ? presenceChecker : tag -> tag != null && tag.contains(id);
     }
 
     public String getId() {
@@ -60,7 +70,7 @@ public final class NodePropertyKey<T> {
     }
 
     public boolean isPresentInNBT(CompoundTag tag) {
-        return tag != null && tag.contains(id);
+        return presenceChecker.test(tag);
     }
 
     // Factory methods for standard types

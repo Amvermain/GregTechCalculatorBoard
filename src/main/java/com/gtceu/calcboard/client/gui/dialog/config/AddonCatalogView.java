@@ -10,8 +10,8 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -456,7 +456,7 @@ public class AddonCatalogView {
             tooltip.add(Component.literal("§eLeft-Click: §aAdd 1 Hatch"));
             tooltip.add(Component.literal("§eShift + Left-Click: §aFill All (" + maxSlots + "x)"));
             tooltip.add(Component.literal("§eRight-Click: §cRemove 1 Hatch"));
-        } else if (tooltip.stream().noneMatch(c -> c.getString().contains("[") || c.getString().contains("Install") || c.getString().contains("Remove") || c.getString().contains(Component.translatable("gui.gtcalcboard.config.install").getString()) || c.getString().contains(Component.translatable("gui.gtcalcboard.config.remove").getString()))) {
+        } else if (!hoveredAddon.isThermalUpgradeKit()) {
             if (isInst) {
                 tooltip.add(Component.literal("§c").append(Component.translatable("gui.gtcalcboard.config.remove")));
             } else {

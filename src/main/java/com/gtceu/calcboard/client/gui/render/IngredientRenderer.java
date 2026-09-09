@@ -96,11 +96,11 @@ public final class IngredientRenderer {
             if (model == null || model.isGui3d() || model.isCustomRenderer()) {
                 return new CachedItem(stack, null, 1.0f, 1.0f, 1.0f, 1.0f, false);
             }
-            var sprite = model.getParticleIcon();
+            var sprite = model.getParticleIcon(net.minecraftforge.client.model.data.ModelData.EMPTY);
             if (sprite == null) {
                 return new CachedItem(stack, null, 1.0f, 1.0f, 1.0f, 1.0f, false);
             }
-            var quads = model.getQuads(null, null, net.minecraft.util.RandomSource.create(42));
+            var quads = model.getQuads(null, null, net.minecraft.util.RandomSource.create(42), net.minecraftforge.client.model.data.ModelData.EMPTY, null);
             if (hasMultipleTintLayers(quads)) {
                 return new CachedItem(stack, null, 1.0f, 1.0f, 1.0f, 1.0f, false);
             }

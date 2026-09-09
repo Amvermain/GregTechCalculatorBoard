@@ -11,6 +11,11 @@ import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.TurbineRotorHelper;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
+import com.gtceu.calcboard.api.catalog.CategoryCapability;
+import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
+import com.gtceu.calcboard.api.catalog.TurbineCatalog;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -53,7 +58,7 @@ public final class GTTurbineHelper {
         }
 
         ResourceLocation machineIcon = node.getMachineIcon();
-        if (machineIcon != null && MultiblockDetector.isTurbineMachine(machineIcon)) {
+        if (machineIcon != null && isTurbineMachine(machineIcon)) {
             return true;
         }
 
@@ -61,6 +66,19 @@ public final class GTTurbineHelper {
             return true;
         }
 
+        return false;
+    }
+
+    public static boolean isTurbineMachine(ResourceLocation icon) {
+        if (icon == null) return false;
+        if (MultiblockDetector.isTurbineMachine(icon)) return true;
+        if (TurbineCatalog.classifyTurbineId(icon) != null) return true;
+        for (ResourceLocation catId : MultiblockDetector.getAllTurbineCategories()) {
+            CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+            if (cap != null && cap.availableWorkstations() != null && cap.availableWorkstations().contains(icon)) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -140,11 +158,7 @@ public final class GTTurbineHelper {
         GTVoltageTier customTier = node.getProperties().get(GTCEuProperties.ROTOR_HOLDER_TIER);
 
         if (targetTier != null) {
-            GTVoltageTier effective = clampToMinimumRotorHolderTier(targetTier, baseTier);
-            if (customTier != effective) {
-                node.getProperties().set(GTCEuProperties.ROTOR_HOLDER_TIER, effective);
-            }
-            return effective;
+            return clampToMinimumRotorHolderTier(targetTier, baseTier);
         }
 
         if (customTier != null) {
@@ -205,7 +219,7 @@ public final class GTTurbineHelper {
 
     public static boolean supportsTurbineBoost(RecipeNode node) {
         if (node == null || !isTurbine(node)) return false;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter != null && adapter.supportsBoosterControl(node);
     }
 
@@ -216,7 +230,7 @@ public final class GTTurbineHelper {
     public static void setLubricantBoost(RecipeNode node, boolean boost) {
         if (node == null || !supportsTurbineBoost(node)) return;
         node.getProperties().set(GTCEuProperties.LUBRICANT_BOOST, boost);
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.syncBoosterInputs(node);
         node.markOverclockDirty();
     }
@@ -228,20 +242,20 @@ public final class GTTurbineHelper {
     public static void setCoolantBoost(RecipeNode node, boolean boost) {
         if (node == null || !supportsTurbineBoost(node)) return;
         node.getProperties().set(GTCEuProperties.COOLANT_BOOST, boost);
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.syncBoosterInputs(node);
         node.markOverclockDirty();
     }
 
     public static void cycleTurbineBoost(RecipeNode node, int direction) {
         if (node == null || !supportsTurbineBoost(node)) return;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.cycleBooster(node, direction);
     }
 
     public static double getTurbineBoostMultiplier(RecipeNode node) {
         if (node == null || !isTurbine(node)) return 1.0;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter instanceof com.gtceu.calcboard.compat.start.StarTModAdapter) {
             return com.gtceu.calcboard.compat.start.StarTTurbineHelper.getTurbineBoostMultiplier(node);
         }
@@ -498,7 +512,7 @@ public final class GTTurbineHelper {
 
         int multiplier = GTPlasmaTurbineModel.isPlasmaTurbine(node) ? GTPlasmaTurbineModel.getModel(node).getParallelMultiplier() : 1;
         node.setParallel((int) Math.max(1, Math.ceil(capFinal / recipeEUt)) * multiplier);
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.syncBoosterInputs(node);
     }
 
@@ -516,9 +530,7 @@ public final class GTTurbineHelper {
 
         double actualGen = GTPowerCalculator.computeSingleMachinePower(node);
         double ratio = Math.min(1.0, actualGen / capHolder);
-        double lossPerSec = 20.0 * ratio; // 20 damage/sec at 100% capacity
-        node.getProperties().set(GTCEuProperties.ROTOR_WEAR_PER_SEC, lossPerSec);
-        return lossPerSec;
+        return 20.0 * ratio; // 20 damage/sec at 100% capacity
     }
 
     /**

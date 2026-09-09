@@ -501,6 +501,12 @@ public class EmiRecipeViewerAdapter implements IRecipeViewerAdapter {
         } catch (Throwable ignored) {}
         return false;
     }
+
+    @Override
+    public boolean isViewerScreen(net.minecraft.client.gui.screens.Screen screen) {
+        if (screen == null) return false;
+        return screen instanceof dev.emi.emi.screen.RecipeScreen;
+    }
 }
 
 

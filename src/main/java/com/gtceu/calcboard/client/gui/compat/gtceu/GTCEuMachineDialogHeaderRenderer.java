@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
@@ -150,7 +151,7 @@ public class GTCEuMachineDialogHeaderRenderer {
             curX += dynamoAmpsBtnW + gap;
 
             // Boost Multiplier Button (via IModAdapter SPI)
-            com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            com.gtceu.calcboard.api.spi.IModAdapter adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(node);
             boolean supportsBoost = adapter != null && adapter.supportsBoosterControl(node);
             if (supportsBoost) {
                 Component boostComp = adapter.getBoosterDisplayComponent(node);
@@ -210,7 +211,7 @@ public class GTCEuMachineDialogHeaderRenderer {
             }
         } else if (GTCombustionHelper.isCombustionEngine(node)) {
             renderCombustionDialogHeader(dialog, graphics, font, node, x, y, dialogW, mouseX, mouseY, partialTicks, parallelBox, parent);
-        } else if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
+        } else if (node.isLiquidBoilerRecipe() || (ModAdapterRegistry.getAdapterForNode(node) != null && ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
             graphics.drawString(font, "§6♨ " + Component.translatable("gui.gtcalcboard.boiler_type_title").getString(), x + 10, y + 30, 0xFFFFFFFF, false);
             com.gtceu.calcboard.api.type.GTBoilerTier curTier = com.gtceu.calcboard.api.type.GTBoilerTier.getBoilerTier(node);
 
@@ -310,7 +311,7 @@ public class GTCEuMachineDialogHeaderRenderer {
                 graphics.drawString(font, "§8" + Component.translatable("gui.gtcalcboard.config.singleblock_parallel_desc").getString(), x + 10, y + 48, 0xFF888888, false);
             }
         } else if (GTCEuNodeCardGuiHandler.isFusionMachine(node)) {
-            List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+            List<ResourceLocation> mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
             if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
                 mbWorkstations = List.of(node.getMachineIcon());
             }
@@ -496,12 +497,12 @@ public class GTCEuMachineDialogHeaderRenderer {
                 showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             }
         } else if (GTCEuNodeCardGuiHandler.isCoilMultiblock(node)) {
-            List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+            List<ResourceLocation> mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
             if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
                 mbWorkstations = List.of(node.getMachineIcon());
             }
 
-            int defPar = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
+            int defPar = ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
             int totalCount = mbWorkstations.size();
             boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
             int parBtnW = supportsParHatch ? 120 : 0;
@@ -694,7 +695,7 @@ public class GTCEuMachineDialogHeaderRenderer {
                 showTooltip(dialog, graphics, font, tt, mouseX, mouseY);
             }
         } else {
-            List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+            List<ResourceLocation> mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
             if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
                 mbWorkstations = List.of(node.getMachineIcon());
             }
@@ -707,7 +708,7 @@ public class GTCEuMachineDialogHeaderRenderer {
                 }
             }
 
-            int defPar = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
+            int defPar = ModAdapterRegistry.getAdapterForNode(node).getDefaultParallel(node);
             int totalCount = mbWorkstations.size();
             boolean supportsParHatch = MultiblockDetector.supportsParallelHatch(node.getMachineIcon(), node.getAvailableWorkstations());
             int parBtnW = supportsParHatch ? 130 : 0;

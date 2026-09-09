@@ -10,8 +10,6 @@ import com.gtceu.calcboard.integration.ae2.generator.Ae2PatternPageGenerator;
 import com.gtceu.calcboard.integration.ae2.model.PatternId;
 import com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -19,9 +17,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,29 +36,21 @@ public class ClientAe2PatternTermHook {
 
     private static void initReflection() {
         if (reflectionInitialized) return;
-        try {
-            patternTermScreenClass = Class.forName("appeng.client.gui.me.PatternEncodingTermScreen");
-        } catch (Throwable ignored) {}
+        patternTermScreenClass = resolveClass(
+                "appeng.client.gui.me.items.PatternEncodingTermScreen",
+                "appeng.client.gui.me.PatternEncodingTermScreen"
+        );
         reflectionInitialized = true;
     }
 
-    @SubscribeEvent
-    public static void onScreenInit(ScreenEvent.Init.Post event) {
-        if (!ModCompatHelper.isAe2Loaded()) return;
-        Screen screen = event.getScreen();
-        if (!isPatternEncodingScreen(screen)) return;
-
-        AbstractContainerScreen<?> containerScreen = (AbstractContainerScreen<?>) screen;
-        int btnX = containerScreen.getGuiLeft() + 80;
-        int btnY = containerScreen.getGuiTop() - 18;
-
-        Button calcBoardBtn = Button.builder(Component.literal("§b⚡ CalcBoard"), btn -> handleTerminalButtonClick(containerScreen))
-                .pos(btnX, btnY)
-                .size(76, 18)
-                .tooltip(Tooltip.create(Component.translatable("gui.gtcalcboard.tooltip.btn_ae2_create_page")))
-                .build();
-
-        event.addListener(calcBoardBtn);
+    private static Class<?> resolveClass(String... candidates) {
+        for (String candidate : candidates) {
+            try {
+                return Class.forName(candidate);
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
     }
 
     public static boolean tryHandlePatternShortcut(Screen screen, double mouseX, double mouseY) {
@@ -78,7 +65,7 @@ public class ClientAe2PatternTermHook {
         return tryCreateFromTerminal(containerScreen);
     }
 
-    private static void handleTerminalButtonClick(AbstractContainerScreen<?> screen) {
+    private static void createOrSwitchFromTerminal(AbstractContainerScreen<?> screen) {
         if (!(screen.getMenu() instanceof PatternEncodingTermMenu termMenu)) return;
 
         PatternId patternId = Ae2PatternPageGenerator.createPatternIdFromTerminalMenu(termMenu);
@@ -113,7 +100,7 @@ public class ClientAe2PatternTermHook {
         if (!isPatternEncodingScreen(screen)) return false;
         if (!(screen.getMenu() instanceof PatternEncodingTermMenu termMenu)) return false;
 
-        handleTerminalButtonClick(screen);
+        createOrSwitchFromTerminal(screen);
         return true;
     }
 

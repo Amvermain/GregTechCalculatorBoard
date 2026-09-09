@@ -182,10 +182,6 @@ public final class RecipeNodeSerializer {
             tag.put("moduleOutputOrigins", outOriginsTag);
         }
 
-        if (node.hasThreading()) {
-            tag.putString("threadingJson", node.getThreadingConfig().toJson().toString());
-        }
-
         if (!node.getHiddenInputIndices().isEmpty()) {
             tag.putIntArray("hiddenInputs", node.getHiddenInputIndices().stream().mapToInt(Integer::intValue).toArray());
         }
@@ -387,13 +383,6 @@ public final class RecipeNodeSerializer {
             }
         }
 
-        if (tag.contains("threadingJson")) {
-            try {
-                com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(tag.getString("threadingJson")).getAsJsonObject();
-                node.getThreadingConfig().fromJson(json);
-            } catch (Throwable ignored) {}
-        }
-
         if (tag.contains("hiddenInputs")) {
             for (int idx : tag.getIntArray("hiddenInputs")) {
                 node.hideInputPort(idx);
@@ -427,6 +416,10 @@ public final class RecipeNodeSerializer {
 
         if (tag.contains("properties", Tag.TAG_COMPOUND)) {
             node.getProperties().deserializeNBT(tag.getCompound("properties"));
+        } else if (tag.contains("threadingJson")) {
+            CompoundTag legacyProps = new CompoundTag();
+            legacyProps.putString("threadingJson", tag.getString("threadingJson"));
+            node.getProperties().deserializeNBT(legacyProps);
         }
 
         return node;

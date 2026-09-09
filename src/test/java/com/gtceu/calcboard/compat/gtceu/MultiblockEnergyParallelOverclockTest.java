@@ -73,6 +73,13 @@ public class MultiblockEnergyParallelOverclockTest {
                 parHatchId.toString(), "LuV Parallel Hatch", "64x Parallel", parHatchId, 64, false
         );
         node.getAddons().add(parHatch);
+
+        ResourceLocation energyHatchId = ResourceLocation.tryParse("gtceu:ev_energy_input_hatch_2a");
+        GTEnergyHatchAddon energyHatch = new GTEnergyHatchAddon(
+                energyHatchId.toString(), "2A EV Energy Hatch", "Energy Hatch", energyHatchId,
+                GTVoltageTier.EV, 2, false, false, false
+        );
+        node.getAddons().add(energyHatch);
         node.markOverclockDirty();
 
         // 64 parallels of 30 EU/t = 1,920 EU/t.
@@ -101,6 +108,13 @@ public class MultiblockEnergyParallelOverclockTest {
                 parHatchId.toString(), "EV Parallel Hatch", "4x Parallel", parHatchId, 4, false
         );
         node.getAddons().add(parHatch);
+
+        ResourceLocation energyHatchId = ResourceLocation.tryParse("gtceu:ev_energy_input_hatch_2a");
+        GTEnergyHatchAddon energyHatch = new GTEnergyHatchAddon(
+                energyHatchId.toString(), "2A EV Energy Hatch", "Energy Hatch", energyHatchId,
+                GTVoltageTier.EV, 2, false, false, false
+        );
+        node.getAddons().add(energyHatch);
         node.markOverclockDirty();
 
         // 4 parallels of 30 EU/t = 120 EU/t.

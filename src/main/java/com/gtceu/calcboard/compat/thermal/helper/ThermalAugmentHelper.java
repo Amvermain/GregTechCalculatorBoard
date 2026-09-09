@@ -183,6 +183,16 @@ public class ThermalAugmentHelper {
         return 1.0;
     }
 
+    private static final java.util.Set<String> DYNAMO_AUGMENT_TYPES = java.util.Set.of("dynamo", "fuel");
+    private static final java.util.Set<String> MACHINE_AUGMENT_TYPES = java.util.Set.of("machine", "process");
+
+    private static final java.util.Set<String> DYNAMO_AUGMENT_PATHS = java.util.Set.of(
+            "dynamo", "reaction_chamber", "injector", "flux_linkage"
+    );
+    private static final java.util.Set<String> MACHINE_AUGMENT_PATHS = java.util.Set.of(
+            "machine", "sieve", "reclamation", "catalyst", "filter"
+    );
+
     private static ThermalAugmentAddon.AugmentTarget resolveAugmentTarget(CompoundTag augTag, ResourceLocation id, boolean isKit) {
         if (isKit) return ThermalAugmentAddon.AugmentTarget.ALL;
 
@@ -192,13 +202,12 @@ public class ThermalAugmentHelper {
         boolean hasDynamoKeys = augTag.contains("DynamoPower") || augTag.contains("DynPower") || augTag.contains("DynamoEnergy") || augTag.contains("DynEnergy") || augTag.contains("FuelMod");
         boolean hasMachineKeys = augTag.contains("MachinePower") || augTag.contains("ProcessPower") || augTag.contains("MachineSpeed") || augTag.contains("ProcessSpeed") || augTag.contains("MachineEnergy");
 
-        if (hasDynamoKeys || typeStr.contains("dynamo") || typeStr.contains("fuel")
-                || path.contains("dynamo") || path.contains("reaction_chamber") || path.contains("injector")
-                || path.contains("flux_linkage")) {
+        boolean isDynamo = hasDynamoKeys || DYNAMO_AUGMENT_TYPES.contains(typeStr) || path.startsWith("dynamo") || DYNAMO_AUGMENT_PATHS.contains(path);
+        boolean isMachine = hasMachineKeys || MACHINE_AUGMENT_TYPES.contains(typeStr) || path.startsWith("machine") || MACHINE_AUGMENT_PATHS.contains(path);
+
+        if (isDynamo) {
             return ThermalAugmentAddon.AugmentTarget.DYNAMO;
-        } else if (hasMachineKeys || typeStr.contains("machine") || typeStr.contains("process")
-                || path.contains("machine") || path.contains("sieve") || path.contains("reclamation")
-                || path.contains("catalyst") || path.contains("filter")) {
+        } else if (isMachine) {
             return ThermalAugmentAddon.AugmentTarget.MACHINE;
         }
 

@@ -22,6 +22,7 @@ public class AutoRatioDivergenceTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode cracker = RecipeNode.create("Cracker", 20.0, 30.0, GTVoltageTier.LV);
+        cracker.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         cracker.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_fuel"), "Heavy Fuel", 100.0, 1.0));
         cracker.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_fuel"), "Cracked Heavy Fuel", 100.0, 1.0));
         cracker.setMachineCount(1.0);
@@ -29,6 +30,7 @@ public class AutoRatioDivergenceTest {
         graph.addNode(cracker);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower", 20.0, 30.0, GTVoltageTier.LV);
+        distTower.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_fuel"), "Cracked Heavy Fuel", 100.0, 1.0));
         distTower.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_fuel"), "Heavy Fuel", 40.0, 1.0));
         distTower.setMachineCount(1.0);
@@ -54,6 +56,7 @@ public class AutoRatioDivergenceTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode cracker = RecipeNode.create("Cracker", 20.0, 30.0, GTVoltageTier.LV);
+        cracker.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         cracker.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_fuel"), "Heavy Fuel", 100.0, 1.0));
         cracker.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_fuel"), "Cracked Heavy Fuel", 100.0, 1.0));
         cracker.setMachineCount(1.0);
@@ -61,6 +64,7 @@ public class AutoRatioDivergenceTest {
         graph.addNode(cracker);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower", 20.0, 30.0, GTVoltageTier.LV);
+        distTower.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_fuel"), "Cracked Heavy Fuel", 100.0, 1.0));
         distTower.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_fuel"), "Heavy Fuel", 50.0, 1.0));
         distTower.setMachineCount(1.0);
@@ -119,6 +123,7 @@ public class AutoRatioDivergenceTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode cracker = RecipeNode.create("Cracker", 20.0, 30.0, GTVoltageTier.LV);
+        cracker.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         cracker.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_fuel"), "Heavy Fuel", 100.0, 1.0));
         cracker.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_fuel"), "Cracked Heavy Fuel", 100.0, 1.0));
         cracker.setMachineCount(1.0);
@@ -126,6 +131,7 @@ public class AutoRatioDivergenceTest {
         graph.addNode(cracker);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower", 20.0, 30.0, GTVoltageTier.LV);
+        distTower.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_heavy_fuel"), "Cracked Heavy Fuel", 100.0, 1.0));
         distTower.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:heavy_fuel"), "Heavy Fuel", 40.0, 1.0));
         distTower.setMachineCount(1.0);

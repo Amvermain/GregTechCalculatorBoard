@@ -13,7 +13,7 @@ import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -301,8 +301,8 @@ public class GTCEuSteamProcessingTest {
         Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lv_steam_turbine"), turbine.getMachineIcon());
         Assertions.assertFalse(turbine.isMultiblock());
         Assertions.assertFalse(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isLargeTurbine(turbine));
-        Assertions.assertFalse(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
-        Assertions.assertTrue(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine).isEmpty());
+        Assertions.assertFalse(ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
+        Assertions.assertTrue(ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine).isEmpty());
 
         // 2. Singleblock MV & HV Steam Turbine
         turbine.setTargetTier(GTVoltageTier.MV);
@@ -321,9 +321,9 @@ public class GTCEuSteamProcessingTest {
         Assertions.assertEquals(ResourceLocation.tryParse("gtceu:large_steam_turbine"), turbine.getMachineIcon());
         Assertions.assertTrue(turbine.isMultiblock());
         Assertions.assertTrue(com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isLargeTurbine(turbine));
-        Assertions.assertTrue(com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
+        Assertions.assertTrue(ModAdapterRegistry.getAdapterForNode(turbine).supportsAddons(turbine));
 
-        var cats = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine);
+        var cats = ModAdapterRegistry.getAdapterForNode(turbine).getApplicableAddonCategories(turbine);
         Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.ROTOR));
         Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.MAINTENANCE));
         Assertions.assertTrue(cats.contains(com.gtceu.calcboard.api.catalog.AddonCategory.CUSTOM));

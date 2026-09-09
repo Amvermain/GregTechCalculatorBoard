@@ -1,6 +1,7 @@
-package com.gtceu.calcboard.api.type;
+package com.gtceu.calcboard.compat.start.model;
 
 import com.google.gson.JsonObject;
+import com.gtceu.calcboard.api.type.GTThreadingHelix;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -291,4 +292,3 @@ public class NodeThreadingConfig {
         clampAssignments();
     }
 }
-

@@ -1,7 +1,13 @@
 package com.gtceu.calcboard.compat.extension;
 
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.extension.IBoosterProvider;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.start.StarTModAdapter;
@@ -44,7 +50,7 @@ class ModAdapterExtensionTest {
         assertTrue(adapter.hasExtension(ICompoundRecipeProvider.class));
         assertTrue(adapter.hasExtension(ICapabilityMatrixProvider.class));
         assertTrue(adapter.hasExtension(IHardwareAddonProvider.class));
-        assertFalse(adapter.hasExtension(IMultiblockBOMProvider.class));
+        assertTrue(adapter.hasExtension(IMultiblockBOMProvider.class));
         assertFalse(adapter.hasExtension(IBoosterProvider.class));
     }
 

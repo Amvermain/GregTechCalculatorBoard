@@ -17,13 +17,13 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.extension.IBoosterProvider;
-import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
-import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
-import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
-import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
-import com.gtceu.calcboard.compat.extension.IMultiblockBOMProvider;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.extension.IBoosterProvider;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
 import com.gtceu.calcboard.compat.gtceu.addon.GTCoilAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
@@ -34,6 +34,7 @@ import com.gtceu.calcboard.compat.gtceu.badge.GTBadgeProvider;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import com.gtceu.calcboard.compat.gtceu.handler.GTNodeValidator;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCapabilityScanner;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuMachineLifecycleHandler;
@@ -45,7 +46,16 @@ import com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTMultiblockBOMResolver;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import com.gtceu.calcboard.compat.gtceu.physics.GTTurbinePhysics;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
+import com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry;
+import com.gtceu.calcboard.api.catalog.TurbineCatalog;
+import com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge;
+import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
+import com.gtceu.calcboard.compat.gtceu.extractor.GTCEuCleanroomExtractor;
+import com.gtceu.calcboard.compat.gtceu.extractor.GTCEuEbfTemperatureExtractor;
+import com.gtceu.calcboard.compat.gtceu.extractor.GTCEuFusionStartEnergyExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -382,7 +392,7 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         return GTCEuRecipeHandler.adaptRecipeDetails(emiRecipeObj, backing, details);
     }
 
@@ -396,11 +406,11 @@ public class GTCEuModAdapter implements IModAdapter {
     ) {
         if (backingRecipe == null && recipeObj == null) return null;
 
-        String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : resolveMachineName(recipeObj);
+        String machineName = preferredWorkstation != null ? RecipeConversionHelper.formatName(preferredWorkstation.getPath()) : resolveMachineName(recipeObj);
         ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : resolveMachineIcon(recipeObj);
 
         if (GTCEuLayeredRecipeExtractor.isLayeredRecipe(backingRecipe, recipeObj)) {
-            EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+            RecipeDetails details = new RecipeDetails();
             Object detailSource = backingRecipe != null ? backingRecipe : recipeObj;
             GTCEuRecipeHandler.extractGTRecipeDetails(detailSource, details);
             return GTCEuLayeredRecipeExtractor.buildCompoundCluster(
@@ -413,16 +423,14 @@ public class GTCEuModAdapter implements IModAdapter {
 
     private static String resolveMachineName(Object recipeObj) {
         if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emi && emi.getCategory() != null && emi.getCategory().getId() != null) {
-            return EmiRecipeConverter.formatName(emi.getCategory().getId().getPath());
+            return RecipeConversionHelper.formatName(emi.getCategory().getId().getPath());
         }
         return "Machine";
     }
 
     private static ResourceLocation resolveMachineIcon(Object recipeObj) {
-        if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emi) {
-            return EmiRecipeConverter.findMachineIcon(emi);
-        }
-        return null;
+        var bridge = RecipeViewerBridgeRegistry.getActiveBridge();
+        return bridge != null ? bridge.findMachineIcon(recipeObj) : null;
     }
 
     @Override
@@ -589,5 +597,92 @@ public class GTCEuModAdapter implements IModAdapter {
             return String.format("§d⚡%s", h.getTier().getName());
         }
         return IModAdapter.super.formatAddonBadge(node, addon);
+    }
+
+    @Override
+    public void initialize() {
+        RecipePropertyExtractorPipeline.register(new GTCEuEbfTemperatureExtractor());
+        RecipePropertyExtractorPipeline.register(new GTCEuFusionStartEnergyExtractor());
+        RecipePropertyExtractorPipeline.register(new GTCEuCleanroomExtractor());
+    }
+
+    @Override
+    public int calculateTierDelta(RecipeNode node, GTVoltageTier targetTier, GTVoltageTier recipeTier) {
+        if (targetTier == null || recipeTier == null) return 0;
+        int delta = targetTier.ordinal() - recipeTier.ordinal();
+        if (recipeTier == GTVoltageTier.ULV) {
+            delta--;
+        }
+        return Math.max(0, delta);
+    }
+
+    @Override
+    public boolean isMultiblock(ResourceLocation machineId) {
+        if (machineId == null) return false;
+        if (isCombustionEngine(machineId)) return true;
+        Object def = GTCEuReflectionBridge.getMachineDefinition(machineId);
+        return def != null && GTCEuReflectionBridge.isMultiblockDefinition(def);
+    }
+
+    @Override
+    public boolean isCoilMultiblock(ResourceLocation machineId) {
+        if (machineId == null) return false;
+        Object def = GTCEuReflectionBridge.getMachineDefinition(machineId);
+        if (def != null) {
+            Class<?> mCls = GTCEuReflectionBridge.getMachineClass(def);
+            if (mCls != null && GTCEuReflectionBridge.isCoilWorkableClass(mCls)) {
+                return true;
+            }
+        }
+        return GTCEuCoilModifierHelper.getCoilMachineSpec(machineId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC;
+    }
+
+    @Override
+    public boolean isCombustionEngine(ResourceLocation machineId) {
+        if (machineId == null) return false;
+        return GTCombustionHelper.isCombustionEngine(machineId);
+    }
+
+    @Override
+    public boolean isTurbine(ResourceLocation machineId) {
+        if (machineId == null) return false;
+        if (TurbineCatalog.classifyTurbineId(machineId) != null || TurbineCatalog.getTurbineBaseTier(machineId) != null) {
+            return true;
+        }
+        return hasTurbineSignature(machineId, TurbineCatalog.getTurbineAlias(machineId));
+    }
+
+    @Override
+    public boolean isPlasmaTurbine(RecipeNode node) {
+        return com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node);
+    }
+
+    @Override
+    public boolean isCombustionMachine(RecipeNode node) {
+        return GTCombustionHelper.isCombustionEngine(node);
+    }
+
+    @Override
+    public boolean hasTurbineSignature(ResourceLocation machineId, ResourceLocation alias) {
+        Object gtDef = GTCEuReflectionBridge.getMachineDefinition(machineId);
+        if (gtDef == null && alias != null) {
+            gtDef = GTCEuReflectionBridge.getMachineDefinition(alias);
+        }
+        return gtDef != null && GTCEuReflectionBridge.hasTurbineSignature(gtDef);
+    }
+
+    @Override
+    public boolean isThreadingAvailable(RecipeNode node) {
+        return com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper.isThreadingAvailable(node);
+    }
+
+    @Override
+    public boolean hasThreading(RecipeNode node) {
+        return com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper.hasThreading(node);
+    }
+
+    @Override
+    public void setThreadingActive(RecipeNode node, boolean active) {
+        com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper.setThreadingActive(node, active);
     }
 }

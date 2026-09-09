@@ -2,8 +2,8 @@ package com.gtceu.calcboard.integration.emi;
 
 import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
@@ -139,10 +139,10 @@ public class EmiRecipeConverter {
         CompoundTag recipeDataTag = com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler.extractRecipeDataTag(backing);
         com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.extractAll(backing, recipeDataTag, catId, node.getProperties());
 
-        boolean isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catId);
+        boolean isSupported = ModAdapterRegistry.isCategorySupported(catId);
         String rModId = (recipe.getId() != null) ? recipe.getId().getNamespace() : null;
         if (!isSupported && rModId != null) {
-            isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isRecipeSupported(rModId, catId);
+            isSupported = ModAdapterRegistry.isRecipeSupported(rModId, catId);
         }
         if (!isSupported) {
             node.getProperties().set(com.gtceu.calcboard.api.property.NodeProperties.IS_GENERIC_UNSUPPORTED, true);
@@ -307,7 +307,7 @@ public class EmiRecipeConverter {
         }
         if (hasAnyMulti && !hasAnySingle) {
             node.setMultiblock(true);
-            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (adapter != null) {
                 var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
                 if (preferredWs != null) {
@@ -320,7 +320,7 @@ public class EmiRecipeConverter {
             node.setMultiblock(true);
             GTVoltageTier minTier = node.getMinFusionVoltageTier();
             node.setTargetTier(minTier);
-            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (adapter != null) {
                 var preferredWs = adapter.getPreferredMultiblockWorkstation(node, node.getAvailableWorkstations());
                 if (preferredWs != null) {
@@ -349,7 +349,7 @@ public class EmiRecipeConverter {
         if (preferredWorkstation == null) {
             com.gtceu.calcboard.api.preset.CategoryMachinePresetManager.getInstance().applyPresetIfPresent(node);
         }
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
         GTVoltageTier effectiveTier = node.getTargetTier() != null ? node.getTargetTier() : (node.getRecipeTier() != null ? node.getRecipeTier() : GTVoltageTier.LV);
         if (adapter != null) {
             effectiveTier = adapter.sanitizeTargetTier(node, effectiveTier);
@@ -575,19 +575,7 @@ public class EmiRecipeConverter {
         return EmiRecipeDetailsExtractor.unwrapBackingRecipe(recipe);
     }
 
-    public static class RecipeDetails {
-        public double durationTicks = 20.0;
-        public double eut = 0.0;
-        public GTVoltageTier tier = GTVoltageTier.ULV;
-        public boolean isGenerator = false;
-        public com.gtceu.calcboard.api.type.EnergyType energyType = com.gtceu.calcboard.api.type.EnergyType.NONE;
-        public int backingRecipeTemp = 0;
-        public int circuitNumber = -1;
-        public String heatCondition = "NONE";
-        public List<IngredientStack> extraInputs = new ArrayList<>();
-        public List<IngredientStack> extraOutputs = new ArrayList<>();
-        public boolean overrideOutputs = false;
-        public List<IngredientStack> customOutputs = new ArrayList<>();
+    public static class RecipeDetails extends com.gtceu.calcboard.api.model.RecipeDetails {
     }
 
     public static RecipeDetails extractRecipeDetails(EmiRecipe recipe, ResourceLocation preferredWorkstation) {

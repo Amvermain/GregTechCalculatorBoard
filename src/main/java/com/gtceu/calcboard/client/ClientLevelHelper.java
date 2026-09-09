@@ -81,5 +81,14 @@ public final class ClientLevelHelper implements com.gtceu.calcboard.api.catalog.
         }
         return null;
     }
+
+    @Override
+    public RegistryAccess getRegistryAccess() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.level != null) {
+            return mc.level.registryAccess();
+        }
+        return null;
+    }
 }
 

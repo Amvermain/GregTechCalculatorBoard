@@ -4,8 +4,9 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.compat.create.AbstractKineticModAdapter;
-import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
@@ -19,12 +20,12 @@ import java.util.Set;
  */
 public class CreateDieselGeneratorsModAdapter extends AbstractKineticModAdapter {
 
-    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
             IEnergySimulationProvider.class
     );
 
     @Override
-    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
         return SUPPORTED_EXTENSIONS;
     }
 
@@ -68,7 +69,7 @@ public class CreateDieselGeneratorsModAdapter extends AbstractKineticModAdapter 
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         return CDGRecipeHandler.adaptRecipeDetails(emiRecipe, backingRecipe, details);
     }
 

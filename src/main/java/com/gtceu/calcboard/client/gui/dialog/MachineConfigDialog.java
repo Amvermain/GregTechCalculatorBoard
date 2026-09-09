@@ -17,8 +17,8 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -32,6 +32,7 @@ import org.lwjgl.glfw.GLFW;
 import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -440,9 +441,17 @@ public class MachineConfigDialog implements IBoardModal {
         }
         graphics.drawString(font, title, x + 8, y + 7, 0xFFE0E6F0, false);
         if (titleHover) {
-            this.deferredTooltip = List.of(
-                    Component.literal("⚙ ").append(Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName()))
-            );
+            List<Component> tt = new ArrayList<>();
+            tt.add(Component.literal("⚙ ").append(Component.translatable("gui.gtcalcboard.config_dialog_title", node.getName())));
+            com.gtceu.calcboard.api.model.FlowGraph graph = parent != null ? parent.getGraph() : null;
+            if (!node.isOperational(graph)) {
+                tt.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()));
+                List<Component> warnings = node.getOperationalWarnings(graph);
+                for (Component w : warnings) {
+                    tt.add(Component.literal("§c❌ ").append(w));
+                }
+            }
+            this.deferredTooltip = tt;
         }
 
         // SECTION 1: Base Parallel Header Area

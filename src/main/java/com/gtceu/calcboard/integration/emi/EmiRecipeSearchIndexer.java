@@ -136,9 +136,9 @@ public final class EmiRecipeSearchIndexer {
         String[] outNamesArr = outputNames.isEmpty() ? null : outputNames.toArray(new String[0]);
 
         ResourceLocation catResId = (cat != null) ? cat.getId() : null;
-        boolean isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isCategorySupported(catResId);
+        boolean isSupported = com.gtceu.calcboard.api.spi.ModAdapterRegistry.isCategorySupported(catResId);
         if (!isSupported && modId != null && !modId.isEmpty()) {
-            isSupported = com.gtceu.calcboard.compat.ModAdapterRegistry.isRecipeSupported(modId, catResId);
+            isSupported = com.gtceu.calcboard.api.spi.ModAdapterRegistry.isRecipeSupported(modId, catResId);
         }
 
         return new SearchableRecipe(

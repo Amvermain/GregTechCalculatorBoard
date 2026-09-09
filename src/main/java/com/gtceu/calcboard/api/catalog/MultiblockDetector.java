@@ -6,8 +6,9 @@ import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry;
 import net.minecraft.resources.ResourceLocation;
 
 import java.lang.reflect.Field;
@@ -62,8 +63,8 @@ public class MultiblockDetector {
 
     public static void registerTurbine(ResourceLocation controllerId, ResourceLocation recipeCategoryId, GTVoltageTier baseTier, double baseProduction) {
         if (controllerId != null) {
-            if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(controllerId)
-                    || com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(controllerId)) {
+            IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(controllerId.getNamespace());
+            if (adapter != null && adapter.isCombustionEngine(controllerId)) {
                 return;
             }
             TURBINE_CONTROLLERS.add(controllerId);
@@ -150,7 +151,6 @@ public class MultiblockDetector {
     public static void registerOverpressureMultiblock(ResourceLocation controllerId) {
         if (controllerId != null) {
             OVERPRESSURE_CONTROLLERS.add(controllerId);
-            MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
         }
     }
 
@@ -207,42 +207,6 @@ public class MultiblockDetector {
             if (ws != null && STEAM_ORE_FACTORIES.contains(ws)) return true;
         }
         return false;
-    }
-
-    public static void registerMachineCapabilities(ResourceLocation id, com.gtceu.calcboard.compat.gtceu.helper.GTCEuMachineAnalyzer.MachineCapabilities caps) {
-        if (id == null || caps == null) return;
-        if (caps.isMultiblock()) {
-            registerMultiblock(id);
-        }
-        if (caps.isCoilWorkable()) {
-            registerCoilMultiblock(id, null);
-        }
-        if (caps.isTurbine()) {
-            registerTurbine(id, null, caps.turbineTier(), caps.turbineBaseEnergy());
-        }
-        if (caps.isSteam()) {
-            registerSteamMultiblock(id, caps.defaultParallel(), caps.steamDrainRate());
-        } else if (caps.defaultParallel() > 1) {
-            registerDefaultParallel(id, caps.defaultParallel());
-        }
-        if (caps.supportsParallelHatch()) {
-            registerParallelHatchMultiblock(id);
-        }
-        if (caps.supportsBatchMode()) {
-            registerBatchModeMultiblock(id);
-        }
-        if (caps.supportsThroughputBoosting()) {
-            registerThroughputBoostingMultiblock(id);
-        }
-        if (caps.supportsBulkProcessing()) {
-            registerBulkProcessingMultiblock(id);
-        }
-        if (caps.supportsOverpressure()) {
-            registerOverpressureMultiblock(id);
-        }
-        if (caps.supportsLaserHatch()) {
-            registerLaserHatchMultiblock(id);
-        }
     }
 
     public static void registerParallelHatchMultiblock(ResourceLocation controllerId) {
@@ -358,111 +322,7 @@ public class MultiblockDetector {
     }
 
     private static void scanEmiMultiblockRecipes(Object rmObj) {
-        if (!com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
-            return;
-        }
-        try {
-            EmiMultiblockScanner.scan(rmObj);
-        } catch (Throwable t) {
-            com.gtceu.calcboard.GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Error scanning EMI multiblock_info recipes: {}", t.getMessage());
-        }
-    }
-
-    private static class EmiMultiblockScanner {
-        private static void scan(Object rmObj) {
-            Object resolvedManager = resolveEmiRecipeManager(rmObj);
-            if (resolvedManager == null) return;
-
-            if (resolvedManager instanceof dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
-                scanEmiManagerCategories(emiManager);
-                return;
-            }
-
-            scanGenericRecipeCollection(resolvedManager);
-        }
-
-        private static Object resolveEmiRecipeManager(Object rmObj) {
-            if (rmObj != null) return rmObj;
-            if (!com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) return null;
-            try {
-                return dev.emi.emi.api.EmiApi.getRecipeManager();
-            } catch (Throwable ignored) {
-                return null;
-            }
-        }
-
-        private static void scanEmiManagerCategories(dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
-            if (emiManager.getCategories() == null) return;
-            for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : emiManager.getCategories()) {
-                if (cat == null || cat.getId() == null) continue;
-                if (!isMultiblockCategory(cat.getId().getPath())) continue;
-
-                List<dev.emi.emi.api.recipe.EmiRecipe> mbRecipes = emiManager.getRecipes(cat);
-                if (mbRecipes != null) {
-                    mbRecipes.forEach(EmiMultiblockScanner::processEmiMultiblockRecipe);
-                }
-            }
-        }
-
-        private static void scanGenericRecipeCollection(Object rmObj) {
-            Iterable<?> recipes = extractRecipeIterable(rmObj);
-            if (recipes == null) return;
-
-            for (Object recipeObj : recipes) {
-                if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
-                    processRecipeIfMultiblock(recipe);
-                }
-            }
-        }
-
-        private static Iterable<?> extractRecipeIterable(Object rmObj) {
-            if (rmObj instanceof Iterable<?> it) return it;
-            try {
-                Method mGetRecipes = rmObj.getClass().getMethod("getRecipes");
-                Object res = mGetRecipes.invoke(rmObj);
-                if (res instanceof Iterable<?> it) return it;
-            } catch (Throwable ignored) {}
-            return null;
-        }
-
-        private static void processRecipeIfMultiblock(dev.emi.emi.api.recipe.EmiRecipe recipe) {
-            if (recipe.getCategory() == null || recipe.getCategory().getId() == null) return;
-            if (isMultiblockCategory(recipe.getCategory().getId().getPath())) {
-                processEmiMultiblockRecipe(recipe);
-            }
-        }
-
-        private static boolean isMultiblockCategory(String path) {
-            return path.equals("multiblock_info") || path.contains("multiblock");
-        }
-
-        private static void processEmiMultiblockRecipe(dev.emi.emi.api.recipe.EmiRecipe recipe) {
-            if (recipe == null) return;
-            ResourceLocation controllerId = null;
-
-            if (recipe.getId() != null) {
-                String rPath = recipe.getId().getPath();
-                if (rPath.contains("/")) {
-                    String machineName = rPath.substring(rPath.lastIndexOf('/') + 1);
-                    controllerId = ResourceLocation.tryParse(recipe.getId().getNamespace() + ":" + machineName);
-                } else {
-                    controllerId = recipe.getId();
-                }
-            }
-
-            if (controllerId == null && recipe.getOutputs() != null) {
-                for (var es : recipe.getOutputs()) {
-                    if (es != null && es.getId() != null) {
-                        controllerId = es.getId();
-                        break;
-                    }
-                }
-            }
-
-            if (controllerId != null) {
-                MULTIBLOCK_RECIPE_CONTROLLERS.add(controllerId);
-            }
-        }
+        RecipeViewerBridgeRegistry.getActiveBridges().forEach(b -> b.discoverMultiblockControllers(MULTIBLOCK_RECIPE_CONTROLLERS::add));
     }
 
     public static void reinitialize() {
@@ -511,16 +371,22 @@ public class MultiblockDetector {
     }
 
     public static boolean supportsTurbineRotor(ResourceLocation machineIcon, List<ResourceLocation> availableWorkstations) {
-        if (machineIcon != null && (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(machineIcon)
-                || com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(machineIcon))) {
-            return false;
+        if (machineIcon != null) {
+            IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(machineIcon.getNamespace());
+            if (adapter != null && adapter.isCombustionEngine(machineIcon)) {
+                return false;
+            }
         }
         if (isTurbineMachine(machineIcon)) return true;
         if (availableWorkstations == null) return false;
         for (ResourceLocation ws : availableWorkstations) {
-            if (ws != null && !com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(ws)
-                    && !com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(ws)
-                    && isTurbineMachine(ws)) return true;
+            if (ws != null) {
+                IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(ws.getNamespace());
+                if (adapter != null && adapter.isCombustionEngine(ws)) {
+                    continue;
+                }
+                if (isTurbineMachine(ws)) return true;
+            }
         }
         return false;
     }
@@ -647,13 +513,10 @@ public class MultiblockDetector {
         if (STEAM_MULTIBLOCKS.contains(workstationId)) return true;
         if (THREADING_MAX_HELIX_CAPACITY.containsKey(workstationId)) return true;
         if (MultiblockStructureCatalog.getStructure(workstationId) != null) return true;
-        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(workstationId)) return true;
-        Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
-        if (def != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isMultiblockDefinition(def)) {
-            return true;
-        }
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(workstationId.getNamespace());
+        if (adapter != null && adapter.isMultiblock(workstationId)) return true;
         String path = workstationId.getPath().toLowerCase(Locale.ROOT);
-        return path.endsWith("fusion_reactor") || path.contains("auxiliary_fusion") || path.contains("auxiliary_booster");
+        return path.endsWith("fusion_reactor") || path.startsWith("auxiliary_fusion") || path.startsWith("auxiliary_booster");
     }
 
     public static boolean isCoilMultiblock(ResourceLocation workstationId) {
@@ -669,16 +532,8 @@ public class MultiblockDetector {
             return true;
         }
 
-        Object def = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
-        if (def != null) {
-            Class<?> mCls = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineClass(def);
-            if (mCls != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.isCoilWorkableClass(mCls)) {
-                COIL_MULTIBLOCK_CONTROLLERS.add(workstationId);
-                return true;
-            }
-        }
-
-        if (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(workstationId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(workstationId.getNamespace());
+        if (adapter != null && adapter.isCoilMultiblock(workstationId)) {
             COIL_MULTIBLOCK_CONTROLLERS.add(workstationId);
             return true;
         }
@@ -708,8 +563,8 @@ public class MultiblockDetector {
 
     public static boolean isTurbineMachine(ResourceLocation workstationId) {
         if (workstationId == null) return false;
-        if (com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(workstationId)
-                || com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isSingleblockCombustionGenerator(workstationId)) {
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForMod(workstationId.getNamespace());
+        if (adapter != null && adapter.isCombustionEngine(workstationId)) {
             return false;
         }
         if (!initialized && !initializing) {
@@ -729,11 +584,7 @@ public class MultiblockDetector {
         }
         if (def != null && def.supportsAbility("ROTOR_HOLDER")) {
             if (!isCoilMultiblock(workstationId)) {
-                Object gtDef = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(workstationId);
-                if (gtDef == null && alias != null) {
-                    gtDef = com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.getMachineDefinition(alias);
-                }
-                if (gtDef != null && com.gtceu.calcboard.compat.gtceu.helper.GTCEuReflectionBridge.hasTurbineSignature(gtDef)) {
+                if (adapter != null && adapter.hasTurbineSignature(workstationId, alias)) {
                     registerTurbine(workstationId, null, null, 0.0);
                     return true;
                 }

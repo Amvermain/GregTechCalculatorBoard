@@ -1,8 +1,7 @@
 package com.gtceu.calcboard.api.event;
 
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
-
-import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
 import net.minecraftforge.eventbus.ListenerList;
 import net.minecraftforge.eventbus.api.Event;
 

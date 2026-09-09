@@ -16,7 +16,9 @@ import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class NodeWidgetInteractionHandler {
 
@@ -123,7 +125,15 @@ public final class NodeWidgetInteractionHandler {
 
         boolean expanded = parent.getGraph().expandModule(node);
         if (expanded) {
-            parent.recordCommand(new BoardCommand.ExpandModuleCommand(node, subNodes, subEdges, moduleEdges, subFrames, subNotes));
+            Set<String> subNodeIds = new HashSet<>();
+            for (RecipeNode sn : subNodes) subNodeIds.add(sn.getId());
+            List<FlowGraph.ConnectionEdge> restoredEdges = new ArrayList<>();
+            for (FlowGraph.ConnectionEdge e : parent.getGraph().getConnections()) {
+                if (subNodeIds.contains(e.fromNodeId()) || subNodeIds.contains(e.toNodeId())) {
+                    restoredEdges.add(e);
+                }
+            }
+            parent.recordCommand(new BoardCommand.ExpandModuleCommand(node, subNodes, restoredEdges, moduleEdges, subFrames, subNotes));
             parent.rebuildWidgets();
             parent.markSummaryDirty();
             TutorialManager.getInstance().onModuleExpanded();

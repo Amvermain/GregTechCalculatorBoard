@@ -9,7 +9,7 @@ import com.gtceu.calcboard.client.gui.compat.gtceu.GTCEuModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.systeams.SysteamsModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.thermal.ThermalModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.vanilla.VanillaModGuiHandler;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 

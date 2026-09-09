@@ -26,7 +26,6 @@ public class ClientModBusEvents {
             if (ModCompatHelper.isAe2Loaded()) {
                 com.gtceu.calcboard.integration.ae2.registry.PatternGraphRegistry.getInstance();
                 MinecraftForge.EVENT_BUS.register(com.gtceu.calcboard.client.gui.compat.ae2.ClientAe2CraftConfirmHook.class);
-                MinecraftForge.EVENT_BUS.register(com.gtceu.calcboard.client.gui.compat.ae2.ClientAe2PatternTermHook.class);
             }
         });
     }

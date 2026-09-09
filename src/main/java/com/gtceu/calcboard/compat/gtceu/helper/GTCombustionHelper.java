@@ -2,6 +2,7 @@ package com.gtceu.calcboard.compat.gtceu.helper;
 
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import net.minecraft.resources.ResourceLocation;
@@ -133,13 +134,19 @@ public final class GTCombustionHelper {
         if (node == null) {
             return false;
         }
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         if (node.getMachineIcon() != null && isCombustionEngine(node.getMachineIcon())) return true;
-        if (node.getMultiblockWorkstation() != null && isCombustionEngine(node.getMultiblockWorkstation())) return true;
+        if (node.isMultiblock() && node.getMultiblockWorkstation() != null && isCombustionEngine(node.getMultiblockWorkstation())) return true;
         return isLargeCombustionEngine(node) || isExtremeCombustionEngine(node) || isStarTModule(node);
     }
 
     public static boolean isLargeCombustionEngine(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         if (LARGE_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
             return true;
         }
@@ -154,6 +161,9 @@ public final class GTCombustionHelper {
 
     public static boolean isExtremeCombustionEngine(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         if (EXTREME_COMBUSTION_ENGINE.equals(node.getMachineIcon())) {
             return true;
         }
@@ -168,24 +178,36 @@ public final class GTCombustionHelper {
 
     public static boolean isStarTCombustionModule(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         return (node.getMachineIcon() != null && START_COMBUSTION_MODULES.contains(node.getMachineIcon()))
                 || (node.getMultiblockWorkstation() != null && START_COMBUSTION_MODULES.contains(node.getMultiblockWorkstation()));
     }
 
     public static boolean isStarTRocketModule(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         return (node.getMachineIcon() != null && START_ROCKET_MODULES.contains(node.getMachineIcon()))
                 || (node.getMultiblockWorkstation() != null && START_ROCKET_MODULES.contains(node.getMultiblockWorkstation()));
     }
 
     public static boolean isStarTModule(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         return (node.getMachineIcon() != null && START_MODULES.contains(node.getMachineIcon()))
                 || (node.getMultiblockWorkstation() != null && START_MODULES.contains(node.getMultiblockWorkstation()));
     }
 
     public static boolean isModularCombustionFrame(RecipeNode node) {
         if (node == null) return false;
+        if (node.getMachineIcon() != null && isSingleblockCombustionGenerator(node.getMachineIcon())) {
+            return false;
+        }
         return START_MCF.equals(node.getMachineIcon()) || START_MCF.equals(node.getMultiblockWorkstation());
     }
 
@@ -275,7 +297,7 @@ public final class GTCombustionHelper {
             node.setName(resolvedName);
         }
 
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) {
             adapter.onMachineIconChanged(node, oldIcon, targetMachine);
         }

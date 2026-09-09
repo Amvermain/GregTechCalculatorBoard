@@ -26,7 +26,7 @@ public class CoilAndReflectorHardwareGatingTest {
 
     @BeforeAll
     public static void setup() {
-        com.gtceu.calcboard.compat.ModAdapterRegistry.init();
+        com.gtceu.calcboard.api.spi.ModAdapterRegistry.init();
     }
 
     @Test
@@ -123,6 +123,8 @@ public class CoilAndReflectorHardwareGatingTest {
         ebf.setMultiblock(true);
         ebf.setMachineIcon(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
         ebf.setRecipeTemperature(1800);
+        ebf.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:hv_energy_hatch", "HV Energy Hatch", "", ResourceLocation.tryParse("gtceu:hv_energy_hatch"), GTVoltageTier.HV, 1, false, false, false));
 
         CoilHelper.installCoil(ebf, CoilHelper.getCoilForTemperature(1800));
         double initialEUt = ebf.getSingleMachineEUt();
@@ -194,6 +196,8 @@ public class CoilAndReflectorHardwareGatingTest {
         tungsten.setMultiblock(true);
         tungsten.setMachineIcon(ResourceLocation.tryParse("gtceu:electric_blast_furnace"));
         tungsten.getProperties().set(com.gtceu.calcboard.compat.gtceu.GTCEuProperties.EBF_TEMPERATURE, 3000); // Requires 3000K
+        tungsten.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon(
+                "gtceu:ev_energy_hatch", "EV Energy Hatch", "", ResourceLocation.tryParse("gtceu:ev_energy_hatch"), GTVoltageTier.EV, 1, false, false, false));
 
         // Installed: Cupronickel (1800K) -> Deficit!
         CoilHelper.installCoil(tungsten, CoilHelper.getCoilForTemperature(1800));

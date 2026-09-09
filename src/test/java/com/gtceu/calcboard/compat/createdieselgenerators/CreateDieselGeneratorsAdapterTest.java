@@ -4,9 +4,9 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.AfterEach;
@@ -101,7 +101,7 @@ public class CreateDieselGeneratorsAdapterTest {
     @DisplayName("CDG 레시피 세부사항 변환 검증 (Basin Fermenting & Distillation)")
     void testAdaptRecipeDetails() {
         // Basin Fermenting: Passive, 200 ticks fallback
-        EmiRecipeConverter.RecipeDetails fermentDetails = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails fermentDetails = new RecipeDetails();
         boolean handled = CDGRecipeHandler.adaptRecipeDetails(new DummyEmiRecipe(CDGRecipeHandler.CAT_BASIN_FERMENTING), null, fermentDetails);
         assertTrue(handled);
         assertEquals(EnergyType.NONE, fermentDetails.energyType);
@@ -109,14 +109,14 @@ public class CreateDieselGeneratorsAdapterTest {
         assertEquals(0.0, fermentDetails.eut);
 
         // Distillation: Passive, 100 ticks fallback
-        EmiRecipeConverter.RecipeDetails distDetails = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails distDetails = new RecipeDetails();
         boolean handledDist = CDGRecipeHandler.adaptRecipeDetails(new DummyEmiRecipe(CDGRecipeHandler.CAT_DISTILLATION), null, distDetails);
         assertTrue(handledDist);
         assertEquals(EnergyType.NONE, distDetails.energyType);
         assertEquals(100.0, distDetails.durationTicks);
 
         // Compression Molding: 256 SU @ 32 RPM, 100 ticks fallback
-        EmiRecipeConverter.RecipeDetails moldDetails = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails moldDetails = new RecipeDetails();
         boolean handledMold = CDGRecipeHandler.adaptRecipeDetails(new DummyEmiRecipe(CDGRecipeHandler.CAT_COMPRESSION_MOLDING), null, moldDetails);
         assertTrue(handledMold);
         assertEquals(EnergyType.KINETIC_SU, moldDetails.energyType);

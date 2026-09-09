@@ -1,7 +1,9 @@
 package com.gtceu.calcboard.compat.extension;
 
 /**
- * Marker interface for all modular capability extensions decoupled from the core IModAdapter SPI.
+ * Backward compatibility alias for {@link com.gtceu.calcboard.api.spi.extension.IModExtension}.
+ * @deprecated Use {@link com.gtceu.calcboard.api.spi.extension.IModExtension} directly.
  */
-public interface IModExtension {
+@Deprecated
+public interface IModExtension extends com.gtceu.calcboard.api.spi.extension.IModExtension {
 }

@@ -2,7 +2,6 @@
   "key.categories.gtcalcboard": "GregTech Calculator Board",
   "key.gtcalcboard.open_board": "Open Calculator Board",
   "key.gtcalcboard.add_recipe_to_board": "Add Recipe to Calculator Board",
-
   "gtcalcboard.chat.welcome.prefix": "[GT CalcBoard]",
   "gtcalcboard.chat.welcome.text": "Process calculator board is ready. Press %s or",
   "gtcalcboard.chat.welcome.open_button": "[▶ Open Board]",
@@ -483,28 +482,20 @@
   "gui.gtcalcboard.tutorial.step5_junction_desc": "[Left-Click] the bottom badge on the junction node to enter a target batch quantity (e.g. 1000 mB)! The estimated completion time (ET: 2.0s) calculates in real time based on steam inflow (500 mB/s). [Shift+Right-Click] to reset.",
   "gui.gtcalcboard.tutorial.step5_selector_title": "6. Machine & Multiblock Switch (Machine Selector)",
   "gui.gtcalcboard.tutorial.step5_selector_desc": "Click the [Machine Icon] at the top-left of the node to open the machine selector. Inspect the capability badges (Coil, Parallel Hatch, Rotor, etc.) and select the [Electric Blast Furnace] multiblock!",
-
   "gui.gtcalcboard.tutorial.step5_title": "7. Machine Hardware & Addon Configuration",
   "gui.gtcalcboard.tutorial.step5_desc": "Click the [⚙] config button on the turbine card! You can freely configure voltage tiers (LV~MAX), overclocking, coils, parallel hatches, and augment kits.",
-
   "gui.gtcalcboard.tutorial.step6_title": "8. Multi-Selection & Canvas Group Frames",
   "gui.gtcalcboard.tutorial.step6_desc": "Drag-select both the Boiler and Turbine nodes, then press [Ctrl + G]! A clean [Group Frame] will wrap them, allowing batch moving and [✦] theme color styling.",
-
   "gui.gtcalcboard.tutorial.step7_title": "9. Compound Module Packaging & Expand",
   "gui.gtcalcboard.tutorial.step7_desc": "Click the [▦] button on the frame header to compress the factory into a clean [Compound Module]! Click [⤢ Expand] anytime to restore the original wiring 100%.",
-
   "gui.gtcalcboard.tutorial.step8_title": "10. Shared Machine Time-Multiplexing",
   "gui.gtcalcboard.tutorial.step8_desc": "Select the 3 geode slicing cutter nodes and press [Ctrl + Shift + S]! The 3 fractional cutter workloads merge into a single physical LV Cutter (45.0% load) with accurate single-machine power.",
-
   "gui.gtcalcboard.tutorial.step9_title": "11. Multiblock BOM & Material Optimization",
   "gui.gtcalcboard.tutorial.step9_desc": "Click [▦ BOM] in the bottom status bar or press [Shift + B] / [M] to open the Multiblock BOM! Notice how the cutter hull and casings are counted exactly once for 1 machine instead of 3x duplicate hulls.",
-
   "gui.gtcalcboard.tutorial.step10_title": "12. Junction Supply (∞), Raw Depletion (DT) & Void",
   "gui.gtcalcboard.tutorial.step10_desc": "[Right-Click] the junction to open supply settings (or click [⚙ Configure Junction] in the right Inspector), then select [Infinite Supply (∞)] or [Fixed Rate]! This blocks upstream demand propagation, calculates stock Depletion Time (DT), or voids surplus byproducts.",
-
   "gui.gtcalcboard.tutorial.step11_title": "13. Folder Browser & Blueprint Management",
   "gui.gtcalcboard.tutorial.step11_desc": "Click the [📁] button on the left activity dock, [Page Name ▼] in the top toolbar, or press [Tab] to open the Folder Browser! Create nested subfolders, multi-select with Ctrl/Shift, drag & drop pages, and export/import full folder blueprints (GTFOLDER:...).",
-
   "gui.gtcalcboard.tutorial.completed_title": "Tutorial Complete!",
   "gui.gtcalcboard.tutorial.completed_desc": "Congratulations! You are now ready to design massive petrochemical, nuclear, and multi-tier GregTech factories! Revisit [Help] or [Tutorial] anytime.",
   "gui.gtcalcboard.tutorial.completed_tag": "[Complete]",
@@ -807,8 +798,10 @@
   "gui.gtcalcboard.node_warning.dt_multi_fluid_unsupported": "Distillation Tower requires 1x single-fluid output hatches per layer and does not support multi-fluid output hatches (%s).",
   "gui.gtcalcboard.node_warning.dt_excess_output_hatches": "Distillation Tower has %d output hatches installed, but this recipe only produces %d fluid fractions.",
   "gui.gtcalcboard.node_warning.fusion_energy_hatch_tier_mismatch": "Fusion Reactor (%s) requires matching energy hatch tier, but has %s hatch installed.",
+  "gui.gtcalcboard.node_warning.energy_hatch_missing": "Missing Energy Hatch (multiblock requires power input)",
   "gui.gtcalcboard.turbine_flow_deficit_warning": "Turbine requires 100%% %s flow (Current: %d%%)",
   "gui.gtcalcboard.node_badge.turbine_deficit": "⚠ Deficit",
+  "gui.gtcalcboard.node_badge.energy_hatch_missing": "No Power Hatch",
   "gui.gtcalcboard.node_badge.oxygen_boost": "Oxygen Boost Active",
   "gui.gtcalcboard.node_badge.liquid_oxygen_boost": "Liquid Oxygen Boost Active",
   "gui.gtcalcboard.turbine_deficit_title": "Turbine Input Flow Deficit",
@@ -1163,6 +1156,7 @@
   "gui.gtcalcboard.inspector.title": "Node Inspector",
   "gui.gtcalcboard.inspector.count": "Machine Count",
   "gui.gtcalcboard.inspector.tier": "Target Voltage Tier",
+  "gui.gtcalcboard.inspector.tier_locked_by_energy_hatch": "Voltage tier is locked by installed Energy Hatch (%s)",
   "gui.gtcalcboard.inspector.overclock": "Overclock Mode",
   "gui.gtcalcboard.inspector.machine_config": "Hardware & Addon Config",
   "gui.gtcalcboard.inspector.single_power": "Unit Power",
@@ -1265,5 +1259,18 @@
   "gui.gtcalcboard.summary.stress_deficit": "Stress Deficit: -%s SU",
   "gui.gtcalcboard.summary.rate": "Rate: %s",
   "gui.gtcalcboard.summary.fuel_burn_speed": "Fuel Burn Speed: %sx%s",
-  "gui.gtcalcboard.summary.steam_output": "Steam Output: %s mB/s (%s mB/t)"
+  "gui.gtcalcboard.summary.steam_output": "Steam Output: %s mB/s (%s mB/t)",
+  "gui.gtcalcboard.junction.split_mode_label": "Split Mode:",
+  "gui.gtcalcboard.junction.split_mode.proportional": "Proportional",
+  "gui.gtcalcboard.junction.split_mode.equal": "Equal Split",
+  "gui.gtcalcboard.junction.split_mode.priority": "Priority Split",
+  "gui.gtcalcboard.junction.priority_label": "Priority",
+  "gui.gtcalcboard.junction.proportional_tooltip": "Divides available flow proportionally based on consumer demand",
+  "gui.gtcalcboard.junction.equal_tooltip": "Divides available flow equally among outgoing branches",
+  "gui.gtcalcboard.junction.priority_tooltip": "Higher priority branches are satisfied first (AE2-style priority)",
+  "gui.gtcalcboard.toast.priority_changed": "Priority: %s",
+  "gui.gtcalcboard.tooltip.allocated_flow": "Allocated Flow",
+  "gui.gtcalcboard.tooltip.wire_priority": "Priority: %d",
+  "gui.gtcalcboard.tooltip.wire_priority_default": "Priority: 0 (Default)",
+  "gui.gtcalcboard.tooltip.wire_scroll_priority_hint": "[Mouse Wheel] Adjust Priority (+ / -)"
 }

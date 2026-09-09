@@ -10,7 +10,7 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
@@ -126,8 +126,8 @@ public final class GTCEuWorkstationResolver {
             result.sort((a, b) -> {
                 if (catId != null) {
                     String catPath = catId.getPath().toLowerCase(Locale.ROOT);
-                    boolean aMatch = a.getPath().toLowerCase(Locale.ROOT).contains(catPath);
-                    boolean bMatch = b.getPath().toLowerCase(Locale.ROOT).contains(catPath);
+                    boolean aMatch = a.equals(catId) || a.getPath().endsWith("_" + catPath);
+                    boolean bMatch = b.equals(catId) || b.getPath().endsWith("_" + catPath);
                     if (aMatch != bMatch) return aMatch ? -1 : 1;
                 }
 
@@ -288,7 +288,7 @@ public final class GTCEuWorkstationResolver {
 
         GTVoltageTier minTier = null;
         for (ResourceLocation ws : workstations) {
-            if (ws == null || EmiRecipeConverter.isDummyConditionMarker(ws) || EmiRecipeConverter.isIgnoredWorkstation(ws)) {
+            if (ws == null || RecipeConversionHelper.isDummyConditionMarker(ws) || RecipeConversionHelper.isIgnoredWorkstation(ws)) {
                 continue;
             }
             GTVoltageTier tier = extractVoltageTierFromIcon(ws);
@@ -300,6 +300,13 @@ public final class GTCEuWorkstationResolver {
     }
 
     public static GTVoltageTier sanitizeTargetTier(RecipeNode node, GTVoltageTier requestedTier) {
+        if (node != null && com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            GTVoltageTier hatchTier = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.getPrimaryEnergyHatchTier(node);
+            if (hatchTier != null) {
+                return hatchTier;
+            }
+        }
+
         GTVoltageTier tier = requestedTier != null ? requestedTier : (node != null ? node.getRecipeTier() : GTVoltageTier.ULV);
         if (node == null) return tier;
 
@@ -345,6 +352,9 @@ public final class GTCEuWorkstationResolver {
     }
 
     private static GTVoltageTier clampToWorkstationMinimumTier(RecipeNode node, GTVoltageTier tier) {
+        if (node.getRecipeTier() == GTVoltageTier.ULV && tier == GTVoltageTier.ULV) {
+            return tier;
+        }
         boolean isVanillaCooking = node.getRecipeCategoryId() != null && GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
         boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == EnergyType.NONE;
         if (isVanillaCooking || isPassiveOrSteam) {

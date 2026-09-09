@@ -57,6 +57,14 @@ public final class GTNodeValidator {
             }
         }
 
+        // 3. Electric Multiblock Energy Hatch Requirement Check
+        if (GTAddonCompatibilityHandler.requiresEnergyHatch(node) && !GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            if (warnings != null) {
+                warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_missing"));
+            }
+            valid = false;
+        }
+
         // 3. Turbine 100% Flow Fulfillment Check
         if (graph != null && GTTurbineHelper.isTurbine(node)) {
             for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {

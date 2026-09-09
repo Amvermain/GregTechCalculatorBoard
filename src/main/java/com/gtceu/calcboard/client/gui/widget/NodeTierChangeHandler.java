@@ -7,8 +7,8 @@ import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
@@ -20,6 +20,9 @@ public final class NodeTierChangeHandler {
 
     public static boolean changeTier(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction) {
         if (parent != null && !parent.ensureEditPermission()) return false;
+        if (com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            return false;
+        }
 
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null && adapter.isBoilerRecipe(node)) {

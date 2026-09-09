@@ -160,10 +160,19 @@ public class NodePropertyStore {
   - `getNodes()` 및 `getEdges()`는 불변 뷰를 반환하여 외부에서의 임의 조작(`graph.getNodes().add(...)`)을 금지하고, 반드시 전용 메서드(`addNode`, `removeNode`, `connect`, `disconnect`)를 통해서만 변경되도록 강제합니다.
 * **$O(1)$ 빠른 노드 색인 동기화 (`nodeMap`)**:
   - 노드 추가/삭제/클리어 시 내부 `Map<String, RecipeNode> nodeMap`이 완벽히 동기화되어 `getNode(id)` 질의를 $O(1)$ 시간에 보장합니다.
-* **`ConnectionEdge` 불변 레코드**:
+* **`ConnectionEdge` 불변 레코드 (ADR-041)**:
   ```java
-  public record ConnectionEdge(String fromNodeId, int outputIndex, String toNodeId, int inputIndex)
+  public record ConnectionEdge(
+      String fromNodeId,
+      int outputIndex,
+      String toNodeId,
+      int inputIndex,
+      double fixedFlowLimit,
+      int priority
+  )
   ```
+  - `fixedFlowLimit`: 해당 연결선을 통과할 수 있는 최대 고정 유량 한도 (음수 시 무제한).
+  - `priority`: 선로 우선순위 계층 (기본값 `0`). 상위 우선순위 선로부터 먼저 유량을 공급합니다.
 
 ---
 
@@ -183,21 +192,31 @@ public class NodePropertyStore {
 
 ---
 
-### 1.8 `SupplyMode` 및 외부 공급 유량 모델 (ADR-012)
-정션(Junction) 노드 및 원자재 공급점에 대해 무한 공급(Infinite) 또는 지정된 초당 고정 공급량(Fixed Rate)을 정의합니다.
+### 1.8 `SupplyMode` 및 `FlowSplitMode` (유량 공급 & 분기 모델, ADR-012, ADR-019, ADR-041)
+정션(Junction) 노드 및 원자재 공급점에 대해 공급 및 배출 방식을 정의합니다.
 
 ```java
 public enum SupplyMode {
     NONE,         // 외부 공급 없음 (상류 연결 노드의 생산 유량에만 의존)
     INFINITE,     // 무한 자원 공급 (상류 요구량 전파를 차단하고 하류 수요를 100% 충족)
-    FIXED_RATE    // 초당 고정 수량 공급 (지정된 externalSupplyRate 만큼 공급 충당)
+    FIXED_RATE,   // 초당 고정 수량 공급 (지정된 externalSupplyRate 만큼 공급 충당)
+    VOID_SINK,    // 무한 폐기 싱크 (유입되는 모든 잉여 자원을 소각/삭제)
+    FIXED_DRAIN   // 고정 유량 배출 (지정된 수량만큼 하류로 강제 배출)
 }
 ```
 
-* **`RecipeNode` 외부 공급 속성**:
+```java
+public enum FlowSplitMode {
+    PROPORTIONAL, // 하류 연결선들의 요구량에 비례하여 유량 배분
+    EQUAL         // 하류 연결선 수(1/N)에 따라 균등하게 유량 분할
+}
+```
+
+* **`RecipeNode` 외부 공급 및 분기 속성**:
   - `supplyMode` (`SupplyMode`, 기본값 `NONE`): 노드의 외부 공급 모드.
-  - `externalSupplyRate` (`double`, 기본값 `0.0`): `FIXED_RATE` 모드 시 초당 고정 공급 수량 (단위: items/s 또는 mB/s).
+  - `externalSupplyRate` (`double`, 기본값 `0.0`): `FIXED_RATE` 또는 `FIXED_DRAIN` 모드 시 초당 고정 수량.
   - `customParallel` (`int`, 기본값 `0`): 사용자가 수동 지정한 커스텀 병렬 수치.
+  - `NodeProperties.JUNCTION_SPLIT_MODE` (`FlowSplitMode`, 기본값 `PROPORTIONAL`): 정션 노드의 하류 분기 방식.
 
 ---
 

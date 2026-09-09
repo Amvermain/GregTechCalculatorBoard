@@ -4,8 +4,9 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.compat.start.helper.RecipeNodeThreadingHelper;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -132,9 +133,9 @@ public class ActiveAddonsView {
                 for (MachineAddon a : toRemove) {
                     adapter.handleUninstallAddon(node, a);
                 }
-                if (node.getThreadingConfig() != null) {
-                    node.getThreadingConfig().getHelixCounts().clear();
-                    node.getThreadingConfig().reset();
+                if (RecipeNodeThreadingHelper.hasThreading(node)) {
+                    RecipeNodeThreadingHelper.getThreadingConfig(node).getHelixCounts().clear();
+                    RecipeNodeThreadingHelper.getThreadingConfig(node).reset();
                 }
                 node.getAddons().clear();
                 node.setRotorEfficiency(100);

@@ -7,7 +7,7 @@
 > 📘 **Detailed Technical Specification Series**:
 > * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> The complete v2.2.0-beta.1 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
+> The complete v2.2.0-beta.2 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
 
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer (SPI) of **GregTech Calculator Board**.
 
@@ -41,17 +41,16 @@ graph TD
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec, RecipeNodeSerializer)"]
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
         Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, CanvasGroupFrame, NodeRateCalculator, NodeWorkstationResolver)"]
-        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowEdgeAllocator, FlowGraphModuleHandler)"]
         Linear["solver.linear.* (TwoStageLinearFlowSolver, GaussJordanEliminator, LinearEquationSystem)"]
         Stability["solver.* (ProcessStabilityAnalyzer, HarmonizedRatioOptimizer, AutoRatioEngine)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory, MultiblockDetector)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode, AutoRatioMode)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode, FlowSplitMode)"]
         Prop["property.* (NodeProperties, NodePropertyStore, NodeBadgeRegistry)"]
+        SPI["spi.* (ModAdapterRegistry, IModAdapter, IModExtension, Providers)"]
     end
 
-    subgraph Compat["3. Mod Compatibility Common SPI (com.gtceu.calcboard.compat)"]
-        MAR["ModAdapterRegistry (Priority Dynamic Routing SPI)"]
-        IMA["IModAdapter & Extension Object Providers (Energy, Recipe, Addon, BOM, Booster, Capability)"]
+    subgraph Compat["3. Mod Compatibility Implementations (com.gtceu.calcboard.compat)"]
         subgraph Adapters["Domain Mod Adapters (100% Headless Safe)"]
             GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, physics.GTFusionHelper, helper.GTCombustionHelper, BOMResolver)"]
             CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, Kinetic Machines)"]
@@ -63,8 +62,7 @@ graph TD
             ST["start (StarTReflectionBridge, Plasma Turbines, Threading Helix Structures, SPT/NPT Traits)"]
             VN["vanilla (Passive Unpowered Fallback)"]
         end
-        MAR --> IMA
-        IMA --> Adapters
+        SPI --> Adapters
     end
 
     subgraph ServerNet["4. Multiplayer Server & Network (server / network)"]
@@ -151,6 +149,22 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 ### 2.10 Two-Stage Linear Flow Balance Solver & Junction Anchoring (ADR-034 & ADR-035)
 * **Two-Stage Linear Flow Solver (`TwoStageLinearFlowSolver`)**: Combines continuous Gauss-Jordan flow solving with integer ceiling quantization to achieve single-click deterministic mass balance convergence across complex cyclic networks.
 * **Junction Buffer Wiring & Anchoring**: Enables port context dragging for 1-click creation of surplus drain, deficit supply, and void sink junctions, alongside pinning fixed junction nodes as anchors to drive upstream/downstream rate calculations.
+
+### 2.11 Domain Purity & SPI Separation (`com.gtceu.calcboard.api.spi`, ADR-037)
+* **SPI Decoupling**: Relocated `ModAdapterRegistry` and `IModAdapter` to `api.spi` to eliminate reverse architectural dependencies between API and compat layers.
+* **Pure Domain Models**: Completely stripped third-party mod field artifacts from `RecipeNode`, managing mode states, validation, and energy models strictly through SPI adapters and `NodePropertyStore`.
+
+### 2.12 Simulation Purity & Invariant Protection (ADR-038)
+* **Zero Side-Effect Solvers**: Guarantees mathematical calculation purity with 0 mutation of node ports or topology during graph evaluation.
+* **Compound Module Scale Preservation**: Restores sub-process node scaling factors deterministically across module collapse and expand lifecycles.
+
+### 2.13 Precision Cache Invalidation & Rendering Lifecycle (ADR-039)
+* **Isolated Invalidation Boundaries**: Dragging, resizing, or recoloring sticky notes and group frames updates local visual bounds without triggering global flow balance recalculation or node card text cache eviction.
+* **Cached Reflection & Search Acceleration**: Eliminates per-frame keyboard focus reflection overhead in recipe viewers (JEI/EMI) and leverages pre-indexed spatial bounds for immediate frame and auto-connect lookups.
+
+### 2.14 Equal Splitting & Hierarchical Priority Flow Allocation (ADR-041)
+* **Dual Split Modes (`FlowSplitMode`)**: Supports `PROPORTIONAL` (demand-weighted) and `EQUAL` ($1/N$ mechanical division) split modes on junction nodes.
+* **Hierarchical Priority Cascades (`FlowEdgeAllocator`)**: Wires carry an integer `priority` tier; higher-priority consumers are satisfied first, while residual flow within each priority tier is distributed according to the junction's split mode.
 
 ---
 

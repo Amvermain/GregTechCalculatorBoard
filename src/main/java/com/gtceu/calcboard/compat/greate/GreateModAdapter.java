@@ -7,7 +7,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.create.AbstractKineticModAdapter;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -111,7 +111,7 @@ public class GreateModAdapter extends AbstractKineticModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         ResourceLocation categoryId = getEmiCategoryId(emiRecipe);
         boolean isGreateCategory = categoryId != null && MOD_ID.equals(categoryId.getNamespace());
 

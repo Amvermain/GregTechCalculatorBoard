@@ -303,14 +303,10 @@ public class AutoConnectFilterDialog implements IBoardModal {
         graphics.pose().translate(0, 0, 700.0f);
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        // 1. Semi-transparent backdrop
         graphics.fill(0, 0, screenW, screenH, 0x88000000);
-
-        // 2. Main Box Background & Border
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xF5161C26);
         graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4B66);
 
-        // 3. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
         graphics.drawString(font, "§e↔ " + Component.translatable("gui.gtcalcboard.dialog.auto_connect.title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
@@ -322,11 +318,9 @@ public class AutoConnectFilterDialog implements IBoardModal {
         graphics.renderOutline(closeX, closeY, 16, 16, closeHover ? 0xFFFF4444 : 0xFF4A5A78);
         graphics.drawCenteredString(font, "✕", closeX + 8, closeY + 4, closeHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        // 4. Subtitle & Quick Selection Bar
         int subY = dialogY + 28;
         graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.dialog.auto_connect.desc").getString(), dialogX + 10, subY + 2, 0xFFAAAAAA, false);
 
-        // Select All / Deselect All Buttons
         int selAllW = 74;
         int deselAllW = 82;
         int btnH = 14;
@@ -336,7 +330,6 @@ public class AutoConnectFilterDialog implements IBoardModal {
         drawSmallBtn(graphics, font, Component.translatable("gui.gtcalcboard.dialog.auto_connect.select_all").getString(), selAllX, subY, selAllW, btnH, mouseX, mouseY, 0xFF55FF88, 0xFF1C3524, 0xFF2A5A38);
         drawSmallBtn(graphics, font, Component.translatable("gui.gtcalcboard.dialog.auto_connect.deselect_all").getString(), deselAllX, subY, deselAllW, btnH, mouseX, mouseY, 0xFFFF7777, 0xFF3D1C1C, 0xFF5A2A2A);
 
-        // 5. Scrollable Candidate Item List
         int listX = dialogX + 8;
         int listY = subY + 18;
         int listW = dialogW - 16;
@@ -363,7 +356,6 @@ public class AutoConnectFilterDialog implements IBoardModal {
                 graphics.renderOutline(listX + 2, curY, listW - 10, rowH - 2, 0xFF4A6080);
             }
 
-            // Checkbox
             int chkX = listX + 6;
             int chkY = curY + 3;
             graphics.fill(chkX, chkY, chkX + 12, chkY + 12, entry.isSelected() ? 0xFF1E4D2B : 0xFF222833);
@@ -409,7 +401,6 @@ public class AutoConnectFilterDialog implements IBoardModal {
             graphics.fill(sbX, thumbY, sbX + 3, thumbY + thumbH, 0xFFAAAAAA);
         }
 
-        // 6. Bottom Action Buttons
         int selectedWireCount = getSelectedWireCount();
         int bottomBtnH = 20;
         int bottomBtnY = dialogY + dialogH - bottomBtnH - 8;

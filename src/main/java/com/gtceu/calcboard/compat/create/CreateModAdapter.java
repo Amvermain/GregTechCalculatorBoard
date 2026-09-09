@@ -6,38 +6,43 @@ import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
-import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
-import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
+import com.gtceu.calcboard.compat.create.extractor.CreateKineticRpmExtractor;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
+import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLLoader;
 
-import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * Mod Adapter facade for Create kinetic generators and processing machinery.
  */
-public class CreateModAdapter extends AbstractKineticModAdapter implements IHardwareAddonProvider {
+public class CreateModAdapter extends AbstractKineticModAdapter implements IHardwareAddonProvider, IMultiblockBOMProvider {
 
-    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
             IEnergySimulationProvider.class,
             ICompoundRecipeProvider.class,
             ICapabilityMatrixProvider.class,
-            IHardwareAddonProvider.class
+            IHardwareAddonProvider.class,
+            IMultiblockBOMProvider.class
     );
 
     @Override
-    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
         return SUPPORTED_EXTENSIONS;
     }
 
@@ -98,6 +103,11 @@ public class CreateModAdapter extends AbstractKineticModAdapter implements IHard
     }
 
     @Override
+    public void initialize() {
+        com.gtceu.calcboard.api.property.RecipePropertyExtractorPipeline.register(new CreateKineticRpmExtractor());
+    }
+
+    @Override
     public boolean handlesNode(RecipeNode node) {
         if (node == null) return false;
         if (node.getMachineIcon() != null && "greate".equals(node.getMachineIcon().getNamespace())) return false;
@@ -108,7 +118,7 @@ public class CreateModAdapter extends AbstractKineticModAdapter implements IHard
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         return CreateRecipeHandler.adaptRecipeDetails(emiRecipe, backingRecipe, details);
     }
 
@@ -122,7 +132,7 @@ public class CreateModAdapter extends AbstractKineticModAdapter implements IHard
     ) {
         if (backingRecipe == null) return null;
         if (CreateSequencedRecipeExtractor.isSequencedRecipe(backingRecipe)) {
-            String machineName = preferredWorkstation != null ? EmiRecipeConverter.formatName(preferredWorkstation.getPath()) : "Sequenced Assembly";
+            String machineName = preferredWorkstation != null ? RecipeConversionHelper.formatName(preferredWorkstation.getPath()) : "Sequenced Assembly";
             ResourceLocation icon = preferredWorkstation != null ? preferredWorkstation : ResourceLocation.tryParse("create:sequenced_assembly");
             return CreateSequencedRecipeExtractor.buildCompoundCluster(
                     backingRecipe, machineName, icon, GTVoltageTier.ULV, startX, startY
@@ -225,6 +235,56 @@ public class CreateModAdapter extends AbstractKineticModAdapter implements IHard
     @Override
     public void collectNativeCatalogRecipes(List<SearchableRecipe> collector) {
         CreateRecipeHandler.collectNativeCatalogRecipes(collector);
+    }
+
+    private static final ResourceLocation ITEM_FLUID_TANK = ResourceLocation.tryParse("create:fluid_tank");
+    private static final ResourceLocation ITEM_STEAM_ENGINE = ResourceLocation.tryParse("create:steam_engine");
+
+    @Override
+    public void populateExtraBOMParts(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts) {
+        if (node == null || parts == null) return;
+        if (!CreateProperties.isCreateBoiler(node)) return;
+
+        int sizeBlocks = node.getProperties().get(CreateProperties.BOILER_SIZE_BLOCKS);
+        if (sizeBlocks > 0) {
+            String tankName = com.gtceu.calcboard.api.bom.BOMDisplayNameResolver.resolve(ITEM_FLUID_TANK, "Fluid Tank");
+            parts.add(new com.gtceu.calcboard.api.bom.MultiblockStructurePart(
+                    ITEM_FLUID_TANK,
+                    tankName,
+                    sizeBlocks,
+                    com.gtceu.calcboard.api.bom.PartCategory.CASING
+            ));
+        }
+
+        int level = node.getProperties().get(CreateProperties.BOILER_LEVEL);
+        int requiredEngines = Math.max(1, level);
+        if (requiredEngines > 1) {
+            updateEngineControllerPartAmount(node, parts, requiredEngines);
+        }
+    }
+
+    private void updateEngineControllerPartAmount(RecipeNode node, List<com.gtceu.calcboard.api.bom.MultiblockStructurePart> parts, int requiredEngines) {
+        ResourceLocation icon = node.getMachineIcon();
+        for (int i = 0; i < parts.size(); i++) {
+            com.gtceu.calcboard.api.bom.MultiblockStructurePart p = parts.get(i);
+            if (p.category() == com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER && Objects.equals(p.itemId(), icon)) {
+                parts.set(i, new com.gtceu.calcboard.api.bom.MultiblockStructurePart(
+                        p.itemId(),
+                        p.displayName(),
+                        requiredEngines,
+                        p.category()
+                ));
+                return;
+            }
+        }
+    }
+
+    @Override
+    public com.gtceu.calcboard.api.bom.PartCategory classifyBOMPart(ResourceLocation itemId) {
+        if (itemId == null) return null;
+        if (ITEM_FLUID_TANK.equals(itemId)) return com.gtceu.calcboard.api.bom.PartCategory.CASING;
+        if (ITEM_STEAM_ENGINE.equals(itemId)) return com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER;
+        return null;
     }
 }
 

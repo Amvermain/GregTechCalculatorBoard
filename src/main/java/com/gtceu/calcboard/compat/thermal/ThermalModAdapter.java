@@ -12,14 +12,15 @@ import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
 
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
-import com.gtceu.calcboard.compat.extension.ICompoundRecipeProvider;
-import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
-import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.ICompoundRecipeProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
 import com.gtceu.calcboard.compat.thermal.addon.ThermalAugmentAddon;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -34,7 +35,7 @@ import java.util.Set;
  */
 public class ThermalModAdapter implements IModAdapter {
 
-    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
             IHardwareAddonProvider.class,
             IEnergySimulationProvider.class,
             ICompoundRecipeProvider.class,
@@ -42,7 +43,7 @@ public class ThermalModAdapter implements IModAdapter {
     );
 
     @Override
-    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
         return SUPPORTED_EXTENSIONS;
     }
 
@@ -177,8 +178,13 @@ public class ThermalModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         return ThermalRecipeHandler.adaptRecipeDetails(emiRecipeObj, backing, details);
+    }
+
+    @Override
+    public boolean isThermalMachine(RecipeNode node) {
+        return ThermalAugmentHelper.isThermalMachine(node);
     }
 
     public static long extractEnergyRF(Object backing) {

@@ -105,7 +105,9 @@ public class CanvasNoteInteractionHandler {
                     note.getContent(), note.getContent(),
                     oldColor, note.getColor()
             ));
-            screen.markSummaryDirty();
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
             Minecraft.getInstance().getSoundManager().play(
                     SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.2F)
             );
@@ -303,7 +305,9 @@ public class CanvasNoteInteractionHandler {
                 ));
             }
             resizingNote = null;
-            screen.markSummaryDirty();
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
             return true;
         }
 
@@ -354,8 +358,21 @@ public class CanvasNoteInteractionHandler {
 
         if (!nodeDeltas.isEmpty() || !noteDeltas.isEmpty() || !frameDeltas.isEmpty()) {
             screen.recordCommand(new BoardCommand.MoveComponentsCommand(nodeDeltas, noteDeltas, frameDeltas));
-            screen.markSummaryDirty();
+            boolean needsSummary = !nodeDeltas.isEmpty() || hasSharedFrameDelta(graph, frameDeltas.keySet());
+            if (needsSummary) {
+                screen.markSummaryDirty();
+            } else if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
         }
         dragStartPositions.clear();
+    }
+
+    private boolean hasSharedFrameDelta(FlowGraph graph, Set<String> frameIds) {
+        for (String fid : frameIds) {
+            CanvasGroupFrame f = graph.findFrameById(fid);
+            if (f != null && f.isSharedMachineFrame()) return true;
+        }
+        return false;
     }
 }

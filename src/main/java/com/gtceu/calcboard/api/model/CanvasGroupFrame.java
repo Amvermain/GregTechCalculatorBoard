@@ -502,13 +502,6 @@ public class CanvasGroupFrame {
             // Node Property Store
             target.getProperties().copyFrom(sourceNode.getProperties());
 
-            // Threading Config
-            if (sourceNode.getThreadingConfig() != null) {
-                target.setThreadingConfig(sourceNode.getThreadingConfig().copy());
-            } else {
-                target.setThreadingConfig(null);
-            }
-
             // Turbine & Boiler Specifics
             target.setRotorName(sourceNode.getRotorName());
             target.setRotorEfficiency(sourceNode.getRotorEfficiency());

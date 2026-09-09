@@ -5,6 +5,8 @@
 </p>
 
 <p align="center">
+  <a href="https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board"><img src="https://img.shields.io/curseforge/dt/1656634?logo=curseforge&logoColor=white&color=f16436&label=CurseForge" alt="CurseForge"></a>
+  <a href="https://modrinth.com/mod/gtcalcboard"><img src="https://img.shields.io/modrinth/dt/gtcalcboard?logo=modrinth&logoColor=white&color=00AF5C&label=Modrinth" alt="Modrinth"></a>
   <img src="https://img.shields.io/badge/Minecraft-1.20.1-brightgreen.svg" alt="Minecraft 1.20.1">
   <img src="https://img.shields.io/badge/Loader-Forge%2047.2.0+-orange.svg" alt="Forge">
   <img src="https://img.shields.io/badge/GregTech-CEu%20Modern-blue.svg" alt="GTCEu Modern">
@@ -115,6 +117,13 @@ An in-game node graph calculator and flowchart editor for GregTech CEu Modern, E
 
 ---
 
+## Downloads
+
+- **CurseForge**: [GregTech Calculator Board - Minecraft Mods - CurseForge](https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board)
+- **Modrinth**: [GTCalcBoard - Minecraft Mod](https://modrinth.com/mod/gtcalcboard)
+
+---
+
 ## Installation & Server Compatibility
 
 GregTech Calculator Board is completely optional on both client and server sides:
@@ -155,7 +164,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-beta.1.jar`.
+The compiled jar will be located in `build/libs/gtcalcboard-1.20.1-2.2.0-beta.2.jar`.
 
 ---
 

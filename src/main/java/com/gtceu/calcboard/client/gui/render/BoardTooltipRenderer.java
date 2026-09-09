@@ -3,6 +3,7 @@ package com.gtceu.calcboard.client.gui.render;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowEdgeAllocator;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.CanvasInteractionHandler;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
@@ -109,6 +110,10 @@ public final class BoardTooltipRenderer {
             return;
         }
 
+        if (renderWireTooltip(screen, graphics, font, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
+            return;
+        }
+
         if (screen.getSummaryOverlay() != null) {
             screen.getSummaryOverlay().renderTooltips(graphics, font, mouseX, mouseY);
         }
@@ -156,7 +161,10 @@ public final class BoardTooltipRenderer {
         if (NodeControlsTooltipRenderer.renderCountBoxTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
             return true;
         }
-        return NodeControlsTooltipRenderer.renderMachineConfigTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY);
+        if (NodeControlsTooltipRenderer.renderMachineConfigTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
+            return true;
+        }
+        return renderInactiveHeaderTooltip(screen, graphics, font, widget, graph, canvasMouseX, canvasMouseY, mouseX, mouseY);
     }
 
     private static boolean renderWidgetHeaderButtons(BoardScreen screen, GuiGraphics graphics, Font font, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
@@ -184,6 +192,24 @@ public final class BoardTooltipRenderer {
         return false;
     }
 
+    private static boolean renderInactiveHeaderTooltip(BoardScreen screen, GuiGraphics graphics, Font font, NodeWidget widget, FlowGraph graph, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        if (!widget.isHeaderHovered(canvasMouseX, canvasMouseY)) {
+            return false;
+        }
+        RecipeNode n = widget.getNode();
+        if (n.isOperational(graph)) {
+            return false;
+        }
+        List<Component> tooltipLines = new ArrayList<>();
+        tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()));
+        List<Component> warnings = n.getOperationalWarnings(graph);
+        for (Component w : warnings) {
+            tooltipLines.add(Component.literal("§c❌ ").append(w));
+        }
+        renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
+        return true;
+    }
+
     private static boolean renderMachineIconTooltip(BoardScreen screen, GuiGraphics graphics, Font font, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
         if (!widget.isMachineIconHovered(canvasMouseX, canvasMouseY)) {
             return false;
@@ -192,6 +218,13 @@ public final class BoardTooltipRenderer {
         List<Component> tooltipLines = new ArrayList<>();
         String mName = n.getMachineDisplayName();
         tooltipLines.add(Component.literal((n.isMultiblock() ? "§e▦ " : "§b⚡ ") + mName));
+        if (!n.isOperational(screen.getGraph())) {
+            tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()));
+            List<Component> warnings = n.getOperationalWarnings(screen.getGraph());
+            for (Component w : warnings) {
+                tooltipLines.add(Component.literal("§c❌ ").append(w));
+            }
+        }
         tooltipLines.add(Component.literal("§7[Click]: §f" + Component.translatable("gui.gtcalcboard.tooltip.switch_machine_hint").getString()));
         renderComponentTooltip(graphics, font, tooltipLines, mouseX, mouseY, screen.width, screen.height);
         return true;
@@ -234,6 +267,66 @@ public final class BoardTooltipRenderer {
         } else {
             renderTooltip(graphics, font, Component.translatable(hintKey), mouseX, mouseY, screen.width, screen.height);
         }
+    }
+
+    private static boolean renderWireTooltip(BoardScreen screen, GuiGraphics graphics, Font font, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        if (mouseY < screen.getHeaderBottomY()) return false;
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+        FlowGraph.ConnectionEdge edge = screen.findHoveredWire(canvasMouseX, canvasMouseY, 8.0);
+        if (edge == null) return false;
+
+        RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+        RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+        if (fromNode == null || toNode == null) return false;
+
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.literal("§b⚡ " + fromNode.getMachineDisplayName() + " §7→ §f" + toNode.getMachineDisplayName()));
+
+        IngredientStack stack = resolveWireIngredient(fromNode, edge.outputIndex(), toNode, edge.inputIndex());
+        if (stack != null) {
+            lines.add(Component.literal("§f" + stack.getDisplayName()));
+        }
+
+        double allocatedFlow = FlowEdgeAllocator.getEdgeAllocatedFlow(graph, edge, null);
+        String flowStr = FormatUtil.formatRate(allocatedFlow, stack);
+        double demand = (!toNode.isVoidSink()) ? FlowEdgeAllocator.getConnectedConsumerDemand(graph, toNode, edge.inputIndex()) : 0.0;
+        if (demand > 0.0001) {
+            String demandStr = FormatUtil.formatRate(demand, stack);
+            double pct = Math.min(100.0, (allocatedFlow / demand) * 100.0);
+            String pctColor = (allocatedFlow >= demand - 0.0001) ? "§a" : "§e";
+            lines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.allocated_flow").getString() + ": " + pctColor + flowStr + " §8/ §7" + demandStr + " §8(" + pctColor + String.format(java.util.Locale.ROOT, "%.1f%%", pct) + "§8)"));
+        } else {
+            lines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.allocated_flow").getString() + ": §a" + flowStr));
+        }
+
+        if (edge.priority() > 0) {
+            lines.add(Component.literal("§6★ " + Component.translatable("gui.gtcalcboard.tooltip.wire_priority", edge.priority()).getString()));
+        } else {
+            lines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.wire_priority_default").getString()));
+        }
+
+        if (edge.hasFixedLimit()) {
+            String limitStr = FormatUtil.formatRate(edge.fixedFlowLimit(), stack);
+            lines.add(Component.literal("§e⌖ " + Component.translatable("gui.gtcalcboard.junction.fixed_limit").getString() + ": §f" + limitStr));
+        }
+
+        lines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.wire_scroll_priority_hint").getString()));
+        renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
+        return true;
+    }
+
+    private static IngredientStack resolveWireIngredient(RecipeNode fromNode, int outputIndex, RecipeNode toNode, int inputIndex) {
+        if (fromNode.isReroute() && fromNode.getRerouteIngredient() != null) {
+            return fromNode.getRerouteIngredient();
+        }
+        if (outputIndex >= 0 && outputIndex < fromNode.getOutputs().size()) {
+            return fromNode.getOutputs().get(outputIndex);
+        }
+        if (toNode != null && inputIndex >= 0 && inputIndex < toNode.getInputs().size()) {
+            return toNode.getInputs().get(inputIndex);
+        }
+        return null;
     }
 
     public static String formatPortRate(double rate, IngredientStack stack, boolean showExact, boolean[] hiddenExactRef) {

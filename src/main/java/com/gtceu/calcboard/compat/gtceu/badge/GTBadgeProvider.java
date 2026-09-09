@@ -12,6 +12,7 @@ import com.gtceu.calcboard.api.util.NumberFormatUtil;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
+import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -136,6 +137,20 @@ public final class GTBadgeProvider {
                         Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.turbine_deficit_title").getString()),
                         Component.literal("§7" + Component.translatable("gui.gtcalcboard.turbine_deficit_desc").getString()),
                         Component.literal("§c❌ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString())
+                );
+                return List.of(new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
+            }
+            return List.of();
+        });
+
+        // 4b. Missing Energy Hatch Badge Provider
+        NodeBadgeRegistry.register((node, store) -> {
+            if (node == null) return List.of();
+            if (GTAddonCompatibilityHandler.requiresEnergyHatch(node) && !GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+                String badgeText = "⚡ ⚠ " + Component.translatable("gui.gtcalcboard.node_badge.energy_hatch_missing").getString();
+                List<Component> tooltip = List.of(
+                        Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()),
+                        Component.literal("§c❌ " + Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_missing").getString())
                 );
                 return List.of(new NodeBadge(badgeText, 0xFFFF5555, 0xEE3D1E1E, 0xFFFF5555, tooltip, true));
             }

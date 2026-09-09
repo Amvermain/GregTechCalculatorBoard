@@ -29,6 +29,11 @@ public final class NodeProperties {
             NodePropertyKey.ofBoolean("is_generic_unsupported", false)
     );
 
+    // Steam Mode Property (RFC-037)
+    public static final NodePropertyKey<com.gtceu.calcboard.api.type.SteamMode> STEAM_MODE = register(
+            NodePropertyKey.ofEnum("steam_mode", com.gtceu.calcboard.api.type.SteamMode.class, com.gtceu.calcboard.api.type.SteamMode.NONE)
+    );
+
     // Compound / Layered Recipe Properties
     public static final NodePropertyKey<String> COMPOUND_GROUP_ID = register(
             NodePropertyKey.ofString("compound_group_id", "")
@@ -49,6 +54,9 @@ public final class NodeProperties {
     );
     public static final NodePropertyKey<Double> JUNCTION_BUFFER_SIZE = register(
             NodePropertyKey.ofDouble("junction_buffer_size", 0.0)
+    );
+    public static final NodePropertyKey<com.gtceu.calcboard.api.type.FlowSplitMode> JUNCTION_SPLIT_MODE = register(
+            NodePropertyKey.ofEnum("junction_split_mode", com.gtceu.calcboard.api.type.FlowSplitMode.class, com.gtceu.calcboard.api.type.FlowSplitMode.PROPORTIONAL)
     );
 
     // Auto-Ratio Recirculation Divergence Properties (RFC-032 / RFC-033)

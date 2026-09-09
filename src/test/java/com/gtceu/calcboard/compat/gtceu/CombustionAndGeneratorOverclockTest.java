@@ -405,6 +405,7 @@ public class CombustionAndGeneratorOverclockTest {
         lvNode.getAvailableWorkstations().add(GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
         adapter.onMachineIconChanged(lvNode, null, GTCombustionHelper.LV_COMBUSTION);
 
+        Assertions.assertTrue(lvNode.isGenerator());
         Assertions.assertFalse(lvNode.isMultiblock());
         Assertions.assertFalse(adapter.supportsAddons(lvNode));
 
@@ -427,6 +428,7 @@ public class CombustionAndGeneratorOverclockTest {
         lceNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
         adapter.onMachineIconChanged(lceNode, null, GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
 
+        Assertions.assertTrue(lceNode.isGenerator());
         Assertions.assertTrue(lceNode.isMultiblock());
         Assertions.assertTrue(adapter.supportsAddons(lceNode));
         Assertions.assertTrue(adapter.isAddonCompatible(lceNode, oxygenBoost));
@@ -437,6 +439,7 @@ public class CombustionAndGeneratorOverclockTest {
         eceNode.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:combustion_generator"));
         adapter.onMachineIconChanged(eceNode, null, GTCombustionHelper.EXTREME_COMBUSTION_ENGINE);
 
+        Assertions.assertTrue(eceNode.isGenerator());
         Assertions.assertTrue(eceNode.isMultiblock());
         Assertions.assertTrue(adapter.supportsAddons(eceNode));
         Assertions.assertFalse(adapter.isAddonCompatible(eceNode, oxygenBoost));
@@ -719,5 +722,40 @@ public class CombustionAndGeneratorOverclockTest {
         // Auxiliary oxygen must be cleaned up, fuel remains
         Assertions.assertEquals(1, lce.getInputs().size());
         Assertions.assertEquals(fuel, lce.getInputs().get(0));
+        Assertions.assertFalse(lce.isGenerator(), "Mixer must not be a generator");
+    }
+
+    @Test
+    void testSingleblockCombustionGeneratorTransitions() {
+        RecipeNode node = new RecipeNode("sb-comb-test", "Combustion Transition", 100.0, 32.0, GTVoltageTier.LV);
+        ResourceLocation macerator = ResourceLocation.tryParse("gtceu:lv_macerator");
+        node.setMachineIcon(macerator);
+        adapter.onMachineIconChanged(node, null, macerator);
+        Assertions.assertFalse(node.isGenerator(), "Macerator must not be a generator");
+        Assertions.assertFalse(node.isMultiblock());
+
+        // Switch to singleblock LV combustion generator
+        node.setMachineIcon(GTCombustionHelper.LV_COMBUSTION);
+        adapter.onMachineIconChanged(node, macerator, GTCombustionHelper.LV_COMBUSTION);
+        Assertions.assertTrue(node.isGenerator(), "Singleblock combustion generator must be a generator");
+        Assertions.assertFalse(node.isMultiblock(), "Singleblock combustion generator must not be a multiblock");
+
+        // Switch to Large Combustion Engine
+        node.setMachineIcon(GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        adapter.onMachineIconChanged(node, GTCombustionHelper.LV_COMBUSTION, GTCombustionHelper.LARGE_COMBUSTION_ENGINE);
+        Assertions.assertTrue(node.isGenerator(), "LCE must be a generator");
+        Assertions.assertTrue(node.isMultiblock(), "LCE must be a multiblock");
+
+        // Switch back to singleblock LV combustion generator
+        node.setMachineIcon(GTCombustionHelper.LV_COMBUSTION);
+        adapter.onMachineIconChanged(node, GTCombustionHelper.LARGE_COMBUSTION_ENGINE, GTCombustionHelper.LV_COMBUSTION);
+        Assertions.assertTrue(node.isGenerator(), "Singleblock LV generator must remain a generator");
+        Assertions.assertFalse(node.isMultiblock(), "Singleblock LV generator must not be a multiblock");
+
+        // Switch back to macerator
+        node.setMachineIcon(macerator);
+        adapter.onMachineIconChanged(node, GTCombustionHelper.LV_COMBUSTION, macerator);
+        Assertions.assertFalse(node.isGenerator(), "Switching to consumer must reset generator flag to false");
+        Assertions.assertFalse(node.isMultiblock());
     }
 }

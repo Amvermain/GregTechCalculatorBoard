@@ -114,5 +114,20 @@ public final class RecipeViewerRegistry {
         }
         return false;
     }
+
+    public static boolean isAnyViewerScreen(net.minecraft.client.gui.screens.Screen screen) {
+        if (screen == null) return false;
+        if (!initialized) {
+            init();
+        }
+        for (IRecipeViewerAdapter adapter : ADAPTERS) {
+            try {
+                if (adapter.isAvailable() && adapter.isViewerScreen(screen)) {
+                    return true;
+                }
+            } catch (Throwable ignored) {}
+        }
+        return false;
+    }
 }
 

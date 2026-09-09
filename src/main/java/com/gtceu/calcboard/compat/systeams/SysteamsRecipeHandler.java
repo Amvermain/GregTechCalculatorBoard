@@ -8,7 +8,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.compat.thermal.ThermalModAdapter;
 import com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.fluids.FluidStack;
@@ -149,7 +149,7 @@ public class SysteamsRecipeHandler {
         return () -> defaultVal;
     }
 
-    public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details, SysteamsModAdapter adapter) {
+    public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details, SysteamsModAdapter adapter) {
         ResourceLocation catId = null;
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
             catId = EmiSysteamsHelper.getCategoryId(emiRecipeObj);
@@ -184,7 +184,7 @@ public class SysteamsRecipeHandler {
         return false;
     }
 
-    public static boolean adaptSteamDynamoRecipe(Object backing, EmiRecipeConverter.RecipeDetails details, ResourceLocation catId) {
+    public static boolean adaptSteamDynamoRecipe(Object backing, RecipeDetails details, ResourceLocation catId) {
         long energyRF = ThermalModAdapter.extractEnergyRF(backing);
         if (energyRF <= 0) return false;
 
@@ -198,7 +198,7 @@ public class SysteamsRecipeHandler {
         return true;
     }
 
-    public static boolean adaptBoilerRecipe(Object backing, EmiRecipeConverter.RecipeDetails details, ResourceLocation catId) {
+    public static boolean adaptBoilerRecipe(Object backing, RecipeDetails details, ResourceLocation catId) {
         long energyRF = ThermalModAdapter.extractEnergyRF(backing);
         if (energyRF <= 0) return false;
 

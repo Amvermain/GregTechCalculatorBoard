@@ -2,12 +2,10 @@
   "key.categories.gtcalcboard": "그렉텍 계산기 보드",
   "key.gtcalcboard.open_board": "계산기 보드 열기",
   "key.gtcalcboard.add_recipe_to_board": "계산기 보드에 레시피 추가",
-
   "gtcalcboard.chat.welcome.prefix": "[GT CalcBoard]",
   "gtcalcboard.chat.welcome.text": "공정 계산기 보드가 활성화되었습니다. 단축키 %s 또는",
   "gtcalcboard.chat.welcome.open_button": "[▶ 보드 열기]",
   "gtcalcboard.chat.welcome.open_button.tooltip": "클릭하여 공정 계산기 보드를 엽니다.",
-
   "gui.gtcalcboard.title": "GT 계산기 보드",
   "gui.gtcalcboard.title_short": "GT 보드",
   "gui.gtcalcboard.summary": "공정 요약",
@@ -150,7 +148,6 @@
   "gui.gtcalcboard.addon.rotor.efficiency": "효율: %s",
   "gui.gtcalcboard.addon.rotor.power": "출력: %s",
   "gui.gtcalcboard.addon.reflector.tier": "티어 %s 반사판",
-
   "gui.gtcalcboard.addon_cat.all": "전체",
   "gui.gtcalcboard.addon_cat.energy_hatch": "⚡ 전력 해치",
   "gui.gtcalcboard.addon_cat.hatch_bus": "▦ 입출력 해치 및 버스",
@@ -265,8 +262,6 @@
   "gui.gtcalcboard.addon.muffler_hatch_desc": "머플러 해치 (배기가스 회수 및 공해 감소)",
   "gui.gtcalcboard.addon.turbine_efficiency_desc": "터빈 연료 효율 %s%%",
   "gui.gtcalcboard.addon.custom_modifier_desc": "사용자 정의 커스텀 수식어",
-
-
   "gui.gtcalcboard.undo": "실행취소",
   "gui.gtcalcboard.redo": "다시실행",
   "gui.gtcalcboard.add_recipe": "추가",
@@ -294,7 +289,6 @@
   "gui.gtcalcboard.steam_badge": "증기",
   "gui.gtcalcboard.tooltip.systeams_toggle_to_boiler": "[클릭]: Systeams 보일러 모드로 전환 (증기 생산)",
   "gui.gtcalcboard.tooltip.systeams_toggle_to_dynamo": "[클릭]: 써멀 다이나모 모드로 전환 (RF 발전)",
-
   "gui.gtcalcboard.rotor.title": "⚡ 터빈 로터 선택",
   "gui.gtcalcboard.rotor.count": "✔ %s개 GT 로터",
   "gui.gtcalcboard.rotor.eff": "효율",
@@ -304,16 +298,13 @@
   "gui.gtcalcboard.rotor.tooltip_eff": "터빈 효율: %s%%",
   "gui.gtcalcboard.rotor.tooltip_power": "터빈 출력: %s%%",
   "gui.gtcalcboard.rotor.tooltip_equip": "클릭하여 터빈에 장착",
-
   "gui.gtcalcboard.page_delete.title": "페이지 삭제 확인",
   "gui.gtcalcboard.page_delete.desc": "'%s' 페이지와 내부의 모든 공정/연결선이 삭제됩니다.\\n이 작업은 실행 취소(Undo)할 수 없습니다. 계속하시겠습니까?",
   "gui.gtcalcboard.page_delete.confirm": "삭제",
   "gui.gtcalcboard.page_delete.cancel": "취소",
-
   "gui.gtcalcboard.power_mode.eut": "EU/t",
   "gui.gtcalcboard.power_mode.amps": "암페어 (A)",
   "gui.gtcalcboard.power_mode.both": "EU/t + 암페어 (A)",
-
   "gui.gtcalcboard.input": "입력",
   "gui.gtcalcboard.output": "출력",
   "gui.gtcalcboard.hidden_port_single_output": "%d개 출력 숨김",
@@ -336,7 +327,6 @@
   "gui.gtcalcboard.tooltip.unconnected_raw": "미연결 (외부 투입 원자재)",
   "gui.gtcalcboard.tooltip.unconnected_final": "미연결 (최종 완제품 출력)",
   "gui.gtcalcboard.tooltip.upstream_throttled": "상류 감속됨 (실효 소비량: %s)",
-
   "gui.gtcalcboard.tooltip.base_active": "기준 마스터 레시피 (활성)",
   "gui.gtcalcboard.tooltip.base_active_desc": "클릭하여 기준 마스터 해제",
   "gui.gtcalcboard.tooltip.base_set": "기준 마스터 레시피로 지정",
@@ -350,7 +340,6 @@
   "gui.gtcalcboard.tooltip.scroll_cycle": "마우스 휠",
   "gui.gtcalcboard.tooltip.tag_alts": "대체 태그 재료 전환 (%s/%s)",
   "gui.gtcalcboard.tooltip.recipes_uses": "[R] 레시피  [U] 사용처",
-
   "message.gtcalcboard.group_success": "총 %s대의 설비가 단일 복합 모듈로 성공적으로 압축되었습니다!",
   "message.gtcalcboard.group_min_nodes": "모듈로 묶으려면 캔버스에 2개 이상의 레시피 노드가 필요합니다!",
   "message.gtcalcboard.save_success": "보드가 성공적으로 저장되었습니다! (%s개 노드)",
@@ -380,18 +369,14 @@
   "message.gtcalcboard.disconnect_wire": "연결선이 해제되었습니다",
   "message.gtcalcboard.disconnect_in": "입력 연결선이 해제되었습니다",
   "message.gtcalcboard.disconnect_out": "출력 연결선이 해제되었습니다",
-
   "gui.gtcalcboard.guide_btn": "도움말",
   "gui.gtcalcboard.guide.modal_title": "그렉텍 계산기 보드 완벽 매뉴얼 & 가이드",
-
   "gui.gtcalcboard.guide.cat_basics": "1. 기본 조작|캔버스 이동 및 레시피",
   "gui.gtcalcboard.guide.basics_title": "▪ 1장. 시작하기 및 캔버스 기본 조작",
   "gui.gtcalcboard.guide.basics_desc": "### 캔버스 이동 및 확대/축소\n- [마우스 우클릭 / 휠 클릭 드래그]: 캔버스 화면을 자유롭게 이동(Pan)합니다.\n- [마우스 휠 굴리기]: 캔버스를 0.2배부터 3.0배까지 자유롭게 확대/축소(Zoom)합니다.\n- 상단 [⊕ 중앙정렬] 버튼: 화면 시점을 원점으로 복귀시킵니다.\n\n### 레시피를 보드에 추가하는 방법\n1. EMI 아이템 목록에서 원하는 아이템에 마우스를 올리고 [R] (조합법) 또는 [U] (사용처)를 누릅니다.\n2. 레시피 화면 상단 또는 우측의 [+] 버튼을 누르면 즉시 계산기 보드에 해당 공정 노드가 생성됩니다.\n3. 보드 상단의 [➕ 추가] 버튼을 눌러 레시피 검색창에서 직접 기계와 레시피를 검색하여 배치할 수도 있습니다.\n\n> ★ TIP: 캔버스 크기 조절: 각 기계 카드 우측 하단의 [◢] 모서리를 드래그하면 카드의 가로 너비와 세로 높이를 원하는 크기로 자유롭게 조절할 수 있습니다.",
-
   "gui.gtcalcboard.guide.cat_search": "2. 스마트 검색|드래그 배선 및 검색",
   "gui.gtcalcboard.guide.search_title": "? 2장. 조건부 파라메트릭 검색 및 드래그 자동 배선",
   "gui.gtcalcboard.guide.search_desc": "### 포트 드래그 검색 및 자동 배선\n- [포트에서 빈 캔버스로 드래그]: 기계의 출력 포트(또는 입력 포트)에서 선을 끌어 빈 공간에 놓으면, 해당 아이템/유체를 소비(또는 생산)하는 레시피 검색창이 자동으로 열립니다.\n- 레시피를 선택하는 즉시 마우스 위치에 기계가 생성되며 [와이어가 자동으로 연결]됩니다!\n- [Shift]를 누른 채 선택하면 1:1 기계 대수 비율 맞춤까지 한 번에 완료됩니다.\n\n### 조건부 파라메트릭 검색 문법\n- [입력 재료 한정 검색]: `in:iron`, `input:steam`, `>iron` (해당 재료를 소비하는 레시피만 필터링)\n- [출력 생산품 한정 검색]: `out:steel`, `output:oxygen`, `<steel` (해당 아이템을 생산하는 레시피만 필터링)\n- [복합 조건 검색]: `in:iron out:steel` (철을 소모하여 강철을 생산하는 레시피)\n- 다중 키워드 [AND] 검색: 공백 또는 '&' (예: `pyrolyse oil` $\\rightarrow$ 두 단어가 모두 포함된 레시피 검색)\n- [OR] 조건 검색: '|' (예: `oil | creosote` $\\rightarrow$ 둘 중 하나라도 포함된 레시피 검색)\n- [NOT] 제외 검색: '!' (예: `!in:water`, `!out:slag`, `pyrolyse !charcoal`)\n- 모드 필터: `@gtceu`, `@minecraft` 등 (또는 `in:@gtceu`, `out:@thermal`)\n- 태그 필터: `#forge:logs`, `#c:dusts` 등 (또는 `in:#forge:dusts`)\n- 기계 분류: `[pyrolyse_oven]`, `[chemical_reactor]` 등\n- 정확한 구문: `\"sulfuric acid\"` 또는 `in:\"heavy fuel\"`\n\n### 싱글플레이 일시정지 제어\n- 상단 툴바의 [⏸ 일시정지: 켜짐] / [▶ 일시정지: 꺼짐] 버튼을 눌러 계산 보드를 열었을 때 싱글플레이 게임을 멈출지 백그라운드로 작동시킬지 자유롭게 설정할 수 있습니다.",
-
   "gui.gtcalcboard.guide.cat_wiring": "3. 와이어 연결|1:1 자동 비율 맞춤",
   "gui.gtcalcboard.guide.wiring_title": "⚡ 3장. 와이어 연결 및 Shift 자동 비율 맞춤",
   "gui.gtcalcboard.guide.wiring_desc": "### 기본 와이어 연결\n- 기계 출력 슬롯 우측의 [초록색 포트]를 클릭한 뒤, 연결할 다른 기계 입력 슬롯 좌측의 [파란색 포트]를 클릭하면 유체/아이템 파이프 연결선이 생성됩니다.\n\n### ✨ Shift + 와이어 드래그 (자동 비율 맞춤)\n- [Shift 키]를 누른 상태로 출력 포트에서 입력 포트로 와이어를 연결해 보세요!\n- 연결되는 순간 두 기계 간의 생산 속도(Output Rate)와 소비 속도(Input Rate)를 분석하여, 생산량이 100% 딱 맞아떨어지도록 [목표 기계의 대수(Machine Count)]가 즉시 자동 계산되어 맞춰집니다.\n- 예를 들어 초당 500mB를 생산하는 반응기에서 초당 100mB를 소비하는 증류탑으로 Shift 연결하면, 증류탑의 대수가 [5.0대]로 즉각 맞춰집니다!\n\n### ↔ 분기점 노드 & 배치 소요 시간(ET / DT) 계산\n- [와이어 더블클릭]: 연결선 중간에 0비용 [↔ 분기점 노드]를 즉시 삽입하여 배선을 깔끔하게 정리하고 다중 분기할 수 있습니다.\n- [하단 뱃지 좌클릭]: 분기점 하단의 뱃지 영역을 클릭하여 목표 배치 수량(예: 64개, 10,000 mB)을 입력하세요. 실시간 유입 속도를 기반으로 생산 완료 소요 시간(ET: xx.xs)이 계산되어 뱃지에 표시됩니다.\n- [원자재 고갈 시간 DT]: 상류 공급자가 없는 외부 투입 분기점의 경우, 현재 소비 속도에 따른 보유량 소진 시간(DT: xx.xs)이 계산됩니다.\n- [분기점 우클릭]: 공급 모드 설정 창을 열어 [무한 공급 (∞)] 또는 [고정 유량 (Fixed Rate)]을 지정하여 상류 결핍 전파를 차단할 수 있습니다.\n- [Shift + 우클릭]: 설정된 목표 배치 수량을 즉시 0으로 초기화합니다.\n\n### 와이어 연결 끊기\n- 연결된 와이어 선 위를 [마우스 우클릭]하거나, 해당 포트를 [우클릭]하면 즉시 연결이 깔끔하게 끊어집니다.",
@@ -410,14 +395,12 @@
   "gui.gtcalcboard.guide.cat_shortcuts": "8. 다중 선택|일괄 이동 및 단축키",
   "gui.gtcalcboard.guide.shortcuts_title": "▪ 8장. 드래그 다중 선택, 클립보드, 이름 변경",
   "gui.gtcalcboard.guide.shortcuts_desc": "### 드래그 영역 다중 선택 (Marquee Box)\n- [마우스 좌클릭 드래그]: 캔버스 빈 공간에서 드래그하여 여러 기계를 한 번에 다중 선택합니다.\n- [Shift + 좌클릭]: 원하는 기계만 하나씩 선택에 추가하거나 제외합니다.\n- [선택 기계 일괄 이동]: 선택된 기계들 중 하나를 잡고 드래그하면 내부 와이어 연결을 유지하며 함께 이동합니다.\n\n### 격자 스냅 및 유량 모델링\n- [G 키]: 16px 단위 정밀 격자 스냅을 토글하여 노드와 프레임을 깔끔하게 정렬합니다.\n- [분기점 뱃지 좌클릭]: 목표 배치 수량 입력 -> 실시간 생산 소요 시간(ET) 또는 원자재 고갈 시간(DT) 계산.\n- [분기점 우클릭]: 무한 공급(∞) 또는 초당 고정 공급량(items/s, mB/s)을 설정하여 상류 역전파를 차단합니다.\n- [분기점 Shift + 우클릭]: 설정된 목표 수량을 0으로 리셋.\n- [기계 템플릿 복제]: 기계 설정창의 템플릿 버튼을 통해 전압/병렬/애드온 하드웨어 구성을 저장하고 다른 노드들에 원클릭 일괄 적용합니다.\n\n### 실행 취소 및 단축키\n- [Ctrl + Z]: 직전에 수행한 작업(노드 이동/추가/삭제/연결/모듈화/속성편집 등)을 실행 취소(Undo)합니다.\n- [Ctrl + Y / Ctrl + Shift + Z]: 취소했던 작업을 다시 실행(Redo)합니다.\n- [Ctrl + K / P]: 빠른 페이지 스위처(Quick Switcher)를 열어 페이지를 즉시 전환합니다.\n- [Ctrl + X]: 선택한 기계들과 내부 연결선을 잘라내기(Cut)합니다.\n- [Ctrl + C]: 선택한 기계들과 내부 연결선을 클립보드에 복사합니다.\n- [Ctrl + V]: 마우스 커서 위치에 새 노드로 와이어와 함께 복제 붙여넣기합니다.\n- [Ctrl + D]: 선택한 기계들을 즉시 복제(Duplicate)합니다.\n- [Delete / Backspace]: 선택한 기계들과 연결선을 일괄 삭제합니다.\n- [Ctrl + A]: 보드의 모든 기계를 전체 선택합니다.\n\n### 노드 이름 직접 수정\n- 기계 헤더의 이름 텍스트를 [더블클릭]하면 인라인 입력창이 열립니다.\n- 원하는 공정 이름(예: [황산 1라인], [터빈 발전소])을 직접 타이핑하고 [Enter]를 누르면 저장됩니다.",
-
   "gui.gtcalcboard.tutorial_btn": "튜토리얼",
   "gui.gtcalcboard.advanced_tutorial_btn": "심화 튜토리얼",
   "gui.gtcalcboard.welcome.title": "그렉텍 계산기 보드에 오신 것을 환영합니다!",
   "gui.gtcalcboard.welcome.desc": "그렉텍 공정 계산기를 처음 사용하시나요?\n1분 인터랙티브 튜토리얼을 통해 와이어 연결, Auto-Ratio 비율 맞춤, 공정 모듈화의 핵심 기능을 직접 체험해 보세요!",
   "gui.gtcalcboard.welcome.start": "▶ 1분 튜토리얼 시작",
   "gui.gtcalcboard.welcome.skip": "직접 둘러보기",
-
   "gui.gtcalcboard.tooltip.quick_add": "클릭하여 여기에 레시피 추가 (Space / 더블클릭)",
   "gui.gtcalcboard.tooltip.quick_search": "레시피 검색 (클릭)",
   "gui.gtcalcboard.tooltip.quick_junction": "분기점 노드 삽입 (클릭)",
@@ -481,53 +464,38 @@
   "gui.gtcalcboard.hotkey_hud.delete": "선택 삭제",
   "gui.gtcalcboard.hotkey_hud.grid_snap": "격자 스냅",
   "gui.gtcalcboard.hotkey_hud.shared_machine": "공유 기계 풀",
-
   "gui.gtcalcboard.tutorial.page_name": "▶ 튜토리얼",
   "gui.gtcalcboard.tutorial.advanced_page_name": "✦ 심화 튜토리얼",
   "gui.gtcalcboard.tutorial.prev": "⮜ 이전",
   "gui.gtcalcboard.tutorial.skip": "건너뛰기",
   "gui.gtcalcboard.tutorial.next": "다음 ➔",
   "gui.gtcalcboard.tutorial.finish": "완료하고 시작하기",
-
   "gui.gtcalcboard.tutorial.step1_title": "1. 레시피 노드 추가하기",
   "gui.gtcalcboard.tutorial.step1_desc": "캔버스 빈 곳을 [우클릭]하여 [+ 레시피 추가...]를 선택하거나, 상단의 [🔍 레시피 검색...] 버튼을 클릭(또는 Space 키)하여 첫 레시피 노드(예: Boiler)를 배치해 보세요.",
-
   "gui.gtcalcboard.tutorial.step2_title": "2. 포트 드래그 검색 & 자동 배선",
   "gui.gtcalcboard.tutorial.step2_desc": "보일러의 [스팀] 출력 포트(초록색)를 클릭하여 빈 캔버스로 드래그해 놓으세요! 4버튼 메뉴에서 [?]를 눌러 [Steam Turbine]을 선택하면 기계가 자동 배선되어 생성됩니다.",
-
   "gui.gtcalcboard.tutorial.step3_title": "3. 와이어 더블클릭 분기점 삽입",
   "gui.gtcalcboard.tutorial.step3_desc": "연결선(와이어)을 마우스로 [더블 클릭]해 보세요! 배선을 깔끔하게 정리해 주는 0비용 [↔ 분기점 노드]가 와이어 중간에 즉시 삽입됩니다.",
-
   "gui.gtcalcboard.tutorial.step4_title": "4. 우클릭 배선 끊기 & Shift+재연결 (1:1 비율 맞춤)",
   "gui.gtcalcboard.tutorial.step4_desc": "우선 연결선(와이어)을 [우클릭]하여 끊어보세요! 그런 다음 [Shift 키]를 누른 채 분기점 출력에서 터빈 입력으로 와이어를 다시 연결하면, 공급량(500 mB/s)에 맞춰 터빈 대수가 5.0대로 즉시 자동 계산됩니다.",
-
   "gui.gtcalcboard.tutorial.step5_junction_title": "5. 분기점 목표 수량 & 배치 생산 소요 시간(ET) 계산",
   "gui.gtcalcboard.tutorial.step5_junction_desc": "분기점 노드 하단 뱃지를 [좌클릭]하여 목표 수량(예: 1000 mB)을 입력해 보세요! 유입 속도(500 mB/s)에 따라 완제품 생산 소요 시간(ET: 2.0s)이 실시간 산출되며, [Shift+우클릭] 시 0으로 초기화됩니다.",
-
   "gui.gtcalcboard.tutorial.step5_selector_title": "6. 기계 및 멀티블록 전환 (Machine Selector)",
   "gui.gtcalcboard.tutorial.step5_selector_desc": "노드 좌측 상단의 [기계 아이콘]을 클릭하여 기계 선택 창을 여세요. 목록에서 기계별 지원 특성(코일, 패러럴 해치, 로터 등) 뱃지를 확인하고, [Electric Blast Furnace] 멀티블록을 선택해 보세요!",
-
   "gui.gtcalcboard.tutorial.step5_title": "7. 기계 하드웨어 & 증강/애드온 설정",
   "gui.gtcalcboard.tutorial.step5_desc": "터빈 카드의 [⚙] 설정 버튼을 클릭해 보세요! 전압 티어(LV~MAX), 오버클럭 모드, 가열 코일, 병렬/유지보수 해치, 써멀 증강 키트를 자유롭게 장착할 수 있습니다.",
-
   "gui.gtcalcboard.tutorial.step6_title": "8. 다중 선택 & 캔버스 그룹 프레임화",
   "gui.gtcalcboard.tutorial.step6_desc": "마우스 드래그로 보일러와 터빈을 함께 선택한 뒤 [Ctrl + G]를 눌러보세요! 영역을 깔끔하게 묶어주는 [그룹 프레임]이 생성되며, [✦]로 테마 색상을 변경할 수 있습니다.",
-
   "gui.gtcalcboard.tutorial.step7_title": "9. 복합 모듈 패키징 & 펼치기",
   "gui.gtcalcboard.tutorial.step7_desc": "프레임 상단의 [▦] 버튼을 눌러 거대한 공정을 깔끔한 [복합 모듈] 단일 카드로 압축해 보세요! 모듈 카드의 [⤢ 펼치기]를 누르면 언제든 원래 공정으로 100% 복원됩니다.",
-
   "gui.gtcalcboard.tutorial.step8_title": "10. 공유 기계 시분할 가동 (Shared Machine Pool)",
   "gui.gtcalcboard.tutorial.step8_desc": "3개의 지오드 슬라이싱 커터 노드를 모두 선택하고 [Ctrl + Shift + S]를 누르세요! 3개의 소량 레시피 부하가 단 1대의 물리적 LV 커터(부하율 45.0%)로 통합 집계됩니다.",
-
   "gui.gtcalcboard.tutorial.step9_title": "11. 멀티블록 BOM 자재 명세서 확인",
   "gui.gtcalcboard.tutorial.step9_desc": "하단 바의 [▦ BOM] 버튼이나 [Shift + B], [M]을 눌러 멀티블록 BOM 창을 여세요! 3개 레시피가 있더라도 커터 본체와 케이싱이 3배로 과다 집계되지 않고 정확히 1대분으로 최적화 집계된 것을 확인하세요.",
-
   "gui.gtcalcboard.tutorial.step10_title": "12. 분기점 외부 공급(∞)·원자재 고갈(DT)·보이드",
   "gui.gtcalcboard.tutorial.step10_desc": "분기점을 [우클릭]하여 공급 설정 창을 열고(또는 우측 인스펙터의 [⚙ 정션 설정] 클릭), [무한 공급 (∞)]이나 [고정 유량]을 설정해 보세요! 상류 수요 전파가 즉시 차단되며, 외부 원자재 투입 시 재고 소진 시간(DT)을 계산하거나 보이드 싱크 모드로 잉여를 소각할 수 있습니다.",
-
   "gui.gtcalcboard.tutorial.step11_title": "13. 폴더 탐색기 & 공정 청사진 관리",
   "gui.gtcalcboard.tutorial.step11_desc": "화면 좌측 바의 [📁] 버튼이나 상단 툴바의 [현재 페이지명 ▼], [Tab] 키를 눌러 폴더 탐색기를 여세요! 중첩 하위 폴더 생성, Ctrl/Shift 다중 선택, 드래그 이동 및 폴더 단위 청사진(GTFOLDER:...) 내보내기/가져오기를 지원합니다.",
-
   "gui.gtcalcboard.tutorial.completed_title": "튜토리얼 완료!",
   "gui.gtcalcboard.tutorial.completed_desc": "축하합니다! 이제 그렉텍 및 써멀의 모든 거대한 공정을 직관적이고 강력하게 설계해 보세요! 언제든 상단 [도움말]이나 [튜토리얼]을 다시 열람할 수 있습니다.",
   "gui.gtcalcboard.tutorial.completed_tag": "[완료]",
@@ -535,7 +503,6 @@
   "gui.gtcalcboard.tutorial.exit_dialog.desc": "튜토리얼 진행 중에 다른 캔버스 탭으로 이동하면 튜토리얼이 종료됩니다.\\n튜토리얼을 종료하고 선택한 캔버스로 이동하시겠습니까?",
   "gui.gtcalcboard.tutorial.exit_dialog.confirm": "종료하고 이동",
   "gui.gtcalcboard.tutorial.exit_dialog.cancel": "튜토리얼 계속 진행",
-
   "gui.gtcalcboard.global_balance": "종합 수지",
   "gui.gtcalcboard.global_balance.modal_title": "대상 페이지 종합 수지 대시보드",
   "gui.gtcalcboard.global_balance.power_surplus": "전력 잉여",
@@ -554,7 +521,6 @@
   "gui.gtcalcboard.global_balance.breakdown_header": "페이지별 생산 및 소비 기여도 내역:",
   "gui.gtcalcboard.global_balance.net_total": "대상 페이지 종합 순 수지:",
   "gui.gtcalcboard.tooltip.btn_global_balance": "대상 페이지 종합 수지 대시보드 (B)\n선택한 여러 페이지들의 생산량, 소비량, 총 전력 및 페이지별 기여도를 종합 집계합니다.",
-
   "gui.gtcalcboard.error.access_denied": "팀 워크스페이스에 대한 접근 권한이 없습니다.",
   "gui.gtcalcboard.error.locked_by_other": "이 페이지는 다른 팀원이 잠금(편집) 중입니다. 편집이 완료될 때까지 기다려 주세요.",
   "gui.gtcalcboard.error.revision_conflict": "리비전 충돌이 발생했습니다! 다른 팀원이 먼저 페이지를 저장했습니다. 새로고침해 주세요.",
@@ -565,7 +531,6 @@
   "gui.gtcalcboard.toast.lock_acquired": "페이지 편집 권한(Lock) 획득: %s",
   "gui.gtcalcboard.toast.lock_busy": "해당 페이지는 현재 %s님이 편집 중입니다.",
   "gui.gtcalcboard.toast.error": "워크스페이스 오류: %s",
-
   "gui.gtcalcboard.workspace.personal": "내 보드",
   "gui.gtcalcboard.workspace.team": "팀 보드 (%s)",
   "gui.gtcalcboard.lock.editing_by_me": "내가 수정 중",
@@ -575,7 +540,6 @@
   "gui.gtcalcboard.presence.viewing_header": "보드를 보고 있는 팀원 (%s명):",
   "gui.gtcalcboard.toast.switched_to_personal": "개인 보드로 전환되었습니다.",
   "gui.gtcalcboard.toast.switched_to_team": "팀 보드(%s)로 전환되었습니다.",
-
   "gui.gtcalcboard.btn_save_team": "팀에 저장",
   "gui.gtcalcboard.btn_cancel_edit": "편집 종료",
   "gui.gtcalcboard.btn_start_edit": "편집 시작",
@@ -586,12 +550,10 @@
   "gui.gtcalcboard.toast.copied_to_personal": "개인 보드로 복사 완료: %s",
   "gui.gtcalcboard.toast.saved_to_team": "팀 워크스페이스에 저장 완료: %s",
   "gui.gtcalcboard.toast.exported_to_team": "팀 워크스페이스로 내보내기 완료: %s",
-
   "gui.gtcalcboard.dialog.commit_hint": "저장 설명 입력 (예: 에틸렌 4병렬)",
   "gui.gtcalcboard.dialog.save_to_team_title": "팀 보드에 저장",
   "gui.gtcalcboard.dialog.save_to_team_sub": "수정한 내용을 팀원들과 실시간 동기화합니다.",
   "gui.gtcalcboard.dialog.btn_save_sync": "저장 및 동기화",
-
   "gui.gtcalcboard.dialog.export_to_team_title": "팀 보드로 공정 내보내기",
   "gui.gtcalcboard.dialog.export_to_team_sub": "개인 보드의 설계를 팀 워크스페이스로 공유합니다.",
   "gui.gtcalcboard.dialog.btn_export_new_page": "팀 보드에 새 페이지로 추가",
@@ -836,8 +798,10 @@
   "gui.gtcalcboard.node_warning.dt_multi_fluid_unsupported": "증류탑(DT)은 층별 1x 단일 유체 출력 해치만 지원하며, 다중 유체 출력 해치(%s)는 사용할 수 없습니다.",
   "gui.gtcalcboard.node_warning.dt_excess_output_hatches": "증류탑(DT)에 출력 해치가 %d개 장착되어 있으나, 현재 레시피의 유체 분획은 %d개입니다.",
   "gui.gtcalcboard.node_warning.fusion_energy_hatch_tier_mismatch": "핵융합로 (%s)는 동일한 티어의 에너지 해치만 지원하지만, %s 해치가 장착되어 있습니다.",
+  "gui.gtcalcboard.node_warning.energy_hatch_missing": "에너지 해치 미장착 (멀티블록 가동에 전력 입력 필요)",
   "gui.gtcalcboard.turbine_flow_deficit_warning": "터빈은 100%%의 %s 공급이 필요합니다 (현재: %d%%)",
   "gui.gtcalcboard.node_badge.turbine_deficit": "⚠ 유량 부족",
+  "gui.gtcalcboard.node_badge.energy_hatch_missing": "전력 해치 누락",
   "gui.gtcalcboard.node_badge.oxygen_boost": "산소 부스트 활성",
   "gui.gtcalcboard.node_badge.liquid_oxygen_boost": "액체 산소 부스트 활성",
   "gui.gtcalcboard.turbine_deficit_title": "터빈 입력 유량 부족 (Deficit)",
@@ -1192,6 +1156,7 @@
   "gui.gtcalcboard.inspector.title": "노드 속성 검사기",
   "gui.gtcalcboard.inspector.count": "기계 대수",
   "gui.gtcalcboard.inspector.tier": "목표 전압 티어",
+  "gui.gtcalcboard.inspector.tier_locked_by_energy_hatch": "전압 티어가 장착된 에너지 해치(%s)에 의해 고정됨",
   "gui.gtcalcboard.inspector.overclock": "오버클럭 모드",
   "gui.gtcalcboard.inspector.machine_config": "하드웨어 및 애드온 설정",
   "gui.gtcalcboard.inspector.single_power": "대당 소비/생산 전력",
@@ -1294,5 +1259,18 @@
   "gui.gtcalcboard.summary.stress_deficit": "스트레스 부족량: -%s SU",
   "gui.gtcalcboard.summary.rate": "속도: %s",
   "gui.gtcalcboard.summary.fuel_burn_speed": "연료 연소 속도: %sx%s",
-  "gui.gtcalcboard.summary.steam_output": "증기 생산량: %s mB/s (%s mB/t)"
+  "gui.gtcalcboard.summary.steam_output": "증기 생산량: %s mB/s (%s mB/t)",
+  "gui.gtcalcboard.junction.split_mode_label": "분할 방식:",
+  "gui.gtcalcboard.junction.split_mode.proportional": "수요 비례",
+  "gui.gtcalcboard.junction.split_mode.equal": "균등 분할",
+  "gui.gtcalcboard.junction.split_mode.priority": "우선순위 분할",
+  "gui.gtcalcboard.junction.priority_label": "우선순위",
+  "gui.gtcalcboard.junction.proportional_tooltip": "하류 설비의 요구 수요량에 비례하여 유량을 분할 배분합니다",
+  "gui.gtcalcboard.junction.equal_tooltip": "사용 가능한 유량을 모든 하류 선로에 균등하게 분할 배분합니다",
+  "gui.gtcalcboard.junction.priority_tooltip": "우선순위가 높은 하류 선로에 유량이 먼저 배분됩니다 (AE2 스타일 우선순위)",
+  "gui.gtcalcboard.toast.priority_changed": "우선순위: %s",
+  "gui.gtcalcboard.tooltip.allocated_flow": "할당 유량",
+  "gui.gtcalcboard.tooltip.wire_priority": "우선순위: %d",
+  "gui.gtcalcboard.tooltip.wire_priority_default": "우선순위: 0 (기본)",
+  "gui.gtcalcboard.tooltip.wire_scroll_priority_hint": "[마우스 휠] 우선순위 조절 (+ / -)"
 }

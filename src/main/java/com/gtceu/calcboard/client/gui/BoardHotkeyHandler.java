@@ -47,14 +47,6 @@ public final class BoardHotkeyHandler {
                 screen.getCanvasHandler().cancelWireDrag();
                 return true;
             }
-            if (screen.getQuickPageSwitcherDialog() != null && screen.getQuickPageSwitcherDialog().isVisible()) {
-                screen.getQuickPageSwitcherDialog().close();
-                return true;
-            }
-            if (screen.getTemplateCloneDialog() != null && screen.getTemplateCloneDialog().isVisible()) {
-                screen.getTemplateCloneDialog().close();
-                return true;
-            }
             if (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
                 screen.getPageBrowserDrawer().setOpen(false);
                 return true;
@@ -69,73 +61,12 @@ public final class BoardHotkeyHandler {
             }
         }
 
-        // 2. Open Modal Dialog key handling
-        if (screen.getDeletePageDialog() != null && screen.getDeletePageDialog().isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                screen.getDeletePageDialog().close();
-                return true;
-            }
-            return screen.getDeletePageDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getTutorialExitDialog() != null && screen.getTutorialExitDialog().isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                screen.getTutorialExitDialog().close();
-                return true;
-            }
-            return screen.getTutorialExitDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getGlobalBalanceDialog() != null && screen.getGlobalBalanceDialog().isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                screen.getGlobalBalanceDialog().close();
-                return true;
-            }
-            return screen.getGlobalBalanceDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getMultiblockBOMDialog() != null && screen.getMultiblockBOMDialog().isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                screen.getMultiblockBOMDialog().close();
-                return true;
-            }
-            return screen.getMultiblockBOMDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getGuideDialog() != null && screen.getGuideDialog().isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                screen.getGuideDialog().close();
-                return true;
-            }
-            return screen.getGuideDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getPageTabBar().keyPressed(keyCode, scanCode, modifiers)) {
+        if (screen.getDialogManager() != null && screen.getDialogManager().handleKeyPressed(keyCode, scanCode, modifiers)) {
             return true;
         }
 
         if (screen.getFavoritesDockWidget() != null && screen.getFavoritesDockWidget().keyPressed(keyCode, scanCode, modifiers)) {
             return true;
-        }
-
-        if (screen.getMachineConfigDialog() != null && screen.getMachineConfigDialog().isVisible()) {
-            return screen.getMachineConfigDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getSearchDialog() != null && screen.getSearchDialog().isVisible()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                screen.getSearchDialog().setVisible(false);
-                return true;
-            }
-            return screen.getSearchDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getFrameEditDialog() != null && screen.getFrameEditDialog().isVisible()) {
-            return screen.getFrameEditDialog().keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        if (screen.getNoteEditDialog() != null && screen.getNoteEditDialog().isVisible()) {
-            return screen.getNoteEditDialog().keyPressed(keyCode, scanCode, modifiers);
         }
 
         for (NodeWidget w : screen.getNodeWidgets()) {

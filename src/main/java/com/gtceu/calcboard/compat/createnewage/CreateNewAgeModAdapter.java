@@ -13,13 +13,14 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.extension.ICapabilityMatrixProvider;
-import com.gtceu.calcboard.compat.extension.IEnergySimulationProvider;
-import com.gtceu.calcboard.compat.extension.IHardwareAddonProvider;
-import com.gtceu.calcboard.compat.extension.IMultiblockBOMProvider;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.extension.ICapabilityMatrixProvider;
+import com.gtceu.calcboard.api.spi.extension.IEnergySimulationProvider;
+import com.gtceu.calcboard.api.spi.extension.IHardwareAddonProvider;
+import com.gtceu.calcboard.api.spi.extension.IModExtension;
+import com.gtceu.calcboard.api.spi.extension.IMultiblockBOMProvider;
 import com.gtceu.calcboard.compat.createnewage.addon.CreateMagnetAddon;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -37,7 +38,7 @@ import java.util.Set;
  */
 public class CreateNewAgeModAdapter implements IModAdapter {
 
-    private static final Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
+    private static final Set<Class<? extends IModExtension>> SUPPORTED_EXTENSIONS = Set.of(
             IHardwareAddonProvider.class,
             IMultiblockBOMProvider.class,
             IEnergySimulationProvider.class,
@@ -45,7 +46,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     );
 
     @Override
-    public Set<Class<? extends com.gtceu.calcboard.compat.extension.IModExtension>> getSupportedExtensions() {
+    public Set<Class<? extends IModExtension>> getSupportedExtensions() {
         return SUPPORTED_EXTENSIONS;
     }
 
@@ -147,7 +148,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     }
 
     @Override
-    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         return CreateNewAgeRecipeHandler.adaptRecipeDetails(emiRecipe, backingRecipe, details);
     }
 
@@ -194,6 +195,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         } else {
             node.addAddon(addon.copy());
         }
+        syncGeneratorCoilInput(node);
     }
 
     @Override
@@ -204,6 +206,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         } else {
             node.removeAddon(addon.getId());
         }
+        syncGeneratorCoilInput(node);
     }
 
     @Override
@@ -262,6 +265,63 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         }
     }
 
+    public static int calculateTotalMagnetStrength(RecipeNode node) {
+        if (node == null) return 0;
+        int totalStrength = 0;
+        for (MachineAddon addon : node.getAddons()) {
+            if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
+                totalStrength += addon.getMagneticForce();
+            }
+        }
+        return totalStrength;
+    }
+
+    public static double calculateGeneratorCoilSuRequired(RecipeNode node) {
+        if (node == null) return 0.0;
+        int totalStrength = calculateTotalMagnetStrength(node);
+        int rpm = Math.abs(node.getRpm());
+        return (24.0 + totalStrength) * rpm;
+    }
+
+    public static void syncGeneratorCoilInput(RecipeNode node) {
+        if (node == null) return;
+        if (!node.getInputs().isEmpty() && node.getInputs().get(0).isStressUnit()) {
+            double req = calculateGeneratorCoilSuRequired(node);
+            if (Math.abs(node.getInputs().get(0).getAmount() - req) > 1e-6) {
+                node.getInputs().set(0, IngredientStack.stressUnit(req));
+            }
+        }
+    }
+
+    public boolean isGeneratorCoil(RecipeNode node) {
+        if (node == null) return false;
+        if (node.isGenerator() && node.getEnergyType() == EnergyType.ELECTRIC_FE) {
+            return true;
+        }
+        ResourceLocation icon = node.getMachineIcon();
+        return ITEM_GENERATOR_COIL.equals(icon) || ITEM_CARBON_BRUSHES.equals(icon);
+    }
+
+    @Override
+    public double computeEffectiveIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node != null && stack != null && isInput && stack.isStressUnit() && isGeneratorCoil(node)) {
+            double baseAmount = stack.getAmount();
+            double scale = baseAmount > 0.0001 ? (defaultRate / baseAmount) : (node.getMachineCount() * node.getTotalParallel() * node.getEfficiency());
+            return calculateGeneratorCoilSuRequired(node) * scale;
+        }
+        return defaultRate;
+    }
+
+    @Override
+    public double computeSingleMachineIngredientRate(RecipeNode node, IngredientStack stack, boolean isInput, double defaultRate) {
+        if (node != null && stack != null && isInput && stack.isStressUnit() && isGeneratorCoil(node)) {
+            double baseAmount = stack.getAmount();
+            double scale = baseAmount > 0.0001 ? (defaultRate / baseAmount) : (double) node.getTotalParallel();
+            return calculateGeneratorCoilSuRequired(node) * scale;
+        }
+        return defaultRate;
+    }
+
     @Override
     public OverclockMode.OverclockResult computeOverclock(RecipeNode node, GTVoltageTier targetTier, boolean isGenerator) {
         int rpm = node.getRpm();
@@ -269,24 +329,10 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         double basePower = node.getBaseEUt();
 
         if (isGenerator && node.getEnergyType() == EnergyType.ELECTRIC_FE) {
-            // Create: New Age Generator Coil formula:
-            // Sum of all installed magnet strengths (up to 12 positions per coil ring).
-            int totalStrength = 0;
-            for (MachineAddon addon : node.getAddons()) {
-                if (addon.getCategory().equals(AddonCategory.MAGNET) || addon.getMagneticForce() > 0) {
-                    totalStrength += addon.getMagneticForce();
-                }
-            }
-
-            // Deductively queries NewAgeConfig.getCommon().suToEnergy ratio (e.g. 0.05 in modpacks, 15/512 default)
+            int totalStrength = calculateTotalMagnetStrength(node);
             double suToEnergy = getSuToEnergyRatio();
             double generatedFePerTick = totalStrength * Math.abs(rpm) * suToEnergy;
-            double requiredSuPerTick = (24.0 + totalStrength) * Math.abs(rpm);
-
-            if (!node.getInputs().isEmpty() && node.getInputs().get(0).isStressUnit()) {
-                node.getInputs().set(0, IngredientStack.stressUnit(requiredSuPerTick));
-            }
-
+            syncGeneratorCoilInput(node);
             return new OverclockMode.OverclockResult(baseDuration, generatedFePerTick, 1.0, 0);
         }
 
@@ -310,7 +356,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
     public String formatEnergyStats(RecipeNode node, PowerDisplayMode displayMode) {
         if (node == null) return "";
         if (node.getEnergyType() == EnergyType.ELECTRIC_FE) {
-            double effectivePower = node.getSingleMachineEUt() * node.getEfficiency();
+            double effectivePower = node.getSingleMachineEUt() * node.getMachineCount() * node.getEfficiency();
             String unit = "FE/t";
             if (node.isGenerator()) {
                 return String.format(Locale.ROOT, "+%,.2f %s", effectivePower, unit);
@@ -320,7 +366,7 @@ public class CreateNewAgeModAdapter implements IModAdapter {
         } else {
             double basePower = node.getBaseEUt();
             double speedFactor = Math.max(0.01, node.getRpm() / 32.0);
-            double effectiveSu = (node.isGenerator() ? basePower : (basePower * speedFactor)) * node.getEfficiency();
+            double effectiveSu = (node.isGenerator() ? basePower : (basePower * speedFactor)) * node.getMachineCount() * node.getEfficiency();
             if (node.isGenerator()) {
                 return String.format(Locale.ROOT, "+%,.0f SU", effectiveSu);
             } else {

@@ -20,7 +20,7 @@ class GTTurbineEnhancementTest {
 
     @BeforeAll
     static void init() {
-        com.gtceu.calcboard.compat.ModAdapterRegistry.init();
+        com.gtceu.calcboard.api.spi.ModAdapterRegistry.init();
     }
 
     private RecipeNode createLargeSteamTurbineNode() {

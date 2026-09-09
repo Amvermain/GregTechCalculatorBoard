@@ -4,7 +4,7 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import com.gtceu.calcboard.compat.create.CreateProperties;
 import com.gtceu.calcboard.compat.create.addon.CreateHeaterAddon;

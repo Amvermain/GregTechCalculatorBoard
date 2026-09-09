@@ -76,6 +76,10 @@ public interface IRecipeViewerAdapter {
     default boolean tryAddHoveredRecipeToBoard(net.minecraft.client.gui.screens.Screen screen, double mouseX, double mouseY) {
         return false;
     }
+
+    default boolean isViewerScreen(net.minecraft.client.gui.screens.Screen screen) {
+        return false;
+    }
 }
 
 

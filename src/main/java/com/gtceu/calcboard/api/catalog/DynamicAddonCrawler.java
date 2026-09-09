@@ -2,8 +2,10 @@ package com.gtceu.calcboard.api.catalog;
 
 import com.gtceu.calcboard.api.event.MachineAddonRegisterEvent;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.viewer.IRecipeViewerBridge;
+import com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -135,11 +137,7 @@ public class DynamicAddonCrawler {
     }
 
     private static void scanEmiOutputsIfLoaded(Consumer<ItemStack> collector) {
-        if (ModCompatHelper.isEmiLoaded()) {
-            if (com.gtceu.calcboard.integration.emi.EmiLifecycleHook.isEmiRecipeBakingComplete()) {
-                EmiExtractor.scanEmiRecipes(collector);
-            }
-        }
+        RecipeViewerBridgeRegistry.getActiveBridges().forEach(b -> b.discoverRecipeOutputs(collector));
     }
 
     private static void scanGTOutputsIfLoaded(Consumer<ItemStack> collector) {
@@ -188,8 +186,10 @@ public class DynamicAddonCrawler {
     public static void extractRecipeOutputs(Object recipe, List<ItemStack> outputStacks) {
         if (recipe == null) return;
 
-        if (ModCompatHelper.isEmiLoaded() && EmiExtractor.extractEmiRecipe(recipe, outputStacks)) {
-            return;
+        for (IRecipeViewerBridge bridge : RecipeViewerBridgeRegistry.getActiveBridges()) {
+            if (bridge.extractRecipeOutputs(recipe, outputStacks)) {
+                return;
+            }
         }
 
         if (recipe.getClass().getName().contains("GTRecipe")) {
@@ -372,8 +372,10 @@ public class DynamicAddonCrawler {
             }
             return;
         }
-        if (ModCompatHelper.isEmiLoaded() && EmiExtractor.extractEmiStack(obj, outputStacks)) {
-            return;
+        for (IRecipeViewerBridge bridge : RecipeViewerBridgeRegistry.getActiveBridges()) {
+            if (bridge.extractRecipeOutputs(obj, outputStacks)) {
+                return;
+            }
         }
         if (obj instanceof Map<?, ?> map) {
             for (Object val : map.values()) extractItemStacks(val, outputStacks);
@@ -447,61 +449,6 @@ public class DynamicAddonCrawler {
 
     private static boolean isTargetStackMethodName(String mn) {
         return mn.equals("getContent") || mn.equals("getItems") || mn.equals("getMatchingStacks") || mn.equals("getInner") || mn.equals("getItemStack") || mn.equals("getOutputs") || mn.equals("getOutputsList") || mn.equals("getResults") || mn.equals("getResultItem") || mn.equals("item");
-    }
-
-    private static class EmiExtractor {
-        private static void scanEmiRecipes(Consumer<ItemStack> collector) {
-            var emiRecipeManager = dev.emi.emi.api.EmiApi.getRecipeManager();
-            if (emiRecipeManager == null || emiRecipeManager.getRecipes() == null || emiRecipeManager.getRecipes().isEmpty()) {
-                return;
-            }
-            for (dev.emi.emi.api.recipe.EmiRecipe emiRecipe : emiRecipeManager.getRecipes()) {
-                if (emiRecipe == null || emiRecipe.getOutputs() == null) continue;
-                collectEmiRecipeOutputs(emiRecipe.getOutputs(), collector);
-            }
-        }
-
-        private static void collectEmiRecipeOutputs(List<dev.emi.emi.api.stack.EmiStack> outputs, Consumer<ItemStack> collector) {
-            for (dev.emi.emi.api.stack.EmiStack es : outputs) {
-                if (es == null || es.isEmpty()) continue;
-                ItemStack is = es.getItemStack();
-                if (is == null || is.isEmpty()) continue;
-                if (!is.hasTag() && es.getNbt() != null) {
-                    is = is.copy();
-                    is.setTag(es.getNbt().copy());
-                }
-                collector.accept(is);
-            }
-        }
-
-        private static boolean extractEmiRecipe(Object recipe, List<ItemStack> outputStacks) {
-            if (recipe instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe) {
-                if (emiRecipe.getOutputs() != null) {
-                    for (dev.emi.emi.api.stack.EmiStack es : emiRecipe.getOutputs()) {
-                        extractItemStacks(es, outputStacks);
-                    }
-                }
-                return true;
-            }
-            return false;
-        }
-
-        private static boolean extractEmiStack(Object obj, List<ItemStack> outputStacks) {
-            if (obj instanceof dev.emi.emi.api.stack.EmiStack emiStack) {
-                if (!emiStack.isEmpty()) {
-                    ItemStack is = emiStack.getItemStack();
-                    if (is != null && !is.isEmpty()) {
-                        if (!is.hasTag() && emiStack.getNbt() != null) {
-                            is = is.copy();
-                            is.setTag(emiStack.getNbt().copy());
-                        }
-                        outputStacks.add(is);
-                    }
-                }
-                return true;
-            }
-            return false;
-        }
     }
 }
 

@@ -3,7 +3,7 @@ package com.gtceu.calcboard.compat.gtceu;
 import com.gtceu.calcboard.api.model.CompoundRecipeBuilder;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
@@ -143,7 +143,7 @@ public final class GTCEuLayeredRecipeExtractor {
         List<Object> stepRecipes = extractLayeredSteps(resolvedRecipe, recipeObj);
         if (stepRecipes.size() < 2) return null;
 
-        EmiRecipeConverter.RecipeDetails parentDetails = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails parentDetails = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(resolvedRecipe, parentDetails);
 
         double totalDurationTicks = parentDetails.durationTicks;
@@ -158,7 +158,7 @@ public final class GTCEuLayeredRecipeExtractor {
         for (Object stepObj : stepRecipes) {
             if (stepObj == null) continue;
 
-            EmiRecipeConverter.RecipeDetails stepDetails = new EmiRecipeConverter.RecipeDetails();
+            RecipeDetails stepDetails = new RecipeDetails();
             GTCEuRecipeHandler.extractGTRecipeDetails(stepObj, stepDetails);
 
             double stepDuration = stepDetails.durationTicks > 0.0 ? stepDetails.durationTicks : fallbackDurationPerStep;

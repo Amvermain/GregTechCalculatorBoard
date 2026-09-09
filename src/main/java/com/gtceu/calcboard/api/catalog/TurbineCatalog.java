@@ -16,6 +16,39 @@ public final class TurbineCatalog {
     private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
     private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new HashMap<>();
 
+    private static final java.util.Set<ResourceLocation> GAS_TURBINE_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("gtceu:large_gas_turbine"),
+            ResourceLocation.tryParse("gtceu:gas_large_turbine"),
+            ResourceLocation.tryParse("gtceu:gas_turbine"),
+            ResourceLocation.tryParse("gtceu:gas_turbine_fuels")
+    );
+    private static final java.util.Set<ResourceLocation> PLASMA_TURBINE_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
+            ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
+            ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"),
+            ResourceLocation.tryParse("start_core:supreme_plasma_turbine"),
+            ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"),
+            ResourceLocation.tryParse("start_core:nyinsane_plasma_turbine"),
+            ResourceLocation.tryParse("gtceu:plasma_turbine"),
+            ResourceLocation.tryParse("gtceu:plasma_generator"),
+            ResourceLocation.tryParse("gtceu:plasma_generator_fuels")
+    );
+    private static final java.util.Set<ResourceLocation> STEAM_TURBINE_IDS = java.util.Set.of(
+            ResourceLocation.tryParse("gtceu:large_steam_turbine"),
+            ResourceLocation.tryParse("gtceu:steam_large_turbine"),
+            ResourceLocation.tryParse("gtceu:steam_turbine"),
+            ResourceLocation.tryParse("gtceu:steam_turbine_fuels"),
+            ResourceLocation.tryParse("gtceu:steam_turbine_superheated")
+    );
+
+    public static GTVoltageTier classifyTurbineId(ResourceLocation id) {
+        if (id == null) return null;
+        if (GAS_TURBINE_IDS.contains(id)) return GTVoltageTier.EV;
+        if (PLASMA_TURBINE_IDS.contains(id)) return GTVoltageTier.IV;
+        if (STEAM_TURBINE_IDS.contains(id)) return GTVoltageTier.HV;
+        return null;
+    }
+
     private TurbineCatalog() {}
 
     public static void registerTurbineTierAndProduction(ResourceLocation id, GTVoltageTier baseTier, double baseProduction) {
@@ -88,14 +121,7 @@ public final class TurbineCatalog {
             if (alias != null) tier = TURBINE_BASE_TIERS.get(alias);
         }
         if (tier == null) {
-            String path = id.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) {
-                tier = GTVoltageTier.EV;
-            } else if (path.contains("plasma")) {
-                tier = GTVoltageTier.IV;
-            } else if (path.contains("steam")) {
-                tier = GTVoltageTier.HV;
-            }
+            tier = classifyTurbineId(id);
         }
         return tier;
     }
@@ -134,17 +160,13 @@ public final class TurbineCatalog {
         }
         ResourceLocation cat = node.getRecipeCategoryId();
         if (cat != null) {
-            String path = cat.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) return GTVoltageTier.EV;
-            if (path.contains("plasma")) return GTVoltageTier.IV;
-            if (path.contains("steam")) return GTVoltageTier.HV;
+            GTVoltageTier t = classifyTurbineId(cat);
+            if (t != null) return t;
         }
         ResourceLocation icon = node.getMachineIcon();
         if (icon != null) {
-            String path = icon.getPath().toLowerCase(Locale.ROOT);
-            if (path.contains("gas_turbine") || path.contains("gas_large") || path.contains("large_gas")) return GTVoltageTier.EV;
-            if (path.contains("plasma")) return GTVoltageTier.IV;
-            if (path.contains("steam")) return GTVoltageTier.HV;
+            GTVoltageTier t = classifyTurbineId(icon);
+            if (t != null) return t;
         }
         if (node.getSteamMode() != null && node.getSteamMode().isSteam()) return GTVoltageTier.HV;
         return GTVoltageTier.HV;

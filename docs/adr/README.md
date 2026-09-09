@@ -65,20 +65,18 @@ stateDiagram-v2
 | **[ADR-034](ADR_034_JUNCTION_BUFFER_AND_ANCHOR_SYSTEM.md)** | 정션 노드 동적 잉여/결핍 완충 배선 및 Auto-Ratio 유량 앵커 시스템<br/>*(Junction Dynamic Buffer/Sink Wiring & Auto-Ratio Flow Anchoring System)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-07 | 퀵 마커 컨텍스트 드래그(잉여 배출/결핍 공급 1클릭 생성), Void Sink 오버플로우 스필웨이 우선 배분, Fixed 정션 유량 앵커 Auto-Ratio 지원 |
 | **[ADR-035](ADR_035_TWO_STAGE_LINEAR_FLOW_SOLVER.md)** | 2단계 선형 연립방정식 유량 솔버 및 정수 양자화 아키텍처<br/>*(Two-Stage Linear Flow Balance Solver & Integer Quantization Architecture)* | 🟢 `IMPLEMENTED` | `v2.2.0-alpha.4` | 2026-09-08 | 가우스 소거법 기반 1단계 연속 유량 균형 연산 및 2단계 정수 양자화를 통한 단 1회 클릭 결정론적 수렴 보장 및 질량 보존 정합 |
 | **[ADR-036](ADR_036_KINETIC_GENERATOR_AND_ENERGY_CONVERTER_TAXONOMY.md)** | 회전 운동 동력원 및 에너지 상호 변환기 분류 체계, 가변 RPM 동적 산출 및 뷰어 UI 개편 명세<br/>*(Kinetic Sources & Energy Converter Taxonomy, Dynamic RPM Calculation & Viewer UI Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0` | 2026-09-08 | 4대 카테고리 분리, Windmill Bearing 가변 돛/RPM 수식 산출 모델링, EMI 자가 복제 슬롯 해소 및 단일 소스(SSOT) 검색 인덱싱 일원화 |
+| **[ADR-037](ADR_037_DOMAIN_PURITY_AND_DETERMINISTIC_DEDUCTION_REFACTORING.md)** | 도메인 엔티티 순수성 회복, 역방향 의존성 격리 및 결정론적 스펙 연역 무결성 개편 명세<br/>*(Domain Purity Restoration, Reverse Dependency Isolation & Deterministic Spec Deduction Refactoring)* | 🟢 `IMPLEMENTED` | `v2.2.0-beta.2` | 2026-09-09 | IModAdapter를 api.spi로 이전하여 역방향 참조 0건 달성, EMI/JEI 53개소 뷰어 브릿지 추상화, RecipePropertyExtractorPipeline IoC 전환, RecipeNode 모드 필드 완전 이전, CDG 클라이언트 리플렉션 제거, Set Exact Match 일원화 |
+| **[ADR-038](ADR_038_LEGACY_CALCULATION_ALGORITHM_AND_SIMULATION_PURITY_REFACTORING.md)** | 레거시 계산 알고리즘 및 물리 시뮬레이션 순수성 개편 명세<br/>*(Legacy Calculation Algorithms & Physical Simulation Purity Refactoring)* | 🟢 `IMPLEMENTED` | `v2.2.0-beta.2` | 2026-09-09 | 순수 연산 중 포트 변조 및 부수 효과 근절, UI 렌더링 중 캐시 무효화 차단, 플래그 오바인딩 해소, 모듈 축소 스케일링 복원 |
+| **[ADR-039](ADR_039_RENDERING_LIFECYCLE_AND_PRECISION_CACHE_INVALIDATION.md)** | 렌더링 생명주기 최적화, 정밀 캐시 무효화 및 그래프 탐색 알고리즘 개편 명세<br/>*(Rendering Lifecycle Optimization, Precision Cache Invalidation & Graph Search Algorithm Refactoring)* | 🟢 `IMPLEMENTED` | `v2.2.0-beta.2` | 2026-09-09 | JEI 렌더 루프 리플렉션 캐싱, 스티키 노트/프레임 정밀 캐시 무효화 격리, findFrameEnclosingNode 직접 바운딩 검사, autoConnect 인덱스 최적화, 전역 대시보드 비활성 페이지 캐시 재활용 |
+| **[ADR-041](ADR_041_JUNCTION_EQUAL_AND_PRIORITY_SPLITTING.md)** | 정션 노드 균등 분할 및 AE2 스타일 우선순위 유량 분배 시스템 명세<br/>*(Junction Node Equal Splitting & AE2-Style Priority Flow Allocation Specification)* | 🟢 `IMPLEMENTED` | `v2.2.0-beta.2` | 2026-09-09 | 정션 노드 균등 분할(1/N) 및 AE2 스타일 우선순위 계층 연쇄 유량 분배 알고리즘, ConnectionEdge priority 확장 및 UI 연동 |
 
 ---
 
 ## 💡 활성 RFC 제안 목록 (Active RFC Proposals)
 
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
-| :---: | :--- | :--- :---: | :---: | :---: | :--- |
+| :---: | :--- | :---: | :---: | :---: | :--- |
 | **[RFC-013](../RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세<br/>*(Star Technology Modular Combustion Complex & Frame Boosting Integration)* | 🟡 `PARTIALLY_IMPLEMENTED` | `v2.2.0` | 2026-09-02 | Trait 기반 물리/승수(5A~12A, 냉각 1.2x/1.4x) 및 머신 설정 UI 통합 완료(Phase 1), 부수 유체 입력 주입 대기(Phase 2) |
-| **[RFC-037](../RFC_037_DOMAIN_PURITY_AND_DETERMINISTIC_DEDUCTION_REFACTORING.md)** | 도메인 엔티티 순수성 회복, 역방향 의존성 격리 및 결정론적 스펙 연역 무결성 개편 명세<br/>*(Domain Purity Restoration, Reverse Dependency Isolation & Deterministic Spec Deduction Refactoring)* | 🔵 `PROPOSED` | `v2.2.0-beta.2` | 2026-09-08 | api.catalog의 compat 역방향 참조 제거(ICapabilityMatrixProvider), RecipeNode 특화 필드 NodePropertyStore 이전, 최후 폴백 path.contains 제거 및 Set Exact Match 일원화, 리플렉션 static 캐싱 |
-
-
-
-
-
-
+| **[RFC-040](../RFC_040_RUNTIME_CONCURRENCY_REFLECTION_AND_GOD_CLASS_DECOMPOSITION.md)** | 런타임 동시성 무결성, 리플렉션 정적 최적화 및 갓 클래스 모듈화 명세<br/>*(Runtime Concurrency Integrity, Reflection Static Optimization & God Class Modular Decomposition Specification)* | 🔵 `PROPOSED` | `v2.2.0-beta.3` | 2026-09-09 | MultiblockDetector 13개 Set/Map 스레드 안전화, 다국어 텍스트 캐시 리로드 훅 연동, GTCEuRecipeHandler 47건 등 251개 리플렉션 static 캐싱, catch(Throwable ignored) 정제, 800라인 초과 갓 클래스 7종 SRP 모듈화 분해 |
 
 

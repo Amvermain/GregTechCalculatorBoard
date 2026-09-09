@@ -9,9 +9,10 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
+import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTRotorAddon;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.ParallelHelper;
@@ -44,6 +45,7 @@ public class MachineAddonTest {
     public void testMachineAddonsAndAbsoluteParallelHatch() {
         // 1. Test Absolute Parallel Hatch (4x parallel with ZERO extra power consumption)
         RecipeNode node = RecipeNode.create("Test Pyrolyse", 20.0, 30.0, GTVoltageTier.LV);
+        node.addAddon(new GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         node.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 100.0, 1.0));
         node.setMachineCount(1.0);
 
@@ -61,6 +63,7 @@ public class MachineAddonTest {
 
         // 2. Test Throughput Boosting Trait (4x Par, 1.6x Time, 0.95x EU)
         RecipeNode superPyrolyse = RecipeNode.create("Super Pyrolyse", 20.0, 30.0, GTVoltageTier.LV);
+        superPyrolyse.addAddon(new GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         MachineAddon boost = new MachineAddon("gtceu:throughput_boosting", "처리 부스팅", MachineAddon.Category.MULTIBLOCK_TRAIT, "", null);
         boost.setParallelMultiplier(4);
         boost.setDurationMultiplier(1.6);
@@ -87,7 +90,7 @@ public class MachineAddonTest {
         CompoundTag tag = superPyrolyse.serializeNBT();
         RecipeNode loadedNode = RecipeNode.deserializeNBT(tag);
         Assertions.assertNotNull(loadedNode);
-        Assertions.assertEquals(2, loadedNode.getAddons().size());
+        Assertions.assertEquals(3, loadedNode.getAddons().size());
         Assertions.assertEquals(superPyrolyse.getSingleMachineEUt(), loadedNode.getSingleMachineEUt(), 0.001);
         Assertions.assertEquals(superPyrolyse.getCyclesPerSecond(), loadedNode.getCyclesPerSecond(), 0.001);
     }
@@ -211,24 +214,28 @@ public class MachineAddonTest {
 
         // 2. Pyrolyse Oven: Speed 250% -> Duration 100/250 = 0.40x
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 20.0, 64.0, GTVoltageTier.MV);
+        pyrolyse.addAddon(new GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         pyrolyse.addAddon(hssgCoil.forMachine(pyrolyse.getName()));
         Assertions.assertEquals(0.40, pyrolyse.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(64.0, pyrolyse.getSingleMachineEUt(), 0.001);
 
         // 3. Cracking Unit: Energy 60% -> EU/t 0.60x
         RecipeNode cracker = RecipeNode.create("Cracking Unit", 20.0, 100.0, GTVoltageTier.HV);
+        cracker.addAddon(new GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", ResourceLocation.tryParse("gtceu:hv_energy_hatch"), GTVoltageTier.HV, 1, false, false, false));
         cracker.addAddon(hssgCoil.forMachine(cracker.getName()));
         Assertions.assertEquals(1.0, cracker.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(60.0, cracker.getSingleMachineEUt(), 0.001);
 
         // 4. Chemical Reactor: Speed 175% (0.5714x duration), Energy 80% (0.80x EU/t)
         RecipeNode lcr = RecipeNode.create("Large Chemical Reactor", 20.0, 100.0, GTVoltageTier.HV);
+        lcr.addAddon(new GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", ResourceLocation.tryParse("gtceu:hv_energy_hatch"), GTVoltageTier.HV, 1, false, false, false));
         lcr.addAddon(hssgCoil.forMachine(lcr.getName()));
         Assertions.assertEquals(11.0 / 20.0, lcr.getEffectiveDurationSeconds(), 0.001);
         Assertions.assertEquals(80.0, lcr.getSingleMachineEUt(), 0.001);
 
         // 5. Multi Smelter: Parallel 128x
         RecipeNode smelter = RecipeNode.create("Multi Smelter", 20.0, 16.0, GTVoltageTier.MV);
+        smelter.addAddon(new GTEnergyHatchAddon("gtceu:ev_energy_hatch", "EV Energy Hatch", "", ResourceLocation.tryParse("gtceu:ev_energy_hatch"), GTVoltageTier.EV, 1, false, false, false));
         MachineAddon smelterAddon = hssgCoil.forMachine(smelter.getName());
         smelter.addAddon(smelterAddon);
         Assertions.assertEquals(128, smelterAddon.getParallelMultiplier());
@@ -236,16 +243,19 @@ public class MachineAddonTest {
 
         // 6. EBF: 5% EU discount per 900K excess temperature above recipe's requirement
         RecipeNode ebfAluminium = RecipeNode.create("Electric Blast Furnace", 20.0, 100.0, GTVoltageTier.MV);
+        ebfAluminium.addAddon(new GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         ebfAluminium.setRecipeTemperature(1800);
         ebfAluminium.addAddon(hssgCoil.forMachine(ebfAluminium));
         Assertions.assertEquals(100.0 * Math.pow(0.95, 4), ebfAluminium.getSingleMachineEUt(), 0.001);
 
         RecipeNode ebfTungsten = RecipeNode.create("Electric Blast Furnace", 20.0, 100.0, GTVoltageTier.MV);
+        ebfTungsten.addAddon(new GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         ebfTungsten.setRecipeTemperature(3600);
         ebfTungsten.addAddon(hssgCoil.forMachine(ebfTungsten));
         Assertions.assertEquals(100.0 * Math.pow(0.95, 2), ebfTungsten.getSingleMachineEUt(), 0.001);
 
         RecipeNode ebfNaquadah = RecipeNode.create("Electric Blast Furnace", 20.0, 100.0, GTVoltageTier.MV);
+        ebfNaquadah.addAddon(new GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
         ebfNaquadah.setRecipeTemperature(5400);
         ebfNaquadah.addAddon(hssgCoil.forMachine(ebfNaquadah));
         Assertions.assertEquals(100.0, ebfNaquadah.getSingleMachineEUt(), 0.001);
@@ -1339,7 +1349,8 @@ public class MachineAddonTest {
         Assertions.assertTrue(MultiblockDetector.isCoilParallelMultiblock(multiSmelterId), "multi_smelter must be recognized as coil parallel");
         Assertions.assertFalse(MultiblockDetector.isCoilParallelMultiblock(absId), "alloy_blast_smelter must NOT be misidentified as coil parallel");
 
-        RecipeNode absNode = RecipeNode.create("Alloy Blast Smelter", 280.0, 100.0, GTVoltageTier.HV);
+        RecipeNode absNode = RecipeNode.create("Alloy Blast Smelter", 280.0, 100.0, GTVoltageTier.UHV);
+        absNode.addAddon(new GTEnergyHatchAddon("gtceu:uhv_energy_hatch", "UHV Energy Hatch", "", ResourceLocation.tryParse("gtceu:uhv_energy_hatch"), GTVoltageTier.UHV, 1, false, false, false));
         absNode.setMultiblock(true);
         absNode.setParallel(64);
         absNode.setMachineIcon(absId);

@@ -7,7 +7,7 @@
 > 📘 **상세 코드 명세서 시리즈**:
 > * 🇰🇷 **한국어 에디션**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **영문 에디션**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> 전체 v2.2.0-beta.1 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
+> 전체 v2.2.0-beta.2 아키텍처 명세서, 5대 그래프 알고리즘, 폐루프 질량 보존 가우스-요르단 선형 솔버, `CategoryCapabilityMatrix`, 및 2계층 온디맨드 멀티플레이어 스트리밍 프로토콜은 위 링크에서 확인할 수 있습니다.
 
 본 문서는 **GregTech Calculator Board (그렉텍 계산기 보드)**의 내부 시스템 아키텍처, 수학적 솔버 엔진, 캔버스 렌더링 파이프라인, 및 멀티 모드 호환성 계층(SPI)을 설명합니다.
 
@@ -41,17 +41,16 @@ graph TD
         Storage["storage.* (BoardManager, BoardPage, HistoryManager, BlueprintCodec, RecipeNodeSerializer)"]
         Preset["preset.* (CategoryMachinePreset, CategoryMachinePresetManager)"]
         Model["model.* (RecipeNode, ConnectionEdge, IngredientStack, CanvasGroupFrame, NodeRateCalculator, NodeWorkstationResolver)"]
-        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowGraphTopologyAnalyzer, FlowSummaryAggregator, ProductionETACalculator)"]
+        Solver["solver.* (FlowGraph, FlowGraphSolver, MassBalanceSolver, FlowBalanceMatrixSolver, FlowEdgeAllocator, FlowGraphModuleHandler)"]
         Linear["solver.linear.* (TwoStageLinearFlowSolver, GaussJordanEliminator, LinearEquationSystem)"]
         Stability["solver.* (ProcessStabilityAnalyzer, HarmonizedRatioOptimizer, AutoRatioEngine)"]
         Catalog["catalog.* (CapabilityMatrix, MachineAddonCatalog, PartCategory, MultiblockDetector)"]
-        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode, AutoRatioMode)"]
+        Type["type.* (GTVoltageTier, OverclockMode, EnergyType, SteamMode, FluidUnitMode, WireColorPreset, WireAnimationMode, SupplyMode, FlowSplitMode)"]
         Prop["property.* (NodeProperties, NodePropertyStore, NodeBadgeRegistry)"]
+        SPI["spi.* (ModAdapterRegistry, IModAdapter, IModExtension, Providers)"]
     end
 
-    subgraph Compat["3. 모드 호환성 공용 SPI 계층 (com.gtceu.calcboard.compat)"]
-        MAR["ModAdapterRegistry (우선순위 기반 동적 라우팅 SPI)"]
-        IMA["IModAdapter & 6대 Extension Provider (에너지, 레시피, 애드온, BOM, 부스터, 기능)"]
+    subgraph Compat["3. 모드 호환성 구현 계층 (com.gtceu.calcboard.compat)"]
         subgraph Adapters["도메인 모드 어댑터 (100% 헤드리스 안전)"]
             GT["gtceu (GTCEuMachineAnalyzer, physics.GTBoilerPhysics, physics.GTTurbinePhysics, physics.GTFusionHelper, helper.GTCombustionHelper, BOMResolver)"]
             CR_MOD["create (CreateSequencedRecipeExtractor, RPM/SU, 스트레스 용량, 키네틱 기계)"]
@@ -63,8 +62,7 @@ graph TD
             ST["start (StarTReflectionBridge, 플라즈마 터빈, 스레딩 헬릭스 구조체, SPT/NPT 특성)"]
             VN["vanilla (무전력 패시브 폴백)"]
         end
-        MAR --> IMA
-        IMA --> Adapters
+        SPI --> Adapters
     end
 
     subgraph ServerNet["4. 멀티플레이어 서버 & 네트워크 (server / network)"]
@@ -151,6 +149,22 @@ graph TD
 ### 2.10 2단계 선형 연립방정식 유량 솔버 & 정션 앵커링 (ADR-034 & ADR-035)
 * **2단계 선형 연립방정식 유량 솔버 (`TwoStageLinearFlowSolver`)**: 복합 순환 및 분기 공정에서 1단계 연속 유량 균형 연산(가우스-요르단 소거법)과 2단계 정수 양자화(천장 함수 및 비례 스케일링)를 통해 단 1회의 클릭으로 결정론적 수렴을 보장합니다.
 * **정션 완충 배선 및 유량 앵커 시스템**: 포트 드래그를 통한 잉여 배출, 결핍 공급, 보이드 싱크 원클릭 생성과, 고정 정션 노드를 기준 앵커로 설정하여 목표 유량에 맞춘 상·하류 기계 대수 연쇄 자동 역산을 지원합니다.
+
+### 2.11 도메인 순수성 및 SPI 계층 분리 (`com.gtceu.calcboard.api.spi`, ADR-037)
+* **SPI 패키지 완전 이전**: `ModAdapterRegistry` 및 `IModAdapter`를 `api.spi`로 이전하여 API와 호환 계층 간의 역방향 순환 참조를 0건으로 근절했습니다.
+* **순수 도메인 엔티티 확립**: `RecipeNode` 내부의 모드 특화 필드를 전면 제거하고, 모드별 상태와 유효성 검증 및 에너지 모델을 오직 SPI 어댑터와 `NodePropertyStore`를 통해 관리합니다.
+
+### 2.12 시뮬레이션 순수성 및 불변식 보호 (ADR-038)
+* **부수 효과 없는 순수 연산**: 유량 균형 연산 과정에서 노드 포트나 토폴로지를 임의로 변조하지 않는 순수 함수성을 보장합니다.
+* **복합 모듈 스케일 보존**: 모듈 축소 및 펼침 생명주기 전반에서 내부 서브 프로세스 노드들의 축소 배율을 결정론적으로 보존합니다.
+
+### 2.13 정밀 캐시 무효화 및 렌더링 생명주기 최적화 (ADR-039)
+* **무효화 격리 경계 구축**: 스티키 메모나 그룹 프레임의 이동, 크기 조절, 색상 변경 시 전역 유량 재계산이나 노드 카드 텍스트 캐시 무효화가 격리되어 불필요한 프레임 낭비를 방지합니다.
+* **리플렉션 캐싱 및 공간 색인 검색 가속**: 레시피 뷰어(JEI/EMI)의 키보드 포커스 리플렉션 오버헤드를 1회 캐싱으로 제거하고, 사전 색인된 바운즈를 활용하여 프레임 감지 및 자동 연결을 가속합니다.
+
+### 2.14 정션 노드 균등 분할 및 계층형 우선순위 유량 분배 (ADR-041)
+* **이중 분할 모드 (`FlowSplitMode`)**: 정션 노드에서 하류 수요 가중치 기반 비례 분할(`PROPORTIONAL`)과 기계적 균등 분할(`EQUAL`, 1/N)을 지원합니다.
+* **계층형 우선순위 연쇄 분배 (`FlowEdgeAllocator`)**: 연결선에 정수형 `priority`를 부여하여 상위 우선순위 라인부터 먼저 충족하고, 각 우선순위 계층 내부의 잔여 유량은 정션의 분할 방식에 따라 분배합니다.
 
 ---
 

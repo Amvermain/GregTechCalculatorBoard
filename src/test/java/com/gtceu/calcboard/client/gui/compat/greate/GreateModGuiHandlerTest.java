@@ -5,9 +5,10 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.compat.IModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.greate.GreateProperties;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -85,7 +86,7 @@ public class GreateModGuiHandlerTest {
         node.getProperties().set(GreateProperties.REQUIRED_RECIPE_TIER, 2); // MS
         node.getProperties().set(GreateProperties.MACHINE_TIER, 0); // ULS (Deficit)
 
-        com.gtceu.calcboard.compat.IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         Assertions.assertInstanceOf(com.gtceu.calcboard.compat.greate.GreateModAdapter.class, adapter);
 
         java.util.List<net.minecraft.network.chat.Component> warnings = new java.util.ArrayList<>();
@@ -136,7 +137,7 @@ public class GreateModGuiHandlerTest {
         node.setRecipeCategoryId(ResourceLocation.tryParse("tfg:compacting"));
         node.getProperties().set(GreateProperties.IS_GREATE, true);
 
-        com.gtceu.calcboard.compat.IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         Assertions.assertInstanceOf(com.gtceu.calcboard.compat.greate.GreateModAdapter.class, adapter);
 
         IModGuiHandler guiHandler = ModGuiHandlerRegistry.getHandlerForNode(node);
@@ -145,10 +146,10 @@ public class GreateModGuiHandlerTest {
 
     @Test
     public void testIgnoredWorkstationFiltering() {
-        Assertions.assertTrue(EmiRecipeConverter.isIgnoredWorkstation(ResourceLocation.tryParse("gtceu:dimension_marker")));
-        Assertions.assertTrue(EmiRecipeConverter.isIgnoredWorkstation(ResourceLocation.tryParse("start_core:temperature_marker_item")));
-        Assertions.assertTrue(EmiRecipeConverter.isIgnoredWorkstation(null));
-        Assertions.assertFalse(EmiRecipeConverter.isIgnoredWorkstation(ResourceLocation.tryParse("greate:steel_mechanical_press")));
+        Assertions.assertTrue(RecipeConversionHelper.isIgnoredWorkstation(ResourceLocation.tryParse("gtceu:dimension_marker")));
+        Assertions.assertTrue(RecipeConversionHelper.isIgnoredWorkstation(ResourceLocation.tryParse("start_core:temperature_marker_item")));
+        Assertions.assertTrue(RecipeConversionHelper.isIgnoredWorkstation(null));
+        Assertions.assertFalse(RecipeConversionHelper.isIgnoredWorkstation(ResourceLocation.tryParse("greate:steel_mechanical_press")));
     }
 
     @Test

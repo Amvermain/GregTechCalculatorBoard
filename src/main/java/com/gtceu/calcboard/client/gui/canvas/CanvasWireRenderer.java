@@ -14,13 +14,18 @@ import net.minecraft.client.gui.screens.Screen;
 import com.gtceu.calcboard.client.gui.util.OklabColorUtil;
 
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Handles spatial indexing, Bezier wire batch rendering, viewport culling, and animated pulse dots on the canvas.
  */
 public class CanvasWireRenderer {
+
+    public record WirePriorityBadge(float x, float y, int priority) {}
 
     private final WireSpatialIndex wireSpatialIndex = new WireSpatialIndex();
     private final FloatArrayList visibleWiresBuffer = new FloatArrayList();
@@ -79,53 +84,60 @@ public class CanvasWireRenderer {
 
         ConnectionRenderer.beginBatch(graphics);
         visibleWiresBuffer.clear();
+        List<WirePriorityBadge> priorityBadges = new ArrayList<>();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
             RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
             RecipeNode toNode = graph.findNodeById(edge.toNodeId());
-            if (fromNode != null && toNode != null) {
-                NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
-                NodeWidget toWidget = screen.findWidgetForNode(toNode);
-                if (fromWidget != null && toWidget != null) {
-                    float x1 = fromWidget.getOutputPortX(edge.outputIndex());
-                    float y1 = fromWidget.getOutputPortY(edge.outputIndex());
-                    float x2 = toWidget.getInputPortX(edge.inputIndex());
-                    float y2 = toWidget.getInputPortY(edge.inputIndex());
+            if (fromNode == null || toNode == null) continue;
 
-                    float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
-                    float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
+            NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
+            NodeWidget toWidget = screen.findWidgetForNode(toNode);
+            if (fromWidget == null || toWidget == null) continue;
 
-                    ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, scratchCp);
+            float x1 = fromWidget.getOutputPortX(edge.outputIndex());
+            float y1 = fromWidget.getOutputPortY(edge.outputIndex());
+            float x2 = toWidget.getInputPortX(edge.inputIndex());
+            float y2 = toWidget.getInputPortY(edge.inputIndex());
 
-                    float minX = Math.min(Math.min(x1, x2), Math.min(scratchCp[0], scratchCp[2])) - 16.0f;
-                    float maxX = Math.max(Math.max(x1, x2), Math.max(scratchCp[0], scratchCp[2])) + 16.0f;
-                    float minY = Math.min(Math.min(y1, y2), Math.min(scratchCp[1], scratchCp[3])) - 16.0f;
-                    float maxY = Math.max(Math.max(y1, y2), Math.max(scratchCp[1], scratchCp[3])) + 16.0f;
-                    if (maxX < screenLeft || minX > screenRight || maxY < screenTop || minY > screenBottom) {
-                        continue;
-                    }
+            float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
+            float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
 
-                    float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
-                    boolean isHovered = edge.equals(hoveredEdge);
-                    boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
-                    int defWireColor = BoardManager.getInstance().getWireColor();
-                    int matchedWireColor = BoardManager.getInstance().getMatchedWireColor();
-                    WireStyle wireStyle = resolveWireStyle(isHovered, isWireGlowing, satRatio, defWireColor, matchedWireColor);
-                    ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, wireStyle.color(), wireStyle.thickness());
+            ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, scratchCp);
 
-                    float fromEff = resolveFromEfficiency(graph, fromNode);
-                    float badgeCode = resolveBadgeCode(fromNode);
-
-                    visibleWiresBuffer.add(x1);
-                    visibleWiresBuffer.add(y1);
-                    visibleWiresBuffer.add(x2);
-                    visibleWiresBuffer.add(y2);
-                    visibleWiresBuffer.add(fromDirX);
-                    visibleWiresBuffer.add(toDirX);
-                    visibleWiresBuffer.add(satRatio);
-                    visibleWiresBuffer.add(fromEff);
-                    visibleWiresBuffer.add(badgeCode);
-                }
+            float minX = Math.min(Math.min(x1, x2), Math.min(scratchCp[0], scratchCp[2])) - 16.0f;
+            float maxX = Math.max(Math.max(x1, x2), Math.max(scratchCp[0], scratchCp[2])) + 16.0f;
+            float minY = Math.min(Math.min(y1, y2), Math.min(scratchCp[1], scratchCp[3])) - 16.0f;
+            float maxY = Math.max(Math.max(y1, y2), Math.max(scratchCp[1], scratchCp[3])) + 16.0f;
+            if (maxX < screenLeft || minX > screenRight || maxY < screenTop || minY > screenBottom) {
+                continue;
             }
+
+            if (edge.priority() > 0) {
+                float mx = (x1 + 3 * scratchCp[0] + 3 * scratchCp[2] + x2) * 0.125f;
+                float my = (y1 + 3 * scratchCp[1] + 3 * scratchCp[3] + y2) * 0.125f;
+                priorityBadges.add(new WirePriorityBadge(mx, my, edge.priority()));
+            }
+
+            float satRatio = calculateSaturationRatio(graph, toNode, edge.inputIndex());
+            boolean isHovered = edge.equals(hoveredEdge);
+            boolean isWireGlowing = TutorialManager.getInstance().isWireGlowing(fromNode.getId(), toNode.getId());
+            int defWireColor = BoardManager.getInstance().getWireColor();
+            int matchedWireColor = BoardManager.getInstance().getMatchedWireColor();
+            WireStyle wireStyle = resolveWireStyle(isHovered, isWireGlowing, satRatio, defWireColor, matchedWireColor);
+            ConnectionRenderer.addBezierToBatch(x1, y1, x2, y2, fromDirX, toDirX, wireStyle.color(), wireStyle.thickness());
+
+            float fromEff = resolveFromEfficiency(graph, fromNode);
+            float badgeCode = resolveBadgeCode(fromNode);
+
+            visibleWiresBuffer.add(x1);
+            visibleWiresBuffer.add(y1);
+            visibleWiresBuffer.add(x2);
+            visibleWiresBuffer.add(y2);
+            visibleWiresBuffer.add(fromDirX);
+            visibleWiresBuffer.add(toDirX);
+            visibleWiresBuffer.add(satRatio);
+            visibleWiresBuffer.add(fromEff);
+            visibleWiresBuffer.add(badgeCode);
         }
 
         // Render Active Wire Dragging (Single or Multi-Port Bundle)
@@ -177,6 +189,29 @@ public class CanvasWireRenderer {
         var animMode = BoardManager.getInstance().getWireAnimationMode();
         if (zoom >= 0.28 && animMode != com.gtceu.calcboard.api.type.WireAnimationMode.DISABLED) {
             ConnectionRenderer.renderPulseDotsBatch(graphics, visibleWiresBuffer, animMode);
+        }
+
+        if (!priorityBadges.isEmpty() && zoom >= 0.28) {
+            renderPriorityBadges(graphics, priorityBadges);
+        }
+    }
+
+    private static void renderPriorityBadges(GuiGraphics graphics, List<WirePriorityBadge> badges) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) return;
+        Font font = mc.font;
+
+        for (WirePriorityBadge b : badges) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(b.x(), b.y(), 0.0f);
+            graphics.pose().scale(0.65f, 0.65f, 1.0f);
+            String text = "P" + b.priority();
+            int tw = font.width(text);
+            int halfW = tw / 2;
+            graphics.fill(-halfW - 3, -6, halfW + 3, 6, 0xEE181A22);
+            graphics.renderOutline(-halfW - 3, -6, tw + 6, 12, 0xFFEAB308);
+            graphics.drawString(font, text, -halfW, -4, 0xFFFACC15, false);
+            graphics.pose().popPose();
         }
     }
 

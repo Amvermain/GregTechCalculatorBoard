@@ -52,7 +52,40 @@ public class GTCEuMultiblockScanner {
         if (id == null) return;
 
         GTCEuMachineAnalyzer.MachineCapabilities caps = GTCEuMachineAnalyzer.analyze(id, def);
-        MultiblockDetector.registerMachineCapabilities(id, caps);
+        if (caps != null) {
+            if (caps.isMultiblock()) {
+                MultiblockDetector.registerMultiblock(id);
+            }
+            if (caps.isCoilWorkable()) {
+                MultiblockDetector.registerCoilMultiblock(id, null);
+            }
+            if (caps.isTurbine()) {
+                MultiblockDetector.registerTurbine(id, null, caps.turbineTier(), caps.turbineBaseEnergy());
+            }
+            if (caps.isSteam()) {
+                MultiblockDetector.registerSteamMultiblock(id, caps.defaultParallel(), caps.steamDrainRate());
+            } else if (caps.defaultParallel() > 1) {
+                MultiblockDetector.registerDefaultParallel(id, caps.defaultParallel());
+            }
+            if (caps.supportsParallelHatch()) {
+                MultiblockDetector.registerParallelHatchMultiblock(id);
+            }
+            if (caps.supportsBatchMode()) {
+                MultiblockDetector.registerBatchModeMultiblock(id);
+            }
+            if (caps.supportsThroughputBoosting()) {
+                MultiblockDetector.registerThroughputBoostingMultiblock(id);
+            }
+            if (caps.supportsBulkProcessing()) {
+                MultiblockDetector.registerBulkProcessingMultiblock(id);
+            }
+            if (caps.supportsOverpressure()) {
+                MultiblockDetector.registerOverpressureMultiblock(id);
+            }
+            if (caps.supportsLaserHatch()) {
+                MultiblockDetector.registerLaserHatchMultiblock(id);
+            }
+        }
 
         registerMachineRecipeCategories(id, def, caps);
     }
@@ -104,20 +137,7 @@ public class GTCEuMultiblockScanner {
                 if (rmObj == null) return;
 
                 if (rmObj instanceof dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
-                    if (emiManager.getCategories() != null) {
-                        for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : emiManager.getCategories()) {
-                            if (cat == null || cat.getId() == null) continue;
-                            String catPath = cat.getId().getPath();
-                            if (catPath.equals("multiblock_info") || catPath.contains("multiblock")) {
-                                List<dev.emi.emi.api.recipe.EmiRecipe> mbRecipes = emiManager.getRecipes(cat);
-                                if (mbRecipes != null) {
-                                    for (dev.emi.emi.api.recipe.EmiRecipe recipe : mbRecipes) {
-                                        processGTCEuEmiMultiblockRecipe(recipe);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    scanEmiManager(emiManager);
                     return;
                 }
 
@@ -133,18 +153,43 @@ public class GTCEuMultiblockScanner {
                 }
 
                 if (recipes != null) {
-                    for (Object recipeObj : recipes) {
-                        if (recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe) {
-                            if (recipe.getCategory() != null && recipe.getCategory().getId() != null) {
-                                String catPath = recipe.getCategory().getId().getPath();
-                                if (catPath.equals("multiblock_info") || catPath.contains("multiblock")) {
-                                    processGTCEuEmiMultiblockRecipe(recipe);
-                                }
-                            }
-                        }
-                    }
+                    scanGenericRecipeList(recipes);
                 }
             } catch (Throwable ignored) {}
+        }
+
+        private static void scanEmiManager(dev.emi.emi.api.recipe.EmiRecipeManager emiManager) {
+            if (emiManager.getCategories() == null) return;
+            for (dev.emi.emi.api.recipe.EmiRecipeCategory cat : emiManager.getCategories()) {
+                if (cat == null || cat.getId() == null) continue;
+                if (!isMultiblockCategoryPath(cat.getId().getPath())) continue;
+                List<dev.emi.emi.api.recipe.EmiRecipe> mbRecipes = emiManager.getRecipes(cat);
+                if (mbRecipes == null) continue;
+                for (dev.emi.emi.api.recipe.EmiRecipe recipe : mbRecipes) {
+                    processGTCEuEmiMultiblockRecipe(recipe);
+                }
+            }
+        }
+
+        private static void scanGenericRecipeList(Iterable<?> recipes) {
+            for (Object recipeObj : recipes) {
+                if (!(recipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe)) continue;
+                if (recipe.getCategory() == null || recipe.getCategory().getId() == null) continue;
+                if (isMultiblockCategoryPath(recipe.getCategory().getId().getPath())) {
+                    processGTCEuEmiMultiblockRecipe(recipe);
+                }
+            }
+        }
+
+        private static final java.util.Set<String> MULTIBLOCK_CATEGORY_NAMES = java.util.Set.of(
+                "multiblock_info", "multiblock"
+        );
+
+        private static boolean isMultiblockCategoryPath(String catPath) {
+            if (catPath == null) return false;
+            return MULTIBLOCK_CATEGORY_NAMES.contains(catPath)
+                    || catPath.startsWith("multiblock_")
+                    || catPath.endsWith("_multiblock");
         }
 
         private static void processGTCEuEmiMultiblockRecipe(dev.emi.emi.api.recipe.EmiRecipe recipe) {

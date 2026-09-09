@@ -145,29 +145,17 @@ public class RecipeSearchEngine {
             }
         }
 
-        // 1. First pass: exact category/workstation match + exact input match, scored by secondary inputs
         SearchableRecipe bestSr = null;
         int maxScore = -1;
 
         for (SearchableRecipe sr : allRecipes) {
-            if (!sr.isSupported()) continue;
-            if (sr.hasExactInput(inputId)) {
-                String srCat = sr.categoryId();
-                if (srCat != null && !srCat.isEmpty()) {
-                    String lowerCat = srCat.toLowerCase(Locale.ROOT);
-                    boolean catMatched = targetKeys.contains(lowerCat);
-                    if (!catMatched && lowerCat.contains(":")) {
-                        String path = lowerCat.substring(lowerCat.indexOf(':') + 1);
-                        catMatched = targetKeys.contains(path);
-                    }
-                    if (catMatched) {
-                        int score = calculateSecondaryMatchScore(sr, templateInputIds, inputId);
-                        if (score > maxScore) {
-                            maxScore = score;
-                            bestSr = sr;
-                        }
-                    }
-                }
+            if (!sr.isSupported() || !sr.hasExactInput(inputId)) continue;
+            if (!matchesCategoryOrWorkstation(sr.categoryId(), targetKeys)) continue;
+
+            int score = calculateSecondaryMatchScore(sr, templateInputIds, inputId);
+            if (score > maxScore) {
+                maxScore = score;
+                bestSr = sr;
             }
         }
 
@@ -175,39 +163,64 @@ public class RecipeSearchEngine {
             return bestSr;
         }
 
-        // 2. Second pass: category name / partial match if exact didn't hit
         String nodeName = templateNode.getName();
         String baseName = nodeName != null && nodeName.contains(" (") ? nodeName.substring(0, nodeName.indexOf(" (")).toLowerCase(Locale.ROOT).trim() : (nodeName != null ? nodeName.toLowerCase(Locale.ROOT).trim() : "");
 
         for (SearchableRecipe sr : allRecipes) {
-            if (!sr.isSupported()) continue;
-            if (sr.hasExactInput(inputId)) {
-                String catName = sr.categoryName();
-                if (catName != null && !baseName.isEmpty() && catName.toLowerCase(Locale.ROOT).contains(baseName)) {
-                    int score = calculateSecondaryMatchScore(sr, templateInputIds, inputId);
-                    if (score > maxScore) {
-                        maxScore = score;
-                        bestSr = sr;
-                    }
-                }
+            if (!sr.isSupported() || !sr.hasExactInput(inputId)) continue;
+            String catName = sr.categoryName();
+            if (catName == null || baseName.isEmpty() || !catName.toLowerCase(Locale.ROOT).contains(baseName)) continue;
+
+            int score = calculateSecondaryMatchScore(sr, templateInputIds, inputId);
+            if (score > maxScore) {
+                maxScore = score;
+                bestSr = sr;
             }
         }
 
         return bestSr;
     }
 
+    private static boolean matchesCategoryOrWorkstation(String srCat, Set<String> targetKeys) {
+        if (srCat == null || srCat.isEmpty()) return false;
+        String lowerCat = srCat.toLowerCase(Locale.ROOT);
+        if (targetKeys.contains(lowerCat)) return true;
+        if (lowerCat.contains(":")) {
+            String path = lowerCat.substring(lowerCat.indexOf(':') + 1);
+            return targetKeys.contains(path);
+        }
+        return false;
+    }
+
     private static int calculateSecondaryMatchScore(SearchableRecipe sr, Set<ResourceLocation> templateInputIds, ResourceLocation mainInputId) {
+        if (sr.inputIds() == null || templateInputIds == null || templateInputIds.isEmpty()) return 0;
         int score = 0;
-        if (sr.inputIds() != null && templateInputIds != null && !templateInputIds.isEmpty()) {
-            for (ResourceLocation inId : sr.inputIds()) {
-                if (inId != null && !inId.equals(mainInputId)) {
-                    if (templateInputIds.contains(inId)) {
-                        score += 100;
-                    }
-                }
+        for (ResourceLocation inId : sr.inputIds()) {
+            if (inId == null || inId.equals(mainInputId)) continue;
+            if (templateInputIds.contains(inId)) {
+                score += 100;
             }
         }
         return score;
+    }
+
+    private record ParsedPrefix(Scope scope, boolean negated) {}
+
+    private static ParsedPrefix parsePrefix(String prefix) {
+        if (prefix == null || prefix.isEmpty()) {
+            return new ParsedPrefix(Scope.ALL, false);
+        }
+        String p = prefix.toLowerCase(Locale.ROOT);
+        boolean neg = p.startsWith("!");
+        if (neg) p = p.substring(1);
+
+        if (p.equals("in:") || p.equals("input:") || p.equals(">")) {
+            return new ParsedPrefix(Scope.INPUT, neg);
+        }
+        if (p.equals("out:") || p.equals("output:") || p.equals("<") || p.equals("^")) {
+            return new ParsedPrefix(Scope.OUTPUT, neg);
+        }
+        return new ParsedPrefix(Scope.ALL, neg);
     }
 
     public record StackSearchData(String name, String searchText) {}
@@ -264,18 +277,9 @@ public class RecipeSearchEngine {
                 if (quoted != null) {
                     token = quoted.trim();
                     type = MatchType.GENERAL;
-                    if (prefix != null && !prefix.isEmpty()) {
-                        String p = prefix.toLowerCase(Locale.ROOT);
-                        if (p.startsWith("!")) {
-                            negated = true;
-                            p = p.substring(1);
-                        }
-                        if (p.equals("in:") || p.equals("input:") || p.equals(">")) {
-                            scope = Scope.INPUT;
-                        } else if (p.equals("out:") || p.equals("output:") || p.equals("<") || p.equals("^")) {
-                            scope = Scope.OUTPUT;
-                        }
-                    }
+                    ParsedPrefix pp = parsePrefix(prefix);
+                    scope = pp.scope();
+                    negated = pp.negated();
                 } else if (bracketed != null) {
                     token = bracketed.trim();
                     type = MatchType.CATEGORY;
@@ -455,78 +459,102 @@ public class RecipeSearchEngine {
     public static MatchedOutputResult findMatchedOutput(SearchableRecipe recipe, ParsedQuery query, ResourceLocation contextId, String contextName) {
         if (recipe == null) return null;
 
-        // 1. Contextual Wire Target Match
-        if (contextId != null && recipe.outputIds() != null) {
-            for (int i = 0; i < recipe.outputIds().length; i++) {
-                ResourceLocation outId = recipe.outputIds()[i];
-                if (outId != null && (outId.equals(contextId) || outId.getPath().equalsIgnoreCase(contextId.getPath()))) {
-                    String name = (recipe.outputNames() != null && i < recipe.outputNames().length) ? recipe.outputNames()[i] : null;
-                    return new MatchedOutputResult(outId, name, i);
-                }
+        MatchedOutputResult byId = findMatchedOutputByContextId(recipe, contextId);
+        if (byId != null) return byId;
+
+        MatchedOutputResult byName = findMatchedOutputByContextName(recipe, contextName);
+        if (byName != null) return byName;
+
+        return findMatchedOutputByQuery(recipe, query);
+    }
+
+    private static MatchedOutputResult findMatchedOutputByContextId(SearchableRecipe recipe, ResourceLocation contextId) {
+        if (contextId == null || recipe.outputIds() == null) return null;
+        for (int i = 0; i < recipe.outputIds().length; i++) {
+            ResourceLocation outId = recipe.outputIds()[i];
+            if (outId != null && (outId.equals(contextId) || outId.getPath().equalsIgnoreCase(contextId.getPath()))) {
+                String name = (recipe.outputNames() != null && i < recipe.outputNames().length) ? recipe.outputNames()[i] : null;
+                return new MatchedOutputResult(outId, name, i);
             }
         }
-        if (contextName != null && !contextName.isEmpty() && recipe.outputNames() != null) {
-            for (int i = 0; i < recipe.outputNames().length; i++) {
-                String outName = recipe.outputNames()[i];
-                if (outName != null && outName.equalsIgnoreCase(contextName)) {
-                    ResourceLocation id = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
-                    return new MatchedOutputResult(id, outName, i);
-                }
-            }
-        }
-
-        // 2. Query Search Match
-        if (query != null && !query.isEmpty() && query.orGroups() != null && recipe.outputNames() != null) {
-            for (AndGroup group : query.orGroups()) {
-                for (QueryTerm term : group.terms()) {
-                    if (term.negated()) continue;
-                    if (term.scope() == Scope.INPUT || term.type() == MatchType.CATEGORY) continue;
-
-                    String t = term.text().toLowerCase(Locale.ROOT).trim();
-                    String tSpaced = t.replace('_', ' ').trim();
-                    String tUnder = t.replace(' ', '_').trim();
-                    if (t.isEmpty()) continue;
-
-                    // Priority 1: Exact or prefix match across outputs
-                    for (int i = 0; i < recipe.outputNames().length; i++) {
-                        String outName = recipe.outputNames()[i];
-                        ResourceLocation outId = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
-                        if (outName != null) {
-                            String lowerName = outName.toLowerCase(Locale.ROOT);
-                            if (lowerName.equals(t) || lowerName.equals(tSpaced) || lowerName.startsWith(t) || lowerName.startsWith(tSpaced)) {
-                                return new MatchedOutputResult(outId, outName, i);
-                            }
-                        }
-                        if (outId != null) {
-                            String lowerPath = outId.getPath().toLowerCase(Locale.ROOT);
-                            if (lowerPath.equals(t) || lowerPath.equals(tUnder) || lowerPath.startsWith(t) || lowerPath.startsWith(tUnder)) {
-                                return new MatchedOutputResult(outId, outName, i);
-                            }
-                        }
-                    }
-
-                    // Priority 2: Contains substring match across outputs
-                    for (int i = 0; i < recipe.outputNames().length; i++) {
-                        String outName = recipe.outputNames()[i];
-                        ResourceLocation outId = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
-                        if (outName != null) {
-                            String lowerName = outName.toLowerCase(Locale.ROOT);
-                            if (lowerName.contains(t) || (!tSpaced.isEmpty() && lowerName.contains(tSpaced))) {
-                                return new MatchedOutputResult(outId, outName, i);
-                            }
-                        }
-                        if (outId != null) {
-                            String lowerPath = outId.getPath().toLowerCase(Locale.ROOT);
-                            if (lowerPath.contains(t) || (!tUnder.isEmpty() && lowerPath.contains(tUnder))) {
-                                return new MatchedOutputResult(outId, outName, i);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         return null;
+    }
+
+    private static MatchedOutputResult findMatchedOutputByContextName(SearchableRecipe recipe, String contextName) {
+        if (contextName == null || contextName.isEmpty() || recipe.outputNames() == null) return null;
+        for (int i = 0; i < recipe.outputNames().length; i++) {
+            String outName = recipe.outputNames()[i];
+            if (outName != null && outName.equalsIgnoreCase(contextName)) {
+                ResourceLocation id = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
+                return new MatchedOutputResult(id, outName, i);
+            }
+        }
+        return null;
+    }
+
+    private static MatchedOutputResult findMatchedOutputByQuery(SearchableRecipe recipe, ParsedQuery query) {
+        if (query == null || query.isEmpty() || query.orGroups() == null || recipe.outputNames() == null) return null;
+        for (AndGroup group : query.orGroups()) {
+            MatchedOutputResult match = findMatchedOutputInGroup(recipe, group);
+            if (match != null) return match;
+        }
+        return null;
+    }
+
+    private static MatchedOutputResult findMatchedOutputInGroup(SearchableRecipe recipe, AndGroup group) {
+        for (QueryTerm term : group.terms()) {
+            MatchedOutputResult match = findMatchedOutputForTerm(recipe, term);
+            if (match != null) return match;
+        }
+        return null;
+    }
+
+    private static MatchedOutputResult findMatchedOutputForTerm(SearchableRecipe recipe, QueryTerm term) {
+        if (term.negated()) return null;
+        if (term.scope() == Scope.INPUT || term.type() == MatchType.CATEGORY) return null;
+
+        String t = term.text().toLowerCase(Locale.ROOT).trim();
+        if (t.isEmpty()) return null;
+        String tSpaced = t.replace('_', ' ').trim();
+        String tUnder = t.replace(' ', '_').trim();
+
+        MatchedOutputResult exactMatch = matchOutputTerm(recipe, t, tSpaced, tUnder, true);
+        if (exactMatch != null) return exactMatch;
+
+        return matchOutputTerm(recipe, t, tSpaced, tUnder, false);
+    }
+
+    private static MatchedOutputResult matchOutputTerm(SearchableRecipe recipe, String t, String tSpaced, String tUnder, boolean exactOnly) {
+        if (recipe.outputNames() == null) return null;
+        for (int i = 0; i < recipe.outputNames().length; i++) {
+            String outName = recipe.outputNames()[i];
+            ResourceLocation outId = (recipe.outputIds() != null && i < recipe.outputIds().length) ? recipe.outputIds()[i] : null;
+
+            if (matchesOutputNameOrPath(outName, outId, t, tSpaced, tUnder, exactOnly)) {
+                return new MatchedOutputResult(outId, outName, i);
+            }
+        }
+        return null;
+    }
+
+    private static boolean matchesOutputNameOrPath(String outName, ResourceLocation outId, String t, String tSpaced, String tUnder, boolean exactOnly) {
+        if (outName != null) {
+            String lowerName = outName.toLowerCase(Locale.ROOT);
+            if (exactOnly) {
+                if (lowerName.equals(t) || lowerName.equals(tSpaced) || lowerName.startsWith(t) || lowerName.startsWith(tSpaced)) return true;
+            } else {
+                if (lowerName.contains(t) || (!tSpaced.isEmpty() && lowerName.contains(tSpaced))) return true;
+            }
+        }
+        if (outId != null) {
+            String lowerPath = outId.getPath().toLowerCase(Locale.ROOT);
+            if (exactOnly) {
+                return lowerPath.equals(t) || lowerPath.equals(tUnder) || lowerPath.startsWith(t) || lowerPath.startsWith(tUnder);
+            } else {
+                return lowerPath.contains(t) || (!tUnder.isEmpty() && lowerPath.contains(tUnder));
+            }
+        }
+        return false;
     }
 
     /**
@@ -566,23 +594,7 @@ public class RecipeSearchEngine {
                 score += 10000;
             }
 
-            int sharedOutputs = 0;
-            if (sr.outputIds() != null) {
-                for (ResourceLocation rid : sr.outputIds()) {
-                    if (rid != null && outIds.contains(rid)) {
-                        sharedOutputs++;
-                        score += 4000;
-                    }
-                }
-            }
-            if (sr.outputNames() != null) {
-                for (String oname : sr.outputNames()) {
-                    if (oname != null && outNames.contains(oname.toLowerCase(Locale.ROOT))) {
-                        sharedOutputs++;
-                        score += 2000;
-                    }
-                }
-            }
+            score += calculateAlternativeSharedScore(sr, outIds, outNames);
 
             if (score > 0) {
                 list.add(new ScoredAlternative(sr, score));
@@ -595,6 +607,25 @@ public class RecipeSearchEngine {
                 .limit(80)
                 .map(ScoredAlternative::recipe)
                 .toList();
+    }
+
+    private static int calculateAlternativeSharedScore(SearchableRecipe sr, Set<ResourceLocation> outIds, Set<String> outNames) {
+        int score = 0;
+        if (sr.outputIds() != null) {
+            for (ResourceLocation rid : sr.outputIds()) {
+                if (rid != null && outIds.contains(rid)) {
+                    score += 4000;
+                }
+            }
+        }
+        if (sr.outputNames() != null) {
+            for (String oname : sr.outputNames()) {
+                if (oname != null && outNames.contains(oname.toLowerCase(Locale.ROOT))) {
+                    score += 2000;
+                }
+            }
+        }
+        return score;
     }
 
     /**
@@ -617,23 +648,12 @@ public class RecipeSearchEngine {
                 String tSpaced = t.replace('_', ' ').trim();
                 String tUnder = t.replace(' ', '_').trim();
                 String tClean = t.replaceAll("_+$", "").trim();
-                if (term.scope() == Scope.OUTPUT) {
-                    if (!matchesOutput(recipe, term.type(), t, tSpaced, tUnder, tClean)) {
-                        allInOutputs = false;
-                    }
-                    allInInputsOrCat = false;
-                } else if (term.scope() == Scope.INPUT) {
-                    if (!matchesInput(recipe, term.type(), t, tSpaced, tUnder, tClean)) {
-                        allInInputsOrCat = false;
-                    }
+
+                if (allInOutputs && !checkTermMatch(recipe, term, t, tSpaced, tUnder, tClean, true)) {
                     allInOutputs = false;
-                } else {
-                    if (!recipe.outputSearchIndex().contains(t) && !recipe.displayName().toLowerCase(Locale.ROOT).contains(t)) {
-                        allInOutputs = false;
-                    }
-                    if (!recipe.inputSearchIndex().contains(t) && !recipe.categoryName().contains(t) && !recipe.categoryId().contains(t)) {
-                        allInInputsOrCat = false;
-                    }
+                }
+                if (allInInputsOrCat && !checkTermMatch(recipe, term, t, tSpaced, tUnder, tClean, false)) {
+                    allInInputsOrCat = false;
                 }
                 if (!allInOutputs && !allInInputsOrCat) {
                     break;
@@ -651,6 +671,19 @@ public class RecipeSearchEngine {
             }
         }
         return maxScore;
+    }
+
+    private static boolean checkTermMatch(SearchableRecipe recipe, QueryTerm term, String t, String tSpaced, String tUnder, String tClean, boolean isOutputCheck) {
+        if (term.scope() == Scope.OUTPUT) {
+            return isOutputCheck && matchesOutput(recipe, term.type(), t, tSpaced, tUnder, tClean);
+        }
+        if (term.scope() == Scope.INPUT) {
+            return !isOutputCheck && matchesInput(recipe, term.type(), t, tSpaced, tUnder, tClean);
+        }
+        if (isOutputCheck) {
+            return recipe.outputSearchIndex().contains(t) || recipe.displayName().toLowerCase(Locale.ROOT).contains(t);
+        }
+        return recipe.inputSearchIndex().contains(t) || recipe.categoryName().contains(t) || recipe.categoryId().contains(t);
     }
 
     /**
@@ -693,74 +726,81 @@ public class RecipeSearchEngine {
 
             for (QueryTerm term : group.terms()) {
                 if (term.negated()) continue;
-                String t = term.text();
-                String tUnder = t.replace(' ', '_');
-
-                if (term.type() == MatchType.CATEGORY) {
-                    if (cat.equals(t) || catId.equals(t) || catId.equals(tUnder)) {
-                        score += 20000;
-                    } else if (cat.contains(t) || catId.contains(t) || catId.contains(tUnder)) {
-                        score += 10000;
-                    }
-                } else if (term.type() == MatchType.MOD_ID) {
-                    if (term.scope() == Scope.INPUT) {
-                        if (recipe.inputSearchIndex().startsWith(t + ":") || recipe.inputSearchIndex().contains(" " + t + ":")) score += 10000;
-                    } else if (term.scope() == Scope.OUTPUT) {
-                        if (recipe.outputSearchIndex().startsWith(t + ":") || recipe.outputSearchIndex().contains(" " + t + ":")) score += 10000;
-                    } else {
-                        if (recipe.modId().equals(t)) {
-                            score += 10000;
-                        } else if (recipe.modId().contains(t)) {
-                            score += 5000;
-                        }
-                    }
-                } else if (term.type() == MatchType.TAG) {
-                    if (recipe.inputSearchIndex().contains(t) || recipe.inputSearchIndex().contains(tUnder)
-                            || recipe.outputSearchIndex().contains(t) || recipe.outputSearchIndex().contains(tUnder)) {
-                        score += 8000;
-                    }
-                } else {
-                    if (term.scope() == Scope.OUTPUT) {
-                        if (dn.equals(t)) {
-                            score += 12000;
-                        } else if (dn.startsWith(t)) {
-                            score += 6000;
-                        } else if (dn.contains(t)) {
-                            score += 3000;
-                        }
-                        if (recipe.outputSearchIndex().contains(t)) {
-                            score += 3000;
-                        }
-                    } else if (term.scope() == Scope.INPUT) {
-                        if (recipe.inputSearchIndex().contains(t)) {
-                            score += 4000;
-                        }
-                    } else {
-                        if (dn.equals(t)) {
-                            score += 10000;
-                        } else if (dn.startsWith(t)) {
-                            score += 5000;
-                        } else if (dn.contains(t)) {
-                            score += 2500;
-                        }
-
-                        if (cat.equals(t) || catId.equals(t) || catId.equals(tUnder)) {
-                            score += 4000;
-                        } else if (cat.contains(t) || catId.contains(t) || catId.contains(tUnder)) {
-                            score += 2000;
-                        }
-
-                        if (recipe.outputSearchIndex().contains(t)) {
-                            score += 1500;
-                        } else if (recipe.inputSearchIndex().contains(t)) {
-                            score += 800;
-                        }
-                    }
-                }
+                score += calculateTermScore(term, recipe, cat, catId, dn);
             }
         }
-
         return score;
+    }
+
+    private static int calculateTermScore(QueryTerm term, SearchableRecipe recipe, String cat, String catId, String dn) {
+        String t = term.text();
+        String tUnder = t.replace(' ', '_');
+
+        if (term.type() == MatchType.CATEGORY) {
+            return scoreCategoryTerm(t, tUnder, cat, catId);
+        }
+        if (term.type() == MatchType.MOD_ID) {
+            return scoreModIdTerm(term, recipe, t);
+        }
+        if (term.type() == MatchType.TAG) {
+            return scoreTagTerm(recipe, t, tUnder);
+        }
+        return scoreGeneralTerm(term, recipe, t, tUnder, cat, catId, dn);
+    }
+
+    private static int scoreCategoryTerm(String t, String tUnder, String cat, String catId) {
+        if (cat.equals(t) || catId.equals(t) || catId.equals(tUnder)) return 20000;
+        if (cat.contains(t) || catId.contains(t) || catId.contains(tUnder)) return 10000;
+        return 0;
+    }
+
+    private static int scoreModIdTerm(QueryTerm term, SearchableRecipe recipe, String t) {
+        if (term.scope() == Scope.INPUT) {
+            if (recipe.inputSearchIndex().startsWith(t + ":") || recipe.inputSearchIndex().contains(" " + t + ":")) return 10000;
+            return 0;
+        }
+        if (term.scope() == Scope.OUTPUT) {
+            if (recipe.outputSearchIndex().startsWith(t + ":") || recipe.outputSearchIndex().contains(" " + t + ":")) return 10000;
+            return 0;
+        }
+        if (recipe.modId().equals(t)) return 10000;
+        if (recipe.modId().contains(t)) return 5000;
+        return 0;
+    }
+
+    private static int scoreTagTerm(SearchableRecipe recipe, String t, String tUnder) {
+        if (recipe.inputSearchIndex().contains(t) || recipe.inputSearchIndex().contains(tUnder)
+                || recipe.outputSearchIndex().contains(t) || recipe.outputSearchIndex().contains(tUnder)) {
+            return 8000;
+        }
+        return 0;
+    }
+
+    private static int scoreGeneralTerm(QueryTerm term, SearchableRecipe recipe, String t, String tUnder, String cat, String catId, String dn) {
+        int s = 0;
+        if (term.scope() == Scope.OUTPUT) {
+            if (dn.equals(t)) s += 12000;
+            else if (dn.startsWith(t)) s += 6000;
+            else if (dn.contains(t)) s += 3000;
+
+            if (recipe.outputSearchIndex().contains(t)) s += 3000;
+            return s;
+        }
+        if (term.scope() == Scope.INPUT) {
+            if (recipe.inputSearchIndex().contains(t)) s += 4000;
+            return s;
+        }
+
+        if (dn.equals(t)) s += 10000;
+        else if (dn.startsWith(t)) s += 5000;
+        else if (dn.contains(t)) s += 2500;
+
+        if (cat.equals(t) || catId.equals(t) || catId.equals(tUnder)) s += 4000;
+        else if (cat.contains(t) || catId.contains(t) || catId.contains(tUnder)) s += 2000;
+
+        if (recipe.outputSearchIndex().contains(t)) s += 1500;
+        else if (recipe.inputSearchIndex().contains(t)) s += 800;
+        return s;
     }
 
     public static void clearCaches() {

@@ -223,25 +223,25 @@ public class UiFormattingTest {
 
     @Test
     public void testDummyConditionMarkerFiltering() {
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:overworld_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:nether_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:the_end_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:dimension_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:biome_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:altitude_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("start_core:abydos_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("sgjourney:chulak_marker")));
-        Assertions.assertTrue(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("kubejs:custom_planet_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:overworld_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:nether_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:the_end_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:dimension_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:biome_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:altitude_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("start_core:abydos_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("sgjourney:chulak_marker")));
+        Assertions.assertTrue(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("kubejs:custom_planet_marker")));
 
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:programmed_circuit")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:integrated_circuit")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:potato")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:lv_electric_motor")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:enderium_ingot")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:ender_pearl")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:end_stone")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("thermal:enderium_dust")));
-        Assertions.assertFalse(com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(ResourceLocation.tryParse("create:blender")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:programmed_circuit")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:integrated_circuit")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:potato")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:lv_electric_motor")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("gtceu:enderium_ingot")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:ender_pearl")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("minecraft:end_stone")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("thermal:enderium_dust")));
+        Assertions.assertFalse(com.gtceu.calcboard.api.util.RecipeConversionHelper.isDummyConditionMarker(ResourceLocation.tryParse("create:blender")));
     }
 
     @Test

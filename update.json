@@ -1,10 +1,11 @@
 {
   "homepage": "https://www.curseforge.com/minecraft/mc-mods/gregtech-calculator-board",
   "promos": {
-    "1.20.1-latest": "2.2.0-beta.1",
-    "1.20.1-recommended": "2.2.0-beta.1"
+    "1.20.1-latest": "2.2.0-beta.2",
+    "1.20.1-recommended": "2.2.0-beta.2"
   },
   "1.20.1": {
+    "2.2.0-beta.2": "Release 2.2.0-beta.2",
     "2.2.0-beta.1": "Release 2.2.0-beta.1",
     "2.2.0-alpha.4": "Release 2.2.0-alpha.4",
     "2.2.0-alpha.3": "Release 2.2.0-alpha.3",

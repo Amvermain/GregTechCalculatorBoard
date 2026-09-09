@@ -7,9 +7,9 @@ import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import com.gtceu.calcboard.compat.create.CreateProperties;
 import com.gtceu.calcboard.compat.create.CreateStressHelper;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.chat.Component;
@@ -106,7 +106,7 @@ public class CDGRecipeHandler {
         FUEL_TYPE_REGISTRY_KEY = fuelKey;
     }
 
-    public static boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, EmiRecipeConverter.RecipeDetails details) {
+    public static boolean adaptRecipeDetails(Object emiRecipe, Object backingRecipe, RecipeDetails details) {
         ResourceLocation catId = extractCategoryId(emiRecipe, backingRecipe);
         if (catId == null || !MOD_ID.equals(catId.getNamespace())) {
             return false;
@@ -131,7 +131,7 @@ public class CDGRecipeHandler {
         };
     }
 
-    private static boolean adaptBasinFermenting(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptBasinFermenting(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 200;
         details.energyType = EnergyType.NONE;
         details.eut = 0.0;
@@ -139,7 +139,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptBulkFermenting(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptBulkFermenting(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 200;
         details.energyType = EnergyType.NONE;
         details.eut = 0.0;
@@ -147,7 +147,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptCompressionMolding(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptCompressionMolding(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 100;
         details.energyType = EnergyType.KINETIC_SU;
         net.minecraft.world.level.block.Block pressBlock = CreateStressHelper.findBlock(ResourceLocation.tryParse("create:mechanical_press"));
@@ -159,7 +159,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptCasting(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptCasting(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 100;
         details.energyType = EnergyType.NONE;
         details.eut = 0.0;
@@ -167,7 +167,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptDistillation(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptDistillation(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 100;
         details.energyType = EnergyType.NONE;
         details.eut = 0.0;
@@ -175,7 +175,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptDieselCombustion(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptDieselCombustion(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 20;
         details.energyType = EnergyType.KINETIC_SU;
         details.isGenerator = true;
@@ -186,7 +186,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptManualTool(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptManualTool(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 20;
         details.energyType = EnergyType.NONE;
         details.eut = 0.0;
@@ -194,7 +194,7 @@ public class CDGRecipeHandler {
         return true;
     }
 
-    private static boolean adaptGenericCDG(EmiRecipeConverter.RecipeDetails details, int duration) {
+    private static boolean adaptGenericCDG(RecipeDetails details, int duration) {
         details.durationTicks = duration > 0 ? duration : 100;
         details.energyType = EnergyType.NONE;
         details.eut = 0.0;
@@ -247,13 +247,10 @@ public class CDGRecipeHandler {
             }
         } catch (Throwable ignored) {}
         try {
-            Class<?> mcClass = Class.forName("net.minecraft.client.Minecraft");
-            Object mc = mcClass.getMethod("getInstance").invoke(null);
-            if (mc != null) {
-                Object level = mcClass.getField("level").get(mc);
-                if (level instanceof net.minecraft.world.level.Level lvl) {
-                    return lvl.registryAccess();
-                }
+            var provider = DynamicAddonCrawler.getLevelRecipeProvider();
+            if (provider != null) {
+                RegistryAccess access = provider.getRegistryAccess();
+                if (access != null) return access;
             }
         } catch (Throwable ignored) {}
         return null;

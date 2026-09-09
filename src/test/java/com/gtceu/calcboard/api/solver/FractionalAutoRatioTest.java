@@ -55,6 +55,7 @@ public class FractionalAutoRatioTest {
             ResourceLocation itemId = ResourceLocation.tryParse("gtceu:silicon_ingot");
 
             RecipeNode supplier = RecipeNode.create(ResourceLocation.tryParse("gtceu:ebf"), "EBF", 20, 120, GTVoltageTier.MV);
+            supplier.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
             supplier.getOutputs().add(IngredientStack.item(itemId, "Silicon Ingot", 1.0));
             graph.addNode(supplier);
 
@@ -91,6 +92,7 @@ public class FractionalAutoRatioTest {
             ResourceLocation itemId = ResourceLocation.tryParse("gtceu:silicon_ingot");
 
             RecipeNode supplier = RecipeNode.create(ResourceLocation.tryParse("gtceu:ebf"), "EBF", 20, 120, GTVoltageTier.MV);
+            supplier.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", ResourceLocation.tryParse("gtceu:mv_energy_hatch"), GTVoltageTier.MV, 1, false, false, false));
             supplier.getOutputs().add(IngredientStack.item(itemId, "Silicon Ingot", 1.0));
             graph.addNode(supplier);
 

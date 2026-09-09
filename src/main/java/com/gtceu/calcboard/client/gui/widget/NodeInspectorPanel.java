@@ -11,7 +11,7 @@ import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.api.type.SteamMode;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import net.minecraft.client.Minecraft;
@@ -320,6 +320,7 @@ public class NodeInspectorPanel {
         var node = targetWidget.getNode();
         GTVoltageTier currentTier = node.getTargetTier();
         List<GTVoltageTier> tiers = getInspectorTiers(node);
+        boolean isEnergyHatchLocked = com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.hasEnergyHatch(node);
         int totalW = PANEL_WIDTH - 16;
         int cols = 4;
         int gap = 4;
@@ -337,16 +338,41 @@ public class NodeInspectorPanel {
             boolean isCur = (t == currentTier);
             boolean hov = mouseX >= cx && mouseX <= cx + chipW && mouseY >= cy && mouseY <= cy + chipH;
 
-            int bg = isCur ? 0xFF0284C7 : (hov ? 0xFF334155 : 0xFF1E293B);
-            int border = isCur ? 0xFF38BDF8 : (hov ? 0xFF64748B : 0xFF334155);
+            int bg;
+            int border;
+            int textColor;
+            if (isEnergyHatchLocked) {
+                if (isCur) {
+                    bg = 0xFF1E3A5F;
+                    border = 0xFF2563EB;
+                    textColor = 0xFF93C5FD;
+                } else {
+                    bg = 0xFF0F172A;
+                    border = 0xFF1E293B;
+                    textColor = 0xFF475569;
+                }
+            } else {
+                bg = isCur ? 0xFF0284C7 : (hov ? 0xFF334155 : 0xFF1E293B);
+                border = isCur ? 0xFF38BDF8 : (hov ? 0xFF64748B : 0xFF334155);
+                textColor = isCur ? 0xFFFFFFFF : 0xFF94A3B8;
+            }
+
             graphics.fill(cx, cy, cx + chipW, cy + chipH, bg);
             graphics.renderOutline(cx, cy, chipW, chipH, border);
-            graphics.drawCenteredString(font, t.name(), cx + chipW / 2, cy + 4, isCur ? 0xFFFFFFFF : 0xFF94A3B8);
+            graphics.drawCenteredString(font, t.name(), cx + chipW / 2, cy + 4, textColor);
+
+            if (hov && isEnergyHatchLocked) {
+                String hatchTierName = currentTier != null ? currentTier.getName() : "Unknown";
+                graphics.renderTooltip(font, Component.translatable("gui.gtcalcboard.inspector.tier_locked_by_energy_hatch", hatchTierName), mouseX, mouseY);
+            }
         }
     }
 
     private boolean handleTierControlsClick(double mouseX, double mouseY, int x, int curY) {
         var node = targetWidget.getNode();
+        if (com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            return false;
+        }
         List<GTVoltageTier> tiers = getInspectorTiers(node);
         int totalW = PANEL_WIDTH - 16;
         int cols = 4;
@@ -374,6 +400,9 @@ public class NodeInspectorPanel {
     }
 
     private void applyTierSelection(RecipeNode node, GTVoltageTier tier) {
+        if (com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+            return;
+        }
         if (GTCombustionHelper.isCombustionFamily(node)) {
             GTVoltageTier oldTier = node.getTargetTier();
             boolean ok = GTCombustionHelper.syncCombustionMachine(node, tier);

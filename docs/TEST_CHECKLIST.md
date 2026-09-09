@@ -268,6 +268,8 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] **Aggregated Metrics**: Top badge displays total power consumption/generation and machine counts.
 - [ ] **Module Expansion (`⤢`)**:
   - [ ] Expanding the module restores original node positions, configurations, and wiring with **100% layout fidelity**.
+- [ ] **Unconnected Port Preservation & Self-Balancing Loop Isolation (`GroupCollapsePortBugTest`)**:
+  - [ ] When collapsing a group into a module, unconnected input/output ports sharing the same ingredient (e.g., catalyst or heating fluids like Hot Brine) are preserved on module boundaries and not inadvertently cancelled out by global balance summary.
 
 ---
 

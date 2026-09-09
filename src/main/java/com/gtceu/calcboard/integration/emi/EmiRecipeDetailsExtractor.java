@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
 import com.gtceu.calcboard.compat.systeams.SysteamsModAdapter;
 import dev.emi.emi.api.recipe.EmiRecipe;
@@ -66,14 +66,20 @@ public final class EmiRecipeDetailsExtractor {
         return false;
     }
 
+    private static final java.util.Set<String> GENERATOR_CATEGORY_PATHS = java.util.Set.of(
+            "generator", "combustion_generator", "semi_fluid_generator",
+            "gas_turbine", "steam_turbine", "plasma_generator"
+    );
+
     public static boolean isGeneratorCategory(ResourceLocation catId) {
         String catPath = catId.getPath().toLowerCase();
         String catNs = catId.getNamespace().toLowerCase();
-        return catPath.contains("dynamo") || catPath.contains("turbine")
-                || "generator".equals(catPath) || catPath.endsWith("_generator")
-                || "combustion_generator".equals(catPath) || "semi_fluid_generator".equals(catPath)
-                || "gas_turbine".equals(catPath) || "steam_turbine".equals(catPath) || "plasma_generator".equals(catPath)
-                || (("thermal".equals(catNs) || "thermal_expansion".equals(catNs) || "systeams".equals(catNs)) && catPath.contains("fuel"));
+        boolean isDynamoOrTurbine = catPath.startsWith("dynamo") || catPath.endsWith("dynamo")
+                || catPath.startsWith("turbine") || catPath.endsWith("turbine")
+                || catPath.endsWith("_generator") || GENERATOR_CATEGORY_PATHS.contains(catPath);
+        boolean isThermalFuel = ("thermal".equals(catNs) || "thermal_expansion".equals(catNs) || "systeams".equals(catNs))
+                && (catPath.endsWith("fuel") || catPath.endsWith("fuels"));
+        return isDynamoOrTurbine || isThermalFuel;
     }
 
     public static Object unwrapBackingRecipe(EmiRecipe recipe) {

@@ -5,10 +5,10 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.PowerDisplayMode;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Assertions;
@@ -129,7 +129,7 @@ public class GreateModAdapterTest {
             public int getProcessingDuration() { return 80; }
         };
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
 
         boolean adapted = adapter.adaptRecipeDetails(null, mockRecipe, details);
         Assertions.assertTrue(adapted);

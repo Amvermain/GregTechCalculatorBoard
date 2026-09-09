@@ -1,10 +1,8 @@
 package com.gtceu.calcboard.client.gui.search;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
-
-import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.model.IngredientStack;
@@ -369,7 +367,7 @@ public class RecipeHoverPreviewRenderer {
         // Stats Footer (Duration & EU/t / RF/t / Heat)
         int footerY = cardY + cardH - 16 - ((sr != null && !sr.isSupported()) ? 24 : 0);
         graphics.fill(cardX, footerY - 2, cardX + cardW, footerY - 1, 0xFF1E293B);
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(rn);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(rn);
         String statsStr = String.format("§b⏱ %.2fs  %s", rn.getBaseDurationTicks() / 20.0, adapter.formatEnergyStats(rn, com.gtceu.calcboard.api.storage.BoardManager.getInstance().getPowerDisplayMode()));
         graphics.drawString(font, font.plainSubstrByWidth(statsStr, cardW - 8), cardX + 6, footerY + 2, 0xFF94A3B8, false);
 

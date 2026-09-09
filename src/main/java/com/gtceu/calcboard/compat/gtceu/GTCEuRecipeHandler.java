@@ -6,7 +6,8 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.compat.gtceu.physics.GTBoilerPhysics;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -74,7 +75,7 @@ public class GTCEuRecipeHandler {
         return matchesGTRecipeShape(unwrapRecipe(backing));
     }
 
-    public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public static boolean adaptRecipeDetails(Object emiRecipeObj, Object backing, RecipeDetails details) {
         if (backing == null && emiRecipeObj == null) return false;
 
         if (backing != null) {
@@ -111,24 +112,7 @@ public class GTCEuRecipeHandler {
             details.eut = 0.0;
             details.tier = GTVoltageTier.ULV;
 
-            boolean isLiquidFuel = false;
-            if (backing != null) {
-                try {
-                    Field inputsField = backing.getClass().getField("inputs");
-                    Object inMap = inputsField.get(backing);
-                    if (inMap instanceof Map<?, ?> map) {
-                        for (Object key : map.keySet()) {
-                            if (key != null) {
-                                String kName = key.getClass().getName().toLowerCase(Locale.ROOT);
-                                if (kName.contains("fluid") || key.toString().toLowerCase(Locale.ROOT).contains("fluid")) {
-                                    isLiquidFuel = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {}
-            }
+            boolean isLiquidFuel = isLiquidFuelGTRecipe(backing);
             if (!isLiquidFuel && com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
                 isLiquidFuel = EmiGTCEuHelper.isLiquidFuel(emiRecipeObj);
             }
@@ -167,6 +151,30 @@ public class GTCEuRecipeHandler {
         return false;
     }
 
+    private static boolean isLiquidFuelGTRecipe(Object backing) {
+        if (backing == null) return false;
+        try {
+            Field inputsField = backing.getClass().getField("inputs");
+            Object inMap = inputsField.get(backing);
+            if (inMap instanceof Map<?, ?> map && hasFluidCapabilityKey(map)) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+        List<IngredientStack> inputs = extractGTRecipeContents(backing, "inputs");
+        return inputs.stream().anyMatch(IngredientStack::isFluid);
+    }
+
+    private static boolean hasFluidCapabilityKey(Map<?, ?> map) {
+        for (Object key : map.keySet()) {
+            if (key == null) continue;
+            String kName = key.getClass().getSimpleName();
+            if (kName.equals("FluidRecipeCapability") || key.toString().equalsIgnoreCase("fluid")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static class EmiGTCEuHelper {
         private static ResourceLocation getCategoryId(Object emiRecipeObj) {
             if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe recipe && recipe.getCategory() != null) {
@@ -192,31 +200,39 @@ public class GTCEuRecipeHandler {
         }
 
         private static boolean isLiquidFuel(Object emiRecipeObj) {
-            if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe && emiRecipe.getInputs() != null) {
-                for (var in : emiRecipe.getInputs()) {
-                    if (in != null && in.getEmiStacks() != null) {
-                        for (var st : in.getEmiStacks()) {
-                            if (st != null) {
-                                Object key = st.getKey();
-                                if (key instanceof net.minecraft.world.level.material.Fluid || (key != null && key.getClass().getName().contains("Fluid"))) {
-                                    return true;
-                                }
-                                ResourceLocation sId = st.getId();
-                                if (sId != null && net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(sId)) {
-                                    return true;
-                                }
-                                if (st.getItemStack() != null && st.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem bi && bi.getFluid() != net.minecraft.world.level.material.Fluids.EMPTY) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
+            if (!(emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe) || emiRecipe.getInputs() == null) {
+                return false;
+            }
+            for (var in : emiRecipe.getInputs()) {
+                if (hasLiquidStack(in)) return true;
             }
             return false;
         }
 
-        private static void enrichBucketOutputs(Object emiRecipeObj, EmiRecipeConverter.RecipeDetails details) {
+        private static boolean hasLiquidStack(dev.emi.emi.api.stack.EmiIngredient in) {
+            if (in == null || in.getEmiStacks() == null) return false;
+            for (var st : in.getEmiStacks()) {
+                if (isLiquidEmiStack(st)) return true;
+            }
+            return false;
+        }
+
+        private static boolean isLiquidEmiStack(dev.emi.emi.api.stack.EmiStack st) {
+            if (st == null) return false;
+            Object key = st.getKey();
+            if (key instanceof net.minecraft.world.level.material.Fluid || (key != null && key.getClass().getSimpleName().endsWith("Fluid"))) {
+                return true;
+            }
+            ResourceLocation sId = st.getId();
+            if (sId != null && net.minecraftforge.registries.ForgeRegistries.FLUIDS.containsKey(sId)) {
+                return true;
+            }
+            return st.getItemStack() != null
+                    && st.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem bi
+                    && bi.getFluid() != net.minecraft.world.level.material.Fluids.EMPTY;
+        }
+
+        private static void enrichBucketOutputs(Object emiRecipeObj, RecipeDetails details) {
             if (emiRecipeObj instanceof dev.emi.emi.api.recipe.EmiRecipe emiRecipe && emiRecipe.getInputs() != null) {
                 for (var in : emiRecipe.getInputs()) {
                     if (in != null && in.getEmiStacks() != null) {
@@ -235,7 +251,7 @@ public class GTCEuRecipeHandler {
         }
     }
 
-    public static void extractGTRecipeDetails(Object backing, EmiRecipeConverter.RecipeDetails details) {
+    public static void extractGTRecipeDetails(Object backing, RecipeDetails details) {
         if (backing == null || details == null) return;
 
         backing = unwrapRecipe(backing);
@@ -733,27 +749,26 @@ public class GTCEuRecipeHandler {
             }
 
             if (mapObj instanceof Map<?, ?> map) {
-                for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    Object contentList = entry.getValue();
+                boolean isInput = fieldName != null && fieldName.toLowerCase(Locale.ROOT).contains("input");
+                for (Object contentList : map.values()) {
                     if (contentList instanceof List<?> list) {
-                        boolean isInput = fieldName != null && fieldName.toLowerCase(Locale.ROOT).contains("input");
-                        for (Object contentObj : list) {
-                            IngredientStack is = parseGTContent(contentObj);
-                            if (is != null && is.getId() != null) {
-                                if (isInput && com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isIgnoredInput(is.getId(), is.getChance())) {
-                                    continue;
-                                }
-                                if (!isInput && com.gtceu.calcboard.integration.emi.EmiRecipeConverter.isDummyConditionMarker(is.getId())) {
-                                    continue;
-                                }
-                                result.add(is);
-                            }
-                        }
+                        parseAndCollectGTContents(list, isInput, result);
                     }
                 }
             }
         } catch (Throwable ignored) {}
         return result;
+    }
+
+    private static void parseAndCollectGTContents(List<?> list, boolean isInput, List<IngredientStack> result) {
+        if (list == null) return;
+        for (Object contentObj : list) {
+            IngredientStack is = parseGTContent(contentObj);
+            if (is == null || is.getId() == null) continue;
+            if (isInput && RecipeConversionHelper.isIgnoredInput(is.getId(), is.getChance())) continue;
+            if (!isInput && RecipeConversionHelper.isDummyConditionMarker(is.getId())) continue;
+            result.add(is);
+        }
     }
 
     public static List<IngredientStack> extractTickIngredients(Object backing, String fieldName, double durationTicks) {

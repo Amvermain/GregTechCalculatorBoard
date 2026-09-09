@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.client.gui.editor;
 
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -118,7 +119,7 @@ public class NodeParallelEditor {
     public void setMaxParallel() {
         var node = widget.getNode();
         if (node == null) return;
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
         int maxPar = adapter != null ? adapter.getMaxParallelCapacity(node) : 1;
         if (maxPar >= 1) {
             int oldVal = node.getParallel();

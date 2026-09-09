@@ -4,7 +4,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
+import com.gtceu.calcboard.api.model.RecipeDetails;
 import net.minecraft.nbt.CompoundTag;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -146,7 +146,7 @@ public class GTRecipeExtractionTest {
 
         Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(recipe));
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
 
         Assertions.assertEquals(160.0, details.durationTicks, 1e-6);
@@ -163,7 +163,7 @@ public class GTRecipeExtractionTest {
 
         Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(recipe));
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
 
         Assertions.assertEquals(40.0, details.durationTicks, 1e-6);
@@ -179,7 +179,7 @@ public class GTRecipeExtractionTest {
 
         Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(recipe));
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
 
         Assertions.assertEquals(160.0, details.durationTicks, 1e-6);
@@ -193,7 +193,7 @@ public class GTRecipeExtractionTest {
     public void testExtractEnergyFromMapInspection() {
         MockMapEnergyRecipe recipe = new MockMapEnergyRecipe();
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
 
         Assertions.assertEquals(100.0, details.durationTicks, 1e-6);
@@ -214,7 +214,7 @@ public class GTRecipeExtractionTest {
         Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
         Assertions.assertNotSame(wrapper, GTCEuRecipeHandler.unwrapRecipe(wrapper), "JEI wrapper must not be treated as the recipe body");
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
 
         Assertions.assertEquals(120.0, details.durationTicks, 1e-6);
@@ -233,7 +233,7 @@ public class GTRecipeExtractionTest {
 
         Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
 
         Assertions.assertEquals(40.0, details.durationTicks, 1e-6);
@@ -261,7 +261,7 @@ public class GTRecipeExtractionTest {
         Assertions.assertTrue(GTCEuRecipeHandler.isGTRecipe(wrapper));
         Assertions.assertSame(recipe, GTCEuRecipeHandler.unwrapRecipe(wrapper));
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(wrapper, details);
 
         Assertions.assertEquals(90.0, details.durationTicks, 1e-6);
@@ -288,7 +288,7 @@ public class GTRecipeExtractionTest {
     public void testExtractEnergyFromObjectWithVoltageAndAmperage() {
         MockObjectEnergyRecipe recipe = new MockObjectEnergyRecipe();
 
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
 
         Assertions.assertEquals(80.0, details.durationTicks, 1e-6);

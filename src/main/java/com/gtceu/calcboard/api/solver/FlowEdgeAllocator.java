@@ -2,6 +2,7 @@ package com.gtceu.calcboard.api.solver;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.type.FlowSplitMode;
 
 import java.util.*;
 
@@ -166,6 +167,23 @@ public final class FlowEdgeAllocator {
             return allocations;
         }
 
+        FlowSplitMode splitMode = (producer != null && producer.isReroute())
+                ? producer.getJunctionSplitMode()
+                : FlowSplitMode.PROPORTIONAL;
+        if (splitMode == null) {
+            splitMode = FlowSplitMode.PROPORTIONAL;
+        }
+
+        if (hasCustomPriority(outEdges)) {
+            allocateHierarchicalPriorityEdges(graph, outEdges, totalProducerRate, effMap, allocations, splitMode, context);
+            return allocations;
+        }
+
+        if (splitMode == FlowSplitMode.EQUAL) {
+            allocateEqualEdges(graph, outEdges, totalProducerRate, effMap, allocations, context);
+            return allocations;
+        }
+
         double remainingFlow = totalProducerRate;
         List<FlowGraph.ConnectionEdge> variableEdges = new ArrayList<>(outEdges.size());
         for (FlowGraph.ConnectionEdge edge : outEdges) {
@@ -187,8 +205,18 @@ public final class FlowEdgeAllocator {
             return allocations;
         }
 
-        allocateVariableEdges(graph, variableEdges, remainingFlow, effMap, allocations, context);
+        allocateProportionalEdges(graph, variableEdges, remainingFlow, effMap, allocations, context);
         return allocations;
+    }
+
+    private static boolean hasCustomPriority(List<FlowGraph.ConnectionEdge> outEdges) {
+        if (outEdges == null) return false;
+        for (FlowGraph.ConnectionEdge edge : outEdges) {
+            if (edge.priority() != 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static List<FlowGraph.ConnectionEdge> collectOutgoingEdgesForPort(
@@ -205,7 +233,7 @@ public final class FlowEdgeAllocator {
         return result;
     }
 
-    private static void allocateVariableEdges(
+    private static void allocateProportionalEdges(
             FlowGraph graph,
             List<FlowGraph.ConnectionEdge> variableEdges,
             double remainingFlow,
@@ -233,18 +261,10 @@ public final class FlowEdgeAllocator {
 
         if (totalNormalDemand <= 0.0001) {
             if (!voidEdges.isEmpty()) {
-                double split = remainingFlow / voidEdges.size();
-                for (FlowGraph.ConnectionEdge edge : voidEdges) {
-                    allocations.put(edge, split);
-                }
-                for (FlowGraph.ConnectionEdge edge : normalEdges) {
-                    allocations.put(edge, 0.0);
-                }
+                distributeEvenly(voidEdges, remainingFlow, allocations);
+                distributeEvenly(normalEdges, 0.0, allocations);
             } else {
-                double split = remainingFlow / variableEdges.size();
-                for (FlowGraph.ConnectionEdge edge : variableEdges) {
-                    allocations.put(edge, split);
-                }
+                distributeEvenly(variableEdges, remainingFlow, allocations);
             }
             return;
         }
@@ -267,20 +287,305 @@ public final class FlowEdgeAllocator {
                         : 0.0;
                 allocations.put(edge, demand + surplusShare);
             }
-            if (!voidEdges.isEmpty()) {
-                double voidSplit = surplus / voidEdges.size();
-                for (FlowGraph.ConnectionEdge edge : voidEdges) {
-                    allocations.put(edge, voidSplit);
-                }
-            }
+            distributeEvenly(voidEdges, voidEdges.isEmpty() ? 0.0 : surplus, allocations);
             return;
         }
 
         for (FlowGraph.ConnectionEdge edge : normalEdges) {
             allocations.put(edge, remainingFlow * (demandMap.get(edge) / totalNormalDemand));
         }
-        for (FlowGraph.ConnectionEdge edge : voidEdges) {
+        distributeEvenly(voidEdges, 0.0, allocations);
+    }
+
+    private static void allocateEqualEdges(
+            FlowGraph graph,
+            List<FlowGraph.ConnectionEdge> outEdges,
+            double totalProducerRate,
+            Map<String, Double> effMap,
+            Map<FlowGraph.ConnectionEdge, Double> allocations,
+            SolverContext context
+    ) {
+        List<FlowGraph.ConnectionEdge> normalEdges = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> voidEdges = new ArrayList<>();
+        Map<FlowGraph.ConnectionEdge, Double> capMap = new LinkedHashMap<>();
+        double totalNormalCap = 0.0;
+
+        for (FlowGraph.ConnectionEdge edge : outEdges) {
+            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+            if (consumer != null && consumer.isVoidSink()) {
+                voidEdges.add(edge);
+            } else {
+                normalEdges.add(edge);
+                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+                double cap = edge.hasFixedLimit()
+                        ? (demand > 0.0001 ? Math.min(demand, edge.fixedFlowLimit()) : edge.fixedFlowLimit())
+                        : (demand > 0.0001 ? demand : Double.MAX_VALUE);
+                capMap.put(edge, cap);
+                if (cap < Double.MAX_VALUE) {
+                    totalNormalCap += cap;
+                }
+            }
+        }
+
+        distributeEvenly(voidEdges, 0.0, allocations);
+        if (normalEdges.isEmpty()) {
+            distributeEvenly(voidEdges, totalProducerRate, allocations);
+            return;
+        }
+
+        if (voidEdges.isEmpty()) {
+            allocateEqualWithoutVoidSink(normalEdges, totalProducerRate, allocations);
+            return;
+        }
+
+        allocateEqualWithVoidSink(normalEdges, voidEdges, capMap, totalNormalCap, totalProducerRate, allocations);
+    }
+
+    private static void allocateEqualWithoutVoidSink(
+            List<FlowGraph.ConnectionEdge> normalEdges,
+            double flow,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        Map<FlowGraph.ConnectionEdge, Double> limits = new LinkedHashMap<>();
+        for (FlowGraph.ConnectionEdge edge : normalEdges) {
+            limits.put(edge, edge.hasFixedLimit() ? edge.fixedFlowLimit() : Double.MAX_VALUE);
+        }
+        allocateEqualWithCaps(normalEdges, limits, flow, allocations);
+    }
+
+    private static void allocateEqualWithVoidSink(
+            List<FlowGraph.ConnectionEdge> normalEdges,
+            List<FlowGraph.ConnectionEdge> voidEdges,
+            Map<FlowGraph.ConnectionEdge, Double> capMap,
+            double totalNormalCap,
+            double flow,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        if (totalNormalCap <= 0.0001) {
+            allocateEqualWithCaps(normalEdges, capMap, flow, allocations);
+            return;
+        }
+
+        if (flow >= totalNormalCap - 0.0001) {
+            for (FlowGraph.ConnectionEdge edge : normalEdges) {
+                allocations.put(edge, capMap.get(edge));
+            }
+            double surplus = Math.max(0.0, flow - totalNormalCap);
+            distributeEvenly(voidEdges, surplus, allocations);
+            return;
+        }
+
+        allocateEqualWithCaps(normalEdges, capMap, flow, allocations);
+    }
+
+    private static void allocateEqualWithCaps(
+            List<FlowGraph.ConnectionEdge> edges,
+            Map<FlowGraph.ConnectionEdge, Double> caps,
+            double flow,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        if (edges.isEmpty()) return;
+        List<FlowGraph.ConnectionEdge> active = new ArrayList<>(edges);
+        double remaining = flow;
+
+        while (!active.isEmpty() && remaining > 0.0001) {
+            double share = remaining / active.size();
+            boolean anyCapped = false;
+            Iterator<FlowGraph.ConnectionEdge> it = active.iterator();
+            while (it.hasNext()) {
+                FlowGraph.ConnectionEdge edge = it.next();
+                double cap = caps.getOrDefault(edge, Double.MAX_VALUE);
+                if (cap <= share + 0.000001) {
+                    allocations.put(edge, cap);
+                    remaining = Math.max(0.0, remaining - cap);
+                    it.remove();
+                    anyCapped = true;
+                }
+            }
+            if (!anyCapped) {
+                for (FlowGraph.ConnectionEdge edge : active) {
+                    allocations.put(edge, share);
+                }
+                return;
+            }
+        }
+
+        for (FlowGraph.ConnectionEdge edge : active) {
             allocations.put(edge, 0.0);
+        }
+    }
+
+    private static void allocateHierarchicalPriorityEdges(
+            FlowGraph graph,
+            List<FlowGraph.ConnectionEdge> outEdges,
+            double totalProducerRate,
+            Map<String, Double> effMap,
+            Map<FlowGraph.ConnectionEdge, Double> allocations,
+            FlowSplitMode splitMode,
+            SolverContext context
+    ) {
+        List<FlowGraph.ConnectionEdge> normalEdges = new ArrayList<>();
+        List<FlowGraph.ConnectionEdge> voidEdges = new ArrayList<>();
+        Map<FlowGraph.ConnectionEdge, Double> demandMap = new LinkedHashMap<>();
+        Map<FlowGraph.ConnectionEdge, Double> capMap = new LinkedHashMap<>();
+        double totalNormalCap = 0.0;
+
+        for (FlowGraph.ConnectionEdge edge : outEdges) {
+            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+            if (consumer != null && consumer.isVoidSink()) {
+                voidEdges.add(edge);
+                demandMap.put(edge, 0.0);
+                capMap.put(edge, 0.0);
+            } else {
+                normalEdges.add(edge);
+                double demand = getConnectedConsumerDemand(graph, consumer, edge.inputIndex(), effMap, context);
+                demandMap.put(edge, demand);
+                double cap = edge.hasFixedLimit()
+                        ? (demand > 0.0001 ? Math.min(demand, edge.fixedFlowLimit()) : edge.fixedFlowLimit())
+                        : demand;
+                capMap.put(edge, cap);
+                totalNormalCap += cap;
+            }
+        }
+
+        distributeEvenly(voidEdges, 0.0, allocations);
+
+        if (normalEdges.isEmpty()) {
+            distributeEvenly(voidEdges, totalProducerRate, allocations);
+            return;
+        }
+
+        Map<Integer, List<FlowGraph.ConnectionEdge>> priorityTiers = new TreeMap<>(Collections.reverseOrder());
+        for (FlowGraph.ConnectionEdge edge : normalEdges) {
+            priorityTiers.computeIfAbsent(edge.priority(), p -> new ArrayList<>()).add(edge);
+        }
+
+        if (totalNormalCap <= 0.0001) {
+            if (!voidEdges.isEmpty()) {
+                distributeEvenly(voidEdges, totalProducerRate, allocations);
+                distributeEvenly(normalEdges, 0.0, allocations);
+            } else {
+                allocateZeroDemandPriorityTiers(priorityTiers, totalProducerRate, allocations);
+            }
+            return;
+        }
+
+        double currentFlow = totalProducerRate;
+        for (Map.Entry<Integer, List<FlowGraph.ConnectionEdge>> entry : priorityTiers.entrySet()) {
+            currentFlow = allocateSinglePriorityTier(entry.getValue(), capMap, currentFlow, splitMode, allocations);
+        }
+
+        if (currentFlow > 0.0001) {
+            handlePrioritySurplus(graph, normalEdges, voidEdges, demandMap, currentFlow, allocations, splitMode);
+        }
+    }
+
+    private static double allocateSinglePriorityTier(
+            List<FlowGraph.ConnectionEdge> tierEdges,
+            Map<FlowGraph.ConnectionEdge, Double> capMap,
+            double currentFlow,
+            FlowSplitMode splitMode,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        if (currentFlow <= 0.000001) {
+            distributeEvenly(tierEdges, 0.0, allocations);
+            return 0.0;
+        }
+
+        double tierDemand = 0.0;
+        for (FlowGraph.ConnectionEdge edge : tierEdges) {
+            tierDemand += capMap.getOrDefault(edge, 0.0);
+        }
+
+        if (tierDemand <= 0.0001) {
+            distributeEvenly(tierEdges, 0.0, allocations);
+            return currentFlow;
+        }
+
+        if (currentFlow >= tierDemand - 0.0001) {
+            for (FlowGraph.ConnectionEdge edge : tierEdges) {
+                allocations.put(edge, capMap.get(edge));
+            }
+            return Math.max(0.0, currentFlow - tierDemand);
+        }
+
+        if (splitMode == FlowSplitMode.EQUAL) {
+            allocateEqualWithCaps(tierEdges, capMap, currentFlow, allocations);
+        } else {
+            for (FlowGraph.ConnectionEdge edge : tierEdges) {
+                allocations.put(edge, currentFlow * (capMap.get(edge) / tierDemand));
+            }
+        }
+        return 0.0;
+    }
+
+    private static void allocateZeroDemandPriorityTiers(
+            Map<Integer, List<FlowGraph.ConnectionEdge>> priorityTiers,
+            double flow,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        boolean firstTier = true;
+        for (List<FlowGraph.ConnectionEdge> tierEdges : priorityTiers.values()) {
+            if (firstTier) {
+                distributeEvenly(tierEdges, flow, allocations);
+                firstTier = false;
+            } else {
+                distributeEvenly(tierEdges, 0.0, allocations);
+            }
+        }
+    }
+
+    private static void handlePrioritySurplus(
+            FlowGraph graph,
+            List<FlowGraph.ConnectionEdge> normalEdges,
+            List<FlowGraph.ConnectionEdge> voidEdges,
+            Map<FlowGraph.ConnectionEdge, Double> demandMap,
+            double surplus,
+            Map<FlowGraph.ConnectionEdge, Double> allocations,
+            FlowSplitMode splitMode
+    ) {
+        if (!voidEdges.isEmpty()) {
+            distributeEvenly(voidEdges, surplus, allocations);
+            return;
+        }
+
+        List<FlowGraph.ConnectionEdge> shareableEdges = new ArrayList<>();
+        double shareableDemand = 0.0;
+        for (FlowGraph.ConnectionEdge edge : normalEdges) {
+            RecipeNode consumer = graph.findNodeById(edge.toNodeId());
+            if (!edge.hasFixedLimit() && !isFixedCappedConsumer(graph, consumer)) {
+                shareableEdges.add(edge);
+                shareableDemand += demandMap.getOrDefault(edge, 0.0);
+            }
+        }
+
+        if (shareableEdges.isEmpty()) {
+            return;
+        }
+
+        if (splitMode == FlowSplitMode.EQUAL || shareableDemand <= 0.0001) {
+            double split = surplus / shareableEdges.size();
+            for (FlowGraph.ConnectionEdge edge : shareableEdges) {
+                allocations.put(edge, allocations.getOrDefault(edge, 0.0) + split);
+            }
+        } else {
+            for (FlowGraph.ConnectionEdge edge : shareableEdges) {
+                double demand = demandMap.get(edge);
+                double currentAlloc = allocations.getOrDefault(edge, demand);
+                allocations.put(edge, currentAlloc + surplus * (demand / shareableDemand));
+            }
+        }
+    }
+
+    private static void distributeEvenly(
+            List<FlowGraph.ConnectionEdge> edges,
+            double flow,
+            Map<FlowGraph.ConnectionEdge, Double> allocations
+    ) {
+        if (edges.isEmpty()) return;
+        double split = flow / edges.size();
+        for (FlowGraph.ConnectionEdge edge : edges) {
+            allocations.put(edge, split);
         }
     }
 

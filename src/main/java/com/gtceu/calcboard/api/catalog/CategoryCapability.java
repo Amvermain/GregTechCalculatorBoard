@@ -5,6 +5,8 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
@@ -73,7 +75,8 @@ public record CategoryCapability(
             if (node.isMultiblock() || node.hasMultiblockOption() || hasMultiblockOption) {
                 cats.add(AddonCategory.ROTOR);
                 cats.add(AddonCategory.MAINTENANCE);
-                if (com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)) {
+                IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+                if (adapter != null && adapter.isPlasmaTurbine(node)) {
                     cats.add(AddonCategory.MULTIBLOCK_TRAIT);
                 }
                 cats.add(AddonCategory.CUSTOM);
@@ -111,11 +114,9 @@ public record CategoryCapability(
             if (def != null) {
                 supportsCoil = def.supportsAbility("HEATING_COILS")
                         || def.coilSlotCount() > 0
-                        || MultiblockDetector.isCoilMultiblock(mbId)
-                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+                        || MultiblockDetector.isCoilMultiblock(mbId);
             } else {
-                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
-                        || (com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId);
             }
             if (supportsCoil) {
                 cats.add(AddonCategory.COIL);

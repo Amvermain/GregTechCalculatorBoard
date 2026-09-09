@@ -4,6 +4,7 @@ import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MachineAddonCatalog;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
@@ -226,7 +227,7 @@ public class GTCEuMachineDialogHeaderHandler {
         if (MachineAddon.isTurbineMachine(node) && node.isMultiblock()) {
             return handleTurbineHeaderClick(dialog, node, x, y, dialogW, mouseX, mouseY, button, parallelBox, parent);
         }
-        if (node.isLiquidBoilerRecipe() || (com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node) != null && com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
+        if (node.isLiquidBoilerRecipe() || (ModAdapterRegistry.getAdapterForNode(node) != null && ModAdapterRegistry.getAdapterForNode(node).isBoilerRecipe(node))) {
             return handleBoilerHeaderClick(node, x, y, dialogW, mouseX, mouseY, parent);
         }
         if (!node.isMultiblock()) {
@@ -292,7 +293,7 @@ public class GTCEuMachineDialogHeaderHandler {
         }
         curX += dynamoAmpsBtnW + gap;
 
-        var clickAdapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var clickAdapter = ModAdapterRegistry.getAdapterForNode(node);
         if (clickAdapter != null && clickAdapter.supportsBoosterControl(node)) {
             int boostBtnW = 110;
             if (mouseX >= curX && mouseX <= curX + boostBtnW && mouseY >= btnY && mouseY <= btnY + 16) {
@@ -414,7 +415,7 @@ public class GTCEuMachineDialogHeaderHandler {
 
     private boolean handleGenericMultiblockHeaderClick(MachineConfigDialog dialog, RecipeNode node, int x, int y, int dialogW,
                                                        double mouseX, double mouseY, BoardScreen parent) {
-        var mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+        var mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
         if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
             mbWorkstations = List.of(node.getMachineIcon());
         }
@@ -559,7 +560,7 @@ public class GTCEuMachineDialogHeaderHandler {
 
     private boolean selectFusionController(MachineConfigDialog dialog, RecipeNode node, int x, double mouseX, BoardScreen parent) {
         var font = Minecraft.getInstance().font;
-        var mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+        var mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
         if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
             mbWorkstations = List.of(node.getMachineIcon());
         }
@@ -619,7 +620,7 @@ public class GTCEuMachineDialogHeaderHandler {
 
     private boolean selectCoilController(MachineConfigDialog dialog, RecipeNode node, int x, double mouseX, BoardScreen parent) {
         var font = Minecraft.getInstance().font;
-        var mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+        var mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
         if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
             mbWorkstations = List.of(node.getMachineIcon());
         }
@@ -694,7 +695,7 @@ public class GTCEuMachineDialogHeaderHandler {
         }
         curX += dynamoAmpsBtnW + gap;
 
-        var scrollAdapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var scrollAdapter = ModAdapterRegistry.getAdapterForNode(node);
         if (scrollAdapter != null && scrollAdapter.supportsBoosterControl(node) && mouseX >= curX && mouseX <= curX + boostBtnW) {
             scrollAdapter.cycleBooster(node, dir);
             markParentDirty(dialog);
@@ -706,7 +707,7 @@ public class GTCEuMachineDialogHeaderHandler {
 
     public static boolean handleControllerScroll(RecipeNode node, double delta) {
         if (node == null || !node.isMultiblock()) return false;
-        List<ResourceLocation> mbWorkstations = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
+        List<ResourceLocation> mbWorkstations = ModAdapterRegistry.getAdapterForNode(node).getMultiblockWorkstations(node);
         if (mbWorkstations.isEmpty() && node.getMachineIcon() != null) {
             mbWorkstations = List.of(node.getMachineIcon());
         }
@@ -753,7 +754,7 @@ public class GTCEuMachineDialogHeaderHandler {
         for (MachineAddon a : node.getAddons()) {
             if (a.getCategory() == MachineAddon.Category.ROTOR) rotors.add(a);
         }
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = ModAdapterRegistry.getAdapterForNode(node);
         for (MachineAddon r : rotors) {
             if (adapter != null) adapter.handleUninstallAddon(node, r);
             else node.getAddons().remove(r);
@@ -788,7 +789,7 @@ public class GTCEuMachineDialogHeaderHandler {
             }
         }
         if (equippedParallel != null) {
-            var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
             if (adapter != null) adapter.handleUninstallAddon(node, equippedParallel);
             else node.getAddons().remove(equippedParallel);
         } else if (dialog != null) {

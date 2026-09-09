@@ -6,6 +6,39 @@
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+## [2.2.0-beta.2] - 2026-09-09
+
+### Added
+- Simplified junction node splitting to Proportional and Equal (1/N) modes while unifying priority tiering across all connection wires, satisfying higher-priority lines first and distributing flow within each tier according to the node's split mode.
+- Added connection wire priority adjustment via mouse wheel scroll on canvas wires or the junction port list, complete with visual priority badges and informative wire tooltips.
+
+### Fixed
+- Fixed an issue where the crafting plan duration (ETA) banner did not appear in the AE2 autocrafting confirmation screen for linked pages, and streamlined page generation to the Shift+A shortcut while restoring pattern creation hint tooltips.
+- Fixed an issue where inactive machines only displayed a generic requirement warning, now explicitly listing all unsatisfied operating conditions (such as missing energy hatches, insufficient coil temperature, reflector tier, or slot deficits) on the card title, machine icon, and configuration tooltips.
+- Fixed an issue where large turbine generators returned to a singleblock turbine lost their generator status upon uninstalling rotor addons.
+- Fixed an issue where ULV tier processing recipes transitioning from steam mode were improperly clamped up to LV.
+- Fixed an issue where singleblock combustion generators could be misconfigured as multiblock engines, improperly displaying oxygen and coolant boost options.
+- Improved dedicated server stability when calculating recipes for external mod machines without client dependencies.
+- Fixed an issue where the Bill of Materials (BOM) failed to reflect the tank size and required steam engine count for Create Steam Boilers, properly listing the configured Fluid Tank blocks and engines based on boiler operating level.
+- Fixed an issue where electric multiblock machines without an energy hatch incorrectly operated with unlimited power at the recipe's base voltage tier, and ensured missing energy hatches trigger an inactive status warning until equipped.
+- Fixed an issue where multiblock machines equipped with an energy hatch still allowed changing the voltage tier via scrolling or the inspector panel, properly locking the machine's voltage tier to the installed energy hatch.
+- Fixed an issue where unconnected input and output ports sharing the same resource (such as heating fluids or catalysts) disappeared from the module card when collapsing a group of machines into a compound module.
+- Fixed an issue where output flow allocation values set on junction nodes were reset to 0 when grouping machines into a module or expanding them back.
+- Fixed an issue where Create: New Age generator coils and motors did not update Stress Unit (SU) consumption and generation when changing machine count.
+- Fixed an issue where inactive machines failing operational requirements (such as missing energy hatches or insufficient coil temperatures) continued to display output flows to downstream lines, properly cutting off output flow to 0.
+- Fixed an issue where hovering over turbine generator cards caused unnecessary continuous recalculation of rotor wear and tier parameters on every render frame.
+- Fixed an issue where individual machine scales within compound modules were improperly altered when expanding and collapsing modules.
+- Fixed unnecessary full process recalculation and text re-rendering when dragging, resizing, or changing colors of sticky notes and decorative group frames.
+- Improved responsiveness and eliminated stutter when navigating the canvas with keyboard panning (WASD) while recipe viewers (JEI) are active.
+- Improved auto-connect performance when wiring large process lines with numerous nodes and connection wires.
+- Optimized opening of the Global Balance Dashboard by reusing existing calculations for inactive pages.
+
 ## [2.2.0-beta.1] - 2026-09-08
 
 ### Added

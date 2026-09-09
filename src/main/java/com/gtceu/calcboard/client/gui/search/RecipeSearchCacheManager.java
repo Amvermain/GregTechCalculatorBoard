@@ -158,7 +158,7 @@ public final class RecipeSearchCacheManager {
 
                 CACHING_PROGRESS = new RecipeLoadingProgress(2, 4, "gui.gtcalcboard.loading_recipe_phase.2", rawList.size() + " Recipes");
                 List<SearchableRecipe> tempList = new ArrayList<>(rawList);
-                for (com.gtceu.calcboard.compat.IModAdapter modAdapter : com.gtceu.calcboard.compat.ModAdapterRegistry.getAllLoadedAdapters()) {
+                for (com.gtceu.calcboard.api.spi.IModAdapter modAdapter : com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAllLoadedAdapters()) {
                     try {
                         modAdapter.collectNativeCatalogRecipes(tempList);
                     } catch (Throwable ignored) {}

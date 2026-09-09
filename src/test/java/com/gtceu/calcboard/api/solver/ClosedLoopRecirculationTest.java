@@ -35,6 +35,7 @@ public class ClosedLoopRecirculationTest {
 
         // 3. Cracker: Consumes Slurry 40 mB/s and Steam 4 mB/s, Produces Cracked Slurry 40 mB/s (1 sec recipe)
         RecipeNode cracker = RecipeNode.create("Cracker", 20.0, 30.0, GTVoltageTier.LV);
+        cracker.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:lv_energy_hatch", "LV Energy Hatch", "", ResourceLocation.tryParse("gtceu:lv_energy_hatch"), GTVoltageTier.LV, 1, false, false, false));
         cracker.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:bauxite_slurry"), "Bauxite Slurry", 40.0, 1.0));
         cracker.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:steam"), "Steam", 4.0, 1.0));
         cracker.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:cracked_slurry"), "Cracked Slurry", 40.0, 1.0));

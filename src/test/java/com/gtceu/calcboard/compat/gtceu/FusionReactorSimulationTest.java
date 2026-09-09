@@ -23,7 +23,7 @@ public class FusionReactorSimulationTest {
 
     @org.junit.jupiter.api.BeforeAll
     public static void setup() {
-        com.gtceu.calcboard.compat.ModAdapterRegistry.init();
+        com.gtceu.calcboard.api.spi.ModAdapterRegistry.init();
     }
 
     @Test
@@ -111,7 +111,7 @@ public class FusionReactorSimulationTest {
         mk1.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:fusion_reactor"));
         mk1.setEuToStart(40_000_000L); // targetTier is LuV
 
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(mk1);
+        var adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(mk1);
 
         // LuV energy hatch on LuV fusion reactor -> Compatible
         var luvHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_luv", "LuV Energy Hatch", "", null, GTVoltageTier.LuV, 2);
@@ -152,7 +152,7 @@ public class FusionReactorSimulationTest {
         assertTrue(badges.stream().anyMatch(b -> b.text().contains("Mk2")));
 
         // Check ZPM energy hatch is now compatible, while LuV is incompatible
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(node);
         var luvHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_luv", "LuV Energy Hatch", "", null, GTVoltageTier.LuV, 2);
         var zpmHatch = new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:energy_hatch_zpm", "ZPM Energy Hatch", "", null, GTVoltageTier.ZPM, 2);
 
@@ -281,7 +281,7 @@ public class FusionReactorSimulationTest {
         mk3Node.setEuToStart(640_000_000L);
         mk3Node.getAvailableWorkstations().addAll(wsList);
 
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(mk3Node);
+        var adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(mk3Node);
         ResourceLocation preferredMk3 = adapter.getPreferredMultiblockWorkstation(mk3Node, wsList);
         assertEquals(ResourceLocation.tryParse("start_core:uv_fusion_reactor"), preferredMk3);
 
@@ -309,7 +309,7 @@ public class FusionReactorSimulationTest {
         node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:uv_fusion_reactor"));
         node.getAvailableWorkstations().add(ResourceLocation.tryParse("start_core:zpm_fusion_reactor"));
 
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(node);
         List<ResourceLocation> sorted = adapter.getMultiblockWorkstations(node);
 
         assertEquals(6, sorted.size());
@@ -335,7 +335,7 @@ public class FusionReactorSimulationTest {
         var t3Reflector = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_3", "T3 Reflector", "", null, 3);
         var t4Reflector = new com.gtceu.calcboard.compat.gtceu.addon.GTReflectorAddon("gtceu:reflector_tier_4", "T4 Reflector", "", null, 4);
 
-        var adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        var adapter = com.gtceu.calcboard.api.spi.ModAdapterRegistry.getAdapterForNode(node);
 
         adapter.onAddonInstalled(node, t2Reflector);
         assertEquals(2, node.getInstalledReflectorTier());

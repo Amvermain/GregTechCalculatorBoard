@@ -551,6 +551,69 @@ public class CreateKineticTest {
         Assertions.assertEquals(10, (int) boiler.getProperties().get(CreateProperties.BOILER_LEVEL));
         Assertions.assertEquals(163840.0, boiler.getBaseEUt(), 0.001);
     }
+
+    @Test
+    public void testCreateBoilerBOMReflectsTankSizeAndLevel() {
+        RecipeNode boiler = CreateRecipeHandler.createCreateBoilerNode();
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerSize(boiler, 72);
+
+        com.gtceu.calcboard.api.bom.MultiblockBOMSummary summaryDefault =
+                com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(boiler), false);
+        Assertions.assertEquals(1, summaryDefault.totalMultiblockCount());
+
+        ResourceLocation tankId = ResourceLocation.tryParse("create:fluid_tank");
+        ResourceLocation engineId = ResourceLocation.tryParse("create:steam_engine");
+
+        var tankEntry = summaryDefault.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(tankId)).findFirst().orElse(null);
+        var engineEntry = summaryDefault.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(engineId)).findFirst().orElse(null);
+
+        Assertions.assertNotNull(tankEntry);
+        Assertions.assertEquals(72, tankEntry.totalAmount());
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CASING, tankEntry.category());
+
+        Assertions.assertNotNull(engineEntry);
+        Assertions.assertEquals(1, engineEntry.totalAmount());
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER, engineEntry.category());
+
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerSize(boiler, 16);
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerHeat(boiler, 4);
+        com.gtceu.calcboard.compat.create.CreateProperties.setBoilerWater(boiler, 40);
+
+        com.gtceu.calcboard.api.bom.MultiblockBOMSummary summaryLv4 =
+                com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(boiler), false);
+
+        var tankLv4 = summaryLv4.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(tankId)).findFirst().orElse(null);
+        var engineLv4 = summaryLv4.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(engineId)).findFirst().orElse(null);
+
+        Assertions.assertNotNull(tankLv4);
+        Assertions.assertEquals(16, tankLv4.totalAmount());
+        Assertions.assertNotNull(engineLv4);
+        Assertions.assertEquals(4, engineLv4.totalAmount());
+
+        boiler.setMachineCount(2.0);
+        com.gtceu.calcboard.api.bom.MultiblockBOMSummary summary2x =
+                com.gtceu.calcboard.api.bom.MultiblockBOMCalculator.calculateBOM(List.of(boiler), false);
+        Assertions.assertEquals(2, summary2x.totalMultiblockCount());
+
+        var tank2x = summary2x.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(tankId)).findFirst().orElse(null);
+        var engine2x = summary2x.aggregatedItems().stream()
+                .filter(e -> e.itemId().equals(engineId)).findFirst().orElse(null);
+
+        Assertions.assertNotNull(tank2x);
+        Assertions.assertEquals(32, tank2x.totalAmount());
+        Assertions.assertNotNull(engine2x);
+        Assertions.assertEquals(8, engine2x.totalAmount());
+
+        CreateModAdapter adapter = new CreateModAdapter();
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CASING, adapter.classifyBOMPart(tankId));
+        Assertions.assertEquals(com.gtceu.calcboard.api.bom.PartCategory.CONTROLLER, adapter.classifyBOMPart(engineId));
+        Assertions.assertNull(adapter.classifyBOMPart(ResourceLocation.tryParse("minecraft:dirt")));
+    }
 }
 
 

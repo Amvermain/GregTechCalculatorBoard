@@ -105,63 +105,66 @@ public class ToolbarActionHandler {
         List<FlowGraph.ConnectionEdge> addedEdges = new ArrayList<>();
         if (graph == null) return addedEdges;
 
+        AutoConnectGraphIndex index = AutoConnectGraphIndex.build(graph);
+
         for (RecipeNode from : graph.getNodes()) {
             for (int outIdx = 0; outIdx < from.getOutputs().size(); outIdx++) {
-                connectOutputToGraph(graph, from, outIdx, allowedItemIds, addedEdges, subCommands);
+                connectOutputToGraph(graph, index, from, outIdx, allowedItemIds, addedEdges, subCommands);
             }
         }
         return addedEdges;
     }
 
-    private static void connectOutputToGraph(FlowGraph graph, RecipeNode from, int outIdx, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<BoardCommand> subCommands) {
+    private static void connectOutputToGraph(FlowGraph graph, AutoConnectGraphIndex index, RecipeNode from, int outIdx, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<BoardCommand> subCommands) {
         var out = from.getOutputs().get(outIdx);
-        boolean fromFeedsReroute = !from.isReroute() && isOutputFeedingReroute(graph, from.getId(), outIdx);
+        boolean fromFeedsReroute = !from.isReroute() && index.isOutputFeedingReroute(graph, from.getId(), outIdx);
 
         for (RecipeNode to : graph.getNodes()) {
             if (from == to) continue;
-            connectOutputToNode(graph, from, outIdx, out, fromFeedsReroute, to, allowedItemIds, addedEdges, subCommands);
+            connectOutputToNode(graph, index, from, outIdx, out, fromFeedsReroute, to, allowedItemIds, addedEdges, subCommands);
         }
     }
 
-    private static void connectOutputToNode(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<BoardCommand> subCommands) {
+    private static void connectOutputToNode(FlowGraph graph, AutoConnectGraphIndex index, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<BoardCommand> subCommands) {
         for (int inIdx = 0; inIdx < to.getInputs().size(); inIdx++) {
             var in = to.getInputs().get(inIdx);
-            tryConnectPortPair(graph, from, outIdx, out, fromFeedsReroute, to, inIdx, in, allowedItemIds, addedEdges, subCommands);
+            tryConnectPortPair(graph, index, from, outIdx, out, fromFeedsReroute, to, inIdx, in, allowedItemIds, addedEdges, subCommands);
         }
     }
 
-    private static void tryConnectPortPair(FlowGraph graph, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, int inIdx, IngredientStack in, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<BoardCommand> subCommands) {
-        if (!canConnectPort(graph, from, out, to, inIdx, in)) return;
+    private static void tryConnectPortPair(FlowGraph graph, AutoConnectGraphIndex index, RecipeNode from, int outIdx, IngredientStack out, boolean fromFeedsReroute, RecipeNode to, int inIdx, IngredientStack in, Set<ResourceLocation> allowedItemIds, List<FlowGraph.ConnectionEdge> addedEdges, List<BoardCommand> subCommands) {
+        if (!canConnectPort(graph, index, from, out, to, inIdx, in)) return;
 
         ResourceLocation itemKey = out.getId() != null ? out.getId() : in.getId();
         if (allowedItemIds != null && (itemKey == null || !allowedItemIds.contains(itemKey))) return;
-        if (isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) return;
+        if (index.isPortConnected(graph, from.getId(), outIdx, to.getId(), inIdx)) return;
         if (fromFeedsReroute && !to.isReroute()) return;
 
         RecipeNode targetNode = to;
         int targetInIdx = inIdx;
         if (!from.isReroute() && !to.isReroute()) {
-            RecipeNode feedingReroute = findFeedingRerouteNode(graph, to.getId(), inIdx);
+            RecipeNode feedingReroute = index.findFeedingRerouteNode(graph, to.getId(), inIdx);
             if (feedingReroute != null) {
                 targetNode = feedingReroute;
                 targetInIdx = 0;
-                if (isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
+                if (index.isPortConnected(graph, from.getId(), outIdx, targetNode.getId(), targetInIdx)) {
                     return;
                 }
             }
         }
 
-        applyPortAlternativeSelection(graph, to, inIdx, out, in, subCommands);
+        applyPortAlternativeSelection(graph, index, to, inIdx, out, in, subCommands);
 
         FlowGraph.ConnectionEdge edge = new FlowGraph.ConnectionEdge(from.getId(), outIdx, targetNode.getId(), targetInIdx);
-        if (!graph.getConnections().contains(edge)) {
+        if (!index.containsEdge(edge)) {
             graph.addConnection(from.getId(), outIdx, targetNode.getId(), targetInIdx);
             addedEdges.add(edge);
+            index.addEdge(edge);
         }
     }
 
-    private static void applyPortAlternativeSelection(FlowGraph graph, RecipeNode to, int inIdx, IngredientStack out, IngredientStack in, List<BoardCommand> subCommands) {
-        boolean inputAlreadyFed = isInputPortFed(graph, to.getId(), inIdx);
+    private static void applyPortAlternativeSelection(FlowGraph graph, AutoConnectGraphIndex index, RecipeNode to, int inIdx, IngredientStack out, IngredientStack in, List<BoardCommand> subCommands) {
+        boolean inputAlreadyFed = index.isInputPortFed(to.getId(), inIdx);
         if (inputAlreadyFed || out.equals(in) || !in.hasAlternatives() || subCommands == null) return;
 
         ResourceLocation oldAlt = in.getId();
@@ -174,62 +177,82 @@ public class ToolbarActionHandler {
         }
     }
 
-    private static boolean isPortConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
-        if (fromNodeId.equals(toNodeId)) return true;
-        Set<String> visited = new HashSet<>();
-        Queue<String> queue = new ArrayDeque<>();
+    private static final class AutoConnectGraphIndex {
+        private final Map<String, List<FlowGraph.ConnectionEdge>> outEdges = new HashMap<>();
+        private final Map<String, List<FlowGraph.ConnectionEdge>> inEdges = new HashMap<>();
+        private final Set<FlowGraph.ConnectionEdge> edgeSet = new HashSet<>();
 
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (!edge.fromNodeId().equals(fromNodeId) || edge.outputIndex() != outIdx) continue;
-            if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) return true;
-            RecipeNode target = graph.getNode(edge.toNodeId());
-            if (target != null && target.isReroute() && visited.add(target.getId())) {
-                queue.add(target.getId());
+        public static AutoConnectGraphIndex build(FlowGraph graph) {
+            AutoConnectGraphIndex index = new AutoConnectGraphIndex();
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                index.addEdge(edge);
             }
+            return index;
         }
 
-        return pollRerouteConnection(graph, queue, visited, toNodeId, inIdx);
-    }
+        public void addEdge(FlowGraph.ConnectionEdge edge) {
+            edgeSet.add(edge);
+            outEdges.computeIfAbsent(edge.fromNodeId() + ":" + edge.outputIndex(), k -> new ArrayList<>()).add(edge);
+            inEdges.computeIfAbsent(edge.toNodeId() + ":" + edge.inputIndex(), k -> new ArrayList<>()).add(edge);
+        }
 
-    private static boolean pollRerouteConnection(FlowGraph graph, Queue<String> queue, Set<String> visited, String toNodeId, int inIdx) {
-        while (!queue.isEmpty()) {
-            String currRerouteId = queue.poll();
-            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-                if (!edge.fromNodeId().equals(currRerouteId)) continue;
+        public boolean containsEdge(FlowGraph.ConnectionEdge edge) {
+            return edgeSet.contains(edge);
+        }
+
+        public List<FlowGraph.ConnectionEdge> getOutEdges(String fromNodeId, int outIdx) {
+            return outEdges.getOrDefault(fromNodeId + ":" + outIdx, Collections.emptyList());
+        }
+
+        public List<FlowGraph.ConnectionEdge> getInEdges(String toNodeId, int inIdx) {
+            return inEdges.getOrDefault(toNodeId + ":" + inIdx, Collections.emptyList());
+        }
+
+        public boolean isInputPortFed(String toNodeId, int inIdx) {
+            return inEdges.containsKey(toNodeId + ":" + inIdx);
+        }
+
+        public boolean isOutputFeedingReroute(FlowGraph graph, String fromNodeId, int outIdx) {
+            for (FlowGraph.ConnectionEdge edge : getOutEdges(fromNodeId, outIdx)) {
+                RecipeNode target = graph.getNode(edge.toNodeId());
+                if (target != null && target.isReroute()) return true;
+            }
+            return false;
+        }
+
+        public RecipeNode findFeedingRerouteNode(FlowGraph graph, String toNodeId, int inIdx) {
+            for (FlowGraph.ConnectionEdge edge : getInEdges(toNodeId, inIdx)) {
+                RecipeNode src = graph.getNode(edge.fromNodeId());
+                if (src != null && src.isReroute()) return src;
+            }
+            return null;
+        }
+
+        public boolean isPortConnected(FlowGraph graph, String fromNodeId, int outIdx, String toNodeId, int inIdx) {
+            if (fromNodeId.equals(toNodeId)) return true;
+            Set<String> visited = new HashSet<>();
+            Queue<String> queue = new ArrayDeque<>();
+
+            for (FlowGraph.ConnectionEdge edge : getOutEdges(fromNodeId, outIdx)) {
                 if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) return true;
                 RecipeNode target = graph.getNode(edge.toNodeId());
                 if (target != null && target.isReroute() && visited.add(target.getId())) {
                     queue.add(target.getId());
                 }
             }
-        }
-        return false;
-    }
 
-    private static boolean isOutputFeedingReroute(FlowGraph graph, String fromNodeId, int outIdx) {
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (!edge.fromNodeId().equals(fromNodeId) || edge.outputIndex() != outIdx) continue;
-            RecipeNode target = graph.getNode(edge.toNodeId());
-            if (target != null && target.isReroute()) return true;
+            while (!queue.isEmpty()) {
+                String currRerouteId = queue.poll();
+                for (FlowGraph.ConnectionEdge edge : getOutEdges(currRerouteId, 0)) {
+                    if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) return true;
+                    RecipeNode target = graph.getNode(edge.toNodeId());
+                    if (target != null && target.isReroute() && visited.add(target.getId())) {
+                        queue.add(target.getId());
+                    }
+                }
+            }
+            return false;
         }
-        return false;
-    }
-
-    private static RecipeNode findFeedingRerouteNode(FlowGraph graph, String toNodeId, int inIdx) {
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (!edge.toNodeId().equals(toNodeId) || edge.inputIndex() != inIdx) continue;
-            RecipeNode src = graph.getNode(edge.fromNodeId());
-            if (src != null && src.isReroute()) return src;
-        }
-        return null;
-    }
-
-    private static boolean isInputPortFed(FlowGraph graph, String toNodeId, int inIdx) {
-        if (graph == null) return false;
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            if (edge.toNodeId().equals(toNodeId) && edge.inputIndex() == inIdx) return true;
-        }
-        return false;
     }
 
     private static boolean isReachable(FlowGraph graph, String startNodeId, String targetNodeId) {
@@ -252,9 +275,9 @@ public class ToolbarActionHandler {
         return false;
     }
 
-    private static boolean canConnectPort(FlowGraph graph, RecipeNode from, IngredientStack out, RecipeNode to, int inIdx, IngredientStack in) {
+    private static boolean canConnectPort(FlowGraph graph, AutoConnectGraphIndex index, RecipeNode from, IngredientStack out, RecipeNode to, int inIdx, IngredientStack in) {
         boolean isExactMatch = out.equals(in) || Objects.equals(out.getId(), in.getId());
-        if (isInputPortFed(graph, to.getId(), inIdx)) {
+        if (index.isInputPortFed(to.getId(), inIdx)) {
             return isExactMatch;
         }
         if (isExactMatch) return true;

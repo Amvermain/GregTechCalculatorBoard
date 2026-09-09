@@ -5,6 +5,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver;
 import com.gtceu.calcboard.api.solver.FlowEdgeAllocator;
+import com.gtceu.calcboard.api.type.FlowSplitMode;
 import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.BoardScreen;
@@ -38,6 +39,7 @@ public class JunctionSupplyDialog implements IBoardModal {
 
     private int activeTab = 0;
     private SupplyMode selectedMode = SupplyMode.NONE;
+    private FlowSplitMode splitMode = FlowSplitMode.PROPORTIONAL;
     private EditBox rateEditBox;
     private boolean isAnchor = false;
 
@@ -46,6 +48,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     private int outgoingScrollOffset = 0;
     private final List<FlowGraph.ConnectionEdge> outgoingEdges = new ArrayList<>();
     private final Map<FlowGraph.ConnectionEdge, EditBox> edgeLimitEditBoxes = new LinkedHashMap<>();
+    private final Map<FlowGraph.ConnectionEdge, EditBox> edgePriorityEditBoxes = new LinkedHashMap<>();
 
     private static final int DIALOG_WIDTH = 340;
     private static final int DIALOG_HEIGHT = 250;
@@ -58,6 +61,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         if (node == null || !node.isReroute()) return;
         this.targetNode = node;
         this.selectedMode = node.getSupplyMode();
+        this.splitMode = node.getJunctionSplitMode();
         this.isBuffer = node.isJunctionBuffer();
         this.isAnchor = node.isBaseNode();
         this.activeTab = 0;
@@ -91,6 +95,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     private void initOutgoingEdges(Font font, int x, int y) {
         this.outgoingEdges.clear();
         this.edgeLimitEditBoxes.clear();
+        this.edgePriorityEditBoxes.clear();
         FlowGraph graph = parent != null ? parent.getGraph() : null;
         if (graph == null || targetNode == null) return;
 
@@ -103,10 +108,15 @@ public class JunctionSupplyDialog implements IBoardModal {
         if (font != null) {
             for (int i = 0; i < outgoingEdges.size(); i++) {
                 FlowGraph.ConnectionEdge edge = outgoingEdges.get(i);
-                EditBox eb = new EditBox(font, x + DIALOG_WIDTH - 85, -1000, 70, 14, Component.translatable("gui.gtcalcboard.junction.fixed_limit"));
+                EditBox eb = new EditBox(font, x + 226, -1000, DIALOG_WIDTH - 240, 14, Component.translatable("gui.gtcalcboard.junction.fixed_limit"));
                 eb.setMaxLength(16);
-                eb.setValue(edge.hasFixedLimit() ? String.format("%.2f", edge.fixedFlowLimit()) : "0.0");
+                eb.setValue(edge.hasFixedLimit() ? String.format(java.util.Locale.ROOT, "%.2f", edge.fixedFlowLimit()) : "0.0");
                 edgeLimitEditBoxes.put(edge, eb);
+
+                EditBox ebPri = new EditBox(font, x + 168, -1000, 28, 14, Component.translatable("gui.gtcalcboard.junction.priority_label"));
+                ebPri.setMaxLength(6);
+                ebPri.setValue(String.valueOf(edge.priority()));
+                edgePriorityEditBoxes.put(edge, ebPri);
             }
         }
     }
@@ -116,6 +126,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         this.targetNode = null;
         this.outgoingScrollOffset = 0;
         this.edgeLimitEditBoxes.clear();
+        this.edgePriorityEditBoxes.clear();
         this.outgoingEdges.clear();
     }
 
@@ -284,6 +295,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.junction.total_inflow", "§b" + inflowStr).getString(), x + 14, y + 68, 0xFFE2E8F0, false);
 
         renderBufferToggle(graphics, font, x, y, inflow, mouseX, mouseY);
+        renderSplitModeSelector(graphics, font, x, y, mouseX, mouseY);
         renderOutgoingList(graphics, font, x, y, mouseX, mouseY);
     }
 
@@ -304,8 +316,44 @@ public class JunctionSupplyDialog implements IBoardModal {
 
             double bufSize = parseDoubleSafe(bufferSizeEditBox.getValue());
             double chargeDur = (inflow > 0.0001 && bufSize > 0.0) ? bufSize / inflow : 0.0;
-            String durStr = String.format("%.2fs", chargeDur);
-            graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.junction.charge_duration", "§e" + durStr).getString(), x + 14, y + 103, 0xFFCBD5E1, false);
+            String durStr = String.format(java.util.Locale.ROOT, "%.2fs", chargeDur);
+            graphics.drawString(font, "§7" + Component.translatable("gui.gtcalcboard.junction.charge_duration", "§e" + durStr).getString(), x + 175, y + 68, 0xFFCBD5E1, false);
+        }
+    }
+
+    private void renderSplitModeSelector(GuiGraphics graphics, Font font, int x, int y, int mouseX, int mouseY) {
+        int modeY = y + 102;
+        String modeLabel = Component.translatable("gui.gtcalcboard.junction.split_mode_label").getString();
+        graphics.drawString(font, modeLabel, x + 14, modeY + 3, 0xFFCBD5E1, false);
+
+        renderSplitModeButton(graphics, font, x + 75, modeY, 122, FlowSplitMode.PROPORTIONAL, "gui.gtcalcboard.junction.split_mode.proportional", "gui.gtcalcboard.junction.proportional_tooltip", mouseX, mouseY);
+        renderSplitModeButton(graphics, font, x + 203, modeY, 122, FlowSplitMode.EQUAL, "gui.gtcalcboard.junction.split_mode.equal", "gui.gtcalcboard.junction.equal_tooltip", mouseX, mouseY);
+    }
+
+    private void renderSplitModeButton(
+            GuiGraphics graphics,
+            Font font,
+            int btnX,
+            int btnY,
+            int btnW,
+            FlowSplitMode mode,
+            String textKey,
+            String tipKey,
+            int mouseX,
+            int mouseY
+    ) {
+        boolean selected = (this.splitMode == mode);
+        boolean hover = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + 14;
+        int bg = selected ? 0xFF0284C7 : (hover ? 0xFF334155 : 0xFF1E293B);
+        int border = selected ? 0xFF38BDF8 : (hover ? 0xFF64748B : 0xFF475569);
+        graphics.fill(btnX, btnY, btnX + btnW, btnY + 14, bg);
+        graphics.renderOutline(btnX, btnY, btnW, 14, border);
+
+        int textCol = selected ? 0xFFFFFFFF : (hover ? 0xFFF1F5F9 : 0xFF94A3B8);
+        graphics.drawCenteredString(font, Component.translatable(textKey).getString(), btnX + btnW / 2, btnY + 3, textCol);
+
+        if (hover) {
+            graphics.renderTooltip(font, Component.translatable(tipKey), mouseX, mouseY);
         }
     }
 
@@ -320,6 +368,9 @@ public class JunctionSupplyDialog implements IBoardModal {
         }
 
         for (EditBox eb : edgeLimitEditBoxes.values()) {
+            eb.setY(-1000);
+        }
+        for (EditBox eb : edgePriorityEditBoxes.values()) {
             eb.setY(-1000);
         }
 
@@ -337,13 +388,26 @@ public class JunctionSupplyDialog implements IBoardModal {
             RecipeNode toNode = graph != null ? graph.findNodeById(edge.toNodeId()) : null;
             String toName = (toNode != null && toNode.getName() != null && !toNode.getName().isBlank()) ? toNode.getName() : edge.toNodeId();
             String portLabel = String.format("#%d → %s", edge.outputIndex() + 1, toName);
-            graphics.drawString(font, font.plainSubstrByWidth(portLabel, DIALOG_WIDTH - 110), x + 14, rowY + 3, 0xFFE2E8F0, false);
 
-            EditBox eb = edgeLimitEditBoxes.get(edge);
-            if (eb != null) {
-                eb.setX(x + DIALOG_WIDTH - 85);
-                eb.setY(rowY);
-                eb.render(graphics, mouseX, mouseY, 0);
+            EditBox ebLimit = edgeLimitEditBoxes.get(edge);
+            EditBox ebPri = edgePriorityEditBoxes.get(edge);
+
+            graphics.drawString(font, font.plainSubstrByWidth(portLabel, 135), x + 14, rowY + 3, 0xFFE2E8F0, false);
+
+            graphics.drawString(font, "P:", x + 155, rowY + 3, 0xFF94A3B8, false);
+            if (ebPri != null) {
+                ebPri.setX(x + 168);
+                ebPri.setWidth(28);
+                ebPri.setY(rowY);
+                ebPri.render(graphics, mouseX, mouseY, 0);
+            }
+
+            graphics.drawString(font, "Cap:", x + 202, rowY + 3, 0xFF94A3B8, false);
+            if (ebLimit != null) {
+                ebLimit.setX(x + 226);
+                ebLimit.setWidth(DIALOG_WIDTH - 240);
+                ebLimit.setY(rowY);
+                ebLimit.render(graphics, mouseX, mouseY, 0);
             }
         }
     }
@@ -411,11 +475,14 @@ public class JunctionSupplyDialog implements IBoardModal {
         } else {
             if (isBuffer && checkEditBoxClicked(bufferSizeEditBox, mouseX, mouseY, button)) return true;
             if (checkBufferToggleClicked(x, y, mouseX, mouseY)) return true;
+            if (checkSplitModeClicked(x, y, mouseX, mouseY)) return true;
             int visibleCount = Math.min(3, outgoingEdges.size() - outgoingScrollOffset);
             for (int i = 0; i < visibleCount; i++) {
                 FlowGraph.ConnectionEdge edge = outgoingEdges.get(outgoingScrollOffset + i);
                 EditBox eb = edgeLimitEditBoxes.get(edge);
                 if (eb != null && checkEditBoxClicked(eb, mouseX, mouseY, button)) return true;
+                EditBox ebPri = edgePriorityEditBoxes.get(edge);
+                if (ebPri != null && checkEditBoxClicked(ebPri, mouseX, mouseY, button)) return true;
             }
         }
 
@@ -444,6 +511,23 @@ public class JunctionSupplyDialog implements IBoardModal {
         int toggleY = y + 84;
         if (mouseY >= toggleY && mouseY <= toggleY + 16 && mouseX >= x + 10 && mouseX <= x + 200) {
             isBuffer = !isBuffer;
+            playClickSound();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean checkSplitModeClicked(int x, int y, double mouseX, double mouseY) {
+        int modeY = y + 102;
+        if (mouseY < modeY || mouseY > modeY + 14) return false;
+
+        if (mouseX >= x + 75 && mouseX <= x + 197) {
+            this.splitMode = FlowSplitMode.PROPORTIONAL;
+            playClickSound();
+            return true;
+        }
+        if (mouseX >= x + 203 && mouseX <= x + 325) {
+            this.splitMode = FlowSplitMode.EQUAL;
             playClickSound();
             return true;
         }
@@ -605,6 +689,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         FlowGraph graph = parent != null ? parent.getGraph() : null;
 
         targetNode.setSupplyMode(selectedMode);
+        targetNode.setJunctionSplitMode(splitMode);
         if (selectedMode == SupplyMode.FIXED_RATE && rateEditBox != null) {
             targetNode.setExternalSupplyRate(Math.max(0.0, parseDoubleSafe(rateEditBox.getValue())));
         } else if (selectedMode == SupplyMode.FIXED_DRAIN && rateEditBox != null) {
@@ -628,6 +713,9 @@ public class JunctionSupplyDialog implements IBoardModal {
                 FlowGraph.ConnectionEdge edge = entry.getKey();
                 double limit = Math.max(0.0, parseDoubleSafe(entry.getValue().getValue()));
                 graph.setConnectionFixedLimit(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), limit);
+                EditBox priBox = edgePriorityEditBoxes.get(edge);
+                int pri = priBox != null ? Math.max(0, Math.min(99, parseIntSafe(priBox.getValue()))) : edge.priority();
+                graph.setConnectionPriority(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), pri);
             }
             net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
                 new com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionConfigured(graph, targetNode, selectedMode)
@@ -663,6 +751,15 @@ public class JunctionSupplyDialog implements IBoardModal {
         }
     }
 
+    private int parseIntSafe(String s) {
+        if (s == null || s.isBlank()) return 0;
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
     private void playClickSound() {
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.getSoundManager() != null) {
@@ -693,6 +790,11 @@ public class JunctionSupplyDialog implements IBoardModal {
                     return eb.keyPressed(keyCode, scanCode, modifiers);
                 }
             }
+            for (EditBox eb : edgePriorityEditBoxes.values()) {
+                if (eb.isFocused()) {
+                    return eb.keyPressed(keyCode, scanCode, modifiers);
+                }
+            }
         }
         return true;
     }
@@ -707,6 +809,11 @@ public class JunctionSupplyDialog implements IBoardModal {
                 return bufferSizeEditBox.charTyped(codePoint, modifiers);
             }
             for (EditBox eb : edgeLimitEditBoxes.values()) {
+                if (eb.isFocused()) {
+                    return eb.charTyped(codePoint, modifiers);
+                }
+            }
+            for (EditBox eb : edgePriorityEditBoxes.values()) {
                 if (eb.isFocused()) {
                     return eb.charTyped(codePoint, modifiers);
                 }

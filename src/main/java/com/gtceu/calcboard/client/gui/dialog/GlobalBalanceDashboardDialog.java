@@ -147,14 +147,11 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 600.0f);
 
-        // 1. Semi-transparent Black Dim Overlay
         graphics.fill(0, 0, screenWidth, screenHeight, 0x88000000);
 
-        // 2. Dialog Main Container Background & Border
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + dialogH, 0xF2121722);
         graphics.renderOutline(dialogX, dialogY, dialogW, dialogH, 0xFF3D4B66);
 
-        // 3. Header Bar
         graphics.fill(dialogX, dialogY, dialogX + dialogW, dialogY + 24, 0xFF1C2433);
         graphics.drawString(font, "§6∑ " + Component.translatable("gui.gtcalcboard.global_balance.modal_title").getString(), dialogX + 10, dialogY + 8, 0xFFFFFFFF, false);
 
@@ -166,7 +163,6 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         graphics.renderOutline(closeX, closeY, 16, 16, closeHover ? 0xFFFF4444 : 0xFF4A5A78);
         graphics.drawCenteredString(font, "✕", closeX + 8, closeY + 4, closeHover ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        // 4. Top Summary Banner (Power Balance + Machine Stats)
         int bannerY = dialogY + 26;
         int bannerH = 26;
         graphics.fill(dialogX + 6, bannerY, dialogX + dialogW - 6, bannerY + bannerH, 0xDD18202E);
@@ -214,17 +210,14 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         int pageCountW = font.width(pageCountStr);
         graphics.drawString(font, pageCountStr, machX - pageCountW - 8, pY, 0xFFAAAAAA, false);
 
-        // 5. Left Sidebar (Included Pages List & Selection Controls)
         int sidebarX = dialogX + 6;
         int sidebarY = bannerY + bannerH + 4;
         int sidebarH = dialogH - (sidebarY - dialogY) - 6;
 
         renderSidebar(graphics, font, sidebarX, sidebarY, SIDEBAR_WIDTH, sidebarH, mouseX, mouseY);
 
-        // Separator between sidebar and main content
         graphics.fill(dialogX + SIDEBAR_WIDTH + 8, sidebarY, dialogX + SIDEBAR_WIDTH + 9, sidebarY + sidebarH, 0xFF283448);
 
-        // 6. Right Main Content (Material Balance List & Filter Controls)
         int mainX = dialogX + SIDEBAR_WIDTH + 12;
         int mainY = sidebarY;
         int mainW = dialogW - SIDEBAR_WIDTH - 18;
@@ -234,7 +227,6 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
 
         graphics.pose().popPose();
 
-        // 7. Render Drill-Down Popup (Highest dialog layer)
         if (contributionPopup.isVisible()) {
             contributionPopup.render(graphics, screenWidth, screenHeight, mouseX, mouseY);
         } else {
@@ -455,10 +447,8 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         graphics.fill(x, y, x + w, y + h, rowBg);
         graphics.renderOutline(x, y, w, h, rowBorder);
 
-        // 1. Icon
         IngredientRenderer.render(graphics, item.stack, x + 4, y + 1);
 
-        // 2. Rightmost Status Tag: [Deficit ●] / [Surplus ●] / [Balanced ●]
         String tagStr = switch (item.statusType) {
             case 0 -> "§c[" + Component.translatable("gui.gtcalcboard.tooltip.deficit").getString() + " ●]";
             case 1 -> "§a[" + Component.translatable("gui.gtcalcboard.tooltip.surplus").getString() + " ●]";
@@ -475,13 +465,11 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         int rateX = tagX - 6 - rateW;
         graphics.drawString(font, rateFormatted, rateX, y + 5, rateColor, false);
 
-        // 4. Flow Details: (+Prod -Cons) dynamically placed to the left of Net Rate
         String flowDetails = String.format("§7(+%s -%s)", FormatUtil.formatCompactNumber(item.producedRate), FormatUtil.formatCompactNumber(item.consumedRate));
         int flowW = font.width(flowDetails);
         int flowX = rateX - 6 - flowW;
         graphics.drawString(font, flowDetails, flowX, y + 5, 0xFF888888, false);
 
-        // 5. Name: dynamically sized to fit available width between Icon (x + 24) and Flow Details (flowX)
         int maxNameW = Math.max(20, (flowX - 6) - (x + 24));
         String name = item.stack.getDisplayName();
         if (font.width(name) > maxNameW) {
@@ -559,7 +547,6 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
             return true;
         }
 
-        // 2. Sidebar selection buttons & checkboxes
         int sidebarX = dialogX + 6;
         int bannerH = 26;
         int sidebarY = dialogY + 26 + bannerH + 4;
@@ -589,7 +576,6 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
             return true;
         }
 
-        // Page Checkbox Rows clicked
         int pageListY = sidebarY + 18;
         int pageListH = btnY - pageListY - 2;
         if (mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= pageListY && mouseY <= pageListY + pageListH && button == 0) {
@@ -609,7 +595,6 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
             }
         }
 
-        // 3. Filter Tabs
         int mainX = dialogX + SIDEBAR_WIDTH + 12;
         int tabY = sidebarY + 3;
         int tabH = 14;
@@ -638,7 +623,6 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
             return true;
         }
 
-        // 4. Material Row click -> Open Drilldown Popup
         int itemListY = sidebarY + 22;
         int mainW = dialogW - SIDEBAR_WIDTH - 18;
         int itemListH = sidebarH - 26;

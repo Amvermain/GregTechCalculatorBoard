@@ -133,6 +133,7 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven (Charcoal)", 320.0, 64.0, GTVoltageTier.MV);
+        pyrolyse.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
         pyrolyse.setTargetTier(GTVoltageTier.HV); // 1 OC -> 256 EU/t, 160 ticks (8s -> 0.125 cycles/s)
         pyrolyse.setMachineCount(1.0);
         pyrolyse.addInput(IngredientStack.item(ResourceLocation.tryParse("minecraft:oak_log"), "Oak Log", 16, 1.0));
@@ -141,6 +142,7 @@ public class CalculationTest {
         graph.addNode(pyrolyse);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower (Wood Tar)", 200.0, 120.0, GTVoltageTier.MV);
+        distTower.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:hv_energy_hatch", "HV Energy Hatch", "", null, GTVoltageTier.HV, 1, false, false, false));
         distTower.setTargetTier(GTVoltageTier.HV); // 1 OC -> 480 EU/t, 100 ticks (5s -> 0.2 cycles/s)
         distTower.setMachineCount(3.0); // 3 machines -> 0.6 cycles/s
         distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
@@ -204,12 +206,14 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode pyrolyse = RecipeNode.create("Pyrolyse Oven", 320.0, 64.0, GTVoltageTier.MV);
+        pyrolyse.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", null, GTVoltageTier.MV, 1, false, false, false));
         pyrolyse.setTargetTier(GTVoltageTier.MV);
         pyrolyse.setMachineCount(1.0);
         pyrolyse.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
         graph.addNode(pyrolyse);
 
         RecipeNode distTower = RecipeNode.create("Distillation Tower", 100.0, 120.0, GTVoltageTier.MV);
+        distTower.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:mv_energy_hatch", "MV Energy Hatch", "", null, GTVoltageTier.MV, 1, false, false, false));
         distTower.setTargetTier(GTVoltageTier.MV);
         distTower.setMachineCount(2.0);
         distTower.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:wood_tar"), "Wood Tar", 1000, 1.0));
@@ -635,6 +639,7 @@ public class CalculationTest {
         FlowGraph graph = new FlowGraph();
 
         RecipeNode heatChamber = RecipeNode.create("Heat Chamber", 48.0 * 20.0, 92160.0, GTVoltageTier.LuV);
+        heatChamber.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:luv_energy_hatch", "LuV Energy Hatch", "", null, GTVoltageTier.LuV, 1, false, false, false));
         heatChamber.setMachineCount(3);
         IngredientStack netherShardIn = IngredientStack.item(ResourceLocation.tryParse("star_tech:energized_nether_star_shard"), "Energized Nether Star Shard", 1.0, 1.0);
         IngredientStack blazeIn = IngredientStack.fluid(ResourceLocation.tryParse("star_tech:liquid_blaze"), "Liquid Blaze", 1728.0, 1.0);
@@ -645,6 +650,7 @@ public class CalculationTest {
         graph.addNode(heatChamber);
 
         RecipeNode autoclave = RecipeNode.create("Autoclave", 12.0 * 20.0, 30720.0, GTVoltageTier.LuV);
+        autoclave.getAddons().add(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:luv_energy_hatch", "LuV Energy Hatch", "", null, GTVoltageTier.LuV, 1, false, false, false));
         autoclave.setMachineCount(2);
         IngredientStack autoNetherIn = IngredientStack.item(ResourceLocation.tryParse("star_tech:energized_nether_star_shard"), "Energized Nether Star Shard", 1.0, 1.0);
         IngredientStack autoFluidIn = IngredientStack.fluid(ResourceLocation.tryParse("star_tech:energized_fire_fluid"), "Energized Fire Fluid", 576.0, 1.0);

@@ -3,7 +3,7 @@ package com.gtceu.calcboard.integration.jei;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.SearchableRecipe;
 import com.gtceu.calcboard.client.gui.search.RecipeSearchEngine;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuLayeredRecipeExtractor;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
 import mezz.jei.api.recipe.IFocusGroup;

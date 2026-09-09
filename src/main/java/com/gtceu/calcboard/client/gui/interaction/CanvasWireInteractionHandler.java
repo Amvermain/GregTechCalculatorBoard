@@ -198,8 +198,8 @@ public class CanvasWireInteractionHandler {
         }
         graph.addNode(reroute);
         graph.removeConnection(clickedEdge);
-        graph.addConnection(fromNode.getId(), clickedEdge.outputIndex(), reroute.getId(), 0);
-        graph.addConnection(reroute.getId(), 0, toNode.getId(), clickedEdge.inputIndex());
+        graph.addConnection(fromNode.getId(), clickedEdge.outputIndex(), reroute.getId(), 0, clickedEdge.fixedFlowLimit(), clickedEdge.priority());
+        graph.addConnection(reroute.getId(), 0, toNode.getId(), clickedEdge.inputIndex(), clickedEdge.fixedFlowLimit(), clickedEdge.priority());
 
         screen.rebuildWidgets();
         screen.markSummaryDirty();
@@ -226,6 +226,54 @@ public class CanvasWireInteractionHandler {
         screen.markSummaryDirty();
         BoardToast.show(Component.literal("§c✕ ").append(Component.translatable(translatableKey)));
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+    }
+
+    public boolean handleWireScroll(
+            double canvasMouseX,
+            double canvasMouseY,
+            double delta,
+            BoardScreen screen
+    ) {
+        if (screen == null) return false;
+        FlowGraph.ConnectionEdge hoveredEdge = screen.findHoveredWire(canvasMouseX, canvasMouseY, 8.0);
+        if (hoveredEdge == null) return false;
+
+        if (!screen.ensureEditPermission()) return true;
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return true;
+
+        int deltaPri = delta > 0 ? 1 : -1;
+        int currentPri = hoveredEdge.priority();
+        int newPri = Math.max(0, Math.min(99, currentPri + deltaPri));
+
+        if (newPri != currentPri) {
+            graph.setConnectionPriority(
+                    hoveredEdge.fromNodeId(),
+                    hoveredEdge.outputIndex(),
+                    hoveredEdge.toNodeId(),
+                    hoveredEdge.inputIndex(),
+                    newPri
+            );
+            screen.markSummaryDirty();
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
+            playPriorityChangeFeedback(newPri);
+        }
+        return true;
+    }
+
+    private void playPriorityChangeFeedback(int newPri) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.getSoundManager() != null) {
+            float pitch = (float) Math.min(2.0, 1.0 + (newPri * 0.05));
+            mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, pitch));
+        }
+        BoardToast.show(
+                Component.literal("§6★ ").append(
+                        Component.translatable("gui.gtcalcboard.toast.priority_changed", String.valueOf(newPri))
+                )
+        );
     }
 
     public boolean handleWireReleased(

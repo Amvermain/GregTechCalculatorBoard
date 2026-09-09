@@ -251,6 +251,10 @@ public class NodeClipboard {
                 String newGroupId = compoundGroupRemap.getOrDefault(origFrame.getCompoundGroupId(), origFrame.getCompoundGroupId());
                 newFrame.setCompoundGroupId(newGroupId);
             }
+            if (origFrame.isSharedMachineFrame()) {
+                newFrame.setSharedMachineFrame(true);
+                newFrame.setTargetPoolCapacity(origFrame.getTargetPoolCapacity());
+            }
             for (String oldNid : origFrame.getContainedNodeIds()) {
                 RecipeNode mapped = idMap.get(oldNid);
                 if (mapped != null) {
@@ -267,8 +271,8 @@ public class NodeClipboard {
             RecipeNode newFrom = idMap.get(origEdge.fromNodeId());
             RecipeNode newTo = idMap.get(origEdge.toNodeId());
             if (newFrom != null && newTo != null) {
-                graph.addConnection(newFrom.getId(), origEdge.outputIndex(), newTo.getId(), origEdge.inputIndex());
-                newEdges.add(new FlowGraph.ConnectionEdge(newFrom.getId(), origEdge.outputIndex(), newTo.getId(), origEdge.inputIndex()));
+                graph.addConnection(newFrom.getId(), origEdge.outputIndex(), newTo.getId(), origEdge.inputIndex(), origEdge.fixedFlowLimit(), origEdge.priority());
+                newEdges.add(new FlowGraph.ConnectionEdge(newFrom.getId(), origEdge.outputIndex(), newTo.getId(), origEdge.inputIndex(), origEdge.fixedFlowLimit(), origEdge.priority()));
             }
         }
 

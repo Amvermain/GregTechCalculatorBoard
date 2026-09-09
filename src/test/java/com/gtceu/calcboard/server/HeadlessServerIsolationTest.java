@@ -10,7 +10,7 @@ import com.gtceu.calcboard.client.gui.compat.gtceu.GTCEuModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.systeams.SysteamsModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.thermal.ThermalModGuiHandler;
 import com.gtceu.calcboard.client.gui.compat.vanilla.VanillaModGuiHandler;
-import com.gtceu.calcboard.compat.IModAdapter;
+import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.compat.create.CreateModAdapter;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;

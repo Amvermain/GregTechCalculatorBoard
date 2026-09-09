@@ -8,8 +8,8 @@ import com.gtceu.calcboard.client.gui.editor.NodeParallelEditor;
 import com.gtceu.calcboard.client.gui.editor.NodeTargetBatchEditor;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.type.GTVoltageTier;

@@ -14,6 +14,7 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
+import com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import com.gtceu.calcboard.compat.gtceu.physics.GTTurbinePhysics;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
@@ -37,11 +38,22 @@ public final class GTAddonCompatibilityHandler {
     public static final ResourceLocation DISTILLATION_TOWER_ID = ResourceLocation.tryParse("gtceu:distillation_tower");
 
     private static final java.util.Map<ResourceLocation, Boolean> MUFFLER_SUPPORT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Set<String> MUFFLER_ADDON_IDS;
+
+    static {
+        java.util.Set<String> set = new java.util.HashSet<>();
+        set.add("gtceu:muffler_hatch");
+        for (GTVoltageTier tier : GTVoltageTier.values()) {
+            set.add("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_muffler_hatch");
+        }
+        MUFFLER_ADDON_IDS = java.util.Collections.unmodifiableSet(set);
+    }
 
     public static boolean isMufflerAddon(MachineAddon addon) {
         if (addon == null || addon.getId() == null) return false;
         String id = addon.getId();
-        return id.startsWith("gtceu:") && (id.contains("muffler_hatch") || id.contains("muffler"));
+        if (MUFFLER_ADDON_IDS.contains(id)) return true;
+        return addon.getItemIcon() != null && com.gtceu.calcboard.compat.gtceu.GTCEuAddonCrawler.isMufflerHatchItem(null, addon.getItemIcon());
     }
 
     private static boolean supportsMuffler(com.gtceu.calcboard.api.bom.MultiblockStructureDef def, ResourceLocation mbId) {
@@ -570,8 +582,8 @@ public final class GTAddonCompatibilityHandler {
 
     private static void applyAddonInstallation(RecipeNode node, MachineAddon addon) {
         if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
-            if (addon.getId().contains("upgrade_kit") || addon.getId().contains("tier_kit")) {
-                node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && (a.getId().contains("upgrade_kit") || a.getId().contains("tier_kit")));
+            if (addon.isThermalUpgradeKit()) {
+                node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && a.isThermalUpgradeKit());
             }
             node.getAddons().add(addon);
             return;
@@ -777,8 +789,8 @@ public final class GTAddonCompatibilityHandler {
         GTCombustionHelper.syncCombustionInputs(node);
     }
 
-    public static void updateNodeTierFromEnergyHatches(RecipeNode node) {
-        if (node == null) return;
+    public static GTVoltageTier getPrimaryEnergyHatchTier(RecipeNode node) {
+        if (node == null) return null;
         List<GTEnergyHatchAddon> hatches = new ArrayList<>();
         for (MachineAddon a : node.getAddons()) {
             if (a instanceof GTEnergyHatchAddon eh) {
@@ -786,38 +798,71 @@ public final class GTAddonCompatibilityHandler {
             }
         }
         if (hatches.isEmpty()) {
+            return null;
+        }
+        if (hatches.size() == 2 && hatches.get(0).getTier() == hatches.get(1).getTier()) {
+            GTVoltageTier base = hatches.get(0).getTier();
+            return base.ordinal() < GTVoltageTier.MAX.ordinal()
+                    ? GTVoltageTier.getByIndex(base.ordinal() + 1)
+                    : base;
+        }
+        GTVoltageTier maxSingleHatchTier = GTVoltageTier.ULV;
+        for (var h : hatches) {
+            if (h.getTier().ordinal() > maxSingleHatchTier.ordinal()) {
+                maxSingleHatchTier = h.getTier();
+            }
+        }
+        return maxSingleHatchTier;
+    }
+
+    public static boolean requiresEnergyHatch(RecipeNode node) {
+        if (node == null || !node.isMultiblock() || node.isModule() || node.isGenerator()) {
+            return false;
+        }
+        if (node.isFusion() || GTFusionHelper.isFusion(node)) {
+            return false;
+        }
+        if (node.getEnergyType() != EnergyType.ELECTRIC_EU) {
+            return false;
+        }
+        if (GTPowerCalculator.isBoilerRecipe(node) || GTCombustionHelper.isCombustionFamily(node)) {
+            return false;
+        }
+        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
+            return false;
+        }
+        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+        if (mbId != null && MultiblockDetector.isSteamMultiblock(mbId)) {
+            return false;
+        }
+        return true;
+    }
+
+    public static void updateNodeTierFromEnergyHatches(RecipeNode node) {
+        if (node == null) return;
+        GTVoltageTier hatchTier = getPrimaryEnergyHatchTier(node);
+        if (hatchTier == null) {
             if (node.getRecipeTier() != null) {
                 node.setTargetTier(node.getRecipeTier());
             }
             return;
         }
 
-        long totalEUtCapacity = 0;
-        GTVoltageTier maxSingleHatchTier = GTVoltageTier.ULV;
-
-        for (var h : hatches) {
-            totalEUtCapacity += (long) h.getTier().getVoltage() * h.getAmperage();
-            if (h.getTier().ordinal() > maxSingleHatchTier.ordinal()) {
-                maxSingleHatchTier = h.getTier();
-            }
-        }
-
-        if (hatches.size() == 2 && hatches.get(0).getTier() == hatches.get(1).getTier()) {
-            GTVoltageTier base = hatches.get(0).getTier();
-            GTVoltageTier dualTier = base.ordinal() < GTVoltageTier.MAX.ordinal()
-                    ? GTVoltageTier.getByIndex(base.ordinal() + 1)
-                    : base;
-            node.setTargetTier(dualTier);
-            return;
-        }
-
-        node.setTargetTier(maxSingleHatchTier);
+        node.setTargetTier(hatchTier);
 
         if (com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(node)) {
-            GTEnergyHatchAddon primary = hatches.get(0);
-            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, primary.getTier());
-            int totalAmps = hatches.stream().mapToInt(GTEnergyHatchAddon::getAmperage).sum();
-            com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, totalAmps);
+            List<GTEnergyHatchAddon> hatches = new ArrayList<>();
+            for (MachineAddon a : node.getAddons()) {
+                if (a instanceof GTEnergyHatchAddon eh) {
+                    hatches.add(eh);
+                }
+            }
+            if (!hatches.isEmpty()) {
+                GTEnergyHatchAddon primary = hatches.get(0);
+                com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, primary.getTier());
+                int totalAmps = hatches.stream().mapToInt(GTEnergyHatchAddon::getAmperage).sum();
+                com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, totalAmps);
+            }
         }
     }
 

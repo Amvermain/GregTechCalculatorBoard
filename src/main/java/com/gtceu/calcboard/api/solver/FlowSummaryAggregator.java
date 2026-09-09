@@ -135,7 +135,11 @@ public final class FlowSummaryAggregator {
     }
 
     public static BalanceSummary computeSummary(FlowGraph graph, boolean recomputeEfficiencies) {
-        return computeSummaryInternal(graph, recomputeEfficiencies, 0, Collections.newSetFromMap(new IdentityHashMap<>()));
+        BalanceSummary summary = computeSummaryInternal(graph, recomputeEfficiencies, 0, Collections.newSetFromMap(new IdentityHashMap<>()));
+        if (graph != null && recomputeEfficiencies) {
+            graph.setCachedSummary(summary);
+        }
+        return summary;
     }
 
     private static BalanceSummary computeSummaryInternal(

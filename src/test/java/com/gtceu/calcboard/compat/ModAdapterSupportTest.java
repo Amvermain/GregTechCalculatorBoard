@@ -5,7 +5,7 @@ import com.gtceu.calcboard.api.property.NodeBadge;
 import com.gtceu.calcboard.api.property.NodeBadgeRegistry;
 import com.gtceu.calcboard.api.property.NodeProperties;
 import com.gtceu.calcboard.client.gui.search.RecipeFilterConfig;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

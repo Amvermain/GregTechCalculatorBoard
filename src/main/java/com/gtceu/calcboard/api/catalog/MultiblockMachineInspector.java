@@ -1,6 +1,8 @@
 package com.gtceu.calcboard.api.catalog;
 
 import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.api.type.GTThreadingHelix;
 import net.minecraft.resources.ResourceLocation;
 
@@ -123,9 +125,11 @@ public final class MultiblockMachineInspector {
     }
 
     public static void detectAndRegisterCoilMultiblock(ResourceLocation id, Class<?> mCls, ResourceLocation recipeCategoryId) {
+        IModAdapter adapter = id != null ? ModAdapterRegistry.getAdapterForMod(id.getNamespace()) : null;
+        boolean adapterCoil = adapter != null && adapter.isCoilMultiblock(id);
         if (isCoilMachineClass(mCls)
                 || isCoilFromCatalog(id)
-                || com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.getCoilMachineSpec(id).kind() != com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper.CoilMachineKind.GENERIC) {
+                || adapterCoil) {
             MultiblockDetector.registerCoilMultiblock(id, recipeCategoryId);
         }
     }

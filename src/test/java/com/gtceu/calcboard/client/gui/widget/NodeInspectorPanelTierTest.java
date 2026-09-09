@@ -17,7 +17,7 @@ public class NodeInspectorPanelTierTest {
 
     @BeforeAll
     public static void init() {
-        com.gtceu.calcboard.compat.ModAdapterRegistry.init();
+        com.gtceu.calcboard.api.spi.ModAdapterRegistry.init();
     }
 
     @BeforeEach

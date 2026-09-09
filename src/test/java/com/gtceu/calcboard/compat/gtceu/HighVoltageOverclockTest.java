@@ -53,11 +53,14 @@ public class HighVoltageOverclockTest {
         multiblock.addInput(fluidIn);
         multiblock.addOutput(fluidOut);
 
+        multiblock.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:zpm_energy_hatch", "ZPM Energy Hatch", "", ResourceLocation.tryParse("gtceu:zpm_energy_hatch"), GTVoltageTier.ZPM, 1, false, false, false));
         multiblock.setTargetTier(GTVoltageTier.ZPM);
         Assertions.assertEquals(1.0 / 20.0, multiblock.getEffectiveDurationSeconds(), 1e-6);
         Assertions.assertEquals(20.0, multiblock.getEffectiveCyclesPerSecond(), 1e-6);
         Assertions.assertEquals(61440.0, multiblock.getSingleMachineEUt(), 1e-6);
 
+        multiblock.removeAddon("gtceu:zpm_energy_hatch");
+        multiblock.addAddon(new com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon("gtceu:uv_energy_hatch", "UV Energy Hatch", "", ResourceLocation.tryParse("gtceu:uv_energy_hatch"), GTVoltageTier.UV, 1, false, false, false));
         multiblock.setTargetTier(GTVoltageTier.UV);
         Assertions.assertEquals(1.0 / 20.0, multiblock.getEffectiveDurationSeconds(), 1e-6);
         Assertions.assertEquals(40.0, multiblock.getEffectiveCyclesPerSecond(), 1e-6);

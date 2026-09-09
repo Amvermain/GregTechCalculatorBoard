@@ -14,8 +14,8 @@ import com.gtceu.calcboard.api.util.ModCompatHelper;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.dialog.MachineConfigDialog;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.greate.GreateProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
@@ -142,14 +142,9 @@ public final class NodeControlsTooltipRenderer {
         List<Component> tooltipLines = new ArrayList<>();
         if (!n.isOperational(graph)) {
             tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()));
-            if (!n.hasValidReflector()) {
-                int req = n.getRequiredReflectorTier();
-                int inst = n.getInstalledReflectorTier();
-                String instStr = inst > 0 ? ("Tier " + inst) : Component.translatable("gui.gtcalcboard.none_plain").getString();
-                tooltipLines.add(Component.literal("§c❌ " + String.format(Locale.ROOT, Component.translatable("gui.gtcalcboard.node_warning.reflector_detail").getString(), String.valueOf(req), instStr)));
-            }
-            if (graph != null && GTTurbineHelper.hasTurbineFlowDeficit(n, graph)) {
-                tooltipLines.add(Component.literal("§c❌ " + Component.translatable("gui.gtcalcboard.turbine_deficit_desc").getString()));
+            List<Component> warnings = n.getOperationalWarnings(graph);
+            for (Component w : warnings) {
+                tooltipLines.add(Component.literal("§c❌ ").append(w));
             }
         }
         tooltipLines.add(Component.literal("§b⚙ " + Component.translatable("gui.gtcalcboard.config_dialog_title", n.getName()).getString()));

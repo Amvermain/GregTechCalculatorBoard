@@ -482,25 +482,18 @@
   "gui.gtcalcboard.tutorial.step5_junction_desc": "[Левый клик] по нижнему значку узла разветвления позволяет ввести целевой размер партии (напр., 1000 mB)! Время завершения (ET: 2.0s) рассчитывается в реальном времени исходя из притока пара (500 mB/s). [Shift+Правый клик] — сброс.",
   "gui.gtcalcboard.tutorial.step5_selector_title": "6. Смена машины и многоблока (Селектор машин)",
   "gui.gtcalcboard.tutorial.step5_selector_desc": "Нажмите на [Иконку машины] в левом верхнем углу узла, чтобы открыть селектор. Изучите значки возможностей (Катушка, Люк параллельности, Ротор) и выберите многоблок [Электродуговая печь]!",
-
   "gui.gtcalcboard.tutorial.step5_title": "7. Настройка оборудования и дополнений машины",
   "gui.gtcalcboard.tutorial.step5_desc": "Нажмите на кнопку настроек [⚙] на карточке турбины! Здесь можно свободно настраивать тиры напряжения (LV~MAX), разгон, катушки, люки и улучшения.",
-
   "gui.gtcalcboard.tutorial.step6_title": "8. Выделение группы и рамки на холсте",
   "gui.gtcalcboard.tutorial.step6_desc": "Выделите рамкой узлы Котла и Турбины, затем нажмите [Ctrl + G]! Они объединятся в [Групповую рамку], позволяющую двигать их вместе и менять цвет [✦].",
-
   "gui.gtcalcboard.tutorial.step7_title": "9. Упаковка в составной модуль и разворачивание",
   "gui.gtcalcboard.tutorial.step7_desc": "Нажмите кнопку [▦] в заголовке рамки, чтобы упаковать завод в аккуратный [Составной модуль]! Нажав [⤢ Развернуть], вы в любой момент восстановите схему на 100%.",
-
   "gui.gtcalcboard.tutorial.step8_title": "10. Временное разделение общих машин (Shared Pool)",
   "gui.gtcalcboard.tutorial.step8_desc": "Выделите 3 узла распиловки жеод и нажмите [Ctrl + Shift + S]! Нагрузка от 3 дробных рецептов объединится в один физический LV Резак (нагрузка 45.0%) с точным учётом энергии.",
-
   "gui.gtcalcboard.tutorial.step9_title": "11. Ведомость материалов многоблоков (BOM)",
   "gui.gtcalcboard.tutorial.step9_desc": "Нажмите [▦ BOM] в нижней строке состояния или [Shift + B] / [M], чтобы открыть BOM многоблоков! Обратите внимание, что корпус резака и обшивка посчитаны ровно для 1 машины вместо 3 лишних корпусов.",
-
   "gui.gtcalcboard.tutorial.step10_title": "12. Подача в разветвитель (∞), истощение (DT) и сброс",
   "gui.gtcalcboard.tutorial.step10_desc": "[Правый клик] по узлу открывает меню подачи (или нажмите [⚙ Настроить узел] в правом Инспекторе): включите [Бесконечную подачу (∞)] или [Фиксированный поток]! Это изолирует поток вверх по цепочке, считает истощение запасов (DT) или сбрасывает излишки.",
-
   "gui.gtcalcboard.tutorial.step11_title": "13. Проводник папок и управление чертежами",
   "gui.gtcalcboard.tutorial.step11_desc": "Нажмите кнопку [📁] на панели слева, [Имя страницы ▼] вверху или клавишу [Tab], чтобы открыть Проводник! Создавайте вложенные папки, выбирайте через Ctrl/Shift, перетаскивайте страницы и переносите чертежи (GTFOLDER:...).",
   "gui.gtcalcboard.tutorial.completed_title": "Обучение завершено!",
@@ -805,8 +798,10 @@
   "gui.gtcalcboard.node_warning.dt_multi_fluid_unsupported": "Дистилляционная башня требует отдельные люки выхода на слой и не поддерживает многожидкостные люки (%s).",
   "gui.gtcalcboard.node_warning.dt_excess_output_hatches": "В башне установлено %d выходных люков, но этот рецепт выдаёт лишь %d фракций жидкостей.",
   "gui.gtcalcboard.node_warning.fusion_energy_hatch_tier_mismatch": "Термоядерный реактор (%s) требует энерголюк строго соответствующего тира, но установлен люк %s.",
+  "gui.gtcalcboard.node_warning.energy_hatch_missing": "Отсутствует энергетический люк (требуется подача энергии)",
   "gui.gtcalcboard.turbine_flow_deficit_warning": "Турбине требуется 100%% поток %s (Текущий: %d%%)",
   "gui.gtcalcboard.node_badge.turbine_deficit": "⚠ Дефицит",
+  "gui.gtcalcboard.node_badge.energy_hatch_missing": "Нет энерголюка",
   "gui.gtcalcboard.node_badge.oxygen_boost": "Кислородное ускорение активно",
   "gui.gtcalcboard.node_badge.liquid_oxygen_boost": "Ускорение жидким кислородом активно",
   "gui.gtcalcboard.turbine_deficit_title": "Дефицит входного потока турбины",
@@ -1161,6 +1156,7 @@
   "gui.gtcalcboard.inspector.title": "Инспектор узла",
   "gui.gtcalcboard.inspector.count": "Количество машин",
   "gui.gtcalcboard.inspector.tier": "Целевой уровень напряжения",
+  "gui.gtcalcboard.inspector.tier_locked_by_energy_hatch": "Тир напряжения зафиксирован установленным энерголюком (%s)",
   "gui.gtcalcboard.inspector.overclock": "Режим разгона",
   "gui.gtcalcboard.inspector.machine_config": "Конфигурация оборудования",
   "gui.gtcalcboard.inspector.single_power": "Мощность 1 машины",
@@ -1263,5 +1259,18 @@
   "gui.gtcalcboard.summary.stress_deficit": "Дефицит мощности: -%s SU",
   "gui.gtcalcboard.summary.rate": "Скорость: %s",
   "gui.gtcalcboard.summary.fuel_burn_speed": "Скорость горения топлива: %sx%s",
-  "gui.gtcalcboard.summary.steam_output": "Выработка пара: %s мБ/с (%s мБ/т)"
+  "gui.gtcalcboard.summary.steam_output": "Выработка пара: %s мБ/с (%s мБ/т)",
+  "gui.gtcalcboard.junction.split_mode_label": "Режим разделения:",
+  "gui.gtcalcboard.junction.split_mode.proportional": "Пропорционально",
+  "gui.gtcalcboard.junction.split_mode.equal": "Равномерно",
+  "gui.gtcalcboard.junction.split_mode.priority": "По приоритету",
+  "gui.gtcalcboard.junction.priority_label": "Приоритет",
+  "gui.gtcalcboard.junction.proportional_tooltip": "Распределяет доступный поток пропорционально потребностям потребителей",
+  "gui.gtcalcboard.junction.equal_tooltip": "Равномерно делит доступный поток между исходящими линиями",
+  "gui.gtcalcboard.junction.priority_tooltip": "Линии с более высоким приоритетом заполняются первыми (система приоритетов как в AE2)",
+  "gui.gtcalcboard.toast.priority_changed": "Приоритет: %s",
+  "gui.gtcalcboard.tooltip.allocated_flow": "Выделенный поток",
+  "gui.gtcalcboard.tooltip.wire_priority": "Приоритет: %d",
+  "gui.gtcalcboard.tooltip.wire_priority_default": "Приоритет: 0 (По умолчанию)",
+  "gui.gtcalcboard.tooltip.wire_scroll_priority_hint": "[Колесо мыши] Настроить приоритет (+ / -)"
 }

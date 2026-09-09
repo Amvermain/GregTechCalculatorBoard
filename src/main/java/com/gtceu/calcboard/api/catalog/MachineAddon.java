@@ -2,8 +2,8 @@ package com.gtceu.calcboard.api.catalog;
 
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.compat.IModAdapter;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.IModAdapter;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -331,11 +331,15 @@ public class MachineAddon {
     }
 
     public static boolean isCombustionMachine(RecipeNode node) {
-        return com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper.isCombustionEngine(node);
+        if (node == null) return false;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        return adapter != null && adapter.isCombustionMachine(node);
     }
 
     public static boolean isThermalMachine(RecipeNode node) {
-        return com.gtceu.calcboard.compat.thermal.helper.ThermalAugmentHelper.isThermalMachine(node);
+        if (node == null) return false;
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
+        return adapter != null && adapter.isThermalMachine(node);
     }
 
     // Machine-specific coil bonus metrics
@@ -436,7 +440,7 @@ public class MachineAddon {
 
     public MachineAddon forMachine(RecipeNode node) {
         if (node == null) return this;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter.tailorAddon(this, node);
     }
 
@@ -455,7 +459,7 @@ public class MachineAddon {
     public boolean isCompatibleWith(RecipeNode node) {
         if (node == null) return true;
         if (category == null || category.equals(Category.CUSTOM)) return true;
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter.isAddonCompatible(node, this);
     }
 
@@ -463,7 +467,7 @@ public class MachineAddon {
         if (node == null) {
             return new ArrayList<>(AddonCategory.values());
         }
-        com.gtceu.calcboard.compat.IModAdapter adapter = com.gtceu.calcboard.compat.ModAdapterRegistry.getAdapterForNode(node);
+        IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         return adapter.getApplicableAddonCategories(node);
     }
 

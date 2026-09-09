@@ -6,7 +6,7 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.compat.ModAdapterRegistry;
+import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.create.CreateRecipeHandler;
 import com.gtceu.calcboard.compat.createnewage.CreateNewAgeRecipeHandler;
 import com.gtceu.calcboard.compat.gtceu.GTCEuLayeredRecipeExtractor;
@@ -14,8 +14,8 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.GTCEuRecipeHandler;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
 import com.gtceu.calcboard.compat.thermal.ThermalRecipeHandler;
-import com.gtceu.calcboard.integration.emi.EmiRecipeConverter;
-import mezz.jei.api.recipe.IFocusGroup;
+import com.gtceu.calcboard.api.model.RecipeDetails;
+import com.gtceu.calcboard.api.util.RecipeConversionHelper;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.nbt.CompoundTag;
@@ -92,7 +92,7 @@ public class JeiRecipeConverter {
 
         // Details extraction
         boolean isGT = GTCEuRecipeHandler.isGTRecipe(recipe) || (catId != null && GTCEuRecipeHandler.isGTCategoryNamespace(catId.getNamespace()));
-        EmiRecipeConverter.RecipeDetails details = new EmiRecipeConverter.RecipeDetails();
+        RecipeDetails details = new RecipeDetails();
         if (isGT) {
             GTCEuRecipeHandler.extractGTRecipeDetails(recipe, details);
             GTCEuRecipeHandler.adaptRecipeDetails(null, recipe, details);
@@ -290,12 +290,12 @@ public class JeiRecipeConverter {
         }
 
         for (IngredientStack in : inputs) {
-            if (in != null && in.getId() != null && !EmiRecipeConverter.isIgnoredInput(in.getId(), in.getChance())) {
+            if (in != null && in.getId() != null && !RecipeConversionHelper.isIgnoredInput(in.getId(), in.getChance())) {
                 node.addInput(in);
             }
         }
         for (IngredientStack out : outputs) {
-            if (out != null && out.getId() != null && !EmiRecipeConverter.isDummyConditionMarker(out.getId())) {
+            if (out != null && out.getId() != null && !RecipeConversionHelper.isDummyConditionMarker(out.getId())) {
                 node.addOutput(out);
             }
         }
