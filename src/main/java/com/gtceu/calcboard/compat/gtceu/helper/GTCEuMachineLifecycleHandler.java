@@ -166,9 +166,7 @@ public final class GTCEuMachineLifecycleHandler {
                 node.setTargetTier(baseTier);
             }
             int defPar = MultiblockDetector.getDefaultParallel(newIcon);
-            if (defPar > 1) {
-                node.setParallel(defPar);
-            }
+            configureTurbineParallel(node, oldIcon, defPar);
         }
 
         if (oldIcon != null && !oldIcon.equals(newIcon)) {
@@ -204,6 +202,20 @@ public final class GTCEuMachineLifecycleHandler {
                 node.setBaseDurationTicks(200.0);
                 node.setEnergyType(EnergyType.NONE);
             }
+        }
+    }
+
+    private static void configureTurbineParallel(RecipeNode node, ResourceLocation oldIcon, int defPar) {
+        if (oldIcon != null && MultiblockDetector.isTurbineMachine(oldIcon)) {
+            if (GTTurbineHelper.hasRotorAddon(node)) {
+                GTTurbineHelper.autoCalculateTurbineParallel(node);
+                return;
+            }
+            node.setParallel(Math.max(1, defPar));
+            return;
+        }
+        if (defPar > 1) {
+            node.setParallel(defPar);
         }
     }
 

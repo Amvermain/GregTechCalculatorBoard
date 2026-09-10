@@ -11,6 +11,9 @@ import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.SteamMode;
 import net.minecraft.resources.ResourceLocation;
 
+import com.gtceu.calcboard.api.storage.BoardManager;
+import com.gtceu.calcboard.api.storage.BoardPage;
+
 import java.util.*;
 
 /**
@@ -23,6 +26,28 @@ public class ExpandModuleCommand implements BoardCommand {
     private final List<FlowGraph.ConnectionEdge> moduleEdges;
     private final List<CanvasGroupFrame> expandedFrames;
     private final List<CanvasStickyNote> expandedNotes;
+    private final BoardPage capturedSubPage;
+
+    public ExpandModuleCommand(
+            RecipeNode moduleNode,
+            List<RecipeNode> expandedNodes,
+            List<FlowGraph.ConnectionEdge> restoredEdges,
+            List<FlowGraph.ConnectionEdge> moduleEdges,
+            List<CanvasGroupFrame> expandedFrames,
+            List<CanvasStickyNote> expandedNotes,
+            BoardPage capturedSubPage
+    ) {
+        this.moduleNode = moduleNode;
+        this.expandedNodes = new ArrayList<>(expandedNodes);
+        this.restoredEdges = new ArrayList<>(restoredEdges);
+        this.moduleEdges = new ArrayList<>(moduleEdges);
+        this.expandedFrames = expandedFrames != null ? new ArrayList<>(expandedFrames) : Collections.emptyList();
+        this.expandedNotes = expandedNotes != null ? new ArrayList<>(expandedNotes) : Collections.emptyList();
+        this.capturedSubPage = capturedSubPage != null ? capturedSubPage
+                : ((moduleNode != null && moduleNode.getSubPageId() != null)
+                        ? BoardManager.getInstance().getPage(moduleNode.getSubPageId()).orElse(null)
+                        : null);
+    }
 
     public ExpandModuleCommand(
             RecipeNode moduleNode,
@@ -32,18 +57,14 @@ public class ExpandModuleCommand implements BoardCommand {
             List<CanvasGroupFrame> expandedFrames,
             List<CanvasStickyNote> expandedNotes
     ) {
-        this.moduleNode = moduleNode;
-        this.expandedNodes = new ArrayList<>(expandedNodes);
-        this.restoredEdges = new ArrayList<>(restoredEdges);
-        this.moduleEdges = new ArrayList<>(moduleEdges);
-        this.expandedFrames = expandedFrames != null ? new ArrayList<>(expandedFrames) : Collections.emptyList();
-        this.expandedNotes = expandedNotes != null ? new ArrayList<>(expandedNotes) : Collections.emptyList();
+        this(moduleNode, expandedNodes, restoredEdges, moduleEdges, expandedFrames, expandedNotes, null);
     }
 
     public ExpandModuleCommand(RecipeNode moduleNode, List<RecipeNode> expandedNodes, List<FlowGraph.ConnectionEdge> restoredEdges, List<FlowGraph.ConnectionEdge> moduleEdges) {
         this(moduleNode, expandedNodes, restoredEdges, moduleEdges,
                 moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getFrames() : Collections.emptyList(),
-                moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getStickyNotes() : Collections.emptyList());
+                moduleNode != null && moduleNode.getSubGraph() != null ? moduleNode.getSubGraph().getStickyNotes() : Collections.emptyList(),
+                null);
     }
 
     @Override
@@ -66,6 +87,7 @@ public class ExpandModuleCommand implements BoardCommand {
         for (FlowGraph.ConnectionEdge e : moduleEdges) {
             graph.addConnection(e);
         }
+        restoreSubPage();
     }
 
     @Override
@@ -91,6 +113,21 @@ public class ExpandModuleCommand implements BoardCommand {
             if (!graph.getStickyNotes().contains(note)) {
                 graph.addStickyNote(note);
             }
+        }
+        cleanUpSubPage();
+    }
+
+    private void restoreSubPage() {
+        if (capturedSubPage != null && BoardManager.getInstance().getPage(capturedSubPage.getId()).isEmpty()) {
+            BoardManager.getInstance().getPageManager().addPage(capturedSubPage);
+        }
+    }
+
+    private void cleanUpSubPage() {
+        if (capturedSubPage != null) {
+            BoardManager.getInstance().removePage(capturedSubPage);
+        } else if (moduleNode != null && moduleNode.getSubPageId() != null) {
+            BoardManager.getInstance().removePage(moduleNode.getSubPageId());
         }
     }
 

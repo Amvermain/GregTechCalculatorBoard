@@ -408,4 +408,90 @@ class GTTurbineEnhancementTest {
         assertEquals(GTVoltageTier.EV, node.getTargetTier());
         assertEquals(GTVoltageTier.EV, GTTurbineHelper.getRotorHolderTier(node));
     }
+
+    @Test
+    @DisplayName("Verify Large Plasma Turbine (LPT) with ZPM Holder and Prismalium Rotor calculates 512x parallel")
+    void testLargePlasmaTurbineParallelAndConsumptionDiscrepancy() {
+        RecipeNode node = new RecipeNode("lpt", "Large Plasma Turbine", 116.0, 2048.0, GTVoltageTier.IV);
+        node.setGenerator(true);
+        node.setMultiblock(true);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_generator"));
+        node.setMachineIcon(ResourceLocation.tryParse("gtceu:plasma_large_turbine"));
+        node.getAvailableWorkstations().addAll(java.util.List.of(
+                ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine"),
+                ResourceLocation.tryParse("gtceu:supreme_plasma_turbine"),
+                ResourceLocation.tryParse("gtceu:plasma_large_turbine")
+        ));
+        node.setBaseEUt(2048.0);
+        node.setTargetTier(GTVoltageTier.ZPM);
+        GTTurbineHelper.setRotorHolderTier(node, GTVoltageTier.ZPM);
+        GTTurbineHelper.setDynamoTier(node, GTVoltageTier.ZPM);
+        GTTurbineHelper.setDynamoAmperage(node, 16);
+        node.setRotorPower(1600);
+        node.setRotorEfficiency(260);
+        node.setRotorName("Prismalium");
+        node.addInput(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:argon_plasma"), "Argon Plasma", 5, 1.0f));
+
+        double cap = GTTurbineHelper.getGeneratorMaxEUt(node);
+        assertEquals(1048576.0, cap, 0.001, "LPT with ZPM holder and 1600% power must have 1,048,576 EU/t capacity");
+
+        int pmax = GTPowerCalculator.getMaxParallelCapacity(node);
+        assertEquals(512, pmax, "Max parallel capacity must be exactly 512, not inflated by any multiplier");
+
+        GTTurbineHelper.autoCalculateTurbineParallel(node);
+        assertEquals(512, node.getParallel(), "Auto-calculated parallel must be 512");
+        assertEquals(512, node.getTotalParallel(), "Total parallel must be 512");
+
+        node.setMachineCount(34.6);
+        double singleGen = GTPowerCalculator.computeSingleMachinePower(node);
+        assertEquals(1048576.0, singleGen, 1.0, "Single turbine power output must be 1,048,576 EU/t");
+
+        double totalGen = node.getTotalEUt();
+        assertEquals(36280729.6, totalGen, 1000.0, "Total array generation must match ~36.28M EU/t");
+
+        var rates = node.calculateInputRates();
+        assertFalse(rates.isEmpty());
+        double totalRatePerTick = rates.values().iterator().next() / 20.0;
+        assertTrue(totalRatePerTick < 300.0, "Fluid consumption for 34.6 machines must not be in buckets/t: was " + totalRatePerTick + " mB/t");
+    }
+
+    @Test
+    @DisplayName("Switching machine from NPT to LPT must recalculate parallel and reset fluid consumption")
+    void testMachineSwitchFromNptToLptRecalculatesParallelAndRates() {
+        RecipeNode node = new RecipeNode("plasma_node", "Nyinsane Plasma Turbine", 116.0, 2048.0, GTVoltageTier.IV);
+        node.setGenerator(true);
+        node.setMultiblock(true);
+        node.setRecipeCategoryId(ResourceLocation.tryParse("gtceu:plasma_generator"));
+        ResourceLocation nptWs = ResourceLocation.tryParse("gtceu:nyinsane_plasma_turbine");
+        ResourceLocation lptWs = ResourceLocation.tryParse("gtceu:plasma_large_turbine");
+
+        node.setMachineIcon(nptWs);
+        node.getAvailableWorkstations().addAll(java.util.List.of(nptWs, lptWs));
+        node.setBaseEUt(2048.0);
+        node.setTargetTier(GTVoltageTier.ZPM);
+        GTTurbineHelper.setRotorHolderTier(node, GTVoltageTier.ZPM);
+        GTTurbineHelper.setDynamoTier(node, GTVoltageTier.UV);
+        GTTurbineHelper.setDynamoAmperage(node, 64);
+        node.setRotorPower(1600);
+        node.setRotorEfficiency(260);
+        node.setRotorName("Prismalium");
+        node.addInput(com.gtceu.calcboard.api.model.IngredientStack.fluid(ResourceLocation.tryParse("gtceu:argon_plasma"), "Argon Plasma", 5, 1.0f));
+
+        GTTurbineHelper.autoCalculateTurbineParallel(node);
+        assertEquals(6144, node.getParallel(), "NPT must calculate 6144 parallel");
+        assertEquals(6144, node.getTotalParallel());
+
+        node.setMachineIcon(lptWs);
+        assertEquals(512, node.getParallel(), "Switching to LPT must auto-tune parallel to 512");
+        assertEquals(512, node.getTotalParallel(), "Total parallel must drop from 6144 to 512");
+
+        node.setMachineCount(34.6);
+        double singleGen = GTPowerCalculator.computeSingleMachinePower(node);
+        assertEquals(1048576.0, singleGen, 1.0, "LPT single power must be 1,048,576 EU/t");
+
+        var rates = node.calculateInputRates();
+        assertFalse(rates.isEmpty());
+        double totalRatePerTick = rates.values().iterator().next() / 20.0;
+        assertTrue(totalRatePerTick < 300.0, "Fluid rate must normalize to ~222 mB/t, got " + totalRatePerTick);
+    }
 }

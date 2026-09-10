@@ -89,6 +89,9 @@ public class BoardCanvasRenderer {
         List<NodeWidget> deferredSelected = null;
         for (int i = 0; i < nodeWidgets.size(); i++) {
             NodeWidget widget = nodeWidgets.get(i);
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(widget.getNode().getId())) {
+                continue;
+            }
             if (screen.isNodeSelected(widget.getNode().getId())) {
                 if (deferredSelected == null) deferredSelected = new ArrayList<>(4);
                 deferredSelected.add(widget);

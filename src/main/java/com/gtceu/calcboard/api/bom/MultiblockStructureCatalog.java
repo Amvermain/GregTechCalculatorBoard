@@ -37,6 +37,13 @@ public class MultiblockStructureCatalog {
         initializing = false;
     }
 
+    public static void invalidateTextCaches() {
+        clear();
+        for (IModAdapter adapter : ModAdapterRegistry.getAllLoadedAdapters()) {
+            adapter.invalidateTextCaches();
+        }
+    }
+
     public static void clearStructure(ResourceLocation id) {
         if (id == null) return;
         STRUCTURES.remove(id);
@@ -215,9 +222,33 @@ public class MultiblockStructureCatalog {
     private static void scanEmiMultiblockRecipes() {
         RecipeViewerBridgeRegistry.getActiveBridges().forEach(b -> b.discoverMultiblockStructures(def -> {
             if (def != null && def.controllerId() != null) {
-                STRUCTURES.put(def.controllerId(), def);
+                MultiblockStructureDef existing = STRUCTURES.get(def.controllerId());
+                STRUCTURES.put(def.controllerId(), mergeStructureDefs(existing, def));
             }
         }));
+    }
+
+    private static MultiblockStructureDef mergeStructureDefs(MultiblockStructureDef existing, MultiblockStructureDef emiDef) {
+        if (existing == null) return emiDef;
+        Set<String> mergedAbilities = new HashSet<>(existing.allowedAbilities());
+        mergedAbilities.addAll(emiDef.allowedAbilities());
+        Set<ResourceLocation> mergedCandidates = new HashSet<>(existing.candidateBlocks());
+        mergedCandidates.addAll(emiDef.candidateBlocks());
+        List<MultiblockStructurePart> parts = existing.parts().size() >= emiDef.parts().size() ? existing.parts() : emiDef.parts();
+        return new MultiblockStructureDef(
+                existing.controllerId(),
+                existing.controllerName(),
+                parts,
+                Math.max(existing.coilSlotCount(), emiDef.coilSlotCount()),
+                Math.max(existing.energyHatchSlotCount(), emiDef.energyHatchSlotCount()),
+                Math.max(existing.inputBusSlotCount(), emiDef.inputBusSlotCount()),
+                Math.max(existing.outputBusSlotCount(), emiDef.outputBusSlotCount()),
+                Math.max(existing.inputHatchSlotCount(), emiDef.inputHatchSlotCount()),
+                Math.max(existing.outputHatchSlotCount(), emiDef.outputHatchSlotCount()),
+                Math.max(existing.maintenanceSlotCount(), emiDef.maintenanceSlotCount()),
+                Collections.unmodifiableSet(mergedAbilities),
+                Collections.unmodifiableSet(mergedCandidates)
+        );
     }
 
     public static class StructureSlotCounts {

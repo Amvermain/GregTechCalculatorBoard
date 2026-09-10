@@ -131,4 +131,4 @@ src/main/java/com/gtceu/calcboard/
 
 ---
 
-> ➡️ **Next Chapter**: [[01] Core Domain Models & Deterministic Capability Matrix](01_CORE_DOMAIN_AND_MODELS.md)
+> ➡ **Next Chapter**: [[01] Core Domain Models & Deterministic Capability Matrix](01_CORE_DOMAIN_AND_MODELS.md)

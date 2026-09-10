@@ -3,6 +3,7 @@ package com.gtceu.calcboard.api.solver;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.property.NodeProperties;
 
 import java.util.*;
 
@@ -49,6 +50,41 @@ public final class FixedPointEfficiencySolver {
             List<ExternalFeedPort> externalFeedPorts
     ) {}
 
+    /**
+     * Analytical precomputed metadata for damped recirculation loops (ADR-044).
+     * Solves infinite geometric series for steady-state supply: S_steady = S_ext / (1 - r).
+     */
+    public record PrecomputedDampedLoopMeta(
+            Set<String> scc,
+            SelfSustainingResource resource,
+            double recirculationRatio,
+            double nominalDemand,
+            double nominalProduction,
+            List<FlowGraph.ConnectionEdge> externalEdges
+    ) {
+        public double computeExternalSupply(FlowGraph graph, Map<String, Double> effMap, FlowEdgeAllocator.SolverContext context) {
+            return computeIncomingSupply(graph, externalEdges, effMap, context);
+        }
+
+        public double computeSteadyStateSupply(FlowGraph graph, Map<String, Double> effMap, FlowEdgeAllocator.SolverContext context) {
+            double sExt = computeExternalSupply(graph, effMap, context);
+            if (recirculationRatio >= 1.0 - 1e-4) {
+                return sExt;
+            }
+            return sExt / (1.0 - recirculationRatio);
+        }
+
+        public double computeSteadyStateEfficiency(FlowGraph graph, Map<String, Double> effMap, FlowEdgeAllocator.SolverContext context) {
+            if (nominalDemand <= 1e-5) return 1.0;
+            double sSteady = computeSteadyStateSupply(graph, effMap, context);
+            return Math.min(1.0, sSteady / nominalDemand);
+        }
+
+        public boolean matches(RecipeNode node, IngredientStack stack) {
+            return node != null && scc.contains(node.getId()) && resource.matches(stack);
+        }
+    }
+
     public static Map<String, Double> computeNodeEfficiencies(FlowGraph graph) {
         Map<String, Double> effMap = new HashMap<>();
         if (graph == null) return effMap;
@@ -60,13 +96,14 @@ public final class FixedPointEfficiencySolver {
 
         FlowEdgeAllocator.SolverContext context = FlowEdgeAllocator.SolverContext.create(graph);
         List<PrecomputedLoopMeta> loopMetas = precomputeLoopMetas(graph, context);
+        List<PrecomputedDampedLoopMeta> dampedLoopMetas = precomputeDampedLoopMetas(graph, context);
 
         for (int iter = 0; iter < 10; iter++) {
             boolean changed = false;
             List<SelfSustainingLoop> loops = evaluateLoops(graph, loopMetas, effMap, context);
 
             for (RecipeNode consumer : graph.getNodes()) {
-                double calculatedEff = computeConsumerEfficiency(graph, consumer, loops, effMap, context);
+                double calculatedEff = computeConsumerEfficiency(graph, consumer, loops, dampedLoopMetas, effMap, context);
                 double oldEff = effMap.get(consumer.getId());
                 if (Math.abs(oldEff - calculatedEff) > 0.0001) {
                     effMap.put(consumer.getId(), calculatedEff);
@@ -87,6 +124,8 @@ public final class FixedPointEfficiencySolver {
                 node.setEfficiency(finalEff);
             }
         }
+
+        graph.invalidatePortStatsCache();
 
         return effMap;
     }
@@ -155,6 +194,7 @@ public final class FixedPointEfficiencySolver {
             FlowGraph graph,
             RecipeNode consumer,
             List<SelfSustainingLoop> loops,
+            List<PrecomputedDampedLoopMeta> dampedLoopMetas,
             Map<String, Double> effMap,
             FlowEdgeAllocator.SolverContext context
     ) {
@@ -162,7 +202,7 @@ public final class FixedPointEfficiencySolver {
         boolean hasConnectedInput = false;
 
         for (int inIdx = 0; inIdx < consumer.getInputs().size(); inIdx++) {
-            double portRatio = computePortRatio(graph, consumer, inIdx, loops, effMap, context);
+            double portRatio = computePortRatio(graph, consumer, inIdx, loops, dampedLoopMetas, effMap, context);
             if (portRatio < 0.0) {
                 continue;
             }
@@ -178,6 +218,7 @@ public final class FixedPointEfficiencySolver {
             RecipeNode consumer,
             int inIdx,
             List<SelfSustainingLoop> loops,
+            List<PrecomputedDampedLoopMeta> dampedLoopMetas,
             Map<String, Double> effMap,
             FlowEdgeAllocator.SolverContext context
     ) {
@@ -192,14 +233,43 @@ public final class FixedPointEfficiencySolver {
             return -1.0;
         }
 
-        double totalIncomingSupply = computeIncomingSupply(graph, inEdges, effMap, context);
-        double portRatio = totalIncomingSupply / nominalInRate;
-        portRatio = applyLoopRelaxation(consumer, inStack, portRatio, loops);
+        PrecomputedDampedLoopMeta matchingDampedMeta = findMatchingDampedLoop(consumer, inStack, dampedLoopMetas);
+        double portRatio;
+        if (matchingDampedMeta != null) {
+            double totalIncomingSupply = computeIncomingSupply(graph, inEdges, effMap, context);
+            double actualRatio = totalIncomingSupply / nominalInRate;
+            double sExt = matchingDampedMeta.computeExternalSupply(graph, effMap, context);
+            double sSteady = matchingDampedMeta.recirculationRatio() < 1.0 - 1e-4
+                    ? sExt / (1.0 - matchingDampedMeta.recirculationRatio())
+                    : sExt;
+            double steadyRatio = matchingDampedMeta.nominalDemand() > 1e-5
+                    ? (sSteady / matchingDampedMeta.nominalDemand())
+                    : 1.0;
+            portRatio = Math.min(steadyRatio, actualRatio);
+        } else {
+            double totalIncomingSupply = computeIncomingSupply(graph, inEdges, effMap, context);
+            portRatio = totalIncomingSupply / nominalInRate;
+            portRatio = applyLoopRelaxation(consumer, inStack, portRatio, loops);
+        }
 
         if (inStack.isStressUnit() && portRatio < 0.9999) {
             return 0.0;
         }
         return portRatio;
+    }
+
+    private static PrecomputedDampedLoopMeta findMatchingDampedLoop(
+            RecipeNode consumer,
+            IngredientStack inStack,
+            List<PrecomputedDampedLoopMeta> dampedLoopMetas
+    ) {
+        if (dampedLoopMetas == null || dampedLoopMetas.isEmpty()) return null;
+        for (PrecomputedDampedLoopMeta meta : dampedLoopMetas) {
+            if (meta.matches(consumer, inStack)) {
+                return meta;
+            }
+        }
+        return null;
     }
 
     private static double applyLoopRelaxation(
@@ -263,6 +333,9 @@ public final class FixedPointEfficiencySolver {
             Map<SelfSustainingResource, Double> demTotals = new HashMap<>();
 
             accumulateLoopResourceTotals(graph, scc, prodTotals, demTotals, context);
+            if (isStrictlyDampedScc(prodTotals, demTotals)) {
+                continue;
+            }
 
             for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
                 SelfSustainingResource res = entry.getKey();
@@ -276,6 +349,136 @@ public final class FixedPointEfficiencySolver {
             }
         }
         return result;
+    }
+
+    private static boolean isStrictlyDampedScc(
+            Map<SelfSustainingResource, Double> prodTotals,
+            Map<SelfSustainingResource, Double> demTotals
+    ) {
+        boolean hasSurplus = false;
+        boolean hasDamped = false;
+
+        for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
+            double dem = entry.getValue();
+            double prod = prodTotals.getOrDefault(entry.getKey(), 0.0);
+            if (dem <= 0.0001) continue;
+
+            if (prod >= dem + 0.001) {
+                hasSurplus = true;
+            } else if (prod < dem - 1e-4) {
+                hasDamped = true;
+            }
+        }
+
+        return hasDamped && !hasSurplus;
+    }
+
+    public static List<PrecomputedDampedLoopMeta> precomputeDampedLoopMetas(FlowGraph graph, FlowEdgeAllocator.SolverContext context) {
+        List<PrecomputedDampedLoopMeta> result = new ArrayList<>();
+        if (graph == null || graph.getNodes().isEmpty() || graph.getConnections().isEmpty()) {
+            return result;
+        }
+
+        FlowEdgeAllocator.CachedEdgeIndex edgeIndex = context != null ? context.edgeIndex() : FlowEdgeAllocator.buildEdgeIndex(graph);
+        List<Set<String>> sccs = ProcessStabilityAnalyzer.findStronglyConnectedComponents(graph, edgeIndex);
+        for (Set<String> scc : sccs) {
+            if (scc.size() < 2 && !ProcessStabilityAnalyzer.hasSelfLoop(graph, scc, edgeIndex)) {
+                continue;
+            }
+            collectDampedMetasForScc(graph, scc, edgeIndex, context, result);
+        }
+        return result;
+    }
+
+    private static void collectDampedMetasForScc(
+            FlowGraph graph,
+            Set<String> scc,
+            FlowEdgeAllocator.CachedEdgeIndex edgeIndex,
+            FlowEdgeAllocator.SolverContext context,
+            List<PrecomputedDampedLoopMeta> result
+    ) {
+        Map<SelfSustainingResource, Double> prodTotals = new HashMap<>();
+        Map<SelfSustainingResource, Double> demTotals = new HashMap<>();
+        accumulateLoopResourceTotals(graph, scc, prodTotals, demTotals, context);
+
+        if (!isStrictlyDampedScc(prodTotals, demTotals)) {
+            return;
+        }
+
+        for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
+            SelfSustainingResource res = entry.getKey();
+            double dem = entry.getValue();
+            double prod = prodTotals.getOrDefault(res, 0.0);
+            if (dem <= 0.0001) continue;
+
+            double ratio = prod / dem;
+            if (ratio > 1e-5 && ratio < 1.0 - 1e-4) {
+                List<FlowGraph.ConnectionEdge> extEdges = findExternalEdgesForResource(graph, scc, res, edgeIndex);
+                result.add(new PrecomputedDampedLoopMeta(scc, res, ratio, dem, prod, extEdges));
+            }
+        }
+    }
+
+    public static List<FlowGraph.ConnectionEdge> findExternalEdgesForResource(
+            FlowGraph graph,
+            Set<String> scc,
+            SelfSustainingResource res,
+            FlowEdgeAllocator.CachedEdgeIndex edgeIndex
+    ) {
+        List<FlowGraph.ConnectionEdge> extEdges = new ArrayList<>();
+        for (String nodeId : scc) {
+            RecipeNode node = graph.findNodeById(nodeId);
+            if (node == null || node.isReroute()) continue;
+            collectExternalEdgesForNode(graph, node, scc, res, edgeIndex, extEdges);
+        }
+        return extEdges;
+    }
+
+    private static void collectExternalEdgesForNode(
+            FlowGraph graph,
+            RecipeNode node,
+            Set<String> scc,
+            SelfSustainingResource res,
+            FlowEdgeAllocator.CachedEdgeIndex edgeIndex,
+            List<FlowGraph.ConnectionEdge> extEdges
+    ) {
+        for (int inIdx = 0; inIdx < node.getInputs().size(); inIdx++) {
+            IngredientStack inStack = node.getInputs().get(inIdx);
+            if (!res.matches(inStack)) continue;
+            List<FlowGraph.ConnectionEdge> inEdges = findIncomingEdges(graph, node.getId(), inIdx, edgeIndex);
+            for (FlowGraph.ConnectionEdge edge : inEdges) {
+                if (!scc.contains(edge.fromNodeId())) {
+                    extEdges.add(edge);
+                }
+            }
+        }
+    }
+
+    public static PrecomputedDampedLoopMeta findDampedLoopMeta(FlowGraph graph, RecipeNode node, int inIdx) {
+        if (graph == null || node == null || node.isReroute() || inIdx < 0 || inIdx >= node.getInputs().size()) {
+            return null;
+        }
+        IngredientStack stack = node.getInputs().get(inIdx);
+        List<PrecomputedDampedLoopMeta> metas = precomputeDampedLoopMetas(graph, null);
+        for (PrecomputedDampedLoopMeta meta : metas) {
+            if (meta.matches(node, stack)) {
+                return meta;
+            }
+        }
+        return null;
+    }
+
+    public static PrecomputedDampedLoopMeta findDampedLoopMetaForNode(FlowGraph graph, RecipeNode node) {
+        if (graph == null || node == null || node.isReroute()) {
+            return null;
+        }
+        List<PrecomputedDampedLoopMeta> metas = precomputeDampedLoopMetas(graph, null);
+        for (PrecomputedDampedLoopMeta meta : metas) {
+            if (meta.scc().contains(node.getId())) {
+                return meta;
+            }
+        }
+        return null;
     }
 
     private static List<ExternalFeedPort> findExternalFeedPorts(

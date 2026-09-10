@@ -76,4 +76,28 @@ public class RecipeInitialTierClampingTest {
 
         Assertions.assertTrue(node.getTargetTier().ordinal() >= GTVoltageTier.HV.ordinal());
     }
+
+    @Test
+    public void ulvRecipeClampedToMinimumWorkstationTier() {
+        RecipeNode rockBreaker = RecipeNode.create(ResourceLocation.tryParse("gtceu:rock_breaker"), "Rock Breaker", 16.0, 7.0, GTVoltageTier.ULV);
+        rockBreaker.setAvailableWorkstations(List.of(
+                ResourceLocation.tryParse("gtceu:lp_steam_rock_breaker"),
+                ResourceLocation.tryParse("gtceu:hp_steam_rock_breaker"),
+                ResourceLocation.tryParse("gtceu:lv_rock_breaker")
+        ));
+
+        var adapter = ModAdapterRegistry.getAdapterForNode(rockBreaker);
+        Assertions.assertNotNull(adapter);
+
+        GTVoltageTier minWsTier = adapter.getMinimumWorkstationTier(rockBreaker);
+        Assertions.assertEquals(GTVoltageTier.LV, minWsTier);
+
+        GTVoltageTier sanitized = adapter.sanitizeTargetTier(rockBreaker, GTVoltageTier.ULV);
+        Assertions.assertEquals(GTVoltageTier.LV, sanitized);
+
+        rockBreaker.setTargetTier(GTVoltageTier.ULV);
+        Assertions.assertEquals(GTVoltageTier.LV, rockBreaker.getTargetTier());
+        Assertions.assertEquals(ResourceLocation.tryParse("gtceu:lv_rock_breaker"), rockBreaker.getMachineIcon());
+        Assertions.assertNull(adapter.getWorkstationForTier(rockBreaker, GTVoltageTier.ULV));
+    }
 }

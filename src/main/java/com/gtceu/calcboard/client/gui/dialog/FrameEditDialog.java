@@ -61,22 +61,34 @@ public class FrameEditDialog implements IBoardModal {
         this.initialTargetCapacity = frame.getTargetPoolCapacity();
         this.visible = true;
 
-        Font font = Minecraft.getInstance().font;
-        int dialogW = 280;
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc != null ? mc.font : null;
+        int dialogW = 300;
         int dialogH = sharedMachineMode ? 186 : 158;
         int x = (parent.width - dialogW) / 2;
         int y = (parent.height - dialogH) / 2;
 
-        this.titleInput = new EditBox(font, x + 16, y + 42, dialogW - 32, 18, Component.literal("Title"));
-        this.titleInput.setMaxLength(64);
-        this.titleInput.setCanLoseFocus(true);
-        this.titleInput.setValue(frame.getTitle() != null ? frame.getTitle() : "");
-        this.titleInput.setFocused(true);
+        if (font != null) {
+            this.titleInput = new EditBox(font, x + 16, y + 42, dialogW - 32, 18, Component.literal("Title"));
+            this.titleInput.setMaxLength(64);
+            this.titleInput.setCanLoseFocus(true);
+            this.titleInput.setValue(frame.getTitle() != null ? frame.getTitle() : "");
 
-        this.targetCapacityInput = new EditBox(font, x + 110, y + 124, 45, 16, Component.literal("Capacity"));
-        this.targetCapacityInput.setMaxLength(8);
-        this.targetCapacityInput.setCanLoseFocus(true);
-        this.targetCapacityInput.setValue(String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity()));
+            this.targetCapacityInput = new EditBox(font, x + 120, y + 124, 45, 16, Component.literal("Capacity"));
+            this.targetCapacityInput.setMaxLength(8);
+            this.targetCapacityInput.setCanLoseFocus(true);
+            this.targetCapacityInput.setValue(String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity()));
+            switchFocus(this.titleInput);
+        }
+    }
+
+    public void switchFocus(EditBox target) {
+        if (titleInput != null) {
+            titleInput.setFocused(titleInput == target);
+        }
+        if (targetCapacityInput != null) {
+            targetCapacityInput.setFocused(targetCapacityInput == target);
+        }
     }
 
     public void close() {
@@ -99,7 +111,7 @@ public class FrameEditDialog implements IBoardModal {
         if (!visible || targetFrame == null) return;
 
         Font font = Minecraft.getInstance().font;
-        int dialogW = 280;
+        int dialogW = 300;
         int dialogH = sharedMachineMode ? 186 : 158;
         int x = (screenW - dialogW) / 2;
         int y = (screenH - dialogH) / 2;
@@ -153,9 +165,11 @@ public class FrameEditDialog implements IBoardModal {
         // Target Capacity Field & Auto Ratio Button (Shared Machine Mode Only)
         if (sharedMachineMode) {
             int capY = y + 124;
-            graphics.drawString(font, Component.translatable("gui.gtcalcboard.frame.target_capacity").getString(), x + 16, capY + 4, 0xFF94A3B8, false);
+            String capLabel = Component.translatable("gui.gtcalcboard.frame.target_capacity").getString();
+            graphics.drawString(font, capLabel, x + 16, capY + 4, 0xFF94A3B8, false);
 
-            int capInputX = x + 112;
+            int labelW = font.width(capLabel);
+            int capInputX = Math.max(x + 16 + labelW + 6, x + 120);
             int capInputW = 42;
             if (targetCapacityInput != null) {
                 targetCapacityInput.setX(capInputX);
@@ -210,7 +224,7 @@ public class FrameEditDialog implements IBoardModal {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!visible || targetFrame == null) return false;
 
-        int dialogW = 280;
+        int dialogW = 300;
         int dialogH = sharedMachineMode ? 186 : 158;
         int x = (parent.width - dialogW) / 2;
         int y = (parent.height - dialogH) / 2;
@@ -246,12 +260,18 @@ public class FrameEditDialog implements IBoardModal {
         }
 
         // Target Capacity Input and Auto Ratio Button Click
-        if (sharedMachineMode) {
+        if (sharedMachineMode && targetCapacityInput != null) {
             int capY = y + 124;
-            int capInputX = x + 112;
+            Font font = Minecraft.getInstance() != null ? Minecraft.getInstance().font : null;
+            String capLabel = Component.translatable("gui.gtcalcboard.frame.target_capacity").getString();
+            int labelW = font != null ? font.width(capLabel) : 90;
+            int capInputX = Math.max(x + 16 + labelW + 6, x + 120);
             int capInputW = 42;
-            if (targetCapacityInput != null && targetCapacityInput.mouseClicked(mouseX, mouseY, button)) {
-                targetCapacityInput.setFocused(true);
+
+            targetCapacityInput.setX(capInputX);
+            targetCapacityInput.setY(capY + 1);
+            if (targetCapacityInput.mouseClicked(mouseX, mouseY, button)) {
+                switchFocus(targetCapacityInput);
                 return true;
             }
 
@@ -270,7 +290,7 @@ public class FrameEditDialog implements IBoardModal {
             titleInput.setX(x + 16);
             titleInput.setY(y + 42);
             if (titleInput.mouseClicked(mouseX, mouseY, button)) {
-                titleInput.setFocused(true);
+                switchFocus(titleInput);
                 return true;
             }
         }
@@ -308,6 +328,15 @@ public class FrameEditDialog implements IBoardModal {
             return true;
         }
 
+        if (keyCode == GLFW.GLFW_KEY_TAB && sharedMachineMode && targetCapacityInput != null) {
+            if (titleInput != null && titleInput.isFocused()) {
+                switchFocus(targetCapacityInput);
+            } else {
+                switchFocus(titleInput);
+            }
+            return true;
+        }
+
         if (titleInput != null && titleInput.isFocused()) {
             if (titleInput.keyPressed(keyCode, scanCode, modifiers)) return true;
         }
@@ -327,6 +356,29 @@ public class FrameEditDialog implements IBoardModal {
             return targetCapacityInput.charTyped(codePoint, modifiers);
         }
         return true;
+    }
+
+    public EditBox getTitleInput() {
+        return titleInput;
+    }
+
+    public EditBox getTargetCapacityInput() {
+        return targetCapacityInput;
+    }
+
+    public boolean isTitleFocused() {
+        return titleInput != null && titleInput.isFocused();
+    }
+
+    public boolean isTargetCapacityFocused() {
+        return targetCapacityInput != null && targetCapacityInput.isFocused();
+    }
+
+    public void setInputsForTest(EditBox titleInput, EditBox targetCapacityInput) {
+        this.titleInput = titleInput;
+        this.targetCapacityInput = targetCapacityInput;
+        this.visible = true;
+        this.sharedMachineMode = true;
     }
 
     private void commitSave() {

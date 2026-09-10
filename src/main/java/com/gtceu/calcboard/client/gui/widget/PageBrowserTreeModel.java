@@ -40,7 +40,10 @@ public final class PageBrowserTreeModel {
         List<BoardPage> pages = BoardManager.getInstance().getPages();
         for (int i = 0; i < pages.size(); i++) {
             BoardPage p = pages.get(i);
-            String f = p.getFolderPath() != null ? p.getFolderPath().trim() : "";
+            boolean isModule = p.isModuleSubPage();
+            String f = isModule
+                    ? ("📦 " + net.minecraft.network.chat.Component.translatable("gui.gtcalcboard.subpage.module_section").getString())
+                    : (p.getFolderPath() != null ? p.getFolderPath().trim() : "");
             if (!query.isEmpty() && !p.getName().toLowerCase().contains(query) && !f.toLowerCase().contains(query)) {
                 continue;
             }

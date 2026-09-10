@@ -7,10 +7,12 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
+import com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
 import net.minecraft.client.Minecraft;
@@ -49,6 +51,11 @@ public class BoardActionHandler {
         List<FlowGraph.ConnectionEdge> removedEdges = collectRemovedEdges(targetNodeIds);
 
         screen.getGraph().removeNode(targetNode);
+        for (RecipeNode rn : removedNodes) {
+            if (rn.isModule() && rn.getSubPageId() != null) {
+                BoardManager.getInstance().removePage(rn.getSubPageId());
+            }
+        }
         recordRemovalCommands(targetNode, removedNodes, removedFrames, removedEdges);
 
         screen.getSelectedNodeIds().removeAll(targetNodeIds);
@@ -543,5 +550,44 @@ public class BoardActionHandler {
             if (ids.contains(note.getId())) result.add(note);
         }
         return result;
+    }
+
+    public boolean scaleLoopToSteadyState(String targetNodeId) {
+        if (!screen.ensureEditPermission() || screen.getGraph() == null || targetNodeId == null) return false;
+        RecipeNode targetNode = screen.getGraph().findNodeById(targetNodeId);
+        if (targetNode == null) return false;
+
+        FixedPointEfficiencySolver.PrecomputedDampedLoopMeta meta = FixedPointEfficiencySolver.findDampedLoopMetaForNode(screen.getGraph(), targetNode);
+        if (meta == null) return false;
+
+        double targetEfficiency = meta.computeSteadyStateEfficiency(screen.getGraph(), null, null);
+        if (targetEfficiency <= 0.0001 || targetEfficiency >= 0.9999) return false;
+
+        List<BoardCommand> subCmds = new ArrayList<>();
+        int changedCount = 0;
+
+        for (String nodeId : meta.scc()) {
+            RecipeNode n = screen.getGraph().findNodeById(nodeId);
+            if (n == null || n.isReroute()) continue;
+            double oldCount = n.getMachineCount();
+            double newCount = Math.max(0.001, oldCount * targetEfficiency);
+            if (Math.abs(oldCount - newCount) > 0.0001) {
+                n.setMachineCount(newCount);
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(nodeId, oldCount, newCount));
+                changedCount++;
+            }
+        }
+
+        if (changedCount > 0) {
+            screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Scale loop to steady state"));
+            screen.rebuildWidgets();
+            screen.markSummaryDirty();
+            double sampleCount = Math.max(0.001, Math.round(targetNode.getMachineCount() * 1000.0) / 1000.0);
+            String countStr = FormatUtil.formatCompactNumber(sampleCount);
+            BoardToast.show(Component.literal("§b🔄 ").append(Component.translatable("message.gtcalcboard.steady_state_scaled", String.valueOf(changedCount), countStr)));
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.2F));
+            return true;
+        }
+        return false;
     }
 }

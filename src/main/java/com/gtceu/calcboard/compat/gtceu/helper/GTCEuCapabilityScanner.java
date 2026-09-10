@@ -144,17 +144,12 @@ public class GTCEuCapabilityScanner {
         if (id != null && MultiblockDetector.isSteamMultiblock(id)) {
             return true;
         }
-        if (def == null) {
-            if (id != null) {
-                String path = id.getPath().toLowerCase(Locale.ROOT);
-                if (path.startsWith("hp_steam_") || path.contains("_hp_") || path.contains("high_pressure") || path.startsWith("steam_")) {
-                    return true;
-                }
-                if (path.startsWith("lp_steam_") || path.contains("_lp_") || path.contains("low_pressure")) {
-                    return false;
-                }
-            }
-            return true;
+        if (def != null) {
+            try {
+                Method mIsHp = def.getClass().getMethod("isHighPressure");
+                Object res = mIsHp.invoke(def);
+                if (res instanceof Boolean b) return b;
+            } catch (Throwable ignored) {}
         }
         if (id != null) {
             String path = id.getPath().toLowerCase(Locale.ROOT);
@@ -165,11 +160,6 @@ public class GTCEuCapabilityScanner {
                 return false;
             }
         }
-        try {
-            Method mIsHp = def.getClass().getMethod("isHighPressure");
-            Object res = mIsHp.invoke(def);
-            if (res instanceof Boolean b) return b;
-        } catch (Throwable ignored) {}
         return true;
     }
 }

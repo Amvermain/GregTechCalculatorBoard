@@ -51,6 +51,9 @@ public interface IModAdapter extends
     default void initialize() {
     }
 
+    default void invalidateTextCaches() {
+    }
+
     default int calculateTierDelta(RecipeNode node, GTVoltageTier targetTier, GTVoltageTier recipeTier) {
         if (targetTier == null || recipeTier == null) return 0;
         return Math.max(0, targetTier.ordinal() - recipeTier.ordinal());

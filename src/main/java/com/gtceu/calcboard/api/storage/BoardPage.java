@@ -22,6 +22,9 @@ public class BoardPage {
     private ItemStack representativeIcon = ItemStack.EMPTY;
     private boolean isPinned = true;
     private boolean isFolderCollapsed = false;
+    private PageType pageType = PageType.STANDARD;
+    private String parentPageId = "";
+    private String parentModuleNodeId = "";
 
     private final FlowGraph graph;
     private double panX = 40.0;
@@ -89,6 +92,34 @@ public class BoardPage {
 
     public void setFolderCollapsed(boolean folderCollapsed) {
         this.isFolderCollapsed = folderCollapsed;
+    }
+
+    public PageType getPageType() {
+        return pageType != null ? pageType : PageType.STANDARD;
+    }
+
+    public void setPageType(PageType pageType) {
+        this.pageType = pageType != null ? pageType : PageType.STANDARD;
+    }
+
+    public boolean isModuleSubPage() {
+        return pageType == PageType.MODULE;
+    }
+
+    public String getParentPageId() {
+        return parentPageId != null ? parentPageId : "";
+    }
+
+    public void setParentPageId(String parentPageId) {
+        this.parentPageId = parentPageId != null ? parentPageId : "";
+    }
+
+    public String getParentModuleNodeId() {
+        return parentModuleNodeId != null ? parentModuleNodeId : "";
+    }
+
+    public void setParentModuleNodeId(String parentModuleNodeId) {
+        this.parentModuleNodeId = parentModuleNodeId != null ? parentModuleNodeId : "";
     }
 
     public ItemStack getEffectiveRepresentativeIcon() {
@@ -162,6 +193,11 @@ public class BoardPage {
         tag.putString("folderPath", getFolderPath());
         tag.putBoolean("isPinned", isPinned);
         tag.putBoolean("isFolderCollapsed", isFolderCollapsed);
+        tag.putString("pageType", pageType.name());
+        if (pageType == PageType.MODULE) {
+            tag.putString("parentPageId", parentPageId != null ? parentPageId : "");
+            tag.putString("parentModuleNodeId", parentModuleNodeId != null ? parentModuleNodeId : "");
+        }
         if (representativeIcon != null && !representativeIcon.isEmpty()) {
             tag.put("icon", representativeIcon.save(new CompoundTag()));
         }
@@ -178,6 +214,13 @@ public class BoardPage {
         FlowGraph graph = tag.contains("graph") ? FlowGraph.deserializeNBT(tag.getCompound("graph")) : new FlowGraph();
 
         BoardPage page = new BoardPage(id, name, graph);
+        if (tag.contains("pageType")) {
+            try {
+                page.pageType = PageType.valueOf(tag.getString("pageType"));
+            } catch (Throwable ignored) {}
+        }
+        if (tag.contains("parentPageId")) page.parentPageId = tag.getString("parentPageId");
+        if (tag.contains("parentModuleNodeId")) page.parentModuleNodeId = tag.getString("parentModuleNodeId");
         if (tag.contains("folderPath")) page.folderPath = tag.getString("folderPath");
         if (tag.contains("isPinned")) page.isPinned = tag.getBoolean("isPinned");
         if (tag.contains("isFolderCollapsed")) page.isFolderCollapsed = tag.getBoolean("isFolderCollapsed");

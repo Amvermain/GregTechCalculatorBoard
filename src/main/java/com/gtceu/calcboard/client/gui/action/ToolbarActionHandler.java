@@ -372,7 +372,7 @@ public class ToolbarActionHandler {
 
     private void notifyAutoRatioResult(RecipeNode baseNode, boolean harmonized, boolean fractional, AutoRatioResult result) {
         if (result != null && result.hasDivergence()) {
-            BoardToast.show(Component.literal("§6⚠️ ").append(Component.translatable("message.gtcalcboard.auto_ratio_divergence_toast", result.divergentNodeIds().size())));
+            BoardToast.show(Component.literal("§6⚠ ").append(Component.translatable("message.gtcalcboard.auto_ratio_divergence_toast", result.divergentNodeIds().size())));
             playUiSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8F);
             return;
         }

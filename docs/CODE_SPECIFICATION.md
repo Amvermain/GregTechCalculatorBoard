@@ -27,7 +27,7 @@
 
 ```
 docs/
-├── adr/                                     # 🏛️ [아키텍처 결정 기록 (ADR) 보관소]
+├── adr/                                     # 🏛 [아키텍처 결정 기록 (ADR) 보관소]
 │   ├── README.md                            # 📋 ADR 색인 및 생명주기 가이드
 │   ├── ADR_001_COMPAT_GUI_HANDLER_ISOLATION_AND_SERVER_SAFETY.md
 │   ├── ADR_002_ARCHITECTURE_DOCS_RESTRUCTURING_AND_SPEC_MODERNIZATION.md
@@ -37,12 +37,12 @@ docs/
 │   ├── CODE_SPECIFICATION.md                # 📑 [한국어 마스터 인덱스]
 │   ├── TEST_CHECKLIST.md                    # 🧪 [한국어 종합 QA 체크리스트]
 │   └── spec/
-│       ├── 00_OVERVIEW.md                   # 🏛️ [00] 시스템 아키텍처 개요 및 설계 원칙
+│       ├── 00_OVERVIEW.md                   # 🏛 [00] 시스템 아키텍처 개요 및 설계 원칙
 │       ├── 01_CORE_DOMAIN_AND_MODELS.md     # 📦 [01] 코어 도메인 모델 및 수용능력 매트릭스
 │       ├── 02_MATH_AND_ALGORITHMS.md        # 🧮 [02] 수학적 연산 엔진 및 그래프 해석 알고리즘
 │       ├── 03_UI_AND_RENDERING_PIPELINE.md  # 🎨 [03] UI 및 캔버스 렌더링 파이프라인 개요
-│       │   ├── 03_01_CANVAS_AND_NODE_CARDS.md       # 🖼️ [03-01] 2D 캔버스 & 노드 카드 렌더링
-│       │   ├── 03_02_MACHINE_CONFIG_AND_ADDONS.md   # ⚙️ [03-02] 기계 상세 설정 & 애드온 랙 UI
+│       │   ├── 03_01_CANVAS_AND_NODE_CARDS.md       # 🖼 [03-01] 2D 캔버스 & 노드 카드 렌더링
+│       │   ├── 03_02_MACHINE_CONFIG_AND_ADDONS.md   # ⚙ [03-02] 기계 상세 설정 & 애드온 랙 UI
 │       │   ├── 03_03_PAGE_SUMMARY_AND_DASHBOARD.md  # 📊 [03-03] 페이지 결산 & 전역 밸런스 대시보드
 │       │   └── 03_04_RECIPE_SEARCH_AND_TOOLS.md     # 🔍 [03-04] 검색, 필터, HUD, 가이드 & 토스트 UI
 │       ├── 04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md # 🌐 [04] 멀티플레이어 동시성 제어 및 네트워크
@@ -51,12 +51,12 @@ docs/
     ├── CODE_SPECIFICATION.md                # 📑 [English Master Index]
     ├── TEST_CHECKLIST.md                    # 🧪 [English QA Test Checklist]
     └── spec/
-        ├── 00_OVERVIEW.md                   # 🏛️ [00] System Architecture & Design Principles
+        ├── 00_OVERVIEW.md                   # 🏛 [00] System Architecture & Design Principles
         ├── 01_CORE_DOMAIN_AND_MODELS.md     # 📦 [01] Core Domain Models & Capability Matrix
         ├── 02_MATH_AND_ALGORITHMS.md        # 🧮 [02] Math Engine & Graph Solving Algorithms
         ├── 03_UI_AND_RENDERING_PIPELINE.md  # 🎨 [03] UI & Rendering Pipeline Overview
-        │   ├── 03_01_CANVAS_AND_NODE_CARDS.md       # 🖼️ [03-01] 2D Canvas & Node Card Rendering
-        │   ├── 03_02_MACHINE_CONFIG_AND_ADDONS.md   # ⚙️ [03-02] Machine Config & Addon Rack UI
+        │   ├── 03_01_CANVAS_AND_NODE_CARDS.md       # 🖼 [03-01] 2D Canvas & Node Card Rendering
+        │   ├── 03_02_MACHINE_CONFIG_AND_ADDONS.md   # ⚙ [03-02] Machine Config & Addon Rack UI
         │   ├── 03_03_PAGE_SUMMARY_AND_DASHBOARD.md  # 📊 [03-03] Page Summary & Dashboard UI
         │   └── 03_04_RECIPE_SEARCH_AND_TOOLS.md     # 🔍 [03-04] Recipe Search, Tools & Guide UI
         ├── 04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md # 🌐 [04] Multiplayer Concurrency & Network
@@ -65,7 +65,7 @@ docs/
 
 ---
 
-## 🏛️ [아키텍처 결정 기록 색인 (ADR Index)](adr/README.md)
+## 🏛 [아키텍처 결정 기록 색인 (ADR Index)](adr/README.md)
 - 시스템의 모든 주요 아키텍처 결정 배경, 제안서, 채택 이유 및 기술 스펙은 **[`docs/adr/`](adr/README.md)**에 영구히 보존됩니다.
 
 ---

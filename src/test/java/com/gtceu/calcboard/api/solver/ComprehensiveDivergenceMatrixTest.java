@@ -517,4 +517,89 @@ public class ComprehensiveDivergenceMatrixTest {
         Assertions.assertTrue(nodeA.getProperties().get(NodeProperties.DIVERGENCE_WARNING), "Node A must have warning");
         Assertions.assertTrue(nodeB.getProperties().get(NodeProperties.DIVERGENCE_WARNING), "Node B must have warning");
     }
+
+    @Test
+    @DisplayName("Reproduction: Star Technology Bromine loop with byproduct outlet must detect growth warning")
+    public void testStarTechnologyBromineGrowthLoopWithByproductOutlet() {
+        FlowGraph graph = new FlowGraph();
+
+        ResourceLocation hotBrine = ResourceLocation.tryParse("gtceu:hot_brine");
+        ResourceLocation intermediate1 = ResourceLocation.tryParse("gtceu:intermediate_1");
+        ResourceLocation intermediate2 = ResourceLocation.tryParse("gtceu:intermediate_2");
+        ResourceLocation intermediate3 = ResourceLocation.tryParse("gtceu:intermediate_3");
+        ResourceLocation bromine = ResourceLocation.tryParse("gtceu:bromine");
+        ResourceLocation greenLiquid = ResourceLocation.tryParse("gtceu:green_liquid");
+
+        // 100 mB/s input -> 400/3 mB/s output (gain = 4/3)
+        // Node 1: 1000 Hot Brine -> 2000 Interm1 (duration = 10s -> in = 100/s, out = 200/s)
+        RecipeNode node1 = RecipeNode.create("Node 1", 200.0, 30.0, GTVoltageTier.LV);
+        node1.addInput(IngredientStack.fluid(hotBrine, "Hot Brine", 1000.0, 1.0));
+        node1.addOutput(IngredientStack.fluid(intermediate1, "Interm 1", 2000.0, 1.0));
+        node1.setMachineCount(1.0);
+        node1.setBaseNode(true);
+        graph.addNode(node1);
+
+        // Node 2: 1000 Interm1 -> 1000 Interm2 + 2000 Bromine (duration = 5s -> in = 200/s, out = 200/s + 400/s)
+        RecipeNode node2 = RecipeNode.create("Node 2", 100.0, 30.0, GTVoltageTier.LV);
+        node2.addInput(IngredientStack.fluid(intermediate1, "Interm 1", 1000.0, 1.0));
+        node2.addOutput(IngredientStack.fluid(intermediate2, "Interm 2", 1000.0, 1.0));
+        node2.addOutput(IngredientStack.fluid(bromine, "Bromine", 2000.0, 1.0));
+        node2.setMachineCount(1.0);
+        graph.addNode(node2);
+
+        // Node 3: 3000 Interm2 -> 2000 Interm3 (duration = 15s -> in = 200/s, out = 133.33/s)
+        RecipeNode node3 = RecipeNode.create("Node 3", 300.0, 30.0, GTVoltageTier.LV);
+        node3.addInput(IngredientStack.fluid(intermediate2, "Interm 2", 3000.0, 1.0));
+        node3.addOutput(IngredientStack.fluid(intermediate3, "Interm 3", 2000.0, 1.0));
+        node3.setMachineCount(1.0);
+        graph.addNode(node3);
+
+        // Node 4: 1000 Interm3 -> 1000 Hot Brine + 1000 Green Liquid (duration = 7.5s -> in = 133.33/s, out = 133.33/s)
+        RecipeNode node4 = RecipeNode.create("Node 4", 150.0, 30.0, GTVoltageTier.LV);
+        node4.addInput(IngredientStack.fluid(intermediate3, "Interm 3", 1000.0, 1.0));
+        node4.addOutput(IngredientStack.fluid(hotBrine, "Hot Brine", 1000.0, 1.0));
+        node4.addOutput(IngredientStack.fluid(greenLiquid, "Green Liquid", 1000.0, 1.0));
+        node4.setMachineCount(1.0);
+        graph.addNode(node4);
+
+        // External supply for Hot Brine
+        RecipeNode supply = RecipeNode.create("Supply", 20.0, 30.0, GTVoltageTier.LV);
+        supply.addOutput(IngredientStack.fluid(hotBrine, "Hot Brine", 100.0, 1.0));
+        supply.setMachineCount(1.0);
+        graph.addNode(supply);
+
+        // External consumer for Green Liquid (Byproduct outlet)
+        RecipeNode externalConsumer = RecipeNode.create("External Consumer", 20.0, 30.0, GTVoltageTier.LV);
+        externalConsumer.addInput(IngredientStack.fluid(greenLiquid, "Green Liquid", 1000.0, 1.0));
+        externalConsumer.setMachineCount(1.0);
+        graph.addNode(externalConsumer);
+
+        // Connect loop
+        graph.addConnection(supply.getId(), 0, node1.getId(), 0);
+        graph.addConnection(node1.getId(), 0, node2.getId(), 0);
+        graph.addConnection(node2.getId(), 0, node3.getId(), 0);
+        graph.addConnection(node3.getId(), 0, node4.getId(), 0);
+        graph.addConnection(node4.getId(), 0, node1.getId(), 0);
+
+        // Connect external byproduct outlet (Green Liquid)
+        graph.addConnection(node4.getId(), 1, externalConsumer.getId(), 0);
+
+        AutoRatioResult result = graph.autoRatioFromAnchor(node1, true);
+
+        Assertions.assertTrue(result.hasDivergence(), "Bromine loop without Hot Brine sink must detect growth");
+        Assertions.assertTrue(node1.getProperties().get(NodeProperties.DIVERGENCE_WARNING));
+        Assertions.assertEquals("positive_feedback", node1.getProperties().get(NodeProperties.DIVERGENCE_REASON));
+
+        // When external sink is added for Hot Brine, growth warning heals cleanly
+        RecipeNode voidSink = RecipeNode.createReroute(100, 100);
+        voidSink.setSupplyMode(com.gtceu.calcboard.api.type.SupplyMode.VOID_SINK);
+        voidSink.getInputs().add(IngredientStack.fluid(hotBrine, "Hot Brine", 1000.0, 1.0));
+        voidSink.getOutputs().add(IngredientStack.fluid(hotBrine, "Hot Brine", 1000.0, 1.0));
+        graph.addNode(voidSink);
+        graph.addConnection(node4.getId(), 0, voidSink.getId(), 0);
+
+        AutoRatioResult healedResult = graph.autoRatioFromAnchor(node1, true);
+        Assertions.assertFalse(healedResult.hasDivergence(), "Loop with Hot Brine sink must heal");
+        Assertions.assertFalse(node1.getProperties().get(NodeProperties.DIVERGENCE_WARNING));
+    }
 }

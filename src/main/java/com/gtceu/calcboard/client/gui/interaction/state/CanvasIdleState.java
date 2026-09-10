@@ -8,10 +8,17 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Default canvas state when idle, listening for click/hover gestures to trigger state transitions.
@@ -51,6 +58,10 @@ public final class CanvasIdleState implements CanvasInteractionState {
         }
 
         if (handleNodeWidgetsClick(ctx, canvasX, canvasY, button)) {
+            return true;
+        }
+
+        if (handleFoldedFramePortClick(ctx, canvasX, canvasY, button)) {
             return true;
         }
 
@@ -99,10 +110,89 @@ public final class CanvasIdleState implements CanvasInteractionState {
         return false;
     }
 
+    private boolean handleFoldedFramePortClick(CanvasInteractionContext ctx, double canvasX, double canvasY, int button) {
+        BoardScreen screen = ctx.getScreen();
+        if (screen == null) return false;
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+
+        var hit = com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.findHoveredFoldedPort(graph, canvasX, canvasY);
+        if (hit == null || hit.port().internalOrigins().isEmpty()) return false;
+
+        if (!screen.ensureEditPermission()) return true;
+
+        if (button == 0) {
+            return startFoldedPortWireDrag(ctx, screen, graph, hit);
+        } else if (button == 1) {
+            return disconnectFoldedPortEdges(screen, graph, hit);
+        }
+        return false;
+    }
+
+    private boolean startFoldedPortWireDrag(
+            CanvasInteractionContext ctx,
+            BoardScreen screen,
+            FlowGraph graph,
+            com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.FoldedPortHit hit
+    ) {
+        var origin = hit.port().internalOrigins().get(0);
+        RecipeNode originNode = graph.findNodeById(origin.internalNodeId());
+        if (originNode == null) return false;
+
+        NodeWidget originWidget = screen.findWidgetForNode(originNode);
+        if (originWidget == null) return false;
+
+        ctx.getWireHandler().startWireFromFolded(originWidget, origin.internalPortIndex(), hit.isInput(), hit.frame(), hit.portIndex());
+        ctx.getStateMachine().transitionTo(new CanvasWireConnectingState());
+        return true;
+    }
+
+    private boolean disconnectFoldedPortEdges(
+            BoardScreen screen,
+            FlowGraph graph,
+            com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.FoldedPortHit hit
+    ) {
+        Set<FlowGraph.ConnectionEdge> toDisconnect = collectFoldedPortEdges(graph, hit);
+        if (toDisconnect.isEmpty()) return false;
+
+        for (FlowGraph.ConnectionEdge edge : toDisconnect) {
+            graph.removeConnection(edge);
+            screen.recordCommand(new BoardCommand.DisconnectWireCommand(edge));
+        }
+        screen.markSummaryDirty();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("message.gtcalcboard.disconnect_wire")));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.ITEM_BREAK, 1.2F));
+        return true;
+    }
+
+    private Set<FlowGraph.ConnectionEdge> collectFoldedPortEdges(
+            FlowGraph graph,
+            com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.FoldedPortHit hit
+    ) {
+        Set<FlowGraph.ConnectionEdge> toDisconnect = new HashSet<>();
+        for (var origin : hit.port().internalOrigins()) {
+            for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+                boolean matches = hit.isInput()
+                        ? (edge.toNodeId().equals(origin.internalNodeId()) && edge.inputIndex() == origin.internalPortIndex())
+                        : (edge.fromNodeId().equals(origin.internalNodeId()) && edge.outputIndex() == origin.internalPortIndex());
+                if (matches) {
+                    toDisconnect.add(edge);
+                }
+            }
+        }
+        return toDisconnect;
+    }
+
     private boolean isPointInsideAnyNode(CanvasInteractionContext ctx, double canvasX, double canvasY) {
         BoardScreen screen = ctx.getScreen();
         if (screen == null) return false;
         for (NodeWidget nw : screen.getNodeWidgets()) {
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(nw.getNode().getId())) {
+                continue;
+            }
             if (nw.isPointInside(canvasX, canvasY)) {
                 return true;
             }
@@ -116,6 +206,9 @@ public final class CanvasIdleState implements CanvasInteractionState {
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(widget.getNode().getId())) {
+                continue;
+            }
             var popup = widget.getHiddenPortsPopup();
             if (popup == null || !popup.isVisible()) continue;
 
@@ -135,6 +228,9 @@ public final class CanvasIdleState implements CanvasInteractionState {
         List<NodeWidget> nodeWidgets = screen.getNodeWidgets();
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(widget.getNode().getId())) {
+                continue;
+            }
             if (!widget.isPointInside(canvasX, canvasY)) continue;
 
             if (button == 0) {

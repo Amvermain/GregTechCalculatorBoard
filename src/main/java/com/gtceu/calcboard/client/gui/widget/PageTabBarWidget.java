@@ -49,11 +49,18 @@ public class PageTabBarWidget {
         ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
         boolean isTeam = teamState.isTeamMode();
         Font font = Minecraft.getInstance().font;
+        int browserBtnW = 22;
+        int tabY = screen.getPageTabY();
+
+        BoardPage activePage = BoardManager.getInstance().getActivePage();
+        if (!isTeam && activePage != null && activePage.isModuleSubPage()) {
+            renderBreadcrumbBar(graphics, font, activePage, mouseX, mouseY, tabY, browserBtnW);
+            return;
+        }
 
         List<String> pageTitles = getPageTitles(teamState, isTeam);
         int activeIdx = getActivePageIndex(teamState, isTeam);
 
-        int browserBtnW = 22;
         int leftMargin = screen.getDynamicLeftMargin() + browserBtnW + 4;
         int totalWidth = calculateTotalWidth(pageTitles, font, activeIdx, isTeam);
         int navBtnW = 16;
@@ -68,7 +75,6 @@ public class PageTabBarWidget {
         graphics.pose().translate(0, 0, 300.0f);
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
-        int tabY = screen.getPageTabY();
         renderBrowserToggleButton(graphics, font, mouseX, mouseY, tabY, browserBtnW);
 
         int scissorLeft = hasLeftBtn ? (leftMargin + navBtnW + 2) : (leftMargin - 2);
@@ -169,12 +175,17 @@ public class PageTabBarWidget {
 
         ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
         boolean isTeam = teamState.isTeamMode();
-        Font font = Minecraft.getInstance().font;
+        int browserBtnW = 22;
 
+        BoardPage activePage = BoardManager.getInstance().getActivePage();
+        if (!isTeam && activePage != null && activePage.isModuleSubPage()) {
+            return handleBreadcrumbClick(activePage, mouseX, mouseY, button, tabY, browserBtnW);
+        }
+
+        Font font = Minecraft.getInstance().font;
         List<String> pageTitles = getPageTitles(teamState, isTeam);
         int activeIdx = getActivePageIndex(teamState, isTeam);
 
-        int browserBtnW = 22;
         int leftMargin = screen.getDynamicLeftMargin() + browserBtnW + 4;
         int totalWidth = calculateTotalWidth(pageTitles, font, activeIdx, isTeam);
         int navBtnW = 16;
@@ -607,5 +618,76 @@ public class PageTabBarWidget {
         Minecraft.getInstance().getSoundManager().play(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
+    }
+
+    private void renderBreadcrumbBar(GuiGraphics graphics, Font font, BoardPage activePage, int mouseX, int mouseY, int tabY, int browserBtnW) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 300.0f);
+        com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
+
+        renderBrowserToggleButton(graphics, font, mouseX, mouseY, tabY, browserBtnW);
+
+        int curX = screen.getDynamicLeftMargin() + browserBtnW + 6;
+        String backLabel = "⮌ " + Component.translatable("gui.gtcalcboard.subpage.back").getString();
+        int backW = font.width(backLabel) + 10;
+        boolean backHover = mouseX >= curX && mouseX <= curX + backW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
+
+        graphics.fill(curX, tabY, curX + backW, tabY + TAB_HEIGHT, backHover ? 0xFF2A364C : 0xFF1C2230);
+        graphics.renderOutline(curX, tabY, backW, TAB_HEIGHT, backHover ? 0xFF5588DD : 0xFF353C4D);
+        graphics.drawString(font, backLabel, curX + 5, tabY + 5, backHover ? 0xFF93C5FD : 0xFF60A5FA, false);
+
+        curX += backW + 8;
+        String parentName = "";
+        if (!activePage.getParentPageId().isEmpty()) {
+            parentName = BoardManager.getInstance().getPage(activePage.getParentPageId()).map(BoardPage::getName).orElse("");
+        }
+        if (parentName.isEmpty()) parentName = "Main";
+        String parentText = parentName + "  >  ";
+        int parentW = font.width(parentText);
+        boolean parentHover = mouseX >= curX && mouseX <= curX + parentW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
+        graphics.drawString(font, parentText, curX, tabY + 5, parentHover ? 0xFF55FF88 : 0xFFAAAAAA, false);
+
+        curX += parentW;
+        String modName = "📦 " + activePage.getName();
+        graphics.drawString(font, modName, curX, tabY + 5, 0xFFE0E7FF, false);
+
+        graphics.pose().popPose();
+    }
+
+    private boolean handleBreadcrumbClick(BoardPage activePage, double mouseX, double mouseY, int button, int tabY, int browserBtnW) {
+        int brX = screen.getDynamicLeftMargin();
+        if (mouseX >= brX && mouseX <= brX + browserBtnW && button == 0) {
+            if (screen.getPageBrowserDrawer() != null) {
+                screen.getPageBrowserDrawer().toggle();
+                playClickSound();
+            }
+            return true;
+        }
+
+        Font font = Minecraft.getInstance().font;
+        int curX = screen.getDynamicLeftMargin() + browserBtnW + 6;
+        String backLabel = "⮌ " + Component.translatable("gui.gtcalcboard.subpage.back").getString();
+        int backW = font.width(backLabel) + 10;
+
+        if (mouseX >= curX && mouseX <= curX + backW && button == 0) {
+            screen.returnToParentPage();
+            return true;
+        }
+
+        curX += backW + 8;
+        String parentName = "";
+        if (!activePage.getParentPageId().isEmpty()) {
+            parentName = BoardManager.getInstance().getPage(activePage.getParentPageId()).map(BoardPage::getName).orElse("");
+        }
+        if (parentName.isEmpty()) parentName = "Main";
+        String parentText = parentName + "  >  ";
+        int parentW = font.width(parentText);
+
+        if (mouseX >= curX && mouseX <= curX + parentW && button == 0) {
+            screen.returnToParentPage();
+            return true;
+        }
+
+        return false;
     }
 }

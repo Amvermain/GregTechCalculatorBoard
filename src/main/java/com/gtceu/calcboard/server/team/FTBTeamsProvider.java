@@ -47,6 +47,7 @@ public class FTBTeamsProvider implements ITeamProvider {
             if (this.getManagerMethod != null) {
                 this.isFtbTeamsPresent = true;
                 GregTechCalcBoard.LOGGER.info("[GTCalcBoard] Successfully hooked into FTB Teams API for team workspace isolation.");
+                registerEventListeners();
             }
         } catch (Throwable t) {
             GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Could not initialize FTB Teams API reflection: {}", t.getMessage());
@@ -369,5 +370,114 @@ public class FTBTeamsProvider implements ITeamProvider {
     public boolean isAvailable() {
         if (!isInitialized) initReflection();
         return isFtbTeamsPresent;
+    }
+
+    private void registerEventListeners() {
+        try {
+            Class<?> teamEventClass = Class.forName("dev.ftb.mods.ftbteams.api.event.TeamEvent");
+            Class<?> eventClass = Class.forName("dev.architectury.event.Event");
+            Method registerMethod = findMethod(eventClass, "register", 1);
+            if (registerMethod == null) return;
+
+            registerEvent(teamEventClass, registerMethod, "PLAYER_JOINED_PARTY", this::handlePlayerJoinedParty);
+            registerEvent(teamEventClass, registerMethod, "PLAYER_LEFT_PARTY", this::handlePlayerLeftParty);
+            registerEvent(teamEventClass, registerMethod, "PLAYER_CHANGED", this::handlePlayerChangedTeam);
+            registerEvent(teamEventClass, registerMethod, "CREATED", this::handleTeamCreated);
+            registerEvent(teamEventClass, registerMethod, "DELETED", this::handleTeamDeleted);
+            registerEvent(teamEventClass, registerMethod, "PROPERTIES_CHANGED", this::handleTeamPropertiesChanged);
+
+            GregTechCalcBoard.LOGGER.info("[GTCalcBoard] Registered FTB Teams realtime lifecycle event listeners.");
+        } catch (Throwable t) {
+            GregTechCalcBoard.LOGGER.warn("[GTCalcBoard] Could not register FTB Teams event listeners: {}", t.getMessage());
+        }
+    }
+
+    private void registerEvent(Class<?> containerClass, Method registerMethod, String fieldName, java.util.function.Consumer<Object> handler) {
+        try {
+            java.lang.reflect.Field field = containerClass.getField(fieldName);
+            Object eventInstance = field.get(null);
+            if (eventInstance != null) {
+                registerMethod.invoke(eventInstance, handler);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private void handlePlayerJoinedParty(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handlePlayerLeftParty(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handlePlayerChangedTeam(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handleTeamCreated(Object event) {
+        ServerPlayer player = extractPlayer(event);
+        if (player != null) {
+            TeamSyncHelper.syncPlayer(player);
+        }
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handleTeamDeleted(Object event) {
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private void handleTeamPropertiesChanged(Object event) {
+        syncTeamOnlineMembers(extractTeam(event));
+    }
+
+    private ServerPlayer extractPlayer(Object event) {
+        if (event == null) return null;
+        Method m = getCachedMethod(event.getClass(), "getPlayer", 0);
+        if (m != null) {
+            try {
+                Object res = m.invoke(event);
+                if (res instanceof ServerPlayer sp) return sp;
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private Object extractTeam(Object event) {
+        if (event == null) return null;
+        Method m = getCachedMethod(event.getClass(), "getTeam", 0);
+        if (m != null) {
+            try {
+                return m.invoke(event);
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private void syncTeamOnlineMembers(Object team) {
+        if (team == null) return;
+        Method m = getCachedMethod(team.getClass(), "getOnlineMembers", 0);
+        if (m == null) return;
+        try {
+            Object res = m.invoke(team);
+            if (res instanceof Collection<?> col) {
+                for (Object item : col) {
+                    if (item instanceof ServerPlayer sp) {
+                        TeamSyncHelper.syncPlayer(sp);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 }

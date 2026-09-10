@@ -6,8 +6,10 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.FlowBalanceMatrixSolver;
 import com.gtceu.calcboard.api.solver.FlowEdgeAllocator;
 import com.gtceu.calcboard.api.type.FlowSplitMode;
+import com.gtceu.calcboard.api.type.RateTimeUnit;
 import com.gtceu.calcboard.api.type.SupplyMode;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
+import com.gtceu.calcboard.client.gui.util.TargetRateParser;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import net.minecraft.client.Minecraft;
@@ -23,6 +25,7 @@ import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,7 @@ public class JunctionSupplyDialog implements IBoardModal {
     private final List<FlowGraph.ConnectionEdge> outgoingEdges = new ArrayList<>();
     private final Map<FlowGraph.ConnectionEdge, EditBox> edgeLimitEditBoxes = new LinkedHashMap<>();
     private final Map<FlowGraph.ConnectionEdge, EditBox> edgePriorityEditBoxes = new LinkedHashMap<>();
+    private final Map<FlowGraph.ConnectionEdge, EditBox> edgeWeightEditBoxes = new LinkedHashMap<>();
 
     private static final int DIALOG_WIDTH = 340;
     private static final int DIALOG_HEIGHT = 250;
@@ -75,19 +79,19 @@ public class JunctionSupplyDialog implements IBoardModal {
         int x = (screenWidth - DIALOG_WIDTH) / 2;
         int y = (screenHeight - DIALOG_HEIGHT) / 2;
 
-        if (font != null) {
-            int editBoxX = x + DIALOG_WIDTH - 85;
-            int editBoxY = y + 74 + SupplyMode.FIXED_RATE.ordinal() * 18;
-            this.rateEditBox = new EditBox(font, editBoxX, editBoxY, 75, 14, Component.translatable("gui.gtcalcboard.junction.supply_rate"));
-            this.rateEditBox.setMaxLength(16);
-            double curRate = (selectedMode == SupplyMode.FIXED_DRAIN) ? node.getExternalDrainRate() : node.getExternalSupplyRate();
-            this.rateEditBox.setValue(curRate > 0 ? formatRateForEditBox(curRate) : "100.0");
+        int editBoxX = x + DIALOG_WIDTH - 85;
+        int editBoxY = y + 74 + SupplyMode.FIXED_RATE.ordinal() * 18;
+        this.rateEditBox = new EditBox(font, editBoxX, editBoxY, 75, 14, Component.translatable("gui.gtcalcboard.junction.supply_rate"));
+        this.rateEditBox.setMaxLength(16);
+        double curRate = (selectedMode == SupplyMode.FIXED_DRAIN) ? node.getExternalDrainRate() : node.getExternalSupplyRate();
+        RateTimeUnit timeUnit = FormatUtil.getActiveTimeUnit();
+        double factor = (timeUnit != null && !timeUnit.isRecipeBatchMode()) ? timeUnit.getFactor() : 1.0;
+        this.rateEditBox.setValue(curRate > 0 ? formatRateForEditBox(curRate * factor) : "100.0");
 
-            this.bufferSizeEditBox = new EditBox(font, x + DIALOG_WIDTH - 90, y + 84, 75, 14, Component.translatable("gui.gtcalcboard.junction.buffer_size"));
-            this.bufferSizeEditBox.setMaxLength(16);
-            double curBufSize = node.getJunctionBufferSize();
-            this.bufferSizeEditBox.setValue(curBufSize > 0.0 ? String.format("%.2f", curBufSize) : "500.0");
-        }
+        this.bufferSizeEditBox = new EditBox(font, x + DIALOG_WIDTH - 90, y + 84, 75, 14, Component.translatable("gui.gtcalcboard.junction.buffer_size"));
+        this.bufferSizeEditBox.setMaxLength(16);
+        double curBufSize = node.getJunctionBufferSize();
+        this.bufferSizeEditBox.setValue(curBufSize > 0.0 ? String.format("%.2f", curBufSize) : "500.0");
 
         initOutgoingEdges(font, x, y);
     }
@@ -96,6 +100,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         this.outgoingEdges.clear();
         this.edgeLimitEditBoxes.clear();
         this.edgePriorityEditBoxes.clear();
+        this.edgeWeightEditBoxes.clear();
         FlowGraph graph = parent != null ? parent.getGraph() : null;
         if (graph == null || targetNode == null) return;
 
@@ -117,6 +122,11 @@ public class JunctionSupplyDialog implements IBoardModal {
                 ebPri.setMaxLength(6);
                 ebPri.setValue(String.valueOf(edge.priority()));
                 edgePriorityEditBoxes.put(edge, ebPri);
+
+                EditBox ebWeight = new EditBox(font, x + 158, -1000, 34, 14, Component.translatable("gui.gtcalcboard.junction.weight_label"));
+                ebWeight.setMaxLength(8);
+                ebWeight.setValue(formatWeightForEditBox(edge.weight()));
+                edgeWeightEditBoxes.put(edge, ebWeight);
             }
         }
     }
@@ -127,6 +137,7 @@ public class JunctionSupplyDialog implements IBoardModal {
         this.outgoingScrollOffset = 0;
         this.edgeLimitEditBoxes.clear();
         this.edgePriorityEditBoxes.clear();
+        this.edgeWeightEditBoxes.clear();
         this.outgoingEdges.clear();
     }
 
@@ -237,21 +248,33 @@ public class JunctionSupplyDialog implements IBoardModal {
     }
 
     private void renderRateEditBoxWithMatchButton(GuiGraphics graphics, Font font, int x, int optY, SupplyMode mode, int mouseX, int mouseY) {
-        int boxW = 56;
         int btnW = 16;
-        rateEditBox.setX(x + DIALOG_WIDTH - 24 - boxW - 4);
+        int matchX = x + DIALOG_WIDTH - 24;
+        int matchY = optY;
+
+        String unitLabel = getRateUnitLabel();
+        int unitW = font.width(unitLabel);
+        int unitX = matchX - 4 - unitW;
+
+        int boxW = 56;
+        int boxX = unitX - 4 - boxW;
+        rateEditBox.setX(boxX);
         rateEditBox.setWidth(boxW);
         rateEditBox.setY(optY);
         rateEditBox.render(graphics, mouseX, mouseY, 0);
 
-        int matchX = x + DIALOG_WIDTH - 24;
-        int matchY = optY;
+        graphics.drawString(font, unitLabel, unitX, optY + 3, 0xFF94A3B8, false);
+
         boolean matchHover = mouseX >= matchX && mouseX <= matchX + btnW && mouseY >= matchY && mouseY <= matchY + 14;
         graphics.fill(matchX, matchY, matchX + btnW, matchY + 14, matchHover ? 0xFF0284C7 : 0xFF0369A1);
         graphics.renderOutline(matchX, matchY, btnW, 14, matchHover ? 0xFF38BDF8 : 0xFF0284C7);
         graphics.drawString(font, "⚡", matchX + 4, matchY + 3, 0xFFFFFFFF, false);
 
-        if (matchHover) {
+        boolean unitHover = mouseX >= unitX && mouseX <= unitX + unitW && mouseY >= optY && mouseY <= optY + 14;
+        if (unitHover) {
+            Component tip = Component.translatable("gui.gtcalcboard.junction.supply_rate_unit_tooltip");
+            graphics.renderTooltip(font, tip, mouseX, mouseY);
+        } else if (matchHover) {
             double rate = (mode == SupplyMode.FIXED_RATE) ? calculateConnectedDownstreamDemand() : calculateConnectedUpstreamInflow();
             IngredientStack rStack = targetNode.getRerouteIngredient();
             boolean isFluid = rStack != null && rStack.isFluid();
@@ -264,6 +287,20 @@ public class JunctionSupplyDialog implements IBoardModal {
             );
             graphics.renderTooltip(font, tip, mouseX, mouseY);
         }
+    }
+
+    private String getRateUnitLabel() {
+        IngredientStack stack = (targetNode != null) ? targetNode.getRerouteIngredient() : null;
+        if (stack != null && stack.isStressUnit()) {
+            return "SU";
+        }
+        RateTimeUnit timeUnit = FormatUtil.getActiveTimeUnit();
+        String suffix = timeUnit.getSuffix();
+        if (stack != null && stack.isFluid()) {
+            com.gtceu.calcboard.api.type.FluidUnitMode fluidMode = FormatUtil.getActiveFluidUnitMode();
+            return (fluidMode == com.gtceu.calcboard.api.type.FluidUnitMode.ALWAYS_B ? "B" : "mB") + suffix;
+        }
+        return suffix;
     }
 
     private void renderAnchorCheckbox(GuiGraphics graphics, Font font, int x, int anchorY, int mouseX, int mouseY) {
@@ -324,10 +361,17 @@ public class JunctionSupplyDialog implements IBoardModal {
     private void renderSplitModeSelector(GuiGraphics graphics, Font font, int x, int y, int mouseX, int mouseY) {
         int modeY = y + 102;
         String modeLabel = Component.translatable("gui.gtcalcboard.junction.split_mode_label").getString();
-        graphics.drawString(font, modeLabel, x + 14, modeY + 3, 0xFFCBD5E1, false);
+        graphics.drawString(font, font.plainSubstrByWidth(modeLabel, 54), x + 14, modeY + 3, 0xFFCBD5E1, false);
 
-        renderSplitModeButton(graphics, font, x + 75, modeY, 122, FlowSplitMode.PROPORTIONAL, "gui.gtcalcboard.junction.split_mode.proportional", "gui.gtcalcboard.junction.proportional_tooltip", mouseX, mouseY);
-        renderSplitModeButton(graphics, font, x + 203, modeY, 122, FlowSplitMode.EQUAL, "gui.gtcalcboard.junction.split_mode.equal", "gui.gtcalcboard.junction.equal_tooltip", mouseX, mouseY);
+        int btnW = 82;
+        int gap = 5;
+        int btn1X = x + 72;
+        int btn2X = btn1X + btnW + gap;
+        int btn3X = btn2X + btnW + gap;
+
+        renderSplitModeButton(graphics, font, btn1X, modeY, btnW, FlowSplitMode.PROPORTIONAL, "gui.gtcalcboard.junction.split_mode.proportional", "gui.gtcalcboard.junction.proportional_tooltip", mouseX, mouseY);
+        renderSplitModeButton(graphics, font, btn2X, modeY, btnW, FlowSplitMode.EQUAL, "gui.gtcalcboard.junction.split_mode.equal", "gui.gtcalcboard.junction.equal_tooltip", mouseX, mouseY);
+        renderSplitModeButton(graphics, font, btn3X, modeY, btnW, FlowSplitMode.WEIGHTED, "gui.gtcalcboard.junction.split_mode.weighted", "gui.gtcalcboard.junction.weighted_tooltip", mouseX, mouseY);
     }
 
     private void renderSplitModeButton(
@@ -373,6 +417,9 @@ public class JunctionSupplyDialog implements IBoardModal {
         for (EditBox eb : edgePriorityEditBoxes.values()) {
             eb.setY(-1000);
         }
+        for (EditBox eb : edgeWeightEditBoxes.values()) {
+            eb.setY(-1000);
+        }
 
         int listStartY = y + 135;
         if (outgoingEdges.isEmpty()) {
@@ -382,6 +429,8 @@ public class JunctionSupplyDialog implements IBoardModal {
 
         FlowGraph graph = parent != null ? parent.getGraph() : null;
         int visibleCount = Math.min(3, outgoingEdges.size() - outgoingScrollOffset);
+        boolean isWeighted = (splitMode == FlowSplitMode.WEIGHTED);
+
         for (int i = 0; i < visibleCount; i++) {
             FlowGraph.ConnectionEdge edge = outgoingEdges.get(outgoingScrollOffset + i);
             int rowY = listStartY + i * 22;
@@ -391,23 +440,52 @@ public class JunctionSupplyDialog implements IBoardModal {
 
             EditBox ebLimit = edgeLimitEditBoxes.get(edge);
             EditBox ebPri = edgePriorityEditBoxes.get(edge);
+            EditBox ebWeight = edgeWeightEditBoxes.get(edge);
 
-            graphics.drawString(font, font.plainSubstrByWidth(portLabel, 135), x + 14, rowY + 3, 0xFFE2E8F0, false);
+            if (isWeighted) {
+                graphics.drawString(font, font.plainSubstrByWidth(portLabel, 85), x + 14, rowY + 3, 0xFFE2E8F0, false);
 
-            graphics.drawString(font, "P:", x + 155, rowY + 3, 0xFF94A3B8, false);
-            if (ebPri != null) {
-                ebPri.setX(x + 168);
-                ebPri.setWidth(28);
-                ebPri.setY(rowY);
-                ebPri.render(graphics, mouseX, mouseY, 0);
-            }
+                graphics.drawString(font, "P:", x + 103, rowY + 3, 0xFF94A3B8, false);
+                if (ebPri != null) {
+                    ebPri.setX(x + 115);
+                    ebPri.setWidth(24);
+                    ebPri.setY(rowY);
+                    ebPri.render(graphics, mouseX, mouseY, 0);
+                }
 
-            graphics.drawString(font, "Cap:", x + 202, rowY + 3, 0xFF94A3B8, false);
-            if (ebLimit != null) {
-                ebLimit.setX(x + 226);
-                ebLimit.setWidth(DIALOG_WIDTH - 240);
-                ebLimit.setY(rowY);
-                ebLimit.render(graphics, mouseX, mouseY, 0);
+                graphics.drawString(font, "W:", x + 144, rowY + 3, 0xFF94A3B8, false);
+                if (ebWeight != null) {
+                    ebWeight.setX(x + 158);
+                    ebWeight.setWidth(34);
+                    ebWeight.setY(rowY);
+                    ebWeight.render(graphics, mouseX, mouseY, 0);
+                }
+
+                graphics.drawString(font, "Cap:", x + 197, rowY + 3, 0xFF94A3B8, false);
+                if (ebLimit != null) {
+                    ebLimit.setX(x + 224);
+                    ebLimit.setWidth(DIALOG_WIDTH - 238);
+                    ebLimit.setY(rowY);
+                    ebLimit.render(graphics, mouseX, mouseY, 0);
+                }
+            } else {
+                graphics.drawString(font, font.plainSubstrByWidth(portLabel, 135), x + 14, rowY + 3, 0xFFE2E8F0, false);
+
+                graphics.drawString(font, "P:", x + 155, rowY + 3, 0xFF94A3B8, false);
+                if (ebPri != null) {
+                    ebPri.setX(x + 168);
+                    ebPri.setWidth(28);
+                    ebPri.setY(rowY);
+                    ebPri.render(graphics, mouseX, mouseY, 0);
+                }
+
+                graphics.drawString(font, "Cap:", x + 202, rowY + 3, 0xFF94A3B8, false);
+                if (ebLimit != null) {
+                    ebLimit.setX(x + 226);
+                    ebLimit.setWidth(DIALOG_WIDTH - 240);
+                    ebLimit.setY(rowY);
+                    ebLimit.render(graphics, mouseX, mouseY, 0);
+                }
             }
         }
     }
@@ -483,6 +561,10 @@ public class JunctionSupplyDialog implements IBoardModal {
                 if (eb != null && checkEditBoxClicked(eb, mouseX, mouseY, button)) return true;
                 EditBox ebPri = edgePriorityEditBoxes.get(edge);
                 if (ebPri != null && checkEditBoxClicked(ebPri, mouseX, mouseY, button)) return true;
+                if (splitMode == FlowSplitMode.WEIGHTED) {
+                    EditBox ebWeight = edgeWeightEditBoxes.get(edge);
+                    if (ebWeight != null && checkEditBoxClicked(ebWeight, mouseX, mouseY, button)) return true;
+                }
             }
         }
 
@@ -521,17 +603,36 @@ public class JunctionSupplyDialog implements IBoardModal {
         int modeY = y + 102;
         if (mouseY < modeY || mouseY > modeY + 14) return false;
 
-        if (mouseX >= x + 75 && mouseX <= x + 197) {
+        int btnW = 82;
+        int gap = 5;
+        int btn1X = x + 72;
+        int btn2X = btn1X + btnW + gap;
+        int btn3X = btn2X + btnW + gap;
+
+        if (mouseX >= btn1X && mouseX <= btn1X + btnW) {
             this.splitMode = FlowSplitMode.PROPORTIONAL;
+            unfocusWeightEditBoxes();
             playClickSound();
             return true;
         }
-        if (mouseX >= x + 203 && mouseX <= x + 325) {
+        if (mouseX >= btn2X && mouseX <= btn2X + btnW) {
             this.splitMode = FlowSplitMode.EQUAL;
+            unfocusWeightEditBoxes();
+            playClickSound();
+            return true;
+        }
+        if (mouseX >= btn3X && mouseX <= btn3X + btnW) {
+            this.splitMode = FlowSplitMode.WEIGHTED;
             playClickSound();
             return true;
         }
         return false;
+    }
+
+    private void unfocusWeightEditBoxes() {
+        for (EditBox eb : edgeWeightEditBoxes.values()) {
+            eb.setFocused(false);
+        }
     }
 
     private boolean checkMatchFlowClicked(int x, int y, double mouseX, double mouseY) {
@@ -545,7 +646,9 @@ public class JunctionSupplyDialog implements IBoardModal {
             double rate = (selectedMode == SupplyMode.FIXED_RATE)
                     ? calculateConnectedDownstreamDemand()
                     : calculateConnectedUpstreamInflow();
-            rateEditBox.setValue(formatRateForEditBox(rate));
+            RateTimeUnit timeUnit = FormatUtil.getActiveTimeUnit();
+            double factor = (timeUnit != null && !timeUnit.isRecipeBatchMode()) ? timeUnit.getFactor() : 1.0;
+            rateEditBox.setValue(formatRateForEditBox(rate * factor));
             playClickSound();
             return true;
         }
@@ -660,7 +763,9 @@ public class JunctionSupplyDialog implements IBoardModal {
         if (isRateMode && targetNode != null) {
             double cur = (mode == SupplyMode.FIXED_DRAIN) ? targetNode.getExternalDrainRate() : targetNode.getExternalSupplyRate();
             if (cur > 0.0) {
-                rateEditBox.setValue(formatRateForEditBox(cur));
+                RateTimeUnit timeUnit = FormatUtil.getActiveTimeUnit();
+                double factor = (timeUnit != null && !timeUnit.isRecipeBatchMode()) ? timeUnit.getFactor() : 1.0;
+                rateEditBox.setValue(formatRateForEditBox(cur * factor));
             }
         }
     }
@@ -691,9 +796,9 @@ public class JunctionSupplyDialog implements IBoardModal {
         targetNode.setSupplyMode(selectedMode);
         targetNode.setJunctionSplitMode(splitMode);
         if (selectedMode == SupplyMode.FIXED_RATE && rateEditBox != null) {
-            targetNode.setExternalSupplyRate(Math.max(0.0, parseDoubleSafe(rateEditBox.getValue())));
+            targetNode.setExternalSupplyRate(parseRateInput(rateEditBox.getValue()));
         } else if (selectedMode == SupplyMode.FIXED_DRAIN && rateEditBox != null) {
-            targetNode.setExternalDrainRate(Math.max(0.0, parseDoubleSafe(rateEditBox.getValue())));
+            targetNode.setExternalDrainRate(parseRateInput(rateEditBox.getValue()));
         }
 
         targetNode.setJunctionBuffer(isBuffer);
@@ -712,10 +817,14 @@ public class JunctionSupplyDialog implements IBoardModal {
             for (Map.Entry<FlowGraph.ConnectionEdge, EditBox> entry : edgeLimitEditBoxes.entrySet()) {
                 FlowGraph.ConnectionEdge edge = entry.getKey();
                 double limit = Math.max(0.0, parseDoubleSafe(entry.getValue().getValue()));
-                graph.setConnectionFixedLimit(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), limit);
                 EditBox priBox = edgePriorityEditBoxes.get(edge);
                 int pri = priBox != null ? Math.max(0, Math.min(99, parseIntSafe(priBox.getValue()))) : edge.priority();
-                graph.setConnectionPriority(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), pri);
+                EditBox weightBox = edgeWeightEditBoxes.get(edge);
+                double weight = edge.weight();
+                if (weightBox != null && !weightBox.getValue().isBlank()) {
+                    weight = Math.max(0.0, parseDoubleSafe(weightBox.getValue()));
+                }
+                graph.setConnectionProperties(edge.fromNodeId(), edge.outputIndex(), edge.toNodeId(), edge.inputIndex(), limit, pri, weight);
             }
             net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
                 new com.gtceu.calcboard.api.event.FlowGraphEvent.JunctionConfigured(graph, targetNode, selectedMode)
@@ -729,6 +838,37 @@ public class JunctionSupplyDialog implements IBoardModal {
 
         playClickSound();
         close();
+    }
+
+    private double parseRateInput(String text) {
+        if (text == null || text.isBlank()) return 0.0;
+        String trimmed = text.trim();
+
+        IngredientStack boundStack = (targetNode != null) ? targetNode.getRerouteIngredient() : null;
+        boolean isFluid = (boundStack != null && boundStack.isFluid());
+        RateTimeUnit defaultUnit = FormatUtil.getActiveTimeUnit();
+
+        java.util.OptionalDouble parsed = TargetRateParser.parseRate(trimmed, isFluid, defaultUnit);
+        if (parsed.isPresent()) {
+            return Math.max(0.0, parsed.getAsDouble());
+        }
+
+        try {
+            double val = Double.parseDouble(trimmed);
+            if (val <= 0.0) return 0.0;
+            double factor = (defaultUnit != null && !defaultUnit.isRecipeBatchMode()) ? defaultUnit.getFactor() : 1.0;
+            return Math.max(0.0, val / factor);
+        } catch (NumberFormatException ignored) {
+            return 0.0;
+        }
+    }
+
+    private static String formatWeightForEditBox(double weight) {
+        if (!Double.isFinite(weight) || weight < 0.0) return "1";
+        if (weight == Math.floor(weight)) {
+            return String.valueOf((long) weight);
+        }
+        return String.format(java.util.Locale.ROOT, "%.2f", weight).replaceAll("\\.?0+$", "");
     }
 
     private static String formatRateForEditBox(double rate) {
@@ -745,7 +885,8 @@ public class JunctionSupplyDialog implements IBoardModal {
     private double parseDoubleSafe(String s) {
         if (s == null || s.isBlank()) return 0.0;
         try {
-            return Double.parseDouble(s.trim());
+            double val = Double.parseDouble(s.trim());
+            return Double.isFinite(val) ? val : 0.0;
         } catch (NumberFormatException ignored) {
             return 0.0;
         }
@@ -785,18 +926,22 @@ public class JunctionSupplyDialog implements IBoardModal {
             if (bufferSizeEditBox != null && bufferSizeEditBox.isFocused()) {
                 return bufferSizeEditBox.keyPressed(keyCode, scanCode, modifiers);
             }
-            for (EditBox eb : edgeLimitEditBoxes.values()) {
-                if (eb.isFocused()) {
-                    return eb.keyPressed(keyCode, scanCode, modifiers);
-                }
-            }
-            for (EditBox eb : edgePriorityEditBoxes.values()) {
-                if (eb.isFocused()) {
-                    return eb.keyPressed(keyCode, scanCode, modifiers);
-                }
+            if (forwardKeyPressed(edgeLimitEditBoxes.values(), keyCode, scanCode, modifiers)) return true;
+            if (forwardKeyPressed(edgePriorityEditBoxes.values(), keyCode, scanCode, modifiers)) return true;
+            if (splitMode == FlowSplitMode.WEIGHTED && forwardKeyPressed(edgeWeightEditBoxes.values(), keyCode, scanCode, modifiers)) {
+                return true;
             }
         }
         return true;
+    }
+
+    private boolean forwardKeyPressed(Collection<EditBox> boxes, int keyCode, int scanCode, int modifiers) {
+        for (EditBox eb : boxes) {
+            if (eb.isFocused()) {
+                return eb.keyPressed(keyCode, scanCode, modifiers);
+            }
+        }
+        return false;
     }
 
     public boolean charTyped(char codePoint, int modifiers) {
@@ -808,15 +953,19 @@ public class JunctionSupplyDialog implements IBoardModal {
             if (bufferSizeEditBox != null && bufferSizeEditBox.isFocused()) {
                 return bufferSizeEditBox.charTyped(codePoint, modifiers);
             }
-            for (EditBox eb : edgeLimitEditBoxes.values()) {
-                if (eb.isFocused()) {
-                    return eb.charTyped(codePoint, modifiers);
-                }
+            if (forwardCharTyped(edgeLimitEditBoxes.values(), codePoint, modifiers)) return true;
+            if (forwardCharTyped(edgePriorityEditBoxes.values(), codePoint, modifiers)) return true;
+            if (splitMode == FlowSplitMode.WEIGHTED && forwardCharTyped(edgeWeightEditBoxes.values(), codePoint, modifiers)) {
+                return true;
             }
-            for (EditBox eb : edgePriorityEditBoxes.values()) {
-                if (eb.isFocused()) {
-                    return eb.charTyped(codePoint, modifiers);
-                }
+        }
+        return false;
+    }
+
+    private boolean forwardCharTyped(Collection<EditBox> boxes, char codePoint, int modifiers) {
+        for (EditBox eb : boxes) {
+            if (eb.isFocused()) {
+                return eb.charTyped(codePoint, modifiers);
             }
         }
         return false;

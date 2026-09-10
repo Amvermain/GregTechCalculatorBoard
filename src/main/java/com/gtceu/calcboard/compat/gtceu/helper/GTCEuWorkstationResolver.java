@@ -222,6 +222,9 @@ public final class GTCEuWorkstationResolver {
         }
 
         if (catId != null && "gtceu".equals(catId.getNamespace())) {
+            if (tier == GTVoltageTier.ULV) {
+                return null;
+            }
             String cPath = catId.getPath();
             for (GTVoltageTier t : GTVoltageTier.values()) {
                 String prefix = t.name().toLowerCase(Locale.ROOT) + "_";
@@ -230,7 +233,13 @@ public final class GTCEuWorkstationResolver {
                     break;
                 }
             }
-            return ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + cPath);
+            ResourceLocation cand = ResourceLocation.tryParse("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_" + cPath);
+            var itemReg = net.minecraftforge.registries.ForgeRegistries.ITEMS;
+            boolean hasGtItems = itemReg != null && itemReg.containsKey(ResourceLocation.tryParse("gtceu:lv_macerator"));
+            if (cand != null && (itemReg == null || itemReg.isEmpty() || !hasGtItems || itemReg.containsKey(cand))) {
+                return cand;
+            }
+            return null;
         }
 
         return null;
@@ -284,7 +293,22 @@ public final class GTCEuWorkstationResolver {
     public static GTVoltageTier getMinimumWorkstationTier(RecipeNode node) {
         if (node == null) return null;
         List<ResourceLocation> workstations = node.getAvailableWorkstations();
-        if (workstations == null || workstations.isEmpty()) return null;
+        if (workstations == null || workstations.isEmpty()) {
+            ResourceLocation catId = node.getRecipeCategoryId();
+            if (catId != null) {
+                CategoryCapability cap = CategoryCapabilityMatrix.getInstance().getCapability(catId);
+                if (cap != null && cap.availableWorkstations() != null) {
+                    workstations = cap.availableWorkstations();
+                }
+            }
+        }
+        if (workstations == null || workstations.isEmpty()) {
+            ResourceLocation catId = node.getRecipeCategoryId();
+            if (catId != null && "gtceu".equals(catId.getNamespace())) {
+                return GTVoltageTier.LV;
+            }
+            return null;
+        }
 
         GTVoltageTier minTier = null;
         for (ResourceLocation ws : workstations) {
@@ -294,6 +318,12 @@ public final class GTCEuWorkstationResolver {
             GTVoltageTier tier = extractVoltageTierFromIcon(ws);
             if (tier != null && (minTier == null || tier.ordinal() < minTier.ordinal())) {
                 minTier = tier;
+            }
+        }
+        if (minTier == null) {
+            ResourceLocation catId = node.getRecipeCategoryId();
+            if (catId != null && "gtceu".equals(catId.getNamespace())) {
+                return GTVoltageTier.LV;
             }
         }
         return minTier;
@@ -352,9 +382,6 @@ public final class GTCEuWorkstationResolver {
     }
 
     private static GTVoltageTier clampToWorkstationMinimumTier(RecipeNode node, GTVoltageTier tier) {
-        if (node.getRecipeTier() == GTVoltageTier.ULV && tier == GTVoltageTier.ULV) {
-            return tier;
-        }
         boolean isVanillaCooking = node.getRecipeCategoryId() != null && GTCEuModAdapter.VANILLA_COOKING_RECIPE_TYPES.contains(node.getRecipeCategoryId());
         boolean isPassiveOrSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || node.getEnergyType() == EnergyType.NONE;
         if (isVanillaCooking || isPassiveOrSteam) {

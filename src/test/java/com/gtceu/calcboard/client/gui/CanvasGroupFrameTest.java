@@ -519,9 +519,11 @@ public class CanvasGroupFrameTest {
         FlowGraph subGraph = module.getSubGraph();
         Assertions.assertNotNull(subGraph);
 
-        List<FlowGraph.ConnectionEdge> subEdges = subGraph.getConnections();
-        Assertions.assertEquals(2, subEdges.size());
-        for (FlowGraph.ConnectionEdge edge : subEdges) {
+        List<FlowGraph.ConnectionEdge> junctionEdges = subGraph.getConnections().stream()
+                .filter(FlowGraph.ConnectionEdge::hasFixedLimit)
+                .toList();
+        Assertions.assertEquals(2, junctionEdges.size());
+        for (FlowGraph.ConnectionEdge edge : junctionEdges) {
             Assertions.assertEquals(junction.getId(), edge.fromNodeId());
             Assertions.assertEquals(2.0, edge.fixedFlowLimit(), 0.001);
             Assertions.assertTrue(edge.hasFixedLimit());

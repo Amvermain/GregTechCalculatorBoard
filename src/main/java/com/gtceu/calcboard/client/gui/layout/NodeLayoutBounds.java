@@ -152,6 +152,9 @@ public class NodeLayoutBounds {
         if (cardBounds.contains(mouseX, mouseY)) {
             return true;
         }
+        if (findHoveredInputPort(mouseX, mouseY) != null || findHoveredOutputPort(mouseX, mouseY) != null) {
+            return true;
+        }
         return targetBatchBadgeBounds.contains(mouseX, mouseY);
     }
 
@@ -210,6 +213,9 @@ public class NodeLayoutBounds {
             return false;
         }
         if (getHoveredInputPortIndex(mouseX, mouseY) >= 0 || getHoveredOutputPortIndex(mouseX, mouseY) >= 0) {
+            return false;
+        }
+        if (closeBtnBounds.contains(mouseX, mouseY)) {
             return false;
         }
         return headerBounds.contains(mouseX, mouseY);

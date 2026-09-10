@@ -58,4 +58,4 @@ Detailed component behavior, interaction flows, and high-fidelity wireframes are
 
 ---
 
-> ➡️ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocol](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+> ➡ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocol](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

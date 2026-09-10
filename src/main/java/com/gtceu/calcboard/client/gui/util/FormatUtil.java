@@ -204,11 +204,17 @@ public final class FormatUtil {
     }
 
     public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit, boolean isBuffered, boolean isThrottled) {
+        return formatConnectedInput(supplied, required, stack, isDeficit, isBuffered, isThrottled, false);
+    }
+
+    public static String formatConnectedInput(double supplied, double required, IngredientStack stack, boolean isDeficit, boolean isBuffered, boolean isThrottled, boolean isSteadyRecirculating) {
         if (stack != null && stack.isStressUnit()) {
             String unit = " SU";
             String supStr = formatCompactNumber(supplied);
             String reqStr = formatCompactNumber(required);
-            if (isDeficit) {
+            if (isSteadyRecirculating) {
+                return "§b+" + supStr + " §7-" + reqStr + unit + " §b🔄";
+            } else if (isDeficit) {
                 return isBuffered
                         ? "§6+" + supStr + " §7-" + reqStr + unit + " §e⏳"
                         : "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
@@ -218,18 +224,22 @@ public final class FormatUtil {
                 return "§b+" + supStr + " §7-" + reqStr + unit + " §b+";
             }
         }
-        return formatConnectedInput(supplied, required, stack != null && stack.isFluid(), isDeficit, isBuffered, isThrottled);
+        return formatConnectedInput(supplied, required, stack != null && stack.isFluid(), isDeficit, isBuffered, isThrottled, isSteadyRecirculating);
     }
 
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit) {
-        return formatConnectedInput(supplied, required, isFluid, isDeficit, false, false);
+        return formatConnectedInput(supplied, required, isFluid, isDeficit, false, false, false);
     }
 
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit, boolean isBuffered) {
-        return formatConnectedInput(supplied, required, isFluid, isDeficit, isBuffered, false);
+        return formatConnectedInput(supplied, required, isFluid, isDeficit, isBuffered, false, false);
     }
 
     public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit, boolean isBuffered, boolean isThrottled) {
+        return formatConnectedInput(supplied, required, isFluid, isDeficit, isBuffered, isThrottled, false);
+    }
+
+    public static String formatConnectedInput(double supplied, double required, boolean isFluid, boolean isDeficit, boolean isBuffered, boolean isThrottled, boolean isSteadyRecirculating) {
         RateTimeUnit timeUnit = getActiveTimeUnit();
         FluidUnitMode fluidMode = getActiveFluidUnitMode();
         double scaledSup = supplied * timeUnit.getFactor();
@@ -263,14 +273,15 @@ public final class FormatUtil {
             reqStr = formatCompactNumber(scaledReq);
         }
 
-        if (isDeficit) {
+        if (isSteadyRecirculating) {
+            return "§b+" + supStr + " §7-" + reqStr + unit + " §b🔄";
+        } else if (isDeficit) {
             return isBuffered
                     ? "§6+" + supStr + " §7-" + reqStr + unit + " §e⏳"
                     : "§6+" + supStr + " §c-" + reqStr + unit + " §c⚠";
         } else if (isThrottled) {
             return "§b+" + supStr + " §7-" + reqStr + unit + " §3↓";
         } else {
-            // Surplus: Supply in Cyan (+), Machine Demand in Light Gray (-), Plus symbol
             return "§b+" + supStr + " §7-" + reqStr + unit + " §b+";
         }
     }
@@ -401,9 +412,15 @@ public final class FormatUtil {
     }
 
     public static String formatBatchConnectedInput(double suppliedBatch, double reqBatch, IngredientStack stack, boolean isDeficit) {
+        return formatBatchConnectedInput(suppliedBatch, reqBatch, stack, isDeficit, false);
+    }
+
+    public static String formatBatchConnectedInput(double suppliedBatch, double reqBatch, IngredientStack stack, boolean isDeficit, boolean isSteadyRecirculating) {
         String supStr = formatRecipeBatchAmount(suppliedBatch, stack);
         String reqStr = formatRecipeBatchAmount(reqBatch, stack);
-        if (isDeficit) {
+        if (isSteadyRecirculating) {
+            return "§b+" + supStr + " §7-" + reqStr + " §b🔄";
+        } else if (isDeficit) {
             return "§6+" + supStr + " §c-" + reqStr + " §c⚠";
         }
         return "§b+" + supStr + " §7-" + reqStr + " §b+";

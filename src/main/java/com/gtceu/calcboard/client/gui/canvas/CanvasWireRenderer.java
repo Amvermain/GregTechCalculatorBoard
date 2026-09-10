@@ -1,7 +1,9 @@
 package com.gtceu.calcboard.client.gui.canvas;
 
+import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.render.ConnectionRenderer;
@@ -51,25 +53,80 @@ public class CanvasWireRenderer {
         return null;
     }
 
+    public record ResolvedWireEndpoints(
+            float x1, float y1, float x2, float y2,
+            float fromDirX, float toDirX,
+            boolean isInternalCull
+    ) {}
+
+    public static ResolvedWireEndpoints resolveWireEndpoints(FlowGraph graph, BoardScreen screen, FlowGraph.ConnectionEdge edge) {
+        RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
+        RecipeNode toNode = graph.findNodeById(edge.toNodeId());
+        if (fromNode == null || toNode == null) return null;
+
+        CanvasGroupFrame fromFolded = graph.getFoldedFrameForNode(fromNode.getId());
+        CanvasGroupFrame toFolded = graph.getFoldedFrameForNode(toNode.getId());
+
+        if (fromFolded != null && toFolded != null && fromFolded.equals(toFolded)) {
+            return new ResolvedWireEndpoints(0, 0, 0, 0, 0, 0, true);
+        }
+
+        float x1, y1, fromDirX;
+        if (fromFolded != null) {
+            FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, fromFolded);
+            int outIdx = summary.findOutputIndexForOrigin(fromNode.getId(), edge.outputIndex());
+            if (outIdx < 0) outIdx = 0;
+            x1 = (float) (fromFolded.getPosX() + fromFolded.getWidth() - 5.0);
+            y1 = (float) (fromFolded.getPosY() + 64.0 + outIdx * 18.0 + 8.0);
+            fromDirX = 1.0f;
+        } else {
+            NodeWidget fromWidget = screen != null ? screen.findWidgetForNode(fromNode) : null;
+            if (fromWidget != null) {
+                x1 = fromWidget.getOutputPortX(edge.outputIndex());
+                y1 = fromWidget.getOutputPortY(edge.outputIndex());
+            } else if (fromNode.isReroute() || fromNode.isBoundaryPin()) {
+                x1 = (float) (fromNode.getPosX() + (fromNode.isFlipped() ? 0 : 32));
+                y1 = (float) (fromNode.getPosY() + 16.0);
+            } else {
+                x1 = (float) (fromNode.getPosX() + fromNode.getCardWidth());
+                y1 = (float) (fromNode.getPosY() + 20.0);
+            }
+            fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
+        }
+
+        float x2, y2, toDirX;
+        if (toFolded != null) {
+            FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, toFolded);
+            int inIdx = summary.findInputIndexForOrigin(toNode.getId(), edge.inputIndex());
+            if (inIdx < 0) inIdx = 0;
+            x2 = (float) (toFolded.getPosX() + 5.0);
+            y2 = (float) (toFolded.getPosY() + 64.0 + inIdx * 18.0 + 8.0);
+            toDirX = -1.0f;
+        } else {
+            NodeWidget toWidget = screen != null ? screen.findWidgetForNode(toNode) : null;
+            if (toWidget != null) {
+                x2 = toWidget.getInputPortX(edge.inputIndex());
+                y2 = toWidget.getInputPortY(edge.inputIndex());
+            } else if (toNode.isReroute() || toNode.isBoundaryPin()) {
+                x2 = (float) (toNode.getPosX() + (toNode.isFlipped() ? 32 : 0));
+                y2 = (float) (toNode.getPosY() + 16.0);
+            } else {
+                x2 = (float) toNode.getPosX();
+                y2 = (float) (toNode.getPosY() + 20.0);
+            }
+            toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
+        }
+
+        return new ResolvedWireEndpoints(x1, y1, x2, y2, fromDirX, toDirX, false);
+    }
+
     public void updateSpatialIndex(BoardScreen screen, FlowGraph graph) {
         if (!spatialDirty) return;
         wireSpatialIndex.clear();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
-            RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
-            RecipeNode toNode = graph.findNodeById(edge.toNodeId());
-            if (fromNode != null && toNode != null) {
-                NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
-                NodeWidget toWidget = screen.findWidgetForNode(toNode);
-                if (fromWidget != null && toWidget != null) {
-                    float x1 = fromWidget.getOutputPortX(edge.outputIndex());
-                    float y1 = fromWidget.getOutputPortY(edge.outputIndex());
-                    float x2 = toWidget.getInputPortX(edge.inputIndex());
-                    float y2 = toWidget.getInputPortY(edge.inputIndex());
-                    float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
-                    float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
-                    wireSpatialIndex.insert(edge, x1, y1, x2, y2, fromDirX, toDirX);
-                }
-            }
+            ResolvedWireEndpoints pts = resolveWireEndpoints(graph, screen, edge);
+            if (pts == null || pts.isInternalCull()) continue;
+            wireSpatialIndex.insert(edge, pts.x1(), pts.y1(), pts.x2(), pts.y2(), pts.fromDirX(), pts.toDirX());
         }
         spatialDirty = false;
     }
@@ -86,21 +143,18 @@ public class CanvasWireRenderer {
         visibleWiresBuffer.clear();
         List<WirePriorityBadge> priorityBadges = new ArrayList<>();
         for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            ResolvedWireEndpoints pts = resolveWireEndpoints(graph, screen, edge);
+            if (pts == null || pts.isInternalCull()) continue;
+
+            float x1 = pts.x1();
+            float y1 = pts.y1();
+            float x2 = pts.x2();
+            float y2 = pts.y2();
+            float fromDirX = pts.fromDirX();
+            float toDirX = pts.toDirX();
             RecipeNode fromNode = graph.findNodeById(edge.fromNodeId());
             RecipeNode toNode = graph.findNodeById(edge.toNodeId());
             if (fromNode == null || toNode == null) continue;
-
-            NodeWidget fromWidget = screen.findWidgetForNode(fromNode);
-            NodeWidget toWidget = screen.findWidgetForNode(toNode);
-            if (fromWidget == null || toWidget == null) continue;
-
-            float x1 = fromWidget.getOutputPortX(edge.outputIndex());
-            float y1 = fromWidget.getOutputPortY(edge.outputIndex());
-            float x2 = toWidget.getInputPortX(edge.inputIndex());
-            float y2 = toWidget.getInputPortY(edge.inputIndex());
-
-            float fromDirX = fromNode.isFlipped() ? -1.0f : 1.0f;
-            float toDirX = toNode.isFlipped() ? 1.0f : -1.0f;
 
             ConnectionRenderer.computeControlPoints(x1, y1, x2, y2, fromDirX, toDirX, scratchCp);
 

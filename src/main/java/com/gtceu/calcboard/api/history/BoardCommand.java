@@ -74,6 +74,9 @@ public interface BoardCommand {
     }
 
     class ExpandModuleCommand extends com.gtceu.calcboard.api.history.command.ExpandModuleCommand {
+        public ExpandModuleCommand(RecipeNode moduleNode, List<RecipeNode> expandedNodes, List<FlowGraph.ConnectionEdge> restoredEdges, List<FlowGraph.ConnectionEdge> moduleEdges, List<CanvasGroupFrame> expandedFrames, List<CanvasStickyNote> expandedNotes, com.gtceu.calcboard.api.storage.BoardPage capturedSubPage) {
+            super(moduleNode, expandedNodes, restoredEdges, moduleEdges, expandedFrames, expandedNotes, capturedSubPage);
+        }
         public ExpandModuleCommand(RecipeNode moduleNode, List<RecipeNode> expandedNodes, List<FlowGraph.ConnectionEdge> restoredEdges, List<FlowGraph.ConnectionEdge> moduleEdges, List<CanvasGroupFrame> expandedFrames, List<CanvasStickyNote> expandedNotes) {
             super(moduleNode, expandedNodes, restoredEdges, moduleEdges, expandedFrames, expandedNotes);
         }
@@ -92,6 +95,9 @@ public interface BoardCommand {
     }
 
     class GroupModuleCommand extends com.gtceu.calcboard.api.history.command.GroupModuleCommand {
+        public GroupModuleCommand(List<RecipeNode> groupedNodes, RecipeNode moduleNode, List<FlowGraph.ConnectionEdge> originalEdges, List<FlowGraph.ConnectionEdge> rewires, List<CanvasGroupFrame> capturedFrames, List<CanvasStickyNote> capturedNotes, com.gtceu.calcboard.api.storage.BoardPage capturedSubPage) {
+            super(groupedNodes, moduleNode, originalEdges, rewires, capturedFrames, capturedNotes, capturedSubPage);
+        }
         public GroupModuleCommand(List<RecipeNode> groupedNodes, RecipeNode moduleNode, List<FlowGraph.ConnectionEdge> originalEdges, List<FlowGraph.ConnectionEdge> rewires, List<CanvasGroupFrame> capturedFrames, List<CanvasStickyNote> capturedNotes) {
             super(groupedNodes, moduleNode, originalEdges, rewires, capturedFrames, capturedNotes);
         }
@@ -182,6 +188,9 @@ public interface BoardCommand {
     }
 
     class RemoveNodesCommand extends com.gtceu.calcboard.api.history.command.RemoveNodesCommand {
+        public RemoveNodesCommand(List<RecipeNode> nodes, List<FlowGraph.ConnectionEdge> edges, String description, List<com.gtceu.calcboard.api.storage.BoardPage> capturedSubPages) {
+            super(nodes, edges, description, capturedSubPages);
+        }
         public RemoveNodesCommand(List<RecipeNode> nodes, List<FlowGraph.ConnectionEdge> edges, String description) {
             super(nodes, edges, description);
         }
@@ -226,6 +235,12 @@ public interface BoardCommand {
     class SwitchRecipeCommand extends com.gtceu.calcboard.api.history.command.SwitchRecipeCommand {
         public SwitchRecipeCommand(String nodeId, RecipeSnapshot oldRecipe, RecipeSnapshot newRecipe, List<FlowGraph.ConnectionEdge> oldEdges, List<FlowGraph.ConnectionEdge> newEdges) {
             super(nodeId, oldRecipe, newRecipe, oldEdges, newEdges);
+        }
+    }
+
+    class ToggleFrameFoldCommand extends com.gtceu.calcboard.api.history.command.ToggleFrameFoldCommand {
+        public ToggleFrameFoldCommand(String frameId, boolean previousFolded, boolean newFolded) {
+            super(frameId, previousFolded, newFolded);
         }
     }
 }

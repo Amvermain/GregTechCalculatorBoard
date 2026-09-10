@@ -35,7 +35,7 @@ Star Technology를 비롯한 대규모 복합 모드팩 환경에서는 탈황 �
 
 ### 2.3 제안 목표 (Goals)
 * **결정론적 발산 상태 감지**: Auto-Ratio 연산 과정에서 안전 한도 클램핑이 발생했거나, 외부 미공급 폐순환 루프에서 스케일링이 억제된 노드들을 정확히 식별하여 `AutoRatioResult`로 반환.
-* **선언적 노드 경고 뱃지(`⚠️`) 연동**: 억제된 기계 카드의 우측 상단에 눈에 띄는 주황색 경고 뱃지를 렌더링.
+* **선언적 노드 경고 뱃지(`⚠`) 연동**: 억제된 기계 카드의 우측 상단에 눈에 띄는 주황색 경고 뱃지를 렌더링.
 * **상세 가이드 툴팁 (Actionable Tooltip)**:
   - 1행: 경고 제목 (폐순환 루프 발산 방어됨)
   - 2행: 발산 원인 (외부 원료 공급선 결손으로 인한 증폭 억제)
@@ -50,10 +50,10 @@ Star Technology를 비롯한 대규모 복합 모드팩 환경에서는 탈황 �
 
 | 액터 (Actor) | 행동 (Action) | 기대 결과 (Expected Outcome) |
 | :--- | :--- | :--- |
-| **복합 공정 설계자** | 수소 재순환 탈황 공정에서 외부 수소 공급 없이 최종 정제탑을 앵커로 두고 Auto-Ratio 실행 | 기계 대수가 수백만 대로 폭주하지 않고 정상 범위로 수렴하되, 상단에 안내 토스트가 뜨고 LCR/전해조 카드에 `[⚠️ 루프]` 뱃지가 표시됨 |
-| **원인 규명자** | `[⚠️ 루프]` 뱃지에 마우스를 호버함 | 가상 툴팁이 열리며 "외부 수소 공급이 없어 순환선만으로 추가 수요를 감당할 수 없어 증폭이 방어되었습니다"라는 명확한 원인과 2가지 해결 방안이 표시됨 |
+| **복합 공정 설계자** | 수소 재순환 탈황 공정에서 외부 수소 공급 없이 최종 정제탑을 앵커로 두고 Auto-Ratio 실행 | 기계 대수가 수백만 대로 폭주하지 않고 정상 범위로 수렴하되, 상단에 안내 토스트가 뜨고 LCR/전해조 카드에 `[⚠ 루프]` 뱃지가 표시됨 |
+| **원인 규명자** | `[⚠ 루프]` 뱃지에 마우스를 호버함 | 가상 툴팁이 열리며 "외부 수소 공급이 없어 순환선만으로 추가 수요를 감당할 수 없어 증폭이 방어되었습니다"라는 명확한 원인과 2가지 해결 방안이 표시됨 |
 | **신속 조작자** | 경고 뱃지를 클릭하거나 툴팁 내 `[⚓ 앵커 설정]` 안내를 확인하고 뱃지 클릭 | 해당 전해조가 즉시 앵커(Target Base)로 전환되어 금빛 테두리가 켜지고, 플레이어가 원하는 대수로 고정한 뒤 수치 균형을 맞출 수 있게 됨 |
-| **공정 보완자** | 외부 수소 공급선(물 전기분해기 등)을 전해조/크래커에 연결하고 Auto-Ratio 재실행 | 모든 공정이 외부 공급선에 맞춰 완벽히 수렴하며, 이전에 켜졌던 `[⚠️ 루프]` 경고 뱃지가 자동으로 완전히 사라짐 |
+| **공정 보완자** | 외부 수소 공급선(물 전기분해기 등)을 전해조/크래커에 연결하고 Auto-Ratio 재실행 | 모든 공정이 외부 공급선에 맞춰 완벽히 수렴하며, 이전에 켜졌던 `[⚠ 루프]` 경고 뱃지가 자동으로 완전히 사라짐 |
 
 ---
 
@@ -76,7 +76,7 @@ flowchart TD
     subgraph Declarative_Badges ["계층 2: 선언적 뱃지 레지스트리 (API)"]
         H --> I[NodeBadgeRegistry]
         I --> J{DIVERGENCE_WARNING 활성화?}
-        J -- Yes --> K["NodeBadge<br/>text: '⚠️ 루프'<br/>isWarning: true<br/>onClick: setAnchor"]
+        J -- Yes --> K["NodeBadge<br/>text: '⚠ 루프'<br/>isWarning: true<br/>onClick: setAnchor"]
         J -- No --> L[뱃지 미생성]
     end
 
@@ -173,7 +173,7 @@ Auto-Ratio 연산 패스를 시작하기 전($t = 0$), 위상 분석을 통해 �
 
 ```text
 +-------------------------------------------------------------+
-| [⚡ Machine Icon]  LCR Heavy           [⚠️ 루프] [⟲] [➔] [⌖] [X]|
+| [⚡ Machine Icon]  LCR Heavy           [⚠ 루프] [⟲] [➔] [⌖] [X]|
 +-------------------------------------------------------------+
 | [-]  1.00  [+] [/2] [x2]                                    |
 | [HV] [Std]                                                  |
@@ -181,7 +181,7 @@ Auto-Ratio 연산 패스를 시작하기 전($t = 0$), 위상 분석을 통해 �
 | ...                                                         |
 +-------------------------------------------------------------+
 ```
-* **뱃지 텍스트**: `⚠️ 루프` (한) / `⚠️ Loop` (영)
+* **뱃지 텍스트**: `⚠ 루프` (한) / `⚠ Loop` (영)
 * **색상 팔레트**:
   - 배경: `0xEE3D2414` (경고용 다크 브라운-오렌지)
   - 테두리: `0xFFFB923C` (선명한 앰버-오렌지)
@@ -190,11 +190,11 @@ Auto-Ratio 연산 패스를 시작하기 전($t = 0$), 위상 분석을 통해 �
 
 ### 6.2 상호작용형 가이드 툴팁 (Actionable Guide Tooltip)
 
-마우스를 `[⚠️ 루프]` 뱃지에 올렸을 때 [`VirtualTooltipPositioner`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/client/gui/VirtualTooltipPositioner.java)를 통해 노출되는 툴팁:
+마우스를 `[⚠ 루프]` 뱃지에 올렸을 때 [`VirtualTooltipPositioner`](file:///d:/dev-ssd/modding/minecraft/GregTechCalculatorBoard/src/main/java/com/gtceu/calcboard/client/gui/VirtualTooltipPositioner.java)를 통해 노출되는 툴팁:
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│ §6⚠️ 폐순환 루프 발산 방어됨                            │
+│ §6⚠ 폐순환 루프 발산 방어됨                            │
 │ §7이 기계는 부산물이 순환되는 폐루프 공정에 속해 있어,    │
 │ §7외부 수요를 감당하기 위한 무한 증폭이 방어되었습니다. │
 │ ──────────────────────────────────────────────────────── │
@@ -207,7 +207,7 @@ Auto-Ratio 연산 패스를 시작하기 전($t = 0$), 위상 분석을 통해 �
 ```
 
 ### 6.3 뱃지 클릭 인터랙션 (`onClick`)
-* `[⚠️ 루프]` 뱃지를 좌클릭하면:
+* `[⚠ 루프]` 뱃지를 좌클릭하면:
   1. `node.setBaseNode(true)`를 호출하여 해당 기계를 즉시 기준 기계(Anchor)로 승격.
   2. `node.getProperties().set(NodeProperties.DIVERGENCE_WARNING, false)`로 경고 해제.
   3. `BoardToast`로 알림 피드백 제공.
@@ -217,13 +217,13 @@ Auto-Ratio 연산 패스를 시작하기 전($t = 0$), 위상 분석을 통해 �
 
 | Key | en_us | ko_kr |
 | :--- | :--- | :--- |
-| `gui.gtcalcboard.node_badge.divergence_warning` | `⚠️ Loop` | `⚠️ 루프` |
+| `gui.gtcalcboard.node_badge.divergence_warning` | `⚠ Loop` | `⚠ 루프` |
 | `gui.gtcalcboard.node_badge.divergence_title` | `Recirculation Loop Runaway Guarded` | `폐순환 루프 발산 방어됨` |
 | `gui.gtcalcboard.node_badge.divergence_desc` | `This machine belongs to a closed loop. Infinite amplification was suppressed to prevent runaway scaling.` | `이 기계는 폐순환 루프에 속해 있어, 연쇄 증폭으로 인한 기계 수치 폭주가 안전하게 방어되었습니다.` |
 | `gui.gtcalcboard.node_badge.divergence_hint_1` | `1. Connect an external supply line for the deficit fluid/item.` | `1. 부족한 원료에 대한 외부 공급 라인을 추가 연결하세요.` |
 | `gui.gtcalcboard.node_badge.divergence_hint_2` | `2. Or pin this machine as an Anchor to fix its machine count.` | `2. 또는 이 기계를 기준 기계(Anchor)로 고정하여 대수를 수동 지정하세요.` |
 | `gui.gtcalcboard.node_badge.divergence_action` | `[Click]: ⚓ Pin this machine as Anchor` | `[클릭]: ⚓ 이 기계를 기준 기계(Anchor)로 즉시 설정` |
-| `message.gtcalcboard.auto_ratio_divergence_toast` | `Auto-Ratio: Suppressed loop runaway on %d machine(s). Check [⚠️] badges.` | `자동 맞춤: %d개 기계에서 루프 발산이 방어되었습니다. [⚠️] 배지를 확인하세요.` |
+| `message.gtcalcboard.auto_ratio_divergence_toast` | `Auto-Ratio: Suppressed loop runaway on %d machine(s). Check [⚠] badges.` | `자동 맞춤: %d개 기계에서 루프 발산이 방어되었습니다. [⚠] 배지를 확인하세요.` |
 
 ---
 

@@ -4,17 +4,17 @@ import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Catalog managing baseline and custom GT voltage tiers and baseline productions for large turbines.
  */
 public final class TurbineCatalog {
 
-    private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new HashMap<>();
-    private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new HashMap<>();
+    private static final Map<ResourceLocation, GTVoltageTier> TURBINE_BASE_TIERS = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, Double> TURBINE_BASE_PRODUCTIONS = new ConcurrentHashMap<>();
 
     private static final java.util.Set<ResourceLocation> GAS_TURBINE_IDS = java.util.Set.of(
             ResourceLocation.tryParse("gtceu:large_gas_turbine"),
@@ -148,15 +148,15 @@ public final class TurbineCatalog {
             GTVoltageTier t = getTurbineBaseTier(node.getMachineIcon());
             if (t != null) return t;
         }
+        if (node.getRecipeCategoryId() != null) {
+            GTVoltageTier t = getTurbineBaseTier(node.getRecipeCategoryId());
+            if (t != null) return t;
+        }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null) {
                 GTVoltageTier t = getTurbineBaseTier(ws);
                 if (t != null) return t;
             }
-        }
-        if (node.getRecipeCategoryId() != null) {
-            GTVoltageTier t = getTurbineBaseTier(node.getRecipeCategoryId());
-            if (t != null) return t;
         }
         ResourceLocation cat = node.getRecipeCategoryId();
         if (cat != null) {
@@ -178,15 +178,15 @@ public final class TurbineCatalog {
             Double prod = getTurbineBaseProduction(node.getMachineIcon());
             if (prod != null && prod > 0) return prod;
         }
+        if (node.getRecipeCategoryId() != null) {
+            Double prod = getTurbineBaseProduction(node.getRecipeCategoryId());
+            if (prod != null && prod > 0) return prod;
+        }
         for (ResourceLocation ws : node.getAvailableWorkstations()) {
             if (ws != null) {
                 Double prod = getTurbineBaseProduction(ws);
                 if (prod != null && prod > 0) return prod;
             }
-        }
-        if (node.getRecipeCategoryId() != null) {
-            Double prod = getTurbineBaseProduction(node.getRecipeCategoryId());
-            if (prod != null && prod > 0) return prod;
         }
         GTVoltageTier baseTier = getTurbineBaseTier(node);
         return baseTier != null ? (double) (baseTier.getVoltage() * 2L) : 1024.0;

@@ -3,11 +3,15 @@ package com.gtceu.calcboard.client.gui.render;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
+import com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
+import com.gtceu.calcboard.client.gui.util.FormatUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +34,13 @@ public class CanvasGroupFrameRenderer {
     public static final int BTN_SPACING = 3;
     public static final double RESIZE_MARGIN = 6.0;
     public static final double CORNER_SIZE = 14.0;
+
+    public record FoldedPortHit(
+            CanvasGroupFrame frame,
+            boolean isInput,
+            int portIndex,
+            FlowGraphTopologyAnalyzer.AggregatedFoldedPort port
+    ) {}
 
     public static void renderFrames(GuiGraphics graphics, FlowGraph graph, double canvasMouseX, double canvasMouseY, String activeEditingFrameId) {
         renderFrames(graphics, graph, canvasMouseX, canvasMouseY, activeEditingFrameId, java.util.Collections.emptySet());
@@ -61,6 +72,10 @@ public class CanvasGroupFrameRenderer {
 
     public static void renderSingleFrame(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double mouseX, double mouseY, boolean isEditing, boolean isSelected) {
         if (frame == null) return;
+        if (frame.isSharedMachineFrame() && frame.isFolded()) {
+            renderFoldedMachineCard(graphics, font, graph, frame, mouseX, mouseY, isEditing, isSelected);
+            return;
+        }
 
         int x = (int) frame.getPosX();
         int y = (int) frame.getPosY();
@@ -244,6 +259,10 @@ public class CanvasGroupFrameRenderer {
     }
 
     private static boolean renderSingleFrameTooltip(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        if (frame.isSharedMachineFrame() && frame.isFolded()) {
+            return renderFoldedFrameTooltip(graphics, font, graph, frame, canvasMouseX, canvasMouseY, mouseX, mouseY);
+        }
+
         int x = (int) frame.getPosX();
         int y = (int) frame.getPosY();
         int w = (int) frame.getWidth();
@@ -276,7 +295,10 @@ public class CanvasGroupFrameRenderer {
         curBtnX -= (BTN_SIZE + BTN_SPACING);
 
         if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse")), mouseX, mouseY);
+            Component tooltip = frame.isSharedMachineFrame()
+                    ? Component.literal("§b⤡ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_fold"))
+                    : Component.literal("§b▦ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_collapse"));
+            BoardTooltipRenderer.renderTooltip(graphics, font, tooltip, mouseX, mouseY);
             return true;
         }
         curBtnX -= (BTN_SIZE + BTN_SPACING);
@@ -451,11 +473,22 @@ public class CanvasGroupFrameRenderer {
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
 
-            // [▦ Collapse]
+            // [⤢ Unfold] or [▦ Collapse]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
                 return FrameAction.COLLAPSE;
             }
             curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+            if (frame.isSharedMachineFrame() && frame.isFolded()) {
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.AUTO_RATIO;
+                }
+                curBtnX -= (BTN_SIZE + BTN_SPACING);
+                if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+                    return FrameAction.CONFIG;
+                }
+                return FrameAction.NONE;
+            }
 
             // [⛶ Auto-Fit]
             if (isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
@@ -482,14 +515,316 @@ public class CanvasGroupFrameRenderer {
         }
 
         // 2. Multi-direction Resizing Grip & Edge Hit Test
-        ResizeDirection dir = getResizeDirection(frame, mouseX, mouseY);
-        if (dir != ResizeDirection.NONE) {
-            return FrameAction.RESIZE;
+        if (!frame.isFolded()) {
+            ResizeDirection dir = getResizeDirection(frame, mouseX, mouseY);
+            if (dir != ResizeDirection.NONE) {
+                return FrameAction.RESIZE;
+            }
         }
 
         return FrameAction.NONE;
     }
+
+    private static void renderFoldedMachineCard(
+            GuiGraphics graphics,
+            Font font,
+            FlowGraph graph,
+            CanvasGroupFrame frame,
+            double mouseX,
+            double mouseY,
+            boolean isEditing,
+            boolean isSelected
+    ) {
+        int targetW = (int) Math.max(frame.getWidth(), CanvasGroupFrame.MIN_SHARED_FRAME_WIDTH);
+        if (frame.getWidth() < targetW) {
+            frame.setWidth(targetW);
+        }
+        int x = (int) frame.getPosX();
+        int y = (int) frame.getPosY();
+        int w = (int) frame.getWidth();
+        int color = frame.getColor();
+
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        int portRows = summary.maxPortCount();
+        int cardH = 64 + Math.max(portRows, 1) * 18 + 6;
+        if (Math.abs(frame.getHeight() - cardH) > 0.5) {
+            frame.setHeight(cardH);
+        }
+        int h = cardH;
+
+        graphics.fill(x, y, x + w, y + h, 0xEE14171E);
+        int borderCol = isSelected ? 0xFF00FFFF : ((color & 0x00FFFFFF) | 0xAA000000);
+        graphics.renderOutline(x, y, w, h, borderCol);
+        if (isSelected) {
+            graphics.renderOutline(x - 1, y - 1, w + 2, h + 2, 0xFF00FFFF);
+        }
+
+        renderFoldedHeader(graphics, font, graph, frame, x, y, w, color, isSelected, mouseX, mouseY);
+        renderFoldedCountRow(graphics, font, graph, frame, x, y, w, mouseX, mouseY);
+        renderFoldedHardwareRow(graphics, font, graph, frame, x, y, w);
+        renderFoldedPortRows(graphics, font, summary, x, y, w, portRows, mouseX, mouseY);
+    }
+
+    private static void renderFoldedHeader(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int x, int y, int w, int color, boolean isSelected, double mouseX, double mouseY) {
+        int headerH = (int) CanvasGroupFrame.HEADER_HEIGHT;
+        int headerCol = (color & 0x00FFFFFF) | (isSelected ? 0xDD000000 : 0x99000000);
+        graphics.fill(x, y, x + w, y + headerH, headerCol);
+
+        ResourceLocation icon = frame.getSharedMachineIcon(graph);
+        int iconX = x + 4;
+        int iconY = y + 4;
+        boolean rendered = false;
+        if (icon != null) {
+            ItemStack iconStack = NodeCardRenderer.getOrCreateMachineIcon(icon);
+            if (!iconStack.isEmpty()) {
+                rendered = IngredientRenderer.renderItemStack(graphics, iconStack, iconX, iconY);
+            }
+        }
+        if (!rendered) {
+            graphics.drawString(font, "↔", iconX + 4, iconY + 4, 0xFFFFFFFF, false);
+        }
+
+        String machineName = frame.getSharedMachineName(graph);
+        if (machineName == null || machineName.isEmpty()) machineName = frame.getTitle();
+        String suffix = " " + Component.translatable("gui.gtcalcboard.frame.shared_pool_suffix").getString();
+        String displayTitle = machineName + suffix;
+
+        int btnCount = 4;
+        int rightBoundary = x + w - (BTN_SIZE * btnCount + BTN_SPACING * (btnCount - 1) + 6);
+        int maxTitleW = rightBoundary - (iconX + 22);
+        String clippedTitle = displayTitle;
+        if (maxTitleW > 0 && font.width(displayTitle) > maxTitleW) {
+            clippedTitle = font.plainSubstrByWidth(displayTitle, Math.max(0, maxTitleW - font.width("..."))) + "...";
+        }
+        graphics.drawString(font, clippedTitle, iconX + 20, y + 6, 0xFFFFFFFF, true);
+
+        int btnY = y + 4;
+        int curBtnX = x + w - BTN_SIZE - 5;
+
+        boolean delHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
+        drawIconButton(graphics, font, "✕", curBtnX, btnY, BTN_SIZE, BTN_SIZE, delHover, 0xFFFF5555, 0x55FF0000);
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+        boolean unfoldHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
+        drawIconButton(graphics, font, "⤢", curBtnX, btnY, BTN_SIZE, BTN_SIZE, unfoldHover, 0xFF38BDF8, 0x550284C7);
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+        boolean ratioHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
+        drawIconButton(graphics, font, "⚖", curBtnX, btnY, BTN_SIZE, BTN_SIZE, ratioHover, 0xFF60A5FA, 0x553B82F6);
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
+
+        boolean cfgHover = isMouseOver(mouseX, mouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE);
+        drawIconButton(graphics, font, "⚙", curBtnX, btnY, BTN_SIZE, BTN_SIZE, cfgHover, 0xFFFCD34D, 0x55F59E0B);
+    }
+
+    private static void renderFoldedCountRow(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int x, int y, int w, double mouseX, double mouseY) {
+        int ctrlY = y + 26;
+        graphics.drawString(font, "Count:", x + 6, ctrlY + 3, 0xFFAAAAAA, false);
+
+        double totalDuty = frame.computeTotalMachineDuty(graph);
+        String countText = String.format(Locale.ROOT, "%.2f", totalDuty);
+        int countMinusX = x + 38;
+        drawBtn(graphics, font, "-", countMinusX, ctrlY, 14, 14, mouseX, mouseY, 0xFFFFFFFF);
+
+        int countBoxX = countMinusX + 16;
+        int countBoxW = Math.max(32, font.width(countText) + 8);
+        graphics.fill(countBoxX, ctrlY, countBoxX + countBoxW, ctrlY + 14, 0xFF1E293B);
+        graphics.renderOutline(countBoxX, ctrlY, countBoxW, 14, 0xFF475569);
+        graphics.drawString(font, countText, countBoxX + (countBoxW - font.width(countText)) / 2, ctrlY + 3, 0xFFFFFFAA, false);
+
+        int countPlusX = countBoxX + countBoxW + 2;
+        drawBtn(graphics, font, "+", countPlusX, ctrlY, 14, 14, mouseX, mouseY, 0xFFFFFFFF);
+        drawBtn(graphics, font, "/2", countPlusX + 16, ctrlY, 16, 14, mouseX, mouseY, 0xFFFFFFFF);
+        drawBtn(graphics, font, "x2", countPlusX + 34, ctrlY, 16, 14, mouseX, mouseY, 0xFFFFFFFF);
+
+        int recipeCount = frame.getEnclosedNodes(graph).size();
+        String rBadge = "■ " + Component.translatable("gui.gtcalcboard.frame.recipes_count", recipeCount).getString();
+        int rBadgeW = font.width(rBadge);
+        graphics.drawString(font, rBadge, x + w - rBadgeW - 6, ctrlY + 3, 0xFF34D399, false);
+    }
+
+    private static void renderFoldedHardwareRow(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, int x, int y, int w) {
+        int hwY = y + 44;
+        com.gtceu.calcboard.api.type.GTVoltageTier tier = frame.getSharedVoltageTier(graph);
+        com.gtceu.calcboard.api.type.OverclockMode ocMode = frame.getSharedOverclockMode(graph);
+        double totalEUt = frame.computeSharedTotalEUt(graph);
+
+        String tierStr = "[" + tier.name() + "]";
+        graphics.drawString(font, tierStr, x + 6, hwY + 3, tier.getColor(), false);
+        int tierW = font.width(tierStr);
+
+        String ocStr = "[" + ocMode.name() + "]";
+        graphics.drawString(font, ocStr, x + 8 + tierW, hwY + 3, 0xFF94A3B8, false);
+
+        String euStr = String.format(Locale.ROOT, "%.1f EU/t (%s)", totalEUt, tier.name());
+        int euW = font.width(euStr);
+        graphics.drawString(font, euStr, x + w - euW - 6, hwY + 3, 0xFFFCD34D, false);
+
+        graphics.fill(x + 4, y + 62, x + w - 4, y + 63, 0x33FFFFFF);
+    }
+
+    private static void renderFoldedPortRows(GuiGraphics graphics, Font font, FlowGraphTopologyAnalyzer.FoldedPortSummary summary, int x, int y, int w, int portRows, double mouseX, double mouseY) {
+        for (int r = 0; r < portRows; r++) {
+            int rowY = y + 64 + r * 18;
+
+            if (r < summary.inputs().size()) {
+                FlowGraphTopologyAnalyzer.AggregatedFoldedPort in = summary.inputs().get(r);
+                int portX = x + 3;
+                int portY = rowY + 5;
+                boolean inHover = mouseX >= x && mouseX <= x + 32 && mouseY >= rowY && mouseY <= rowY + 16;
+                graphics.fill(portX, portY, portX + 6, portY + 6, inHover ? 0xFF67E8F9 : 0xFF38BDF8);
+                if (inHover) {
+                    graphics.renderOutline(x + 1, rowY, 30, 16, 0xFF38BDF8);
+                }
+                IngredientRenderer.render(graphics, in.ingredient(), x + 12, rowY - 1);
+                if (in.hasDeficit()) {
+                    String defText = String.format(Locale.ROOT, "+%s -%s \u26A0",
+                            FormatUtil.formatRate(in.actualRate(), in.ingredient().isFluid()),
+                            FormatUtil.formatRate(in.nominalRate(), in.ingredient().isFluid()));
+                    graphics.drawString(font, defText, x + 32, rowY + 4, 0xFFEF4444, false);
+                } else {
+                    String rateText = "-" + FormatUtil.formatRate(in.nominalRate(), in.ingredient().isFluid());
+                    graphics.drawString(font, rateText, x + 32, rowY + 4, 0xFFE2E8F0, false);
+                }
+            }
+
+            if (r < summary.outputs().size()) {
+                FlowGraphTopologyAnalyzer.AggregatedFoldedPort out = summary.outputs().get(r);
+                int portX = x + w - 9;
+                int portY = rowY + 5;
+                boolean outHover = mouseX >= x + w - 32 && mouseX <= x + w && mouseY >= rowY && mouseY <= rowY + 16;
+                graphics.fill(portX, portY, portX + 6, portY + 6, outHover ? 0xFF86EFAC : 0xFF4ADE80);
+                if (outHover) {
+                    graphics.renderOutline(x + w - 31, rowY, 30, 16, 0xFF4ADE80);
+                }
+                IngredientRenderer.render(graphics, out.ingredient(), x + w - 28, rowY - 1);
+                String rateText = "+" + FormatUtil.formatRate(out.nominalRate(), out.ingredient().isFluid());
+                int txtW = font.width(rateText);
+                graphics.drawString(font, rateText, x + w - 32 - txtW, rowY + 4, 0xFF4ADE80, false);
+            }
+        }
+    }
+
+    public static FoldedPortHit findHoveredFoldedPort(FlowGraph graph, double canvasX, double canvasY) {
+        if (graph == null) return null;
+        for (CanvasGroupFrame frame : graph.getFrames()) {
+            FoldedPortHit hit = checkFramePortHit(graph, frame, canvasX, canvasY);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    private static FoldedPortHit checkFramePortHit(FlowGraph graph, CanvasGroupFrame frame, double canvasX, double canvasY) {
+        if (frame == null || !frame.isSharedMachineFrame() || !frame.isFolded()) return null;
+        double fx = frame.getPosX();
+        double fy = frame.getPosY();
+        double fw = frame.getWidth();
+        double fh = frame.getHeight();
+        if (canvasX < fx || canvasX > fx + fw || canvasY < fy || canvasY > fy + fh) return null;
+
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        for (int r = 0; r < summary.maxPortCount(); r++) {
+            double rowY = fy + 64.0 + r * 18.0;
+            if (canvasY < rowY || canvasY > rowY + 16.0) continue;
+
+            if (canvasX >= fx && canvasX <= fx + 32.0 && r < summary.inputs().size()) {
+                return new FoldedPortHit(frame, true, r, summary.inputs().get(r));
+            }
+            if (canvasX >= fx + fw - 32.0 && canvasX <= fx + fw && r < summary.outputs().size()) {
+                return new FoldedPortHit(frame, false, r, summary.outputs().get(r));
+            }
+        }
+        return null;
+    }
+
+    private static void drawBtn(GuiGraphics graphics, Font font, String text, int bx, int by, int bw, int bh, double mouseX, double mouseY, int textCol) {
+        boolean hover = isMouseOver(mouseX, mouseY, bx, by, bw, bh);
+        int bg = hover ? 0x66FFFFFF : 0x22000000;
+        int border = hover ? 0xFFFFFFFF : 0x44FFFFFF;
+        graphics.fill(bx, by, bx + bw, by + bh, bg);
+        graphics.renderOutline(bx, by, bw, bh, border);
+        int textW = font.width(text);
+        graphics.drawString(font, text, bx + (bw - textW) / 2, by + (bh - 8) / 2, textCol, false);
+    }
+
+    private static boolean renderFoldedFrameTooltip(GuiGraphics graphics, Font font, FlowGraph graph, CanvasGroupFrame frame, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
+        int x = (int) frame.getPosX();
+        int y = (int) frame.getPosY();
+        int w = (int) frame.getWidth();
+        int h = (int) frame.getHeight();
+
+        if (canvasMouseX < x || canvasMouseX > x + w || canvasMouseY < y || canvasMouseY > y + h) {
+            return false;
+        }
+
+        int btnY = y + 4;
+        int curBtnX = x + w - BTN_SIZE - 5;
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_delete")), mouseX, mouseY);
+            return true;
+        }
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⤢ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_unfold")), mouseX, mouseY);
+            return true;
+        }
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            String capacityStr = String.format(Locale.ROOT, "%.1f", frame.getTargetPoolCapacity());
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§b⚖ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_auto_ratio", capacityStr)), mouseX, mouseY);
+            return true;
+        }
+        curBtnX -= (BTN_SIZE + BTN_SPACING);
+        if (isMouseOver(canvasMouseX, canvasMouseY, curBtnX, btnY, BTN_SIZE, BTN_SIZE)) {
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.frame.tooltip_config")), mouseX, mouseY);
+            return true;
+        }
+
+        int ctrlY = y + 26;
+        int countMinusX = x + 38;
+        int countBoxX = countMinusX + 16;
+        if (canvasMouseY >= ctrlY && canvasMouseY <= ctrlY + 14 && canvasMouseX >= countBoxX && canvasMouseX <= countBoxX + 40) {
+            renderSharedMachineBreakdownTooltip(graphics, font, graph, frame, mouseX, mouseY);
+            return true;
+        }
+
+        FlowGraphTopologyAnalyzer.FoldedPortSummary summary = FlowGraphTopologyAnalyzer.aggregateFoldedPorts(graph, frame);
+        for (int r = 0; r < summary.maxPortCount(); r++) {
+            int rowY = y + 64 + r * 18;
+            if (canvasMouseY < rowY || canvasMouseY > rowY + 16) continue;
+            if (renderFoldedPortTooltip(graphics, font, summary, r, x, w, mouseX, mouseY, canvasMouseX)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean renderFoldedPortTooltip(GuiGraphics graphics, Font font, FlowGraphTopologyAnalyzer.FoldedPortSummary summary, int r, int x, int w, int mouseX, int mouseY, double canvasMouseX) {
+        if (r < summary.inputs().size() && canvasMouseX >= x + 2 && canvasMouseX <= x + w / 2) {
+            var in = summary.inputs().get(r);
+            List<Component> lines = new ArrayList<>();
+            lines.add(Component.literal(in.ingredient().getDisplayName()));
+            lines.add(Component.literal("§7Nominal Demand: §e" + FormatUtil.formatRate(in.nominalRate(), in.ingredient().isFluid())));
+            lines.add(Component.literal("§7Actual Rate: §f" + FormatUtil.formatRate(in.actualRate(), in.ingredient().isFluid())));
+            if (in.hasDeficit()) {
+                lines.add(Component.literal("§c⚠ Upstream supply deficit!"));
+            }
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY);
+            return true;
+        }
+        if (r < summary.outputs().size() && canvasMouseX >= x + w / 2 && canvasMouseX <= x + w - 2) {
+            var out = summary.outputs().get(r);
+            List<Component> lines = new ArrayList<>();
+            lines.add(Component.literal(out.ingredient().getDisplayName()));
+            lines.add(Component.literal("§7Production Rate: §a+" + FormatUtil.formatRate(out.nominalRate(), out.ingredient().isFluid())));
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, lines, mouseX, mouseY);
+            return true;
+        }
+        return false;
+    }
 }
+
 
 
 

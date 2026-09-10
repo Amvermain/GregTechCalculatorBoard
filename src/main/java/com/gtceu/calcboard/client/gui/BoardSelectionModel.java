@@ -5,6 +5,7 @@ import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.NodeClipboard;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.history.BoardCommand;
@@ -109,6 +110,12 @@ public class BoardSelectionModel {
         }
     }
 
+    public void deselectNode(String id) {
+        if (id == null) return;
+        selectedNodeIds.remove(id);
+        selectedPorts.removeIf(p -> p.nodeId().equals(id));
+    }
+
     public void toggle(String id) {
         if (id == null) return;
         if (selectedNodeIds.contains(id)) {
@@ -192,7 +199,9 @@ public class BoardSelectionModel {
         FlowGraph graph = screen.getGraph();
         if (graph != null) {
             for (RecipeNode n : graph.getNodes()) {
-                selectedNodeIds.add(n.getId());
+                if (!graph.isNodeInFoldedFrame(n.getId())) {
+                    selectedNodeIds.add(n.getId());
+                }
             }
             for (CanvasStickyNote note : graph.getStickyNotes()) {
                 selectedNoteIds.add(note.getId());
@@ -260,6 +269,9 @@ public class BoardSelectionModel {
 
         for (RecipeNode n : removedNodes) {
             graph.removeNode(n.getId());
+            if (n.isModule() && n.getSubPageId() != null) {
+                BoardManager.getInstance().removePage(n.getSubPageId());
+            }
         }
         for (FlowGraph.ConnectionEdge e : removedEdges) {
             graph.removeConnection(e);
@@ -399,6 +411,9 @@ public class BoardSelectionModel {
 
         for (RecipeNode n : removedNodes) {
             graph.removeNode(n.getId());
+            if (n.isModule() && n.getSubPageId() != null) {
+                BoardManager.getInstance().removePage(n.getSubPageId());
+            }
         }
         for (FlowGraph.ConnectionEdge e : removedEdges) {
             graph.removeConnection(e);

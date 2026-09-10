@@ -148,6 +148,17 @@ public final class GTPowerCalculator {
     }
 
     private static OverclockMode.OverclockResult calculateElectricOverclock(RecipeNode node) {
+        GTVoltageTier reqTier = node.getRecipeTier();
+        if (reqTier == null && node.getBaseEUt() > 0) {
+            reqTier = GTVoltageTier.getTierForVoltage((long) Math.ceil(node.getBaseEUt()));
+        }
+        GTVoltageTier targetTier = node.getTargetTier();
+        if (!node.isGenerator() && node.getEnergyType() == EnergyType.ELECTRIC_EU && reqTier != null && targetTier != null) {
+            if (targetTier.ordinal() < reqTier.ordinal()) {
+                return new OverclockMode.OverclockResult(node.getBaseDurationTicks(), 0.0, 1.0, 0);
+            }
+        }
+
         int maxTierDelta = resolveMaxTierDelta(node);
         int effectivePar = node.hasPowerConstantAddon() ? node.getParallel() : computeEffectiveParallel(node);
         double combinedEutMult = node.getCombinedEutMultiplier();
@@ -428,10 +439,7 @@ public final class GTPowerCalculator {
             double cap = GTTurbineHelper.getGeneratorMaxEUt(node);
             double recipeEUt = Math.abs(node.getBaseEUt());
             if (recipeEUt <= 0.0 || cap >= Double.MAX_VALUE) return Math.max(1, node.getParallel());
-            int multiplier = com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.isPlasmaTurbine(node)
-                    ? com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel.getModel(node).getParallelMultiplier()
-                    : 1;
-            return (int) Math.max(1, Math.ceil(cap / recipeEUt)) * multiplier;
+            return (int) Math.max(1, Math.ceil(cap / recipeEUt));
         }
 
         // Processing machine
@@ -537,6 +545,16 @@ public final class GTPowerCalculator {
     public static List<Component> buildEnergyTooltip(RecipeNode node) {
         List<Component> tooltipLines = new ArrayList<>();
         if (node == null) return tooltipLines;
+
+        if (!node.isOperational()) {
+            List<Component> warnings = node.getOperationalWarnings(null);
+            if (!warnings.isEmpty()) {
+                tooltipLines.add(Component.literal("§c⚠ " + Component.translatable("gui.gtcalcboard.node_warning.inactive").getString()));
+                for (Component warning : warnings) {
+                    tooltipLines.add(Component.literal("§c❌ ").append(warning));
+                }
+            }
+        }
 
         if (node.getEnergyType() == EnergyType.NONE) {
             tooltipLines.add(Component.literal("§7- " + Component.translatable("gui.gtcalcboard.energy_passive").getString()));

@@ -6,11 +6,35 @@
 
 ## [Unreleased]
 
+## [2.2.0-beta.3] - 2026-09-10
+
 ### Added
+- Added warning badges ([⚠ Damped]) and detailed port notices for unfed damped recirculation loops, clearly alerting players when circulating processes decay to zero throughput due to missing external supplementary feed lines.
+- Added the input/output direction flip option to the junction node right-click context menu.
+- Added Weighted split mode to junction nodes, allowing players to assign custom weight ratios to outgoing lines with full support for fixed flow caps and priority tiering.
+- Added in-place folding for Shared Machine Pools, allowing players to collapse multi-recipe shared machines into a single compact machine card without removing internal nodes, preserving internal recipe ratios while scaling machine count and providing clear deficit warnings when upstream supply is insufficient.
+- Upgraded compound process modules to use dedicated 1:1 sub-pages with boundary input/output pins, allowing players to double-click modules to inspect and edit internal layouts, navigate back smoothly via breadcrumbs or the Escape key, and keep module sub-pages organized in a dedicated explorer section.
+- Added steady-state recirculation tracking and one-click scaling for damped recycling loops, displaying a cyan circulating indicator instead of a false deficit warning when machines are stably operating on external supply, with detailed multi-flow tooltips and one-click machine scaling to steady-state capacity.
 
 ### Changed
+- Overhauled boundary pins in module subpages into compact pins displaying ingredient icons alongside direction and flow rate badges, adding hover quick-deletion, inline renaming, right-click context menu actions, and a dedicated pin inspector panel.
+- Improved the junction external supply dialog to display the active time unit (e.g. mB/t, mB/s) beside the input field, allowing players to enter numbers directly in their current view unit or specify explicit units (e.g. 2B, 2B/s, 100mB/t).
+- Optimized background catalog access and machine recipe loading for improved interface responsiveness and stability during large process calculations.
 
 ### Fixed
+- Fixed an issue where undoing a module collapse caused duplicate sub-pages to accumulate in the process modules list, and ensured sub-page lifecycle is cleanly restored upon redo.
+- Fixed an issue where energy hatch addons could not be equipped on custom electric multiblocks (such as Star Technology's Molten Destabiliser and Ore Processing Plant) when selective hatch slots were used in their structure definitions.
+- Fixed an issue where switching a turbine generator to a Large Plasma Turbine retained inflated parallel tiers from previous models, causing fluid fuel consumption to be multiplied excessively.
+- Fixed an issue where recipes requiring ULV power incorrectly registered a non-existent ULV electric machine and displayed an empty icon, ensuring electric machines start at their true minimum tier (LV) while preserving steam mode transitions.
+- Fixed an issue where multiblock machines equipped with lower-tier energy hatches still executed higher-tier recipes with excessive amperage, ensuring insufficient energy hatch or machine voltage halts operation with clear deficit warnings until an adequate hatch is equipped.
+- Fixed an issue where the team workspace tab and multiplayer collaboration features were not displayed on singleplayer LAN hosts or when joining a party in-game, ensuring team workspaces synchronize in real time upon party creation or member joining.
+- Fixed an issue where closed-loop processes with machine capacity mismatches on intermediate products incorrectly converged to 0% operating efficiency and caused deficit warnings.
+- Fixed an issue where the machine icon in the header rendered incorrectly as a missing texture when folding a Shared Machine Pool frame.
+- Fixed an issue where context menu items for group frames displayed unlocalized translation keys and overlapped with shortcut labels, properly synchronizing localization keys across all 4 languages and dynamically adjusting menu width.
+- Fixed an issue where the target pool machine input in the group frame configuration window could not receive keyboard focus or overlapped with its label, allowing smooth mouse selection and Tab navigation between input fields.
+- Fixed an issue where ports on folded Shared Machine Pool cards could not be clicked or connected with wires, and ensured internal machines are cleanly excluded from marquee selection, highlight boxes, and hover tooltips while folded.
+- Fixed an issue where compressing a process group containing intermediate junction nodes into a module caused junction nodes to be treated as physical machines, creating phantom input/output ports and distorting the process summary net balance.
+- Fixed an issue where compressing machines that receive both internal circulation and external supply (e.g. from a junction) into a module caused the external demand to be over-allocated to the full recipe rate, reducing module operating efficiency and creating unnecessary surplus output ports.
 
 ## [2.2.0-beta.2] - 2026-09-09
 
@@ -77,10 +101,10 @@
   - Added the ability to pin external supply or fixed drain junction nodes as reference Anchors via right-click, automatically scaling upstream or downstream machine counts to match the target flow rate.
   - Added a one-click match button (`[⚡]`) in the junction configuration dialog to automatically fill the rate with the total connected inflow or downstream demand.
 - **Auto-Ratio Recirculation Loop Runaway Warning Badges & Interactive Guidance**:
-  - Displays an amber warning badge (`[⚠️ Loop]`) on machines in closed loops where automatic scaling was suppressed due to missing external ingredient supplies, preventing runaway machine count calculations.
+  - Displays an amber warning badge (`[⚠ Loop]`) on machines in closed loops where automatic scaling was suppressed due to missing external ingredient supplies, preventing runaway machine count calculations.
   - Hovering over the warning badge displays clear explanations and recommended actions, with a one-click shortcut to pin the machine as an Anchor.
 - **Contextual Process Instability Warnings & Diagnostic Guidance**:
-  - Added dedicated warning badges for positive feedback growth loops (`[⚠️ Growth]`), catalyst decay loops (`[⚠️ Catalyst]`), conflicting multiple anchors (`[⚠️ Conflict]`), and extreme micro-yield recipes (`[⚠️ Yield]`).
+  - Added dedicated warning badges for positive feedback growth loops (`[⚠ Growth]`), catalyst decay loops (`[⚠ Catalyst]`), conflicting multiple anchors (`[⚠ Conflict]`), and extreme micro-yield recipes (`[⚠ Yield]`).
   - Provides customized 5-line diagnostic tooltips and one-click actions (such as unpinning conflicting anchors or fixing operating scale) to help troubleshoot and balance complex automated setups.
 - **Shared Machine Pool Capacity-Driven Auto-Ratio**:
   - Added an auto-ratio button (`[⚖]`) to shared machine pool frame headers to proportionally scale all connected processes to match target physical machine capacity (default 1.0x).
@@ -382,7 +406,7 @@
 - **Byproduct Void Management & Sink System**:
   - **Void Sink Junction Node (`SupplyMode.VOID_SINK`)**: Added a Void Sink mode to Junction reroute nodes to infinitely absorb and delete surplus byproducts without upstream demand backpropagation. In 1:N branching topologies, downstream normal consumer demand is strictly prioritized first, absorbing only true surplus and preventing downstream starvation.
   - **Port-Level Direct Void Marking**: Added `Alt + Right-Click` on machine output ports to exclude specific byproduct flows from the net product summary without severing wire connections.
-  - **One-Click Summary Overlay Voiding & Collapsible Restore**: Added a `[🗑️]` void button to net product rows in `SummaryOverlay` to move surplus byproducts to voiding with one click, along with a collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore button.
+  - **One-Click Summary Overlay Voiding & Collapsible Restore**: Added a `[🗑]` void button to net product rows in `SummaryOverlay` to move surplus byproducts to voiding with one click, along with a collapsible `🗑 Voided Byproducts` section and `[↩]` one-click restore button.
 
 ### Changed & Improved
 - **Enhanced Canvas Visual Feedback for Voids and Bottlenecks**:

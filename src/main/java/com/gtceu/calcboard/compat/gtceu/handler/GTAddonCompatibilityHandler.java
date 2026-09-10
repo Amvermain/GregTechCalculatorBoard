@@ -1,6 +1,7 @@
 package com.gtceu.calcboard.compat.gtceu.handler;
 
 import com.gtceu.calcboard.api.bom.MultiblockStructureCatalog;
+import com.gtceu.calcboard.api.bom.MultiblockStructureDef;
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
@@ -14,10 +15,7 @@ import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
 import com.gtceu.calcboard.compat.gtceu.addon.GTEnergyHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.addon.GTHatchAddon;
 import com.gtceu.calcboard.compat.gtceu.model.GTPlasmaTurbineModel;
-import com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
-import com.gtceu.calcboard.compat.gtceu.physics.GTTurbinePhysics;
-import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
 import com.gtceu.calcboard.compat.start.StarTTurbineHelper;
@@ -25,11 +23,17 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Handles GTCEu machine addon compatibility, categories, installation lifecycles, and tooltips.
+ * Delegated to GTEnergyHatchCalculator, GTCombustionAddonHelper, and GTAddonLifecycleHandler.
  */
 public final class GTAddonCompatibilityHandler {
 
@@ -37,48 +41,12 @@ public final class GTAddonCompatibilityHandler {
 
     public static final ResourceLocation DISTILLATION_TOWER_ID = ResourceLocation.tryParse("gtceu:distillation_tower");
 
-    private static final java.util.Map<ResourceLocation, Boolean> MUFFLER_SUPPORT_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final java.util.Set<String> MUFFLER_ADDON_IDS;
-
-    static {
-        java.util.Set<String> set = new java.util.HashSet<>();
-        set.add("gtceu:muffler_hatch");
-        for (GTVoltageTier tier : GTVoltageTier.values()) {
-            set.add("gtceu:" + tier.name().toLowerCase(Locale.ROOT) + "_muffler_hatch");
-        }
-        MUFFLER_ADDON_IDS = java.util.Collections.unmodifiableSet(set);
-    }
-
     public static boolean isMufflerAddon(MachineAddon addon) {
-        if (addon == null || addon.getId() == null) return false;
-        String id = addon.getId();
-        if (MUFFLER_ADDON_IDS.contains(id)) return true;
-        return addon.getItemIcon() != null && com.gtceu.calcboard.compat.gtceu.GTCEuAddonCrawler.isMufflerHatchItem(null, addon.getItemIcon());
-    }
-
-    private static boolean supportsMuffler(com.gtceu.calcboard.api.bom.MultiblockStructureDef def, ResourceLocation mbId) {
-        if (def == null) return false;
-        if (mbId != null) {
-            Boolean cached = MUFFLER_SUPPORT_CACHE.get(mbId);
-            if (cached != null) return cached;
-        }
-        boolean has = def.supportsAbility("MUFFLER") || def.parts().stream().anyMatch(p -> p != null && p.itemId() != null && com.gtceu.calcboard.compat.gtceu.GTCEuAddonCrawler.isMufflerHatchItem(null, p.itemId()));
-        if (mbId != null) {
-            MUFFLER_SUPPORT_CACHE.put(mbId, has);
-        }
-        return has;
+        return GTMufflerMaintenanceHelper.isMufflerAddon(addon);
     }
 
     private static boolean isMaintenanceAddonCompatible(RecipeNode node, MachineAddon addon) {
-        if (!node.isMultiblock()) return false;
-        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
-        if (mbId == null) return true;
-        var def = MultiblockStructureCatalog.getStructure(mbId);
-        if (def == null) return true;
-        if (isMufflerAddon(addon)) {
-            return supportsMuffler(def, mbId);
-        }
-        return def.maintenanceSlotCount() > 0 || def.supportsAbility("MAINTENANCE");
+        return GTMufflerMaintenanceHelper.isMaintenanceAddonCompatible(node, addon);
     }
 
     public static boolean isDistillationTower(ResourceLocation id) {
@@ -169,52 +137,56 @@ public final class GTAddonCompatibilityHandler {
         }
 
         if (isMb) {
-            ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
-            var def = mbId != null ? MultiblockStructureCatalog.getStructure(mbId) : null;
-            boolean isSteamMb = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || (mbId != null && MultiblockDetector.isSteamMultiblock(mbId));
-
-            List<AddonCategory> cats = new ArrayList<>();
-            if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
-                    && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
-                cats.add(AddonCategory.ENERGY_HATCH);
-            }
-            if (def == null || !def.allowedAbilities().isEmpty() || def.inputBusSlotCount() > 0 || def.outputBusSlotCount() > 0 || def.inputHatchSlotCount() > 0 || def.outputHatchSlotCount() > 0 || !node.getInputs().isEmpty() || !node.getOutputs().isEmpty() || isMb) {
-                cats.add(AddonCategory.HATCH_BUS);
-            }
-            boolean supportsCoil = false;
-            if (def != null) {
-                supportsCoil = def.supportsAbility("HEATING_COILS")
-                        || def.coilSlotCount() > 0
-                        || MultiblockDetector.isCoilMultiblock(mbId)
-                        || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
-            } else {
-                supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
-                        || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
-            }
-            if (supportsCoil) {
-                cats.add(AddonCategory.COIL);
-            }
-            boolean supportsPar = mbId != null
-                    ? (MultiblockDetector.supportsParallelHatch(mbId) || (def != null && def.supportsAbility("PARALLEL_HATCH")))
-                    : MultiblockDetector.supportsParallelHatch(null, node.getAvailableWorkstations());
-            if (!isSteamMb && supportsPar) {
-                cats.add(AddonCategory.PARALLEL);
-            }
-            if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {
-                cats.add(AddonCategory.MAINTENANCE);
-            }
-            if (node.hasThreading()) {
-                cats.add(AddonCategory.THREADING);
-            }
-            cats.add(AddonCategory.MULTIBLOCK_TRAIT);
-            cats.add(AddonCategory.CUSTOM);
-            return cats;
+            return resolveMultiblockApplicableCategories(node);
         }
 
         List<AddonCategory> cats = new ArrayList<>();
         if (node.hasThreading()) {
             cats.add(AddonCategory.THREADING);
         }
+        cats.add(AddonCategory.CUSTOM);
+        return cats;
+    }
+
+    private static List<AddonCategory> resolveMultiblockApplicableCategories(RecipeNode node) {
+        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+        var def = mbId != null ? MultiblockStructureCatalog.getStructure(mbId) : null;
+        boolean isSteamMb = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || (mbId != null && MultiblockDetector.isSteamMultiblock(mbId));
+
+        List<AddonCategory> cats = new ArrayList<>();
+        if (!isSteamMb && !node.isGenerator() && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU
+                && (def == null || def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty() || node.getEnergyType() != EnergyType.NONE)) {
+            cats.add(AddonCategory.ENERGY_HATCH);
+        }
+        if (def == null || !def.allowedAbilities().isEmpty() || def.inputBusSlotCount() > 0 || def.outputBusSlotCount() > 0 || def.inputHatchSlotCount() > 0 || def.outputHatchSlotCount() > 0 || !node.getInputs().isEmpty() || !node.getOutputs().isEmpty() || node.isMultiblock()) {
+            cats.add(AddonCategory.HATCH_BUS);
+        }
+        boolean supportsCoil = false;
+        if (def != null) {
+            supportsCoil = def.supportsAbility("HEATING_COILS")
+                    || def.coilSlotCount() > 0
+                    || MultiblockDetector.isCoilMultiblock(mbId)
+                    || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+        } else {
+            supportsCoil = MultiblockDetector.isCoilMultiblock(mbId)
+                    || (GTCEuCoilModifierHelper.getCoilMachineSpec(mbId).kind() != GTCEuCoilModifierHelper.CoilMachineKind.GENERIC);
+        }
+        if (supportsCoil) {
+            cats.add(AddonCategory.COIL);
+        }
+        boolean supportsPar = mbId != null
+                ? (MultiblockDetector.supportsParallelHatch(mbId) || (def != null && def.supportsAbility("PARALLEL_HATCH")))
+                : MultiblockDetector.supportsParallelHatch(null, node.getAvailableWorkstations());
+        if (!isSteamMb && supportsPar) {
+            cats.add(AddonCategory.PARALLEL);
+        }
+        if (!isSteamMb && (def == null || def.supportsAbility("MAINTENANCE") || def.maintenanceSlotCount() > 0 || node.getEnergyType() != EnergyType.NONE)) {
+            cats.add(AddonCategory.MAINTENANCE);
+        }
+        if (node.hasThreading()) {
+            cats.add(AddonCategory.THREADING);
+        }
+        cats.add(AddonCategory.MULTIBLOCK_TRAIT);
         cats.add(AddonCategory.CUSTOM);
         return cats;
     }
@@ -229,23 +201,17 @@ public final class GTAddonCompatibilityHandler {
         }
 
         if (GTCombustionHelper.isCombustionFamily(node)) {
-            if (!node.isMultiblock()) {
-                return false;
-            }
-            if (addon.getCategory() == AddonCategory.MAINTENANCE || addon.getCategory() == AddonCategory.HATCH_BUS) {
-                return true;
-            }
+            if (!node.isMultiblock()) return false;
+            if (addon.getCategory() == AddonCategory.MAINTENANCE || addon.getCategory() == AddonCategory.HATCH_BUS) return true;
             if (addon.getCategory() == AddonCategory.MULTIBLOCK_TRAIT) {
-                return isCombustionBoostCompatible(node, addon);
+                return GTCombustionAddonHelper.isCombustionBoostCompatible(node, addon);
             }
             return false;
         }
 
         if (node.isTurbine()) {
             if (!node.isMultiblock()) return false;
-            if (addon.getCategory() == AddonCategory.ROTOR || addon.getCategory() == AddonCategory.MAINTENANCE || addon.getCategory() == AddonCategory.HATCH_BUS) {
-                return true;
-            }
+            if (addon.getCategory() == AddonCategory.ROTOR || addon.getCategory() == AddonCategory.MAINTENANCE || addon.getCategory() == AddonCategory.HATCH_BUS) return true;
             if (addon.getCategory() == AddonCategory.MULTIBLOCK_TRAIT && StarTTurbineHelper.isStarTTrait(addon)) {
                 return StarTTurbineHelper.isCompatibleStarTTrait(node, addon);
             }
@@ -263,10 +229,7 @@ public final class GTAddonCompatibilityHandler {
         }
         if (addon.getCategory() == MachineAddon.Category.COIL) {
             if (isGen || !node.canUseCoils() || !node.isMultiblock()) return false;
-            ResourceLocation mbId = node.getMachineIcon();
-            if (mbId == null) {
-                mbId = node.getMultiblockWorkstation();
-            }
+            ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
             if (mbId != null) {
                 var def = MultiblockStructureCatalog.getStructure(mbId);
                 if (def != null && def.coilSlotCount() == 0) return false;
@@ -286,133 +249,132 @@ public final class GTAddonCompatibilityHandler {
             return isMaintenanceAddonCompatible(node, addon);
         }
         if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-            if ((!node.isMultiblock() && !isFusion) || isGen) return false;
-            if (isFusion && addon instanceof GTEnergyHatchAddon eh) {
-                if (eh.getTier() != node.getTargetTier()) {
-                    return false;
-                }
-            }
-            ResourceLocation mbId = node.getMachineIcon();
-            if (mbId == null) {
-                mbId = node.getMultiblockWorkstation();
-            }
-            if (mbId != null) {
-                var def = MultiblockStructureCatalog.getStructure(mbId);
-                if (def != null) {
-                    if (addon instanceof GTEnergyHatchAddon eh) {
-                        if (eh.isLaser()) {
-                            if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_LASER")) return false;
-                        } else if (eh.isSubstation()) {
-                            if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")) return false;
-                        } else {
-                            if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_ENERGY")) return false;
-                        }
-                    } else if (!def.allowedAbilities().isEmpty() && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("INPUT_LASER") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY")) {
-                        return false;
-                    }
-                    if (def.energyHatchSlotCount() == 0 && (MultiblockDetector.isSteamMultiblock(mbId) || isGen)) return false;
-                }
-            }
-            return true;
+            return isEnergyHatchCompatible(node, addon, isGen, isFusion);
         }
         if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-            if (!node.isMultiblock()) return false;
-            ResourceLocation mbId = node.getMachineIcon();
-            if (mbId == null) {
-                mbId = node.getMultiblockWorkstation();
-            }
-            if (mbId != null) {
-                var def = MultiblockStructureCatalog.getStructure(mbId);
-                if (def != null) {
-                    // 1. Candidate block direct match
-                    if (addon.getItemIcon() != null && def.isCandidateBlock(addon.getItemIcon())) {
-                        return true;
-                    }
-
-                    // 2. PartAbility matching
-                    if (def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) {
-                        if (addon instanceof GTHatchAddon gh && !gh.getAbilities().isEmpty()) {
-                            for (String reqAbility : gh.getAbilities()) {
-                                if (!def.supportsAbility(reqAbility)) {
-                                    return false;
-                                }
-                            }
-                        } else {
-                            var type = resolveHatchType(addon);
-                            switch (type) {
-                                case ITEM_INPUT -> {
-                                    if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("STEAM_IMPORT_ITEMS")) return false;
-                                }
-                                case ITEM_OUTPUT -> {
-                                    if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("STEAM_EXPORT_ITEMS")) return false;
-                                }
-                                case FLUID_INPUT -> {
-                                    if (!def.supportsAbility("IMPORT_FLUIDS") && !def.supportsAbility("STEAM_IMPORT_FLUIDS")) return false;
-                                }
-                                case FLUID_OUTPUT -> {
-                                    if (!def.supportsAbility("EXPORT_FLUIDS") && !def.supportsAbility("STEAM_EXPORT_FLUIDS")) return false;
-                                }
-                                case DUAL_INPUT -> {
-                                    if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("IMPORT_FLUIDS")) return false;
-                                }
-                                case DUAL_OUTPUT -> {
-                                    if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("EXPORT_FLUIDS")) return false;
-                                }
-                                default -> {}
-                            }
-                        }
-                    }
-                }
-            }
-            if (isDistillationTower(node)) {
-                if (addon instanceof GTHatchAddon h) {
-                    if ((h.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || h.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT) && h.getSlotCapacity() > 1) {
-                        return false;
-                    }
-                } else {
-                    String path = addon.getId().toLowerCase(Locale.ROOT);
-                    if ((path.contains("4x") || path.contains("9x") || path.contains("16x") || path.contains("quadruple") || path.contains("nonuple") || path.contains("hexadecimal") || path.contains("multi_fluid")) && (path.contains("output") || path.contains("export"))) {
-                        return false;
-                    }
-                }
-            }
-            return true;
+            return isHatchBusCompatible(node, addon);
         }
         if (addon.getCategory().equals(AddonCategory.THREADING)) {
             return node.hasThreading();
         }
         if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-            if (!node.isMultiblock()) return false;
-            if (StarTTurbineHelper.isStarTTrait(addon)) {
-                return node.isTurbine() && StarTTurbineHelper.isCompatibleStarTTrait(node, addon);
-            }
-            if (node.isTurbine()) return false;
-            if (addon.getId().equals("gtceu:batch_processing")) {
-                ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
-                boolean supportsBatch = mbId != null
-                        ? MultiblockDetector.supportsBatchMode(mbId)
-                        : MultiblockDetector.supportsBatchMode(null, node.getAvailableWorkstations());
-                return !isGen && node.isMultiblock() && supportsBatch;
-            }
-            if (addon.getId().equals("gtceu:throughput_boosting")) {
-                return !isGen && node.isMultiblock() && MultiblockDetector.supportsThroughputBoosting(node.getMachineIcon());
-            }
-            if (addon.getId().equals("gtceu:bulk_processing")) {
-                return !isGen && node.isMultiblock() && MultiblockDetector.supportsBulkProcessing(node.getMachineIcon());
-            }
-            if (addon.getId().equals("gtceu:overpressure_autoclave")) {
-                return !isGen && node.isMultiblock() && MultiblockDetector.supportsOverpressure(node.getMachineIcon());
-            }
-            if (addon.getItemIcon() != null) {
-                ResourceLocation target = addon.getItemIcon();
-                if (node.getMachineIcon() != null && node.getMachineIcon().equals(target)) return true;
-                if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().equals(target)) return true;
-                return false;
-            }
-            return false;
+            return isMultiblockTraitCompatible(node, addon, isGen);
         }
 
         return true;
+    }
+
+    private static boolean isEnergyHatchCompatible(RecipeNode node, MachineAddon addon, boolean isGen, boolean isFusion) {
+        if ((!node.isMultiblock() && !isFusion) || isGen) return false;
+        if (isFusion && addon instanceof GTEnergyHatchAddon eh && eh.getTier() != node.getTargetTier()) {
+            return false;
+        }
+        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+        if (mbId == null) return true;
+        MultiblockStructureDef def = MultiblockStructureCatalog.getStructure(mbId);
+        if (def == null) return true;
+        if (!matchesEnergyHatchAbilities(def, addon, node, mbId, isGen)) return false;
+        if (def.energyHatchSlotCount() == 0 && (MultiblockDetector.isSteamMultiblock(mbId) || isGen)) return false;
+        return true;
+    }
+
+    private static boolean matchesEnergyHatchAbilities(MultiblockStructureDef def, MachineAddon addon, RecipeNode node, ResourceLocation mbId, boolean isGen) {
+        if (addon instanceof GTEnergyHatchAddon eh) {
+            if (eh.isLaser()) {
+                return def.supportsAbility("INPUT_LASER") || def.allowedAbilities().isEmpty();
+            }
+            if (eh.isSubstation()) {
+                return def.supportsAbility("SUBSTATION_INPUT_ENERGY") || def.allowedAbilities().isEmpty();
+            }
+            if (def.supportsAbility("INPUT_ENERGY") || def.energyHatchSlotCount() > 0 || def.allowedAbilities().isEmpty()) {
+                return true;
+            }
+            boolean isSteam = (node.getSteamMode() != null && node.getSteamMode().isSteam()) || MultiblockDetector.isSteamMultiblock(mbId);
+            return !isSteam && !isGen && node.getEnergyType() != EnergyType.NONE && node.getEnergyType() != EnergyType.KINETIC_SU;
+        }
+        if (def.allowedAbilities().isEmpty()) return true;
+        return def.supportsAbility("INPUT_ENERGY") || def.supportsAbility("INPUT_LASER") || def.supportsAbility("SUBSTATION_INPUT_ENERGY");
+    }
+
+    private static boolean isHatchBusCompatible(RecipeNode node, MachineAddon addon) {
+        if (!node.isMultiblock()) return false;
+        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+        if (mbId != null && !matchesHatchStructure(mbId, addon)) {
+            return false;
+        }
+        if (isDistillationTower(node) && !isDistillationTowerHatchCompatible(addon)) {
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean matchesHatchStructure(ResourceLocation mbId, MachineAddon addon) {
+        MultiblockStructureDef def = MultiblockStructureCatalog.getStructure(mbId);
+        if (def == null) return true;
+        if (addon.getItemIcon() != null && def.isCandidateBlock(addon.getItemIcon())) {
+            return true;
+        }
+        if (def.allowedAbilities() == null || def.allowedAbilities().isEmpty()) {
+            return true;
+        }
+        if (addon instanceof GTHatchAddon gh && !gh.getAbilities().isEmpty()) {
+            return gh.getAbilities().stream().allMatch(def::supportsAbility);
+        }
+        return matchesHatchTypeAbilities(def, resolveHatchType(addon));
+    }
+
+    private static boolean matchesHatchTypeAbilities(MultiblockStructureDef def, GTHatchAddon.HatchType type) {
+        return switch (type) {
+            case ITEM_INPUT -> def.supportsAbility("IMPORT_ITEMS") || def.supportsAbility("STEAM_IMPORT_ITEMS");
+            case ITEM_OUTPUT -> def.supportsAbility("EXPORT_ITEMS") || def.supportsAbility("STEAM_EXPORT_ITEMS");
+            case FLUID_INPUT -> def.supportsAbility("IMPORT_FLUIDS") || def.supportsAbility("STEAM_IMPORT_FLUIDS");
+            case FLUID_OUTPUT -> def.supportsAbility("EXPORT_FLUIDS") || def.supportsAbility("STEAM_EXPORT_FLUIDS");
+            case DUAL_INPUT -> def.supportsAbility("IMPORT_ITEMS") || def.supportsAbility("IMPORT_FLUIDS");
+            case DUAL_OUTPUT -> def.supportsAbility("EXPORT_ITEMS") || def.supportsAbility("EXPORT_FLUIDS");
+            default -> true;
+        };
+    }
+
+    private static boolean isDistillationTowerHatchCompatible(MachineAddon addon) {
+        if (addon instanceof GTHatchAddon h) {
+            boolean isFluidOut = h.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || h.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT;
+            return !isFluidOut || h.getSlotCapacity() <= 1;
+        }
+        String path = addon.getId().toLowerCase(Locale.ROOT);
+        boolean isMultiFluid = path.contains("4x") || path.contains("9x") || path.contains("16x") || path.contains("quadruple") || path.contains("nonuple") || path.contains("hexadecimal") || path.contains("multi_fluid");
+        boolean isOutput = path.contains("output") || path.contains("export");
+        return !(isMultiFluid && isOutput);
+    }
+
+    private static boolean isMultiblockTraitCompatible(RecipeNode node, MachineAddon addon, boolean isGen) {
+        if (!node.isMultiblock()) return false;
+        if (StarTTurbineHelper.isStarTTrait(addon)) {
+            return node.isTurbine() && StarTTurbineHelper.isCompatibleStarTTrait(node, addon);
+        }
+        if (node.isTurbine()) return false;
+        if (addon.getId().equals("gtceu:batch_processing")) {
+            ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+            boolean supportsBatch = mbId != null
+                    ? MultiblockDetector.supportsBatchMode(mbId)
+                    : MultiblockDetector.supportsBatchMode(null, node.getAvailableWorkstations());
+            return !isGen && node.isMultiblock() && supportsBatch;
+        }
+        if (addon.getId().equals("gtceu:throughput_boosting")) {
+            return !isGen && node.isMultiblock() && MultiblockDetector.supportsThroughputBoosting(node.getMachineIcon());
+        }
+        if (addon.getId().equals("gtceu:bulk_processing")) {
+            return !isGen && node.isMultiblock() && MultiblockDetector.supportsBulkProcessing(node.getMachineIcon());
+        }
+        if (addon.getId().equals("gtceu:overpressure_autoclave")) {
+            return !isGen && node.isMultiblock() && MultiblockDetector.supportsOverpressure(node.getMachineIcon());
+        }
+        if (addon.getItemIcon() != null) {
+            ResourceLocation target = addon.getItemIcon();
+            if (node.getMachineIcon() != null && node.getMachineIcon().equals(target)) return true;
+            if (node.getRecipeCategoryId() != null && node.getRecipeCategoryId().equals(target)) return true;
+            return false;
+        }
+        return false;
     }
 
     public static boolean canInstallAddon(RecipeNode node, MachineAddon addon) {
@@ -420,64 +382,47 @@ public final class GTAddonCompatibilityHandler {
         if (addon.getCategory() == AddonCategory.CUSTOM || addon.getCategory() == AddonCategory.THERMAL_AUGMENT) {
             return true;
         }
-        if (isDistillationTower(node)) {
-            if (addon instanceof GTHatchAddon h) {
-                if (h.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || h.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT) {
-                    if (h.getSlotCapacity() > 1) {
-                        return false;
-                    }
-                    int reqFluidOut = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
-                    long currentInstalled = node.getAddons().stream()
-                            .filter(a -> a instanceof GTHatchAddon gh && (gh.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || gh.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT))
-                            .count();
-                    if (reqFluidOut > 0 && currentInstalled >= reqFluidOut) {
-                        return false;
-                    }
-                }
-            } else if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                String path = addon.getId().toLowerCase(Locale.ROOT);
-                if ((path.contains("4x") || path.contains("9x") || path.contains("16x") || path.contains("quadruple") || path.contains("nonuple") || path.contains("hexadecimal") || path.contains("multi_fluid")) && (path.contains("output") || path.contains("export"))) {
-                    return false;
-                }
-            }
+        if (isDistillationTower(node) && !canInstallDistillationTowerHatch(node, addon)) {
+            return false;
         }
-        if (node.isMultiblock()) {
-            ResourceLocation mbWs = node.getMachineIcon();
-            if (mbWs == null) mbWs = node.getMultiblockWorkstation();
-            if (mbWs != null) {
-                var def = MultiblockStructureCatalog.getStructure(mbWs);
-                if (def != null) {
-                    if (addon.getCategory() == MachineAddon.Category.COIL && def.coilSlotCount() == 0 && !MultiblockDetector.isCoilMultiblock(mbWs)) return false;
-                    if (addon.getCategory() == MachineAddon.Category.MAINTENANCE && def.maintenanceSlotCount() == 0 && !def.supportsAbility("MAINTENANCE") && def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) return false;
-                    if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && def.energyHatchSlotCount() == 0 && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY") && (MultiblockDetector.isSteamMultiblock(mbWs) || node.isGenerator())) return false;
-                    if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-                        if (addon.getItemIcon() != null && def.isCandidateBlock(addon.getItemIcon())) {
-                            // Directly matched candidate block
-                        } else if (def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) {
-                            if (addon instanceof GTHatchAddon gh && !gh.getAbilities().isEmpty()) {
-                                for (String reqAbility : gh.getAbilities()) {
-                                    if (!def.supportsAbility(reqAbility)) return false;
-                                }
-                            } else {
-                                var type = resolveHatchType(addon);
-                                switch (type) {
-                                    case ITEM_INPUT -> { if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("STEAM_IMPORT_ITEMS")) return false; }
-                                    case ITEM_OUTPUT -> { if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("STEAM_EXPORT_ITEMS")) return false; }
-                                    case FLUID_INPUT -> { if (!def.supportsAbility("IMPORT_FLUIDS") && !def.supportsAbility("STEAM_IMPORT_FLUIDS")) return false; }
-                                    case FLUID_OUTPUT -> { if (!def.supportsAbility("EXPORT_FLUIDS") && !def.supportsAbility("STEAM_EXPORT_FLUIDS")) return false; }
-                                    case DUAL_INPUT -> { if (!def.supportsAbility("IMPORT_ITEMS") && !def.supportsAbility("IMPORT_FLUIDS")) return false; }
-                                    case DUAL_OUTPUT -> { if (!def.supportsAbility("EXPORT_ITEMS") && !def.supportsAbility("EXPORT_FLUIDS")) return false; }
-                                    default -> {}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        if (node.isMultiblock() && !canInstallMultiblockAddon(node, addon)) {
+            return false;
         }
         if (addon.getCategory() == MachineAddon.Category.ROTOR && !node.isTurbine() && !MachineAddon.isTurbineMachine(node)) {
             return false;
         }
+        return true;
+    }
+
+    private static boolean canInstallDistillationTowerHatch(RecipeNode node, MachineAddon addon) {
+        if (addon instanceof GTHatchAddon h) {
+            boolean isFluidOut = h.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || h.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT;
+            if (!isFluidOut) return true;
+            if (h.getSlotCapacity() > 1) return false;
+            int reqFluidOut = (int) node.getOutputs().stream().filter(IngredientStack::isFluid).count();
+            long currentInstalled = node.getAddons().stream()
+                    .filter(a -> a instanceof GTHatchAddon gh && (gh.getHatchType() == GTHatchAddon.HatchType.FLUID_OUTPUT || gh.getHatchType() == GTHatchAddon.HatchType.DUAL_OUTPUT))
+                    .count();
+            return reqFluidOut == 0 || currentInstalled < reqFluidOut;
+        }
+        if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
+            String path = addon.getId().toLowerCase(Locale.ROOT);
+            boolean isMulti = path.contains("4x") || path.contains("9x") || path.contains("16x") || path.contains("quadruple") || path.contains("nonuple") || path.contains("hexadecimal") || path.contains("multi_fluid");
+            boolean isOut = path.contains("output") || path.contains("export");
+            if (isMulti && isOut) return false;
+        }
+        return true;
+    }
+
+    private static boolean canInstallMultiblockAddon(RecipeNode node, MachineAddon addon) {
+        ResourceLocation mbWs = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
+        if (mbWs == null) return true;
+        MultiblockStructureDef def = MultiblockStructureCatalog.getStructure(mbWs);
+        if (def == null) return true;
+        if (addon.getCategory() == MachineAddon.Category.COIL && def.coilSlotCount() == 0 && !MultiblockDetector.isCoilMultiblock(mbWs)) return false;
+        if (addon.getCategory() == MachineAddon.Category.MAINTENANCE && def.maintenanceSlotCount() == 0 && !def.supportsAbility("MAINTENANCE") && def.allowedAbilities() != null && !def.allowedAbilities().isEmpty()) return false;
+        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH && def.energyHatchSlotCount() == 0 && !def.supportsAbility("INPUT_ENERGY") && !def.supportsAbility("SUBSTATION_INPUT_ENERGY") && (MultiblockDetector.isSteamMultiblock(mbWs) || node.isGenerator())) return false;
+        if (addon.getCategory() == MachineAddon.Category.HATCH_BUS && !isHatchBusCompatible(node, addon)) return false;
         return true;
     }
 
@@ -498,479 +443,55 @@ public final class GTAddonCompatibilityHandler {
     }
 
     public static ResourceLocation getPreferredMultiblockWorkstation(RecipeNode node, List<ResourceLocation> availableWorkstations) {
-        if (node == null || availableWorkstations == null || availableWorkstations.isEmpty()) return null;
-
-        if (com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.isFusion(node)) {
-            GTVoltageTier minTier = com.gtceu.calcboard.compat.gtceu.physics.GTFusionHelper.getMinFusionVoltageTier(node);
-
-            for (ResourceLocation ws : availableWorkstations) {
-                if (ws != null) {
-                    GTVoltageTier wsTier = GTCEuModAdapter.extractVoltageTierFromIcon(ws);
-                    if (wsTier == minTier) {
-                        return ws;
-                    }
-                }
-            }
-
-            ResourceLocation bestHigher = null;
-            GTVoltageTier bestTier = null;
-            for (ResourceLocation ws : availableWorkstations) {
-                if (ws != null) {
-                    GTVoltageTier wsTier = GTCEuModAdapter.extractVoltageTierFromIcon(ws);
-                    if (wsTier != null && wsTier.ordinal() >= minTier.ordinal()) {
-                        if (bestTier == null || wsTier.ordinal() < bestTier.ordinal()) {
-                            bestTier = wsTier;
-                            bestHigher = ws;
-                        }
-                    }
-                }
-            }
-            if (bestHigher != null) {
-                return bestHigher;
-            }
-        }
-
-        ResourceLocation catId = node.getRecipeCategoryId();
-        if (catId != null) {
-            for (ResourceLocation ws : availableWorkstations) {
-                if (MultiblockDetector.isMultiblock(ws) && ws.getPath().equalsIgnoreCase(catId.getPath())) {
-                    return ws;
-                }
-            }
-        }
-
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws)) {
-                String path = ws.getPath().toLowerCase(Locale.ROOT);
-                if (path.startsWith("large_")) {
-                    return ws;
-                }
-            }
-        }
-
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws)) {
-                String path = ws.getPath().toLowerCase(Locale.ROOT);
-                if (!path.startsWith("mega_") && !path.startsWith("extreme_") && !path.startsWith("incomprehensible_")
-                        && !path.startsWith("advanced_") && !path.startsWith("yielding_") && !path.startsWith("super_")
-                        && !path.startsWith("supreme_") && !path.startsWith("nyinsane_")) {
-                    return ws;
-                }
-            }
-        }
-
-        for (ResourceLocation ws : availableWorkstations) {
-            if (MultiblockDetector.isMultiblock(ws)) {
-                return ws;
-            }
-        }
-        return null;
+        return GTWorkstationSelector.getPreferredMultiblockWorkstation(node, availableWorkstations);
     }
 
     public static void onAddonInstalled(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return;
-        if (!node.isMultiblock() && addon.getCategory() != AddonCategory.CUSTOM && addon.getCategory() != AddonCategory.THERMAL_AUGMENT) {
-            node.setMultiblock(true);
-            ResourceLocation mbWs = node.getMultiblockWorkstation();
-            if (mbWs != null) {
-                node.setMachineIcon(mbWs);
-            }
-        }
-        applyAddonInstallation(node, addon);
-        node.markOverclockDirty();
-    }
-
-    private static void applyAddonInstallation(RecipeNode node, MachineAddon addon) {
-        if (addon.getCategory() == MachineAddon.Category.THERMAL_AUGMENT) {
-            if (addon.isThermalUpgradeKit()) {
-                node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.THERMAL_AUGMENT && a.isThermalUpgradeKit());
-            }
-            node.getAddons().add(addon);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
-            int eff = (int) Math.round(addon.getDurationMultiplier() * 100.0);
-            int power = addon.getRotorPower() > 0 ? addon.getRotorPower() : 100;
-            node.setRotorEfficiency(eff);
-            node.setRotorPower(power);
-            node.setRotorName(addon.getName());
-            node.getAddons().add(addon);
-            GTTurbinePhysics.autoCalculateTurbineParallel(node);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.COIL) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.COIL);
-            MachineAddon tailored = addon.forMachine(node);
-            node.getAddons().add(tailored);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.REFLECTOR) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.REFLECTOR);
-            node.getAddons().add(addon);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.MAINTENANCE) {
-            if (isMufflerAddon(addon)) {
-                node.getAddons().removeIf(GTAddonCompatibilityHandler::isMufflerAddon);
-            } else {
-                node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.MAINTENANCE && !isMufflerAddon(a));
-            }
-            node.getAddons().add(addon);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.PARALLEL) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.PARALLEL);
-            node.getAddons().add(addon);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-            List<MachineAddon> existing = new ArrayList<>();
-            for (MachineAddon a : node.getAddons()) {
-                if (a.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-                    existing.add(a);
-                }
-            }
-            if (existing.size() >= 2) {
-                node.getAddons().remove(existing.get(0));
-            }
-            node.getAddons().add(addon);
-            updateNodeTierFromEnergyHatches(node);
-            return;
-        }
-        if (isCombustionBoostAddon(addon)) {
-            applyCombustionBoostInstallation(node, addon);
-            node.getAddons().add(addon);
-            GTCombustionHelper.syncCombustionInputs(node);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
-            node.getAddons().add(addon);
-            return;
-        }
-        if (addon.getCategory() == MachineAddon.Category.HATCH_BUS) {
-            node.getAddons().add(addon);
-            return;
-        }
-        node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
-        node.getAddons().add(addon);
+        GTAddonLifecycleHandler.onAddonInstalled(node, addon);
     }
 
     public static void onAddonRemoved(RecipeNode node, MachineAddon addon) {
-        if (node == null || addon == null) return;
-        if (addon.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-            updateNodeTierFromEnergyHatches(node);
-            if (com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(node)) {
-                List<GTEnergyHatchAddon> remaining = node.getAddons().stream()
-                        .filter(a -> a instanceof GTEnergyHatchAddon)
-                        .map(a -> (GTEnergyHatchAddon) a)
-                        .toList();
-                if (!remaining.isEmpty()) {
-                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, remaining.get(0).getTier());
-                    int totalAmps = remaining.stream().mapToInt(GTEnergyHatchAddon::getAmperage).sum();
-                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, totalAmps);
-                } else {
-                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, node.getTargetTier() != null ? node.getTargetTier() : GTVoltageTier.EV);
-                    com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, 1);
-                }
-            }
-        } else if (addon.getCategory() == MachineAddon.Category.ROTOR) {
-            node.getAddons().removeIf(a -> a.getCategory() == MachineAddon.Category.ROTOR);
-            node.setRotorEfficiency(100);
-            node.setRotorPower(100);
-            GTTurbinePhysics.autoCalculateTurbineParallel(node);
-        } else if (addon.getCategory() == MachineAddon.Category.MULTIBLOCK_TRAIT) {
-            node.getAddons().removeIf(a -> a.getId().equals(addon.getId()));
-            if (isCombustionBoostAddon(addon)) {
-                applyCombustionBoostRemoval(node, addon);
-            }
-        }
-        node.markOverclockDirty();
+        GTAddonLifecycleHandler.onAddonRemoved(node, addon);
     }
 
     public static boolean isCombustionBoostAddon(MachineAddon addon) {
-        if (addon == null || addon.getId() == null) return false;
-        String id = addon.getId();
-        return "gtceu:oxygen_boost".equals(id)
-                || "gtceu:liquid_oxygen_boost".equals(id)
-                || isCoolantAddon(addon)
-                || isOxidizerAddon(addon);
+        return GTCombustionAddonHelper.isCombustionBoostAddon(addon);
     }
 
     public static boolean isCoolantAddon(MachineAddon addon) {
-        if (addon == null || addon.getId() == null) return false;
-        String id = addon.getId();
-        return "start_core:distilled_water_coolant".equals(id) || "start_core:deionized_water_coolant".equals(id);
+        return GTCombustionAddonHelper.isCoolantAddon(addon);
     }
 
     public static boolean isOxidizerAddon(MachineAddon addon) {
-        if (addon == null || addon.getId() == null) return false;
-        String id = addon.getId();
-        return "start_core:t1_oxidizer_boost".equals(id)
-                || "start_core:t2_oxidizer_boost".equals(id)
-                || "start_core:t3_oxidizer_boost".equals(id)
-                || "start_core:t4_oxidizer_boost".equals(id);
+        return GTCombustionAddonHelper.isOxidizerAddon(addon);
     }
 
-    private static boolean isCombustionBoostCompatible(RecipeNode node, MachineAddon addon) {
-        String id = addon.getId();
-        if (GTCombustionHelper.isLargeCombustionEngine(node)) {
-            return "gtceu:oxygen_boost".equals(id);
-        }
-        if (GTCombustionHelper.isExtremeCombustionEngine(node)) {
-            return "gtceu:liquid_oxygen_boost".equals(id);
-        }
-        if (GTCombustionHelper.isModularCombustionFrame(node)
-                || GTCombustionHelper.isStarTCombustionModule(node)
-                || GTCombustionHelper.isStarTRocketModule(node)) {
-            if (isCoolantAddon(addon)) {
-                return true;
-            }
-        }
-        if (GTCombustionHelper.START_T1_COMBUSTION.equals(node.getMachineIcon())) {
-            return "start_core:t1_oxidizer_boost".equals(id);
-        }
-        if (GTCombustionHelper.START_T2_COMBUSTION.equals(node.getMachineIcon())) {
-            return "start_core:t2_oxidizer_boost".equals(id);
-        }
-        if (GTCombustionHelper.START_T3_COMBUSTION.equals(node.getMachineIcon())) {
-            return "start_core:t3_oxidizer_boost".equals(id);
-        }
-        if (GTCombustionHelper.START_T4_COMBUSTION.equals(node.getMachineIcon())) {
-            return "start_core:t4_oxidizer_boost".equals(id);
-        }
-        return false;
-    }
-
-    private static void applyCombustionBoostInstallation(RecipeNode node, MachineAddon addon) {
-        String id = addon.getId();
-        if ("gtceu:oxygen_boost".equals(id)) {
-            node.getAddons().removeIf(a -> "gtceu:oxygen_boost".equals(a.getId()));
-            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, true);
-        } else if ("gtceu:liquid_oxygen_boost".equals(id)) {
-            node.getAddons().removeIf(a -> "gtceu:liquid_oxygen_boost".equals(a.getId()));
-            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, true);
-        } else if ("start_core:distilled_water_coolant".equals(id)) {
-            node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
-            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "distilled_water");
-        } else if ("start_core:deionized_water_coolant".equals(id)) {
-            node.getAddons().removeIf(GTAddonCompatibilityHandler::isCoolantAddon);
-            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "deionized_water");
-        } else if ("start_core:t1_oxidizer_boost".equals(id)) {
-            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
-            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "white_fuming_nitric_acid");
-        } else if ("start_core:t2_oxidizer_boost".equals(id)) {
-            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
-            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "red_fuming_nitric_acid");
-        } else if ("start_core:t3_oxidizer_boost".equals(id)) {
-            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
-            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "dioxygen_difluoride");
-        } else if ("start_core:t4_oxidizer_boost".equals(id)) {
-            node.getAddons().removeIf(GTAddonCompatibilityHandler::isOxidizerAddon);
-            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "ferrocenium_superoxide");
-        }
-    }
-
-    private static void applyCombustionBoostRemoval(RecipeNode node, MachineAddon addon) {
-        String id = addon.getId();
-        if ("gtceu:oxygen_boost".equals(id)) {
-            node.getProperties().set(GTCEuProperties.OXYGEN_BOOST, false);
-        } else if ("gtceu:liquid_oxygen_boost".equals(id)) {
-            node.getProperties().set(GTCEuProperties.LIQUID_OXYGEN_BOOST, false);
-        } else if ("start_core:distilled_water_coolant".equals(id) || "start_core:deionized_water_coolant".equals(id)) {
-            node.getProperties().set(GTCEuProperties.COMBUSTION_COOLANT_TYPE, "none");
-        } else if ("start_core:t1_oxidizer_boost".equals(id)
-                || "start_core:t2_oxidizer_boost".equals(id)
-                || "start_core:t3_oxidizer_boost".equals(id)
-                || "start_core:t4_oxidizer_boost".equals(id)) {
-            node.getProperties().set(GTCEuProperties.COMBUSTION_OXIDIZER_TYPE, "none");
-        }
-        GTCombustionHelper.syncCombustionInputs(node);
+    public static int getMaxAllowedEnergyHatches(RecipeNode node) {
+        return GTEnergyHatchCalculator.getMaxAllowedEnergyHatches(node);
     }
 
     public static GTVoltageTier getPrimaryEnergyHatchTier(RecipeNode node) {
-        if (node == null) return null;
-        List<GTEnergyHatchAddon> hatches = new ArrayList<>();
-        for (MachineAddon a : node.getAddons()) {
-            if (a instanceof GTEnergyHatchAddon eh) {
-                hatches.add(eh);
-            }
-        }
-        if (hatches.isEmpty()) {
-            return null;
-        }
-        if (hatches.size() == 2 && hatches.get(0).getTier() == hatches.get(1).getTier()) {
-            GTVoltageTier base = hatches.get(0).getTier();
-            return base.ordinal() < GTVoltageTier.MAX.ordinal()
-                    ? GTVoltageTier.getByIndex(base.ordinal() + 1)
-                    : base;
-        }
-        GTVoltageTier maxSingleHatchTier = GTVoltageTier.ULV;
-        for (var h : hatches) {
-            if (h.getTier().ordinal() > maxSingleHatchTier.ordinal()) {
-                maxSingleHatchTier = h.getTier();
-            }
-        }
-        return maxSingleHatchTier;
+        return GTEnergyHatchCalculator.getPrimaryEnergyHatchTier(node);
     }
 
     public static boolean requiresEnergyHatch(RecipeNode node) {
-        if (node == null || !node.isMultiblock() || node.isModule() || node.isGenerator()) {
-            return false;
-        }
-        if (node.isFusion() || GTFusionHelper.isFusion(node)) {
-            return false;
-        }
-        if (node.getEnergyType() != EnergyType.ELECTRIC_EU) {
-            return false;
-        }
-        if (GTPowerCalculator.isBoilerRecipe(node) || GTCombustionHelper.isCombustionFamily(node)) {
-            return false;
-        }
-        if (node.getSteamMode() != null && node.getSteamMode().isSteam()) {
-            return false;
-        }
-        ResourceLocation mbId = node.getMachineIcon() != null ? node.getMachineIcon() : node.getMultiblockWorkstation();
-        if (mbId != null && MultiblockDetector.isSteamMultiblock(mbId)) {
-            return false;
-        }
-        return true;
+        return GTEnergyHatchCalculator.requiresEnergyHatch(node);
     }
 
     public static void updateNodeTierFromEnergyHatches(RecipeNode node) {
-        if (node == null) return;
-        GTVoltageTier hatchTier = getPrimaryEnergyHatchTier(node);
-        if (hatchTier == null) {
-            if (node.getRecipeTier() != null) {
-                node.setTargetTier(node.getRecipeTier());
-            }
-            return;
-        }
-
-        node.setTargetTier(hatchTier);
-
-        if (com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.isTurbine(node)) {
-            List<GTEnergyHatchAddon> hatches = new ArrayList<>();
-            for (MachineAddon a : node.getAddons()) {
-                if (a instanceof GTEnergyHatchAddon eh) {
-                    hatches.add(eh);
-                }
-            }
-            if (!hatches.isEmpty()) {
-                GTEnergyHatchAddon primary = hatches.get(0);
-                com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoTier(node, primary.getTier());
-                int totalAmps = hatches.stream().mapToInt(GTEnergyHatchAddon::getAmperage).sum();
-                com.gtceu.calcboard.compat.gtceu.GTTurbineHelper.setDynamoAmperage(node, totalAmps);
-            }
-        }
+        GTEnergyHatchCalculator.updateNodeTierFromEnergyHatches(node);
     }
 
     public static long getMaxEUtCapacity(RecipeNode node) {
-        if (node == null) return Long.MAX_VALUE;
-        List<GTEnergyHatchAddon> hatches = new ArrayList<>();
-        for (MachineAddon a : node.getAddons()) {
-            if (a instanceof GTEnergyHatchAddon eh) {
-                hatches.add(eh);
-            }
-        }
-        if (!hatches.isEmpty()) {
-            long total = 0;
-            for (var h : hatches) {
-                total += (long) h.getTier().getVoltage() * h.getAmperage();
-            }
-            return total;
-        }
-        if (node.getTargetTier() != null) {
-            boolean hasParallelHatch = node.getAddons().stream().anyMatch(a ->
-                    a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon
-                            || a.getCategory() == MachineAddon.Category.PARALLEL);
-            if (hasParallelHatch && node.getRecipeTier() != null && node.getTargetTier().ordinal() > node.getRecipeTier().ordinal()) {
-                return node.getTargetTier().getVoltage() * 2L;
-            }
-        }
-        return Long.MAX_VALUE;
+        return GTEnergyHatchCalculator.getMaxEUtCapacity(node);
     }
 
     public static long getOverclockVoltage(RecipeNode node) {
-        if (node == null) return Long.MAX_VALUE;
-        List<GTEnergyHatchAddon> hatches = new ArrayList<>();
-        for (MachineAddon a : node.getAddons()) {
-            if (a instanceof GTEnergyHatchAddon eh) {
-                hatches.add(eh);
-            }
-        }
-        if (!hatches.isEmpty()) {
-            long totalInputVoltage = 0;
-            long inputAmperage = 0;
-            for (var h : hatches) {
-                totalInputVoltage += (long) h.getTier().getVoltage() * h.getAmperage();
-                inputAmperage += h.getAmperage();
-            }
-            if (totalInputVoltage <= 1 || inputAmperage <= 1) {
-                return totalInputVoltage;
-            }
-            long voltage = totalInputVoltage;
-            long amperage = inputAmperage;
-            if (hasPrimeFactorGreaterThanTwo(amperage) || isPowerOfFour(amperage)) {
-                amperage = 1;
-            } else if (amperage % 4 == 0) {
-                while (amperage > 4) {
-                    amperage /= 4;
-                }
-                voltage /= amperage;
-            } else if (amperage == 2) {
-                voltage /= amperage;
-            } else {
-                amperage = 1;
-            }
-
-            if (amperage == 1) {
-                GTVoltageTier floorTier = GTVoltageTier.getMaxTierProvided(voltage);
-                return floorTier != null ? floorTier.getVoltage() : voltage;
-            } else {
-                return voltage;
-            }
-        }
-        if (node.isMultiblock() && node.getTargetTier() != null) {
-            boolean hasParallelHatch = node.getAddons().stream().anyMatch(a ->
-                    a instanceof com.gtceu.calcboard.compat.gtceu.addon.GTParallelHatchAddon
-                            || a.getCategory() == MachineAddon.Category.PARALLEL);
-            if (hasParallelHatch && node.getRecipeTier() != null && node.getTargetTier().ordinal() > node.getRecipeTier().ordinal()) {
-                return node.getTargetTier().getVoltage();
-            }
-        }
-        return Long.MAX_VALUE;
-    }
-
-    private static boolean hasPrimeFactorGreaterThanTwo(long l) {
-        int i = 2;
-        long max = l / 2;
-        while (i <= max) {
-            if (l % i == 0) {
-                if (i > 2) return true;
-                l /= i;
-            } else {
-                i++;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isPowerOfFour(long l) {
-        if (l == 0) return false;
-        if ((l & (l - 1)) != 0) return false;
-        return (l & 0x55555555L) != 0;
+        return GTEnergyHatchCalculator.getOverclockVoltage(node);
     }
 
     public static boolean hasEnergyHatch(RecipeNode node) {
-        if (node == null) return false;
-        for (MachineAddon a : node.getAddons()) {
-            if (a instanceof GTEnergyHatchAddon || a.getCategory() == MachineAddon.Category.ENERGY_HATCH) {
-                return true;
-            }
-        }
-        return false;
+        return GTEnergyHatchCalculator.hasEnergyHatch(node);
     }
 
     public static void buildAddonTooltip(RecipeNode node, MachineAddon addon, boolean isActiveAddon, List<Component> tooltip) {

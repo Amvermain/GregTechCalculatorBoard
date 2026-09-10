@@ -57,12 +57,36 @@ public final class GTNodeValidator {
             }
         }
 
-        // 3. Electric Multiblock Energy Hatch Requirement Check
-        if (GTAddonCompatibilityHandler.requiresEnergyHatch(node) && !GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
-            if (warnings != null) {
-                warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_missing"));
+        // 3. Electric Voltage & Energy Hatch Tier Requirement Check
+        if (GTAddonCompatibilityHandler.requiresEnergyHatch(node)) {
+            if (!GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
+                if (warnings != null) {
+                    warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_missing"));
+                }
+                valid = false;
+            } else {
+                com.gtceu.calcboard.api.type.GTVoltageTier hatchTier = GTAddonCompatibilityHandler.getPrimaryEnergyHatchTier(node);
+                com.gtceu.calcboard.api.type.GTVoltageTier reqTier = getRequiredRecipeTier(node);
+                if (hatchTier != null && reqTier != null && hatchTier.ordinal() < reqTier.ordinal()) {
+                    if (warnings != null) {
+                        warnings.add(Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_tier_deficit",
+                                reqTier.getName(), hatchTier.getName()));
+                    }
+                    valid = false;
+                }
             }
-            valid = false;
+        } else if (!node.isMultiblock() && !node.isGenerator() && !node.isModule()
+                && node.getEnergyType() == com.gtceu.calcboard.api.type.EnergyType.ELECTRIC_EU
+                && (node.getSteamMode() == null || !node.getSteamMode().isSteam())) {
+            com.gtceu.calcboard.api.type.GTVoltageTier curTier = node.getTargetTier();
+            com.gtceu.calcboard.api.type.GTVoltageTier reqTier = getRequiredRecipeTier(node);
+            if (curTier != null && reqTier != null && curTier.ordinal() < reqTier.ordinal()) {
+                if (warnings != null) {
+                    warnings.add(Component.translatable("gui.gtcalcboard.node_warning.voltage_tier_deficit",
+                            reqTier.getName(), curTier.getName()));
+                }
+                valid = false;
+            }
         }
 
         // 3. Turbine 100% Flow Fulfillment Check
@@ -235,5 +259,14 @@ public final class GTNodeValidator {
         }
 
         return valid;
+    }
+
+    public static com.gtceu.calcboard.api.type.GTVoltageTier getRequiredRecipeTier(RecipeNode node) {
+        if (node == null) return null;
+        com.gtceu.calcboard.api.type.GTVoltageTier req = node.getRecipeTier();
+        if (req == null && node.getBaseEUt() > 0) {
+            req = com.gtceu.calcboard.api.type.GTVoltageTier.getTierForVoltage((long) Math.ceil(node.getBaseEUt()));
+        }
+        return req;
     }
 }

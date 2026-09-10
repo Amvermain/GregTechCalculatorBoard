@@ -202,4 +202,4 @@ flowchart TB
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[03-03] 페이지 결산 및 전역 밸런스 대시보드 UI](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)
+> ➡ **다음 장으로 이동**: [[03-03] 페이지 결산 및 전역 밸런스 대시보드 UI](03_03_PAGE_SUMMARY_AND_DASHBOARD.md)

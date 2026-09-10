@@ -116,7 +116,7 @@ public class NodeCardTextCache {
 
         updateTitle(node, cardW, titleX, x, headerBtnMargin, isOperational);
         updatePowerAndDuration(widget, font, node, cardW, isOperational);
-        updateBadges(node);
+        updateBadges(node, graph);
         updatePorts(widget, font, graph, node, cardW, isOperational);
         updateStarved(graph, node);
         updateRow2Buttons(widget, font, node, cardW, isOperational);
@@ -225,8 +225,8 @@ public class NodeCardTextCache {
         return "§c0.0 EU/t §7(0A " + tierName + ")";
     }
 
-    private void updateBadges(RecipeNode node) {
-        this.badges = NodeBadgeRegistry.getBadgesForNode(node);
+    private void updateBadges(RecipeNode node, FlowGraph graph) {
+        this.badges = NodeBadgeRegistry.getBadgesForNode(node, graph);
     }
 
     private record RawPortData(String rateStr, int textColor, int portColor) {}
@@ -331,12 +331,14 @@ public class NodeCardTextCache {
         boolean isDeficit = stats != null && stats.isInputDeficit();
         boolean isThrottled = stats != null && stats.isUpstreamThrottled();
         boolean isBuffered = graph != null && graph.findConnectedBufferNode(node, inOrigIdx) != null;
+        boolean isSteadyRecirc = stats != null && stats.isSteadyStateRecirculating();
 
         int portColor = !isOperational ? 0xFF77333B
                 : (!isConnected ? 0xFF5599FF
                 : (isBalanced ? 0xFF55FF88
+                : (isSteadyRecirc ? 0xFF55FFFF
                 : (isDeficit ? (isBuffered ? 0xFFFFD700 : 0xFFFFAA33)
-                : (isThrottled ? 0xFF5599FF : 0xFF55FFFF))));
+                : (isThrottled ? 0xFF5599FF : 0xFF55FFFF)))));
 
         if (!isOperational) {
             return new RawPortData("§c-" + FormatUtil.formatRate(0.0, in), 0xFFFF7777, portColor);
@@ -347,7 +349,7 @@ public class NodeCardTextCache {
         if (isBalanced) {
             return new RawPortData("§a" + FormatUtil.formatRate(rate, in) + " §2✔", 0xFFFFFFFF, portColor);
         }
-        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit, isBuffered, isThrottled), 0xFFFFFFFF, portColor);
+        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit, isBuffered, isThrottled, isSteadyRecirc), 0xFFFFFFFF, portColor);
     }
 
     private RawPortData computeBatchInputPortData(FlowGraph graph, RecipeNode node, IngredientStack in, int inOrigIdx, boolean isOperational) {
@@ -355,11 +357,13 @@ public class NodeCardTextCache {
         boolean isConnected = stats != null && stats.isConnected();
         boolean isBalanced = stats != null && stats.isBalanced();
         boolean isDeficit = stats != null && stats.isInputDeficit();
+        boolean isSteadyRecirc = stats != null && stats.isSteadyStateRecirculating();
 
         int portColor = !isOperational ? 0xFF77333B
                 : (!isConnected ? 0xFF5599FF
                 : (isBalanced ? 0xFF55FF88
-                : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF)));
+                : (isSteadyRecirc ? 0xFF55FFFF
+                : (isDeficit ? 0xFFFFAA33 : 0xFF55FFFF))));
 
         if (!isOperational) {
             return new RawPortData("§c-" + FormatUtil.formatRecipeBatchAmount(0.0, in), 0xFFFF7777, portColor);
@@ -371,7 +375,7 @@ public class NodeCardTextCache {
         if (isBalanced) {
             return new RawPortData("§a" + FormatUtil.formatRecipeBatchAmount(reqAmount, in) + " §2✔", 0xFFFFFFFF, portColor);
         }
-        return new RawPortData(FormatUtil.formatBatchConnectedInput(stats.connectedRate(), reqAmount, in, isDeficit), 0xFFFFFFFF, portColor);
+        return new RawPortData(FormatUtil.formatBatchConnectedInput(stats.connectedRate(), reqAmount, in, isDeficit, isSteadyRecirc), 0xFFFFFFFF, portColor);
     }
 
     private RawPortData computeOutputPortData(NodeWidget widget, FlowGraph graph, RecipeNode node, IngredientStack out, int outOrigIdx, boolean isOperational) {

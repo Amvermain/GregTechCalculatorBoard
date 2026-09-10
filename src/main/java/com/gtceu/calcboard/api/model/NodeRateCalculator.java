@@ -50,6 +50,9 @@ public final class NodeRateCalculator {
 
     public static double getInputSlotRate(RecipeNode node, int index, boolean effective) {
         if (node == null || index < 0 || index >= node.getInputs().size()) return 0.0;
+        if (node.isReroute()) {
+            return node.isFixedDrain() ? node.getExternalDrainRate() : 0.0;
+        }
         IngredientStack in = node.getInputs().get(index);
         double r;
         if (in.isStressUnit()) {
@@ -82,6 +85,9 @@ public final class NodeRateCalculator {
 
     public static double getOutputSlotRate(RecipeNode node, int index, boolean effective) {
         if (node == null || index < 0 || index >= node.getOutputs().size()) return 0.0;
+        if (node.isReroute()) {
+            return node.isExternalSupply() ? node.getExternalSupplyRate() : 0.0;
+        }
         IngredientStack out = node.getOutputs().get(index);
         double r;
         if (out.isStressUnit()) {
@@ -102,6 +108,12 @@ public final class NodeRateCalculator {
     public static Map<IngredientStack, Double> calculateOutputRates(RecipeNode node) {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         if (node == null) return rates;
+        if (node.isReroute()) {
+            if (node.isExternalSupply() && node.getExternalSupplyRate() > 0.0 && node.getRerouteIngredient() != null) {
+                rates.put(node.getRerouteIngredient(), node.getExternalSupplyRate());
+            }
+            return rates;
+        }
 
         double cps = node.getCyclesPerSecond();
         for (int i = 0; i < node.getOutputs().size(); i++) {
@@ -139,6 +151,12 @@ public final class NodeRateCalculator {
     public static Map<IngredientStack, Double> calculateEffectiveInputRates(RecipeNode node, boolean postEvent) {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         if (node == null) return rates;
+        if (node.isReroute()) {
+            if (node.isFixedDrain() && node.getExternalDrainRate() > 0.0 && node.getRerouteIngredient() != null) {
+                rates.put(node.getRerouteIngredient(), node.getExternalDrainRate());
+            }
+            return rates;
+        }
 
         double cps = node.getEffectiveCyclesPerSecond();
         for (int i = 0; i < node.getInputs().size(); i++) {
@@ -168,6 +186,12 @@ public final class NodeRateCalculator {
     public static Map<IngredientStack, Double> calculateEffectiveOutputRates(RecipeNode node, boolean postEvent) {
         Map<IngredientStack, Double> rates = new LinkedHashMap<>();
         if (node == null) return rates;
+        if (node.isReroute()) {
+            if (node.isExternalSupply() && node.getExternalSupplyRate() > 0.0 && node.getRerouteIngredient() != null) {
+                rates.put(node.getRerouteIngredient(), node.getExternalSupplyRate());
+            }
+            return rates;
+        }
 
         double cps = node.getEffectiveCyclesPerSecond();
         for (int i = 0; i < node.getOutputs().size(); i++) {

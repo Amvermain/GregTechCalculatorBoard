@@ -56,12 +56,12 @@ public class ClientWorkspaceState {
     }
 
     public boolean isCollaborationEnabled() {
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        if (mc == null || mc.player == null) {
-            return false;
+        if (serverSupported) {
+            return true;
         }
-        if (mc.hasSingleplayerServer()) {
-            return false;
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc != null && (mc.getCurrentServer() != null || (mc.getConnection() != null && !mc.hasSingleplayerServer()))) {
+            return true;
         }
         return currentTeamId != null;
     }

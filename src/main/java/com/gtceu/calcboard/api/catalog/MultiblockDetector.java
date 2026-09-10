@@ -22,19 +22,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class MultiblockDetector {
 
-    private static final Set<ResourceLocation> MULTIBLOCK_RECIPE_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> COIL_MULTIBLOCK_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> COIL_RECIPE_CATEGORIES = new HashSet<>();
-    private static final Set<ResourceLocation> TURBINE_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> TURBINE_RECIPE_CATEGORIES = new HashSet<>();
-    private static final Set<ResourceLocation> BATCH_MODE_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> THROUGHPUT_BOOSTING_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> BULK_PROCESSING_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> OVERPRESSURE_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> COIL_PARALLEL_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> PARALLEL_HATCH_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> LASER_HATCH_CONTROLLERS = new HashSet<>();
-    private static final Set<ResourceLocation> STEAM_MULTIBLOCKS = new HashSet<>();
+    private static final Set<ResourceLocation> MULTIBLOCK_RECIPE_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> COIL_MULTIBLOCK_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> COIL_RECIPE_CATEGORIES = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> TURBINE_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> TURBINE_RECIPE_CATEGORIES = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> BATCH_MODE_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> THROUGHPUT_BOOSTING_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> BULK_PROCESSING_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> OVERPRESSURE_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> COIL_PARALLEL_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> PARALLEL_HATCH_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> LASER_HATCH_CONTROLLERS = ConcurrentHashMap.newKeySet();
+    private static final Set<ResourceLocation> STEAM_MULTIBLOCKS = ConcurrentHashMap.newKeySet();
     private static final Map<ResourceLocation, Double> STEAM_MULTIBLOCK_CONSUMPTIONS = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, Integer> THREADING_MAX_HELIX_CAPACITY = new ConcurrentHashMap<>();
     private static final Map<ResourceLocation, Integer> DEFAULT_MULTIBLOCK_PARALLELS = new ConcurrentHashMap<>();
@@ -292,6 +292,7 @@ public class MultiblockDetector {
             if (initialized || initializing) return;
             initializing = true;
             try {
+                registerBaselineTurbines();
                 initializeStructureCatalog();
                 scanEmiMultiblockRecipes(rmObj);
                 scanAdapterMultiblocks(rmObj);

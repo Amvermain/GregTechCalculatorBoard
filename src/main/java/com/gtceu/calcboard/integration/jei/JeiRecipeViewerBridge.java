@@ -73,4 +73,9 @@ public final class JeiRecipeViewerBridge implements IRecipeViewerBridge {
             }
         } catch (Throwable ignored) {}
     }
+
+    @Override
+    public void invalidateTextCaches() {
+        JeiRecipeSearchIndexer.clearCaches();
+    }
 }

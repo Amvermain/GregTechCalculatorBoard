@@ -40,9 +40,9 @@ public class ClientModBusEvents {
     public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener((ResourceManagerReloadListener) resourceManager -> {
             MachineAddonCatalog.getInstance().markDirty();
-            if (com.gtceu.calcboard.api.util.ModCompatHelper.isEmiLoaded()) {
-                com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.clearGlobalCache();
-            }
+            com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.invalidateTextCaches();
+            com.gtceu.calcboard.api.spi.viewer.RecipeViewerBridgeRegistry.invalidateAllTextCaches();
+            com.gtceu.calcboard.client.gui.dialog.RecipeSearchDialog.clearGlobalCache();
         });
     }
 }

@@ -22,6 +22,7 @@ public class CategoryCapabilityMatrixTest {
 
     @BeforeEach
     void setUp() {
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
         matrix = CategoryCapabilityMatrix.getInstance();
     }
 

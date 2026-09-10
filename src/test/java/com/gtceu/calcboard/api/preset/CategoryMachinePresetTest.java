@@ -20,6 +20,7 @@ public class CategoryMachinePresetTest {
     @BeforeEach
     public void setup() {
         CategoryMachinePresetManager.getInstance().clearAll();
+        com.gtceu.calcboard.testutil.TestMultiblockFixtures.initTestEnvironmentDefaults();
     }
 
     @Test

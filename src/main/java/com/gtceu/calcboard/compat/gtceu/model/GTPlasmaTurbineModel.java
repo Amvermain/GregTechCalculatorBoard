@@ -17,7 +17,10 @@ public enum GTPlasmaTurbineModel {
             ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
             Set.of(
                     ResourceLocation.tryParse("gtceu:large_plasma_turbine"),
-                    ResourceLocation.tryParse("gtceu:plasma_large_turbine")
+                    ResourceLocation.tryParse("gtceu:plasma_large_turbine"),
+                    ResourceLocation.tryParse("gtceu:plasma_generator"),
+                    ResourceLocation.tryParse("gtceu:plasma_generator_fuels"),
+                    ResourceLocation.tryParse("gtceu:plasma_turbine")
             )),
 
     /**
@@ -102,15 +105,6 @@ public enum GTPlasmaTurbineModel {
             for (GTPlasmaTurbineModel m : values()) {
                 if (m.matchingIcons.contains(icon)) {
                     return m;
-                }
-            }
-        }
-        for (ResourceLocation ws : node.getAvailableWorkstations()) {
-            if (ws != null) {
-                for (GTPlasmaTurbineModel m : values()) {
-                    if (m.matchingIcons.contains(ws)) {
-                        return m;
-                    }
                 }
             }
         }

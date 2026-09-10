@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.compat;
 
 import com.gtceu.calcboard.api.catalog.AddonCategory;
 import com.gtceu.calcboard.api.history.BoardCommand;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTBoilerTier;
@@ -58,7 +59,8 @@ public class GenericModGuiHandler implements IModGuiHandler {
         buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(6, tierBtnW, tierName, tierTextW, tierColor, false, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
 
         int nextRelX = 6 + tierBtnW + 4;
-        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node);
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null);
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, graph);
         for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
             int textW = font.width(badge.text());
             int badgeW = textW + 8;
@@ -223,7 +225,8 @@ public class GenericModGuiHandler implements IModGuiHandler {
         int y = (int) node.getPosY();
         int row2Y = y + 20 + 6 + 18;
         int nextCtrlX = x + 42;
-        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node);
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null);
+        List<com.gtceu.calcboard.api.property.NodeBadge> badges = com.gtceu.calcboard.api.property.NodeBadgeRegistry.getBadgesForNode(node, graph);
         for (com.gtceu.calcboard.api.property.NodeBadge badge : badges) {
             int badgeW = safeFontWidth(badge.text(), 30) + 8;
             if (nextCtrlX + badgeW > x + node.getCardWidth() - 46) break;

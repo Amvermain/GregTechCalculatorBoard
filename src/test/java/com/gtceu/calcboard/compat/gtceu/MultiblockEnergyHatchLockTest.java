@@ -116,4 +116,42 @@ public class MultiblockEnergyHatchLockTest {
         Assertions.assertTrue(valid);
         Assertions.assertTrue(warnings.isEmpty());
     }
+
+    @Test
+    @DisplayName("Custom electric multiblock with omitted INPUT_ENERGY ability must still allow standard energy hatches")
+    void testCustomKubeJsMultiblockEnergyHatchCompatibility() {
+        ResourceLocation mdId = ResourceLocation.tryParse("gtceu:molten_destabiliser");
+        com.gtceu.calcboard.api.bom.MultiblockStructureDef customDef = new com.gtceu.calcboard.api.bom.MultiblockStructureDef(
+                mdId,
+                "Molten Destabiliser",
+                java.util.Collections.emptyList(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                java.util.Set.of("PARALLEL_HATCH", "BATCH_MODE", "BLOCKS"),
+                java.util.Collections.emptySet()
+        );
+        com.gtceu.calcboard.api.bom.MultiblockStructureCatalog.registerManualStructure(customDef);
+
+        RecipeNode mdNode = RecipeNode.create("Molten Destabiliser", 100.0, 512.0, GTVoltageTier.EV);
+        mdNode.setMultiblock(true);
+        mdNode.setMachineIcon(mdId);
+        mdNode.setEnergyType(EnergyType.ELECTRIC_EU);
+
+        GTEnergyHatchAddon standardHatch = new GTEnergyHatchAddon(
+                "gtceu:ev_energy_hatch", "EV Energy Hatch", "",
+                ResourceLocation.tryParse("gtceu:ev_energy_hatch"), GTVoltageTier.EV, 1, false, false, false);
+        var adapter = ModAdapterRegistry.getAdapterForNode(mdNode);
+
+        Assertions.assertTrue(adapter.isAddonCompatible(mdNode, standardHatch));
+
+        GTEnergyHatchAddon dreamLinkHatch = new GTEnergyHatchAddon(
+                "start_core:uev_16a_dream_link_energy_hatch", "UEV 16A Dream-Link Energy Hatch", "",
+                ResourceLocation.tryParse("start_core:uev_16a_dream_link_energy_hatch"), GTVoltageTier.UEV, 16, false, false, false);
+        Assertions.assertTrue(adapter.isAddonCompatible(mdNode, dreamLinkHatch));
+    }
 }

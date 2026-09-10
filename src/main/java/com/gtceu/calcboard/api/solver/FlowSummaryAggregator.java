@@ -49,7 +49,64 @@ public final class FlowSummaryAggregator {
         boolean isConnected = count > 0;
         double effectiveRate = Math.min(effectiveReq, totalSupplied);
         boolean isUpstreamThrottled = isConnected && (effectiveReq < nominalReq - 0.001) && (totalSupplied > effectiveReq + 0.001);
-        return new FlowGraphSolver.PortFlowStats(nominalReq, totalSupplied, count, isConnected, effectiveRate, isUpstreamThrottled);
+
+        FixedPointEfficiencySolver.PrecomputedDampedLoopMeta dampedMeta = (!node.isReroute())
+                ? FixedPointEfficiencySolver.findDampedLoopMeta(graph, node, inputIndex)
+                : null;
+        boolean isSteadyStateRecirculating = false;
+        boolean isUnfedDampedLoop = false;
+        double externalSupplyRate = 0.0;
+        double loopSupplyRate = 0.0;
+        double recirculationRatio = 0.0;
+
+        if (dampedMeta != null && isConnected) {
+            double sExt = dampedMeta.computeExternalSupply(graph, null, null);
+            if (sExt <= 0.0001) {
+                isUnfedDampedLoop = true;
+                recirculationRatio = dampedMeta.recirculationRatio();
+            } else {
+                double sSteady = dampedMeta.recirculationRatio() < 1.0 - 1e-4
+                        ? sExt / (1.0 - dampedMeta.recirculationRatio())
+                        : sExt;
+                double steadyReq = dampedMeta.nominalDemand() > 0 ? sSteady * (nominalReq / dampedMeta.nominalDemand()) : sSteady;
+                boolean fulfillsSteady = totalSupplied >= steadyReq * 0.999 - 1e-4;
+                boolean belowNominal = totalSupplied < nominalReq - 0.001;
+
+                double extSupply = calculateExternalSupplyToPort(graph, node.getId(), inputIndex, dampedMeta.scc());
+                double loopSupply = Math.max(0.0, totalSupplied - extSupply);
+
+                if (fulfillsSteady && belowNominal && loopSupply > 0.0001) {
+                    isSteadyStateRecirculating = true;
+                    recirculationRatio = dampedMeta.recirculationRatio();
+                    externalSupplyRate = extSupply;
+                    loopSupplyRate = loopSupply;
+                }
+            }
+        }
+
+        return new FlowGraphSolver.PortFlowStats(
+                nominalReq,
+                totalSupplied,
+                count,
+                isConnected,
+                effectiveRate,
+                isUpstreamThrottled,
+                isSteadyStateRecirculating,
+                externalSupplyRate,
+                loopSupplyRate,
+                recirculationRatio,
+                isUnfedDampedLoop
+        );
+    }
+
+    private static double calculateExternalSupplyToPort(FlowGraph graph, String nodeId, int inputIndex, Set<String> scc) {
+        double extSupply = 0.0;
+        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+            if (edge.toNodeId().equals(nodeId) && edge.inputIndex() == inputIndex && !scc.contains(edge.fromNodeId())) {
+                extSupply += FlowBalanceMatrixSolver.getEdgeAllocatedFlow(graph, edge, null);
+            }
+        }
+        return extSupply;
     }
 
     public static FlowGraphSolver.PortFlowStats getOutputPortStats(FlowGraph graph, RecipeNode node, int outputIndex) {
@@ -201,6 +258,9 @@ public final class FlowSummaryAggregator {
         for (RecipeNode node : graph.getNodes()) {
             if (node.isReroute()) {
                 aggregateRerouteNode(graph, node, totalProduction, totalConsumption, totalVoided);
+                continue;
+            }
+            if (node.isBoundaryPin()) {
                 continue;
             }
             boolean isCompoundSlave = node.isCompoundNode() && !node.isCompoundMaster();

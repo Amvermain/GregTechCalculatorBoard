@@ -43,6 +43,11 @@ public final class EmiRecipeViewerBridge implements IRecipeViewerBridge {
     }
 
     @Override
+    public void invalidateTextCaches() {
+        ITEM_NAME_CACHE.clear();
+    }
+
+    @Override
     public String getViewerId() {
         return "emi";
     }
@@ -165,12 +170,14 @@ public final class EmiRecipeViewerBridge implements IRecipeViewerBridge {
 
     private static Set<String> determineAllowedAbilities(MultiblockStructureCatalog.StructureSlotCounts slots, boolean isSteam, boolean isCoilCapable) {
         Set<String> abilities = new HashSet<>();
-        if (slots.inputBusSlots > 0) abilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
-        if (slots.outputBusSlots > 0) abilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
-        if (slots.inputHatchSlots > 0) abilities.add(isSteam ? "STEAM_IMPORT_FLUIDS" : "IMPORT_FLUIDS");
-        if (slots.outputHatchSlots > 0) abilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
-        if (slots.energyHatchSlots > 0 && !isSteam) abilities.add("INPUT_ENERGY");
-        if (slots.maintenanceSlots > 0 && !isSteam) abilities.add("MAINTENANCE");
+        if (slots.inputBusSlots > 0 || !isSteam) abilities.add(isSteam ? "STEAM_IMPORT_ITEMS" : "IMPORT_ITEMS");
+        if (slots.outputBusSlots > 0 || !isSteam) abilities.add(isSteam ? "STEAM_EXPORT_ITEMS" : "EXPORT_ITEMS");
+        if (slots.inputHatchSlots > 0 || !isSteam) abilities.add(isSteam ? "STEAM_IMPORT_FLUIDS" : "IMPORT_FLUIDS");
+        if (slots.outputHatchSlots > 0 || !isSteam) abilities.add(isSteam ? "STEAM_EXPORT_FLUIDS" : "EXPORT_FLUIDS");
+        if (!isSteam) {
+            abilities.add("INPUT_ENERGY");
+            abilities.add("MAINTENANCE");
+        }
         if (slots.coilSlots > 0 && isCoilCapable) abilities.add("HEATING_COILS");
         return abilities;
     }

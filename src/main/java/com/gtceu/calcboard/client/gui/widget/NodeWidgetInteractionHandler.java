@@ -72,7 +72,7 @@ public final class NodeWidgetInteractionHandler {
             return handleExpandModule(parent, node);
         }
 
-        if (widget.isCloseButtonHovered(mouseX, mouseY)) {
+        if (button == 0 && widget.isCloseButtonHovered(mouseX, mouseY)) {
             if (parent != null) parent.removeNode(widget);
             return true;
         }
@@ -95,6 +95,9 @@ public final class NodeWidgetInteractionHandler {
     private static boolean handlePortRightClick(NodeWidget widget, double mouseX, double mouseY) {
         int inPort = widget.getHoveredInputPortIndex(mouseX, mouseY);
         if (inPort >= 0) {
+            if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                return scaleLoopOnShiftClick(widget, inPort);
+            }
             widget.hidePortAndDisconnectWires(true, inPort);
             return true;
         }
@@ -110,6 +113,17 @@ public final class NodeWidgetInteractionHandler {
         return false;
     }
 
+    private static boolean scaleLoopOnShiftClick(NodeWidget widget, int inPort) {
+        if (widget == null || widget.getParent() == null || widget.getParent().getGraph() == null) {
+            return true;
+        }
+        var stats = widget.getParent().getGraph().getInputPortStats(widget.getNode(), inPort);
+        if (stats != null && stats.isSteadyStateRecirculating()) {
+            widget.getParent().scaleLoopToSteadyState(widget.getNode().getId());
+        }
+        return true;
+    }
+
     private static boolean handleExpandModule(BoardScreen parent, RecipeNode node) {
         if (parent == null || parent.getGraph() == null) return true;
         List<FlowGraph.ConnectionEdge> moduleEdges = new ArrayList<>();
@@ -123,6 +137,10 @@ public final class NodeWidgetInteractionHandler {
         List<com.gtceu.calcboard.api.model.CanvasGroupFrame> subFrames = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getFrames()) : Collections.emptyList();
         List<com.gtceu.calcboard.api.model.CanvasStickyNote> subNotes = node.getSubGraph() != null ? new ArrayList<>(node.getSubGraph().getStickyNotes()) : Collections.emptyList();
 
+        com.gtceu.calcboard.api.storage.BoardPage subPage = (node.getSubPageId() != null)
+                ? com.gtceu.calcboard.api.storage.BoardManager.getInstance().getPage(node.getSubPageId()).orElse(null)
+                : null;
+
         boolean expanded = parent.getGraph().expandModule(node);
         if (expanded) {
             Set<String> subNodeIds = new HashSet<>();
@@ -133,7 +151,7 @@ public final class NodeWidgetInteractionHandler {
                     restoredEdges.add(e);
                 }
             }
-            parent.recordCommand(new BoardCommand.ExpandModuleCommand(node, subNodes, restoredEdges, moduleEdges, subFrames, subNotes));
+            parent.recordCommand(new BoardCommand.ExpandModuleCommand(node, subNodes, restoredEdges, moduleEdges, subFrames, subNotes, subPage));
             parent.rebuildWidgets();
             parent.markSummaryDirty();
             TutorialManager.getInstance().onModuleExpanded();
@@ -182,11 +200,8 @@ public final class NodeWidgetInteractionHandler {
             return adjustMachineCount(widget, parent, node, -1, net.minecraft.client.gui.screens.Screen.hasShiftDown());
         }
 
-        if (button == 0 && widget.getNameEditor().isEditing() && widget.isHeaderHovered(mouseX, mouseY)) {
-            var mc = Minecraft.getInstance();
-            if (mc != null && mc.font != null) {
-                int titleX = x + (node.getMachineIcon() != null ? 22 : 6);
-                widget.getNameEditor().onClick(mc.font, mouseX, titleX + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+        if (button == 0 && widget.getNameEditor().isEditing()) {
+            if (handleNameEditorClick(widget, node, mouseX, mouseY, x)) {
                 return true;
             }
         }
@@ -218,6 +233,34 @@ public final class NodeWidgetInteractionHandler {
         return false;
     }
 
+    private static boolean handleNameEditorClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int x) {
+        var mc = Minecraft.getInstance();
+        if (mc == null || mc.font == null) {
+            return false;
+        }
+        if (node.isBoundaryPin()) {
+            return handleBoundaryPinNameEditorClick(widget, node, mouseX, mouseY, x, mc.font);
+        }
+        if (widget.isHeaderHovered(mouseX, mouseY)) {
+            int titleX = x + (node.getMachineIcon() != null ? 22 : 6);
+            widget.getNameEditor().onClick(mc.font, mouseX, titleX + 2, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean handleBoundaryPinNameEditorClick(NodeWidget widget, RecipeNode node, double mouseX, double mouseY, int x, net.minecraft.client.gui.Font font) {
+        String editTxt = widget.getNameEditor().getDisplayText();
+        int editW = Math.max(48, font.width(editTxt) + 8);
+        int editX = x + 16 - editW / 2;
+        int editY = (int) node.getPosY() - 24;
+        if (mouseX >= editX && mouseX <= editX + editW && mouseY >= editY && mouseY <= editY + 14) {
+            widget.getNameEditor().onClick(font, mouseX, editX + 4, net.minecraft.client.gui.screens.Screen.hasShiftDown());
+            return true;
+        }
+        return false;
+    }
+
     private static boolean adjustMachineCount(NodeWidget widget, BoardScreen parent, RecipeNode node, int sign, boolean shift) {
         widget.commitCountEdit();
         double oldVal = node.getMachineCount();
@@ -237,11 +280,18 @@ public final class NodeWidgetInteractionHandler {
 
     private static void applyNewCount(NodeWidget widget, BoardScreen parent, RecipeNode node, double oldVal, double newVal) {
         if (oldVal != newVal) {
-            node.setMachineCount(newVal);
+            if (node.isModule()) {
+                com.gtceu.calcboard.api.solver.FlowGraphModuleHandler.scaleModuleSubPage(node, newVal);
+            } else {
+                node.setMachineCount(newVal);
+            }
             if (parent != null) {
                 parent.recordCommand(BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
                 if (node.isCompoundNode()) {
                     parent.getGraph().syncCompoundParameters(node);
+                    parent.rebuildWidgets();
+                    parent.markSummaryDirty();
+                } else if (node.isModule()) {
                     parent.rebuildWidgets();
                     parent.markSummaryDirty();
                 }

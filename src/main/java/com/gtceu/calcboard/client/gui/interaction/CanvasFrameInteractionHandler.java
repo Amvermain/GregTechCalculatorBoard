@@ -74,8 +74,20 @@ public class CanvasFrameInteractionHandler {
                 return executeFrameAction(action, frame, canvasMouseX, canvasMouseY, button, screen);
             }
 
-            if (frame.isPointInHeader(canvasMouseX, canvasMouseY) && button == 0) {
-                return handleFrameHeaderClick(frame, canvasMouseX, canvasMouseY, screen, dragStartPositions);
+            if (frame.isSharedMachineFrame() && frame.isFolded()) {
+                if (handleFoldedCardClick(frame, canvasMouseX, canvasMouseY, button, screen)) {
+                    return true;
+                }
+            }
+
+            if (frame.isPointInHeader(canvasMouseX, canvasMouseY)) {
+                if (button == 0) {
+                    return handleFrameHeaderClick(frame, canvasMouseX, canvasMouseY, screen, dragStartPositions);
+                }
+                if (button == 1) {
+                    screen.getContextMenuManager().openForFrame(screen.toScreenX(canvasMouseX), screen.toScreenY(canvasMouseY), frame);
+                    return true;
+                }
             }
         }
         return false;
@@ -112,8 +124,7 @@ public class CanvasFrameInteractionHandler {
             return true;
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.COLLAPSE && button == 0) {
-            screen.collapseFrameIntoModule(frame);
-            return true;
+            return handleFrameCollapse(frame, screen);
         }
         if (action == CanvasGroupFrameRenderer.FrameAction.AUTOFIT && button == 0) {
             return autoFitFrame(frame, screen);
@@ -256,6 +267,32 @@ public class CanvasFrameInteractionHandler {
         }
         cmds.add(new BoardCommand.RemoveFramesCommand(List.of(frame), "Delete compound frame"));
         screen.recordCommand(new BoardCommand.CompoundCommand(cmds, "Delete " + frame.getTitle()));
+    }
+
+    private boolean handleFrameCollapse(CanvasGroupFrame frame, BoardScreen screen) {
+        if (!frame.isSharedMachineFrame()) {
+            screen.collapseFrameIntoModule(frame);
+            return true;
+        }
+
+        boolean prevFolded = frame.isFolded();
+        frame.toggleFolded(screen.getGraph());
+        if (frame.isFolded()) {
+            deselectFoldedFrameNodes(frame, screen);
+        }
+        screen.recordCommand(new BoardCommand.ToggleFrameFoldCommand(frame.getId(), prevFolded, frame.isFolded()));
+        screen.rebuildWidgets();
+        screen.markSummaryDirty();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        return true;
+    }
+
+    private void deselectFoldedFrameNodes(CanvasGroupFrame frame, BoardScreen screen) {
+        for (String nid : frame.getContainedNodeIds()) {
+            screen.deselectNode(nid);
+        }
     }
 
     private boolean autoFitFrame(CanvasGroupFrame frame, BoardScreen screen) {
@@ -612,4 +649,91 @@ public class CanvasFrameInteractionHandler {
         }
         return false;
     }
+
+    private boolean handleFoldedCardClick(
+            CanvasGroupFrame frame,
+            double canvasMouseX,
+            double canvasMouseY,
+            int button,
+            BoardScreen screen
+    ) {
+        if (button != 0) return false;
+        int x = (int) frame.getPosX();
+        int y = (int) frame.getPosY();
+        int ctrlY = y + 26;
+
+        if (canvasMouseY < ctrlY || canvasMouseY > ctrlY + 14) return false;
+
+        FlowGraph graph = screen.getGraph();
+        if (graph == null) return false;
+        if (!screen.ensureEditPermission()) return true;
+
+        int countMinusX = x + 38;
+        int countBoxX = countMinusX + 16;
+        net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
+        String countText = String.format(Locale.ROOT, "%.2f", frame.computeTotalMachineDuty(graph));
+        int countBoxW = Math.max(32, font.width(countText) + 8);
+        int countPlusX = countBoxX + countBoxW + 2;
+        int div2X = countPlusX + 16;
+        int mul2X = countPlusX + 34;
+
+        if (canvasMouseX >= countMinusX && canvasMouseX <= countMinusX + 14) {
+            double currentDuty = frame.computeTotalMachineDuty(graph);
+            if (currentDuty <= 0.0001) currentDuty = 1.0;
+            double targetDuty = Math.max(0.1, Math.round((currentDuty - 1.0) * 10.0) / 10.0);
+            double factor = targetDuty / currentDuty;
+            scaleFoldedFrameAndRefresh(frame, graph, factor, screen);
+            return true;
+        }
+
+        if (canvasMouseX >= countPlusX && canvasMouseX <= countPlusX + 14) {
+            double currentDuty = frame.computeTotalMachineDuty(graph);
+            if (currentDuty <= 0.0001) currentDuty = 1.0;
+            double targetDuty = Math.round((currentDuty + 1.0) * 10.0) / 10.0;
+            double factor = targetDuty / currentDuty;
+            scaleFoldedFrameAndRefresh(frame, graph, factor, screen);
+            return true;
+        }
+
+        if (canvasMouseX >= div2X && canvasMouseX <= div2X + 16) {
+            scaleFoldedFrameAndRefresh(frame, graph, 0.5, screen);
+            return true;
+        }
+
+        if (canvasMouseX >= mul2X && canvasMouseX <= mul2X + 16) {
+            scaleFoldedFrameAndRefresh(frame, graph, 2.0, screen);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void scaleFoldedFrameAndRefresh(CanvasGroupFrame frame, FlowGraph graph, double factor, BoardScreen screen) {
+        List<RecipeNode> enclosed = frame.getEnclosedNodes(graph);
+        Map<String, Double> oldCounts = new HashMap<>();
+        for (RecipeNode n : enclosed) {
+            oldCounts.put(n.getId(), n.getMachineCount());
+        }
+        frame.scaleEnclosedNodes(graph, factor);
+        List<BoardCommand> subCmds = new ArrayList<>();
+        for (RecipeNode n : enclosed) {
+            double oldC = oldCounts.getOrDefault(n.getId(), 1.0);
+            double newC = n.getMachineCount();
+            if (Math.abs(oldC - newC) > 0.0001) {
+                subCmds.add(BoardCommand.ModifyPropertyCommand.machineCount(n.getId(), oldC, newC));
+            }
+        }
+        if (!subCmds.isEmpty()) {
+            screen.recordCommand(new BoardCommand.CompoundCommand(subCmds, "Scale Folded Pool: " + frame.getTitle()));
+        }
+        screen.markSummaryDirty();
+        screen.rebuildWidgets();
+        if (screen.getWireRenderer() != null) {
+            screen.getWireRenderer().markDirty();
+        }
+        Minecraft.getInstance().getSoundManager().play(
+                SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.get(), 1.0F)
+        );
+    }
 }
+

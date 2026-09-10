@@ -245,6 +245,11 @@ public class GTCEuMultiblockStructureScanner {
         }
     }
 
+    public static void invalidateTextCaches() {
+        ITEM_NAME_CACHE.clear();
+        BLOCK_NAME_CACHE.clear();
+    }
+
     private static String resolveStackDisplayName(ItemStack stack, ResourceLocation id) {
         if (stack == null || stack.isEmpty()) {
             return id != null ? MultiblockStructureCatalog.formatMachineName(id.getPath()) : "";

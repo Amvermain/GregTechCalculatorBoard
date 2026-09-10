@@ -166,6 +166,7 @@ public class CategoryCapabilityMatrix {
         } else {
             if (isTurbine) supported.add(AddonCategory.ROTOR);
             if (isCoil) supported.add(AddonCategory.COIL);
+            supported.add(AddonCategory.ENERGY_HATCH);
             supported.add(AddonCategory.PARALLEL);
             supported.add(AddonCategory.MAINTENANCE);
             supported.add(AddonCategory.MULTIBLOCK_TRAIT);

@@ -72,7 +72,7 @@ public final class HarmonizedRatioOptimizer {
 
     public static double calculateConsumerMatchCount(FlowGraph graph, RecipeNode producer, int outPortIdx, RecipeNode consumer, int inPortIdx) {
         if (graph == null || producer == null || consumer == null) return 1.0;
-        if (consumer.isReroute()) return 1.0;
+        if (consumer.isReroute() || consumer.isBoundaryPin()) return 1.0;
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         double producedRate;
@@ -97,7 +97,7 @@ public final class HarmonizedRatioOptimizer {
 
     public static double calculateProducerMatchCount(FlowGraph graph, RecipeNode producer, int outPortIdx, RecipeNode consumer, int inPortIdx) {
         if (graph == null || producer == null || consumer == null) return 1.0;
-        if (producer.isReroute()) return 1.0;
+        if (producer.isReroute() || producer.isBoundaryPin()) return 1.0;
         if (outPortIdx >= producer.getOutputs().size() || inPortIdx >= consumer.getInputs().size()) return 1.0;
 
         double totalDemand;

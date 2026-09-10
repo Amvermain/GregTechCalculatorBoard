@@ -459,7 +459,7 @@ public class MachineHardwareTemplate {
   - `targetBatchAmount`, `targetBatchTimeSec`: 단말 노드의 목표 생산 수량과 소요 시간 제약 조건.
   - 2단계 선형 솔버(`TwoStageLinearFlowSolver`)는 이 앵커들을 경계 조건(Boundary Conditions)으로 삼아 상호 모순 없는 유일한 유량 해를 역산합니다.
 * **충돌 탐지 (`AnchorConflict`)**:
-  - 동일한 연결 컴포넌트 내에 상호 양립할 수 없는 복수의 유량 앵커가 지정된 경우 충돌 플래그를 설정하고 `[⚠️ Conflict]` 배지를 활성화합니다.
+  - 동일한 연결 컴포넌트 내에 상호 양립할 수 없는 복수의 유량 앵커가 지정된 경우 충돌 플래그를 설정하고 `[⚠ Conflict]` 배지를 활성화합니다.
 
 ### 12.2 공유 기계 풀 프레임 도메인 명세 (`SharedMachinePool`)
 복수의 서로 다른 레시피 노드를 하나의 물리적 기계 풀로 묶어 시간 분할(Time-Sharing) 가동하는 프레임 도메인 모델입니다:
@@ -473,4 +473,4 @@ public class MachineHardwareTemplate {
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[02] 수학적 연산 엔진 및 그래프 해석 알고리즘](02_MATH_AND_ALGORITHMS.md)
+> ➡ **다음 장으로 이동**: [[02] 수학적 연산 엔진 및 그래프 해석 알고리즘](02_MATH_AND_ALGORITHMS.md)

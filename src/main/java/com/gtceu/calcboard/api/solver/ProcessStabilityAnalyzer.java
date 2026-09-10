@@ -217,7 +217,7 @@ public final class ProcessStabilityAnalyzer {
         Set<RecipeNode> cycleNodes = collectCycleNodes(graph, cycleEdges);
 
         if (cycleReturnRatio > 1.0 + 1e-4) {
-            if (!hasExternalSink(graph, cycleNodes, sccNodeIds)) {
+            if (!hasExternalSink(graph, cycleNodes, cycleEdges, sccNodeIds)) {
                 for (RecipeNode n : cycleNodes) {
                     divergenceContext.recordPositiveFeedback(n.getId(), cycleNodes);
                 }
@@ -252,10 +252,27 @@ public final class ProcessStabilityAnalyzer {
         return cycleNodes;
     }
 
-    private static boolean hasExternalSink(FlowGraph graph, Set<RecipeNode> cycleNodes, Set<String> sccNodeIds) {
+    private static boolean hasExternalSink(
+            FlowGraph graph,
+            Set<RecipeNode> cycleNodes,
+            List<FlowGraph.ConnectionEdge> cycleEdges,
+            Set<String> sccNodeIds
+    ) {
+        Set<IngredientStack> cycleResources = new HashSet<>();
+        for (FlowGraph.ConnectionEdge cEdge : cycleEdges) {
+            RecipeNode src = graph.findNodeById(cEdge.fromNodeId());
+            if (src != null && cEdge.outputIndex() < src.getOutputs().size()) {
+                cycleResources.add(src.getOutputs().get(cEdge.outputIndex()));
+            }
+        }
+
         for (RecipeNode n : cycleNodes) {
             for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
                 if (!edge.fromNodeId().equals(n.getId())) continue;
+                if (edge.outputIndex() >= n.getOutputs().size()) continue;
+                IngredientStack outStack = n.getOutputs().get(edge.outputIndex());
+                if (!cycleResources.contains(outStack)) continue;
+
                 RecipeNode target = graph.findNodeById(edge.toNodeId());
                 if (target != null && (target.isVoidSink() || !sccNodeIds.contains(target.getId()))) {
                     return true;

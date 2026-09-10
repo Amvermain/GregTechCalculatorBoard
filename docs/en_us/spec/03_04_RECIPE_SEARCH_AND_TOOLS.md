@@ -41,7 +41,7 @@ Unified search dialog for finding recipes across tens of thousands of entries in
       <!-- Result 1 -->
       <div style="background: #14171e; border: 1px solid #334155; border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span>⚗️</span>
+          <span>⚗</span>
           <div>
             <div style="color: #f8fafc; font-weight: bold; font-size: 12px;">Benzene Cracking ➔ Ethylene & Gasoline</div>
             <div style="color: #64748b; font-size: 10px;">Large Chemical Reactor | Duration: 1.25s | Power: 480 EU/t (LV)</div>
@@ -253,7 +253,7 @@ Dedicated sidebar dock located at the top-left of the board to view pinned EMI f
         </div>
         <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span>⚗️</span>
+            <span>⚗</span>
             <span style="color: #cbd5e1; font-size: 11px;">Sulfuric Acid</span>
           </div>
           <span style="color: #64748b; font-size: 10px;">1</span>
@@ -441,4 +441,4 @@ Performs background release checks to inform users of the latest improvements an
 
 ---
 
-> ➡️ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocols](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+> ➡ **Next Chapter**: [[04] Multiplayer Concurrency & Network Protocols](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

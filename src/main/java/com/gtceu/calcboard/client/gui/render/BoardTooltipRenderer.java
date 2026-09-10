@@ -122,6 +122,9 @@ public final class BoardTooltipRenderer {
     private static boolean renderNodeWidgetsTooltips(BoardScreen screen, GuiGraphics graphics, Font font, List<NodeWidget> nodeWidgets, FlowGraph graph, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
         for (int i = nodeWidgets.size() - 1; i >= 0; i--) {
             NodeWidget widget = nodeWidgets.get(i);
+            if (graph != null && graph.isNodeInFoldedFrame(widget.getNode().getId())) {
+                continue;
+            }
             if (widget.isPointInside(canvasMouseX, canvasMouseY)) {
                 if (renderWidgetHoverAction(screen, graphics, font, widget, graph, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
                     return true;
@@ -144,6 +147,9 @@ public final class BoardTooltipRenderer {
         }
         int outIdx = widget.getHoveredOutputPortIndex(canvasMouseX, canvasMouseY);
         if (NodePortTooltipRenderer.renderOutputPortTooltip(graphics, font, screen, widget, outIdx, mouseX, mouseY)) {
+            return true;
+        }
+        if (BoundaryPinTooltipRenderer.renderBoundaryPinTooltip(graphics, font, screen, widget, graph, mouseX, mouseY)) {
             return true;
         }
         if (NodeControlsTooltipRenderer.renderNodeInfoTooltip(graphics, font, screen, widget, canvasMouseX, canvasMouseY, mouseX, mouseY)) {
@@ -306,6 +312,12 @@ public final class BoardTooltipRenderer {
             lines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.wire_priority_default").getString()));
         }
 
+        if (fromNode.isReroute() && fromNode.getJunctionSplitMode() == com.gtceu.calcboard.api.type.FlowSplitMode.WEIGHTED) {
+            lines.add(Component.literal("§b⚖ " + Component.translatable("gui.gtcalcboard.tooltip.wire_weight", formatWeight(edge.weight())).getString()));
+        } else if (Math.abs(edge.weight() - 1.0) > 0.0001) {
+            lines.add(Component.literal("§b⚖ " + Component.translatable("gui.gtcalcboard.tooltip.wire_weight", formatWeight(edge.weight())).getString()));
+        }
+
         if (edge.hasFixedLimit()) {
             String limitStr = FormatUtil.formatRate(edge.fixedFlowLimit(), stack);
             lines.add(Component.literal("§e⌖ " + Component.translatable("gui.gtcalcboard.junction.fixed_limit").getString() + ": §f" + limitStr));
@@ -314,6 +326,14 @@ public final class BoardTooltipRenderer {
         lines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.wire_scroll_priority_hint").getString()));
         renderComponentTooltip(graphics, font, lines, mouseX, mouseY, screen.width, screen.height);
         return true;
+    }
+
+    private static String formatWeight(double weight) {
+        if (!Double.isFinite(weight) || weight < 0.0) return "1";
+        if (weight == Math.floor(weight)) {
+            return String.valueOf((long) weight);
+        }
+        return String.format(java.util.Locale.ROOT, "%.2f", weight).replaceAll("\\.?0+$", "");
     }
 
     private static IngredientStack resolveWireIngredient(RecipeNode fromNode, int outputIndex, RecipeNode toNode, int inputIndex) {

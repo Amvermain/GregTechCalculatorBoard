@@ -201,7 +201,10 @@ public final class NodePortTooltipRenderer {
         boolean isBuffered = bufferNode != null;
 
         String supDisplay = BoardTooltipRenderer.formatPortRate(stats.connectedRate(), in, showExact, hiddenRef);
-        String percentCol = stats.isBalanced() ? "§a" : (stats.isInputDeficit() ? (isBuffered ? "§e" : "§c") : (stats.isUpstreamThrottled() ? "§3" : "§b"));
+        String percentCol = stats.isBalanced() ? "§a"
+                : (stats.isSteadyStateRecirculating() ? "§b"
+                : (stats.isInputDeficit() ? (isBuffered ? "§e" : "§c")
+                : (stats.isUpstreamThrottled() ? "§3" : "§b")));
 
         if (stats.isBalanced()) {
             tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.supply").getString() + ": " + percentCol + supDisplay + " §7(§a✔ 100%§7)"));
@@ -209,7 +212,9 @@ public final class NodePortTooltipRenderer {
             return;
         }
 
-        if (stats.isInputDeficit()) {
+        if (stats.isSteadyStateRecirculating()) {
+            appendSteadyStateRecirculatingStats(tooltipLines, stats, in, showExact, hiddenRef, node);
+        } else if (stats.isInputDeficit()) {
             appendInputDeficitStats(tooltipLines, stats, in, showExact, hiddenRef, percentCol, supDisplay, isBuffered, bufferNode, graph);
         } else if (stats.isUpstreamThrottled()) {
             appendUpstreamThrottledStats(tooltipLines, stats, in, showExact, hiddenRef, percentCol, supDisplay);
@@ -220,7 +225,62 @@ public final class NodePortTooltipRenderer {
         tooltipLines.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.tooltip.connected_producers", String.valueOf(stats.connectionCount())).getString()));
     }
 
+    private static void appendSteadyStateRecirculatingStats(
+            List<Component> tooltipLines,
+            FlowGraphSolver.PortFlowStats stats,
+            IngredientStack in,
+            boolean showExact,
+            boolean[] hiddenRef,
+            RecipeNode node
+    ) {
+        String extDisplay = BoardTooltipRenderer.formatPortRate(stats.externalSupplyRate(), in, showExact, hiddenRef);
+        String loopDisplay = BoardTooltipRenderer.formatPortRate(stats.loopSupplyRate(), in, showExact, hiddenRef);
+        String totalDisplay = BoardTooltipRenderer.formatPortRate(stats.connectedRate(), in, showExact, hiddenRef);
+        String ratedDisplay = BoardTooltipRenderer.formatPortRate(stats.requiredOrProducedRate(), in, showExact, hiddenRef);
+
+        tooltipLines.add(Component.literal("§b[" + Component.translatable("gui.gtcalcboard.tooltip.steady_state_recirculating").getString() + "]"));
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.external_net_feed").getString() + ": §f" + extDisplay));
+        tooltipLines.add(Component.literal(String.format(
+                Locale.ROOT,
+                "§7%s: §f%s §7(%s %.1f%%)",
+                Component.translatable("gui.gtcalcboard.tooltip.internal_recirculation").getString(),
+                loopDisplay,
+                Component.translatable("gui.gtcalcboard.tooltip.recirculation_ratio").getString(),
+                stats.recirculationRatio() * 100.0
+        )));
+        tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.total_recirculation_throughput").getString() + ": §a" + totalDisplay));
+        double effPercent = (node != null ? node.getEfficiency() : (stats.connectedRate() / stats.requiredOrProducedRate())) * 100.0;
+        tooltipLines.add(Component.literal(String.format(
+                Locale.ROOT,
+                "§7%s: §e%.1f%% §7(%s: %s)",
+                Component.translatable("gui.gtcalcboard.tooltip.machine_effective_duty").getString(),
+                effPercent,
+                Component.translatable("gui.gtcalcboard.tooltip.rated_capacity").getString(),
+                ratedDisplay
+        )));
+        tooltipLines.add(Component.literal("§8─────────────────────────"));
+        double targetCount = node != null && stats.requiredOrProducedRate() > 0.0001
+                ? Math.round(node.getMachineCount() * (stats.connectedRate() / stats.requiredOrProducedRate()) * 1000.0) / 1000.0
+                : 1.0;
+        String countStr = FormatUtil.formatCompactNumber(targetCount);
+        tooltipLines.add(Component.translatable("gui.gtcalcboard.tooltip.scale_to_steady_state", countStr));
+    }
+
     private static void appendInputDeficitStats(List<Component> tooltipLines, FlowGraphSolver.PortFlowStats stats, IngredientStack in, boolean showExact, boolean[] hiddenRef, String percentCol, String supDisplay, boolean isBuffered, RecipeNode bufferNode, FlowGraph graph) {
+        if (stats.isUnfedDampedLoop()) {
+            tooltipLines.add(Component.literal("§6[" + Component.translatable("gui.gtcalcboard.tooltip.damped_loop_unfed_title").getString() + "]"));
+            tooltipLines.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.damped_loop_unfed_desc").getString()));
+            tooltipLines.add(Component.literal(String.format(
+                    Locale.ROOT,
+                    "§7%s: §e%.1f%% §7(%s)",
+                    Component.translatable("gui.gtcalcboard.tooltip.recirculation_ratio").getString(),
+                    stats.recirculationRatio() * 100.0,
+                    Component.translatable("gui.gtcalcboard.tooltip.damped_loop_deficit_note").getString()
+            )));
+            tooltipLines.add(Component.literal("§e💡 " + Component.translatable("gui.gtcalcboard.tooltip.damped_loop_unfed_hint").getString()));
+            tooltipLines.add(Component.literal("§8─────────────────────────"));
+        }
+
         double deficit = stats.requiredOrProducedRate() - stats.connectedRate();
         double defPercent = (1.0 - stats.getRatio()) * 100.0;
         String defDisplay = BoardTooltipRenderer.formatPortRate(deficit, in, showExact, hiddenRef);

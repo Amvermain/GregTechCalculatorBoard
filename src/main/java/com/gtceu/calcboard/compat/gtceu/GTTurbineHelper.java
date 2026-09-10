@@ -478,8 +478,7 @@ public final class GTTurbineHelper {
         double holderCap = getRotorHolderCapacity(node);
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0.0 || holderCap >= Double.MAX_VALUE) return Math.max(1, node.getParallel());
-        int multiplier = GTPlasmaTurbineModel.isPlasmaTurbine(node) ? GTPlasmaTurbineModel.getModel(node).getParallelMultiplier() : 1;
-        return (int) Math.max(1, Math.ceil(holderCap / recipeEUt)) * multiplier;
+        return (int) Math.max(1, Math.ceil(holderCap / recipeEUt));
     }
 
     /**
@@ -491,8 +490,7 @@ public final class GTTurbineHelper {
         double cap = getGeneratorMaxEUt(node);
         double recipeEUt = Math.abs(node.getBaseEUt());
         if (recipeEUt <= 0 || cap >= Double.MAX_VALUE) return Math.max(1, node.getParallel());
-        int multiplier = GTPlasmaTurbineModel.isPlasmaTurbine(node) ? GTPlasmaTurbineModel.getModel(node).getParallelMultiplier() : 1;
-        int calculated = (int) Math.max(1, Math.ceil(cap / recipeEUt)) * multiplier;
+        int calculated = (int) Math.max(1, Math.ceil(cap / recipeEUt));
         return Math.max(calculated, node.getParallel());
     }
 
@@ -510,8 +508,7 @@ public final class GTTurbineHelper {
         double capFinal = getGeneratorMaxEUt(node);
         if (capFinal <= 0.0 || capFinal >= Double.MAX_VALUE) return;
 
-        int multiplier = GTPlasmaTurbineModel.isPlasmaTurbine(node) ? GTPlasmaTurbineModel.getModel(node).getParallelMultiplier() : 1;
-        node.setParallel((int) Math.max(1, Math.ceil(capFinal / recipeEUt)) * multiplier);
+        node.setParallel((int) Math.max(1, Math.ceil(capFinal / recipeEUt)));
         IModAdapter adapter = ModAdapterRegistry.getAdapterForNode(node);
         if (adapter != null) adapter.syncBoosterInputs(node);
     }

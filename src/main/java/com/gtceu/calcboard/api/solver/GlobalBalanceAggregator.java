@@ -39,7 +39,7 @@ public final class GlobalBalanceAggregator {
         Map<IngredientStack, List<GlobalBalanceSummary.PageContribution>> itemContributions = new LinkedHashMap<>();
 
         for (BoardPage page : selectedPagesList) {
-            if (page == null || page.getGraph() == null) continue;
+            if (page == null || page.getGraph() == null || page.isModuleSubPage()) continue;
 
             FlowGraph graph = page.getGraph();
             BalanceSummary pageSummary = (!graph.isSummaryDirty() && graph.getCachedSummary() != null)

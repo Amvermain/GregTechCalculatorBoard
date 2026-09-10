@@ -312,4 +312,37 @@ public final class FlowBalanceMatrixSolver {
     public static int autoRatioFromSharedPool(FlowGraph graph, CanvasGroupFrame poolFrame, double targetMachines, AutoRatioMode mode) {
         return HarmonizedRatioOptimizer.autoRatioFromSharedPool(graph, poolFrame, targetMachines, mode);
     }
+
+    public static FixedPointEfficiencySolver.PrecomputedDampedLoopMeta findDampedLoopMeta(FlowGraph graph, RecipeNode node, int inputIndex) {
+        return FixedPointEfficiencySolver.findDampedLoopMeta(graph, node, inputIndex);
+    }
+
+    public static FixedPointEfficiencySolver.PrecomputedDampedLoopMeta findDampedLoopMetaForNode(FlowGraph graph, RecipeNode node) {
+        return FixedPointEfficiencySolver.findDampedLoopMetaForNode(graph, node);
+    }
+
+    public static int scaleLoopToSteadyState(FlowGraph graph, String targetNodeId) {
+        if (graph == null || targetNodeId == null) return 0;
+        RecipeNode targetNode = graph.findNodeById(targetNodeId);
+        if (targetNode == null) return 0;
+
+        FixedPointEfficiencySolver.PrecomputedDampedLoopMeta meta = FixedPointEfficiencySolver.findDampedLoopMetaForNode(graph, targetNode);
+        if (meta == null) return 0;
+
+        double targetEfficiency = meta.computeSteadyStateEfficiency(graph, null, null);
+        if (targetEfficiency <= 0.0001 || targetEfficiency >= 0.9999) return 0;
+
+        int changedCount = 0;
+        for (String nodeId : meta.scc()) {
+            RecipeNode n = graph.findNodeById(nodeId);
+            if (n == null || n.isReroute()) continue;
+            double oldCount = n.getMachineCount();
+            double newCount = Math.max(0.001, oldCount * targetEfficiency);
+            if (Math.abs(oldCount - newCount) > 0.0001) {
+                n.setMachineCount(newCount);
+                changedCount++;
+            }
+        }
+        return changedCount;
+    }
 }

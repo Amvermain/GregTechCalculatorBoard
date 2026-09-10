@@ -86,10 +86,12 @@ public class BoardPageManager {
         if (page == null) return;
         pages.add(page);
         int idx = pages.size() - 1;
-        activePageIndex = idx;
-        if (!openPageIds.contains(page.getId())) {
-            openPageIds.add(page.getId());
-            notifyTabOpened(page, page.getId());
+        if (!page.isModuleSubPage()) {
+            activePageIndex = idx;
+            if (!openPageIds.contains(page.getId())) {
+                openPageIds.add(page.getId());
+                notifyTabOpened(page, page.getId());
+            }
         }
         for (IPageLifecycleListener l : pageLifecycleListeners) {
             try {
@@ -119,6 +121,14 @@ public class BoardPageManager {
             if (activePageIndex >= pages.size()) {
                 activePageIndex = pages.size() - 1;
             }
+            if (removed.isModuleSubPage() && removed.getParentPageId() != null) {
+                getPage(removed.getParentPageId()).ifPresent(parent -> {
+                    int pIdx = pages.indexOf(parent);
+                    if (pIdx >= 0) {
+                        activePageIndex = pIdx;
+                    }
+                });
+            }
             if (openPageIds.isEmpty() && !pages.isEmpty()) {
                 openPageIds.add(getActivePage().getId());
             }
@@ -133,6 +143,25 @@ public class BoardPageManager {
                 }
             }
             return true;
+        }
+        return false;
+    }
+
+    public boolean removePage(String pageId) {
+        if (pageId == null || pageId.isEmpty()) return false;
+        for (int i = 0; i < pages.size(); i++) {
+            if (pages.get(i).getId().equals(pageId)) {
+                return removePage(i);
+            }
+        }
+        return false;
+    }
+
+    public boolean removePage(BoardPage page) {
+        if (page == null) return false;
+        int idx = pages.indexOf(page);
+        if (idx >= 0) {
+            return removePage(idx);
         }
         return false;
     }
@@ -206,7 +235,7 @@ public class BoardPageManager {
         if (opt.isEmpty()) return false;
 
         BoardPage page = opt.get();
-        if (!openPageIds.contains(pageId)) {
+        if (!page.isModuleSubPage() && !openPageIds.contains(pageId)) {
             openPageIds.add(pageId);
             notifyTabOpened(page, pageId);
         }

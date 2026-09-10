@@ -178,19 +178,34 @@ public final class SimulatedGTEnvironment {
         );
         matrix.registerMockCategory(
                 STEAM_TURBINE_CAT,
-                List.of(STEAM_TURBINE_ID),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:lv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:mv_steam_turbine"),
+                        ResourceLocation.tryParse("gtceu:hv_steam_turbine"),
+                        STEAM_TURBINE_ID
+                ),
                 STEAM_TURBINE_ID,
                 false, true, false, true, false, false, false, null, null, GTVoltageTier.HV, 1024.0
         );
         matrix.registerMockCategory(
                 GAS_TURBINE_CAT,
-                List.of(GAS_TURBINE_ID),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:mv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:hv_gas_turbine"),
+                        ResourceLocation.tryParse("gtceu:ev_gas_turbine"),
+                        GAS_TURBINE_ID
+                ),
                 GAS_TURBINE_ID,
                 false, true, false, true, false, false, false, null, null, GTVoltageTier.EV, 4096.0
         );
         matrix.registerMockCategory(
                 PLASMA_TURBINE_CAT,
-                List.of(PLASMA_TURBINE_ID),
+                List.of(
+                        ResourceLocation.tryParse("gtceu:iv_plasma_turbine"),
+                        ResourceLocation.tryParse("gtceu:luv_plasma_turbine"),
+                        ResourceLocation.tryParse("gtceu:zpm_plasma_turbine"),
+                        PLASMA_TURBINE_ID
+                ),
                 PLASMA_TURBINE_ID,
                 false, true, false, true, false, false, false, null, null, GTVoltageTier.IV, 16384.0
         );

@@ -5,7 +5,8 @@ package com.gtceu.calcboard.api.type;
  */
 public enum FlowSplitMode {
     PROPORTIONAL("gui.gtcalcboard.junction.split_mode.proportional"),
-    EQUAL("gui.gtcalcboard.junction.split_mode.equal");
+    EQUAL("gui.gtcalcboard.junction.split_mode.equal"),
+    WEIGHTED("gui.gtcalcboard.junction.split_mode.weighted");
 
     private final String translationKey;
 

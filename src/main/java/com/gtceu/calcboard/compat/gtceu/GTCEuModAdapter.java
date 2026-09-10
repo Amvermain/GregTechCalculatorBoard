@@ -109,6 +109,11 @@ public class GTCEuModAdapter implements IModAdapter {
     }
 
     @Override
+    public void invalidateTextCaches() {
+        com.gtceu.calcboard.compat.gtceu.helper.GTCEuMultiblockStructureScanner.invalidateTextCaches();
+    }
+
+    @Override
     public boolean isLoaded() {
         try {
             if (ModList.get() != null) {

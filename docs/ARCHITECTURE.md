@@ -7,7 +7,7 @@
 > 📘 **Detailed Technical Specification Series**:
 > * 🇰🇷 **Korean Edition**: [docs/ko_kr/CODE_SPECIFICATION.md](ko_kr/CODE_SPECIFICATION.md)
 > * 🇺🇸 **English Edition**: [docs/en_us/CODE_SPECIFICATION.md](en_us/CODE_SPECIFICATION.md)
-> The complete v2.2.0-beta.2 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
+> The complete v2.2.0-beta.3 architecture specifications, 5 graph algorithms, Gauss-Jordan mass balance linear solver, `CategoryCapabilityMatrix`, and 2-tier on-demand streaming protocol are documented in the links above.
 
 This document describes the internal architecture, mathematical solver engine, canvas rendering pipeline, and multi-mod compatibility layer (SPI) of **GregTech Calculator Board**.
 
@@ -144,7 +144,7 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 
 ### 2.9 Shared Machine Pool Capacity Scaling & Stability Matrix (ADR-031 ~ ADR-033)
 * **Shared Machine Pool Scaling (`CanvasGroupFrame`)**: Scales all connected processes proportionally ($S = M_{\text{target}} / D_{\text{current}}$) to match physical machine capacity ($M_{\text{target}}$, default 1.0) on multi-process frame setups.
-* **Comprehensive Stability Defense Matrix (`ProcessStabilityAnalyzer`)**: Protects closed loops, positive feedback growth, catalyst decay, and conflicting anchors against infinite scaling runaway, presenting contextual warning badges (`[⚠️ Loop]`, `[⚠️ Growth]`) and actionable 5-line diagnostic tooltips via `NodeBadgeRegistry`.
+* **Comprehensive Stability Defense Matrix (`ProcessStabilityAnalyzer`)**: Protects closed loops, positive feedback growth, catalyst decay, and conflicting anchors against infinite scaling runaway, presenting contextual warning badges (`[⚠ Loop]`, `[⚠ Growth]`) and actionable 5-line diagnostic tooltips via `NodeBadgeRegistry`.
 
 ### 2.10 Two-Stage Linear Flow Balance Solver & Junction Anchoring (ADR-034 & ADR-035)
 * **Two-Stage Linear Flow Solver (`TwoStageLinearFlowSolver`)**: Combines continuous Gauss-Jordan flow solving with integer ceiling quantization to achieve single-click deterministic mass balance convergence across complex cyclic networks.
@@ -162,9 +162,21 @@ The Core Domain Engine (`com.gtceu.calcboard.api`) and Common Mod Adapters (`com
 * **Isolated Invalidation Boundaries**: Dragging, resizing, or recoloring sticky notes and group frames updates local visual bounds without triggering global flow balance recalculation or node card text cache eviction.
 * **Cached Reflection & Search Acceleration**: Eliminates per-frame keyboard focus reflection overhead in recipe viewers (JEI/EMI) and leverages pre-indexed spatial bounds for immediate frame and auto-connect lookups.
 
-### 2.14 Equal Splitting & Hierarchical Priority Flow Allocation (ADR-041)
-* **Dual Split Modes (`FlowSplitMode`)**: Supports `PROPORTIONAL` (demand-weighted) and `EQUAL` ($1/N$ mechanical division) split modes on junction nodes.
+### 2.14 Split Modes & Hierarchical Priority Flow Allocation (ADR-041)
+* **Tri-State Split Modes (`FlowSplitMode`)**: Supports `PROPORTIONAL` (demand-weighted), `EQUAL` ($1/N$ uniform division), and `WEIGHTED` (user-defined explicit branch weights) split modes on junction nodes.
 * **Hierarchical Priority Cascades (`FlowEdgeAllocator`)**: Wires carry an integer `priority` tier; higher-priority consumers are satisfied first, while residual flow within each priority tier is distributed according to the junction's split mode.
+
+### 2.15 Shared Machine Pool In-Place Folding & Ratio Preservation (ADR-042)
+* **Topology-Preserving In-Place Folding**: Collapses multi-recipe shared machine pool frames into a single compact virtual machine card without removing or modifying internal nodes or connections.
+* **Proportional Scaling & Deficit Gating**: Preserves internal recipe duty ratios during machine count adjustments, while aggregating boundary I/O ports via `FlowGraphTopologyAnalyzer` and signaling upstream supply deficits.
+
+### 2.16 Dedicated Sub-Page Composite Modules & Boundary I/O Pins (ADR-043)
+* **1:1 Dedicated Sub-Page Isolation**: Upgrades compound modules to independent sub-pages (`PageType.MODULE`) accessible via double-click with breadcrumb and Escape navigation.
+* **Boundary Pin Domain Contracts (`BoundaryPinNode`)**: Defines explicit `ModuleInputPin` and `ModuleOutputPin` boundary interface nodes for sub-pages, eliminating ambiguous topological inferences.
+
+### 2.17 Damped Recirculation Loop Closed-Form Solver & Steady-State Visualization (ADR-044)
+* **Infinite Geometric Series Closed-Form Convergence**: Solves steady-state recirculating supply via $S_{\text{steady}} = \frac{S_{\text{ext}}}{1 - r}$ in $O(1)$ without artificial deficit warnings.
+* **Steady-State Operational Visualization**: Displays cyan circulating indicators for balanced recirculation loops and provides 1-click machine scaling to steady-state capacity.
 
 ---
 

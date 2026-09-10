@@ -43,4 +43,7 @@ public interface IRecipeViewerBridge {
     default ResourceLocation findMachineIcon(Object recipe) {
         return null;
     }
+
+    default void invalidateTextCaches() {
+    }
 }

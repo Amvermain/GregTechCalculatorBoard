@@ -178,4 +178,4 @@ classDiagram
 
 ---
 
-> ➡️ **Next Chapter**: [[05] External Integration & Internationalization](05_INTEGRATION_AND_I18N.md)
+> ➡ **Next Chapter**: [[05] External Integration & Internationalization](05_INTEGRATION_AND_I18N.md)

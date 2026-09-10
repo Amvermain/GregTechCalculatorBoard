@@ -354,15 +354,15 @@ Proportionally scales processes sharing a physical machine frame to match a desi
 Detects 7 potential operational instability scenarios across closed recirculation loops and external feeds, preventing calculation runaway while attaching diagnostic metadata:
 
 1. **Unfed Deficit Recirculation Loop**:
-   When Auto-Ratio is executed on a closed cycle with self-sufficiency ratio $\rho_{\text{cycle}} < 1.0$ lacking external inputs, machine count runaway is suppressed, operational scale is frozen safely, and an amber `[⚠️ Loop]` warning badge is displayed.
+   When Auto-Ratio is executed on a closed cycle with self-sufficiency ratio $\rho_{\text{cycle}} < 1.0$ lacking external inputs, machine count runaway is suppressed, operational scale is frozen safely, and an amber `[⚠ Loop]` warning badge is displayed.
 2. **Positive Feedback Growth Loop**:
-   Detects cycles where byproduct generation exceeds consumption ($\rho_{\text{cycle}} > 1.0$), displaying a `[⚠️ Growth]` badge suggesting connection to an overflow drain.
+   Detects cycles where byproduct generation exceeds consumption ($\rho_{\text{cycle}} > 1.0$), displaying a `[⚠ Growth]` badge suggesting connection to an overflow drain.
 3. **Catalyst Decay Loop**:
-   Identifies closed loops with fractional stoichiometric catalyst decay lacking replenishment, presenting `[⚠️ Catalyst]`.
+   Identifies closed loops with fractional stoichiometric catalyst decay lacking replenishment, presenting `[⚠ Catalyst]`.
 4. **Anchor Contradiction**:
-   Resolves conflicting reference anchors situated along the same path by prioritizing the primary anchor and presenting `[⚠️ Conflict]` with 1-click dismissal actions.
+   Resolves conflicting reference anchors situated along the same path by prioritizing the primary anchor and presenting `[⚠ Conflict]` with 1-click dismissal actions.
 5. **Micro-Yield Defense**:
-   Prevents floating-point precision overflow on recipes yielding $< 10^{-5}$ units per craft, activating `[⚠️ Yield]`.
+   Prevents floating-point precision overflow on recipes yielding $< 10^{-5}$ units per craft, activating `[⚠ Yield]`.
 
 ---
 
@@ -392,4 +392,4 @@ Guarantees single-click deterministic mass balance convergence across coupled re
 
 ---
 
-> ➡️ **Next Chapter**: [[03] UI & Canvas Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md)
+> ➡ **Next Chapter**: [[03] UI & Canvas Rendering Pipeline](03_UI_AND_RENDERING_PIPELINE.md)

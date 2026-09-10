@@ -55,13 +55,20 @@ public class WorkspaceTabBarWidget {
         // 2. [Team Board] Tab
         boolean isTeam = state.isTeamMode();
         String teamName = state.getCurrentTeamName();
-        String teamTxt = "■ " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString();
+        boolean hasTeam = state.getCurrentTeamId() != null;
+        String teamTxt = hasTeam
+                ? "■ " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString()
+                : "■ " + Component.translatable("gui.gtcalcboard.workspace.team_no_party").getString();
         int teamW = font.width(teamTxt) + 14;
         boolean teamHover = mouseX >= curX && mouseX <= curX + teamW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2;
 
-        graphics.fill(curX, barY, curX + teamW, barY + BAR_HEIGHT - 2, isTeam ? 0xFF1C4232 : (teamHover ? 0xFF22352B : 0xFF1B1E28));
-        graphics.renderOutline(curX, barY, teamW, BAR_HEIGHT - 2, isTeam ? 0xFF55FF88 : 0xFF353C4D);
-        graphics.drawString(font, teamTxt, curX + 7, barY + 5, isTeam ? 0xFF55FF88 : 0xFF9CA5B8, false);
+        int teamBg = isTeam ? 0xFF1C4232 : (teamHover ? (hasTeam ? 0xFF22352B : 0xFF262A35) : 0xFF1B1E28);
+        int teamOutline = isTeam ? 0xFF55FF88 : (hasTeam ? (teamHover ? 0xFF44AA66 : 0xFF353C4D) : 0xFF475569);
+        int teamColor = isTeam ? 0xFF55FF88 : (hasTeam ? 0xFF9CA5B8 : 0xFF64748B);
+
+        graphics.fill(curX, barY, curX + teamW, barY + BAR_HEIGHT - 2, teamBg);
+        graphics.renderOutline(curX, barY, teamW, BAR_HEIGHT - 2, teamOutline);
+        graphics.drawString(font, teamTxt, curX + 7, barY + 5, teamColor, false);
 
         // 3. Right-side Status Badges (Team mode only)
         if (isTeam) {
@@ -194,14 +201,21 @@ public class WorkspaceTabBarWidget {
         curX += persW + 4;
 
         // 2. [Team Board] Tab Click
+        boolean hasTeam = state.getCurrentTeamId() != null;
         String teamName = state.getCurrentTeamName();
-        String teamTxt = "■ " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString();
+        String teamTxt = hasTeam
+                ? "■ " + Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString()
+                : "■ " + Component.translatable("gui.gtcalcboard.workspace.team_no_party").getString();
         int teamW = font.width(teamTxt) + 14;
         if (mouseX >= curX && mouseX <= curX + teamW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
+            if (!hasTeam) {
+                NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(new UUID(0L, 0L), "page_main"));
+                com.gtceu.calcboard.client.gui.widget.BoardToast.show("gui.gtcalcboard.toast.team_no_party");
+                return true;
+            }
             if (!state.isTeamMode()) {
                 state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
-                // Request fresh workspace from server
-                UUID teamId = state.getCurrentTeamId() != null ? state.getCurrentTeamId() : (mc.player != null ? mc.player.getUUID() : UUID.randomUUID());
+                UUID teamId = state.getCurrentTeamId();
                 String activePageId = state.getActiveTeamPageId() != null ? state.getActiveTeamPageId() : "page_main";
                 NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, activePageId));
                 NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, activePageId, true));

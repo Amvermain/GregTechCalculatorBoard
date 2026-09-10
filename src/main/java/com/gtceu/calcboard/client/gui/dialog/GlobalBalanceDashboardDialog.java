@@ -70,14 +70,19 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         return visible;
     }
 
+    private List<BoardPage> getDisplayPages() {
+        return BoardManager.getInstance().getPages().stream()
+                .filter(p -> !p.isModuleSubPage())
+                .toList();
+    }
+
     public void open() {
         this.visible = true;
         this.pageScrollY = 0;
         this.itemScrollY = 0;
         this.contributionPopup.close();
 
-        // Default: select all pages if nothing selected
-        List<BoardPage> pages = BoardManager.getInstance().getPages();
+        List<BoardPage> pages = getDisplayPages();
         if (selectedPageIds.isEmpty()) {
             for (BoardPage page : pages) {
                 selectedPageIds.add(page.getId());
@@ -112,7 +117,7 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
 
     private void updateSummaryIfNeeded() {
         if (dirty || cachedSummary == null) {
-            List<BoardPage> allPages = BoardManager.getInstance().getPages();
+            List<BoardPage> allPages = getDisplayPages();
             List<BoardPage> selectedPages = new ArrayList<>();
             for (BoardPage p : allPages) {
                 if (selectedPageIds.contains(p.getId())) {
@@ -267,7 +272,7 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         int listY = y + 18;
         int listH = btnY - listY - 2;
 
-        List<BoardPage> pages = BoardManager.getInstance().getPages();
+        List<BoardPage> pages = getDisplayPages();
         int rowH = 18;
         int totalH = pages.size() * rowH;
         maxPageScrollY = Math.max(0, totalH - listH);
@@ -514,9 +519,48 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
             String exactRateStr = FormatUtil.formatExactRate(hoveredRate, hoveredStack);
             String ratePrefix = hoveredRate > 0 ? "+" : "";
             tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.global_balance.net_rate").getString() + ": §f" + ratePrefix + exactRateStr));
+            appendRecirculationBreakdown(tooltip, hoveredStack);
             tooltip.add(Component.literal("§8" + Component.translatable("gui.gtcalcboard.global_balance.click_drilldown_hint").getString()));
             com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltip, mouseX, mouseY, screenWidth, screenHeight);
         }
+    }
+
+    private void appendRecirculationBreakdown(List<Component> tooltip, IngredientStack stack) {
+        if (stack == null) return;
+        double[] totals = new double[2];
+        for (BoardPage page : getDisplayPages()) {
+            if (selectedPageIds.contains(page.getId())) {
+                accumulatePageRecirculation(page, stack, totals);
+            }
+        }
+        if (totals[0] > 0.0001) {
+            String recircStr = FormatUtil.formatExactRate(totals[0], stack);
+            String totalStr = FormatUtil.formatExactRate(totals[1], stack);
+            tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.internal_recirculation").getString() + ": §b" + recircStr));
+            tooltip.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.total_recirculation_throughput").getString() + ": §a" + totalStr));
+        }
+    }
+
+    private void accumulatePageRecirculation(BoardPage page, IngredientStack stack, double[] totals) {
+        if (page.getGraph() == null) return;
+        var metas = com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver.precomputeDampedLoopMetas(page.getGraph(), null);
+        for (var meta : metas) {
+            accumulateMetaRecirculation(page.getGraph(), meta, stack, totals);
+        }
+    }
+
+    private void accumulateMetaRecirculation(
+            com.gtceu.calcboard.api.model.FlowGraph graph,
+            com.gtceu.calcboard.api.solver.FixedPointEfficiencySolver.PrecomputedDampedLoopMeta meta,
+            IngredientStack stack,
+            double[] totals
+    ) {
+        if (!meta.resource().matches(stack)) return;
+        double sExt = meta.computeExternalSupply(graph, null, null);
+        double sSteady = meta.computeSteadyStateSupply(graph, null, null);
+        double internalLoop = Math.max(0.0, sSteady - sExt);
+        totals[0] += internalLoop;
+        totals[1] += sSteady;
     }
 
     @Override
@@ -560,7 +604,7 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
 
         // [Select All] clicked
         if (mouseX >= allBtnX && mouseX <= allBtnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH && button == 0) {
-            for (BoardPage page : BoardManager.getInstance().getPages()) {
+            for (BoardPage page : getDisplayPages()) {
                 selectedPageIds.add(page.getId());
             }
             this.dirty = true;
@@ -579,7 +623,7 @@ public class GlobalBalanceDashboardDialog implements IBoardModal {
         int pageListY = sidebarY + 18;
         int pageListH = btnY - pageListY - 2;
         if (mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= pageListY && mouseY <= pageListY + pageListH && button == 0) {
-            List<BoardPage> pages = BoardManager.getInstance().getPages();
+            List<BoardPage> pages = getDisplayPages();
             int rowH = 18;
             int clickedIdx = (int) ((mouseY - pageListY + pageScrollY) / rowH);
             if (clickedIdx >= 0 && clickedIdx < pages.size()) {

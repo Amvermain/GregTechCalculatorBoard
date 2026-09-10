@@ -3,8 +3,11 @@ package com.gtceu.calcboard.api.storage;
 import com.gtceu.calcboard.api.catalog.CategoryCapability;
 import com.gtceu.calcboard.api.catalog.CategoryCapabilityMatrix;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
+import com.gtceu.calcboard.api.model.BoundaryPinNode;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.ModuleInputPin;
+import com.gtceu.calcboard.api.model.ModuleOutputPin;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
@@ -151,6 +154,30 @@ public final class RecipeNodeSerializer {
         if (node.isMultiblock()) {
             tag.putBoolean("isMultiblock", true);
         }
+        if (node instanceof BoundaryPinNode pin) {
+            tag.putString("pinType", pin.getDirection().name());
+            tag.putString("pinLabel", pin.getPinLabel());
+            tag.putInt("targetPortIndex", pin.getTargetPortIndex());
+            if (pin.getBoundIngredient() != null) {
+                tag.put("boundIngredient", pin.getBoundIngredient().serializeNBT());
+            }
+        }
+        if (node.isModule()) {
+            tag.putBoolean("isModule", true);
+            if (node.getSubPageId() != null && !node.getSubPageId().isEmpty()) {
+                tag.putString("subPageId", node.getSubPageId());
+            }
+            if (!node.getInputPinNodeIds().isEmpty()) {
+                ListTag inPins = new ListTag();
+                for (String pid : node.getInputPinNodeIds()) inPins.add(net.minecraft.nbt.StringTag.valueOf(pid));
+                tag.put("inputPinNodeIds", inPins);
+            }
+            if (!node.getOutputPinNodeIds().isEmpty()) {
+                ListTag outPins = new ListTag();
+                for (String pid : node.getOutputPinNodeIds()) outPins.add(net.minecraft.nbt.StringTag.valueOf(pid));
+                tag.put("outputPinNodeIds", outPins);
+            }
+        }
         if (node.isReroute()) {
             tag.putBoolean("isReroute", true);
         }
@@ -158,29 +185,7 @@ public final class RecipeNodeSerializer {
             tag.putBoolean("isFlipped", true);
         }
 
-        if (!node.getModuleInputOrigins().isEmpty()) {
-            ListTag inOriginsTag = new ListTag();
-            for (List<PortOrigin> origins : node.getModuleInputOrigins()) {
-                ListTag slotList = new ListTag();
-                for (PortOrigin o : origins) {
-                    slotList.add(o.serializeNBT());
-                }
-                inOriginsTag.add(slotList);
-            }
-            tag.put("moduleInputOrigins", inOriginsTag);
-        }
-
-        if (!node.getModuleOutputOrigins().isEmpty()) {
-            ListTag outOriginsTag = new ListTag();
-            for (List<PortOrigin> origins : node.getModuleOutputOrigins()) {
-                ListTag slotList = new ListTag();
-                for (PortOrigin o : origins) {
-                    slotList.add(o.serializeNBT());
-                }
-                outOriginsTag.add(slotList);
-            }
-            tag.put("moduleOutputOrigins", outOriginsTag);
-        }
+        node.getPortOriginManager().serialize(tag);
 
         if (!node.getHiddenInputIndices().isEmpty()) {
             tag.putIntArray("hiddenInputs", node.getHiddenInputIndices().stream().mapToInt(Integer::intValue).toArray());
@@ -231,7 +236,25 @@ public final class RecipeNodeSerializer {
             recipeTier = GTVoltageTier.getTierForVoltage((long) baseEUt);
         }
 
-        RecipeNode node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+        RecipeNode node;
+        if (tag.contains("pinType")) {
+            String pType = tag.getString("pinType");
+            String pLabel = tag.getString("pinLabel");
+            IngredientStack bound = tag.contains("boundIngredient")
+                    ? IngredientStack.deserializeNBT(tag.getCompound("boundIngredient"))
+                    : null;
+            if ("INPUT".equalsIgnoreCase(pType)) {
+                ModuleInputPin inPin = new ModuleInputPin(id, pLabel, bound);
+                inPin.setTargetPortIndex(tag.getInt("targetPortIndex"));
+                node = inPin;
+            } else {
+                ModuleOutputPin outPin = new ModuleOutputPin(id, pLabel, bound);
+                outPin.setTargetPortIndex(tag.getInt("targetPortIndex"));
+                node = outPin;
+            }
+        } else {
+            node = new RecipeNode(id, name, baseDuration, baseEUt, recipeTier);
+        }
         if (tag.contains("hasCustomName")) {
             node.setHasCustomName(tag.getBoolean("hasCustomName"));
         }
@@ -320,6 +343,21 @@ public final class RecipeNodeSerializer {
         if (tag.contains("isModule")) {
             node.setModule(tag.getBoolean("isModule"));
         }
+        if (tag.contains("subPageId")) {
+            node.setSubPageId(tag.getString("subPageId"));
+        }
+        if (tag.contains("inputPinNodeIds", Tag.TAG_LIST)) {
+            ListTag inPins = tag.getList("inputPinNodeIds", Tag.TAG_STRING);
+            for (int i = 0; i < inPins.size(); i++) {
+                node.getInputPinNodeIds().add(inPins.getString(i));
+            }
+        }
+        if (tag.contains("outputPinNodeIds", Tag.TAG_LIST)) {
+            ListTag outPins = tag.getList("outputPinNodeIds", Tag.TAG_STRING);
+            for (int i = 0; i < outPins.size(); i++) {
+                node.getOutputPinNodeIds().add(outPins.getString(i));
+            }
+        }
         if (tag.contains("containedMachineCount")) {
             node.setContainedMachineCount(tag.getInt("containedMachineCount"));
         }
@@ -360,28 +398,7 @@ public final class RecipeNodeSerializer {
         if (tag.contains("isFlipped")) {
             node.setFlipped(tag.getBoolean("isFlipped"));
         }
-        if (tag.contains("moduleInputOrigins", Tag.TAG_LIST)) {
-            ListTag inOriginsTag = tag.getList("moduleInputOrigins", Tag.TAG_LIST);
-            for (int i = 0; i < inOriginsTag.size(); i++) {
-                ListTag slotList = inOriginsTag.getList(i);
-                List<PortOrigin> origins = new ArrayList<>();
-                for (int j = 0; j < slotList.size(); j++) {
-                    origins.add(PortOrigin.deserializeNBT(slotList.getCompound(j)));
-                }
-                node.getModuleInputOrigins().add(origins);
-            }
-        }
-        if (tag.contains("moduleOutputOrigins", Tag.TAG_LIST)) {
-            ListTag outOriginsTag = tag.getList("moduleOutputOrigins", Tag.TAG_LIST);
-            for (int i = 0; i < outOriginsTag.size(); i++) {
-                ListTag slotList = outOriginsTag.getList(i);
-                List<PortOrigin> origins = new ArrayList<>();
-                for (int j = 0; j < slotList.size(); j++) {
-                    origins.add(PortOrigin.deserializeNBT(slotList.getCompound(j)));
-                }
-                node.getModuleOutputOrigins().add(origins);
-            }
-        }
+        node.getPortOriginManager().deserialize(tag);
 
         if (tag.contains("hiddenInputs")) {
             for (int idx : tag.getIntArray("hiddenInputs")) {

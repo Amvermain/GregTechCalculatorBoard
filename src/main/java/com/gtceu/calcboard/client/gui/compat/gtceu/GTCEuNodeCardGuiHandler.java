@@ -2,6 +2,7 @@ package com.gtceu.calcboard.client.gui.compat.gtceu;
 
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.catalog.MultiblockDetector;
+import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.property.NodeBadge;
 import com.gtceu.calcboard.api.property.NodeBadgeRegistry;
@@ -16,6 +17,7 @@ import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
 import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
+import com.gtceu.calcboard.compat.gtceu.handler.GTNodeValidator;
 import com.gtceu.calcboard.compat.gtceu.helper.CoilHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCEuCoilModifierHelper;
 import com.gtceu.calcboard.compat.gtceu.helper.GTCombustionHelper;
@@ -131,18 +133,22 @@ public class GTCEuNodeCardGuiHandler {
                     node.setTargetTier(tier);
                 }
             }
-            int tierColor = !isOperational ? 0xFFFF8888 : (tier != null ? tier.getColor() : 0xFFFFFFFF);
-            String tierName = (tier != null ? tier.getName() : "LV");
-            if (node.isMultiblock()) {
-                tierName = "▦ " + tierName;
+            GTVoltageTier reqTier = GTNodeValidator.getRequiredRecipeTier(node);
+            boolean isTierDeficit = reqTier != null && tier != null && tier.ordinal() < reqTier.ordinal();
+            int tierColor = (!isOperational || isTierDeficit) ? 0xFFFF8888 : (tier != null ? tier.getColor() : 0xFFFFFFFF);
+            String prefix = node.isMultiblock() ? "▦ " : "";
+            if (isTierDeficit) {
+                prefix += "⚠ ";
             }
+            String tierName = prefix + (tier != null ? tier.getName() : "LV");
             int textW = font.width(tierName);
             int btnW = Math.max(32, textW + 8);
-            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, btnW, tierName, textW, tierColor, !isOperational, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
+            buttons.add(new com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button(nextRelX, btnW, tierName, textW, tierColor, !isOperational || isTierDeficit, false, com.gtceu.calcboard.client.gui.render.NodeCardTextCache.Row2Button.ButtonRole.TIER, null));
             nextRelX += btnW + 4;
         }
 
-        List<NodeBadge> badges = NodeBadgeRegistry.getBadgesForNode(node);
+        FlowGraph graph = (widget != null && widget.getParent() != null) ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null);
+        List<NodeBadge> badges = NodeBadgeRegistry.getBadgesForNode(node, graph);
         for (NodeBadge badge : badges) {
             int textW = font.width(badge.text());
             int badgeW = textW + 8;

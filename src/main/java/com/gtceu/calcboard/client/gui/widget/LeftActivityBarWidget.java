@@ -248,8 +248,13 @@ public class LeftActivityBarWidget {
             state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
             NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false));
         } else {
+            if (state.getCurrentTeamId() == null) {
+                NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(new UUID(0L, 0L), "page_main"));
+                com.gtceu.calcboard.client.gui.widget.BoardToast.show("gui.gtcalcboard.toast.team_no_party");
+                return;
+            }
             state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
-            UUID teamId = state.getCurrentTeamId() != null ? state.getCurrentTeamId() : (mc.player != null ? mc.player.getUUID() : UUID.randomUUID());
+            UUID teamId = state.getCurrentTeamId();
             String activePageId = state.getActiveTeamPageId() != null ? state.getActiveTeamPageId() : "page_main";
             NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, activePageId));
             NetworkHandler.sendToServer(new C2SPingPresencePacket(teamId, activePageId, true));

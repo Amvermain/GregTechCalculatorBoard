@@ -104,7 +104,7 @@ public final class NodeTierChangeHandler {
 
     private static int resolveMinTierIndex(RecipeNode node, IModAdapter adapter, boolean isVanillaCooking, boolean isPassiveOrSteam) {
         int minIdx = node.getRecipeTier() != null ? node.getRecipeTier().ordinal() : GTVoltageTier.ULV.ordinal();
-        if (adapter != null && !isVanillaCooking && !isPassiveOrSteam) {
+        if (adapter != null && !isVanillaCooking) {
             GTVoltageTier minWsTier = adapter.getMinimumWorkstationTier(node);
             if (minWsTier != null) {
                 minIdx = Math.max(minIdx, minWsTier.ordinal());
@@ -148,7 +148,7 @@ public final class NodeTierChangeHandler {
     private static boolean handleHighPressureSteam(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
         if (direction > 0) {
             node.setSteamMode(SteamMode.NONE);
-            GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+            GTVoltageTier lowestElectric = isVanillaCooking ? GTVoltageTier.LV : GTVoltageTier.getByIndex(minIdx);
             node.setTargetTier(lowestElectric);
             ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
             if (sbWs != null) {
@@ -176,7 +176,7 @@ public final class NodeTierChangeHandler {
             if (node.supportsSteamMode()) {
                 node.setSteamMode(SteamMode.LOW_PRESSURE);
             } else {
-                GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+                GTVoltageTier lowestElectric = isVanillaCooking ? GTVoltageTier.LV : GTVoltageTier.getByIndex(minIdx);
                 node.setTargetTier(lowestElectric);
                 ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
                 if (sbWs != null) {
@@ -195,7 +195,7 @@ public final class NodeTierChangeHandler {
 
     private static Boolean handleElectricToSteamDowngrade(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
         int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
-        int lowestAllowedElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV.ordinal() : GTVoltageTier.LV.ordinal();
+        int lowestAllowedElectric = isVanillaCooking ? GTVoltageTier.LV.ordinal() : minIdx;
         if (direction < 0 && curIdx <= lowestAllowedElectric) {
             if (node.supportsSteamMode()) {
                 node.setSteamMode(SteamMode.HIGH_PRESSURE);
@@ -218,11 +218,13 @@ public final class NodeTierChangeHandler {
 
     private static boolean transitionNoneEnergyToElectric(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
         if (direction > 0) {
-            GTVoltageTier lowestElectric = (minIdx == GTVoltageTier.ULV.ordinal() && !isVanillaCooking) ? GTVoltageTier.ULV : GTVoltageTier.LV;
+            GTVoltageTier lowestElectric = isVanillaCooking ? GTVoltageTier.LV : GTVoltageTier.getByIndex(minIdx);
             node.setTargetTier(lowestElectric);
             ResourceLocation sbWs = node.getWorkstationForTier(lowestElectric);
             if (sbWs != null) {
                 node.setMachineIcon(sbWs);
+            } else if (isVanillaCooking) {
+                node.setMachineIcon(ResourceLocation.tryParse("gtceu:lv_electric_furnace"));
             }
             syncSharedFrameHardware(parent, node);
             if (parent != null) parent.markSummaryDirty();

@@ -224,6 +224,8 @@ public class BoardManager {
     public BoardPage addPage(String name, String folderPath) { return pageManager.addPage(name, folderPath); }
     public void addPage(BoardPage page) { pageManager.addPage(page); }
     public boolean removePage(int index) { return pageManager.removePage(index); }
+    public boolean removePage(BoardPage page) { return pageManager.removePage(page); }
+    public boolean removePage(String pageId) { return pageManager.removePage(pageId); }
     public void switchPage(int index) { pageManager.switchPage(index); }
     public void renamePage(int index, String newName) { pageManager.renamePage(index, newName); }
     public void setFolderPath(int index, String folderPath) { pageManager.setFolderPath(index, folderPath); }

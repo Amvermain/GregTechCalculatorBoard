@@ -35,9 +35,16 @@ public final class CanvasSingleWireHandler {
         boolean connected = false;
         for (NodeWidget targetWidget : screen.getNodeWidgets()) {
             if (targetWidget != wireStartNode && targetWidget.isPointInside(canvasMouseX, canvasMouseY)) {
+                if (graph != null && graph.isNodeInFoldedFrame(targetWidget.getNode().getId())) {
+                    continue;
+                }
                 connected = tryConnectToPort(wireStartNode, wireStartPortIdx, wireStartIsInput, targetWidget, canvasMouseX, canvasMouseY, graph, screen);
                 if (connected) break;
             }
+        }
+
+        if (!connected && graph != null) {
+            connected = tryConnectToFoldedPort(wireStartNode, wireStartPortIdx, wireStartIsInput, canvasMouseX, canvasMouseY, graph, screen);
         }
 
         if (!connected && screen.getSearchDialog() != null) {
@@ -214,5 +221,82 @@ public final class CanvasSingleWireHandler {
             }
         }
         return null;
+    }
+
+    private static boolean tryConnectToFoldedPort(
+            NodeWidget wireStartNode,
+            int wireStartPortIdx,
+            boolean wireStartIsInput,
+            double canvasMouseX,
+            double canvasMouseY,
+            FlowGraph graph,
+            BoardScreen screen
+    ) {
+        var hit = com.gtceu.calcboard.client.gui.render.CanvasGroupFrameRenderer.findHoveredFoldedPort(graph, canvasMouseX, canvasMouseY);
+        if (hit == null || hit.port().internalOrigins().isEmpty()) return false;
+
+        RecipeNode startNode = wireStartNode.getNode();
+        if (!wireStartIsInput) {
+            if (!hit.isInput()) return false;
+            RecipeNode.PortOrigin targetOrigin = findBestMatchingOrigin(graph, startNode, wireStartPortIdx, false, hit.port());
+            if (targetOrigin == null) return false;
+
+            RecipeNode toNode = graph.findNodeById(targetOrigin.internalNodeId());
+            if (toNode == null) return false;
+
+            int inPortIdx = targetOrigin.internalPortIndex();
+            bindRerouteStacks(startNode, toNode, wireStartPortIdx, inPortIdx);
+            graph.addConnection(startNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx);
+            screen.recordCommand(new BoardCommand.ConnectWireCommand(new FlowGraph.ConnectionEdge(startNode.getId(), wireStartPortIdx, toNode.getId(), inPortIdx)));
+            screen.markSummaryDirty();
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            return true;
+        } else {
+            if (hit.isInput()) return false;
+            RecipeNode.PortOrigin sourceOrigin = findBestMatchingOrigin(graph, startNode, wireStartPortIdx, true, hit.port());
+            if (sourceOrigin == null) return false;
+
+            RecipeNode fromNode = graph.findNodeById(sourceOrigin.internalNodeId());
+            if (fromNode == null) return false;
+
+            int outPortIdx = sourceOrigin.internalPortIndex();
+            bindRerouteStacks(fromNode, startNode, outPortIdx, wireStartPortIdx);
+            graph.addConnection(fromNode.getId(), outPortIdx, startNode.getId(), wireStartPortIdx);
+            screen.recordCommand(new BoardCommand.ConnectWireCommand(new FlowGraph.ConnectionEdge(fromNode.getId(), outPortIdx, startNode.getId(), wireStartPortIdx)));
+            screen.markSummaryDirty();
+            if (screen.getWireRenderer() != null) {
+                screen.getWireRenderer().markDirty();
+            }
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F));
+            return true;
+        }
+    }
+
+    private static RecipeNode.PortOrigin findBestMatchingOrigin(
+            FlowGraph graph,
+            RecipeNode otherNode,
+            int otherPortIdx,
+            boolean otherIsInput,
+            com.gtceu.calcboard.api.solver.FlowGraphTopologyAnalyzer.AggregatedFoldedPort foldedPort
+    ) {
+        IngredientStack otherStack = otherIsInput
+                ? (otherPortIdx >= 0 && otherPortIdx < otherNode.getInputs().size() ? otherNode.getInputs().get(otherPortIdx) : null)
+                : (otherPortIdx >= 0 && otherPortIdx < otherNode.getOutputs().size() ? otherNode.getOutputs().get(otherPortIdx) : null);
+
+        for (RecipeNode.PortOrigin origin : foldedPort.internalOrigins()) {
+            RecipeNode internalNode = graph.findNodeById(origin.internalNodeId());
+            if (internalNode == null) continue;
+            IngredientStack internalStack = foldedPort.isInput()
+                    ? (origin.internalPortIndex() >= 0 && origin.internalPortIndex() < internalNode.getInputs().size() ? internalNode.getInputs().get(origin.internalPortIndex()) : null)
+                    : (origin.internalPortIndex() >= 0 && origin.internalPortIndex() < internalNode.getOutputs().size() ? internalNode.getOutputs().get(origin.internalPortIndex()) : null);
+
+            if (otherStack != null && internalStack != null && otherStack.matchesOrAlternative(internalStack)) {
+                return origin;
+            }
+        }
+        return foldedPort.internalOrigins().get(0);
     }
 }

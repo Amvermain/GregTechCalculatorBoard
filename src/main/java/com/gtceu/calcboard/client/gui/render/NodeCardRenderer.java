@@ -17,6 +17,7 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.solver.FlowGraphSolver;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
+import com.gtceu.calcboard.api.model.BoundaryPinNode;
 import com.gtceu.calcboard.api.catalog.MachineAddon;
 import com.gtceu.calcboard.api.type.OverclockMode;
 import com.gtceu.calcboard.api.type.WireAnimationMode;
@@ -41,7 +42,8 @@ public class NodeCardRenderer {
     private static final Component COUNT_LABEL = Component.translatable("gui.gtcalcboard.count");
     private static final Map<ResourceLocation, ItemStack> MACHINE_ICON_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
-    private static ItemStack getOrCreateMachineIcon(ResourceLocation iconId) {
+    public static ItemStack getOrCreateMachineIcon(ResourceLocation iconId) {
+        if (iconId == null) return ItemStack.EMPTY;
         return MACHINE_ICON_CACHE.computeIfAbsent(iconId, id -> {
             var item = ForgeRegistries.ITEMS.getValue(id);
             if ((item == null || item == Items.AIR) && ForgeRegistries.BLOCKS != null) {
@@ -66,6 +68,11 @@ public class NodeCardRenderer {
 
         if (node.isReroute()) {
             renderRerouteNode(widget, graphics, font, x, y, mouseX, mouseY);
+            return;
+        }
+
+        if (node.isBoundaryPin()) {
+            renderBoundaryPinNode(widget, graphics, font, (BoundaryPinNode) node, x, y, cardW, height, mouseX, mouseY);
             return;
         }
 
@@ -894,6 +901,161 @@ public class NodeCardRenderer {
 
     private static void renderIngredient(GuiGraphics graphics, IngredientStack stack, int x, int y) {
         IngredientRenderer.render(graphics, stack, x, y);
+    }
+
+    private static void renderBoundaryPinNode(
+            NodeWidget widget,
+            GuiGraphics graphics,
+            Font font,
+            BoundaryPinNode pin,
+            int x,
+            int y,
+            int cardW,
+            int height,
+            int mouseX,
+            int mouseY
+    ) {
+        boolean isSelected = (Minecraft.getInstance().screen instanceof BoardScreen bs) && bs.isNodeSelected(pin.getId());
+        boolean isHovered = widget.isPointInside(mouseX, mouseY);
+        boolean isInput = pin.getDirection() == BoundaryPinNode.PinDirection.INPUT;
+        boolean isFlipped = pin.isFlipped();
+
+        renderBoundaryPinFrame(graphics, x, y, isSelected, isHovered, isInput);
+        renderBoundaryPinDirectionBadge(graphics, font, x, y, isInput);
+        renderBoundaryPinCenterIcon(graphics, font, pin, x, y, isInput);
+        renderBoundaryPinRateBadge(graphics, font, widget, pin, x, y, isInput);
+        renderBoundaryPinPortDot(graphics, widget, x, y, isInput, isFlipped, mouseX, mouseY);
+        renderBoundaryPinCloseButton(graphics, font, widget, x, y, isHovered, isInput, isFlipped, mouseX, mouseY);
+        renderBoundaryPinNameEditor(graphics, font, widget, x, y);
+    }
+
+    private static void renderBoundaryPinFrame(GuiGraphics graphics, int x, int y, boolean isSelected, boolean isHovered, boolean isInput) {
+        int bg = isHovered
+                ? (isInput ? 0xF0133E3A : 0xF03D280A)
+                : (isInput ? 0xF00D2825 : 0xF02A1A07);
+        graphics.fill(x + 2, y + 2, x + 30, y + 30, bg);
+
+        int border = isSelected
+                ? 0xFF00FFFF
+                : (isHovered
+                        ? (isInput ? 0xFF2DD4BF : 0xFFFBBF24)
+                        : (isInput ? 0xFF0D9488 : 0xFFD97706));
+        graphics.renderOutline(x + 2, y + 2, 28, 28, border);
+        if (isSelected) {
+            graphics.renderOutline(x + 1, y + 1, 30, 30, 0x8800FFFF);
+        }
+    }
+
+    private static void renderBoundaryPinDirectionBadge(GuiGraphics graphics, Font font, int x, int y, boolean isInput) {
+        String dirText = isInput ? "IN" : "OUT";
+        int dirTextW = font.width(dirText);
+        int dirBadgeW = dirTextW + 6;
+        int dirBadgeX = x + 16 - dirBadgeW / 2;
+        int dirBadgeY = y - 8;
+        graphics.fill(dirBadgeX, dirBadgeY, dirBadgeX + dirBadgeW, dirBadgeY + 9, isInput ? 0xEE042F2E : 0xEE331B05);
+        graphics.renderOutline(dirBadgeX, dirBadgeY, dirBadgeW, 9, isInput ? 0xFF0D9488 : 0xFFD97706);
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 200);
+        graphics.drawString(font, dirText, dirBadgeX + 3, dirBadgeY + 1, isInput ? 0xFF5EEAD4 : 0xFFFCD34D, false);
+        graphics.pose().popPose();
+    }
+
+    private static void renderBoundaryPinCenterIcon(GuiGraphics graphics, Font font, BoundaryPinNode pin, int x, int y, boolean isInput) {
+        IngredientStack stack = pin.getBoundIngredient();
+        if (stack == null) {
+            stack = isInput
+                    ? (!pin.getOutputs().isEmpty() ? pin.getOutputs().get(0) : null)
+                    : (!pin.getInputs().isEmpty() ? pin.getInputs().get(0) : null);
+        }
+        if (stack != null) {
+            IngredientRenderer.render(graphics, stack, x + 8, y + 8);
+        } else {
+            graphics.drawString(font, isInput ? "»" : "«", x + 13, y + 12, isInput ? 0xFF5EEAD4 : 0xFFFCD34D, false);
+        }
+    }
+
+    private static void renderBoundaryPinRateBadge(GuiGraphics graphics, Font font, NodeWidget widget, BoundaryPinNode pin, int x, int y, boolean isInput) {
+        IngredientStack stack = pin.getBoundIngredient();
+        if (stack == null) {
+            stack = isInput
+                    ? (!pin.getOutputs().isEmpty() ? pin.getOutputs().get(0) : null)
+                    : (!pin.getInputs().isEmpty() ? pin.getInputs().get(0) : null);
+        }
+        FlowGraph graph = widget.getParent() != null ? widget.getParent().getGraph() : (Minecraft.getInstance().screen instanceof BoardScreen bs ? bs.getGraph() : null);
+        FlowGraphSolver.PortFlowStats stats = graph != null
+                ? (isInput ? graph.getOutputPortStats(pin, 0) : graph.getInputPortStats(pin, 0))
+                : null;
+        double rate = (stats != null && stats.isConnected() && stats.connectedRate() > 0.0001)
+                ? stats.connectedRate()
+                : (stack != null ? stack.getAmount() : 0.0);
+        String ratePrefix = isInput ? "+" : "-";
+        String rateStr = ratePrefix + FormatUtil.formatRate(rate, stack);
+        int rateTextW = font.width(rateStr);
+        int rateBadgeW = Math.max(26, rateTextW + 6);
+        int rateBadgeX = x + 16 - rateBadgeW / 2;
+        int rateBadgeY = y + 31;
+        graphics.fill(rateBadgeX, rateBadgeY, rateBadgeX + rateBadgeW, rateBadgeY + 9, 0xEE0B132B);
+        graphics.renderOutline(rateBadgeX, rateBadgeY, rateBadgeW, 9, isInput ? 0xFF0D9488 : 0xFFD97706);
+        int textColor = (stats != null && stats.isConnected() && stats.isBalanced())
+                ? 0xFF4ADE80
+                : (isInput ? 0xFF5EEAD4 : 0xFFFCD34D);
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 200);
+        graphics.drawString(font, rateStr, rateBadgeX + (rateBadgeW - rateTextW) / 2, rateBadgeY + 1, textColor, false);
+        graphics.pose().popPose();
+    }
+
+    private static void renderBoundaryPinPortDot(GuiGraphics graphics, NodeWidget widget, int x, int y, boolean isInput, boolean isFlipped, int mouseX, int mouseY) {
+        if (isInput) {
+            int outDotX = isFlipped ? x : (x + 28);
+            boolean outHover = widget.getHoveredOutputPortIndex(mouseX, mouseY) >= 0;
+            int outDotColor = outHover ? 0xFF00FFFF : 0xFF38BDF8;
+            graphics.fill(outDotX, y + 14, outDotX + 4, y + 18, outDotColor);
+            graphics.renderOutline(outDotX - 1, y + 13, 6, 6, outHover ? 0xFFFFFFFF : 0x88000000);
+        } else {
+            int inDotX = isFlipped ? (x + 28) : x;
+            boolean inHover = widget.getHoveredInputPortIndex(mouseX, mouseY) >= 0;
+            int inDotColor = inHover ? 0xFF00FFFF : 0xFF38BDF8;
+            graphics.fill(inDotX, y + 14, inDotX + 4, y + 18, inDotColor);
+            graphics.renderOutline(inDotX - 1, y + 13, 6, 6, inHover ? 0xFFFFFFFF : 0x88000000);
+        }
+    }
+
+    private static void renderBoundaryPinCloseButton(GuiGraphics graphics, Font font, NodeWidget widget, int x, int y, boolean isHovered, boolean isInput, boolean isFlipped, int mouseX, int mouseY) {
+        if (!isHovered) {
+            return;
+        }
+        int closeX = isInput
+                ? (isFlipped ? (x + 21) : (x + 2))
+                : (isFlipped ? (x + 2) : (x + 21));
+        int closeY = y + 2;
+        boolean closeHover = widget.isCloseButtonHovered(mouseX, mouseY);
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 250);
+        graphics.fill(closeX, closeY, closeX + 9, closeY + 9, closeHover ? 0xFF7F1D1D : 0xEE0F172A);
+        graphics.renderOutline(closeX, closeY, 9, 9, closeHover ? 0xFFEF4444 : 0xFF475569);
+        graphics.pose().scale(0.7f, 0.7f, 1.0f);
+        int sx = (int) ((closeX + 2) / 0.7f);
+        int sy = (int) ((closeY + 1) / 0.7f);
+        graphics.drawString(font, "✕", sx, sy, closeHover ? 0xFFFCA5A5 : 0xFF94A3B8, false);
+        graphics.pose().popPose();
+    }
+
+    private static void renderBoundaryPinNameEditor(GuiGraphics graphics, Font font, NodeWidget widget, int x, int y) {
+        NodeNameEditor nameEditor = widget.getNameEditor();
+        if (nameEditor == null || !nameEditor.isEditing()) {
+            return;
+        }
+        String editTxt = nameEditor.getDisplayText();
+        int editW = Math.max(48, font.width(editTxt) + 8);
+        int editX = x + 16 - editW / 2;
+        int editY = y - 24;
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, 300);
+        graphics.fill(editX, editY, editX + editW, editY + 14, 0xF00F172A);
+        graphics.renderOutline(editX, editY, editW, 14, 0xFF55FFFF);
+        graphics.drawString(font, editTxt, editX + 4, editY + 3, 0xFF55FFFF, false);
+        graphics.pose().popPose();
     }
 
 }

@@ -27,10 +27,27 @@ public final class FlowGraphSolver {
         int connectionCount,
         boolean isConnected,
         double effectiveRate,
-        boolean isUpstreamThrottled
+        boolean isUpstreamThrottled,
+        boolean isSteadyStateRecirculating,
+        double externalSupplyRate,
+        double loopSupplyRate,
+        double recirculationRatio,
+        boolean isUnfedDampedLoop
     ) {
         public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected) {
-            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, requiredOrProducedRate, false);
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, requiredOrProducedRate, false, false, 0.0, 0.0, 0.0, false);
+        }
+
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected, double effectiveRate, boolean isUpstreamThrottled) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, effectiveRate, isUpstreamThrottled, false, 0.0, 0.0, 0.0, false);
+        }
+
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected, double effectiveRate, boolean isUpstreamThrottled, boolean isSteadyStateRecirculating) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, effectiveRate, isUpstreamThrottled, isSteadyStateRecirculating, 0.0, 0.0, 0.0, false);
+        }
+
+        public PortFlowStats(double requiredOrProducedRate, double connectedRate, int connectionCount, boolean isConnected, double effectiveRate, boolean isUpstreamThrottled, boolean isSteadyStateRecirculating, double externalSupplyRate, double loopSupplyRate, double recirculationRatio) {
+            this(requiredOrProducedRate, connectedRate, connectionCount, isConnected, effectiveRate, isUpstreamThrottled, isSteadyStateRecirculating, externalSupplyRate, loopSupplyRate, recirculationRatio, false);
         }
 
         public double getRatio() {
@@ -47,13 +64,14 @@ public final class FlowGraphSolver {
         }
 
         public boolean isInputDeficit() {
-            if (!isConnected) return false;
+            if (!isConnected || isSteadyStateRecirculating) return false;
             double effectiveReq = effectiveRate > 0.0001 ? effectiveRate : requiredOrProducedRate;
             return connectedRate < requiredOrProducedRate - 0.001 && connectedRate <= effectiveReq + 0.001;
         }
 
         public boolean isNominalDeficit() {
-            return isConnected && connectedRate < requiredOrProducedRate - 0.001;
+            if (!isConnected || isSteadyStateRecirculating) return false;
+            return connectedRate < requiredOrProducedRate - 0.001;
         }
 
         public boolean isUpstreamThrottled() {

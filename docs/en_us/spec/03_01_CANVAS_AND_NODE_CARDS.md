@@ -319,11 +319,11 @@ Provides a single-source-of-truth immutable layout model to decouple the renderi
 Visualizes divergence, conflict, and loop anomalies across complex flowsheets, offering instant resolution guides:
 
 * **5 Contextual Instability Badges (`NodeBadgeRegistry`)**:
-  - `[⚠️ Loop]`: Closed self-contained loop lacking external makeup inputs, suppressing infinite scale explosion.
-  - `[⚠️ Growth]`: Positive-feedback amplification loop where flow scales multiplicatively per cycle.
-  - `[⚠️ Catalyst]`: Catalyst regeneration loop experiencing micro-fractional decay.
-  - `[⚠️ Conflict]`: Conflicting flow rates imposed by multiple inconsistent target anchors.
-  - `[⚠️ Yield]`: Sub-ppm micro-yield recipe requiring extreme production scaling ($< 10^{-5}$).
+  - `[⚠ Loop]`: Closed self-contained loop lacking external makeup inputs, suppressing infinite scale explosion.
+  - `[⚠ Growth]`: Positive-feedback amplification loop where flow scales multiplicatively per cycle.
+  - `[⚠ Catalyst]`: Catalyst regeneration loop experiencing micro-fractional decay.
+  - `[⚠ Conflict]`: Conflicting flow rates imposed by multiple inconsistent target anchors.
+  - `[⚠ Yield]`: Sub-ppm micro-yield recipe requiring extreme production scaling ($< 10^{-5}$).
 * **5-Line Interactive Diagnostic Tooltip**:
   - Displays a structured 5-line diagnostic breakdown on hover: `Cause Summary`, `In-Game Mechanism`, `Recommended Fix 1`, `Recommended Fix 2`, and `[Click] Action Shortcut`.
   - Clicking the badge directly clears conflicting anchors or locks the node as a primary anchor in a single action.
@@ -332,4 +332,4 @@ Visualizes divergence, conflict, and loop anomalies across complex flowsheets, o
 
 ---
 
-> ➡️ **Next Sub-Specification**: [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)
+> ➡ **Next Sub-Specification**: [[03-02] Machine Configuration & Addon Rack UI](03_02_MACHINE_CONFIG_AND_ADDONS.md)

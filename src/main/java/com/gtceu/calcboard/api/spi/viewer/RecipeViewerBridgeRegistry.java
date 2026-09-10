@@ -86,4 +86,10 @@ public final class RecipeViewerBridgeRegistry {
         }
         return false;
     }
+
+    public static void invalidateAllTextCaches() {
+        for (IRecipeViewerBridge b : getActiveBridges()) {
+            b.invalidateTextCaches();
+        }
+    }
 }

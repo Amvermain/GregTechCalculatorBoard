@@ -18,6 +18,8 @@ import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.greate.GreateProperties;
 import com.gtceu.calcboard.compat.gtceu.GTTurbineHelper;
+import com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler;
+import com.gtceu.calcboard.compat.gtceu.handler.GTNodeValidator;
 import com.gtceu.calcboard.compat.gtceu.physics.GTPowerCalculator;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
 import net.minecraft.client.gui.Font;
@@ -58,7 +60,8 @@ public final class NodeControlsTooltipRenderer {
     public static boolean renderNodeBadgeTooltip(GuiGraphics graphics, Font font, BoardScreen screen, NodeWidget widget, double canvasMouseX, double canvasMouseY, int mouseX, int mouseY) {
         RecipeNode node = widget.getNode();
         if (node == null || node.isReroute()) return false;
-        List<NodeBadge> badges = NodeBadgeRegistry.getBadgesForNode(node);
+        FlowGraph graph = screen != null ? screen.getGraph() : (widget != null && widget.getParent() != null ? widget.getParent().getGraph() : (node != null ? node.getParentGraph() : null));
+        List<NodeBadge> badges = NodeBadgeRegistry.getBadgesForNode(node, graph);
         if (badges.isEmpty()) return false;
 
         int x = (int) node.getPosX();
@@ -235,6 +238,12 @@ public final class NodeControlsTooltipRenderer {
             list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
         } else if (!n.isGenerator()) {
             list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.addon_cat.energy_hatch").getString() + " §7(" + tierName + ")"));
+            GTVoltageTier reqTier = GTNodeValidator.getRequiredRecipeTier(n);
+            GTVoltageTier hatchTier = GTAddonCompatibilityHandler.getPrimaryEnergyHatchTier(n);
+            if (reqTier != null && (hatchTier == null || hatchTier.ordinal() < reqTier.ordinal())) {
+                String curTierName = hatchTier != null ? hatchTier.getName() : Component.translatable("gui.gtcalcboard.none_plain").getString();
+                list.add(Component.literal("§c❌ " + Component.translatable("gui.gtcalcboard.node_warning.energy_hatch_tier_deficit", curTierName, reqTier.getName()).getString()));
+            }
             list.add(Component.literal("§7" + Component.translatable("gui.gtcalcboard.tooltip.multiblock_energy_hatch_hint").getString()));
         } else {
             list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + tierName + ")"));
@@ -254,6 +263,12 @@ public final class NodeControlsTooltipRenderer {
         List<Component> list = new ArrayList<>();
         String tierName = n.getTargetTier() != null ? n.getTargetTier().getName() : "LV";
         list.add(Component.literal("§e⚡ " + Component.translatable("gui.gtcalcboard.config.voltage_tier").getString() + " §7(" + tierName + ")"));
+        if (!n.isGenerator()) {
+            GTVoltageTier reqTier = GTNodeValidator.getRequiredRecipeTier(n);
+            if (reqTier != null && n.getTargetTier() != null && n.getTargetTier().ordinal() < reqTier.ordinal()) {
+                list.add(Component.literal("§c❌ " + Component.translatable("gui.gtcalcboard.node_warning.voltage_tier_deficit", n.getTargetTier().getName(), reqTier.getName()).getString()));
+            }
+        }
         list.add(Component.literal("§7[Click / Scroll]: §f" + Component.translatable("gui.gtcalcboard.tooltip.cycle_tier").getString()));
         return list;
     }

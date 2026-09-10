@@ -85,6 +85,12 @@ public final class IngredientRenderer {
     private static CachedItem computeItem(ResourceLocation id) {
         try {
             var item = ForgeRegistries.ITEMS.getValue(id);
+            if ((item == null || item == Items.AIR) && ForgeRegistries.BLOCKS != null) {
+                var block = ForgeRegistries.BLOCKS.getValue(id);
+                if (block != null && block.asItem() != Items.AIR) {
+                    item = block.asItem();
+                }
+            }
             if (item == null || item == Items.AIR) return null;
             ItemStack stack = new ItemStack(item);
             var mc = net.minecraft.client.Minecraft.getInstance();

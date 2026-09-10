@@ -21,6 +21,8 @@ public class CanvasWireInteractionHandler {
     private NodeWidget wireStartNode = null;
     private int wireStartPortIdx = -1;
     private boolean wireStartIsInput = false;
+    private com.gtceu.calcboard.api.model.CanvasGroupFrame wireStartFoldedFrame = null;
+    private int wireStartFoldedPortRow = -1;
     private long lastWireClickTime = 0;
     private FlowGraph.ConnectionEdge lastClickedEdge = null;
 
@@ -44,6 +46,16 @@ public class CanvasWireInteractionHandler {
         this.wireStartNode = null;
         this.wireStartPortIdx = -1;
         this.wireStartIsInput = false;
+        this.wireStartFoldedFrame = null;
+        this.wireStartFoldedPortRow = -1;
+    }
+
+    public void startWireFromFolded(NodeWidget widget, int portIdx, boolean isInput, com.gtceu.calcboard.api.model.CanvasGroupFrame frame, int portRow) {
+        this.wireStartNode = widget;
+        this.wireStartPortIdx = portIdx;
+        this.wireStartIsInput = isInput;
+        this.wireStartFoldedFrame = frame;
+        this.wireStartFoldedPortRow = portRow;
     }
 
     public boolean handlePortClick(
@@ -309,8 +321,17 @@ public class CanvasWireInteractionHandler {
         double canvasMouseX = screen.toCanvasX(mouseX);
         double canvasMouseY = screen.toCanvasY(mouseY);
 
-        double startX = wireStartIsInput ? wireStartNode.getInputPortX(wireStartPortIdx) : wireStartNode.getOutputPortX(wireStartPortIdx);
-        double startY = wireStartIsInput ? wireStartNode.getInputPortY(wireStartPortIdx) : wireStartNode.getOutputPortY(wireStartPortIdx);
+        double startX;
+        double startY;
+        if (wireStartFoldedFrame != null && wireStartFoldedPortRow >= 0) {
+            startX = wireStartIsInput
+                    ? (wireStartFoldedFrame.getPosX() + 6.0)
+                    : (wireStartFoldedFrame.getPosX() + wireStartFoldedFrame.getWidth() - 6.0);
+            startY = wireStartFoldedFrame.getPosY() + 64.0 + wireStartFoldedPortRow * 18.0 + 8.0;
+        } else {
+            startX = wireStartIsInput ? wireStartNode.getInputPortX(wireStartPortIdx) : wireStartNode.getOutputPortX(wireStartPortIdx);
+            startY = wireStartIsInput ? wireStartNode.getInputPortY(wireStartPortIdx) : wireStartNode.getOutputPortY(wireStartPortIdx);
+        }
 
         int wireColor = 0xFF38BDF8;
         if (wireStartIsInput) {

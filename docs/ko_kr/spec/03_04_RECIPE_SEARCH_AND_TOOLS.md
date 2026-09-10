@@ -41,7 +41,7 @@
       <!-- Result 1 -->
       <div style="background: #14171e; border: 1px solid #334155; border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span>⚗️</span>
+          <span>⚗</span>
           <div>
             <div style="color: #f8fafc; font-weight: bold; font-size: 12px;">벤젠 크래킹 ➔ 에틸렌 & 가솔린</div>
             <div style="color: #64748b; font-size: 10px;">대형 화학 반응기 | 소요 시간: 1.25s | 소모 전력: 480 EU/t (LV)</div>
@@ -253,7 +253,7 @@
         </div>
         <div style="background: #141b2a; border: 1px solid #232d3d; border-radius: 3px; padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span>⚗️</span>
+            <span>⚗</span>
             <span style="color: #cbd5e1; font-size: 11px;">황산 제조</span>
           </div>
           <span style="color: #64748b; font-size: 10px;">1</span>
@@ -441,4 +441,4 @@
 
 ---
 
-> ➡️ **다음 장으로 이동**: [[04] 멀티플레이어 동시성 제어 및 네트워크 프로토콜](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)
+> ➡ **다음 장으로 이동**: [[04] 멀티플레이어 동시성 제어 및 네트워크 프로토콜](04_MULTIPLAYER_AND_NETWORK_PROTOCOL.md)

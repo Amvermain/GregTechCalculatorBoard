@@ -237,7 +237,11 @@ public class JeiRecipeConverter {
 
         ResourceLocation icon = preferredWorkstation;
         if (icon == null && !node.getAvailableWorkstations().isEmpty()) {
+            var adapter = ModAdapterRegistry.getAdapterForNode(node);
             GTVoltageTier initialTier = details.tier != null ? details.tier : GTVoltageTier.LV;
+            if (adapter != null) {
+                initialTier = adapter.sanitizeTargetTier(node, initialTier);
+            }
             ResourceLocation tieredWs = node.getWorkstationForTier(initialTier);
             if (tieredWs != null && (node.getAvailableWorkstations().contains(tieredWs) || ForgeRegistries.ITEMS.containsKey(tieredWs))) {
                 icon = tieredWs;

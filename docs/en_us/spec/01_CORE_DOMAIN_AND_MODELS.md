@@ -457,7 +457,7 @@ Serves as fixed boundary conditions for flow scaling across cyclic loops and ter
   - `targetBatchAmount`, `targetBatchTimeSec`: Target batch production quantity and completion deadline constraints for terminal nodes.
   - The 2-stage linear flow solver (`TwoStageLinearFlowSolver`) adopts these anchors as strict boundary conditions to solve for unique, consistent flow rates.
 * **Conflict Detection (`AnchorConflict`)**:
-  - Sets a conflict flag and activates the `[⚠️ Conflict]` badge if multiple mutually inconsistent flow anchors reside in the same connected subgraph component.
+  - Sets a conflict flag and activates the `[⚠ Conflict]` badge if multiple mutually inconsistent flow anchors reside in the same connected subgraph component.
 
 ### 12.2 Shared Machine Pool Frame Domain Model (`SharedMachinePool`)
 A frame-based domain model grouping multiple heterogeneous recipe nodes to run on a time-shared physical machine cluster:
@@ -471,4 +471,4 @@ A frame-based domain model grouping multiple heterogeneous recipe nodes to run o
 
 ---
 
-> ➡️ **Next Chapter**: [[02] Mathematical Engine & Graph Analysis Algorithms](02_MATH_AND_ALGORITHMS.md)
+> ➡ **Next Chapter**: [[02] Mathematical Engine & Graph Analysis Algorithms](02_MATH_AND_ALGORITHMS.md)

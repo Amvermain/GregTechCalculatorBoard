@@ -212,28 +212,28 @@ public class NodeWidget {
     public float getOutputPortX(int index) {
         var port = getLayoutBounds().findPort(false, index);
         if (port != null) return port.anchorX();
-        if (node.isReroute()) return (float) (node.getPosX() + (node.isFlipped() ? 0 : 32));
+        if (node.isReroute() || node.isBoundaryPin()) return (float) (node.getPosX() + (node.isFlipped() ? 0 : 32));
         return (float) (node.getPosX() + (node.isFlipped() ? 6 : getWidth() - 6));
     }
 
     public float getOutputPortY(int index) {
         var port = getLayoutBounds().findPort(false, index);
         if (port != null) return port.anchorY();
-        if (node.isReroute()) return (float) (node.getPosY() + 16);
+        if (node.isReroute() || node.isBoundaryPin()) return (float) (node.getPosY() + 16);
         return (float) (getContentStartY() + index * 18 + 8);
     }
 
     public float getInputPortX(int index) {
         var port = getLayoutBounds().findPort(true, index);
         if (port != null) return port.anchorX();
-        if (node.isReroute()) return (float) (node.getPosX() + (node.isFlipped() ? 32 : 0));
+        if (node.isReroute() || node.isBoundaryPin()) return (float) (node.getPosX() + (node.isFlipped() ? 32 : 0));
         return (float) (node.getPosX() + (node.isFlipped() ? getWidth() - 6 : 6));
     }
 
     public float getInputPortY(int index) {
         var port = getLayoutBounds().findPort(true, index);
         if (port != null) return port.anchorY();
-        if (node.isReroute()) return (float) (node.getPosY() + 16);
+        if (node.isReroute() || node.isBoundaryPin()) return (float) (node.getPosY() + 16);
         return (float) (getContentStartY() + index * 18 + 8);
     }
 
@@ -274,6 +274,16 @@ public class NodeWidget {
     }
 
     public boolean isPointInside(double canvasMouseX, double canvasMouseY) {
+        if (nameEditor != null && nameEditor.isEditing() && node.isBoundaryPin()) {
+            var mc = Minecraft.getInstance();
+            var font = mc != null ? mc.font : null;
+            int editW = Math.max(48, (font != null ? font.width(nameEditor.getDisplayText()) : 40) + 8);
+            int editX = (int) node.getPosX() + 16 - editW / 2;
+            int editY = (int) node.getPosY() - 24;
+            if (canvasMouseX >= editX && canvasMouseX <= editX + editW && canvasMouseY >= editY && canvasMouseY <= editY + 14) {
+                return true;
+            }
+        }
         return getLayoutBounds().isPointInside(canvasMouseX, canvasMouseY);
     }
 
@@ -318,6 +328,15 @@ public class NodeWidget {
             for (com.gtceu.calcboard.api.model.FlowGraph.ConnectionEdge edge : toRemove) {
                 graph.removeConnection(edge);
             }
+        }
+
+        if (node.isBoundaryPin() || node.isReroute()) {
+            invalidateCache();
+            if (parent != null) parent.markSummaryDirty();
+            Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.9F)
+            );
+            return;
         }
 
         if (isInput) {
@@ -454,6 +473,10 @@ public class NodeWidget {
             long now = System.currentTimeMillis();
             if (now - lastHeaderClickTime < 350) {
                 commitCountEdit();
+                if (node.isModule() && !node.getSubPageId().isEmpty() && parent != null) {
+                    parent.openModuleSubPage(node);
+                    return true;
+                }
                 if (node.isReroute()) {
                     targetBatchEditor.startEditing();
                     Minecraft.getInstance().getSoundManager().play(
@@ -479,8 +502,15 @@ public class NodeWidget {
         int y = (int) node.getPosY();
 
         if (nameEditor.isEditing()) {
-            int titleX = x + (node.getMachineIcon() != null ? 22 : 6);
-            nameEditor.onDrag(font, canvasMouseX, titleX + 2);
+            if (node.isBoundaryPin()) {
+                String editTxt = nameEditor.getDisplayText();
+                int editW = Math.max(48, font.width(editTxt) + 8);
+                int editX = x + 16 - editW / 2;
+                nameEditor.onDrag(font, canvasMouseX, editX + 4);
+            } else {
+                int titleX = x + (node.getMachineIcon() != null ? 22 : 6);
+                nameEditor.onDrag(font, canvasMouseX, titleX + 2);
+            }
             return true;
         }
 

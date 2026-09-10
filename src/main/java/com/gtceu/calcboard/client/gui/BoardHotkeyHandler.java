@@ -76,6 +76,13 @@ public final class BoardHotkeyHandler {
             }
         }
 
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (BoardManager.getInstance().getActivePage() != null && BoardManager.getInstance().getActivePage().isModuleSubPage()) {
+                screen.returnToParentPage();
+                return true;
+            }
+        }
+
         boolean isControl = isControlDown(modifiers);
         boolean isAlt = isAltDown(modifiers);
         boolean isShift = isShiftDown(modifiers);

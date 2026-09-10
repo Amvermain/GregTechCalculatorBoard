@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui.layout;
 
+import com.gtceu.calcboard.api.model.BoundaryPinNode;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.EnergyType;
@@ -20,7 +21,78 @@ public final class NodeLayoutCalculator {
         if (node.isReroute()) {
             return computeRerouteLayout(node, targetBatchEditing);
         }
+        if (node.isBoundaryPin()) {
+            return computeBoundaryPinLayout((BoundaryPinNode) node);
+        }
         return computeStandardLayout(node, isSlimMode, fontCountBoxW);
+    }
+
+    private static NodeLayoutBounds computeBoundaryPinLayout(BoundaryPinNode pin) {
+        int x = (int) pin.getPosX();
+        int y = (int) pin.getPosY();
+        int size = 32;
+        boolean isFlipped = pin.isFlipped();
+
+        RectBounds cardBounds = new RectBounds(x, y, size, size);
+        RectBounds headerBounds = cardBounds;
+
+        List<PortBounds> inputPorts = new ArrayList<>(1);
+        List<PortBounds> outputPorts = new ArrayList<>(1);
+
+        RectBounds closeBtnBounds;
+        if (pin.getDirection() == BoundaryPinNode.PinDirection.INPUT) {
+            int outMinX = isFlipped ? (x - 4) : (x + 22);
+            RectBounds outHitBox = new RectBounds(outMinX, y + 6, 14, 20);
+            RectBounds outSlotBounds = new RectBounds(outMinX, y + 6, 14, 20);
+            float outAnchorX = (float) (isFlipped ? x : (x + 32));
+            float outAnchorY = (float) (y + 16);
+            outputPorts.add(new PortBounds(0, false, outHitBox, outSlotBounds, outAnchorX, outAnchorY));
+
+            int closeX = isFlipped ? (x + 21) : (x + 2);
+            closeBtnBounds = new RectBounds(closeX, y + 2, 9, 9);
+        } else {
+            int inMinX = isFlipped ? (x + 22) : (x - 4);
+            RectBounds inHitBox = new RectBounds(inMinX, y + 6, 14, 20);
+            RectBounds inSlotBounds = new RectBounds(inMinX, y + 6, 14, 20);
+            float inAnchorX = (float) (isFlipped ? (x + 32) : x);
+            float inAnchorY = (float) (y + 16);
+            inputPorts.add(new PortBounds(0, true, inHitBox, inSlotBounds, inAnchorX, inAnchorY));
+
+            int closeX = isFlipped ? (x + 2) : (x + 21);
+            closeBtnBounds = new RectBounds(closeX, y + 2, 9, 9);
+        }
+
+        return new NodeLayoutBounds(
+                cardBounds,
+                headerBounds,
+                RectBounds.EMPTY,
+                new RectBounds(x, y, size, size),
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                closeBtnBounds,
+                RectBounds.EMPTY,
+                false,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY,
+                y,
+                y,
+                size,
+                size,
+                inputPorts,
+                outputPorts,
+                RectBounds.EMPTY,
+                RectBounds.EMPTY
+        );
     }
 
     private static NodeLayoutBounds computeRerouteLayout(RecipeNode node, boolean targetBatchEditing) {

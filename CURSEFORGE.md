@@ -58,7 +58,7 @@ The mod is completely standalone and fully optional on both client and server:
 * **Junction Flow Prioritization & Accumulation Buffers**: Route fixed supply quotas to priority branches before balancing remaining flows, and toggle accumulation buffer mode on junctions to model batch discharge and intermittent duty-cycle consumers without false-positive deficit warnings.
 * **Junction Void Sink (`SupplyMode.VOID_SINK`)**: Configure Junction nodes into infinite void sinks to absorb/delete surplus byproducts, isolating downstream consumers and preventing upstream demand spikes.
 * **Port-Level Void Marking**: `Alt + Right-Click` on machine output ports to exclude surplus byproducts from final net production summaries without severing topology.
-* **One-Click Summary Voiding**: Click `[🗑️]` on net product rows in `SummaryOverlay` to mark byproducts as voided, with collapsible `🗑️ Voided Byproducts` section and `[↩️]` one-click restore.
+* **One-Click Summary Voiding**: Click `[🗑]` on net product rows in `SummaryOverlay` to mark byproducts as voided, with collapsible `🗑 Voided Byproducts` section and `[↩]` one-click restore.
 
 ***
 

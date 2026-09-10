@@ -93,6 +93,9 @@ public class CanvasSelectionHandler {
         // Select overlapping Nodes or Ports based on coverage threshold
         for (NodeWidget w : screen.getNodeWidgets()) {
             RecipeNode n = w.getNode();
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(n.getId())) {
+                continue;
+            }
             double nw = w.getWidth();
             double nh = w.getHeight();
             double nx1 = n.getPosX();
@@ -172,6 +175,9 @@ public class CanvasSelectionHandler {
         if (screen == null) return;
         for (NodeWidget w : screen.getNodeWidgets()) {
             RecipeNode n = w.getNode();
+            if (screen.getGraph() != null && screen.getGraph().isNodeInFoldedFrame(n.getId())) {
+                continue;
+            }
             double nx = n.getPosX();
             double ny = n.getPosY();
             int nw = w.getWidth();
