@@ -143,6 +143,7 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Render 5-line actionable guidance tooltip on hover explaining root cause and recommended actions.
   - [ ] Clicking the warning badge promotes the node to an Anchor (`node.setBaseNode(true)`) and clears the warning.
   - [ ] Self-healing lifecycle automatically clears divergence warning when balanced external supply is connected.
+  - [ ] Downstream scaling with multi-output anchors respects bottleneck constraints across co-products, preventing machine count blowup (`FractionalAutoRatioTest`).
   - [ ] `AutoRatioDivergenceTest` automated JUnit regression suite passes 100%.
 - [ ] **Comprehensive Process Divergence Defense Matrix (`ComprehensiveDivergenceMatrixTest`, ADR-033)**:
   - [ ] Detect positive feedback growth loops ($\rho > 1.0$) lacking external sinks, clamp machine counts to 1 cycle, and display `[⚠ Growth]` / `[⚠ 증식]` cyan warning badge.
@@ -156,6 +157,7 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] 7-line detailed hover tooltip providing external net supply, internal loop recirculation, recirculation ratio, total throughput, and effective machine duty.
   - [ ] Shift + Right-Click or context menu action [🔄 정상 상태에 대수 맞춤] scales all loop machines to steady-state capacity in a single click.
   - [ ] Global balance dashboard displays internal recirculation breakdown for recirculating resources.
+  - [ ] Multi-step recirculation loops with external supply correctly treat internal intermediates without external feed edges as active internal flows rather than unfed damped extinction (`testMultiStepBrineLoopWithExternalFeed`).
   - [ ] `DampedRecirculationLoopTest` automated JUnit regression suite passes 100%.
 - [ ] **Target Batch ETA & Total Resource Integration (`ProductionETACalculator`)**:
   - [ ] Compute batch duration $T_{\text{ET}} = \frac{A_{\text{target}}}{\text{Rate}_{\text{in}}}$.
@@ -172,6 +174,13 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] `GTEnergyHatchAddon` calculates total capacity via voltage $\times$ amperage (1A, 2A, 4A, 16A).
   - [ ] **Dual Hatch Overclock**: Dual equal-tier energy hatches apply a $+1\text{ Tier}$ overclock boost.
   - [ ] **Asymmetrical Hatches**: Asymmetrical configurations evaluate effective tiers based on peak power capacity.
+
+### 2.4 Property-Based Testing & Fuzz Verification (`FlowSolverPropertyBasedFuzzTest`)
+- [ ] **Arithmetic Safety Invariant**: Validate that across randomized DAG, cyclic feedback, junction, and mixed topologies, no machine count, edge flow, port rate, or efficiency produces `NaN`, `Infinite`, or negative values.
+- [ ] **Mass Conservation Invariant**: Validate that in closed stoichiometric networks and balanced reroute junctions, total production equals total consumption and inflow equals outflow within $10^{-4}$ numerical tolerance.
+- [ ] **Finite Termination & Convergence Invariant**: Validate that pathological topologies (self-loops, dense feedback cliques, extreme rate disparities) terminate promptly without deadlocks, infinite recursion, or crashes.
+- [ ] **Deterministic Reproducibility**: Validate that seed-based graph generation and solver executions produce 100% bit-exact results across repeated runs.
+- [ ] `FlowSolverPropertyBasedFuzzTest` automated JUnit suite passes 100%.
 
 ---
 
@@ -377,6 +386,11 @@ This document is the official QA verification checklist for `GregTechCalculatorB
   - [ ] Checkbox selection for selective multi-port resource linking.
 - [ ] **Blueprint Metadata & Import Preview (`[📥] / [📤]`)**:
   - [ ] Title/description/tags metadata and pre-import node/material summaries.
+- [ ] **Multiplayer Team Workspace & Collaboration (`WorkspaceCollaborationSyncTest`, ADR-003)**:
+  - [ ] Self-lock recognition: ensure player holding page lock can continuously edit without being blocked by self-lock badge or deadlock.
+  - [ ] Per-page revision tracking: auto-commit and export send target page revision instead of workspace-wide revision, preventing false 409 conflict errors.
+  - [ ] Automatic conflict recovery: on 409 revision conflict, client cleanly queries fresh metadata and synchronizes without data loss.
+  - [ ] Obfuscation-safe widget rebuild: tab switching and workspace navigation use `rebuildBoardWidgets()` avoiding runtime `NoSuchMethodError` on `IBoardScreenContext`.
 - [ ] **i18n Consistency (4 Languages)**:
   - [ ] `en_us.json`, `ko_kr.json`, `zh_cn.json`, and `ru_ru.json` format tokens (`%s`, `%d`) match with zero missing translation keys.
   - [ ] `check_i18n.py` and `testI18nCompletenessAndConsistency` unit test pass 100%.

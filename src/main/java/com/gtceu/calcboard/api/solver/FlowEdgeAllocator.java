@@ -937,6 +937,10 @@ public final class FlowEdgeAllocator {
                 return incomingSupply + producer.getExternalSupplyRate();
             }
 
+            if (producer.isFixedDrain() && producer.getExternalDrainRate() > 0.0) {
+                return Math.max(0.0, incomingSupply - producer.getExternalDrainRate());
+            }
+
             if (!hasIncoming) {
                 return calculateTotalConnectedDemand(graph, producer, outputIndex, effMap, context);
             }
@@ -976,28 +980,53 @@ public final class FlowEdgeAllocator {
     }
 
     public static double getConnectedConsumerDemand(FlowGraph graph, RecipeNode consumer, int inputIndex, Map<String, Double> effMap, SolverContext context) {
-        if (consumer == null || consumer.isVoidSink()) return 0.0;
-        if (consumer.isReroute()) {
-            double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0;
-            return drain + calculateTotalRerouteOutputDemand(graph, consumer);
-        }
-        if (inputIndex < consumer.getInputs().size()) {
-            double nominalRate = context != null ? context.getInputRate(consumer, inputIndex) : consumer.getInputSlotRate(inputIndex, false);
-            if (effMap != null && effMap.containsKey(consumer.getId())) {
-                return nominalRate * effMap.get(consumer.getId());
-            }
-            return nominalRate;
-        }
-        return 0.0;
+        return getConnectedConsumerDemand(graph, consumer, inputIndex, effMap, context, new HashSet<>());
     }
 
-    private static double calculateTotalRerouteOutputDemand(FlowGraph graph, RecipeNode rerouteNode) {
+    public static double getConnectedConsumerDemand(
+            FlowGraph graph,
+            RecipeNode consumer,
+            int inputIndex,
+            Map<String, Double> effMap,
+            SolverContext context,
+            Set<String> visited
+    ) {
+        if (consumer == null || consumer.isVoidSink()) return 0.0;
+        if (!visited.add(consumer.getId())) return 0.0;
+        try {
+            if (consumer.isReroute()) {
+                double drain = consumer.isFixedDrain() ? consumer.getExternalDrainRate() : 0.0;
+                return drain + calculateTotalRerouteOutputDemand(graph, consumer, effMap, context, visited);
+            }
+            if (inputIndex < consumer.getInputs().size()) {
+                double nominalRate = context != null ? context.getInputRate(consumer, inputIndex) : consumer.getInputSlotRate(inputIndex, false);
+                if (effMap != null && effMap.containsKey(consumer.getId())) {
+                    return nominalRate * effMap.get(consumer.getId());
+                }
+                return nominalRate;
+            }
+            return 0.0;
+        } finally {
+            visited.remove(consumer.getId());
+        }
+    }
+
+    private static double calculateTotalRerouteOutputDemand(
+            FlowGraph graph,
+            RecipeNode rerouteNode,
+            Map<String, Double> effMap,
+            SolverContext context,
+            Set<String> visited
+    ) {
         double total = 0.0;
-        for (FlowGraph.ConnectionEdge edge : graph.getConnections()) {
+        List<FlowGraph.ConnectionEdge> outCandidates = context != null
+                ? context.getOutEdges(rerouteNode.getId())
+                : graph.getConnections();
+        for (FlowGraph.ConnectionEdge edge : outCandidates) {
             if (edge.fromNodeId().equals(rerouteNode.getId()) && edge.outputIndex() == 0) {
                 RecipeNode target = graph.findNodeById(edge.toNodeId());
                 if (target != null) {
-                    total += getConnectedConsumerDemand(graph, target, edge.inputIndex());
+                    total += getConnectedConsumerDemand(graph, target, edge.inputIndex(), effMap, context, visited);
                 }
             }
         }

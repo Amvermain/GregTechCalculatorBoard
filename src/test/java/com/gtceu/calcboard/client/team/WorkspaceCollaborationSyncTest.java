@@ -54,4 +54,45 @@ public class WorkspaceCollaborationSyncTest {
         assertFalse(state.isCollaborationEnabled());
         assertEquals(ClientWorkspaceState.WorkspaceMode.LOCAL, state.getCurrentMode());
     }
+
+    @Test
+    public void testLockHeldTracking() {
+        assertFalse(state.doesHoldLock("page_main"));
+
+        state.setLockHeld("page_main", true);
+        assertTrue(state.doesHoldLock("page_main"));
+
+        state.setLockHeld("page_main", false);
+        assertFalse(state.doesHoldLock("page_main"));
+    }
+
+    @Test
+    public void testPageRevisionPreservedIndependentlyFromGlobalRevision() {
+        com.gtceu.calcboard.server.storage.TeamWorkspacePage page = new com.gtceu.calcboard.server.storage.TeamWorkspacePage("page_sub", "Sub Factory", 7, new byte[0]);
+        state.updateRemotePages(java.util.List.of(page));
+        state.setGlobalRevision(24);
+
+        com.gtceu.calcboard.server.storage.TeamWorkspacePage remotePage = state.getRemotePage("page_sub");
+        assertNotNull(remotePage);
+        assertEquals(7, remotePage.getPageRevision(), "Page revision should remain independent of global revision");
+        assertEquals(24, state.getGlobalRevision());
+    }
+
+    @Test
+    public void testIsCurrentPlayerHeadlessSafety() {
+        // In headless test environments without active Minecraft player, isCurrentPlayer must safely return false without crashing
+        assertFalse(state.isCurrentPlayer(UUID.randomUUID(), "Kasmov"));
+        assertFalse(state.isCurrentPlayer(null, null));
+    }
+
+    @Test
+    public void testLockHeldRemainsActiveAcrossTicks() {
+        state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.TEAM);
+        state.setCurrentTeamId(UUID.randomUUID());
+        state.setLockHeld("page_main", true);
+        state.markPageDirty("page_main");
+
+        assertTrue(state.doesHoldLock("page_main"));
+        assertTrue(state.isPageDirty("page_main"));
+    }
 }

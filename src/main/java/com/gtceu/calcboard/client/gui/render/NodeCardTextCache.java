@@ -349,7 +349,8 @@ public class NodeCardTextCache {
         if (isBalanced) {
             return new RawPortData("§a" + FormatUtil.formatRate(rate, in) + " §2✔", 0xFFFFFFFF, portColor);
         }
-        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), rate, in, isDeficit, isBuffered, isThrottled, isSteadyRecirc), 0xFFFFFFFF, portColor);
+        double requiredRate = (isDeficit && stats != null) ? stats.requiredOrProducedRate() : rate;
+        return new RawPortData(FormatUtil.formatConnectedInput(stats.connectedRate(), requiredRate, in, isDeficit, isBuffered, isThrottled, isSteadyRecirc), 0xFFFFFFFF, portColor);
     }
 
     private RawPortData computeBatchInputPortData(FlowGraph graph, RecipeNode node, IngredientStack in, int inOrigIdx, boolean isOperational) {

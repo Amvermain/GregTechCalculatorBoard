@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.type.GTBoilerTier;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.editor.NodeCountEditor;
 import com.gtceu.calcboard.client.gui.editor.NodeNameEditor;
 import com.gtceu.calcboard.client.gui.editor.NodeParallelEditor;
@@ -34,7 +34,7 @@ public class NodeWidget {
     public static final int HEADER_HEIGHT = 20;
 
     private final RecipeNode node;
-    private final BoardScreen parent;
+    private final IBoardScreenContext parent;
     private final NodeCountEditor countEditor;
     private final NodeParallelEditor parallelEditor;
     private final NodeNameEditor nameEditor;
@@ -47,10 +47,10 @@ public class NodeWidget {
     private Map<IngredientStack, Double> cachedOutputRates = null;
 
     public NodeWidget(RecipeNode node) {
-        this(node, null);
+        this(node, (IBoardScreenContext) null);
     }
 
-    public NodeWidget(RecipeNode node, BoardScreen parent) {
+    public NodeWidget(RecipeNode node, IBoardScreenContext parent) {
         this.node = node;
         this.parent = parent;
         this.countEditor = new NodeCountEditor(this);
@@ -189,7 +189,7 @@ public class NodeWidget {
         return hiddenPortsPopup;
     }
 
-    public BoardScreen getParent() {
+    public IBoardScreenContext getParent() {
         return parent;
     }
 

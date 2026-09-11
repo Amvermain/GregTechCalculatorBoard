@@ -6,7 +6,7 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTBoilerTier;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.SteamMode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.api.spi.IModAdapter;
 import com.gtceu.calcboard.api.spi.ModAdapterRegistry;
 import com.gtceu.calcboard.compat.gtceu.GTCEuModAdapter;
@@ -18,7 +18,7 @@ public final class NodeTierChangeHandler {
 
     private NodeTierChangeHandler() {}
 
-    public static boolean changeTier(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction) {
+    public static boolean changeTier(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction) {
         if (parent != null && !parent.ensureEditPermission()) return false;
         if (com.gtceu.calcboard.compat.gtceu.handler.GTAddonCompatibilityHandler.hasEnergyHatch(node)) {
             return false;
@@ -62,7 +62,7 @@ public final class NodeTierChangeHandler {
         return changeStandardElectricOrTurbineTier(widget, node, parent, direction, minIdx, maxIdx);
     }
 
-    private static boolean changeBoilerTier(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction) {
+    private static boolean changeBoilerTier(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction) {
         GTBoilerTier curTier = GTBoilerTier.getBoilerTier(node);
         GTBoilerTier[] vals = GTBoilerTier.values();
         int newIdx = (curTier.ordinal() + direction + vals.length) % vals.length;
@@ -74,7 +74,7 @@ public final class NodeTierChangeHandler {
         return true;
     }
 
-    private static boolean changeCombustionTier(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction) {
+    private static boolean changeCombustionTier(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction) {
         GTVoltageTier curTier = node.getTargetTier();
         if (curTier == null) {
             curTier = GTCombustionHelper.getCombustionTierForMachine(node.getMachineIcon());
@@ -113,7 +113,7 @@ public final class NodeTierChangeHandler {
         return minIdx;
     }
 
-    private static Boolean changeSteamModeTier(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
+    private static Boolean changeSteamModeTier(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, int minIdx, boolean isVanillaCooking) {
         SteamMode curSteam = node.getSteamMode();
         if (curSteam == SteamMode.LOW_PRESSURE) {
             return handleLowPressureSteam(widget, node, parent, direction, isVanillaCooking);
@@ -127,7 +127,7 @@ public final class NodeTierChangeHandler {
         return handleElectricToSteamDowngrade(widget, node, parent, direction, minIdx, isVanillaCooking);
     }
 
-    private static boolean handleLowPressureSteam(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, boolean isVanillaCooking) {
+    private static boolean handleLowPressureSteam(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, boolean isVanillaCooking) {
         if (direction > 0) {
             node.setSteamMode(SteamMode.HIGH_PRESSURE);
             if (parent != null) parent.markSummaryDirty();
@@ -145,7 +145,7 @@ public final class NodeTierChangeHandler {
         return false;
     }
 
-    private static boolean handleHighPressureSteam(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
+    private static boolean handleHighPressureSteam(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, int minIdx, boolean isVanillaCooking) {
         if (direction > 0) {
             node.setSteamMode(SteamMode.NONE);
             GTVoltageTier lowestElectric = isVanillaCooking ? GTVoltageTier.LV : GTVoltageTier.getByIndex(minIdx);
@@ -171,7 +171,7 @@ public final class NodeTierChangeHandler {
         return false;
     }
 
-    private static Boolean handleNoneEnergySteamTransition(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
+    private static Boolean handleNoneEnergySteamTransition(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, int minIdx, boolean isVanillaCooking) {
         if (direction > 0) {
             if (node.supportsSteamMode()) {
                 node.setSteamMode(SteamMode.LOW_PRESSURE);
@@ -193,7 +193,7 @@ public final class NodeTierChangeHandler {
         return false;
     }
 
-    private static Boolean handleElectricToSteamDowngrade(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
+    private static Boolean handleElectricToSteamDowngrade(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, int minIdx, boolean isVanillaCooking) {
         int curIdx = node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal();
         int lowestAllowedElectric = isVanillaCooking ? GTVoltageTier.LV.ordinal() : minIdx;
         if (direction < 0 && curIdx <= lowestAllowedElectric) {
@@ -216,7 +216,7 @@ public final class NodeTierChangeHandler {
         return null;
     }
 
-    private static boolean transitionNoneEnergyToElectric(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, boolean isVanillaCooking) {
+    private static boolean transitionNoneEnergyToElectric(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, int minIdx, boolean isVanillaCooking) {
         if (direction > 0) {
             GTVoltageTier lowestElectric = isVanillaCooking ? GTVoltageTier.LV : GTVoltageTier.getByIndex(minIdx);
             node.setTargetTier(lowestElectric);
@@ -234,7 +234,7 @@ public final class NodeTierChangeHandler {
         return false;
     }
 
-    private static boolean changeStandardElectricOrTurbineTier(NodeWidget widget, RecipeNode node, BoardScreen parent, int direction, int minIdx, int maxIdx) {
+    private static boolean changeStandardElectricOrTurbineTier(NodeWidget widget, RecipeNode node, IBoardScreenContext parent, int direction, int minIdx, int maxIdx) {
         int curIdx = node.isLargeTurbine()
                 ? GTTurbineHelper.getRotorHolderTier(node).ordinal()
                 : (node.getTargetTier() != null ? node.getTargetTier().ordinal() : GTVoltageTier.LV.ordinal());
@@ -286,12 +286,12 @@ public final class NodeTierChangeHandler {
         return true;
     }
 
-    public static void syncSharedFrameHardware(BoardScreen parent, RecipeNode node) {
+    public static void syncSharedFrameHardware(IBoardScreenContext parent, RecipeNode node) {
         if (parent != null && parent.getGraph() != null) {
             var frame = parent.getGraph().findFrameEnclosingNode(node);
             if (frame != null && frame.isSharedMachineFrame()) {
                 frame.syncHardwareConfig(node, parent.getGraph());
-                parent.rebuildWidgets();
+                parent.rebuildBoardWidgets();
             }
         }
     }

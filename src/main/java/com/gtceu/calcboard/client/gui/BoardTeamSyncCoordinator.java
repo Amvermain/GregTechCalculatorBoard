@@ -47,14 +47,6 @@ public class BoardTeamSyncCoordinator {
                 NetworkHandler.sendToServer(new C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), true));
             }
         }
-        if (state.isTeamMode()) {
-            String activePageId = state.getActiveTeamPageId();
-            if (state.isPageDirty(activePageId) && lastEditTimestamp > 0 && (System.currentTimeMillis() - lastEditTimestamp > 3000)) {
-                state.autoCommitAndRelease(screen, activePageId);
-                screen.rebuildWidgets();
-                screen.markSummaryDirty();
-            }
-        }
     }
 
     public void markTeamDirty() {
@@ -76,12 +68,15 @@ public class BoardTeamSyncCoordinator {
         if (state.doesHoldLock(activePageId)) return true;
 
         TeamWorkspacePage page = state.getRemotePage(activePageId);
-        if (page != null && page.isLocked() && !state.doesHoldLock(activePageId)) {
-            String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
-                    ? page.getLockHolderName() : state.resolvePlayerName(page.getLockHolderUUID());
-            BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
-            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VILLAGER_NO, 1.0F));
-            return false;
+        if (page != null && page.isLocked()) {
+            boolean isMe = state.isCurrentPlayer(page.getLockHolderUUID(), page.getLockHolderName());
+            if (!isMe) {
+                String lockHolder = page.getLockHolderName() != null && !page.getLockHolderName().isEmpty()
+                        ? page.getLockHolderName() : state.resolvePlayerName(page.getLockHolderUUID());
+                BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", lockHolder)));
+                Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VILLAGER_NO, 1.0F));
+                return false;
+            }
         }
 
         UUID teamId = state.getCurrentTeamId();

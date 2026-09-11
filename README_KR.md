@@ -164,7 +164,7 @@ git clone https://github.com/Amvermain/GregTechCalculatorBoard.git
 cd GregTechCalculatorBoard
 ./gradlew build
 ```
-컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-beta.3.jar` 경로에 생성됩니다.
+컴파일된 jar 파일은 `build/libs/gtcalcboard-1.20.1-2.2.0-beta.4.jar` 경로에 생성됩니다.
 
 ---
 
@@ -189,7 +189,7 @@ cd GregTechCalculatorBoard
 
 - **The Reel One** - 계산기 보드의 사용성 개선을 위한 UX/UI 피드백, 디자인 제안 및 지속적인 테스트를 지원해 주셨습니다.
 - **rafaelpnsm** - 계산기 보드의 사용성 개선을 위한 UX/UI 피드백, 디자인 제안 및 지속적인 테스트를 지원해 주셨습니다.
-- **GenerusWeebius** - 꼼꼼한 테스트와 빈틈없는 버그 리포트로 완성도 향상에 기여해 주셨습니다.
+- **GenerusWeebius** - 꼼꼼한 테스트와 빈틈없는 버그 리포트로 완성도 향상에 기여해 주셨으며, 수학적 검증을 도와주셨습니다.
 
 ---
 

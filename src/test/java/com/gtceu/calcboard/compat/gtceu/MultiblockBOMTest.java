@@ -1373,6 +1373,110 @@ public class MultiblockBOMTest {
         Assertions.assertFalse(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName(null));
         Assertions.assertFalse(MultiblockBOMSummary.BOMItemEntry.isValidDisplayName("   "));
     }
+
+    @Test
+    @DisplayName("BOM Calculation from Shared Team Workspace Page")
+    public void testSharedWorkspacePageBOMCalculation() {
+        com.gtceu.calcboard.client.team.ClientWorkspaceState teamState = com.gtceu.calcboard.client.team.ClientWorkspaceState.getInstance();
+        teamState.clear();
+        teamState.setCurrentTeamId(java.util.UUID.randomUUID());
+        teamState.setCurrentTeamName("Engineers Guild");
+
+        String teamPageId = "page_team_processing";
+        com.gtceu.calcboard.server.storage.TeamWorkspacePage teamPage = new com.gtceu.calcboard.server.storage.TeamWorkspacePage(teamPageId, "Ore Processing");
+        teamState.updateRemotePages(List.of(teamPage));
+
+        com.gtceu.calcboard.api.model.FlowGraph teamGraph = teamState.getTeamGraph(teamPageId);
+        Assertions.assertNotNull(teamGraph);
+
+        ResourceLocation controllerId = ResourceLocation.tryParse("gtceu:electric_blast_furnace");
+        RecipeNode ebfNode = new RecipeNode("team_ebf_node", "Electric Blast Furnace", 100, 100, GTVoltageTier.EV);
+        ebfNode.setMachineIcon(controllerId);
+        ebfNode.setMultiblock(true);
+        ebfNode.setMachineCount(1.0);
+        teamGraph.addNode(ebfNode);
+
+        MultiblockBOMSummary summary = MultiblockBOMCalculator.calculateBOM(teamGraph, false);
+        Assertions.assertNotNull(summary);
+        Assertions.assertEquals(1, summary.totalMultiblockCount());
+        Assertions.assertTrue(summary.totalUniqueItemTypes() > 0);
+
+        boolean hasController = summary.aggregatedItems().stream()
+                .anyMatch(item -> controllerId.equals(item.itemId()) && item.category() == PartCategory.CONTROLLER);
+        Assertions.assertTrue(hasController);
+
+        teamState.clear();
+    }
+
+    @Test
+    @DisplayName("Filter Prepared BOM Items and Clipboard Formatting")
+    public void testBOMFilterPreparedAndClipboardFormatting() {
+        ResourceLocation casingId = ResourceLocation.tryParse("gtceu:heatproof_machine_casing");
+        ResourceLocation coilId = ResourceLocation.tryParse("gtceu:cupronickel_coil_block");
+        ResourceLocation busId = ResourceLocation.tryParse("gtceu:mv_input_bus");
+
+        MultiblockBOMSummary.BOMItemEntry casing = new MultiblockBOMSummary.BOMItemEntry(
+                casingId, "Heat Proof Machine Casing", 9, 0, 9, PartCategory.CASING, List.of("EBF")
+        );
+        MultiblockBOMSummary.BOMItemEntry coil = new MultiblockBOMSummary.BOMItemEntry(
+                coilId, "Cupronickel Coil Block", 16, 0, 16, PartCategory.COIL, List.of("EBF")
+        );
+        MultiblockBOMSummary.BOMItemEntry bus = new MultiblockBOMSummary.BOMItemEntry(
+                busId, "MV Input Bus", 1, 0, 1, PartCategory.HATCH_BUS, List.of("EBF")
+        );
+
+        MultiblockBOMSummary summary = new MultiblockBOMSummary(
+                List.of(casing, coil, bus),
+                List.of(),
+                1,
+                3
+        );
+
+        Assertions.assertSame(summary, summary.filterPrepared(null));
+        Assertions.assertSame(summary, summary.filterPrepared(java.util.Set.of()));
+        Assertions.assertTrue(summary.getPreparedItems(null).isEmpty());
+
+        java.util.Set<ResourceLocation> preparedBus = java.util.Set.of(busId);
+        MultiblockBOMSummary remaining = summary.filterPrepared(preparedBus);
+        Assertions.assertEquals(2, remaining.totalUniqueItemTypes());
+        Assertions.assertEquals(2, remaining.aggregatedItems().size());
+        Assertions.assertFalse(remaining.aggregatedItems().stream().anyMatch(e -> e.itemId().equals(busId)));
+
+        List<MultiblockBOMSummary.BOMItemEntry> preparedList = summary.getPreparedItems(preparedBus);
+        Assertions.assertEquals(1, preparedList.size());
+        Assertions.assertEquals(busId, preparedList.get(0).itemId());
+
+        java.util.Set<ResourceLocation> allPrepared = java.util.Set.of(casingId, coilId, busId);
+        MultiblockBOMSummary allDone = summary.filterPrepared(allPrepared);
+        Assertions.assertEquals(0, allDone.totalUniqueItemTypes());
+        Assertions.assertTrue(allDone.aggregatedItems().isEmpty());
+
+        String initialMarkdown = com.gtceu.calcboard.client.gui.dialog.MultiblockBOMDialog.formatClipboardMarkdown(summary, java.util.Set.of());
+        Assertions.assertTrue(initialMarkdown.contains("Total Multiblocks: 1 | Unique Blocks: 3"));
+        Assertions.assertTrue(initialMarkdown.contains("Heat Proof Machine Casing"));
+        Assertions.assertTrue(initialMarkdown.contains("MV Input Bus"));
+        Assertions.assertFalse(initialMarkdown.contains("### Prepared Materials"));
+
+        String partialMarkdown = com.gtceu.calcboard.client.gui.dialog.MultiblockBOMDialog.formatClipboardMarkdown(summary, preparedBus);
+        Assertions.assertTrue(partialMarkdown.contains("Total Multiblocks: 1 | Unique Blocks: 3 (Remaining: 2, Prepared: 1)"));
+        Assertions.assertTrue(partialMarkdown.contains("### Remaining Required Materials (2)"));
+        Assertions.assertTrue(partialMarkdown.contains("### Prepared Materials (1)"));
+
+        int remainingSectionIdx = partialMarkdown.indexOf("### Remaining Required Materials");
+        int preparedSectionIdx = partialMarkdown.indexOf("### Prepared Materials");
+        String remainingPart = partialMarkdown.substring(remainingSectionIdx, preparedSectionIdx);
+        String preparedPart = partialMarkdown.substring(preparedSectionIdx);
+
+        Assertions.assertFalse(remainingPart.contains("MV Input Bus"));
+        Assertions.assertTrue(remainingPart.contains("Heat Proof Machine Casing"));
+        Assertions.assertTrue(remainingPart.contains("Cupronickel Coil Block"));
+        Assertions.assertTrue(preparedPart.contains("MV Input Bus"));
+
+        String allDoneMarkdown = com.gtceu.calcboard.client.gui.dialog.MultiblockBOMDialog.formatClipboardMarkdown(summary, allPrepared);
+        Assertions.assertTrue(allDoneMarkdown.contains("All required materials have been prepared!"));
+        Assertions.assertTrue(allDoneMarkdown.contains("### Prepared Materials (3)"));
+        Assertions.assertFalse(allDoneMarkdown.contains("### Remaining Required Materials"));
+    }
 }
 
 

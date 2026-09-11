@@ -7,7 +7,7 @@ import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.resources.ResourceLocation;
@@ -34,7 +34,7 @@ public class TutorialManager {
 
     private boolean active = false;
     private TutorialStep currentStep = TutorialStep.STEP_1_ADD_RECIPE;
-    private BoardScreen currentScreen = null;
+    private IBoardScreenContext currentScreen = null;
     private String tutorialPageId = null;
 
     // Track user actions for step transitions
@@ -87,15 +87,15 @@ public class TutorialManager {
         return mode;
     }
 
-    public void startTutorial(BoardScreen screen) {
+    public void startTutorial(IBoardScreenContext screen) {
         startTutorial(screen, TutorialMode.BASIC);
     }
 
-    public void startAdvancedTutorial(BoardScreen screen) {
+    public void startAdvancedTutorial(IBoardScreenContext screen) {
         startTutorial(screen, TutorialMode.ADVANCED);
     }
 
-    public void startTutorial(BoardScreen screen, TutorialMode mode) {
+    public void startTutorial(IBoardScreenContext screen, TutorialMode mode) {
         this.currentScreen = screen;
         this.active = true;
         this.mode = mode;
@@ -113,10 +113,10 @@ public class TutorialManager {
 
         if (screen != null) {
             screen.getSummaryOverlay().setCollapsed(true);
-            screen.setPanX(screen.width / 2.0);
-            screen.setPanY(screen.height / 2.0);
+            screen.setPanX(screen.getScreenWidth() / 2.0);
+            screen.setPanY(screen.getScreenHeight() / 2.0);
             screen.setZoom(1.0);
-            screen.rebuildWidgets();
+            screen.rebuildBoardWidgets();
         }
 
         playUiSound(0, 1.0f);
@@ -230,7 +230,7 @@ public class TutorialManager {
         this.boilerNodeId = boiler.getId();
         tutPage.getGraph().addNode(boiler);
 
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep3Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -248,7 +248,7 @@ public class TutorialManager {
                 tutPage.getGraph().addConnection(boiler.getId(), 0, turbine.getId(), 0);
             }
         }
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep4Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -277,7 +277,7 @@ public class TutorialManager {
             tutPage.getGraph().addConnection(boiler.getId(), 0, junction.getId(), 0);
             tutPage.getGraph().addConnection(junction.getId(), 0, turbine.getId(), 0);
         }
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep5JunctionExercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -323,7 +323,7 @@ public class TutorialManager {
                 }
             }
         }
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep6SelectorExercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -348,7 +348,7 @@ public class TutorialManager {
             this.selectorNodeId = furnaceNode.getId();
             tutPage.getGraph().addNode(furnaceNode);
         }
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep7Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -359,7 +359,7 @@ public class TutorialManager {
         if (turbine != null) {
             turbine.setMachineCount(5.0);
         }
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep8Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -367,7 +367,7 @@ public class TutorialManager {
 
         ensureBoilerAndTurbineExist(tutPage);
         tutPage.getGraph().clearFrames();
-        if (currentScreen != null) currentScreen.rebuildWidgets();
+        if (currentScreen != null) currentScreen.rebuildBoardWidgets();
     }
 
     private void setupStep9Exercise(com.gtceu.calcboard.api.storage.BoardPage tutPage) {
@@ -389,7 +389,7 @@ public class TutorialManager {
         }
         if (currentScreen != null) {
             currentScreen.getSummaryOverlay().setCollapsed(false);
-            currentScreen.rebuildWidgets();
+            currentScreen.rebuildBoardWidgets();
         }
     }
 
@@ -421,7 +421,7 @@ public class TutorialManager {
         tutPage.getGraph().addNode(cutter3);
 
         if (currentScreen != null) {
-            currentScreen.rebuildWidgets();
+            currentScreen.rebuildBoardWidgets();
         }
     }
 
@@ -434,7 +434,7 @@ public class TutorialManager {
             tutPage.getGraph().addFrame(frame);
         }
         if (currentScreen != null) {
-            currentScreen.rebuildWidgets();
+            currentScreen.rebuildBoardWidgets();
         }
     }
 
@@ -471,7 +471,7 @@ public class TutorialManager {
         }
 
         if (currentScreen != null) {
-            currentScreen.rebuildWidgets();
+            currentScreen.rebuildBoardWidgets();
         }
     }
 
@@ -479,7 +479,7 @@ public class TutorialManager {
         if (tutPage == null) return;
         tutPage.setFolderPath("Factory/Refining");
         if (currentScreen != null) {
-            currentScreen.rebuildWidgets();
+            currentScreen.rebuildBoardWidgets();
         }
     }
 
@@ -551,7 +551,7 @@ public class TutorialManager {
     public void onWireDisconnected() {
         if (!active) return;
         if (currentScreen != null) {
-            currentScreen.rebuildWidgets();
+            currentScreen.rebuildBoardWidgets();
         }
     }
 

@@ -337,6 +337,10 @@ public final class FixedPointEfficiencySolver {
                 continue;
             }
 
+            if (!areAllResourcesSelfSustaining(prodTotals, demTotals)) {
+                continue;
+            }
+
             for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
                 SelfSustainingResource res = entry.getKey();
                 double dem = entry.getValue();
@@ -351,26 +355,42 @@ public final class FixedPointEfficiencySolver {
         return result;
     }
 
+    private static boolean areAllResourcesSelfSustaining(
+            Map<SelfSustainingResource, Double> prodTotals,
+            Map<SelfSustainingResource, Double> demTotals
+    ) {
+        for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
+            double dem = entry.getValue();
+            double prod = prodTotals.getOrDefault(entry.getKey(), 0.0);
+            if (dem > 0.0001 && prod < dem - 0.001) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static double computeSccLoopGain(
+            Map<SelfSustainingResource, Double> prodTotals,
+            Map<SelfSustainingResource, Double> demTotals
+    ) {
+        if (demTotals.isEmpty()) return 1.0;
+        double gain = 1.0;
+        for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
+            double dem = entry.getValue();
+            if (dem <= 0.0001) continue;
+            double prod = prodTotals.getOrDefault(entry.getKey(), 0.0);
+            gain *= (prod / dem);
+        }
+        return gain;
+    }
+
     private static boolean isStrictlyDampedScc(
             Map<SelfSustainingResource, Double> prodTotals,
             Map<SelfSustainingResource, Double> demTotals
     ) {
-        boolean hasSurplus = false;
-        boolean hasDamped = false;
-
-        for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
-            double dem = entry.getValue();
-            double prod = prodTotals.getOrDefault(entry.getKey(), 0.0);
-            if (dem <= 0.0001) continue;
-
-            if (prod >= dem + 0.001) {
-                hasSurplus = true;
-            } else if (prod < dem - 1e-4) {
-                hasDamped = true;
-            }
-        }
-
-        return hasDamped && !hasSurplus;
+        if (demTotals.isEmpty()) return false;
+        double loopGain = computeSccLoopGain(prodTotals, demTotals);
+        return (loopGain < 1.0 - 1e-4) && (loopGain > 1e-5);
     }
 
     public static List<PrecomputedDampedLoopMeta> precomputeDampedLoopMetas(FlowGraph graph, FlowEdgeAllocator.SolverContext context) {
@@ -390,6 +410,19 @@ public final class FixedPointEfficiencySolver {
         return result;
     }
 
+    private static Map<SelfSustainingResource, List<FlowGraph.ConnectionEdge>> findExternalEdgesMap(
+            FlowGraph graph,
+            Set<String> scc,
+            Set<SelfSustainingResource> resources,
+            FlowEdgeAllocator.CachedEdgeIndex edgeIndex
+    ) {
+        Map<SelfSustainingResource, List<FlowGraph.ConnectionEdge>> map = new HashMap<>();
+        for (SelfSustainingResource res : resources) {
+            map.put(res, findExternalEdgesForResource(graph, scc, res, edgeIndex));
+        }
+        return map;
+    }
+
     private static void collectDampedMetasForScc(
             FlowGraph graph,
             Set<String> scc,
@@ -405,17 +438,27 @@ public final class FixedPointEfficiencySolver {
             return;
         }
 
+        double loopGain = computeSccLoopGain(prodTotals, demTotals);
+        Map<SelfSustainingResource, List<FlowGraph.ConnectionEdge>> extEdgesMap = findExternalEdgesMap(graph, scc, demTotals.keySet(), edgeIndex);
+        long feedCount = extEdgesMap.values().stream().filter(edges -> !edges.isEmpty()).count();
+        if (feedCount > 1) {
+            return;
+        }
+
+        boolean hasAnyExternalFeed = feedCount > 0;
+
         for (Map.Entry<SelfSustainingResource, Double> entry : demTotals.entrySet()) {
             SelfSustainingResource res = entry.getKey();
             double dem = entry.getValue();
-            double prod = prodTotals.getOrDefault(res, 0.0);
             if (dem <= 0.0001) continue;
 
-            double ratio = prod / dem;
-            if (ratio > 1e-5 && ratio < 1.0 - 1e-4) {
-                List<FlowGraph.ConnectionEdge> extEdges = findExternalEdgesForResource(graph, scc, res, edgeIndex);
-                result.add(new PrecomputedDampedLoopMeta(scc, res, ratio, dem, prod, extEdges));
+            List<FlowGraph.ConnectionEdge> extEdges = extEdgesMap.getOrDefault(res, List.of());
+            if (hasAnyExternalFeed && extEdges.isEmpty()) {
+                continue;
             }
+
+            double prod = prodTotals.getOrDefault(res, 0.0);
+            result.add(new PrecomputedDampedLoopMeta(scc, res, loopGain, dem, prod, extEdges));
         }
     }
 

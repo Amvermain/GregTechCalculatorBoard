@@ -2,7 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
@@ -26,7 +26,7 @@ import java.util.List;
 public class PageTabBarWidget {
     public static final int TAB_HEIGHT = 18;
     public static final int TAB_Y = 22;
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
 
     private int editingPageIndex = -1;
     private EditBox renameBox = null;
@@ -41,7 +41,7 @@ public class PageTabBarWidget {
     private long lastClickTime = 0;
     private int lastClickedTabIdx = -1;
 
-    public PageTabBarWidget(BoardScreen screen) {
+    public PageTabBarWidget(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
@@ -65,7 +65,7 @@ public class PageTabBarWidget {
         int totalWidth = calculateTotalWidth(pageTitles, font, activeIdx, isTeam);
         int navBtnW = 16;
         int rightPadding = 16;
-        this.maxScrollX = Math.max(0, (totalWidth + rightPadding) - (screen.width - leftMargin));
+        this.maxScrollX = Math.max(0, (totalWidth + rightPadding) - (screen.getScreenWidth() - leftMargin));
         this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX));
 
         boolean hasLeftBtn = maxScrollX > 0 && scrollX > 1;
@@ -78,7 +78,7 @@ public class PageTabBarWidget {
         renderBrowserToggleButton(graphics, font, mouseX, mouseY, tabY, browserBtnW);
 
         int scissorLeft = hasLeftBtn ? (leftMargin + navBtnW + 2) : (leftMargin - 2);
-        int scissorRight = hasRightBtn ? (screen.width - navBtnW - 2) : screen.width;
+        int scissorRight = hasRightBtn ? (screen.getScreenWidth() - navBtnW - 2) : screen.getScreenWidth();
         BoardScissorHelper.enableScissor(graphics, scissorLeft, tabY - 2, scissorRight, tabY + TAB_HEIGHT + 4);
 
         graphics.pose().pushPose();
@@ -158,7 +158,7 @@ public class PageTabBarWidget {
             graphics.drawCenteredString(font, "§a«", btnX + navBtnW / 2, tabY + 5, btnHover ? 0xFF55FF88 : 0xFF88AA99);
         }
         if (hasRight) {
-            int btnX = screen.width - navBtnW - 2;
+            int btnX = screen.getScreenWidth() - navBtnW - 2;
             boolean btnHover = mouseX >= btnX && mouseX <= btnX + navBtnW && mouseY >= tabY && mouseY <= tabY + TAB_HEIGHT;
             graphics.fill(btnX, tabY, btnX + navBtnW, tabY + TAB_HEIGHT, btnHover ? 0xFF2A364C : 0xEE11151C);
             graphics.renderOutline(btnX, tabY, navBtnW, TAB_HEIGHT, btnHover ? 0xFF55FF88 : 0xFF353C4D);
@@ -190,7 +190,7 @@ public class PageTabBarWidget {
         int totalWidth = calculateTotalWidth(pageTitles, font, activeIdx, isTeam);
         int navBtnW = 16;
         int rightPadding = 16;
-        this.maxScrollX = Math.max(0, (totalWidth + rightPadding) - (screen.width - leftMargin));
+        this.maxScrollX = Math.max(0, (totalWidth + rightPadding) - (screen.getScreenWidth() - leftMargin));
         this.scrollX = Math.max(0, Math.min(maxScrollX, scrollX));
 
         if (handleNavigationButtonClick(mouseX, button, leftMargin, navBtnW, browserBtnW)) {
@@ -290,7 +290,7 @@ public class PageTabBarWidget {
         }
 
         boolean hasRightBtn = maxScrollX > 0 && scrollX < maxScrollX - 1;
-        if (hasRightBtn && mouseX >= screen.width - navBtnW - 4 && mouseX <= screen.width && button == 0) {
+        if (hasRightBtn && mouseX >= screen.getScreenWidth() - navBtnW - 4 && mouseX <= screen.getScreenWidth() && button == 0) {
             commitRename();
             this.scrollX = Math.min(maxScrollX, this.scrollX + 80);
             playClickSound();
@@ -368,11 +368,8 @@ public class PageTabBarWidget {
             screen.setPanX(active.getPanX());
             screen.setPanY(active.getPanY());
             screen.setZoom(active.getZoom());
-            BoardScreen.lastPanX = active.getPanX();
-            BoardScreen.lastPanY = active.getPanY();
-            BoardScreen.lastZoom = active.getZoom();
         }
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         playClickSound();
         return true;
     }
@@ -400,7 +397,7 @@ public class PageTabBarWidget {
                     com.gtceu.calcboard.network.NetworkHandler.sendToServer(
                         new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamState.getCurrentTeamId(), newPageId, true)
                     );
-                    screen.rebuildWidgets();
+                    screen.rebuildBoardWidgets();
                     screen.markSummaryDirty();
                     playClickSound();
                 }
@@ -426,7 +423,7 @@ public class PageTabBarWidget {
                     screen.setPanY(next.getPanY());
                     screen.setZoom(next.getZoom());
                 }
-                screen.rebuildWidgets();
+                screen.rebuildBoardWidgets();
                 screen.markSummaryDirty();
                 playClickSound();
             }
@@ -464,7 +461,7 @@ public class PageTabBarWidget {
             screen.setPanY(next.getPanY());
             screen.setZoom(next.getZoom());
         }
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         playClickSound();
         return true;
     }
@@ -575,7 +572,7 @@ public class PageTabBarWidget {
         }
         editingPageIndex = -1;
         renameBox = null;
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
     }
 
     private int calculateTotalWidth(List<String> titles, Font font, int activeIdx, boolean isTeam) {

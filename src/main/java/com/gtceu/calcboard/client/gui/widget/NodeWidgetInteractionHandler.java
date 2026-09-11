@@ -4,7 +4,7 @@ import com.gtceu.calcboard.api.history.BoardCommand;
 import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.compat.ModGuiHandlerRegistry;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.compat.systeams.SysteamsRecipeHandler;
@@ -26,7 +26,7 @@ public final class NodeWidgetInteractionHandler {
 
     public static boolean mouseClicked(NodeWidget widget, double mouseX, double mouseY, int button) {
         RecipeNode node = widget.getNode();
-        BoardScreen parent = widget.getParent();
+        IBoardScreenContext parent = widget.getParent();
         int x = (int) node.getPosX();
 
         if (widget.getHiddenPortsPopup().mouseClicked(mouseX, mouseY, button)) {
@@ -124,7 +124,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean handleExpandModule(BoardScreen parent, RecipeNode node) {
+    private static boolean handleExpandModule(IBoardScreenContext parent, RecipeNode node) {
         if (parent == null || parent.getGraph() == null) return true;
         List<FlowGraph.ConnectionEdge> moduleEdges = new ArrayList<>();
         for (FlowGraph.ConnectionEdge e : parent.getGraph().getConnections()) {
@@ -152,7 +152,7 @@ public final class NodeWidgetInteractionHandler {
                 }
             }
             parent.recordCommand(new BoardCommand.ExpandModuleCommand(node, subNodes, restoredEdges, moduleEdges, subFrames, subNotes, subPage));
-            parent.rebuildWidgets();
+            parent.rebuildBoardWidgets();
             parent.markSummaryDirty();
             TutorialManager.getInstance().onModuleExpanded();
             Minecraft.getInstance().getSoundManager().play(
@@ -162,7 +162,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean handleFlipNode(NodeWidget widget, BoardScreen parent, RecipeNode node) {
+    private static boolean handleFlipNode(NodeWidget widget, IBoardScreenContext parent, RecipeNode node) {
         boolean oldFlipped = node.isFlipped();
         boolean newFlipped = !oldFlipped;
         node.setFlipped(newFlipped);
@@ -175,12 +175,12 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean handleTargetBaseToggle(BoardScreen parent, RecipeNode node) {
+    private static boolean handleTargetBaseToggle(IBoardScreenContext parent, RecipeNode node) {
         if (parent == null || parent.getGraph() == null) return true;
         boolean nowBase = !node.isBaseNode();
         parent.recordCommand(BoardCommand.ModifyPropertyCommand.baseAnchor(node.getId(), !nowBase, nowBase));
         parent.getGraph().setBaseNode(nowBase ? node : null);
-        parent.rebuildWidgets();
+        parent.rebuildBoardWidgets();
         parent.markSummaryDirty();
 
         Minecraft mc = Minecraft.getInstance();
@@ -193,7 +193,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean handleCountButtonsAndEditors(NodeWidget widget, BoardScreen parent, RecipeNode node, double mouseX, double mouseY, int button, int x) {
+    private static boolean handleCountButtonsAndEditors(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, double mouseX, double mouseY, int button, int x) {
         var bounds = widget.getLayoutBounds();
 
         if (bounds.getCountMinusBtnBounds().contains(mouseX, mouseY)) {
@@ -261,7 +261,7 @@ public final class NodeWidgetInteractionHandler {
         return false;
     }
 
-    private static boolean adjustMachineCount(NodeWidget widget, BoardScreen parent, RecipeNode node, int sign, boolean shift) {
+    private static boolean adjustMachineCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, int sign, boolean shift) {
         widget.commitCountEdit();
         double oldVal = node.getMachineCount();
         double step = shift ? 0.1 : (sign > 0 ? (oldVal < 1.0 ? 0.05 : 1.0) : (oldVal <= 1.0 ? 0.05 : 1.0));
@@ -270,7 +270,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static boolean scaleMachineCount(NodeWidget widget, BoardScreen parent, RecipeNode node, double factor) {
+    private static boolean scaleMachineCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, double factor) {
         widget.commitCountEdit();
         double oldVal = node.getMachineCount();
         double newVal = factor < 1.0 ? Math.max(0.01, Math.round((oldVal * factor) * 1000.0) / 1000.0) : Math.round((oldVal * factor) * 1000.0) / 1000.0;
@@ -278,7 +278,7 @@ public final class NodeWidgetInteractionHandler {
         return true;
     }
 
-    private static void applyNewCount(NodeWidget widget, BoardScreen parent, RecipeNode node, double oldVal, double newVal) {
+    private static void applyNewCount(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, double oldVal, double newVal) {
         if (oldVal != newVal) {
             if (node.isModule()) {
                 com.gtceu.calcboard.api.solver.FlowGraphModuleHandler.scaleModuleSubPage(node, newVal);
@@ -289,10 +289,10 @@ public final class NodeWidgetInteractionHandler {
                 parent.recordCommand(BoardCommand.ModifyPropertyCommand.machineCount(node.getId(), oldVal, newVal));
                 if (node.isCompoundNode()) {
                     parent.getGraph().syncCompoundParameters(node);
-                    parent.rebuildWidgets();
+                    parent.rebuildBoardWidgets();
                     parent.markSummaryDirty();
                 } else if (node.isModule()) {
-                    parent.rebuildWidgets();
+                    parent.rebuildBoardWidgets();
                     parent.markSummaryDirty();
                 }
             }
@@ -301,14 +301,14 @@ public final class NodeWidgetInteractionHandler {
         widget.invalidateCache();
     }
 
-    private static boolean handleRow2ControlClick(NodeWidget widget, BoardScreen parent, RecipeNode node, double mouseX, double mouseY, int button) {
+    private static boolean handleRow2ControlClick(NodeWidget widget, IBoardScreenContext parent, RecipeNode node, double mouseX, double mouseY, int button) {
         var bounds = widget.getLayoutBounds();
         if (bounds.hasRow2Controls()) {
             var handler = ModGuiHandlerRegistry.getHandlerForNode(node);
             if (handler.handleControlClick(widget, node, mouseX, mouseY, button)) {
                 if (node.isCompoundNode() && parent != null) {
                     parent.getGraph().syncCompoundParameters(node);
-                    parent.rebuildWidgets();
+                    parent.rebuildBoardWidgets();
                     parent.markSummaryDirty();
                 }
                 return true;
@@ -319,7 +319,7 @@ public final class NodeWidgetInteractionHandler {
 
     public static boolean handleRerouteClick(NodeWidget widget, double mouseX, double mouseY, int button) {
         RecipeNode node = widget.getNode();
-        BoardScreen parent = widget.getParent();
+        IBoardScreenContext parent = widget.getParent();
         if (widget.getHoveredInputPortIndex(mouseX, mouseY) >= 0 || widget.getHoveredOutputPortIndex(mouseX, mouseY) >= 0) {
             return false;
         }
@@ -356,7 +356,7 @@ public final class NodeWidgetInteractionHandler {
 
     public static boolean handleInputPortScroll(NodeWidget widget, int inIdx, double delta) {
         RecipeNode node = widget.getNode();
-        BoardScreen parent = widget.getParent();
+        IBoardScreenContext parent = widget.getParent();
         if (parent != null && !parent.ensureEditPermission()) return true;
 
         IngredientStack in = node.getInputs().get(inIdx);

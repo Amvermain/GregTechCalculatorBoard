@@ -259,7 +259,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
                 var frame = widget.getParent().getGraph().findFrameEnclosingNode(node);
                 if (frame != null && frame.isSharedMachineFrame()) {
                     frame.syncHardwareConfig(node, widget.getParent().getGraph());
-                    widget.getParent().rebuildWidgets();
+                    widget.getParent().rebuildBoardWidgets();
                 }
                 widget.getParent().markSummaryDirty();
             }
@@ -295,7 +295,7 @@ public class GenericModGuiHandler implements IModGuiHandler {
         if (widget.getNode() != null && widget.getNode().isBaseNode() && widget.getParent().getGraph() != null) {
             widget.getParent().getGraph().setBaseNode(widget.getNode());
         }
-        widget.getParent().rebuildWidgets();
+        widget.getParent().rebuildBoardWidgets();
         widget.getParent().markSummaryDirty();
     }
 

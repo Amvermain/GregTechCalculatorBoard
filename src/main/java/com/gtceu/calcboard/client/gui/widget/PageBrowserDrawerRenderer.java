@@ -2,7 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -20,9 +20,9 @@ public final class PageBrowserDrawerRenderer {
     public static void render(PageBrowserDrawer drawer, GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         if (!drawer.isOpen()) return;
 
-        BoardScreen screen = drawer.getScreen();
+        IBoardScreenContext screen = drawer.getScreen();
         Font font = Minecraft.getInstance().font;
-        int height = screen.height;
+        int height = screen.getScreenHeight();
         int topY = screen.getHeaderBottomY() + 2;
         int drawerH = height - topY - 4;
 
@@ -222,7 +222,7 @@ public final class PageBrowserDrawerRenderer {
         int menuH = items.size() * 18 + 6;
 
         int mx = Math.max(PageBrowserDrawer.DRAWER_X + 4, Math.min(drawer.getContextMenuX(), PageBrowserDrawer.DRAWER_X + PageBrowserDrawer.DRAWER_WIDTH - menuW - 4));
-        int my = Math.min(drawer.getContextMenuY(), drawer.getScreen().height - menuH - 10);
+        int my = Math.min(drawer.getContextMenuY(), drawer.getScreen().getScreenHeight() - menuH - 10);
 
         graphics.fill(mx, my, mx + menuW, my + menuH, 0xF5181C26);
         graphics.renderOutline(mx, my, menuW, menuH, 0xFF3D4B66);
@@ -241,15 +241,15 @@ public final class PageBrowserDrawerRenderer {
     private static void renderPromptModalOverlay(PageBrowserDrawer drawer, GuiGraphics graphics, Font font, int mouseX, int mouseY, float partialTicks) {
         if (drawer.getPromptMode() == PageBrowserDrawer.PromptMode.NONE) return;
 
-        BoardScreen screen = drawer.getScreen();
+        IBoardScreenContext screen = drawer.getScreen();
         int topY = screen.getHeaderBottomY() + 2;
-        int drawerH = screen.height - topY - 4;
+        int drawerH = screen.getScreenHeight() - topY - 4;
         graphics.fill(PageBrowserDrawer.DRAWER_X, topY, PageBrowserDrawer.DRAWER_X + PageBrowserDrawer.DRAWER_WIDTH, topY + drawerH, 0xAA000000);
 
         int pw = 180;
         int ph = 70;
         int px = PageBrowserDrawer.DRAWER_X + (PageBrowserDrawer.DRAWER_WIDTH - pw) / 2;
-        int py = (screen.height - ph) / 2;
+        int py = (screen.getScreenHeight() - ph) / 2;
 
         graphics.fill(px, py, px + pw, py + ph, 0xF5161A24);
         graphics.renderOutline(px, py, pw, ph, 0xFF5588DD);

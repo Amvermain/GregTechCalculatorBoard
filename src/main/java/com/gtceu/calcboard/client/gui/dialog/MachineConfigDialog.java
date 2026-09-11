@@ -218,6 +218,7 @@ public class MachineConfigDialog implements IBoardModal {
         }
         if (parent != null) {
             parent.markSummaryDirty();
+            parent.rebuildBoardWidgets();
         }
     }
 

@@ -12,7 +12,7 @@ import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.solver.BalanceSummary;
 import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -29,6 +29,7 @@ import java.util.Map;
  */
 public class SummaryOverlay {
     public static final int WIDTH = 240;
+    private final IBoardScreenContext screen;
     private boolean collapsed = false;
     private double scrollY = 0;
     private double maxScrollY = 0;
@@ -46,6 +47,14 @@ public class SummaryOverlay {
     private BalanceSummary lastSummary = null;
 
     private int rightOffset = 0;
+
+    public SummaryOverlay() {
+        this(null);
+    }
+
+    public SummaryOverlay(IBoardScreenContext screen) {
+        this.screen = screen;
+    }
 
     public int getRightOffset() {
         return rightOffset;
@@ -70,7 +79,9 @@ public class SummaryOverlay {
             scrollY = 0;
         }
         BoardManager.getInstance().setSummaryOverlayCollapsed(this.collapsed);
-        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
+        if (screen != null) {
+            screen.onSummaryOverlayToggled();
+        } else if (Minecraft.getInstance().screen instanceof IBoardScreenContext bs) {
             bs.onSummaryOverlayToggled();
         }
     }
@@ -483,9 +494,13 @@ public class SummaryOverlay {
     }
 
     private void executeVoidAction(IngredientStack stack, boolean restore) {
-        if (Minecraft.getInstance().screen instanceof BoardScreen bs) {
-            if (!bs.ensureEditPermission()) return;
-            FlowGraph graph = bs.getGraph();
+        IBoardScreenContext ctx = this.screen;
+        if (ctx == null && Minecraft.getInstance().screen instanceof IBoardScreenContext bs) {
+            ctx = bs;
+        }
+        if (ctx != null) {
+            if (!ctx.ensureEditPermission()) return;
+            FlowGraph graph = ctx.getGraph();
             if (graph == null) return;
             boolean changed = false;
             for (RecipeNode node : graph.getNodes()) {
@@ -508,7 +523,7 @@ public class SummaryOverlay {
                 }
             }
             if (changed) {
-                bs.markSummaryDirty();
+                ctx.markSummaryDirty();
                 Minecraft.getInstance().getSoundManager().play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                         SoundEvents.UI_BUTTON_CLICK, restore ? 1.4F : 0.9F

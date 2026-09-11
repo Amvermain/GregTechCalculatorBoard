@@ -80,7 +80,7 @@ public class SysteamsModGuiHandler implements IModGuiHandler {
                 SysteamsRecipeHandler.toggleDynamoBoilerMode(node);
                 widget.invalidateCache();
                 if (widget.getParent() != null) {
-                    widget.getParent().rebuildWidgets();
+                    widget.getParent().rebuildBoardWidgets();
                     widget.getParent().markSummaryDirty();
                 }
                 Minecraft.getInstance().getSoundManager().play(

@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
@@ -42,7 +42,7 @@ public final class EmiFavoritesDockRenderer {
         int count = favorites.size();
         dock.setHoveredFavorite(null);
 
-        BoardScreen screen = dock.getScreen();
+        IBoardScreenContext screen = dock.getScreen();
         boolean drawerBlocking = (screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen());
         if (screen.isAnyModalOpen() || drawerBlocking || (dock.getActiveFlyoutFavorite() != null && !favorites.contains(dock.getActiveFlyoutFavorite()))) {
             dock.closeFlyout();
@@ -59,7 +59,7 @@ public final class EmiFavoritesDockRenderer {
         int dockY = dock.getDockY();
         String countDisplay = loading ? Component.translatable("gui.gtcalcboard.favorites_dock.loading").getString() : String.valueOf(count);
 
-        int maxH = Math.min(240, screen.height - dockY - 60);
+        int maxH = Math.min(240, screen.getScreenHeight() - dockY - 60);
         int contentH = maxH - HEADER_HEIGHT;
 
         int bg = 0xF00F172A;
@@ -80,8 +80,8 @@ public final class EmiFavoritesDockRenderer {
         int listH = contentH - 4;
 
         int subX = dockX + EXPANDED_WIDTH + 3;
-        int screenW = screen.width;
-        int screenH = screen.height;
+        int screenW = screen.getScreenWidth();
+        int screenH = screen.getScreenHeight();
 
         EmiRecipe activeEmiRecipe = (dock.getActivePreviewRecipe() != null) ? dock.getActivePreviewRecipe() : (dock.getHoveredFavorite() != null && dock.getHoveredFavorite().getRecipe() != null ? dock.getHoveredFavorite().getRecipe() : null);
         int activeEmiRowY = (dock.getActivePreviewRecipe() != null) ? dock.getActivePreviewRowY() : dock.getHoveredFavRowY();
@@ -311,9 +311,9 @@ public final class EmiFavoritesDockRenderer {
     public static void renderTooltips(EmiFavoritesDockImpl dock, GuiGraphics graphics, Font font, int mouseX, int mouseY) {
         if (!dock.getParent().isExpanded() || dock.isDragging()) return;
 
-        BoardScreen screen = dock.getScreen();
-        int screenW = screen.width;
-        int screenH = screen.height;
+        IBoardScreenContext screen = dock.getScreen();
+        int screenW = screen.getScreenWidth();
+        int screenH = screen.getScreenHeight();
 
         if (dock.getActivePreviewRecipe() != null && dock.getActiveFlyoutFavorite() != null) {
             int subX = dock.getDockX() + EXPANDED_WIDTH + 3;

@@ -7,7 +7,7 @@ import com.gtceu.calcboard.api.solver.ProductionETACalculator;
 import com.gtceu.calcboard.api.type.EnergyType;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.render.IngredientRenderer;
 import com.gtceu.calcboard.client.gui.render.NodeCardRenderer;
@@ -33,12 +33,12 @@ import java.util.Locale;
 
 public class NodeInspectorPanel {
 
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
     private NodeWidget targetWidget = null;
     private boolean visible = false;
     public static final int PANEL_WIDTH = 195;
 
-    public NodeInspectorPanel(BoardScreen screen) {
+    public NodeInspectorPanel(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
@@ -75,7 +75,7 @@ public class NodeInspectorPanel {
 
     public boolean isMouseOver(double mouseX, double mouseY) {
         if (!isVisible()) return false;
-        int px = screen.width - PANEL_WIDTH - 6;
+        int px = screen.getScreenWidth() - PANEL_WIDTH - 6;
         int py = screen.getToolbarY() + 22;
         int ph = getPanelHeight();
         return mouseX >= px && mouseX <= px + PANEL_WIDTH && mouseY >= py && mouseY <= py + ph;
@@ -89,7 +89,7 @@ public class NodeInspectorPanel {
         if (!isVisible()) return;
 
         Font font = Minecraft.getInstance().font;
-        int screenW = screen.width;
+        int screenW = screen.getScreenWidth();
 
         int px = screenW - PANEL_WIDTH - 6;
         int py = screen.getToolbarY() + 22;
@@ -221,7 +221,7 @@ public class NodeInspectorPanel {
     }
 
     public int getPanelHeight() {
-        int screenH = screen.height;
+        int screenH = screen.getScreenHeight();
         int py = screen.getToolbarY() + 22;
         int minH = Math.max(160, screenH - py - 32);
         if (targetWidget == null || targetWidget.getNode() == null) {
@@ -448,7 +448,7 @@ public class NodeInspectorPanel {
             var frame = screen.getGraph().findFrameEnclosingNode(node);
             if (frame != null && frame.isSharedMachineFrame()) {
                 frame.syncHardwareConfig(node, screen.getGraph());
-                screen.rebuildWidgets();
+                screen.rebuildBoardWidgets();
             }
         }
     }
@@ -541,7 +541,7 @@ public class NodeInspectorPanel {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!isMouseOver(mouseX, mouseY)) return false;
 
-        int screenW = screen.width;
+        int screenW = screen.getScreenWidth();
         int px = screenW - PANEL_WIDTH - 6;
         int py = screen.getToolbarY() + 22;
 
@@ -592,7 +592,7 @@ public class NodeInspectorPanel {
             if (mouseX >= anchorX && mouseX <= anchorX + 18 && mouseY >= curY && mouseY <= curY + 16) {
                 boolean nowBase = !targetWidget.getNode().isBaseNode();
                 screen.getGraph().setBaseNode(nowBase ? targetWidget.getNode() : null);
-                screen.rebuildWidgets();
+                screen.rebuildBoardWidgets();
                 screen.markSummaryDirty();
                 return true;
             }
@@ -617,6 +617,7 @@ public class NodeInspectorPanel {
                     targetWidget.getNode().setOverclockMode(nextMode);
                     Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
                     targetWidget.invalidateCache();
+                    syncSharedFrame(targetWidget.getNode());
                     screen.markSummaryDirty();
                     return true;
                 }
@@ -624,10 +625,9 @@ public class NodeInspectorPanel {
             }
 
             if (mouseX >= x && mouseX <= x + btnW && mouseY >= curY && mouseY <= curY + 36) {
-                if (screen.getMachineConfigDialog() != null) {
-                    screen.getMachineConfigDialog().open(targetWidget.getNode());
-                    return true;
-                }
+                targetWidget.commitCountEdit();
+                screen.openMachineConfigDialog(targetWidget.getNode());
+                return true;
             }
         }
         return true;

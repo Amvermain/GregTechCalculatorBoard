@@ -1,5 +1,6 @@
 package com.gtceu.calcboard.client.gui;
 
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.widget.LeftActivityBarWidget;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -47,7 +48,7 @@ public final class BoardScreenLayoutHelper {
         return maxBottom;
     }
 
-    public static int getSummaryRightOffset(BoardScreen screen) {
+    public static int getSummaryRightOffset(IBoardScreenContext screen) {
         return (screen.getNodeInspectorPanel() != null && screen.getNodeInspectorPanel().isVisible())
                 ? (screen.getNodeInspectorPanel().getPanelWidth() + 6)
                 : 0;

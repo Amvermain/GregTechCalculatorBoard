@@ -346,5 +346,178 @@ public class DampedRecirculationLoopTest {
         graphB.addNode(node);
         Assertions.assertSame(graphB, node.getParentGraph());
     }
+
+    private FlowGraph createThreeMachineLoop(double extFeedRate) {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode topMachine = RecipeNode.create("Top Machine", 5.0, 30.0, GTVoltageTier.LV);
+        topMachine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:light_brown"), "Light Brown", 1000.0, 1.0));
+        topMachine.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:brown"), "Brown", 1000.0, 1.0));
+        topMachine.setMachineCount(1.0);
+        graph.addNode(topMachine);
+
+        RecipeNode bottomLeftMachine = RecipeNode.create("Bottom Left Machine", 2.0, 30.0, GTVoltageTier.LV);
+        bottomLeftMachine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:brown"), "Brown", 2000.0, 1.0));
+        bottomLeftMachine.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:yellow"), "Yellow", 2000.0, 1.0));
+        bottomLeftMachine.setMachineCount(1.0);
+        graph.addNode(bottomLeftMachine);
+
+        RecipeNode bottomRightMachine = RecipeNode.create("Bottom Right Machine", 2.0, 30.0, GTVoltageTier.LV);
+        bottomRightMachine.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:yellow"), "Yellow", 3000.0, 1.0));
+        bottomRightMachine.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:light_brown"), "Light Brown", 2000.0, 1.0));
+        bottomRightMachine.setMachineCount(1.0);
+        graph.addNode(bottomRightMachine);
+
+        graph.addConnection(topMachine.getId(), 0, bottomLeftMachine.getId(), 0);
+        graph.addConnection(bottomLeftMachine.getId(), 0, bottomRightMachine.getId(), 0);
+        graph.addConnection(bottomRightMachine.getId(), 0, topMachine.getId(), 0);
+
+        if (extFeedRate > 0.0) {
+            RecipeNode feed = RecipeNode.create("External Light Brown Source", 20.0, 30.0, GTVoltageTier.LV);
+            feed.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:light_brown"), "Light Brown", extFeedRate, 1.0));
+            feed.setMachineCount(1.0);
+            graph.addNode(feed);
+            graph.addConnection(feed.getId(), 0, topMachine.getId(), 0);
+        }
+
+        return graph;
+    }
+
+    @Test
+    @DisplayName("Regression: Three-machine multi-resource damped loop without feed converges to 0% and flags unfed")
+    public void testThreeMachineDampedLoopWithoutFeedExtinguishes() {
+        FlowGraph graph = createThreeMachineLoop(0.0);
+        Map<String, Double> effMap = graph.computeNodeEfficiencies();
+
+        RecipeNode topMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Top Machine")).findFirst().orElseThrow();
+        RecipeNode bottomLeftMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Bottom Left Machine")).findFirst().orElseThrow();
+        RecipeNode bottomRightMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Bottom Right Machine")).findFirst().orElseThrow();
+
+        Assertions.assertEquals(0.0, effMap.get(topMachine.getId()), 0.001);
+        Assertions.assertEquals(0.0, effMap.get(bottomLeftMachine.getId()), 0.001);
+        Assertions.assertEquals(0.0, effMap.get(bottomRightMachine.getId()), 0.001);
+
+        FlowGraphSolver.PortFlowStats topStats = graph.getInputPortStats(topMachine, 0);
+        Assertions.assertTrue(topStats.isUnfedDampedLoop());
+        Assertions.assertFalse(topStats.isSteadyStateRecirculating());
+        Assertions.assertTrue(topStats.isInputDeficit());
+
+        FlowGraphSolver.PortFlowStats bottomLeftStats = graph.getInputPortStats(bottomLeftMachine, 0);
+        Assertions.assertTrue(bottomLeftStats.isUnfedDampedLoop());
+        Assertions.assertFalse(bottomLeftStats.isSteadyStateRecirculating());
+        Assertions.assertTrue(bottomLeftStats.isInputDeficit());
+
+        FlowGraphSolver.PortFlowStats bottomRightStats = graph.getInputPortStats(bottomRightMachine, 0);
+        Assertions.assertTrue(bottomRightStats.isUnfedDampedLoop());
+        Assertions.assertFalse(bottomRightStats.isSteadyStateRecirculating());
+        Assertions.assertTrue(bottomRightStats.isInputDeficit());
+    }
+
+    @Test
+    @DisplayName("Regression: Three-machine multi-resource damped loop with external feed reaches steady-state")
+    public void testThreeMachineDampedLoopWithFeedReachesSteadyState() {
+        double extFeed = 1000.0;
+        FlowGraph graph = createThreeMachineLoop(extFeed);
+        Map<String, Double> effMap = graph.computeNodeEfficiencies();
+
+        RecipeNode topMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Top Machine")).findFirst().orElseThrow();
+        RecipeNode bottomLeftMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Bottom Left Machine")).findFirst().orElseThrow();
+        RecipeNode bottomRightMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Bottom Right Machine")).findFirst().orElseThrow();
+
+        Assertions.assertEquals(0.75, effMap.get(topMachine.getId()), 0.01);
+        Assertions.assertEquals(0.15, effMap.get(bottomLeftMachine.getId()), 0.01);
+        Assertions.assertEquals(0.10, effMap.get(bottomRightMachine.getId()), 0.01);
+
+        FlowGraphSolver.PortFlowStats topStats = graph.getInputPortStats(topMachine, 0);
+        Assertions.assertTrue(topStats.isConnected());
+        Assertions.assertFalse(topStats.isInputDeficit());
+        Assertions.assertTrue(topStats.isSteadyStateRecirculating());
+        Assertions.assertEquals(3000.0, topStats.connectedRate(), 1.0);
+        Assertions.assertEquals(1000.0, topStats.externalSupplyRate(), 1.0);
+        Assertions.assertEquals(2000.0, topStats.loopSupplyRate(), 1.0);
+        Assertions.assertEquals(2.0 / 3.0, topStats.recirculationRatio(), 0.001);
+
+        FlowGraphSolver.PortFlowStats bottomLeftStats = graph.getInputPortStats(bottomLeftMachine, 0);
+        Assertions.assertTrue(bottomLeftStats.isInputDeficit());
+        Assertions.assertEquals(3000.0, bottomLeftStats.connectedRate(), 1.0);
+        Assertions.assertEquals(20000.0, bottomLeftStats.requiredOrProducedRate(), 1.0);
+
+        FlowGraphSolver.PortFlowStats bottomRightStats = graph.getInputPortStats(bottomRightMachine, 0);
+        Assertions.assertTrue(bottomRightStats.isInputDeficit());
+        Assertions.assertEquals(3000.0, bottomRightStats.connectedRate(), 1.0);
+        Assertions.assertEquals(30000.0, bottomRightStats.requiredOrProducedRate(), 1.0);
+
+        FlowGraph fullFeedGraph = createThreeMachineLoop(4000.0 / 3.0);
+        RecipeNode fullTopMachine = fullFeedGraph.getNodes().stream().filter(n -> n.getName().equals("Top Machine")).findFirst().orElseThrow();
+        RecipeNode fullBottomLeft = fullFeedGraph.getNodes().stream().filter(n -> n.getName().equals("Bottom Left Machine")).findFirst().orElseThrow();
+        RecipeNode fullBottomRight = fullFeedGraph.getNodes().stream().filter(n -> n.getName().equals("Bottom Right Machine")).findFirst().orElseThrow();
+        Map<String, Double> fullEffMap = fullFeedGraph.computeNodeEfficiencies();
+
+        Assertions.assertEquals(1.0, fullEffMap.get(fullTopMachine.getId()), 0.01);
+        Assertions.assertEquals(0.20, fullEffMap.get(fullBottomLeft.getId()), 0.01);
+        Assertions.assertEquals(2.0 / 15.0, fullEffMap.get(fullBottomRight.getId()), 0.01);
+
+        FlowGraphSolver.PortFlowStats fullTopStats = fullFeedGraph.getInputPortStats(fullTopMachine, 0);
+        Assertions.assertTrue(fullTopStats.isBalanced() || fullTopStats.isSteadyStateRecirculating());
+        Assertions.assertFalse(fullTopStats.isInputDeficit());
+    }
+
+    @Test
+    @DisplayName("Regression: Three-machine damped loop with surplus feed clamps to 100% without overflow")
+    public void testThreeMachineDampedLoopWithSurplusFeedClampsToOneHundredPercent() {
+        FlowGraph graph = createThreeMachineLoop(2000.0);
+        Map<String, Double> effMap = graph.computeNodeEfficiencies();
+
+        RecipeNode topMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Top Machine")).findFirst().orElseThrow();
+        RecipeNode bottomLeftMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Bottom Left Machine")).findFirst().orElseThrow();
+        RecipeNode bottomRightMachine = graph.getNodes().stream().filter(n -> n.getName().equals("Bottom Right Machine")).findFirst().orElseThrow();
+
+        Assertions.assertEquals(1.0, effMap.get(topMachine.getId()), 0.001);
+        Assertions.assertEquals(0.20, effMap.get(bottomLeftMachine.getId()), 0.01);
+        Assertions.assertEquals(2.0 / 15.0, effMap.get(bottomRightMachine.getId()), 0.01);
+
+        FlowGraphSolver.PortFlowStats topStats = graph.getInputPortStats(topMachine, 0);
+        Assertions.assertTrue(topStats.isConnected());
+        Assertions.assertTrue(topStats.isInputSurplus());
+        Assertions.assertFalse(topStats.isInputDeficit());
+    }
+
+    @Test
+    @DisplayName("Regression: Two-machine multi-feed damped loop converges to joint steady-state")
+    public void testTwoMachineMultiFeedDampedLoopConverges() {
+        FlowGraph graph = new FlowGraph();
+
+        RecipeNode machineA = RecipeNode.create("Machine A", 20.0, 30.0, GTVoltageTier.LV);
+        machineA.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 100.0, 1.0));
+        machineA.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 100.0, 1.0));
+        machineA.setMachineCount(1.0);
+        graph.addNode(machineA);
+
+        RecipeNode machineB = RecipeNode.create("Machine B", 20.0, 30.0, GTVoltageTier.LV);
+        machineB.addInput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 100.0, 1.0));
+        machineB.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 50.0, 1.0));
+        machineB.setMachineCount(1.0);
+        graph.addNode(machineB);
+
+        graph.addConnection(machineA.getId(), 0, machineB.getId(), 0);
+        graph.addConnection(machineB.getId(), 0, machineA.getId(), 0);
+
+        RecipeNode feedA = RecipeNode.create("Feed A", 20.0, 30.0, GTVoltageTier.LV);
+        feedA.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_a"), "Fluid A", 40.0, 1.0));
+        feedA.setMachineCount(1.0);
+        graph.addNode(feedA);
+        graph.addConnection(feedA.getId(), 0, machineA.getId(), 0);
+
+        RecipeNode feedB = RecipeNode.create("Feed B", 20.0, 30.0, GTVoltageTier.LV);
+        feedB.addOutput(IngredientStack.fluid(ResourceLocation.tryParse("gtceu:fluid_b"), "Fluid B", 10.0, 1.0));
+        feedB.setMachineCount(1.0);
+        graph.addNode(feedB);
+        graph.addConnection(feedB.getId(), 0, machineB.getId(), 0);
+
+        Map<String, Double> effMap = graph.computeNodeEfficiencies();
+
+        Assertions.assertEquals(0.90, effMap.get(machineA.getId()), 0.02);
+        Assertions.assertEquals(1.00, effMap.get(machineB.getId()), 0.02);
+    }
 }
 

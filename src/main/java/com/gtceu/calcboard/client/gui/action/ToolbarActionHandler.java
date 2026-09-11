@@ -9,7 +9,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BlueprintCodec;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
 import com.gtceu.calcboard.api.type.OverclockMode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import com.gtceu.calcboard.client.gui.widget.NodeWidget;
@@ -28,9 +28,9 @@ import java.util.*;
  * Controller executing complex board actions triggered by the toolbar, hotkeys, or context menus.
  */
 public class ToolbarActionHandler {
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
 
-    public ToolbarActionHandler(BoardScreen screen) {
+    public ToolbarActionHandler(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
@@ -66,7 +66,7 @@ public class ToolbarActionHandler {
         }
     }
 
-    public static void performAutoConnectWithFilter(BoardScreen screen, Set<ResourceLocation> allowedItemIds) {
+    public static void performAutoConnectWithFilter(IBoardScreenContext screen, Set<ResourceLocation> allowedItemIds) {
         if (screen == null || !screen.ensureEditPermission()) return;
         FlowGraph graph = screen.getGraph();
         List<BoardCommand> subCommands = new ArrayList<>();
@@ -85,7 +85,7 @@ public class ToolbarActionHandler {
         screen.markSummaryDirty();
     }
 
-    private static void dispatchAutoConnectCommands(BoardScreen screen, List<BoardCommand> subCommands, int edgeCount) {
+    private static void dispatchAutoConnectCommands(IBoardScreenContext screen, List<BoardCommand> subCommands, int edgeCount) {
         if (subCommands.size() == 1) {
             screen.recordCommand(subCommands.get(0));
         } else {
@@ -493,7 +493,7 @@ public class ToolbarActionHandler {
         screen.recordCommand(new BoardCommand.GroupModuleCommand(groupedNodes, moduleNode, origEdges, rewires));
 
         screen.clearSelection();
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
         TutorialManager.getInstance().onModuleGrouped();
 

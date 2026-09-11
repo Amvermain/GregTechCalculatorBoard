@@ -163,7 +163,8 @@ public class ExportToTeamDialog implements IBoardModal {
         BoardPage activePersonalPage = BoardManager.getInstance().getActivePage();
         String pageTitle = activePersonalPage != null ? activePersonalPage.getName() : "Exported Factory";
         String pageId = asNewPage ? ("page_" + System.currentTimeMillis()) : "page_main";
-        int rev = state.getGlobalRevision();
+        var existing = asNewPage ? null : state.getRemotePage(pageId);
+        int rev = existing != null ? existing.getPageRevision() : 0;
 
         CompoundTag tag = screen.getGraph().serializeNBT();
         byte[] compressed = BlueprintCodec.compressTag(tag);

@@ -2,7 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -17,7 +17,7 @@ import org.lwjgl.glfw.GLFW;
 import java.util.*;
 
 public class PageBrowserDrawer {
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
     private boolean open = false;
 
     private EditBox searchBox;
@@ -54,7 +54,7 @@ public class PageBrowserDrawer {
     public static final int DRAWER_WIDTH = 230;
     public static final int ITEM_HEIGHT = 20;
 
-    public PageBrowserDrawer(BoardScreen screen) {
+    public PageBrowserDrawer(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
@@ -65,7 +65,7 @@ public class PageBrowserDrawer {
     public boolean isMouseOver(double mouseX, double mouseY) {
         if (!open) return false;
         int topY = screen.getHeaderBottomY();
-        int drawerH = screen.height - topY - 4;
+        int drawerH = screen.getScreenHeight() - topY - 4;
         return mouseX >= DRAWER_X && mouseX <= DRAWER_X + DRAWER_WIDTH && mouseY >= topY && mouseY <= topY + drawerH;
     }
 
@@ -110,7 +110,7 @@ public class PageBrowserDrawer {
         PageBrowserDrawerRenderer.render(this, graphics, mouseX, mouseY, partialTicks);
     }
 
-    public BoardScreen getScreen() {
+    public IBoardScreenContext getScreen() {
         return screen;
     }
 
@@ -321,7 +321,7 @@ public class PageBrowserDrawer {
         int pw = 180;
         int ph = 70;
         int px = DRAWER_X + (DRAWER_WIDTH - pw) / 2;
-        int py = (screen.height - ph) / 2;
+        int py = (screen.getScreenHeight() - ph) / 2;
         int btnY = py + 46;
 
         if (mouseX >= px + 10 && mouseX <= px + 80 && mouseY >= btnY && mouseY <= btnY + 16) {
@@ -346,7 +346,7 @@ public class PageBrowserDrawer {
         int menuW = 140;
         int menuH = items.size() * 18 + 6;
         int mx = Math.max(DRAWER_X + 4, Math.min(contextMenuX, DRAWER_X + DRAWER_WIDTH - menuW - 4));
-        int my = Math.min(contextMenuY, screen.height - menuH - 10);
+        int my = Math.min(contextMenuY, screen.getScreenHeight() - menuH - 10);
 
         if (mouseX >= mx && mouseX <= mx + menuW && mouseY >= my && mouseY <= my + menuH) {
             int relY = (int) (mouseY - my - 3);
@@ -381,7 +381,7 @@ public class PageBrowserDrawer {
         }
         if (mouseX >= addPageX && mouseX <= addPageX + 20 && mouseY >= btnY && mouseY <= btnY + 14) {
             BoardManager.getInstance().addPage("Page " + (BoardManager.getInstance().getPages().size() + 1));
-            screen.rebuildWidgets();
+            screen.rebuildBoardWidgets();
             playClickSound();
             return true;
         }
@@ -401,7 +401,7 @@ public class PageBrowserDrawer {
         int listX = DRAWER_X + 6;
         int listY = topY + 44;
         int listW = DRAWER_WIDTH - 12;
-        int listH = screen.height - topY - 54;
+        int listH = screen.getScreenHeight() - topY - 54;
 
         if (mouseX < listX || mouseX > listX + listW || mouseY < listY || mouseY > listY + listH) {
             return false;
@@ -575,7 +575,7 @@ public class PageBrowserDrawer {
             screen.setPanY(active.getPanY());
             screen.setZoom(active.getZoom());
         }
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         playClickSound();
 
         draggingPage = ip.page();
@@ -672,7 +672,7 @@ public class PageBrowserDrawer {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!open || mouseX < DRAWER_X || mouseX > DRAWER_X + DRAWER_WIDTH) return false;
         int topY = screen.getHeaderBottomY();
-        if (mouseY < topY || mouseY > screen.height - 4) return false;
+        if (mouseY < topY || mouseY > screen.getScreenHeight() - 4) return false;
         scrollY = Math.max(0, Math.min(maxScrollY, scrollY - delta * 20.0));
         return true;
     }
@@ -742,13 +742,13 @@ public class PageBrowserDrawer {
                 case NEW_FOLDER -> {
                     BoardManager.getInstance().notifyFolderCreated(val);
                     BoardManager.getInstance().addPage("Page " + (BoardManager.getInstance().getPages().size() + 1), val);
-                    screen.rebuildWidgets();
+                    screen.rebuildBoardWidgets();
                 }
                 case NEW_SUBFOLDER -> {
                     String subPath = promptTargetFolder.isEmpty() ? val : (promptTargetFolder + "/" + val);
                     BoardManager.getInstance().notifyFolderCreated(subPath);
                     BoardManager.getInstance().addPage("Page " + (BoardManager.getInstance().getPages().size() + 1), subPath);
-                    screen.rebuildWidgets();
+                    screen.rebuildBoardWidgets();
                 }
                 case RENAME_FOLDER -> BoardManager.getInstance().renameFolder(promptTargetFolder, val);
                 case RENAME_PAGE -> {

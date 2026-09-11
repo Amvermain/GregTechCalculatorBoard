@@ -13,6 +13,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.storage.FolderBlueprintPackage;
 import com.gtceu.calcboard.client.gui.action.BoardActionHandler;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.canvas.BoardHudRenderer;
 import com.gtceu.calcboard.client.gui.canvas.BoardKeybindDispatcher;
 import com.gtceu.calcboard.client.gui.canvas.CanvasWireRenderer;
@@ -43,7 +44,7 @@ import java.util.*;
  * Main GUI Screen for GregTech Calculator Board.
  * Acts as the master orchestrator coordinating canvas rendering, dialog management, and editor actions.
  */
-public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
+public class BoardScreen extends AbstractContainerScreen<BoardMenu> implements IBoardScreenContext {
     public static final int LEFT_MARGIN = 48;
     private static long lastBoardScreenActiveTime = 0;
 
@@ -72,7 +73,7 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     private final BoardViewportTransform viewportTransform = new BoardViewportTransform();
     private final WorkspaceTabBarWidget workspaceTabBar = new WorkspaceTabBarWidget(this);
     private final PageTabBarWidget pageTabBar = new PageTabBarWidget(this);
-    private final SummaryOverlay summaryOverlay = new SummaryOverlay();
+    private final SummaryOverlay summaryOverlay = new SummaryOverlay(this);
     private final ToolbarWidget toolbarWidget = new ToolbarWidget(this);
     private final HotkeyHudWidget hotkeyHudWidget = new HotkeyHudWidget(this);
     private final FavoritesDockWidget favoritesDockWidget = new FavoritesDockWidget(this);
@@ -196,10 +197,22 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
             widgetByNode.put(node, nw);
             widgetByNodeId.put(node.getId(), nw);
         }
+        if (nodeInspectorPanel != null && nodeInspectorPanel.isVisible()) {
+            NodeWidget oldTarget = nodeInspectorPanel.getTargetWidget();
+            if (oldTarget != null) {
+                NodeWidget newTarget = widgetByNodeId.get(oldTarget.getNode().getId());
+                nodeInspectorPanel.setTargetWidget(newTarget);
+            }
+        }
         if (wireRenderer != null) {
             wireRenderer.markDirty();
         }
         markSummaryDirty();
+    }
+
+    @Override
+    public void rebuildBoardWidgets() {
+        rebuildWidgets();
     }
 
     public void markSummaryDirty() {
@@ -308,6 +321,17 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
         return dialogManager.isAnyModalOpen();
     }
 
+    @Override
+    public int getScreenWidth() {
+        return this.width;
+    }
+
+    @Override
+    public int getScreenHeight() {
+        return this.height;
+    }
+
+    @Override
     public BoardViewportTransform getViewportTransform() {
         return viewportTransform;
     }
@@ -389,6 +413,11 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public void recordCommand(BoardCommand cmd) {
         BoardPage page = BoardManager.getInstance().getActivePage();
         if (page != null) page.getHistoryManager().record(cmd);
+    }
+
+    @Override
+    public void showToast(Component message) {
+        BoardToast.show(message);
     }
 
     public boolean scaleLoopToSteadyState(String targetNodeId) {
@@ -475,6 +504,10 @@ public class BoardScreen extends AbstractContainerScreen<BoardMenu> {
     public void pasteSelection(double canvasX, double canvasY) { selectionModel.pasteSelection(this, canvasX, canvasY); }
     public void cutSelection() { selectionModel.cutSelection(this); }
     public void duplicateSelection() { selectionModel.duplicateSelection(this, lastMouseX, lastMouseY); }
+    @Override
+    public boolean isBoxSelecting() {
+        return canvasHandler != null && canvasHandler.getSelectionHandler().isBoxSelecting();
+    }
 
     public void addNode(RecipeNode node) { actionHandler.addNode(node); }
     public void removeNode(NodeWidget widget) { actionHandler.removeNode(widget); }

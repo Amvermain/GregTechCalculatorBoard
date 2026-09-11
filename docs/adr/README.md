@@ -47,7 +47,7 @@ flowchart TD
     ADR033 --> ADR035["ADR-035<br/>2단계 선형 연립방정식 유량 솔버"]
     ADR034 --> ADR041["ADR-041<br/>정션 균등/우선순위 계층 유량 분배"]
     ADR035 --> ADR041
-    ADR041 -.->|기안 진행 중| RFC044["RFC-044<br/>감쇠 순환 등비급수 해석적 수렴"]
+    ADR041 --> ADR044["ADR-044<br/>감쇠 순환 등비급수 해석적 수렴"]
 ```
 
 ### 2. 캔버스 GUI & 인터랙션 발전사 (Canvas GUI & Interaction)
@@ -74,6 +74,8 @@ flowchart TD
     ADR004 --> ADR029["ADR-029<br/>IModAdapter 인터페이스 분리(ISP)"]
     ADR029 --> ADR037["ADR-037<br/>도메인 순수성 회복 & 역방향 의존성 격리"]
     ADR037 --> ADR038["ADR-038<br/>레거시 알고리즘 & 시뮬레이션 순수성"]
+    ADR037 --> ADR040["ADR-040<br/>갓 클래스 모듈화 & SRP 분해"]
+    ADR040 -.->|기안 진행 중| RFC045["RFC-045<br/>RecipeNode 역할 컴포지션 분해"]
     ADR024 --> ADR031["ADR-031<br/>공유 기계 풀(Shared Pool) 모델"]
     ADR031 --> ADR042["ADR-042<br/>공유 기계 풀 비파괴 인플레이스 접기"]
 ```
@@ -216,3 +218,6 @@ flowchart TD
 | 문서 번호 | RFC 제목 | 상태 (Status) | 목표 버전 | 기안일 | 핵심 제안 요약 |
 | :---: | :--- | :---: | :---: | :---: | :--- |
 | **[RFC-013](../rfc/RFC_013_MODULAR_COMBUSTION_COMPLEX_INTEGRATION.md)** | Star Technology 모듈러 연소 복합체(Modular Combustion Complex) 및 프레임 부스팅 발전 시스템 통합 명세 | 🟡 `PARTIALLY_IMPLEMENTED` | `v2.2.0` | 2026-09-02 | Trait 기반 물리/승수(5A~12A, 냉각 1.2x/1.4x) 및 머신 설정 UI 통합 완료(Phase 1), 부수 유체 입력 주입 대기(Phase 2) |
+| **[RFC-045](../rfc/RFC_045_RECIPE_NODE_COMPOSITION_DECOMPOSITION.md)** | RecipeNode 역할 컴포지션 분해 및 불변 계산 스냅샷 아키텍처 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-11 | RecipeNode를 순수 캔버스 엔티티로 슬림화하고 4대 역할(Machine, Module, Junction, BoundaryPin)을 INodeRole 컴포지션으로 분리, NBT 100% 역호환 및 불변 계산 스냅샷 모델 연계 |
+| **[RFC-046](../rfc/RFC_046_BOARD_PAGE_PROVIDER_ABSTRACTION.md)** | 멀티 워크스페이스 통합 페이지 공급자 추상화 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-11 | MultiblockBOMDialog 및 전역 UI의 ClientWorkspaceState 정적 싱글톤 결합을 IBoardPageProvider SPI 인터페이스로 추상화하여 로컬/원격 페이지 투명 공급 및 헤드리스 테스트 용이성 확보 |
+| **[RFC-047](../rfc/RFC_047_COMPAT_DETERMINISTIC_EXACT_MATCH_NORMALIZATION.md)** | 외부 모드 호환 계층 레거시 폴백 제거 및 Rule 5 결정론적 정규화 명세 | ⚪ `PROPOSED` | `v2.3.0` | 2026-09-11 | Create 시퀀스 조립, 스레딩 모디파이어, 에너지 해치 오프라인 티어, 서멀 다이내모 등 과거 작성된 5개 폴백의 문자열 contains 휴리스틱을 완전 제거하고 ResourceLocation Exact Match 테이블 및 강타입 클래스 검사로 100% 전환 |

@@ -1,7 +1,7 @@
 package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -10,18 +10,18 @@ import net.minecraft.network.chat.Component;
 public class AdaptiveStatusBar {
 
     public static final int BAR_HEIGHT = 20;
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
 
     private int pauseChipX = 0;
     private int pauseChipW = 0;
 
-    public AdaptiveStatusBar(BoardScreen screen) {
+    public AdaptiveStatusBar(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        int width = screen.width;
-        int height = screen.height;
+        int width = screen.getScreenWidth();
+        int height = screen.getScreenHeight();
         int y = height - BAR_HEIGHT;
 
         graphics.pose().pushPose();
@@ -96,15 +96,15 @@ public class AdaptiveStatusBar {
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int y = screen.height - BAR_HEIGHT;
-        if (mouseY < y || mouseY > screen.height || button != 0) {
+        int y = screen.getScreenHeight() - BAR_HEIGHT;
+        if (mouseY < y || mouseY > screen.getScreenHeight() || button != 0) {
             return false;
         }
 
         if (isInside(mouseX, pauseChipX, pauseChipW)) {
             boolean nextVal = !BoardManager.getInstance().isPauseGameInSingleplayer();
             BoardManager.getInstance().setPauseGameInSingleplayer(nextVal);
-            screen.rebuildWidgets();
+            screen.rebuildBoardWidgets();
             screen.markSummaryDirty();
             String statusStr = nextVal ? "ON" : "OFF";
             BoardToast.show(Component.literal("§e⚙ ").append(Component.translatable("gui.gtcalcboard.toast.pause_toggle_hint", statusStr)));

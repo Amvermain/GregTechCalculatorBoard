@@ -255,6 +255,7 @@ public class BoardDialogManager {
     }
 
     public void openJunctionSupplyDialog(RecipeNode node) {
+        if (!screen.ensureEditPermission() || node == null) return;
         if (junctionSupplyDialog != null) {
             junctionSupplyDialog.open(node);
             modalStack.push(junctionSupplyDialog);
@@ -338,6 +339,7 @@ public class BoardDialogManager {
     }
 
     public void openMachineConfigDialog(RecipeNode node, AddonCategory initialCategory, Runnable onCloseCallback) {
+        if (!screen.ensureEditPermission() || node == null) return;
         if (machineConfigDialog == null) {
             machineConfigDialog = new MachineConfigDialog(screen);
             trackModal(machineConfigDialog);
@@ -348,9 +350,9 @@ public class BoardDialogManager {
         Runnable chainedCallback = () -> {
             if (frame != null && frame.isSharedMachineFrame()) {
                 frame.syncHardwareConfig(node, graph);
-                screen.markSummaryDirty();
-                screen.rebuildWidgets();
             }
+            screen.markSummaryDirty();
+            screen.rebuildBoardWidgets();
             if (onCloseCallback != null) {
                 onCloseCallback.run();
             }
@@ -367,12 +369,13 @@ public class BoardDialogManager {
             openMachineConfigDialog(master, null, () -> {
                 frame.syncHardwareConfig(master, graph);
                 screen.markSummaryDirty();
-                screen.rebuildWidgets();
+                screen.rebuildBoardWidgets();
             });
         }
     }
 
     public void openFrameEditDialog(CanvasGroupFrame frame) {
+        if (!screen.ensureEditPermission() || frame == null) return;
         if (frameEditDialog == null) {
             frameEditDialog = new FrameEditDialog(screen);
             trackModal(frameEditDialog);
@@ -382,6 +385,7 @@ public class BoardDialogManager {
     }
 
     public void openNoteEditDialog(CanvasStickyNote note) {
+        if (!screen.ensureEditPermission() || note == null) return;
         if (noteEditDialog == null) {
             noteEditDialog = new NoteEditDialog(screen);
             trackModal(noteEditDialog);

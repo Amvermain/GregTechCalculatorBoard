@@ -2,7 +2,7 @@ package com.gtceu.calcboard.client.gui.widget;
 
 import com.gtceu.calcboard.api.storage.BoardManager;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -12,17 +12,17 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 public class FavoritesDockWidget {
 
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
     private boolean expanded;
     private final IFavoritesDockHandler handler;
 
-    public FavoritesDockWidget(BoardScreen screen) {
+    public FavoritesDockWidget(IBoardScreenContext screen) {
         this.screen = screen;
         this.expanded = BoardManager.getInstance().isFavoritesDockExpanded();
         this.handler = ModCompatHelper.isEmiLoaded() ? createEmiHandler(screen) : null;
     }
 
-    private IFavoritesDockHandler createEmiHandler(BoardScreen screen) {
+    private IFavoritesDockHandler createEmiHandler(IBoardScreenContext screen) {
         return new com.gtceu.calcboard.integration.emi.EmiFavoritesDockImpl(this, screen);
     }
 
@@ -33,7 +33,7 @@ public class FavoritesDockWidget {
     public void setExpanded(boolean expanded) {
         this.expanded = expanded;
         BoardManager.getInstance().setFavoritesDockExpanded(expanded);
-        if (expanded && screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
+        if (expanded && screen != null && screen.getPageBrowserDrawer() != null && screen.getPageBrowserDrawer().isOpen()) {
             screen.getPageBrowserDrawer().setOpen(false);
         }
         if (!expanded && handler != null) {

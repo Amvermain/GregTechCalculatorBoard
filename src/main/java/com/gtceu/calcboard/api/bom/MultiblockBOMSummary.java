@@ -59,6 +59,49 @@ public record MultiblockBOMSummary(
         );
     }
 
+    /**
+     * Returns a new summary excluding items that have already been marked as prepared.
+     *
+     * @param preparedIds set of prepared item resource locations
+     * @return filtered summary containing only remaining required items
+     */
+    public MultiblockBOMSummary filterPrepared(java.util.Set<ResourceLocation> preparedIds) {
+        if (preparedIds == null || preparedIds.isEmpty()) {
+            return this;
+        }
+        List<BOMItemEntry> remaining = new java.util.ArrayList<>();
+        for (BOMItemEntry item : this.aggregatedItems) {
+            if (!preparedIds.contains(item.itemId())) {
+                remaining.add(item);
+            }
+        }
+        return new MultiblockBOMSummary(
+                java.util.Collections.unmodifiableList(remaining),
+                this.machineContributions,
+                this.totalMultiblockCount,
+                remaining.size()
+        );
+    }
+
+    /**
+     * Extracts items that match the given set of prepared resource locations.
+     *
+     * @param preparedIds set of prepared item resource locations
+     * @return unmodifiable list of prepared item entries
+     */
+    public List<BOMItemEntry> getPreparedItems(java.util.Set<ResourceLocation> preparedIds) {
+        if (preparedIds == null || preparedIds.isEmpty()) {
+            return List.of();
+        }
+        List<BOMItemEntry> prepared = new java.util.ArrayList<>();
+        for (BOMItemEntry item : this.aggregatedItems) {
+            if (preparedIds.contains(item.itemId())) {
+                prepared.add(item);
+            }
+        }
+        return java.util.Collections.unmodifiableList(prepared);
+    }
+
     private static void mergeSingleItem(BOMItemEntry item, java.util.Map<ResourceLocation, MergedItemBuilder> itemMap) {
         if (item == null || item.itemId() == null) return;
         MergedItemBuilder builder = itemMap.computeIfAbsent(item.itemId(), k -> new MergedItemBuilder(

@@ -183,7 +183,8 @@ public class SaveToTeamDialog implements IBoardModal {
         UUID teamId = state.getCurrentTeamId() != null ? state.getCurrentTeamId() : (Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
         String pageId = "page_main";
         String pageTitle = "Main Workspace";
-        int rev = state.getGlobalRevision();
+        var remotePage = state.getRemotePage(pageId);
+        int rev = (remotePage != null) ? remotePage.getPageRevision() : 1;
 
         String msg = messageBox != null ? messageBox.getValue().trim() : "";
         if (msg.isEmpty()) msg = "Updated factory layout";

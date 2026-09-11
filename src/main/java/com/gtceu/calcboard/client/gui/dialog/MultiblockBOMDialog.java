@@ -25,13 +25,17 @@ import org.lwjgl.glfw.GLFW;
 import com.gtceu.calcboard.client.gui.dialog.modal.IBoardModal;
 import com.gtceu.calcboard.client.gui.dialog.modal.ModalRenderContext;
 
+import com.gtceu.calcboard.api.model.FlowGraph;
+import com.gtceu.calcboard.client.team.ClientWorkspaceState;
+import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
+
 import java.util.*;
 
 public class MultiblockBOMDialog implements IBoardModal {
     private final BoardScreen parent;
     private boolean visible = false;
 
-    private final Set<String> selectedPageIds = new LinkedHashSet<>();
+    private final Set<String> selectedPageKeys = new LinkedHashSet<>();
     private final Set<ResourceLocation> preparedItemIds = new HashSet<>();
 
     private int filterCategoryIndex = 0; // 0: All, 1: Casings, 2: Coils, 3: Hatches/Buses, 4: Controllers
@@ -48,10 +52,27 @@ public class MultiblockBOMDialog implements IBoardModal {
     private MultiblockBOMSummary cachedSummary;
     private boolean dirty = true;
     private MultiblockBOMSummary.BOMItemEntry hoveredEntry = null;
+    private BOMPageEntry hoveredPageEntry = null;
 
     private static final int DIALOG_WIDTH = 520;
     private static final int DIALOG_HEIGHT = 290;
     private static final int SIDEBAR_WIDTH = 105;
+
+    private record BOMPageEntry(
+            String key,
+            String pageId,
+            String displayName,
+            boolean isTeam,
+            boolean isHeader
+    ) {
+        static BOMPageEntry page(String key, String pageId, String displayName, boolean isTeam) {
+            return new BOMPageEntry(key, pageId, displayName, isTeam, false);
+        }
+
+        static BOMPageEntry header(String title, boolean isTeam) {
+            return new BOMPageEntry(null, null, title, isTeam, true);
+        }
+    }
 
     public MultiblockBOMDialog(BoardScreen parent) {
         this.parent = parent;
@@ -66,13 +87,23 @@ public class MultiblockBOMDialog implements IBoardModal {
             return;
         }
         this.visible = true;
-        this.selectedPageIds.clear();
-        BoardPage curPage = BoardManager.getInstance().getActivePage();
-        if (curPage != null) {
-            this.selectedPageIds.add(curPage.getId());
+        this.selectedPageKeys.clear();
+
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        boolean isTeam = teamState.isCollaborationEnabled() && teamState.isTeamMode();
+
+        if (isTeam) {
+            String activeTeamId = teamState.getActiveTeamPageId();
+            selectedPageKeys.add("team:" + activeTeamId);
+            teamState.requestPageDataIfNeeded(activeTeamId);
         } else {
-            for (BoardPage p : BoardManager.getInstance().getPages()) {
-                this.selectedPageIds.add(p.getId());
+            BoardPage curPage = BoardManager.getInstance().getActivePage();
+            if (curPage != null) {
+                selectedPageKeys.add("local:" + curPage.getId());
+            } else {
+                for (BoardPage p : BoardManager.getInstance().getPages()) {
+                    selectedPageKeys.add("local:" + p.getId());
+                }
             }
         }
         this.searchQuery = "";
@@ -80,6 +111,7 @@ public class MultiblockBOMDialog implements IBoardModal {
         this.pageScrollY = 0.0;
         this.itemScrollY = 0.0;
         this.dirty = true;
+        this.hoveredPageEntry = null;
 
         Font font = Minecraft.getInstance().font;
         int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
@@ -106,6 +138,7 @@ public class MultiblockBOMDialog implements IBoardModal {
 
     public void close() {
         this.visible = false;
+        this.hoveredPageEntry = null;
         if (searchBox != null) {
             searchBox.setFocused(false);
         }
@@ -115,18 +148,83 @@ public class MultiblockBOMDialog implements IBoardModal {
         this.dirty = true;
     }
 
+    private List<BOMPageEntry> collectPageEntries() {
+        ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+        List<BOMPageEntry> entries = new ArrayList<>();
+
+        if (!teamState.isCollaborationEnabled()) {
+            for (BoardPage page : BoardManager.getInstance().getPages()) {
+                String title = getPageDisplayName(page.getName());
+                entries.add(BOMPageEntry.page("local:" + page.getId(), page.getId(), title, false));
+            }
+            return entries;
+        }
+
+        if (teamState.isTeamMode()) {
+            appendTeamPageEntries(entries, teamState);
+            appendLocalPageEntries(entries);
+        } else {
+            appendLocalPageEntries(entries);
+            appendTeamPageEntries(entries, teamState);
+        }
+        return entries;
+    }
+
+    private void appendTeamPageEntries(List<BOMPageEntry> entries, ClientWorkspaceState teamState) {
+        String teamName = teamState.getCurrentTeamName();
+        String headerTitle = teamState.getCurrentTeamId() != null
+                ? Component.translatable("gui.gtcalcboard.workspace.team", teamName).getString()
+                : Component.translatable("gui.gtcalcboard.workspace.team_no_party").getString();
+        entries.add(BOMPageEntry.header(headerTitle, true));
+
+        for (TeamWorkspacePage page : teamState.getRemotePages()) {
+            String title = getPageDisplayName(page.getTitle());
+            entries.add(BOMPageEntry.page("team:" + page.getPageId(), page.getPageId(), title, true));
+        }
+    }
+
+    private void appendLocalPageEntries(List<BOMPageEntry> entries) {
+        String headerTitle = Component.translatable("gui.gtcalcboard.workspace.personal").getString();
+        entries.add(BOMPageEntry.header(headerTitle, false));
+
+        for (BoardPage page : BoardManager.getInstance().getPages()) {
+            String title = getPageDisplayName(page.getName());
+            entries.add(BOMPageEntry.page("local:" + page.getId(), page.getId(), title, false));
+        }
+    }
+
+    private String getPageDisplayName(String rawName) {
+        return (rawName != null && !rawName.isBlank()) ? rawName : "Page";
+    }
+
     private void updateSummaryIfNeeded() {
         if (dirty || cachedSummary == null) {
-            List<BoardPage> allPages = BoardManager.getInstance().getPages();
+            List<BOMPageEntry> entries = collectPageEntries();
             List<MultiblockBOMSummary> pageSummaries = new ArrayList<>();
-            for (BoardPage p : allPages) {
-                if (selectedPageIds.contains(p.getId()) && p.getGraph() != null) {
-                    pageSummaries.add(MultiblockBOMCalculator.calculateBOM(p.getGraph(), dualLowerTierEnergyHatches));
+            ClientWorkspaceState teamState = ClientWorkspaceState.getInstance();
+
+            for (BOMPageEntry entry : entries) {
+                if (entry.isHeader() || !selectedPageKeys.contains(entry.key())) {
+                    continue;
+                }
+                FlowGraph graph = resolveGraphForEntry(entry, teamState);
+                if (graph != null && !graph.getNodes().isEmpty()) {
+                    pageSummaries.add(MultiblockBOMCalculator.calculateBOM(graph, dualLowerTierEnergyHatches));
                 }
             }
             cachedSummary = MultiblockBOMSummary.merge(pageSummaries);
             dirty = false;
         }
+    }
+
+    private FlowGraph resolveGraphForEntry(BOMPageEntry entry, ClientWorkspaceState teamState) {
+        if (entry.isTeam()) {
+            teamState.requestPageDataIfNeeded(entry.pageId());
+            return teamState.getTeamGraph(entry.pageId());
+        }
+        return BoardManager.getInstance().getPage(entry.pageId())
+                .map(BoardPage::getGraph)
+                .orElse(null);
     }
 
     @Override
@@ -146,6 +244,7 @@ public class MultiblockBOMDialog implements IBoardModal {
 
         Font font = Minecraft.getInstance().font;
         hoveredEntry = null;
+        hoveredPageEntry = null;
 
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 600);
@@ -178,7 +277,18 @@ public class MultiblockBOMDialog implements IBoardModal {
         String multiCountStr = "§6▦ " + Component.translatable("gui.gtcalcboard.bom.total_multiblocks", cachedSummary.totalMultiblockCount()).getString();
         graphics.drawString(font, multiCountStr, dialogX + 10, bannerY + 7, 0xFFFFFFFF, false);
 
-        String uniqueBlocksStr = "§b▦ " + Component.translatable("gui.gtcalcboard.bom.total_unique_blocks", cachedSummary.totalUniqueItemTypes()).getString();
+        int totalUnique = cachedSummary.totalUniqueItemTypes();
+        int preparedCount = 0;
+        for (MultiblockBOMSummary.BOMItemEntry item : cachedSummary.aggregatedItems()) {
+            if (preparedItemIds.contains(item.itemId())) {
+                preparedCount++;
+            }
+        }
+        int remainingCount = totalUnique - preparedCount;
+
+        String uniqueBlocksStr = preparedCount > 0
+                ? "§b▦ " + Component.translatable("gui.gtcalcboard.bom.unique_blocks_remaining", remainingCount, totalUnique, preparedCount).getString()
+                : "§b▦ " + Component.translatable("gui.gtcalcboard.bom.total_unique_blocks", totalUnique).getString();
         graphics.drawString(font, uniqueBlocksStr, dialogX + 10 + font.width(multiCountStr) + 14, bannerY + 7, 0xFFFFFFFF, false);
 
         // Quick action buttons in Banner: [» Copy List] and [⭐ Register in EMI/JEI]
@@ -256,36 +366,17 @@ public class MultiblockBOMDialog implements IBoardModal {
         // Scrollable Page List
         int listY = y + titleH + 2;
         int listH = btnY - listY - 2;
-        List<BoardPage> pages = BoardManager.getInstance().getPages();
+        List<BOMPageEntry> entries = collectPageEntries();
         int rowH = 16;
-        int totalListH = pages.size() * rowH;
+        int totalListH = entries.size() * rowH;
         maxPageScrollY = Math.max(0, totalListH - listH);
 
         BoardScissorHelper.enableScissor(graphics, x, listY, x + w, listY + listH);
 
         int curY = (int) (listY - pageScrollY);
-        for (BoardPage page : pages) {
+        for (BOMPageEntry entry : entries) {
             if (curY + rowH >= listY && curY <= listY + listH) {
-                boolean checked = selectedPageIds.contains(page.getId());
-                boolean rowHover = mouseX >= x + 2 && mouseX <= x + w - 2 && mouseY >= curY && mouseY <= curY + rowH;
-
-                if (rowHover) {
-                    graphics.fill(x + 2, curY, x + w - 2, curY + rowH, 0x333A4D6B);
-                }
-
-                // Checkbox
-                int cbX = x + 4;
-                int cbY = curY + 3;
-                graphics.fill(cbX, cbY, cbX + 10, cbY + 10, 0xFF141A24);
-                graphics.renderOutline(cbX, cbY, 10, 10, checked ? 0xFF55FF55 : 0xFF35445E);
-                if (checked) {
-                    graphics.drawString(font, "✔", cbX + 1, cbY + 1, 0xFF55FF55, false);
-                }
-
-                // Page Title
-                String pTitle = page.getName() != null && !page.getName().isBlank() ? page.getName() : "Page";
-                String clippedTitle = font.plainSubstrByWidth(pTitle, w - 24);
-                graphics.drawString(font, (checked ? "§f" : "§7") + clippedTitle, cbX + 14, curY + 4, 0xFFFFFFFF, false);
+                renderSidebarRow(graphics, font, entry, x, curY, w, rowH, mouseX, mouseY);
             }
             curY += rowH;
         }
@@ -300,6 +391,41 @@ public class MultiblockBOMDialog implements IBoardModal {
             graphics.fill(sbX, listY, sbX + 2, listY + listH, 0x44000000);
             graphics.fill(sbX, sbY, sbX + 2, sbY + sbH, 0xFF557799);
         }
+    }
+
+    private void renderSidebarRow(GuiGraphics graphics, Font font, BOMPageEntry entry, int x, int y, int w, int rowH, int mouseX, int mouseY) {
+        if (entry.isHeader()) {
+            int bg = entry.isTeam() ? 0xFF172820 : 0xFF1B2332;
+            int border = entry.isTeam() ? 0xFF2A5538 : 0xFF2D3C52;
+            graphics.fill(x + 2, y + 1, x + w - 2, y + rowH - 1, bg);
+            graphics.renderOutline(x + 2, y + 1, w - 4, rowH - 2, border);
+            String icon = entry.isTeam() ? "§a■ " : "§b● ";
+            String title = font.plainSubstrByWidth(icon + entry.displayName(), w - 8);
+            graphics.drawString(font, title, x + 5, y + 4, 0xFFFFFFFF, false);
+            return;
+        }
+
+        boolean checked = selectedPageKeys.contains(entry.key());
+        boolean rowHover = mouseX >= x + 2 && mouseX <= x + w - 2 && mouseY >= y && mouseY <= y + rowH;
+
+        if (rowHover) {
+            graphics.fill(x + 2, y, x + w - 2, y + rowH, 0x333A4D6B);
+            hoveredPageEntry = entry;
+        }
+
+        // Checkbox
+        int cbX = x + 4;
+        int cbY = y + 3;
+        graphics.fill(cbX, cbY, cbX + 10, cbY + 10, 0xFF141A24);
+        graphics.renderOutline(cbX, cbY, 10, 10, checked ? 0xFF55FF55 : 0xFF35445E);
+        if (checked) {
+            graphics.drawString(font, "✔", cbX + 1, cbY + 1, 0xFF55FF55, false);
+        }
+
+        // Page Title
+        String colorPrefix = checked ? (entry.isTeam() ? "§a" : "§f") : "§7";
+        String clippedTitle = font.plainSubstrByWidth(entry.displayName(), w - 24);
+        graphics.drawString(font, colorPrefix + clippedTitle, cbX + 14, y + 4, 0xFFFFFFFF, false);
     }
 
     private void renderMainContent(GuiGraphics graphics, Font font, int x, int y, int w, int h, int mouseX, int mouseY) {
@@ -466,6 +592,21 @@ public class MultiblockBOMDialog implements IBoardModal {
     }
 
     private void renderTooltips(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
+        int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int screenH = parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
+
+        if (hoveredPageEntry != null && !hoveredPageEntry.isHeader()) {
+            List<Component> pageTip = new ArrayList<>();
+            String typePrefix = hoveredPageEntry.isTeam() ? "§a[Team] §f" : "§b[Personal] §f";
+            pageTip.add(Component.literal(typePrefix + hoveredPageEntry.displayName()));
+            boolean checked = selectedPageKeys.contains(hoveredPageEntry.key());
+            pageTip.add(Component.literal(checked
+                    ? "§a✔ " + Component.translatable("gui.gtcalcboard.bom.page_included").getString()
+                    : "§7" + Component.translatable("gui.gtcalcboard.bom.page_click_to_include").getString()));
+            BoardTooltipRenderer.renderComponentTooltip(graphics, font, pageTip, mouseX, mouseY, screenW, screenH);
+            return;
+        }
+
         if (hoveredEntry != null) {
             List<Component> tip = new ArrayList<>();
             tip.add(Component.literal("§6" + hoveredEntry.displayName()));
@@ -478,9 +619,10 @@ public class MultiblockBOMDialog implements IBoardModal {
                 tip.add(Component.literal(" • §f" + usage));
             }
             tip.add(Component.empty());
+            if (preparedItemIds.contains(hoveredEntry.itemId())) {
+                tip.add(Component.literal("§a✔ " + Component.translatable("gui.gtcalcboard.bom.status_prepared").getString()));
+            }
             tip.add(Component.literal("§8[Click to toggle prepared checklist]"));
-            int screenW = parent != null && parent.width > 0 ? parent.width : Minecraft.getInstance().getWindow().getGuiScaledWidth();
-            int screenH = parent != null && parent.height > 0 ? parent.height : Minecraft.getInstance().getWindow().getGuiScaledHeight();
             BoardTooltipRenderer.renderComponentTooltip(graphics, font, tip, mouseX, mouseY, screenW, screenH);
         }
     }
@@ -548,9 +690,11 @@ public class MultiblockBOMDialog implements IBoardModal {
         int allBtnX = sidebarX + 3;
         if (mouseX >= allBtnX && mouseX <= allBtnX + halfW && mouseY >= btnY && mouseY <= btnY + btnH) {
             playClickSound();
-            selectedPageIds.clear();
-            for (BoardPage p : BoardManager.getInstance().getPages()) {
-                selectedPageIds.add(p.getId());
+            selectedPageKeys.clear();
+            for (BOMPageEntry entry : collectPageEntries()) {
+                if (!entry.isHeader()) {
+                    selectedPageKeys.add(entry.key());
+                }
             }
             dirty = true;
             return true;
@@ -560,7 +704,7 @@ public class MultiblockBOMDialog implements IBoardModal {
         int noneBtnX = allBtnX + halfW + 2;
         if (mouseX >= noneBtnX && mouseX <= noneBtnX + halfW && mouseY >= btnY && mouseY <= btnY + btnH) {
             playClickSound();
-            selectedPageIds.clear();
+            selectedPageKeys.clear();
             dirty = true;
             return true;
         }
@@ -569,16 +713,22 @@ public class MultiblockBOMDialog implements IBoardModal {
         int listY = sidebarY + 16 + 2;
         int listH = btnY - listY - 2;
         if (mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_WIDTH && mouseY >= listY && mouseY <= listY + listH) {
-            List<BoardPage> pages = BoardManager.getInstance().getPages();
+            List<BOMPageEntry> entries = collectPageEntries();
             int rowH = 16;
             int clickedIdx = (int) ((mouseY - listY + pageScrollY) / rowH);
-            if (clickedIdx >= 0 && clickedIdx < pages.size()) {
+            if (clickedIdx >= 0 && clickedIdx < entries.size()) {
+                BOMPageEntry entry = entries.get(clickedIdx);
+                if (entry.isHeader()) {
+                    playClickSound();
+                    toggleSectionPages(entry.isTeam(), entries);
+                    dirty = true;
+                    return true;
+                }
                 playClickSound();
-                String pid = pages.get(clickedIdx).getId();
-                if (selectedPageIds.contains(pid)) {
-                    selectedPageIds.remove(pid);
+                if (selectedPageKeys.contains(entry.key())) {
+                    selectedPageKeys.remove(entry.key());
                 } else {
-                    selectedPageIds.add(pid);
+                    selectedPageKeys.add(entry.key());
                 }
                 dirty = true;
                 return true;
@@ -745,21 +895,8 @@ public class MultiblockBOMDialog implements IBoardModal {
 
     private void copyToClipboard() {
         if (cachedSummary == null) return;
-        StringBuilder sb = new StringBuilder();
-        sb.append("# » Multiblock Construction Bill of Materials (BOM)\n");
-        sb.append(String.format(Locale.ROOT, "Total Multiblocks: %d | Unique Blocks: %d\n\n", cachedSummary.totalMultiblockCount(), cachedSummary.totalUniqueItemTypes()));
-        sb.append("| Block Name | Total Required | Stacks | Used In |\n");
-        sb.append("| :--- | :--- | :--- | :--- |\n");
-        for (MultiblockBOMSummary.BOMItemEntry item : cachedSummary.aggregatedItems()) {
-            sb.append(String.format(Locale.ROOT, "| %s | %d | %s | %s |\n",
-                item.displayName(),
-                item.totalAmount(),
-                item.formatStackCount(),
-                String.join(", ", item.usedByMachines())
-            ));
-        }
-
-        Minecraft.getInstance().keyboardHandler.setClipboard(sb.toString());
+        String markdown = formatClipboardMarkdown(cachedSummary, preparedItemIds);
+        Minecraft.getInstance().keyboardHandler.setClipboard(markdown);
         if (Minecraft.getInstance().player != null) {
             Minecraft.getInstance().player.displayClientMessage(
                 Component.translatable("message.gtcalcboard.bom_copied"),
@@ -768,15 +905,92 @@ public class MultiblockBOMDialog implements IBoardModal {
         }
     }
 
+    public static String formatClipboardMarkdown(MultiblockBOMSummary summary, Set<ResourceLocation> preparedIds) {
+        if (summary == null) return "";
+        MultiblockBOMSummary remaining = summary.filterPrepared(preparedIds);
+        List<MultiblockBOMSummary.BOMItemEntry> preparedList = summary.getPreparedItems(preparedIds);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# » Multiblock Construction Bill of Materials (BOM)\n");
+
+        if (preparedList.isEmpty()) {
+            sb.append(String.format(Locale.ROOT, "Total Multiblocks: %d | Unique Blocks: %d\n\n",
+                summary.totalMultiblockCount(), summary.totalUniqueItemTypes()));
+            sb.append("| Block Name | Total Required | Stacks | Used In |\n");
+            sb.append("| :--- | :--- | :--- | :--- |\n");
+            for (MultiblockBOMSummary.BOMItemEntry item : summary.aggregatedItems()) {
+                appendItemRow(sb, item.displayName(), item.totalAmount(), item.formatStackCount(), item.usedByMachines());
+            }
+            return sb.toString();
+        }
+
+        sb.append(String.format(Locale.ROOT, "Total Multiblocks: %d | Unique Blocks: %d (Remaining: %d, Prepared: %d)\n\n",
+            summary.totalMultiblockCount(), summary.totalUniqueItemTypes(), remaining.totalUniqueItemTypes(), preparedList.size()));
+
+        if (!remaining.aggregatedItems().isEmpty()) {
+            sb.append(String.format(Locale.ROOT, "### Remaining Required Materials (%d)\n", remaining.totalUniqueItemTypes()));
+            sb.append("| Block Name | Total Required | Stacks | Used In |\n");
+            sb.append("| :--- | :--- | :--- | :--- |\n");
+            for (MultiblockBOMSummary.BOMItemEntry item : remaining.aggregatedItems()) {
+                appendItemRow(sb, item.displayName(), item.totalAmount(), item.formatStackCount(), item.usedByMachines());
+            }
+            sb.append("\n");
+        } else {
+            sb.append("> All required materials have been prepared!\n\n");
+        }
+
+        sb.append(String.format(Locale.ROOT, "### Prepared Materials (%d)\n", preparedList.size()));
+        sb.append("| Block Name | Prepared Amount | Stacks | Used In |\n");
+        sb.append("| :--- | :--- | :--- | :--- |\n");
+        for (MultiblockBOMSummary.BOMItemEntry item : preparedList) {
+            appendItemRow(sb, item.displayName(), item.totalAmount(), item.formatStackCount(), item.usedByMachines());
+        }
+
+        return sb.toString();
+    }
+
+    private static void appendItemRow(StringBuilder sb, String displayName, int amount, String stacks, List<String> usedBy) {
+        sb.append(String.format(Locale.ROOT, "| %s | %d | %s | %s |\n",
+            displayName,
+            amount,
+            stacks,
+            String.join(", ", usedBy)
+        ));
+    }
+
     private void registerToBoMGoal() {
         if (cachedSummary == null) return;
-        com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().registerBoMGoal(cachedSummary);
+        MultiblockBOMSummary targetSummary = cachedSummary.filterPrepared(preparedItemIds);
+        if (targetSummary.totalUniqueItemTypes() == 0) {
+            if (Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.displayClientMessage(
+                    Component.translatable("message.gtcalcboard.bom_all_prepared"),
+                    true
+                );
+            }
+            return;
+        }
+        com.gtceu.calcboard.integration.spi.RecipeViewerRegistry.getActiveAdapter().registerBoMGoal(targetSummary);
     }
 
     private void playClickSound() {
         Minecraft.getInstance().getSoundManager().play(
             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F)
         );
+    }
+
+    private void toggleSectionPages(boolean isTeam, List<BOMPageEntry> entries) {
+        List<BOMPageEntry> sectionEntries = entries.stream()
+                .filter(e -> !e.isHeader() && e.isTeam() == isTeam)
+                .toList();
+        boolean allSelected = sectionEntries.stream().allMatch(e -> selectedPageKeys.contains(e.key()));
+        for (BOMPageEntry e : sectionEntries) {
+            if (allSelected) {
+                selectedPageKeys.remove(e.key());
+            } else {
+                selectedPageKeys.add(e.key());
+            }
+        }
     }
 }
 

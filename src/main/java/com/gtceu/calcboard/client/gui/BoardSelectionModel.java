@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.client.gui;
 
-import com.gtceu.calcboard.client.gui.widget.BoardToast;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
@@ -194,7 +194,7 @@ public class BoardSelectionModel {
         lastSelectedPort = null;
     }
 
-    public void selectAll(BoardScreen screen) {
+    public void selectAll(IBoardScreenContext screen) {
         clear();
         FlowGraph graph = screen.getGraph();
         if (graph != null) {
@@ -213,7 +213,7 @@ public class BoardSelectionModel {
         TutorialManager.getInstance().onSelectAll();
     }
 
-    public void deleteSelection(BoardScreen screen) {
+    public void deleteSelection(IBoardScreenContext screen) {
         if (isEmpty()) return;
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
@@ -303,17 +303,17 @@ public class BoardSelectionModel {
         }
 
         clear();
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
 
         for (RecipeNode n : removedNodes) {
             TutorialManager.getInstance().onNodeRemoved(n);
         }
 
-        BoardToast.show(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))));
+        screen.showToast(Component.literal("§c✖ ").append(Component.translatable("message.gtcalcboard.deleted_components", String.valueOf(count))));
     }
 
-    public void copySelection(BoardScreen screen) {
+    public void copySelection(IBoardScreenContext screen) {
         if (isEmpty()) {
             screen.getToolbarWidget().copyBlueprintToClipboard();
             return;
@@ -323,10 +323,10 @@ public class BoardSelectionModel {
 
         int count = size();
         NodeClipboard.getInstance().copy(graph, selectedNodeIds, selectedNoteIds, selectedFrameIds);
-        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copied_components", String.valueOf(count))));
+        screen.showToast(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.copied_components", String.valueOf(count))));
     }
 
-    public void pasteSelection(BoardScreen screen, double canvasX, double canvasY) {
+    public void pasteSelection(IBoardScreenContext screen, double canvasX, double canvasY) {
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
 
@@ -368,14 +368,14 @@ public class BoardSelectionModel {
             selectedFrameIds.add(frame.getId());
         }
 
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
         TutorialManager.getInstance().onPasted();
 
-        BoardToast.show(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.pasted_components", String.valueOf(res.size()))));
+        screen.showToast(Component.literal("§a✔ ").append(Component.translatable("message.gtcalcboard.pasted_components", String.valueOf(res.size()))));
     }
 
-    public void cutSelection(BoardScreen screen) {
+    public void cutSelection(IBoardScreenContext screen) {
         if (isEmpty()) return;
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;
@@ -445,14 +445,14 @@ public class BoardSelectionModel {
         }
 
         clear();
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
         TutorialManager.getInstance().onCut();
 
-        BoardToast.show(Component.literal("§6✂ ").append(Component.translatable("message.gtcalcboard.cut_components", String.valueOf(count))));
+        screen.showToast(Component.literal("§6✂ ").append(Component.translatable("message.gtcalcboard.cut_components", String.valueOf(count))));
     }
 
-    public void duplicateSelection(BoardScreen screen, double mouseX, double mouseY) {
+    public void duplicateSelection(IBoardScreenContext screen, double mouseX, double mouseY) {
         if (isEmpty()) return;
         FlowGraph graph = screen.getGraph();
         if (graph == null) return;

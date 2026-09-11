@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.client.gui.widget;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.client.update.ClientUpdateNotifier;
@@ -22,7 +22,7 @@ public class LeftActivityBarWidget {
     private static final int BTN_SIZE = 18;
     private static final int BTN_SPACING = 3;
 
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
 
     private int pagesBtnY;
     private int favoritesBtnY;
@@ -33,13 +33,13 @@ public class LeftActivityBarWidget {
     private int helpBtnY;
     private int settingsBtnY;
 
-    public LeftActivityBarWidget(BoardScreen screen) {
+    public LeftActivityBarWidget(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         int topY = screen.getHeaderBottomY();
-        int bottomY = screen.height - AdaptiveStatusBar.BAR_HEIGHT;
+        int bottomY = screen.getScreenHeight() - AdaptiveStatusBar.BAR_HEIGHT;
         int barHeight = bottomY - topY;
         if (barHeight <= 40) return;
 
@@ -259,7 +259,7 @@ public class LeftActivityBarWidget {
             NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, activePageId));
             NetworkHandler.sendToServer(new C2SPingPresencePacket(teamId, activePageId, true));
         }
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
     }
 
@@ -267,31 +267,31 @@ public class LeftActivityBarWidget {
         if (mouseX < 0 || mouseX > BAR_WIDTH) return;
 
         if (isHovered(mouseX, mouseY, 2, pagesBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.pages"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.pages"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (isHovered(mouseX, mouseY, 2, favoritesBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.favorites"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.favorites"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (isHovered(mouseX, mouseY, 2, blueprintsBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.blueprints"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.blueprints"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (com.gtceu.calcboard.api.util.ModCompatHelper.isBoMSupported() && isHovered(mouseX, mouseY, 2, bomBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.bom"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.bom"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (isHovered(mouseX, mouseY, 2, balanceBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.balance"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.balance"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (ClientWorkspaceState.getInstance().isCollaborationEnabled() && isHovered(mouseX, mouseY, 2, teamBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.team"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.team"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (isHovered(mouseX, mouseY, 2, helpBtnY)) {
-            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.help"), mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, Component.translatable("gui.gtcalcboard.activity_bar.help"), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
             return;
         }
         if (isHovered(mouseX, mouseY, 2, settingsBtnY)) {
@@ -299,7 +299,7 @@ public class LeftActivityBarWidget {
             if (ClientUpdateNotifier.getInstance().isBadgeVisible()) {
                 tooltip = tooltip.copy().append(" ").append(Component.translatable("gui.gtcalcboard.update.badge_tooltip", ClientUpdateNotifier.getInstance().getLatestVersion()));
             }
-            BoardTooltipRenderer.renderTooltip(graphics, font, tooltip, mouseX, mouseY, screen.width, screen.height);
+            BoardTooltipRenderer.renderTooltip(graphics, font, tooltip, mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
         }
     }
 
@@ -309,7 +309,7 @@ public class LeftActivityBarWidget {
 
     private boolean isInsideBar(double mouseY) {
         int topY = screen.getHeaderBottomY();
-        int bottomY = screen.height - AdaptiveStatusBar.BAR_HEIGHT;
+        int bottomY = screen.getScreenHeight() - AdaptiveStatusBar.BAR_HEIGHT;
         return mouseY >= topY && mouseY <= bottomY;
     }
 

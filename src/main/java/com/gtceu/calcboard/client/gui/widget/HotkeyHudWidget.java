@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.client.gui.widget;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.util.BoardScissorHelper;
 
 import net.minecraft.client.Minecraft;
@@ -14,7 +14,7 @@ import com.gtceu.calcboard.api.storage.BoardManager;
  * HUD overlay widget for rendering keyboard shortcut cheatsheet and quick action guides on the canvas.
  */
 public class HotkeyHudWidget {
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
     private boolean expanded;
 
     private static final int EXPANDED_WIDTH = 195;
@@ -22,7 +22,7 @@ public class HotkeyHudWidget {
 
     private double scrollY = 0;
 
-    public HotkeyHudWidget(BoardScreen screen) {
+    public HotkeyHudWidget(IBoardScreenContext screen) {
         this.screen = screen;
         this.expanded = BoardManager.getInstance().isHotkeyHudExpanded();
     }
@@ -50,8 +50,8 @@ public class HotkeyHudWidget {
         }
 
         Font font = Minecraft.getInstance().font;
-        int screenW = screen.width;
-        int screenH = screen.height;
+        int screenW = screen.getScreenWidth();
+        int screenH = screen.getScreenHeight();
 
         int bottomOffset = getBottomOffset();
         int panelX = getPanelX();
@@ -144,7 +144,7 @@ public class HotkeyHudWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!expanded) return false;
-        int screenH = screen.height;
+        int screenH = screen.getScreenHeight();
         int panelX = getPanelX();
         int panelH = Math.min(EXPANDED_HEIGHT, screenH - 24);
         int panelY = screenH - panelH - 8;
@@ -163,8 +163,8 @@ public class HotkeyHudWidget {
             return false;
         }
 
-        int screenW = screen.width;
-        int screenH = screen.height;
+        int screenW = screen.getScreenWidth();
+        int screenH = screen.getScreenHeight();
         int bottomOffset = getBottomOffset();
         int panelX = getPanelX();
         int panelH = Math.min(EXPANDED_HEIGHT, screenH - bottomOffset - 16);

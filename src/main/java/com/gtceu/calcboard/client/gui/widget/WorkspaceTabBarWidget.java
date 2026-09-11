@@ -1,30 +1,31 @@
 package com.gtceu.calcboard.client.gui.widget;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
-
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.team.ClientWorkspaceState;
 import com.gtceu.calcboard.network.NetworkHandler;
+import com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket;
 import com.gtceu.calcboard.network.packet.c2s.C2SRequestWorkspacePacket;
-import com.gtceu.calcboard.server.storage.TeamWorkspacePage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Top-level workspace tab bar widget for switching between [▪ Personal Board] and [▪ Team Board].
+ * Top bar widget for switching between Personal Workspace and Team Collaboration Workspace tabs.
  * Also renders live team presence and page lock status badges.
  */
 public class WorkspaceTabBarWidget {
 
     public static final int BAR_HEIGHT = 20;
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
 
-    public WorkspaceTabBarWidget(BoardScreen screen) {
+    public WorkspaceTabBarWidget(IBoardScreenContext screen) {
         this.screen = screen;
     }
 
@@ -72,14 +73,14 @@ public class WorkspaceTabBarWidget {
 
         // 3. Right-side Status Badges (Team mode only)
         if (isTeam) {
-            int rightX = screen.width - 6;
+            int rightX = screen.getScreenWidth() - 6;
 
             // Lock Status Badge
             String activePageId = state.getActiveTeamPageId();
             if (activePageId == null) activePageId = "page_main";
             var activePage = state.getRemotePage(activePageId);
             boolean isLockedByMe = state.doesHoldLock(activePageId);
-            boolean isLockedByOther = activePage != null && activePage.isLocked() && !isLockedByMe;
+            boolean isLockedByOther = activePage != null && activePage.isLocked() && !isLockedByMe && !state.isCurrentPlayer(activePage.getLockHolderUUID(), activePage.getLockHolderName());
 
             String lockBadge;
             int lockCol;
@@ -103,7 +104,9 @@ public class WorkspaceTabBarWidget {
 
             int lockW = font.width(lockBadge) + 10;
             rightX -= lockW;
-            graphics.fill(rightX, barY, rightX + lockW, barY + BAR_HEIGHT - 2, lockBg);
+            boolean lockHover = mouseX >= rightX && mouseX <= rightX + lockW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2;
+            int effectiveBg = lockHover ? (isLockedByMe ? 0xFF5A4822 : (isLockedByOther ? 0xFF5A2626 : 0xFF264E31)) : lockBg;
+            graphics.fill(rightX, barY, rightX + lockW, barY + BAR_HEIGHT - 2, effectiveBg);
             graphics.renderOutline(rightX, barY, lockW, BAR_HEIGHT - 2, lockCol);
             graphics.drawString(font, lockBadge, rightX + 5, barY + 5, lockCol, false);
 
@@ -128,14 +131,14 @@ public class WorkspaceTabBarWidget {
         if (!state.isCollaborationEnabled() || !state.isTeamMode()) return;
 
         int barY = 2;
-        int rightX = screen.width - 6;
+        int rightX = screen.getScreenWidth() - 6;
 
         // Lock Badge Width
         String activePageId = state.getActiveTeamPageId();
         if (activePageId == null) activePageId = "page_main";
         var activePage = state.getRemotePage(activePageId);
         boolean isLockedByMe = state.doesHoldLock(activePageId);
-        boolean isLockedByOther = activePage != null && activePage.isLocked() && !isLockedByMe;
+        boolean isLockedByOther = activePage != null && activePage.isLocked() && !isLockedByMe && !state.isCurrentPlayer(activePage.getLockHolderUUID(), activePage.getLockHolderName());
 
         String lockBadge;
         if (isLockedByMe) {
@@ -150,6 +153,23 @@ public class WorkspaceTabBarWidget {
         }
         int lockW = font.width(lockBadge) + 10;
         rightX -= lockW;
+
+        int lockLeft = rightX;
+        boolean lockHover = mouseX >= lockLeft && mouseX <= lockLeft + lockW && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2;
+        if (lockHover) {
+            List<Component> tooltipLines = new ArrayList<>();
+            if (isLockedByMe) {
+                tooltipLines.add(Component.translatable("gui.gtcalcboard.lock.editing_by_me"));
+            } else if (isLockedByOther) {
+                String holder = activePage.getLockHolderName() != null && !activePage.getLockHolderName().isEmpty()
+                        ? activePage.getLockHolderName()
+                        : state.resolvePlayerName(activePage.getLockHolderUUID());
+                tooltipLines.add(Component.translatable("gui.gtcalcboard.lock.locked_by", holder));
+            } else {
+                tooltipLines.add(Component.translatable("gui.gtcalcboard.lock.editable"));
+            }
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, Math.max(30, mouseY + 24), screen.getScreenWidth(), screen.getScreenHeight());
+        }
 
         // Online Presence Badge
         int onlineCount = Math.max(1, state.getActivePresence().size());
@@ -169,7 +189,7 @@ public class WorkspaceTabBarWidget {
                 tooltipLines.add(Component.literal("§7- §b" + member.getPlayerName() + " §8(§f" + pageDisplay + "§8)"));
             }
             // Pass mouseY + 24 to force the tooltip to render below the top bar and never clip at the top
-            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, Math.max(30, mouseY + 24), screen.width, screen.height);
+            com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer.renderComponentTooltip(graphics, font, tooltipLines, mouseX, Math.max(30, mouseY + 24), screen.getScreenWidth(), screen.getScreenHeight());
         }
     }
 
@@ -192,7 +212,7 @@ public class WorkspaceTabBarWidget {
                 state.setCurrentMode(ClientWorkspaceState.WorkspaceMode.LOCAL);
                 // Notify server that player left the team board
                 NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(state.getCurrentTeamId(), state.getActiveTeamPageId(), false));
-                screen.rebuildWidgets();
+                screen.rebuildBoardWidgets();
                 screen.markSummaryDirty();
             }
             return true;
@@ -219,10 +239,54 @@ public class WorkspaceTabBarWidget {
                 String activePageId = state.getActiveTeamPageId() != null ? state.getActiveTeamPageId() : "page_main";
                 NetworkHandler.sendToServer(new C2SRequestWorkspacePacket(teamId, activePageId));
                 NetworkHandler.sendToServer(new com.gtceu.calcboard.network.packet.c2s.C2SPingPresencePacket(teamId, activePageId, true));
-                screen.rebuildWidgets();
+                screen.rebuildBoardWidgets();
                 screen.markSummaryDirty();
             }
             return true;
+        }
+
+        // 3. Lock Badge Click (Acquire or Release edit lock)
+        if (state.isTeamMode()) {
+            int rightEdge = screen.getScreenWidth() - 6;
+            String activePageId = state.getActiveTeamPageId();
+            if (activePageId == null) activePageId = "page_main";
+            var activePage = state.getRemotePage(activePageId);
+            boolean isLockedByMe = state.doesHoldLock(activePageId);
+            boolean isLockedByOther = activePage != null && activePage.isLocked() && !isLockedByMe && !state.isCurrentPlayer(activePage.getLockHolderUUID(), activePage.getLockHolderName());
+
+            String lockBadge;
+            if (isLockedByMe) {
+                lockBadge = "✎ " + Component.translatable("gui.gtcalcboard.lock.editing_by_me").getString();
+            } else if (isLockedByOther) {
+                String holder = activePage.getLockHolderName() != null && !activePage.getLockHolderName().isEmpty()
+                        ? activePage.getLockHolderName()
+                        : state.resolvePlayerName(activePage.getLockHolderUUID());
+                lockBadge = "✕ " + Component.translatable("gui.gtcalcboard.lock.locked_by", holder).getString();
+            } else {
+                lockBadge = "● " + Component.translatable("gui.gtcalcboard.lock.editable").getString();
+            }
+            int lockW = font.width(lockBadge) + 10;
+            int lockLeft = rightEdge - lockW;
+
+            if (mouseX >= lockLeft && mouseX <= rightEdge && mouseY >= barY && mouseY <= barY + BAR_HEIGHT - 2) {
+                if (isLockedByOther) {
+                    String holder = activePage.getLockHolderName() != null && !activePage.getLockHolderName().isEmpty()
+                            ? activePage.getLockHolderName()
+                            : state.resolvePlayerName(activePage.getLockHolderUUID());
+                    BoardToast.show(Component.literal("§c✕ ").append(Component.translatable("gui.gtcalcboard.lock.locked_by", holder)));
+                    mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.VILLAGER_NO, 1.0F));
+                } else if (isLockedByMe) {
+                    state.autoCommitAndRelease(screen, activePageId);
+                    screen.rebuildBoardWidgets();
+                    screen.markSummaryDirty();
+                    mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                } else {
+                    screen.ensureEditPermission();
+                    screen.rebuildBoardWidgets();
+                    mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                }
+                return true;
+            }
         }
 
         return false;

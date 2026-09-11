@@ -51,10 +51,10 @@ public class NodeCountEditor {
                     ));
                     if (widget.getNode().isCompoundNode()) {
                         widget.getParent().getGraph().syncCompoundParameters(widget.getNode());
-                        widget.getParent().rebuildWidgets();
+                        widget.getParent().rebuildBoardWidgets();
                         widget.getParent().markSummaryDirty();
                     } else if (widget.getNode().isModule()) {
-                        widget.getParent().rebuildWidgets();
+                        widget.getParent().rebuildBoardWidgets();
                         widget.getParent().markSummaryDirty();
                     }
                 }

@@ -873,6 +873,17 @@ public class UiFormattingTest {
             FormatUtil.setActiveTimeUnit(RateTimeUnit.PER_SECOND);
         }
     }
+
+    @Test
+    public void testDeficitConnectedInputFormattingWithNominalDemand() {
+        IngredientStack fluid = IngredientStack.fluid(ResourceLocation.tryParse("gtceu:brown"), "Brown", 20000.0, 1.0);
+        String formatted = FormatUtil.formatConnectedInput(4000.0, 20000.0, fluid, true);
+
+        Assertions.assertTrue(formatted.contains("+4") || formatted.contains("+4.00"));
+        Assertions.assertTrue(formatted.contains("-20") || formatted.contains("-20.00"));
+        Assertions.assertTrue(formatted.contains("⚠"));
+        Assertions.assertFalse(formatted.contains("-4.00 B/s") || formatted.contains("-4 B/s"));
+    }
 }
 
 

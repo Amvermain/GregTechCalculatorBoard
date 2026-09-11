@@ -4,8 +4,8 @@ import com.gtceu.calcboard.api.storage.BoardPage;
 import com.gtceu.calcboard.api.type.FluidUnitMode;
 import com.gtceu.calcboard.api.type.RateTimeUnit;
 import com.gtceu.calcboard.api.util.ModCompatHelper;
-import com.gtceu.calcboard.client.gui.BoardScreen;
 import com.gtceu.calcboard.client.gui.action.ToolbarActionHandler;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import com.gtceu.calcboard.client.gui.tutorial.TutorialManager;
 import com.gtceu.calcboard.client.gui.util.FormatUtil;
@@ -27,7 +27,7 @@ import java.util.*;
  * Top horizontal toolbar widget managing quick access buttons, layout modes, tools, and dropdown menus.
  */
 public class ToolbarWidget {
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
     private final ToolbarActionHandler actionHandler;
 
     public enum DropdownMenu {
@@ -59,7 +59,7 @@ public class ToolbarWidget {
     private int closeBtnX, closeBtnW = 18;
     private int tbX, tbY, tbW, tbH = 18;
 
-    public ToolbarWidget(BoardScreen screen) {
+    public ToolbarWidget(IBoardScreenContext screen) {
         this.screen = screen;
         this.actionHandler = new ToolbarActionHandler(screen);
     }
@@ -78,7 +78,7 @@ public class ToolbarWidget {
         com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 
         Font font = Minecraft.getInstance().font;
-        int width = screen.width;
+        int width = screen.getScreenWidth();
 
         this.tbX = screen.getDynamicLeftMargin();
         this.tbY = screen.getToolbarY();
@@ -243,7 +243,7 @@ public class ToolbarWidget {
 
         buildCurrentDropdownItems();
         int popupH = currentDropdownItems.size() * 18 + 4;
-        int px = Math.min(dropdownX, screen.width - dropdownW - 8);
+        int px = Math.min(dropdownX, screen.getScreenWidth() - dropdownW - 8);
         int py = tbY + tbH + 2;
 
         graphics.pose().pushPose();
@@ -338,7 +338,7 @@ public class ToolbarWidget {
         currentDropdownItems.add(new DropdownItem(slimLabel, null, () -> {
             BoardManager.getInstance().setSlimCardMode(!BoardManager.getInstance().isSlimCardMode());
             BoardManager.getInstance().saveForCurrentContext();
-            screen.rebuildWidgets();
+            screen.rebuildBoardWidgets();
             screen.markSummaryDirty();
         }, true));
     }
@@ -415,7 +415,7 @@ public class ToolbarWidget {
         }
 
         int popupH = currentDropdownItems.size() * 18 + 4;
-        int px = Math.min(dropdownX, screen.width - dropdownW - 8);
+        int px = Math.min(dropdownX, screen.getScreenWidth() - dropdownW - 8);
         int py = tbY + tbH + 2;
 
         if (mouseX < px || mouseX > px + dropdownW || mouseY < py || mouseY > py + popupH) {
@@ -526,7 +526,7 @@ public class ToolbarWidget {
             int curBtnW = getActiveDropdownButtonW();
             boolean overBtn = mouseX >= curBtnX - 2 && mouseX <= curBtnX + curBtnW + 2 && mouseY >= tbY - 2 && mouseY <= tbY + tbH + 3;
 
-            int px = Math.min(dropdownX, screen.width - dropdownW - 8);
+            int px = Math.min(dropdownX, screen.getScreenWidth() - dropdownW - 8);
             int py = tbY + tbH + 2;
             int popupH = currentDropdownItems.size() * 18 + 4;
             boolean overPopup = mouseX >= px - 4 && mouseX <= px + dropdownW + 4 && mouseY >= py - 4 && mouseY <= py + popupH + 4;
@@ -592,7 +592,7 @@ public class ToolbarWidget {
         actionHandler.performAutoConnect();
     }
 
-    public static void performAutoConnectWithFilter(BoardScreen screen, Set<ResourceLocation> allowedItemIds) {
+    public static void performAutoConnectWithFilter(IBoardScreenContext screen, Set<ResourceLocation> allowedItemIds) {
         ToolbarActionHandler.performAutoConnectWithFilter(screen, allowedItemIds);
     }
 

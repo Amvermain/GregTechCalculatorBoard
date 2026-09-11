@@ -97,13 +97,13 @@ public class ClientWorkspaceState {
         }
     }
 
-    public void autoCommitAndRelease(com.gtceu.calcboard.client.gui.BoardScreen screen, String pageId) {
+    public void autoCommitAndRelease(com.gtceu.calcboard.client.gui.api.IBoardScreenContext screen, String pageId) {
         if (pageId == null) pageId = getActiveTeamPageId();
         if (screen != null && isPageDirty(pageId)) {
             UUID teamId = getCurrentTeamId() != null ? getCurrentTeamId() : (net.minecraft.client.Minecraft.getInstance().player != null ? net.minecraft.client.Minecraft.getInstance().player.getUUID() : UUID.randomUUID());
             TeamWorkspacePage remotePage = getRemotePage(pageId);
             String pageTitle = (remotePage != null && remotePage.getTitle() != null) ? remotePage.getTitle() : "Main Workspace";
-            int rev = getGlobalRevision();
+            int rev = (remotePage != null) ? remotePage.getPageRevision() : 1;
 
             FlowGraph graph = screen.getGraph();
             net.minecraft.nbt.CompoundTag tag = graph.serializeNBT();
@@ -267,6 +267,8 @@ public class ClientWorkspaceState {
             if (pageId.equals(activeTeamPageId)) {
                 bs.rebuildWidgets();
                 bs.markSummaryDirty();
+            } else if (bs.getMultiblockBOMDialog() != null && bs.getMultiblockBOMDialog().isVisible()) {
+                bs.getMultiblockBOMDialog().markDirty();
             }
         }
     }
@@ -304,6 +306,12 @@ public class ClientWorkspaceState {
                 page.setLockHolderUUID(pm.getLockHolderUUID());
                 page.setLockHolderName(pm.getLockHolderName());
                 page.setLockExpiresTimestamp(pm.getLockExpiresTimestamp());
+
+                if (page.isLocked() && isCurrentPlayer(pm.getLockHolderUUID(), pm.getLockHolderName())) {
+                    myHeldLocks.put(pm.getPageId(), true);
+                } else if (!page.isLocked() || (pm.getLockHolderUUID() != null && !isCurrentPlayer(pm.getLockHolderUUID(), pm.getLockHolderName()))) {
+                    myHeldLocks.remove(pm.getPageId());
+                }
             }
 
             // Remove deleted pages
@@ -327,6 +335,9 @@ public class ClientWorkspaceState {
         if (pages != null && !pages.isEmpty()) {
             for (TeamWorkspacePage p : pages) {
                 remotePages.put(p.getPageId(), p);
+                if (p.isLocked() && isCurrentPlayer(p.getLockHolderUUID(), p.getLockHolderName())) {
+                    myHeldLocks.put(p.getPageId(), true);
+                }
                 if (p.getCompressedGraphData() != null && p.getCompressedGraphData().length > 0) {
                     try {
                         CompoundTag tag = BlueprintCodec.decompressTag(p.getCompressedGraphData());
@@ -382,8 +393,34 @@ public class ClientWorkspaceState {
         return "Teammate";
     }
 
+    public boolean isCurrentPlayer(UUID lockHolderUUID, String lockHolderName) {
+        if (lockHolderUUID == null && (lockHolderName == null || lockHolderName.isEmpty())) {
+            return false;
+        }
+        try {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.player != null) {
+                UUID myUUID = mc.player.getUUID();
+                if (myUUID != null && myUUID.equals(lockHolderUUID)) {
+                    return true;
+                }
+                String myName = mc.player.getGameProfile().getName();
+                return myName != null && !myName.isEmpty() && myName.equalsIgnoreCase(lockHolderName);
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     public boolean doesHoldLock(String pageId) {
-        return Boolean.TRUE.equals(myHeldLocks.get(pageId));
+        if (Boolean.TRUE.equals(myHeldLocks.get(pageId))) {
+            return true;
+        }
+        TeamWorkspacePage page = remotePages.get(pageId);
+        if (page != null && page.isLocked() && isCurrentPlayer(page.getLockHolderUUID(), page.getLockHolderName())) {
+            myHeldLocks.put(pageId, true);
+            return true;
+        }
+        return false;
     }
 
     public void setLockHeld(String pageId, boolean held) {

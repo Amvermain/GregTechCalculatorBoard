@@ -6,7 +6,7 @@ import com.gtceu.calcboard.api.model.FlowGraph;
 import com.gtceu.calcboard.api.model.IngredientStack;
 import com.gtceu.calcboard.api.model.RecipeNode;
 import com.gtceu.calcboard.api.type.GTVoltageTier;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.widget.BoardToast;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.recipe.EmiRecipe;
@@ -26,7 +26,7 @@ public final class EmiFavoritesNodeSpawner {
 
     private EmiFavoritesNodeSpawner() {}
 
-    public static void spawnFavoriteNode(BoardScreen screen, EmiFavorite fav, double canvasX, double canvasY) {
+    public static void spawnFavoriteNode(IBoardScreenContext screen, EmiFavorite fav, double canvasX, double canvasY) {
         RecipeNode node = resolveRecipeNode(fav);
         if (node == null) return;
 
@@ -41,11 +41,11 @@ public final class EmiFavoritesNodeSpawner {
             SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
         );
 
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
     }
 
-    public static void spawnRecipeNode(BoardScreen screen, EmiRecipe recipe, double canvasX, double canvasY) {
+    public static void spawnRecipeNode(IBoardScreenContext screen, EmiRecipe recipe, double canvasX, double canvasY) {
         CompoundRecipeBuilder.CompoundCluster cluster =
                 EmiStepRecipeDetector.tryDetectAndBuild(recipe, null, canvasX, canvasY);
         if (cluster != null && !cluster.nodes().isEmpty()) {
@@ -63,7 +63,7 @@ public final class EmiFavoritesNodeSpawner {
             Minecraft.getInstance().getSoundManager().play(
                 SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
             );
-            screen.rebuildWidgets();
+            screen.rebuildBoardWidgets();
             screen.markSummaryDirty();
             return;
         }
@@ -82,7 +82,7 @@ public final class EmiFavoritesNodeSpawner {
             SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.2F)
         );
 
-        screen.rebuildWidgets();
+        screen.rebuildBoardWidgets();
         screen.markSummaryDirty();
     }
 

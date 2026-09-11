@@ -3,7 +3,7 @@ package com.gtceu.calcboard.client.gui.widget;
 import com.gtceu.calcboard.api.model.CanvasGroupFrame;
 import com.gtceu.calcboard.api.model.CanvasStickyNote;
 import com.gtceu.calcboard.api.model.RecipeNode;
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.render.BoardTooltipRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -26,7 +26,7 @@ public class SelectionFloatingToolbarWidget {
     private static final int BTN_HEIGHT = 16;
     private static final int BTN_SPACING = 3;
 
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
     private final List<ToolbarAction> actions = new ArrayList<>();
     private final List<ButtonSlot> buttonSlots = new ArrayList<>();
 
@@ -54,7 +54,7 @@ public class SelectionFloatingToolbarWidget {
         }
     }
 
-    public SelectionFloatingToolbarWidget(BoardScreen screen) {
+    public SelectionFloatingToolbarWidget(IBoardScreenContext screen) {
         this.screen = screen;
         initActions();
     }
@@ -124,7 +124,7 @@ public class SelectionFloatingToolbarWidget {
         double[] bounds = computeSelectionCanvasBounds();
         if (bounds == null) return false;
 
-        boolean compact = screen.width < 540;
+        boolean compact = screen.getScreenWidth() < 540;
         calculateButtonPositions(font, compact);
         positionToolbar(bounds);
         return true;
@@ -133,8 +133,7 @@ public class SelectionFloatingToolbarWidget {
     private boolean isSuppressed() {
         if (screen == null || screen.isAnyModalOpen()) return true;
         if (screen.getSelectedNodeIds().size() < 2 && getSelectedEntityTotal() < 2) return true;
-        return screen.getCanvasHandler() != null
-                && screen.getCanvasHandler().getSelectionHandler().isBoxSelecting();
+        return screen.isBoxSelecting();
     }
 
     private int getSelectedEntityTotal() {
@@ -213,7 +212,7 @@ public class SelectionFloatingToolbarWidget {
         int targetY = (int) Math.round(screenTopY - BAR_HEIGHT - 8);
 
         int minAllowedY = screen.getHeaderBottomY() + 6;
-        int maxAllowedY = screen.height - AdaptiveStatusBar.BAR_HEIGHT - BAR_HEIGHT - 6;
+        int maxAllowedY = screen.getScreenHeight() - AdaptiveStatusBar.BAR_HEIGHT - BAR_HEIGHT - 6;
 
         if (targetY < minAllowedY) {
             targetY = (int) Math.round(screenBottomY + 8);
@@ -221,7 +220,7 @@ public class SelectionFloatingToolbarWidget {
         targetY = Math.max(minAllowedY, Math.min(maxAllowedY, targetY));
 
         int minAllowedX = LeftActivityBarWidget.BAR_WIDTH + 6;
-        int maxAllowedX = screen.width - barWidth - screen.getSummaryRightOffset() - 6;
+        int maxAllowedX = screen.getScreenWidth() - barWidth - screen.getSummaryRightOffset() - 6;
         targetX = Math.max(minAllowedX, Math.min(maxAllowedX, targetX));
 
         this.barX = targetX;
@@ -254,7 +253,7 @@ public class SelectionFloatingToolbarWidget {
     }
 
     private void renderButtons(GuiGraphics graphics, Font font, int mouseX, int mouseY) {
-        boolean compact = screen.width < 540;
+        boolean compact = screen.getScreenWidth() < 540;
         for (ButtonSlot slot : buttonSlots) {
             boolean hovered = slot.isHovered(mouseX, mouseY);
             renderSingleButton(graphics, font, slot, hovered, compact);
@@ -298,7 +297,7 @@ public class SelectionFloatingToolbarWidget {
         if (!visible) return;
         for (ButtonSlot slot : buttonSlots) {
             if (slot.isHovered(mouseX, mouseY)) {
-                BoardTooltipRenderer.renderTooltip(graphics, font, slot.action.tooltip(), mouseX, mouseY, screen.width, screen.height);
+                BoardTooltipRenderer.renderTooltip(graphics, font, slot.action.tooltip(), mouseX, mouseY, screen.getScreenWidth(), screen.getScreenHeight());
                 return;
             }
         }

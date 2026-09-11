@@ -1,6 +1,6 @@
 package com.gtceu.calcboard.integration.emi;
 
-import com.gtceu.calcboard.client.gui.BoardScreen;
+import com.gtceu.calcboard.client.gui.api.IBoardScreenContext;
 import com.gtceu.calcboard.client.gui.search.RecipeFilterConfig;
 import com.gtceu.calcboard.client.gui.search.RecipeHoverPreviewRenderer;
 import com.gtceu.calcboard.client.gui.widget.FavoritesDockWidget;
@@ -32,7 +32,7 @@ import java.util.*;
 public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
 
     private final FavoritesDockWidget parent;
-    private final BoardScreen screen;
+    private final IBoardScreenContext screen;
 
     private double scrollY = 0;
     private double maxScrollY = 0;
@@ -69,7 +69,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
 
     private static final Map<EmiFavorite, List<EmiRecipe>> FAVORITE_RECIPES_CACHE = new WeakHashMap<>();
 
-    public EmiFavoritesDockImpl(FavoritesDockWidget parent, BoardScreen screen) {
+    public EmiFavoritesDockImpl(FavoritesDockWidget parent, IBoardScreenContext screen) {
         this.parent = parent;
         this.screen = screen;
         RecipeFilterConfig.getInstance().addChangeListener(this::onFilterConfigChanged);
@@ -82,7 +82,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
             if (activeFlyoutRecipes.isEmpty()) {
                 closeFlyout();
             } else {
-                int subH = screen.height - 40;
+                int subH = screen.getScreenHeight() - 40;
                 int totalH = activeFlyoutRecipes.size() * SUB_ROW_HEIGHT;
                 int listH = subH - HEADER_HEIGHT - 4;
                 subMaxScrollY = Math.max(0, totalH - listH);
@@ -92,7 +92,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
     }
 
     FavoritesDockWidget getParent() { return parent; }
-    BoardScreen getScreen() { return screen; }
+    public IBoardScreenContext getScreen() { return screen; }
     int getDockX() { return LeftActivityBarWidget.BAR_WIDTH; }
     int getDockY() { return screen.getFavoritesDockY(); }
 
@@ -332,8 +332,8 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
         EmiRecipe activeEmi = (activePreviewRecipe != null) ? activePreviewRecipe : (hoveredFavorite != null && hoveredFavorite.getRecipe() != null ? hoveredFavorite.getRecipe() : null);
         if (activeEmi == null) return false;
 
-        int screenW = screen.width;
-        int screenH = screen.height;
+        int screenW = screen.getScreenWidth();
+        int screenH = screen.getScreenHeight();
         double mouseX = screen.getLastMouseX();
         double mouseY = screen.getLastMouseY();
 
@@ -354,7 +354,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
                 }
             }
             if (keyCode == GLFW.GLFW_KEY_SPACE || keyCode == GLFW.GLFW_KEY_ENTER) {
-                double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+                double[] pos = screen.getScreenCenterCanvasPosition();
                 EmiFavoritesNodeSpawner.spawnRecipeNode(screen, activeEmi, pos[0], pos[1]);
                 return true;
             }
@@ -369,7 +369,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
         }
 
         int dockY = getDockY();
-        int maxH = Math.min(240, screen.height - dockY - 60);
+        int maxH = Math.min(240, screen.getScreenHeight() - dockY - 60);
 
         if (button == 0 && mouseX >= getDockX() && mouseX <= getDockX() + EXPANDED_WIDTH && mouseY >= dockY && mouseY <= dockY + HEADER_HEIGHT) {
             parent.toggle();
@@ -408,8 +408,8 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
         int activeEmiRowY = (activePreviewRecipe != null) ? activePreviewRowY : hoveredFavRowY;
         int subX = getDockX() + EXPANDED_WIDTH + 3;
         int previewAnchorX = (activeFlyoutFavorite != null) ? (subX + SUB_WIDTH + 6) : (getDockX() + EXPANDED_WIDTH + 6);
-        int screenW = screen.width;
-        int screenH = screen.height;
+        int screenW = screen.getScreenWidth();
+        int screenH = screen.getScreenHeight();
 
         int[] bounds = RecipeHoverPreviewRenderer.calculateEmiPreviewBounds(activeEmi, previewAnchorX, activeEmiRowY, screenW, screenH);
         if (bounds == null || mouseX < bounds[0] || mouseX > bounds[0] + bounds[2] || mouseY < bounds[1] || mouseY > bounds[1] + bounds[3]) {
@@ -429,7 +429,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
         }
 
         if (button == 0) {
-            double[] pos = BoardScreen.getNextNodeCenterPosition(screenW, screenH);
+            double[] pos = screen.getScreenCenterCanvasPosition();
             EmiFavoritesNodeSpawner.spawnRecipeNode(screen, activeEmi, pos[0], pos[1]);
             return true;
         }
@@ -461,7 +461,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
                 boolean addHover = mouseX >= addBtnX && mouseX <= addBtnX + 18 && mouseY >= addBtnY && mouseY <= addBtnY + 16;
 
                 if (button == 0 && addHover) {
-                    double[] pos = BoardScreen.getNextNodeCenterPosition(screen.width, screen.height);
+                    double[] pos = screen.getScreenCenterCanvasPosition();
                     EmiFavoritesNodeSpawner.spawnRecipeNode(screen, recipe, pos[0], pos[1]);
                     return true;
                 }
@@ -582,7 +582,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
     private void updateMainScrollBarDrag(double mouseY) {
         if (maxScrollY <= 0) return;
         int dockY = getDockY();
-        int maxH = Math.min(240, screen.height - dockY - 60);
+        int maxH = Math.min(240, screen.getScreenHeight() - dockY - 60);
         int listY = dockY + HEADER_HEIGHT + 2;
         int listH = maxH - HEADER_HEIGHT - 4;
         int totalH = getFavorites().size() * ROW_HEIGHT;
@@ -595,7 +595,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
     private void updateSubScrollBarDrag(double mouseY) {
         if (subMaxScrollY <= 0 || activeFlyoutFavorite == null) return;
         int dockY = getDockY();
-        int maxH = Math.min(240, screen.height - dockY - 60);
+        int maxH = Math.min(240, screen.getScreenHeight() - dockY - 60);
         int listY = dockY + HEADER_HEIGHT + 2;
         int listH = maxH - HEADER_HEIGHT - 4;
         int totalH = activeFlyoutRecipes.size() * SUB_ROW_HEIGHT;
@@ -619,7 +619,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
                 double canvasY = screen.toCanvasY(mouseY);
                 EmiFavoritesNodeSpawner.spawnRecipeNode(screen, draggingFlyoutRecipe, canvasX, canvasY);
             } else {
-                double[] pos = BoardScreen.getNextNodeCenterPosition(screen.width, screen.height);
+                double[] pos = screen.getScreenCenterCanvasPosition();
                 EmiFavoritesNodeSpawner.spawnRecipeNode(screen, draggingFlyoutRecipe, pos[0], pos[1]);
             }
             draggingFlyoutRecipe = null;
@@ -635,7 +635,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
                 EmiFavoritesNodeSpawner.spawnFavoriteNode(screen, draggingFavorite, canvasX, canvasY);
             } else {
                 if (draggingFavorite.getRecipe() != null) {
-                    double[] pos = BoardScreen.getNextNodeCenterPosition(screen.width, screen.height);
+                    double[] pos = screen.getScreenCenterCanvasPosition();
                     EmiFavoritesNodeSpawner.spawnFavoriteNode(screen, draggingFavorite, pos[0], pos[1]);
                 } else {
                     activeFlyoutFavorite = draggingFavorite;
@@ -654,7 +654,7 @@ public class EmiFavoritesDockImpl implements IFavoritesDockHandler {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!parent.isExpanded()) return false;
         int dockY = getDockY();
-        int maxH = Math.min(240, screen.height - dockY - 60);
+        int maxH = Math.min(240, screen.getScreenHeight() - dockY - 60);
 
         int subX = getDockX() + EXPANDED_WIDTH + 3;
         if (activeFlyoutFavorite != null && !activeFlyoutRecipes.isEmpty()) {
